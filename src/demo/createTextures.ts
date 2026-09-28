@@ -1,0 +1,65 @@
+import Phaser from 'phaser';
+import { demoLimbColors } from './demoLimbColors.js';
+
+const outline = 0x3e433c;
+
+/** Temporary transparent cutouts, generated locally without an asset pipeline. */
+export function createTextures(scene: Phaser.Scene): void {
+  const graphics = scene.add.graphics();
+  const piece = (key: string, width: number, height: number, color: number, detail?: () => void): void => {
+    if (scene.textures.exists(key)) return;
+    graphics.clear();
+    graphics.fillStyle(color).lineStyle(2, outline, 0.9);
+    graphics.fillRoundedRect(2, 2, width - 4, height - 4, Math.min(width / 3, 12));
+    graphics.strokeRoundedRect(2, 2, width - 4, height - 4, Math.min(width / 3, 12));
+    // Fixed flecks suggest paper grain without adding noise to joint silhouettes.
+    graphics.fillStyle(0xffffff, 0.16);
+    for (let index = 0; index < 20; index += 1) {
+      const x = 5 + ((index * 17 + 7) % Math.max(1, width - 10));
+      const y = 5 + ((index * 23 + 3) % Math.max(1, height - 10));
+      graphics.fillRect(x, y, 2, 1);
+    }
+    detail?.();
+    graphics.generateTexture(key, width, height);
+  };
+  const pin = (x: number, y: number): void => {
+    graphics.fillStyle(0xf1ddad).fillCircle(x, y, 4);
+    graphics.lineStyle(1, outline, 0.65).strokeCircle(x, y, 4);
+    graphics.fillStyle(outline).fillCircle(x, y, 1);
+  };
+  piece('paper-torso', 82, 105, 0x698e83, () => {
+    graphics.lineStyle(1, 0xe8ecdd, 0.6).lineBetween(41, 12, 41, 95);
+    pin(41, 97);
+  });
+  piece('paper-pelvis', 68, 40, 0x4e7067, () => {
+    graphics.fillStyle(0xdec29a).fillRect(4, 6, 60, 8);
+    pin(34, 16);
+  });
+  piece('paper-head', 60, 68, 0xe7c69b, () => {
+    graphics.fillStyle(outline).fillCircle(22, 27, 2).fillCircle(41, 27, 2);
+    graphics.lineStyle(2, outline, 0.8).lineBetween(28, 43, 37, 43);
+    graphics.fillStyle(0xbd7355, 0.4).fillCircle(16, 36, 4).fillCircle(47, 36, 4);
+    pin(30, 58.48);
+  });
+  for (const side of ['left', 'right'] as const) {
+    const armColor = demoLimbColors[`${side}Arm`].color;
+    const legColor = demoLimbColors[`${side}Leg`].color;
+    piece(`paper-${side}-upper-arm`, 28, 78, armColor, () => { pin(14, 12); });
+    piece(`paper-${side}-forearm`, 24, 67, armColor, () => { pin(12, 12); });
+    piece(`paper-${side}-hand`, 26, 34, armColor, () => { pin(13, 6.8); });
+    piece(`paper-${side}-thigh`, 34, 88, legColor, () => { pin(17, 14); });
+    piece(`paper-${side}-shin`, 28, 80, legColor, () => { pin(14, 12); });
+    piece(`paper-${side}-foot`, 52, 26, legColor, () => { pin(14.56, 7.8); });
+  }
+
+  if (!scene.textures.exists('paper-prop')) {
+    graphics.clear();
+    graphics.fillStyle(0x7f634a).fillRoundedRect(2, 2, 6, 92, 2);
+    graphics.fillStyle(0xcc744f);
+    graphics.fillTriangle(8, 5, 62, 12, 8, 40);
+    graphics.lineStyle(1, outline, 0.8).strokeTriangle(8, 5, 62, 12, 8, 40);
+    graphics.lineStyle(1, 0xf5dcb0, 0.8).lineBetween(12, 12, 40, 16);
+    graphics.generateTexture('paper-prop', 66, 96);
+  }
+  graphics.destroy();
+}
