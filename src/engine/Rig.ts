@@ -19,6 +19,10 @@ export class Rig {
         assertFinite(createTransform(bone)[property], `${bone.id}.${property}`);
       }
       assertFinite(bone.depth ?? 0, `${bone.id}.depth`);
+      if (bone.length !== undefined) {
+        assertFinite(bone.length, `${bone.id}.length`);
+        if (bone.length < 0) throw new Error(`${bone.id}.length cannot be negative.`);
+      }
       if (bone.sprite) {
         if (!bone.sprite.texture) throw new Error(`Bone "${bone.id}" needs a texture key.`);
         for (const [property, value] of Object.entries(bone.sprite)) {
@@ -45,6 +49,22 @@ export class Rig {
       if (bone.parent !== undefined && !this.definitions.has(bone.parent)) {
         throw new Error(`Unknown parent "${bone.parent}" of bone "${bone.id}".`);
       }
+    }
+
+    // Explicit lengths define the logical skeleton, rather than asking IK to
+    // solve lengths that disagree with the rendered child joint positions.
+    for (const bone of this.definitions.values()) {
+      if (bone.parent === undefined) continue;
+      const length = this.getBone(bone.parent).length;
+      if (length === undefined) continue;
+      const x = bone.x ?? 0;
+      const y = bone.y ?? 0;
+      const distance = Math.hypot(x, y);
+      this.definitions.set(bone.id, Object.freeze({
+        ...bone,
+        x: distance > 0 ? x / distance * length : 0,
+        y: distance > 0 ? y / distance * length : length,
+      }));
     }
 
     const ordered: BoneDefinition[] = [];

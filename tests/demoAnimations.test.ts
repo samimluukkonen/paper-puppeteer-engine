@@ -65,6 +65,28 @@ for (const facing of ['left', 'right'] as const) {
   });
 }
 
+for (const facing of ['left', 'right'] as const) {
+  test(`sword stance uses the idle lower-body pose facing ${facing}, even after walking`, () => {
+    const { rig, joints, player } = fixture();
+    const lowerBody = [
+      'pelvis', 'leftThigh', 'leftLowerLeg', 'leftFoot',
+      'rightThigh', 'rightLowerLeg', 'rightFoot',
+    ];
+    const poseAt = (clip: 'idle' | 'sword', time: number) => {
+      player.play(clip);
+      player.sample(time);
+      for (const [id, x] of Object.entries(demoHipPositions(rig, facing))) joints.get(id)!.pose.x = x;
+      return lowerBody.map(id => ({ id, pose: { ...joints.get(id)!.pose } }));
+    };
+    for (const time of [0, 250, 900, 1400, 1800]) {
+      const idlePose = poseAt('idle', time);
+      player.play('walk');
+      player.sample(750);
+      assert.deepEqual(poseAt('sword', time), idlePose);
+    }
+  });
+}
+
 for (const clip of demoAnimations) {
   for (const facing of ['left', 'right'] as const) {
     test(`${clip.name} bends both knees backward when facing ${facing}`, () => {

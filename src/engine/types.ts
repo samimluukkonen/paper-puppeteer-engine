@@ -27,6 +27,8 @@ export interface SpriteDefinition {
 export interface BoneDefinition extends Partial<JointTransform> {
   id: string;
   parent?: string;
+  /** Logical distance to direct child joints, independent of sprite dimensions. */
+  length?: number;
   sprite?: SpriteDefinition;
   /** Render order among siblings; an entire child subtree shares this order. */
   depth?: number;

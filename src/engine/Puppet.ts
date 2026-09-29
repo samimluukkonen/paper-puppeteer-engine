@@ -5,6 +5,10 @@ import { Bone } from './Bone.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
+import { IKDebug } from './ik/IKDebug.js';
+import { IKPoseState } from './ik/IKPoseState.js';
+import { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
+import type { IKTarget, TwoBoneIKDefinition } from './ik/types.js';
 import { assertFinite } from './types.js';
 import type { AttachmentOptions, Facing, RigDefinition } from './types.js';
 
@@ -17,6 +21,8 @@ export interface PuppetOptions {
   facing?: Facing;
   animations?: readonly AnimationClip[];
   debug?: boolean;
+  ik?: readonly TwoBoneIKDefinition[];
+  ikDebug?: boolean;
   /** Disable if the host calls update(deltaMilliseconds) itself. */
   autoUpdate?: boolean;
 }
@@ -29,6 +35,9 @@ export class Puppet {
   private readonly attachments = new Map<Phaser.GameObjects.GameObject, Phaser.GameObjects.Container>();
   private readonly debugView: PuppetDebug;
   private readonly renderer: PuppetRenderer;
+  private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
+  private readonly ikPose = new IKPoseState();
+  private readonly ikDebugView: IKDebug;
   private facing: Facing;
   private destroyed = false;
 
@@ -57,9 +66,12 @@ export class Puppet {
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones);
     for (const clip of options.animations ?? []) this.addAnimation(clip);
     this.debugView = new PuppetDebug(scene, this.bones);
+    this.ikDebugView = new IKDebug(scene, this.bones);
+    for (const definition of options.ik ?? []) this.addIK(definition);
     this.facing = options.facing ?? 'right';
     this.setFacing(this.facing);
     this.setDebug(options.debug ?? false);
+    this.setIKDebug(options.ikDebug ?? false);
     if (options.autoUpdate !== false) scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.container.once(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
@@ -68,6 +80,7 @@ export class Puppet {
   get currentAnimation(): string | undefined { return this.animationPlayer.currentAnimation; }
   get isPlaying(): boolean { return this.animationPlayer.isPlaying; }
   get isDebug(): boolean { return this.debugView.container.visible; }
+  get isIKDebug(): boolean { return this.ikDebugView.container.visible; }
   get facingDirection(): Facing { return this.facing; }
 
   getBone(id: string): Bone {
@@ -78,6 +91,7 @@ export class Puppet {
 
   setBoneRotation(id: string, rotation: number): this {
     assertFinite(rotation, `${id}.rotation`);
+    this.preparePose();
     const bone = this.getBone(id);
     bone.pose.rotation = rotation;
     this.syncPose();
@@ -90,6 +104,7 @@ export class Puppet {
   }
 
   play(name: string): this {
+    this.preparePose();
     this.animationPlayer.play(name);
     this.syncPose();
     return this;
@@ -101,12 +116,14 @@ export class Puppet {
   }
 
   restart(): this {
+    this.preparePose();
     this.animationPlayer.restart();
     this.syncPose();
     return this;
   }
 
   resetPose(): this {
+    this.preparePose();
     this.stop();
     this.animationPlayer.resetPose();
     this.syncPose();
@@ -118,7 +135,7 @@ export class Puppet {
     this.facing = facing;
     // Mirror outside the animated skeleton, preserving every local joint angle.
     this.container.scaleX = Math.abs(this.container.scaleX) * (facing === 'left' ? -1 : 1);
-    this.debugView.update();
+    this.syncPose();
     return this;
   }
 
@@ -170,6 +187,38 @@ export class Puppet {
     return this;
   }
 
+  addIK(definition: TwoBoneIKDefinition): TwoBoneIKConstraint {
+    if (this.ikConstraints.has(definition.name)) {
+      throw new Error(`IK "${definition.name}" is already registered.`);
+    }
+    const constraint = new TwoBoneIKConstraint(definition, this.rig, this.bones);
+    this.ikConstraints.set(constraint.name, constraint);
+    return constraint;
+  }
+
+  getIK(name: string): TwoBoneIKConstraint {
+    const constraint = this.ikConstraints.get(name);
+    if (!constraint) throw new Error(`Unknown IK "${name}".`);
+    return constraint;
+  }
+
+  setIKTarget(name: string, target: IKTarget): this;
+  setIKTarget(name: string, x: number, y: number): this;
+  setIKTarget(name: string, targetOrX: IKTarget | number, y?: number): this {
+    const constraint = this.getIK(name);
+    if (typeof targetOrX === 'number') {
+      if (y === undefined) throw new Error('IK target needs x and y.');
+      constraint.setTarget(targetOrX, y);
+    } else constraint.setTarget(targetOrX);
+    return this;
+  }
+
+  setIKDebug(enabled: boolean): this {
+    this.ikDebugView.container.setVisible(enabled);
+    this.ikDebugView.update(this.orderedIK());
+    return this;
+  }
+
   /** Choose a screen side for a pivot label; omit side to restore automatic placement. */
   setDebugLabelSide(boneId: string, side?: Facing): this {
     this.debugView.setLabelSide(boneId, side);
@@ -178,6 +227,7 @@ export class Puppet {
 
   update(delta: number): void {
     if (this.destroyed) return;
+    this.preparePose();
     this.animationPlayer.update(delta);
     this.syncPose();
   }
@@ -189,19 +239,59 @@ export class Puppet {
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.container.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
     this.debugView.destroy();
+    this.ikDebugView.destroy();
     this.renderer.destroy();
     if (!this.container.isDestroyed) this.container.destroy();
     this.attachments.clear();
     this.bones.clear();
+    this.ikConstraints.clear();
+    this.ikPose.restore();
   }
 
   private onUpdate(_time: number, delta: number): void { this.update(delta); }
 
-  /** Apply poses after manual edits or an externally scheduled constraint pass. */
+  /** Restore the pre-IK pose before externally sampling animation or editing it. */
+  preparePose(): void { this.ikPose.restore(); }
+
+  private orderedIK(): TwoBoneIKConstraint[] {
+    return [...this.ikConstraints.values()].sort((a, b) => a.priority - b.priority);
+  }
+
+  /** Apply the evaluated pose, solve IK in priority order, then project rendering. */
   syncPose(): void {
+    if (this.destroyed) return;
+    this.preparePose();
     for (const bone of this.bones.values()) bone.syncTransform();
     this.renderer.sync();
+    const constraints = this.orderedIK();
+    this.ikPose.capture(constraints.flatMap(constraint => [
+      this.getBone(constraint.rootBone), this.getBone(constraint.middleBone),
+    ]));
+    const context = {
+      worldToParent: (id: string, target: IKTarget): IKTarget | undefined => {
+        const parent = this.getBone(id).container.parentContainer!;
+        const matrix = parent.getWorldTransformMatrix();
+        const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+        if (!Number.isFinite(determinant) || determinant === 0) return undefined;
+        const point = matrix.applyInverse(target.x, target.y);
+        return Number.isFinite(point.x) && Number.isFinite(point.y) ? { x: point.x, y: point.y } : undefined;
+      },
+    };
+    try {
+      for (const constraint of constraints) {
+        constraint.apply(context);
+        this.getBone(constraint.rootBone).syncTransform();
+        this.getBone(constraint.middleBone).syncTransform();
+        // A later target provider may read an attachment in a render mount.
+        this.renderer.sync();
+      }
+    } finally {
+      // Even a failing target provider must leave earlier IK passes restorable.
+      this.ikPose.commit();
+    }
     this.debugView.container.setDepth(this.container.depth + 1);
     this.debugView.update();
+    this.ikDebugView.container.setDepth(this.container.depth + 2);
+    this.ikDebugView.update(constraints);
   }
 }

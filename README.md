@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The v0.1 demo uses generated placeholder textures to make shoulders, elbows, wrists, hips, knees, ankles, and the neck easy to inspect.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The IK iteration extends v0.1 with analytical two-bone inverse kinematics, fixed foot targets, and a two-handed katana demo. Generated placeholder textures make the skeleton easy to inspect.
 
 ## Install and run
 
@@ -17,13 +17,23 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 | --- | --- |
 | `1` | Play / restart idle |
 | `2` | Play / restart walk |
+| `3` | Two-handed katana stance; enables hand IK |
 | `A` / `D` | Face left / right |
 | `B` | Toggle joint pivots, hierarchy lines, and bone names |
-| `P` | Detach / reattach the flag to the right hand |
+| `I` | Toggle IK targets, joints, chain lines, lengths, bend signs and names |
+| `H` | Toggle mouse-controlled right-hand IK |
+| `F` | Toggle fixed world-space foot targets and gentle body sway |
+| Mouse | Move the hand target while hand IK is enabled |
+| `Q` / `E` | Rotate the katana; the right-facing two-handed rear palm stays visible beside the body |
+| `P` | Detach / reattach the katana to the right hand |
 | `Space` | Stop at the current pose / restart |
 | `R` | Restart the current clip |
 
 To verify the hierarchy, press `2`, then `B`: elbow, wrist, and hand follow the upper arm; knee, ankle, and foot follow the thigh. Press `A` and `D` to see the entire skeleton mirror while the labels stay readable. Press `Space` to freeze a pose. `P` demonstrates attachment ownership.
+
+Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant both ankle pivots as the body sways. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
+
+The two-handed katana stance reuses idle's pelvis bob, leg rotations, and facing-dependent hip positions. This keeps the lower-body pose the same when switching between idle and the stance. If foot IK is enabled, it still adjusts the legs toward the fixed ground targets.
 
 Each limb has a consistent color across all its pieces: left arm blue, right arm purple, left leg coral, and right leg gold. The legend beside the stage identifies them; it moves below the stage on narrower screens.
 
@@ -38,7 +48,7 @@ npm run build
 npm run preview
 ```
 
-`build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation and animation behavior without requiring a browser; `npm run test:watch` runs them interactively.
+`build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
 Direct dependencies use exact versions: Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, and Vitest **5.0.2**. `package-lock.json` locks the resolved dependency graph.
 
@@ -55,6 +65,12 @@ src/engine/
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay
   PuppetRenderer.ts    Independent draw slots retaining ancestor transform chains
+  ik/
+    types.ts           Targets, constraint definitions and coordinate adapter
+    solveTwoBoneIK.ts  Pure law-of-cosines solver and angular blending
+    TwoBoneIKConstraint.ts  Chain validation, effective lengths and pose solving
+    IKPoseState.ts     Pre-IK rotation restoration between passes
+    IKDebug.ts         Independent world-space IK overlay
   index.ts             Public library entry point
 src/demo/
   DemoScene.ts         Example scene, controls and prop
@@ -62,10 +78,12 @@ src/demo/
   demoAnimations.ts    Idle and walk data
   demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
   createTextures.ts    Temporary transparent cutout textures
+  demoIK.ts            Arm/leg chains with explicit execution priorities
+  Katana.ts            Placeholder weapon transform and two data-defined grips
 src/main.ts            Demo bootstrap and control panel
 ```
 
-The engine does not import demo code or assets. `Rig`, `Joint`, and `AnimationPlayer` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies poses to the skeleton and rendering chains together. The puppet's outer container provides placement, scale, and facing independently of animation tracks. Future IK or constraints can operate on `Joint.pose` between animation sampling and display synchronization. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
+The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
 
 ## Define a rig
 
@@ -98,6 +116,8 @@ puppet.setDebug(true);
 `x`, `y`, `rotation`, `scaleX`, and `scaleY` define a bone's **local bind pose** relative to its parent. Positions use pixels, rotations use **radians** (positive clockwise in Phaser's downward Y axis), and scales default to 1. Each container's `(0, 0)` is its joint/pivot. Rotating an upper arm therefore carries the elbow, forearm, and hand automatically.
 
 `sprite.originX` / `originY` are normalized image origins in `[0, 1]`; put them at the shoulder/elbow/etc. within the texture, rather than assuming the center. `sprite.x` / `y` offset the image relative to the joint, and `sprite.scaleX` / `scaleY` scale only the image. Bone scale affects descendants too. `sprite.frame` selects an atlas/spritesheet frame. Transparent images are supported directly.
+
+IK normally measures the current joint-to-child offsets, including effective chain scale. Optional `length` overrides the logical bind distance to each direct child. `Rig` normalizes the child's `x`/`y` to that length while keeping its direction; a child with no offset defaults to positive Y. For example, an upper arm with `length: 52` places its elbow 52 logical pixels from its shoulder, regardless of image height. Images keep their original dimensions. Position animation can subsequently change that distance, and IK measures the evaluated offsets. Lengths must be finite and nonnegative.
 
 `depth` orders subtrees among siblings for the default drawing order; `sprite.depth` determines where the parent's image appears relative to its children. The engine derives a global back-to-front order from these defaults. To interleave unrelated branches, pass every bone ID exactly once to `puppet.setRenderOrder(ids)`. `puppet.getRenderOrder()` returns the current order; `puppet.resetRenderOrder()` restores the rig default. Bones without images still have a draw slot for attachments. The skeleton's parenting stays unchanged when the order changes.
 
@@ -156,7 +176,100 @@ puppet.syncPose();
 const worldPosition = hand.getWorldPosition();
 ```
 
-An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts can call `puppet.animationPlayer.update(delta)`, modify joint poses, then `puppet.syncPose()` to apply a constraint pass after sampling. `animationPlayer.sample(time)` samples the current clip without changing its playback clock. `puppet.resetPose()` stops playback and restores all bind transforms.
+An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.preparePose()` to restore the previous pre-IK pose, then `puppet.animationPlayer.update(delta)`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. `animationPlayer.sample(time)` samples the current clip without changing its playback clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
+
+## Two-bone inverse kinematics
+
+Forward animation specifies joint rotations to place a hand or foot. **Inverse kinematics (IK)** starts with a desired endpoint and calculates those rotations. A two-bone chain contains a root joint (shoulder/hip), middle joint (elbow/knee), and end joint (wrist/ankle).
+
+The pure `solveTwoBoneIK` function uses the law of cosines to solve a triangle from two segment lengths and the root-to-target distance. It clamps that distance to the chain's inner and outer reach boundaries and clamps cosine arguments to `[-1, 1]`. Far targets fully extend the chain; close targets fully fold it. No images stretch. Zero-length segments and a target at the root have deterministic finite solutions. Invalid nonfinite input is rejected.
+
+```ts
+import { Puppet, type TwoBoneIKDefinition } from 'paper-puppeteer-engine';
+
+const rightArmIK: TwoBoneIKDefinition = {
+  name: 'rightArmIK',
+  rootBone: 'rightUpperArm', middleBone: 'rightForearm', endBone: 'rightHand',
+  bendDirection: -1, mix: 1, priority: 0,
+};
+const puppet = new Puppet(scene, { rig, ik: [rightArmIK], ikDebug: true });
+puppet.setIKTarget('rightArmIK', { x: 500, y: 300 });
+puppet.setIKTarget('rightArmIK', 500, 300); // Equivalent overload.
+
+const arm = puppet.getIK('rightArmIK');
+arm.setTarget(450, 320);
+arm.target = { x: 460, y: 330 };
+arm.mix = 0.5;
+arm.enabled = false;
+
+// Constraints can also be registered after construction.
+puppet.addIK({
+  name: 'leftLegIK', rootBone: 'leftThigh', middleBone: 'leftLowerLeg', endBone: 'leftFoot',
+  bendDirection: 1,
+});
+```
+
+The three IDs must form a direct parent-child chain. Names must be unique. Definitions default to `bendDirection: 1`, `mix: 1`, `enabled: true`, and `priority: 0`. A constraint stays inactive until a target is supplied. Assigning `target = undefined` clears it. Targets are copied; assign a new point or use `setTarget` to move them. Changes take effect on the next update or an explicit `syncPose()`.
+
+An optional `endOffset: { x, y }` moves the solved endpoint from the end bone's joint to a local point on that bone. The solver includes the end bone's rotation and scale when measuring the second effective link. With the default `{ x: 0, y: 0 }`, it still targets the joint itself. Use an offset such as `{ x: 0, y: 20 }` to place a hand's palm on a target while its wrist remains behind it.
+
+`bendDirection: 1` selects a positive turn from the first segment to the second; `-1` selects the opposite turn. In Phaser's downward Y axis, positive rotation is clockwise. The sign is defined in rig space and mirrors with facing, so a knee keeps its intended bend when the entire character turns around. The solver does not choose an elbow side based on the previous frame or randomly change branches.
+
+`mix: 0` leaves the evaluated animation rotations alone; `mix: 1` applies the solved rotations; intermediate values blend each local angle along the shortest angular path. Mix must be finite and in `[0, 1]`. Angle blending does not interpolate the endpoint linearly and does not guarantee exact target contact below full influence. Authored full turns are preserved through the nearest equivalent solved angle.
+
+### World coordinates and execution order
+
+Targets use Phaser **world coordinates**, independent of camera screen coordinates. The Puppet adapter inverts the full world matrix of the chain root's parent, then solves in that parent's coordinates. This removes puppet translation, facing, scale, root bone transforms, and rotated/scaled enclosing containers, including affine shear from their combined transforms. Local child offset directions are accounted for; segments need not point along +X or +Y. Sprite origins never supply skeleton lengths. Use `pointer.worldX` / `pointer.worldY` for the default camera; with other cameras, use `camera.getWorldPoint(pointer.x, pointer.y)`.
+
+The normal `puppet.update(delta)` pass is:
+
+1. Restore the previous pre-IK rotations.
+2. Advance animation and evaluate local poses.
+3. Synchronize skeleton and attachment render mounts.
+4. Execute constraints by ascending priority, retaining insertion order for ties. Each constraint resolves its target immediately before solving; the skeleton and render mounts are refreshed after it.
+5. Record solved rotations, then update both debug overlays and render the final pose.
+
+IK modifies the evaluated pose, never animation keys or bind poses. Restoring before each pass prevents partial influence from accumulating on stopped animation or untracked bones. Disabling IK restores the authored pose on the next pass. `syncPose()` also restores the previous pass before resolving constraints; explicit changed pose rotations are retained. For externally scheduled animation, call `preparePose()` before sampling so the evaluation starts from the authored pose:
+
+```ts
+puppet.preparePose();
+puppet.animationPlayer.update(delta);
+// Apply any custom procedural pose edits here.
+puppet.syncPose();
+```
+
+Constraint `status` reports `inactive`, `solved`, `clamped`, `singular-transform`, or `unsupported-scale`. `resolvedTarget`, `lengthA`, and `lengthB` expose the last solve's diagnostics. `puppet.setIKDebug(true)` controls the separate IK overlay; `setDebug(true)` still controls the existing bone overlay. Displayed lengths are in the chain parent's solve coordinates.
+
+### Foot planting
+
+The demo's two leg constraints receive fixed world-space ground points. `F` enables them while the puppet's body sways horizontally and vertically and its normal animation continues. Both ankle pivots stay at their markers whenever the points are reachable. The ground points stay fixed when facing changes. This demonstrates planting without terrain detection, ground raycasts, or procedural steps. Foot orientation remains authored; this version constrains endpoint position only.
+
+```ts
+puppet.setIKTarget('leftLegIK', { x: 360, y: 510 });
+puppet.getIK('leftLegIK').enabled = true;
+// Moving the puppet container now makes the leg solve toward the fixed point.
+```
+
+### Two-handed katana
+
+`src/demo/Katana.ts` defines a weapon container with primary and secondary grip points in its own coordinates. Hand joints are at the wrists; the demo places each grip 15 local pixels down the corresponding hand, at the palm center. Facing changes remount the weapon on the front hand: the right hand holds the primary grip when facing right, and the left hand holds the secondary grip when facing left. The mount compensates for blade rotation so its grip stays on that palm. One-handed mouse targeting (`H`) moves the front arm and its attached katana.
+
+In stance `3`, the front arm runs at priority 0 and follows the mouse target. Its solved hand transform carries the katana. The rear arm runs at priority 1 with an `endOffset` at the **palm**. A target provider reads its grip in world space after the demo aims the blade with `Q` / `E`. Rotating the katana therefore moves the rear grip, and that arm solves toward it in the same frame. Priorities switch when facing changes, so the left arm can fully extend when pointing left.
+
+The demo uses bend direction `-1` for both elbows in the two-handed stance. Both hands follow their grip points without moving the shoulders.
+
+In the two-handed stance, the blade can turn through a horizontal overhead pose. In either facing direction, the rear palm stays outside the head, torso, and pelvis cutouts. It travels around the head's top corners in bounded steps, so moving the mouse or rotating the sword cannot make the hands snap across the face. The demo checks the cutout edges at the palm's height and adjusts the front arm's hand target when either input would carry the rear palm behind the body. Both shoulders stay fixed and both palms stay on the hilt.
+
+```ts
+// Assume katana is attached at its primary grip and both arm chains are registered.
+puppet.getIK('leftArmIK').setTargetProvider(() => {
+  const point = katana.container.getWorldTransformMatrix()
+    .transformPoint(katanaGrips.secondary.x, katanaGrips.secondary.y);
+  return { x: point.x, y: point.y };
+});
+```
+
+Use lower priority for the primary arm and higher priority for the secondary arm. Providers may return `undefined` to skip a pass. `setTarget` or assigning `target` replaces a provider; `setTargetProvider(undefined)` restores use of the stored fixed target. Register dependent constraints in one direction; dependency graphs and cycle detection are outside this iteration. If either grip is beyond an arm's reach, that arm clamps and the debug residual line shows the gap.
 
 ## Attach an object
 
@@ -188,16 +301,18 @@ The library includes TypeScript declarations and source maps. Phaser is external
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
 - One active clip, immediate switching, and linear interpolation; no blending, timeline events, or stepped playback yet.
-- The walk is an in-place hierarchy demonstration; it does not move the character or keep feet physically planted.
+- Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot planting is manual; the walk remains in place.
+- The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
+- Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
 - Debug name labels can overlap on dense rigs. Independent draw slots duplicate ancestor containers, so very large rigs require profiling.
-- No IK, constraints, rig editor, animation editor, or JSON loader. Rig/clip data is JSON-friendly already.
+- No rig editor, animation editor, or JSON loader. Rig/clip/IK definitions are already JSON-friendly.
 
 ## Planned features
 
-- Two-bone IK and joint constraints.
+- Joint angle limits and optional end-effector rotation alignment.
 - Animation blending, stepped / low-FPS animation (8–12 pose updates per second), and timeline events.
 - Multiple skins, sprite swapping, and runtime weapon swapping through attachments.
 - Visual rig and animation editors.
 - JSON rig and animation loading.
 
-The next useful addition is two-bone IK, with joint-space targets and optional limits, followed by stepped sampling for a more theatrical paper-puppet motion style.
+The next useful milestone is joint limits and palm/foot orientation constraints, followed by animation blending and stepped sampling for a more theatrical paper-puppet motion style.

@@ -1,9 +1,13 @@
 import type { AnimationClip, Keyframe } from '../engine/index.js';
 
+const idlePelvisKeys: readonly Keyframe[] = [
+  { time: 0, y: 0 }, { time: 900, y: -2 }, { time: 1800, y: 0 },
+];
+
 export const idle: AnimationClip = {
   name: 'idle', duration: 1800, loop: true,
   tracks: {
-    pelvis: [{ time: 0, y: 0 }, { time: 900, y: -2 }, { time: 1800, y: 0 }],
+    pelvis: idlePelvisKeys,
     torso: [{ time: 0, rotation: -0.018, scaleY: 1 },
       { time: 900, rotation: 0.018, scaleY: 1.012 },
       { time: 1800, rotation: -0.018, scaleY: 1 }],
@@ -44,4 +48,16 @@ export const walk: AnimationClip = {
   },
 };
 
-export const demoAnimations: readonly AnimationClip[] = [idle, walk];
+export const sword: AnimationClip = {
+  name: 'sword', duration: 1800, loop: true,
+  tracks: {
+    pelvis: idlePelvisKeys,
+    torso: [{ time: 0, rotation: -0.08 }],
+    leftUpperArm: [{ time: 0, rotation: -0.8 }],
+    leftForearm: [{ time: 0, rotation: 1.2 }],
+    rightUpperArm: [{ time: 0, rotation: -0.7 }],
+    rightForearm: [{ time: 0, rotation: -1.1 }],
+  },
+};
+
+export const demoAnimations: readonly AnimationClip[] = [idle, walk, sword];
