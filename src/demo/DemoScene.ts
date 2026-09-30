@@ -1,13 +1,10 @@
 import Phaser from 'phaser';
-import type { Facing, IKTarget } from '../engine/index.js';
-import { Puppet } from '../engine/index.js';
-import { createTextures } from './createTextures.js';
-import { demoAnimations } from './demoAnimations.js';
+import type { CharacterDefinition, Facing, IKTarget } from '../engine/index.js';
+import { CharacterLoader, Puppet, queueCharacterTextures } from '../engine/index.js';
 import type { WalkFootIK } from './demoFootTargets.js';
 import { demoWalkFootIK } from './demoFootTargets.js';
 import { demoIK } from './demoIK.js';
 import { demoArmRotations, demoHipPositions, demoRenderOrder, demoShoulderPositions } from './demoPresentation.js';
-import { demoRig } from './demoRig.js';
 import { Katana, katanaGrips } from './Katana.js';
 import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from './katanaArmTarget.js';
 
@@ -72,6 +69,43 @@ export class DemoScene extends Phaser.Scene {
   }
 
   create(): void {
+    void this.loadCharacter();
+  }
+
+  private async loadCharacter(): Promise<void> {
+    try {
+      const url = `${import.meta.env.BASE_URL}characters/demo-puppet/character.json`;
+      const definition = await CharacterLoader.load(url);
+      if (!this.sys.isActive()) return;
+      queueCharacterTextures(this, definition);
+      let failed = false;
+      const onError = (): void => {
+        failed = true;
+      };
+      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+        if (!this.sys.isActive()) return;
+        if (failed) this.showLoadError('One or more character images could not be loaded.');
+        else {
+          try {
+            this.createPuppet(definition);
+          } catch (error) {
+            this.showLoadError(String(error));
+          }
+        }
+      });
+      this.load.start();
+    } catch (error) {
+      this.showLoadError(String(error));
+    }
+  }
+
+  private showLoadError(message: string): void {
+    this.add.text(30, 60, `Character load failed: ${message}`, { color: '#a03930', wordWrap: { width: 600 } });
+  }
+
+  private createPuppet(definition: CharacterDefinition): void {
     this.attached = false;
     this.katanaEnabled = true;
     this.handIK = false;
@@ -87,7 +121,6 @@ export class DemoScene extends Phaser.Scene {
     this.rearPalmSide = 'right';
     this.rearPalmOverHead = false;
     this.previousRearPalm = undefined;
-    createTextures(this);
     const { width, height } = this.scale;
     const floor = this.add.graphics();
     floor.lineStyle(1, 0x9eaa97, 0.45).lineBetween(70, height - 115, width - 70, height - 115);
@@ -106,14 +139,12 @@ export class DemoScene extends Phaser.Scene {
       })
       .setOrigin(1, 0);
     this.puppet = new Puppet(this, {
-      rig: demoRig,
+      definition,
       x: width / 2,
       y: height - 278,
-      animations: demoAnimations,
       ik: demoIK,
       scale: 1.08,
       autoUpdate: false,
-      skin: 'default',
     });
     this.katana = new Katana(this);
     this.katana.container.setVisible(false);
@@ -160,7 +191,7 @@ export class DemoScene extends Phaser.Scene {
       keyboard.on('keydown-H', () => this.toggleHandIK());
       keyboard.on('keydown-T', () => this.toggleProp());
       keyboard.on('keydown-K', () => this.setSkin('default'));
-      keyboard.on('keydown-M', () => this.setSkin('armored'));
+      keyboard.on('keydown-M', () => this.setSkin('alternate'));
       keyboard.on('keydown-G', () => this.toggleGripHand());
       keyboard.on('keydown-N', () => this.toggleHelmet());
       keyboard.on('keydown-V', () => this.toggleSlotDebug());
@@ -308,7 +339,7 @@ export class DemoScene extends Phaser.Scene {
     this.notify();
   }
 
-  setSkin(name: 'default' | 'armored'): void {
+  setSkin(name: 'default' | 'alternate'): void {
     if (!this.puppet) return;
     this.skin = name;
     this.puppet.setSkin(name);

@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.2 adds named visual slots, sprite attachments, and skins. Crossfades, timeline events, stepped playback, masked animation layers, IK, and facing remain available.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.3 adds external character manifests and a complete sample character. Crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins remain available.
 
 ## Install and run
 
@@ -71,6 +71,9 @@ Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser 
 
 ```text
 src/engine/
+  CharacterDefinition.ts  Manifest assembly and cross-file validation (no I/O)
+  CharacterLoader.ts      Fetches manifest, rig, skins, and animations as JSON
+  queueCharacterTextures.ts  Queues image files with Phaser's scene loader
   types.ts             JSON-friendly rig and transform definitions
   schemas.ts           Zod schemas for rig, animation and IK definitions
   externalData.ts      Versioned JSON formats, validation and parsing
@@ -93,18 +96,69 @@ src/engine/
     IKDebug.ts         Independent world-space IK overlay
   index.ts             Public library entry point
 src/demo/
-  DemoScene.ts         Example scene, controls and prop
+  DemoScene.ts         External-character demo, controls and prop
   data/                Versioned JSON rig and idle animation
   demoRig.ts           Parsed 16-joint character
   demoAnimations.ts    Parsed idle and TypeScript-authored walk/sword data
   demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
-  createTextures.ts    Temporary transparent cutout textures
+  createTextures.ts    Legacy generated cutouts for TypeScript demos
   demoIK.ts            Arm/leg chains with explicit execution priorities
   Katana.ts            Placeholder weapon transform and two data-defined grips
 src/main.ts            Demo bootstrap and control panel
 ```
 
 The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
+
+## External characters
+
+The primary demo loads [character.json](public/characters/demo-puppet/character.json) from `public/characters/demo-puppet/`. The folder contains `rig.json`, `skins/default.json`, `skins/alternate.json`, `skins/helmet-only.json`, `animations/idle.json`, `animations/walk.json`, `animations/combat-idle.json`, `animations/guard-upper-body.json`, and transparent PNG files under `images/`. The combat idle file has the runtime clip name `sword`; file names and stable animation IDs can differ.
+
+The version 1 manifest names a rig path, a default skin key, skin keys mapped to JSON paths, animation JSON paths, and Phaser texture keys mapped to image paths. All paths resolve relative to `character.json`. Texture keys are separate from bone, slot, and attachment IDs. `frame` on an attachment or legacy bone sprite selects an atlas frame when the host has preloaded an atlas under the named texture key. The sample uses ordinary PNGs.
+
+```json
+{
+  "version": 1,
+  "id": "demo-puppet",
+  "rig": "rig.json",
+  "defaultSkin": "default",
+  "skins": { "default": "skins/default.json", "alternate": "skins/alternate.json" },
+  "animations": ["animations/idle.json", "animations/walk.json"],
+  "textures": { "paper-head": "images/paper-head.png" }
+}
+```
+
+`CharacterLoader.load` fetches JSON metadata only. Queue images through Phaser after loading the metadata, then construct the puppet when Phaser reports completion:
+
+```ts
+import Phaser from 'phaser';
+import { CharacterLoader, Puppet, queueCharacterTextures } from 'paper-puppeteer-engine';
+
+const definition = await CharacterLoader.load('/characters/demo-puppet/character.json');
+queueCharacterTextures(scene, definition);
+scene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+  const puppet = new Puppet(scene, { definition, x: 500, y: 500 });
+  puppet.play('idle');
+});
+scene.load.start();
+```
+
+For Phaser `preload`, custom pipelines, generated content, or tests, pass already parsed values to `CharacterDefinition.fromData({ manifest, rig, skins, animations }, optionalManifestUrl)`. The `skins` and `animations` objects are indexed by the paths in the manifest. `queueCharacterTextures` skips texture keys already loaded in the scene, so an app can preload an atlas itself. `definition.textureUrl(key)` resolves a key to a URL when given a manifest URL; without one it returns the authored path. `new Puppet(scene, { rig, animations, skin })` and TypeScript-authored rigs and clips continue to work.
+
+`validateCharacterDefinition(data)` returns structured `{ severity, path, message }` issues without Phaser. It checks the manifest version and shape, missing files, default skin, skin and slot references, attachment texture keys, duplicate animation names, and animation bone references in addition to the existing rig and timeline rules. `CharacterDefinition.fromData` throws `CharacterValidationError` with those issues. Validation checks declared texture keys and image paths; image bytes and atlas frame existence are checked by Phaser at load or Puppet construction.
+
+### Artist workflow
+
+```text
+Artist exports transparent PNG body parts
+  ↓ developer assigns stable texture keys
+rig.json defines skeleton and pivots
+  ↓ slots connect visuals to bones
+skins/*.json choose attachments
+  ↓ animations/*.json reference stable bone IDs
+character.json ties the files together
+```
+
+Export near and far limbs separately, as well as weapons and alternate hand states. Keep a consistent resolution and enough transparent canvas near joints. The image center is not the joint pivot: rig bone positions define the skeleton, while attachment `x`/`y` offset the image and `originX`/`originY` set its normalized pivot within the image. Adjust these values in JSON to align art without re-exporting PNGs. Keep asset filenames and texture keys independent of bone IDs such as `leftUpperArm`, `leftForearm`, and `leftHand`.
 
 `Rig`, animation registration and IK constraint construction validate plain input with Zod before applying hierarchy and timeline rules. Their underlying `rigDefinitionSchema`, `animationClipSchema` and `twoBoneIKDefinitionSchema` are also public. Use the versioned parsers below for external rig and animation files; they add version, JSON compatibility, hierarchy and timeline checks. Validation runs when definitions are loaded or registered, not during animation frames.
 
@@ -439,13 +493,13 @@ The library includes TypeScript declarations and source maps. Phaser is external
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
 - Debug name labels can overlap on dense rigs. Independent draw slots duplicate ancestor containers, so very large rigs require profiling.
-- No rig editor, animation editor, or JSON loader. Rig/clip/IK definitions are already JSON-friendly.
+- No rig editor or animation editor. Character JSON loading uses `fetch`; apps with another asset pipeline can use `CharacterDefinition.fromData`.
 
 ## Planned features
 
 - Joint angle limits and optional end-effector rotation alignment.
 - More advanced animation state orchestration and editor tooling.
 - Visual rig and animation editors.
-- JSON rig and animation loading.
+- Character editing tools and richer asset pipeline integration.
 
 The next useful milestone is joint limits and palm/foot orientation constraints, plus attachment or facial sprite swapping driven by the new event API.

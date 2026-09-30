@@ -4,6 +4,15 @@ export { AnimationPlayer } from './AnimationPlayer.js';
 export type { AnimationPose } from './AnimationPose.js';
 export { blendPose, evaluateClip, lerpProperty } from './AnimationPose.js';
 export { Bone } from './Bone.js';
+export type { CharacterData, CharacterManifest } from './CharacterDefinition.js';
+export {
+  CHARACTER_FORMAT_VERSION,
+  CharacterDefinition,
+  CharacterValidationError,
+  characterManifestSchema,
+  validateCharacterDefinition,
+} from './CharacterDefinition.js';
+export { CharacterLoader } from './CharacterLoader.js';
 export type {
   AnimationJsonDefinition,
   AnimationJsonEvent,
@@ -36,6 +45,7 @@ export type {
 export { Joint } from './Joint.js';
 export type { PuppetOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
+export { queueCharacterTextures } from './queueCharacterTextures.js';
 export { Rig } from './Rig.js';
 export { SlotState } from './SlotState.js';
 export {

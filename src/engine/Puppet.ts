@@ -7,6 +7,7 @@ import {
   type PlayAnimationOptions,
 } from './AnimationPlayer.js';
 import { Bone } from './Bone.js';
+import type { CharacterDefinition } from './CharacterDefinition.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { IKPoseState } from './ik/IKPoseState.js';
 import { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
@@ -19,8 +20,7 @@ import { SlotState } from './SlotState.js';
 import type { AttachmentOptions, Facing, RigDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
-export interface PuppetOptions {
-  rig: RigDefinition | Rig;
+interface PuppetSettings {
   x?: number;
   y?: number;
   scale?: number;
@@ -35,6 +35,9 @@ export interface PuppetOptions {
   /** Disable if the host calls update(deltaMilliseconds) itself. */
   autoUpdate?: boolean;
 }
+
+export type PuppetOptions = PuppetSettings &
+  ({ rig: RigDefinition | Rig; definition?: never } | { definition: CharacterDefinition; rig?: never });
 
 export class Puppet {
   readonly rig: Rig;
@@ -57,7 +60,9 @@ export class Puppet {
     private readonly scene: Phaser.Scene,
     options: PuppetOptions,
   ) {
-    this.rig = options.rig instanceof Rig ? options.rig : new Rig(options.rig);
+    const rig = options.rig ?? options.definition?.rig;
+    if (!rig) throw new Error('Puppet requires a rig or character definition.');
+    this.rig = rig instanceof Rig ? rig : new Rig(rig);
     for (const bone of this.rig.bones) {
       if (bone.sprite && !scene.textures.exists(bone.sprite.texture)) {
         throw new Error(`Missing texture "${bone.sprite.texture}" for bone "${bone.id}".`);
@@ -94,9 +99,10 @@ export class Puppet {
     this.slotState = new SlotState(this.rig);
     this.slotDebugView = new SlotDebug(scene, this.rig, this.renderer, this.slotState);
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones);
-    for (const clip of options.animations ?? []) this.addAnimation(clip);
+    for (const clip of options.animations ?? options.definition?.animations ?? []) this.addAnimation(clip);
     this.debugView = new PuppetDebug(scene, this.bones);
-    if (options.skin) this.setSkin(options.skin);
+    const skin = options.skin ?? options.definition?.defaultSkin;
+    if (skin) this.setSkin(skin);
     this.ikDebugView = new IKDebug(scene, this.bones);
     for (const definition of options.ik ?? []) this.addIK(definition);
     this.facing = options.facing ?? 'right';

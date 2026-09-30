@@ -1,0 +1,151 @@
+import type Phaser from 'phaser';
+import { assert, test } from 'vitest';
+import { demoIK } from '../src/demo/demoIK.js';
+import { demoHipPositions, demoRenderOrder } from '../src/demo/demoPresentation.js';
+import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
+import {
+  CharacterDefinition,
+  CharacterValidationError,
+  validateCharacterDefinition,
+} from '../src/engine/CharacterDefinition.js';
+import { CharacterLoader } from '../src/engine/CharacterLoader.js';
+import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
+import { Joint } from '../src/engine/Joint.js';
+import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
+import { SlotState } from '../src/engine/SlotState.js';
+
+const root = new URL('../public/characters/demo-puppet/', import.meta.url);
+const files = import.meta.glob('../public/characters/demo-puppet/**/*.json', { eager: true, import: 'default' });
+const images = import.meta.glob('../public/characters/demo-puppet/**/*.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+const read = (path: string): unknown => {
+  const file = files[`../public/characters/demo-puppet/${path}`];
+  if (!file) throw new Error(`Missing sample file ${path}`);
+  return structuredClone(file);
+};
+const manifest = read('character.json') as {
+  rig: string;
+  skins: Record<string, string>;
+  animations: string[];
+  textures: Record<string, string>;
+  defaultSkin: string;
+};
+const bundle = () => ({
+  manifest: structuredClone(manifest),
+  rig: read(manifest.rig),
+  skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, read(path)])),
+  animations: Object.fromEntries(manifest.animations.map((path) => [path, read(path)])),
+});
+
+test('complete sample character validates and already-parsed data becomes runtime definitions', () => {
+  const data = bundle();
+  assert.deepEqual(validateCharacterDefinition(data), []);
+  const definition = CharacterDefinition.fromData(data);
+  assert.equal(definition.id, 'demo-puppet');
+  assert.equal(definition.rig.bones.length, 16);
+  assert.equal(definition.defaultSkin, 'default');
+  assert.deepEqual(
+    definition.animations.map((clip) => clip.name),
+    ['idle', 'walk', 'sword', 'guardUpperBody'],
+  );
+  for (const path of Object.values(manifest.textures))
+    assert.ok(images[`../public/characters/demo-puppet/${path}`], path);
+  assert.ok(definition.rig.attachments.some((attachment) => attachment.id === 'katana'));
+  const slots = new SlotState(definition.rig);
+  slots.setSkin('default');
+  assert.equal(slots.getAttachment('torsoVisual'), 'torsoDefault');
+  slots.setSkin('alternate');
+  assert.equal(slots.getAttachment('torsoVisual'), 'torsoArmored');
+  const joints = new Map(definition.rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+  const player = new AnimationPlayer(definition.rig, joints);
+  for (const clip of definition.animations) player.addAnimation(clip);
+  for (const chain of demoIK) assert.ok(new TwoBoneIKConstraint(chain, definition.rig, joints));
+  assert.notDeepEqual(demoHipPositions(definition.rig, 'left'), demoHipPositions(definition.rig, 'right'));
+  assert.notDeepEqual(
+    demoRenderOrder(definition.rig, 'walk', 'left'),
+    demoRenderOrder(definition.rig, 'walk', 'right'),
+  );
+  player.play('walk');
+  player.update(250);
+  assert.notEqual(joints.get('leftThigh')?.pose.rotation, joints.get('rightThigh')?.pose.rotation);
+  player.play('idle');
+  assert.equal(player.currentAnimation, 'idle');
+  player.setPlaybackMode({ mode: 'stepped', fps: 10 });
+  player.play('walk');
+  player.update(50);
+  const firstStep = joints.get('leftThigh')!.pose.rotation;
+  player.update(40);
+  assert.equal(joints.get('leftThigh')!.pose.rotation, firstStep);
+  player.update(20);
+  assert.notEqual(joints.get('leftThigh')!.pose.rotation, firstStep);
+});
+
+test('character validation reports missing rig, default skin, duplicates and broken references', () => {
+  const missingRig = bundle();
+  delete (missingRig as { rig?: unknown }).rig;
+  assert.ok(validateCharacterDefinition(missingRig).some((entry) => entry.path === 'rig'));
+
+  const missingSkin = bundle();
+  missingSkin.manifest.defaultSkin = 'absent';
+  assert.ok(validateCharacterDefinition(missingSkin).some((entry) => entry.path === 'manifest.defaultSkin'));
+  const absentFile = bundle();
+  delete absentFile.skins[manifest.skins.default!];
+  assert.ok(validateCharacterDefinition(absentFile).some((entry) => entry.path === 'skins.default'));
+
+  const duplicate = bundle();
+  duplicate.manifest.animations.push(manifest.animations[0]!);
+  assert.ok(validateCharacterDefinition(duplicate).some((entry) => /Duplicate animation name/.test(entry.message)));
+
+  const invalid = bundle();
+  const rig = invalid.rig as { attachments: { texture: string }[] };
+  rig.attachments[0]!.texture = 'missing-image';
+  const skin = invalid.skins[manifest.skins.default!] as { slots: Record<string, string> };
+  skin.slots.ghost = 'unknown';
+  const walk = invalid.animations['animations/walk.json'] as { tracks: Record<string, unknown> };
+  walk.tracks.ghost = [{ time: 0, rotation: 1 }];
+  const issues = validateCharacterDefinition(invalid);
+  assert.ok(issues.some((entry) => entry.path?.includes('attachments') && /Missing texture/.test(entry.message)));
+  assert.ok(issues.some((entry) => /Unknown slot/.test(entry.message)));
+  assert.ok(issues.some((entry) => /unknown bone/.test(entry.message)));
+  assert.throws(() => CharacterDefinition.fromData(invalid), CharacterValidationError);
+});
+
+test('character manifest rejects unsupported versions', () => {
+  const data = bundle();
+  (data.manifest as typeof manifest & { version: number }).version = 2;
+  assert.ok(validateCharacterDefinition(data).some((entry) => entry.path === 'manifest.version'));
+});
+
+test('loader fetches JSON relative to the manifest and leaves image loading to the host', async () => {
+  const requested: string[] = [];
+  const fetcher = (async (url: string | URL | Request) => {
+    const target = new URL(String(url));
+    requested.push(target.pathname);
+    const path = target.href.slice(root.href.length);
+    return new Response(JSON.stringify(read(path)), { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  const definition = await CharacterLoader.load(new URL('character.json', root).href, fetcher);
+  assert.equal(definition.animations.length, 4);
+  assert.equal(requested.length, 1 + 1 + Object.keys(manifest.skins).length + manifest.animations.length);
+  assert.equal(definition.textureUrl('paper-head'), new URL('images/paper-head.png', root).href);
+  assert.ok(requested.every((path) => path.endsWith('.json')));
+});
+
+test('Phaser queue uses stable texture keys and preserves host-preloaded atlas keys', () => {
+  const definition = CharacterDefinition.fromData(bundle(), root.href);
+  const queued: [string, string][] = [];
+  const scene = {
+    textures: { exists: (key: string) => key === 'paper-head' },
+    load: { image: (key: string, url: string) => queued.push([key, url]) },
+  } as unknown as Phaser.Scene;
+  queueCharacterTextures(scene, definition);
+  assert.equal(queued.length, Object.keys(manifest.textures).length - 1);
+  assert.ok(!queued.some(([key]) => key === 'paper-head'));
+  assert.deepEqual(
+    queued.find(([key]) => key === 'paper-torso'),
+    ['paper-torso', new URL('images/paper-torso.png', root).href],
+  );
+});

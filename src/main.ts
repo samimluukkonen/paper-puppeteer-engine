@@ -10,7 +10,7 @@ if (!app) throw new Error('Missing demo host.');
 app.innerHTML = `
   <header class="masthead">
     <a class="wordmark" href="./"><span class="mark" aria-hidden="true">✳</span> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
-    <span class="version">v0.4.2 <span class="version-dot"></span> Skins & slots</span>
+    <span class="version">v0.4.3 <span class="version-dot"></span> External characters</span>
   </header>
   <section class="workbench">
     <aside class="controls" aria-label="Animation controls">
@@ -107,7 +107,7 @@ function updateControls(state: DemoState): void {
     upperBody: state.upperBody,
     pause: state.paused,
     defaultSkin: state.skin === 'default',
-    armoredSkin: state.skin === 'armored',
+    armoredSkin: state.skin === 'alternate',
     gripHand: state.gripHand,
     helmet: state.helmet,
     slotDebug: state.slotDebug,
@@ -155,7 +155,7 @@ const actions: Record<string, () => void> = {
   footIK: () => demo.toggleFootIK(),
   ikDebug: () => demo.toggleIKDebug(),
   defaultSkin: () => demo.setSkin('default'),
-  armoredSkin: () => demo.setSkin('armored'),
+  armoredSkin: () => demo.setSkin('alternate'),
   gripHand: () => demo.toggleGripHand(),
   helmet: () => demo.toggleHelmet(),
   slotDebug: () => demo.toggleSlotDebug(),

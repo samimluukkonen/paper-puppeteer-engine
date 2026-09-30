@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "demo-puppet",
+  "rig": "rig.json",
+  "defaultSkin": "default",
+  "skins": {
+    "default": "skins/default.json",
+    "alternate": "skins/alternate.json",
+    "helmet-only": "skins/helmet-only.json"
+  },
+  "animations": [
+    "animations/idle.json",
+    "animations/walk.json",
+    "animations/combat-idle.json",
+    "animations/guard-upper-body.json"
+  ],
+  "textures": {
+    "paper-pelvis": "images/paper-pelvis.png",
+    "paper-armor-pelvis": "images/paper-armor-pelvis.png",
+    "paper-torso": "images/paper-torso.png",
+    "paper-armor-torso": "images/paper-armor-torso.png",
+    "paper-head": "images/paper-head.png",
+    "paper-helmet-head": "images/paper-helmet-head.png",
+    "paper-left-upper-arm": "images/paper-left-upper-arm.png",
+    "paper-left-forearm": "images/paper-left-forearm.png",
+    "paper-left-hand": "images/paper-left-hand.png",
+    "paper-right-upper-arm": "images/paper-right-upper-arm.png",
+    "paper-right-forearm": "images/paper-right-forearm.png",
+    "paper-right-hand": "images/paper-right-hand.png",
+    "paper-left-thigh": "images/paper-left-thigh.png",
+    "paper-left-shin": "images/paper-left-shin.png",
+    "paper-left-foot": "images/paper-left-foot.png",
+    "paper-right-thigh": "images/paper-right-thigh.png",
+    "paper-right-shin": "images/paper-right-shin.png",
+    "paper-right-foot": "images/paper-right-foot.png",
+    "paper-right-grip-hand": "images/paper-right-grip-hand.png",
+    "paper-kabuto": "images/paper-kabuto.png",
+    "paper-slot-katana": "images/paper-slot-katana.png"
+  }
+}

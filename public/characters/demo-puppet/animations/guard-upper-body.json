@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "name": "guardUpperBody",
+  "duration": 1800,
+  "loop": true,
+  "tracks": {
+    "torso": [
+      {
+        "time": 0,
+        "rotation": -0.08
+      }
+    ],
+    "leftUpperArm": [
+      {
+        "time": 0,
+        "rotation": -0.8
+      }
+    ],
+    "leftForearm": [
+      {
+        "time": 0,
+        "rotation": 1.2
+      }
+    ],
+    "rightUpperArm": [
+      {
+        "time": 0,
+        "rotation": -0.7
+      }
+    ],
+    "rightForearm": [
+      {
+        "time": 0,
+        "rotation": -1.1
+      }
+    ]
+  }
+}
