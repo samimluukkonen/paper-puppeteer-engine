@@ -19,6 +19,7 @@ export { Joint } from './Joint.js';
 export type { PuppetOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
 export { Rig } from './Rig.js';
+export { animationClipSchema, rigDefinitionSchema, twoBoneIKDefinitionSchema } from './schemas.js';
 export type {
   AttachmentOptions,
   BoneDefinition,

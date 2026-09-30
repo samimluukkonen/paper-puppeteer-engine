@@ -1,5 +1,5 @@
+import { rigDefinitionSchema } from './schemas.js';
 import type { BoneDefinition, RigDefinition } from './types.js';
-import { assertFinite, createTransform, transformProperties } from './types.js';
 
 /** Validates a data-only rig and orders it so parents always precede children. */
 export class Rig {
@@ -9,31 +9,11 @@ export class Rig {
   private readonly definitions = new Map<string, BoneDefinition>();
 
   constructor(definition: RigDefinition) {
+    definition = rigDefinitionSchema.parse(definition);
     this.root = definition.root;
-    if (!this.root) throw new Error('A rig needs a root id.');
     for (const bone of definition.bones) {
       if (!bone.id || this.definitions.has(bone.id)) {
         throw new Error(`Empty or duplicate bone id: "${bone.id}".`);
-      }
-      for (const property of transformProperties) {
-        assertFinite(createTransform(bone)[property], `${bone.id}.${property}`);
-      }
-      assertFinite(bone.depth ?? 0, `${bone.id}.depth`);
-      if (bone.length !== undefined) {
-        assertFinite(bone.length, `${bone.id}.length`);
-        if (bone.length < 0) throw new Error(`${bone.id}.length cannot be negative.`);
-      }
-      if (bone.sprite) {
-        if (!bone.sprite.texture) throw new Error(`Bone "${bone.id}" needs a texture key.`);
-        for (const [property, value] of Object.entries(bone.sprite)) {
-          if (typeof value === 'number') assertFinite(value, `${bone.id}.sprite.${property}`);
-        }
-        for (const property of ['originX', 'originY'] as const) {
-          const origin = bone.sprite[property] ?? 0.5;
-          if (origin < 0 || origin > 1) {
-            throw new Error(`${bone.id}.sprite.${property} must be between 0 and 1.`);
-          }
-        }
       }
       this.definitions.set(
         bone.id,

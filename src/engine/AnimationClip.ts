@@ -1,6 +1,7 @@
 import type { Rig } from './Rig.js';
+import { animationClipSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
-import { assertFinite, transformProperties } from './types.js';
+import { transformProperties } from './types.js';
 
 export type Interpolation = 'linear';
 
@@ -48,19 +49,9 @@ export interface CompiledClip {
 
 /** Compile sparse keys per property once rather than searching them every frame. */
 export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
-  if (!clip.name) throw new Error('An animation needs a name.');
-  assertFinite(clip.duration, `${clip.name}.duration`);
-  if (clip.duration <= 0) throw new Error('Animation duration must be greater than zero.');
-  if (clip.interpolation !== undefined && clip.interpolation !== 'linear') {
-    throw new Error(`Unsupported interpolation: ${String(clip.interpolation)}.`);
-  }
-  if (clip.playback?.mode === 'stepped') {
-    assertFinite(clip.playback.fps, `${clip.name}.playback.fps`);
-    if (clip.playback.fps <= 0) throw new Error('Animation FPS must be greater than zero.');
-  }
+  clip = animationClipSchema.parse(clip);
   const events = (clip.events ?? [])
     .map((event) => {
-      assertFinite(event.time, `${clip.name}.event.time`);
       if (event.time < 0 || event.time > clip.duration || !event.name) {
         throw new Error(`Invalid event in animation "${clip.name}".`);
       }
@@ -73,15 +64,10 @@ export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
     const properties = new Map<TransformProperty, readonly PropertyKeyframe[]>();
     let previousTime = -1;
     for (const key of keys) {
-      assertFinite(key.time, `${clip.name}.${bone}.time`);
       if (key.time < 0 || key.time > clip.duration || key.time <= previousTime) {
         throw new Error(`Keys for "${bone}" must have strictly increasing times within the clip.`);
       }
       previousTime = key.time;
-      for (const property of transformProperties) {
-        const value = key[property];
-        if (value !== undefined) assertFinite(value, `${clip.name}.${bone}.${property}`);
-      }
     }
     for (const property of transformProperties) {
       const samples: PropertyKeyframe[] = [];

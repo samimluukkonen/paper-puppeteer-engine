@@ -59,13 +59,14 @@ npm run preview
 
 `check` runs Biome's formatting, lint, and import checks; `npm run check:fix` applies safe fixes. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
-Direct dependencies use exact versions: Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, and Vitest **5.0.2**. `package-lock.json` locks the resolved dependency graph.
+Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, and Vitest **5.0.2**. `package-lock.json` locks the resolved dependency graph.
 
 ## Architecture
 
 ```text
 src/engine/
   types.ts             JSON-friendly rig and transform definitions
+  schemas.ts           Zod schemas for rig, animation and IK definitions
   Rig.ts               Validation, immutable rig snapshot, parent-first ordering
   Joint.ts             Renderer-independent bind pose and mutable local pose
   Bone.ts              Joint backed by a Phaser container and optional image
@@ -94,6 +95,8 @@ src/main.ts            Demo bootstrap and control panel
 ```
 
 The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
+
+`Rig`, animation registration and IK constraint construction validate plain input with Zod before applying hierarchy and timeline rules. For data loaded at runtime, import `rigDefinitionSchema`, `animationClipSchema` or `twoBoneIKDefinitionSchema` from the package and call `parse` (which throws with field paths) or `safeParse` (which returns issues) before passing the result to the engine. Validation runs when definitions are registered, not during animation frames.
 
 ## Define a rig
 

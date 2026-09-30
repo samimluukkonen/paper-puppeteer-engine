@@ -1,5 +1,6 @@
 import type { Joint } from '../Joint.js';
 import type { Rig } from '../Rig.js';
+import { twoBoneIKDefinitionSchema } from '../schemas.js';
 import { assertFinite } from '../types.js';
 import { assertBendDirection, blendIKRotation, IK_EPSILON, solveTwoBoneIK } from './solveTwoBoneIK.js';
 import type {
@@ -33,7 +34,7 @@ export class TwoBoneIKConstraint {
   private readonly end: Joint;
 
   constructor(definition: TwoBoneIKDefinition, rig: Rig, joints: ReadonlyMap<string, Joint>) {
-    if (!definition.name) throw new Error('An IK constraint needs a name.');
+    definition = twoBoneIKDefinitionSchema.parse(definition);
     this.name = definition.name;
     this.rootBone = definition.rootBone;
     this.middleBone = definition.middleBone;
