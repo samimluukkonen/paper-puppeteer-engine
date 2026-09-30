@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.3 adds crossfades, timeline events, stepped playback, and masked animation layers to the existing two-bone IK and katana demo.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.1 adds versioned JSON rig and animation definitions with runtime validation. Crossfades, timeline events, stepped playback, masked animation layers, IK, and facing remain available.
 
 ## Install and run
 
@@ -67,6 +67,7 @@ Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser 
 src/engine/
   types.ts             JSON-friendly rig and transform definitions
   schemas.ts           Zod schemas for rig, animation and IK definitions
+  externalData.ts      Versioned JSON formats, validation and parsing
   Rig.ts               Validation, immutable rig snapshot, parent-first ordering
   Joint.ts             Renderer-independent bind pose and mutable local pose
   Bone.ts              Joint backed by a Phaser container and optional image
@@ -85,8 +86,9 @@ src/engine/
   index.ts             Public library entry point
 src/demo/
   DemoScene.ts         Example scene, controls and prop
-  demoRig.ts           Generic 16-joint character
-  demoAnimations.ts    Idle and walk data
+  data/                Versioned JSON rig and idle animation
+  demoRig.ts           Parsed 16-joint character
+  demoAnimations.ts    Parsed idle and TypeScript-authored walk/sword data
   demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
   createTextures.ts    Temporary transparent cutout textures
   demoIK.ts            Arm/leg chains with explicit execution priorities
@@ -96,7 +98,32 @@ src/main.ts            Demo bootstrap and control panel
 
 The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
 
-`Rig`, animation registration and IK constraint construction validate plain input with Zod before applying hierarchy and timeline rules. For data loaded at runtime, import `rigDefinitionSchema`, `animationClipSchema` or `twoBoneIKDefinitionSchema` from the package and call `parse` (which throws with field paths) or `safeParse` (which returns issues) before passing the result to the engine. Validation runs when definitions are registered, not during animation frames.
+`Rig`, animation registration and IK constraint construction validate plain input with Zod before applying hierarchy and timeline rules. Their underlying `rigDefinitionSchema`, `animationClipSchema` and `twoBoneIKDefinitionSchema` are also public. Use the versioned parsers below for external rig and animation files; they add version, JSON compatibility, hierarchy and timeline checks. Validation runs when definitions are loaded or registered, not during animation frames.
+
+## Load versioned JSON
+
+The external formats currently use `RIG_FORMAT_VERSION = 1` and `ANIMATION_FORMAT_VERSION = 1`. A rig file has `version`, optional `name`, `root`, and `bones`. Bone records use `id`, optional `parent`, local `x`, `y`, `rotation`, `scaleX`, `scaleY`, optional nonnegative `length`, optional `depth`, and optional `sprite` with texture/frame, offsets, normalized origins, scales, and depth. The bone container origin is its pivot. An animation file has `version`, `name`, positive `duration` in milliseconds, `loop`, `tracks` keyed by bone id, optional `events`, and optional `playback` (`{ "mode": "smooth" }` or `{ "mode": "stepped", "fps": 10 }`). Keyframes have `time` and any of the five local transform properties. See [demo-rig.json](src/demo/data/demo-rig.json) and [idle.json](src/demo/data/idle.json).
+
+```ts
+import {
+  parseRigDefinition,
+  parseAnimationClip,
+  validateRigDefinition,
+  validateAnimationDefinition,
+  Puppet,
+} from 'paper-puppeteer-engine';
+
+// Load the files with your app's own I/O (fetch, imports, or a file system).
+const rig = parseRigDefinition(rigJson);
+const idle = parseAnimationClip(idleJson, rig);
+const puppet = new Puppet(scene, { rig, animations: [idle] });
+
+// For editor-style diagnostics, inspect all reported issues without throwing.
+const rigIssues = validateRigDefinition(rigJson);
+const animationIssues = validateAnimationDefinition(idleJson, rig);
+```
+
+The parsers accept already-loaded JavaScript values and require no `fetch`. They return the existing `Rig` and `AnimationClip` runtime types. Invalid files throw `RigValidationError` or `AnimationValidationError`, each with an `issues` array of severity, path, and message. Unsupported versions throw `UnsupportedFormatVersionError`. Validation catches duplicate and missing bones, invalid parents and cycles, nonfinite transforms, negative lengths, invalid timeline times, unknown track bones, invalid FPS, and non-JSON values such as functions, `Map`, `Set`, and cyclic references. Existing unversioned TypeScript `RigDefinition` and `AnimationClip` inputs still work through their original constructors and registration APIs. The external format has no migration support yet.
 
 ## Define a rig
 

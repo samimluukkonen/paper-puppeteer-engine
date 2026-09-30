@@ -4,6 +4,24 @@ export { AnimationPlayer } from './AnimationPlayer.js';
 export type { AnimationPose } from './AnimationPose.js';
 export { blendPose, evaluateClip, lerpProperty } from './AnimationPose.js';
 export { Bone } from './Bone.js';
+export type {
+  AnimationJsonDefinition,
+  AnimationJsonEvent,
+  JsonValue,
+  RigJsonDefinition,
+  ValidationIssue,
+} from './externalData.js';
+export {
+  ANIMATION_FORMAT_VERSION,
+  AnimationValidationError,
+  parseAnimationClip,
+  parseRigDefinition,
+  RIG_FORMAT_VERSION,
+  RigValidationError,
+  UnsupportedFormatVersionError,
+  validateAnimationDefinition,
+  validateRigDefinition,
+} from './externalData.js';
 export type { TwoBoneIKInput, TwoBoneIKResult } from './ik/solveTwoBoneIK.js';
 export { blendIKRotation, solveTwoBoneIK } from './ik/solveTwoBoneIK.js';
 export { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';

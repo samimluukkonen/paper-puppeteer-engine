@@ -1,49 +1,10 @@
-import type { AnimationClip, Keyframe } from '../engine/index.js';
+import type { AnimationClip, Keyframe } from '../engine/AnimationClip.js';
+import { parseAnimationClip } from '../engine/externalData.js';
+import idleDefinition from './data/idle.json';
+import { demoRig } from './demoRig.js';
 
-const idlePelvisKeys: readonly Keyframe[] = [
-  { time: 0, y: 0 },
-  { time: 900, y: -2 },
-  { time: 1800, y: 0 },
-];
-
-export const idle: AnimationClip = {
-  name: 'idle',
-  duration: 1800,
-  loop: true,
-  tracks: {
-    pelvis: idlePelvisKeys,
-    torso: [
-      { time: 0, rotation: -0.018, scaleY: 1 },
-      { time: 900, rotation: 0.018, scaleY: 1.012 },
-      { time: 1800, rotation: -0.018, scaleY: 1 },
-    ],
-    head: [
-      { time: 0, rotation: 0.035 },
-      { time: 900, rotation: -0.035 },
-      { time: 1800, rotation: 0.035 },
-    ],
-    leftUpperArm: [
-      { time: 0, rotation: 0.12 },
-      { time: 900, rotation: 0.18 },
-      { time: 1800, rotation: 0.12 },
-    ],
-    rightUpperArm: [
-      { time: 0, rotation: -0.12 },
-      { time: 900, rotation: -0.18 },
-      { time: 1800, rotation: -0.12 },
-    ],
-    rightForearm: [
-      { time: 0, rotation: -0.12 },
-      { time: 900, rotation: -0.2 },
-      { time: 1800, rotation: -0.12 },
-    ],
-    rightHand: [
-      { time: 0, rotation: -0.08 },
-      { time: 900, rotation: 0.06 },
-      { time: 1800, rotation: -0.08 },
-    ],
-  },
-};
+export const idle: AnimationClip = parseAnimationClip(idleDefinition, demoRig);
+const idlePelvisKeys: readonly Keyframe[] = idle.tracks.pelvis ?? [];
 
 const walkDuration = 1000;
 function rotations(values: readonly number[]): Keyframe[] {
