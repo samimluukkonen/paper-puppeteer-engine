@@ -2,6 +2,10 @@
 
 A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.4 adds static pose presets, bind pose reset, a developer pose inspector, and pose JSON export. Crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins remain available.
 
+**Live demo:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
+
+Pushes to `master` build and deploy the demo through [the Pages workflow](.github/workflows/deploy-pages.yml). In the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. The workflow publishes `dist/demo` and can also be run from the Actions tab.
+
 ## Install and run
 
 Requires Node.js **20.19+ or 22.12+** (Node 24 recommended) and npm.
