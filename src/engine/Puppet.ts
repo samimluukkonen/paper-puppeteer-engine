@@ -1,16 +1,16 @@
 import Phaser from 'phaser';
-import { AnimationPlayer } from './AnimationPlayer.js';
 import type { AnimationClip } from './AnimationClip.js';
+import { AnimationPlayer } from './AnimationPlayer.js';
 import { Bone } from './Bone.js';
-import { PuppetDebug } from './PuppetDebug.js';
-import { PuppetRenderer } from './PuppetRenderer.js';
-import { Rig } from './Rig.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { IKPoseState } from './ik/IKPoseState.js';
 import { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, TwoBoneIKDefinition } from './ik/types.js';
-import { assertFinite } from './types.js';
+import { PuppetDebug } from './PuppetDebug.js';
+import { PuppetRenderer } from './PuppetRenderer.js';
+import { Rig } from './Rig.js';
 import type { AttachmentOptions, Facing, RigDefinition } from './types.js';
+import { assertFinite } from './types.js';
 
 export interface PuppetOptions {
   rig: RigDefinition | Rig;
@@ -41,7 +41,10 @@ export class Puppet {
   private facing: Facing;
   private destroyed = false;
 
-  constructor(private readonly scene: Phaser.Scene, options: PuppetOptions) {
+  constructor(
+    private readonly scene: Phaser.Scene,
+    options: PuppetOptions,
+  ) {
     this.rig = options.rig instanceof Rig ? options.rig : new Rig(options.rig);
     for (const bone of this.rig.bones) {
       if (bone.sprite && !scene.textures.exists(bone.sprite.texture)) {
@@ -49,12 +52,19 @@ export class Puppet {
       }
     }
     for (const [label, value] of Object.entries({
-      x: options.x ?? 0, y: options.y ?? 0, scale: options.scale ?? 1, depth: options.depth ?? 0,
-    })) assertFinite(value, `Puppet ${label}`);
+      x: options.x ?? 0,
+      y: options.y ?? 0,
+      scale: options.scale ?? 1,
+      depth: options.depth ?? 0,
+    }))
+      assertFinite(value, `Puppet ${label}`);
     if ((options.scale ?? 1) <= 0) throw new Error('Puppet scale must be greater than zero.');
 
-    this.container = scene.add.container(options.x ?? 0, options.y ?? 0)
-      .setName('puppet').setScale(options.scale ?? 1).setDepth(options.depth ?? 0);
+    this.container = scene.add
+      .container(options.x ?? 0, options.y ?? 0)
+      .setName('puppet')
+      .setScale(options.scale ?? 1)
+      .setDepth(options.depth ?? 0);
     for (const definition of this.rig.bones) {
       const bone = new Bone(scene, definition);
       this.bones.set(bone.id, bone);
@@ -77,11 +87,21 @@ export class Puppet {
     this.container.once(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
   }
 
-  get currentAnimation(): string | undefined { return this.animationPlayer.currentAnimation; }
-  get isPlaying(): boolean { return this.animationPlayer.isPlaying; }
-  get isDebug(): boolean { return this.debugView.container.visible; }
-  get isIKDebug(): boolean { return this.ikDebugView.container.visible; }
-  get facingDirection(): Facing { return this.facing; }
+  get currentAnimation(): string | undefined {
+    return this.animationPlayer.currentAnimation;
+  }
+  get isPlaying(): boolean {
+    return this.animationPlayer.isPlaying;
+  }
+  get isDebug(): boolean {
+    return this.debugView.container.visible;
+  }
+  get isIKDebug(): boolean {
+    return this.ikDebugView.container.visible;
+  }
+  get facingDirection(): Facing {
+    return this.facing;
+  }
 
   getBone(id: string): Bone {
     const bone = this.bones.get(id);
@@ -140,7 +160,9 @@ export class Puppet {
   }
 
   /** Bone ids in back-to-front order, independent of joint parenting. */
-  getRenderOrder(): readonly string[] { return this.renderer.getOrder(); }
+  getRenderOrder(): readonly string[] {
+    return this.renderer.getOrder();
+  }
 
   setRenderOrder(order: readonly string[]): this {
     this.renderer.setOrder(order);
@@ -155,17 +177,27 @@ export class Puppet {
     const bone = this.getBone(boneId);
     const renderMount = this.renderer.getMount(boneId);
     if (object.scene !== this.scene) throw new Error('Attachments must belong to the puppet scene.');
-    for (let ancestor: Phaser.GameObjects.Container | null = bone.container; ancestor; ancestor = ancestor.parentContainer) {
+    for (
+      let ancestor: Phaser.GameObjects.Container | null = bone.container;
+      ancestor;
+      ancestor = ancestor.parentContainer
+    ) {
       if (ancestor === object) throw new Error('Cannot attach an ancestor of the target bone.');
     }
-    for (let ancestor: Phaser.GameObjects.Container | null = renderMount; ancestor; ancestor = ancestor.parentContainer) {
+    for (
+      let ancestor: Phaser.GameObjects.Container | null = renderMount;
+      ancestor;
+      ancestor = ancestor.parentContainer
+    ) {
       if (ancestor === object) throw new Error('Cannot attach an ancestor of the render mount.');
     }
     for (const [label, value] of Object.entries(options)) assertFinite(value, `Attachment ${label}`);
     this.detach(object);
     // A wrapper permits any Phaser GameObject without changing its own transform.
-    const mount = this.scene.add.container(options.x ?? 0, options.y ?? 0)
-      .setRotation(options.rotation ?? 0).setDepth(options.depth ?? 1);
+    const mount = this.scene.add
+      .container(options.x ?? 0, options.y ?? 0)
+      .setRotation(options.rotation ?? 0)
+      .setDepth(options.depth ?? 1);
     mount.add(object);
     renderMount.add(mount).sort('depth');
     this.attachments.set(object, mount);
@@ -248,10 +280,14 @@ export class Puppet {
     this.ikPose.restore();
   }
 
-  private onUpdate(_time: number, delta: number): void { this.update(delta); }
+  private onUpdate(_time: number, delta: number): void {
+    this.update(delta);
+  }
 
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
-  preparePose(): void { this.ikPose.restore(); }
+  preparePose(): void {
+    this.ikPose.restore();
+  }
 
   private orderedIK(): TwoBoneIKConstraint[] {
     return [...this.ikConstraints.values()].sort((a, b) => a.priority - b.priority);
@@ -264,9 +300,9 @@ export class Puppet {
     for (const bone of this.bones.values()) bone.syncTransform();
     this.renderer.sync();
     const constraints = this.orderedIK();
-    this.ikPose.capture(constraints.flatMap(constraint => [
-      this.getBone(constraint.rootBone), this.getBone(constraint.middleBone),
-    ]));
+    this.ikPose.capture(
+      constraints.flatMap((constraint) => [this.getBone(constraint.rootBone), this.getBone(constraint.middleBone)]),
+    );
     const context = {
       worldToParent: (id: string, target: IKTarget): IKTarget | undefined => {
         const parent = this.getBone(id).container.parentContainer!;

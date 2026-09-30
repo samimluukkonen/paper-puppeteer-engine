@@ -1,5 +1,5 @@
-import { compileClip, sampleProperty } from './AnimationClip.js';
 import type { AnimationClip, CompiledClip } from './AnimationClip.js';
+import { compileClip, sampleProperty } from './AnimationClip.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
 import { assertFinite } from './types.js';
@@ -11,15 +11,24 @@ export class AnimationPlayer {
   private time = 0;
   private playing = false;
 
-  constructor(private readonly rig: Rig, private readonly joints: ReadonlyMap<string, Joint>) {
+  constructor(
+    private readonly rig: Rig,
+    private readonly joints: ReadonlyMap<string, Joint>,
+  ) {
     for (const bone of rig.bones) {
       if (!joints.has(bone.id)) throw new Error(`Missing joint "${bone.id}".`);
     }
   }
 
-  get currentAnimation(): string | undefined { return this.current?.name; }
-  get elapsedTime(): number { return this.time; }
-  get isPlaying(): boolean { return this.playing; }
+  get currentAnimation(): string | undefined {
+    return this.current?.name;
+  }
+  get elapsedTime(): number {
+    return this.time;
+  }
+  get isPlaying(): boolean {
+    return this.playing;
+  }
 
   addAnimation(clip: AnimationClip): void {
     if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);

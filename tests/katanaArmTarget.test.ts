@@ -2,8 +2,7 @@ import { assert, test } from 'vitest';
 import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from '../src/demo/katanaArmTarget.js';
 
 test('an in-range secondary grip leaves the primary hand target alone', () => {
-  assert.deepEqual(gripReachCorrection({ x: 0, y: 0 }, { x: 40, y: 0 }, 30, 30),
-    { x: 0, y: 0 });
+  assert.deepEqual(gripReachCorrection({ x: 0, y: 0 }, { x: 40, y: 0 }, 30, 30), { x: 0, y: 0 });
 });
 
 test('an out-of-reach grip pulls the hand target toward the shoulder', () => {
@@ -20,7 +19,10 @@ test('a grip too close to the shoulder moves away from it', () => {
 
 test('body silhouette edge follows the cutout at the palm height', () => {
   const corners = [
-    { x: 0, y: -2 }, { x: 2, y: 0 }, { x: 0, y: 2 }, { x: -2, y: 0 },
+    { x: 0, y: -2 },
+    { x: 2, y: 0 },
+    { x: 0, y: 2 },
+    { x: -2, y: 0 },
   ];
   assert.deepEqual(horizontalEdgesAtY(corners, 1), { left: -1, right: 1 });
   assert.deepEqual(horizontalEdgesAtY(corners, 0), { left: -2, right: 2 });

@@ -1,18 +1,32 @@
 import { assert, test } from 'vitest';
-import { Rig } from '../src/engine/Rig.js';
+import { idle, walk } from '../src/demo/demoAnimations.js';
+import {
+  demoArmRotations,
+  demoHipPositions,
+  demoRenderOrder,
+  demoShoulderPositions,
+} from '../src/demo/demoPresentation.js';
 import { demoRig } from '../src/demo/demoRig.js';
-import { demoArmRotations, demoHipPositions, demoRenderOrder, demoShoulderPositions } from '../src/demo/demoPresentation.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
-import { idle, walk } from '../src/demo/demoAnimations.js';
+import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig(demoRig);
-const body = ['torso', 'pelvis', 'head', 'leftThigh', 'leftLowerLeg', 'leftFoot',
-  'rightThigh', 'rightLowerLeg', 'rightFoot'];
+const body = [
+  'torso',
+  'pelvis',
+  'head',
+  'leftThigh',
+  'leftLowerLeg',
+  'leftFoot',
+  'rightThigh',
+  'rightLowerLeg',
+  'rightFoot',
+];
 
 for (const facing of ['left', 'right'] as const) {
   test(`idle facing ${facing} keeps the intended slight shoulder tilt throughout the cycle`, () => {
-    const joints = new Map(rig.bones.map(bone => [bone.id, new Joint(bone.id, bone)]));
+    const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
     const player = new AnimationPlayer(rig, joints);
     for (const clip of [idle, walk]) {
       player.addAnimation(clip);
@@ -42,7 +56,7 @@ for (const facing of ['left', 'right'] as const) {
     const rear = facing === 'right' ? 'left' : 'right';
     const front = facing === 'right' ? 'right' : 'left';
     assert.strictEqual(new Set(order).size, rig.bones.length);
-    assert.deepEqual([...order].sort(), rig.bones.map(bone => bone.id).sort());
+    assert.deepEqual([...order].sort(), rig.bones.map((bone) => bone.id).sort());
     for (const part of ['UpperArm', 'Forearm', 'Hand']) {
       for (const id of body) {
         assert.isBelow(order.indexOf(`${rear}${part}`), order.indexOf(id));
@@ -81,7 +95,7 @@ for (const facing of ['left', 'right'] as const) {
 
   for (const clip of [idle, walk]) {
     test(`${clip.name} facing ${facing} keeps the corrected right elbow bend throughout the cycle`, () => {
-      const joints = new Map(rig.bones.map(bone => [bone.id, new Joint(bone.id, bone)]));
+      const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
       const player = new AnimationPlayer(rig, joints);
       player.addAnimation(clip);
       player.play(clip.name);
@@ -117,8 +131,11 @@ test('idle facing right puts the whole left arm behind the character and the rig
     for (const id of body) assert.isAbove(order.indexOf(`right${part}`), order.indexOf(id));
   }
   const torso = ['pelvis', 'torso', 'head'];
-  assert.deepEqual(order.filter(id => torso.includes(id)), rig.renderOrder.filter(id => torso.includes(id)));
-  assert.deepEqual([...order].sort(), rig.bones.map(bone => bone.id).sort());
+  assert.deepEqual(
+    order.filter((id) => torso.includes(id)),
+    rig.renderOrder.filter((id) => torso.includes(id)),
+  );
+  assert.deepEqual([...order].sort(), rig.bones.map((bone) => bone.id).sort());
 });
 
 test('idle facing left puts the whole right arm behind the body and the whole left arm in front', () => {
@@ -130,8 +147,11 @@ test('idle facing left puts the whole right arm behind the body and the whole le
     }
   }
   const torso = ['pelvis', 'torso', 'head'];
-  assert.deepEqual(order.filter(id => torso.includes(id)), rig.renderOrder.filter(id => torso.includes(id)));
-  assert.deepEqual([...order].sort(), rig.bones.map(bone => bone.id).sort());
+  assert.deepEqual(
+    order.filter((id) => torso.includes(id)),
+    rig.renderOrder.filter((id) => torso.includes(id)),
+  );
+  assert.deepEqual([...order].sort(), rig.bones.map((bone) => bone.id).sort());
 });
 
 test('default rig drawing order respects sibling depth and image placement', () => {
@@ -149,8 +169,10 @@ test('idle swaps hip positions facing right and restores them facing left', () =
   assert.strictEqual(left.leftThigh, rig.getBone('leftThigh').x);
   assert.strictEqual(left.rightThigh, rig.getBone('rightThigh').x);
   const legs = ['leftThigh', 'leftLowerLeg', 'leftFoot', 'rightThigh', 'rightLowerLeg', 'rightFoot'];
-  assert.deepEqual(demoRenderOrder(rig, 'idle', 'right').filter(id => legs.includes(id)),
-    rig.renderOrder.filter(id => legs.includes(id)));
+  assert.deepEqual(
+    demoRenderOrder(rig, 'idle', 'right').filter((id) => legs.includes(id)),
+    rig.renderOrder.filter((id) => legs.includes(id)),
+  );
 });
 
 test('idle facing left draws the entire left leg in front of the right leg and pelvis', () => {

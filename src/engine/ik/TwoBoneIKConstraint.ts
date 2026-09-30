@@ -3,7 +3,12 @@ import type { Rig } from '../Rig.js';
 import { assertFinite } from '../types.js';
 import { assertBendDirection, blendIKRotation, IK_EPSILON, solveTwoBoneIK } from './solveTwoBoneIK.js';
 import type {
-  BendDirection, IKStatus, IKTarget, IKTargetProvider, IKTransformContext, TwoBoneIKDefinition,
+  BendDirection,
+  IKStatus,
+  IKTarget,
+  IKTargetProvider,
+  IKTransformContext,
+  TwoBoneIKDefinition,
 } from './types.js';
 
 /** A data-driven chain; the only rendering dependency is a coordinate adapter. */
@@ -57,8 +62,12 @@ export class TwoBoneIKConstraint {
     this.priority = definition.priority ?? 0;
   }
 
-  get mix(): number { return this.influence; }
-  get priority(): number { return this.order; }
+  get mix(): number {
+    return this.influence;
+  }
+  get priority(): number {
+    return this.order;
+  }
   set priority(value: number) {
     assertFinite(value, `IK ${this.name}.priority`);
     this.order = value;
@@ -69,10 +78,17 @@ export class TwoBoneIKConstraint {
     this.influence = value;
   }
 
-  get bendDirection(): BendDirection { return this.bend; }
-  set bendDirection(value: BendDirection) { assertBendDirection(value); this.bend = value; }
+  get bendDirection(): BendDirection {
+    return this.bend;
+  }
+  set bendDirection(value: BendDirection) {
+    assertBendDirection(value);
+    this.bend = value;
+  }
 
-  get endOffset(): Readonly<IKTarget> { return this.endpointOffset; }
+  get endOffset(): Readonly<IKTarget> {
+    return this.endpointOffset;
+  }
   setEndOffset(offset: IKTarget): this {
     assertFinite(offset.x, `IK ${this.name}.endOffset.x`);
     assertFinite(offset.y, `IK ${this.name}.endOffset.y`);
@@ -80,7 +96,9 @@ export class TwoBoneIKConstraint {
     return this;
   }
 
-  get target(): Readonly<IKTarget> | undefined { return this.point; }
+  get target(): Readonly<IKTarget> | undefined {
+    return this.point;
+  }
   set target(value: IKTarget | undefined) {
     if (value) {
       assertFinite(value.x, 'IK target.x');
@@ -114,7 +132,10 @@ export class TwoBoneIKConstraint {
     assertFinite(target.y, 'IK target.y');
     this.resolvedTarget = { ...target };
     const localTarget = context.worldToParent(this.rootBone, target);
-    if (!localTarget) { this.status = 'singular-transform'; return; }
+    if (!localTarget) {
+      this.status = 'singular-transform';
+      return;
+    }
     const root = this.root.pose;
     const middle = this.middle.pose;
     const end = this.end.pose;
@@ -146,7 +167,10 @@ export class TwoBoneIKConstraint {
     const axisB = Math.atan2(by, bx);
     const reflection = Math.sign(sx * sy);
     const solved = solveTwoBoneIK({
-      root, target: localTarget, lengthA: this.lengthA, lengthB: this.lengthB,
+      root,
+      target: localTarget,
+      lengthA: this.lengthA,
+      lengthB: this.lengthB,
       bendDirection: (this.bendDirection * reflection) as BendDirection,
       fallbackRotation: root.rotation + axisA,
     });

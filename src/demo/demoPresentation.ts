@@ -21,12 +21,18 @@ export function demoRenderOrder(rig: Rig, animation: string | undefined, facing:
   const frontArm = facing === 'right' ? rightArm : leftArm;
   const rearLeg = facing === 'right' ? leftLeg : rightLeg;
   const frontLeg = facing === 'right' ? rightLeg : leftLeg;
-  const body = [...rearLeg, ...rig.renderOrder.filter(id => !limbs.has(id))
-    .flatMap(id => id === 'pelvis' ? [id, ...frontLeg] : [id])];
+  const body = [
+    ...rearLeg,
+    ...rig.renderOrder.filter((id) => !limbs.has(id)).flatMap((id) => (id === 'pelvis' ? [id, ...frontLeg] : [id])),
+  ];
   return [...rearArm, ...body, ...frontArm];
 }
 
-export function demoShoulderPositions(rig: Rig, animation: string | undefined, facing: Facing): Readonly<Record<'leftUpperArm' | 'rightUpperArm', number>> {
+export function demoShoulderPositions(
+  rig: Rig,
+  animation: string | undefined,
+  facing: Facing,
+): Readonly<Record<'leftUpperArm' | 'rightUpperArm', number>> {
   const swap = (animation === 'walk' || animation === 'idle' || animation === 'sword') && facing === 'right' ? -1 : 1;
   return {
     leftUpperArm: swap * (rig.getBone('leftUpperArm').x ?? 0),
@@ -37,7 +43,5 @@ export function demoShoulderPositions(rig: Rig, animation: string | undefined, f
 export function demoHipPositions(rig: Rig, facing: Facing): Readonly<Record<'leftThigh' | 'rightThigh', number>> {
   const left = rig.getBone('leftThigh').x ?? 0;
   const right = rig.getBone('rightThigh').x ?? 0;
-  return facing === 'right'
-    ? { leftThigh: right, rightThigh: left }
-    : { leftThigh: left, rightThigh: right };
+  return facing === 'right' ? { leftThigh: right, rightThigh: left } : { leftThigh: left, rightThigh: right };
 }

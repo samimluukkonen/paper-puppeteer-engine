@@ -15,7 +15,8 @@ export class Bone extends Joint {
     this.container.setDepth(definition.depth ?? 0);
     const sprite = definition.sprite;
     if (sprite) {
-      this.sprite = scene.add.image(sprite.x ?? 0, sprite.y ?? 0, sprite.texture, sprite.frame)
+      this.sprite = scene.add
+        .image(sprite.x ?? 0, sprite.y ?? 0, sprite.texture, sprite.frame)
         .setOrigin(sprite.originX ?? 0.5, sprite.originY ?? 0.5)
         .setScale(sprite.scaleX ?? 1, sprite.scaleY ?? 1)
         .setDepth(sprite.depth ?? 0);

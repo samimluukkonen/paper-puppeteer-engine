@@ -8,7 +8,10 @@ export class IKDebug {
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly labels = new Map<string, Phaser.GameObjects.Text>();
 
-  constructor(private readonly scene: Phaser.Scene, private readonly bones: ReadonlyMap<string, Bone>) {
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly bones: ReadonlyMap<string, Bone>,
+  ) {
     this.container = scene.add.container(0, 0).setVisible(false);
     this.graphics = scene.add.graphics();
     this.container.add(this.graphics);
@@ -26,7 +29,8 @@ export class IKDebug {
       const middle = this.bones.get(constraint.middleBone)!.getWorldPosition();
       const endBone = this.bones.get(constraint.endBone)!;
       const wrist = endBone.getWorldPosition();
-      const end = endBone.container.getWorldTransformMatrix()
+      const end = endBone.container
+        .getWorldTransformMatrix()
         .transformPoint(constraint.endOffset.x, constraint.endOffset.y);
       const color = [0x7652ad, 0x337db1, 0xcb674f, 0xb18a22][index % 4]!;
       this.graphics.lineStyle(2, color, 0.9);
@@ -46,25 +50,35 @@ export class IKDebug {
       let label = this.labels.get(constraint.name);
       if (!label) {
         label = this.scene.add.text(0, 0, '', {
-          fontFamily: 'monospace', fontSize: '10px', color: '#513d69',
-          backgroundColor: '#f9f5e9', padding: { x: 3, y: 2 },
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: '#513d69',
+          backgroundColor: '#f9f5e9',
+          padding: { x: 3, y: 2 },
         });
         this.labels.set(constraint.name, label);
         this.container.add(label);
       }
-      label.setVisible(true).setPosition(target.x + 15, target.y + 12)
-        .setText(`${constraint.name} · bend ${constraint.bendDirection}\n`
-          + `A ${constraint.lengthA.toFixed(1)} / B ${constraint.lengthB.toFixed(1)} · ${constraint.status}`);
+      label
+        .setVisible(true)
+        .setPosition(target.x + 15, target.y + 12)
+        .setText(
+          `${constraint.name} · bend ${constraint.bendDirection}\n` +
+            `A ${constraint.lengthA.toFixed(1)} / B ${constraint.lengthB.toFixed(1)} · ${constraint.status}`,
+        );
       let bounds = label.getBounds();
-      let overlap = labelBounds.find(other => Phaser.Geom.Rectangle.Overlaps(bounds, other));
+      let overlap = labelBounds.find((other) => Phaser.Geom.Rectangle.Overlaps(bounds, other));
       while (overlap) {
         label.setY(overlap.bottom + 4);
         bounds = label.getBounds();
-        overlap = labelBounds.find(other => Phaser.Geom.Rectangle.Overlaps(bounds, other));
+        overlap = labelBounds.find((other) => Phaser.Geom.Rectangle.Overlaps(bounds, other));
       }
       labelBounds.push(bounds);
     }
   }
 
-  destroy(): void { this.container.destroy(); this.labels.clear(); }
+  destroy(): void {
+    this.container.destroy();
+    this.labels.clear();
+  }
 }

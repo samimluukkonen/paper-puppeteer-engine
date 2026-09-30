@@ -1,7 +1,7 @@
-import { test, assert } from 'vitest';
-import { Rig } from '../src/engine/Rig.js';
-import { Joint } from '../src/engine/Joint.js';
+import { assert, test } from 'vitest';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
+import { Joint } from '../src/engine/Joint.js';
+import { Rig } from '../src/engine/Rig.js';
 import type { RigDefinition } from '../src/engine/types.js';
 
 const definition: RigDefinition = {
@@ -15,13 +15,16 @@ const definition: RigDefinition = {
 
 function fixture() {
   const rig = new Rig(definition);
-  const joints = new Map(rig.bones.map(bone => [bone.id, new Joint(bone.id, bone)]));
+  const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
   return { rig, joints, player: new AnimationPlayer(rig, joints) };
 }
 
 test('rig accepts unordered definitions and creates an immutable parent-first snapshot', () => {
   const rig = new Rig(definition);
-  assert.deepEqual(rig.bones.map(bone => bone.id), ['root', 'arm', 'hand']);
+  assert.deepEqual(
+    rig.bones.map((bone) => bone.id),
+    ['root', 'arm', 'hand'],
+  );
   assert.strictEqual(rig.getBone('hand').parent, 'arm');
   assert.ok(Object.isFrozen(rig.bones));
   assert.ok(Object.isFrozen(rig.getBone('hand')));
@@ -31,28 +34,41 @@ test('rig accepts unordered definitions and creates an immutable parent-first sn
 test('rig rejects missing roots, duplicate ids, missing parents, extra roots and cycles', () => {
   assert.throws(() => new Rig({ root: 'missing', bones: [{ id: 'root' }] }), /Unknown bone/);
   assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'root' }] }), /duplicate/);
-  assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'missing' }] }), /Unknown parent/);
+  assert.throws(
+    () => new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'missing' }] }),
+    /Unknown parent/,
+  );
   assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'other' }] }), /needs a parent/);
-  assert.throws(() => new Rig({ root: 'root', bones: [
-    { id: 'root' }, { id: 'arm', parent: 'hand' }, { id: 'hand', parent: 'arm' },
-  ] }), /cycle/);
+  assert.throws(
+    () =>
+      new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'hand' }, { id: 'hand', parent: 'arm' }] }),
+    /cycle/,
+  );
   assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root', parent: 'root' }] }), /cannot have a parent/);
 });
 
 test('rig rejects nonfinite transforms and invalid sprite origins', () => {
   assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root', x: NaN }] }), /finite/);
-  assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root', sprite: { texture: 'part', originX: 2 } }] }), /between/);
+  assert.throws(
+    () => new Rig({ root: 'root', bones: [{ id: 'root', sprite: { texture: 'part', originX: 2 } }] }),
+    /between/,
+  );
 });
 
 test('animation interpolates all five properties independently across sparse keys', () => {
   const { player, joints } = fixture();
-  player.addAnimation({ name: 'pose', duration: 1000, loop: false, tracks: {
-    arm: [
-      { time: 0, rotation: 0, x: 10, y: 20, scaleX: 1, scaleY: 1 },
-      { time: 500, x: 20 },
-      { time: 1000, rotation: 2, x: 30, y: 40, scaleX: 3, scaleY: 0.5 },
-    ],
-  } });
+  player.addAnimation({
+    name: 'pose',
+    duration: 1000,
+    loop: false,
+    tracks: {
+      arm: [
+        { time: 0, rotation: 0, x: 10, y: 20, scaleX: 1, scaleY: 1 },
+        { time: 500, x: 20 },
+        { time: 1000, rotation: 2, x: 30, y: 40, scaleX: 3, scaleY: 0.5 },
+      ],
+    },
+  });
   player.play('pose');
   player.update(500);
   assert.deepEqual(joints.get('arm')!.pose, { x: 20, y: 30, rotation: 1, scaleX: 2, scaleY: 0.75 });
@@ -64,9 +80,17 @@ test('animation interpolates all five properties independently across sparse key
 
 test('looping handles large deltas, stopping freezes time and replay/restart begins at zero', () => {
   const { player, joints } = fixture();
-  player.addAnimation({ name: 'loop', duration: 1000, loop: true, tracks: {
-    arm: [{ time: 0, rotation: 0 }, { time: 1000, rotation: 1 }],
-  } });
+  player.addAnimation({
+    name: 'loop',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      arm: [
+        { time: 0, rotation: 0 },
+        { time: 1000, rotation: 1 },
+      ],
+    },
+  });
   player.play('loop');
   player.update(2250);
   assert.strictEqual(player.elapsedTime, 250);
@@ -87,9 +111,17 @@ test('looping handles large deltas, stopping freezes time and replay/restart beg
 
 test('nonlooping clips hold their exact final pose and stop', () => {
   const { player, joints } = fixture();
-  player.addAnimation({ name: 'once', duration: 100, loop: false, tracks: {
-    hand: [{ time: 0, rotation: 0 }, { time: 100, rotation: 1 }],
-  } });
+  player.addAnimation({
+    name: 'once',
+    duration: 100,
+    loop: false,
+    tracks: {
+      hand: [
+        { time: 0, rotation: 0 },
+        { time: 100, rotation: 1 },
+      ],
+    },
+  });
   player.play('once');
   player.update(150);
   assert.strictEqual(player.elapsedTime, 100);
@@ -101,12 +133,23 @@ test('nonlooping clips hold their exact final pose and stop', () => {
 
 test('switching clips resets untracked properties and bones to the bind pose', () => {
   const { player, joints } = fixture();
-  player.addAnimation({ name: 'stretch', duration: 100, loop: true, tracks: {
-    arm: [{ time: 0, scaleX: 2, x: 99 }], hand: [{ time: 0, rotation: 1 }],
-  } });
-  player.addAnimation({ name: 'rest', duration: 100, loop: true, tracks: {
-    arm: [{ time: 0, rotation: 0.1 }],
-  } });
+  player.addAnimation({
+    name: 'stretch',
+    duration: 100,
+    loop: true,
+    tracks: {
+      arm: [{ time: 0, scaleX: 2, x: 99 }],
+      hand: [{ time: 0, rotation: 1 }],
+    },
+  });
+  player.addAnimation({
+    name: 'rest',
+    duration: 100,
+    loop: true,
+    tracks: {
+      arm: [{ time: 0, rotation: 0.1 }],
+    },
+  });
   player.play('stretch');
   player.play('rest');
   assert.strictEqual(joints.get('arm')!.pose.scaleX, 1);
@@ -117,9 +160,17 @@ test('switching clips resets untracked properties and bones to the bind pose', (
 
 test('sampling holds endpoints before the first key and after the last key', () => {
   const { player, joints } = fixture();
-  player.addAnimation({ name: 'hold', duration: 1000, loop: false, tracks: {
-    arm: [{ time: 200, rotation: 0.2 }, { time: 800, rotation: 0.8 }],
-  } });
+  player.addAnimation({
+    name: 'hold',
+    duration: 1000,
+    loop: false,
+    tracks: {
+      arm: [
+        { time: 200, rotation: 0.2 },
+        { time: 800, rotation: 0.8 },
+      ],
+    },
+  });
   player.play('hold');
   assert.strictEqual(joints.get('arm')!.pose.rotation, 0.2);
   player.sample(1000);
@@ -142,9 +193,14 @@ test('animation validation rejects malformed keys and unknown bones without chan
   assert.throws(() => player.addAnimation({ ...clip, duration: Infinity }), /finite/);
   assert.throws(() => player.addAnimation({ ...clip, tracks: { missing: [] } }), /Unknown bone/);
   for (const keys of [
-    [{ time: -1 }], [{ time: 101 }], [{ time: NaN }],
-    [{ time: 0 }, { time: 0 }], [{ time: 50 }, { time: 20 }], [{ time: 0, rotation: NaN }],
-  ]) assert.throws(() => player.addAnimation({ ...clip, tracks: { arm: keys } }));
+    [{ time: -1 }],
+    [{ time: 101 }],
+    [{ time: NaN }],
+    [{ time: 0 }, { time: 0 }],
+    [{ time: 50 }, { time: 20 }],
+    [{ time: 0, rotation: NaN }],
+  ])
+    assert.throws(() => player.addAnimation({ ...clip, tracks: { arm: keys } }));
   player.addAnimation({ ...clip, name: 'valid' });
   assert.throws(() => player.addAnimation({ ...clip, name: 'valid' }), /already registered/);
   player.play('valid');

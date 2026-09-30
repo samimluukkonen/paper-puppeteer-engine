@@ -1,12 +1,12 @@
 import { assert, test } from 'vitest';
-import { Joint } from '../src/engine/Joint.js';
-import { Rig } from '../src/engine/Rig.js';
+import { walk } from '../src/demo/demoAnimations.js';
+import { demoWalkFootIK } from '../src/demo/demoFootTargets.js';
+import { demoHipPositions } from '../src/demo/demoPresentation.js';
+import { demoRig } from '../src/demo/demoRig.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
-import { walk } from '../src/demo/demoAnimations.js';
-import { demoRig } from '../src/demo/demoRig.js';
-import { demoHipPositions } from '../src/demo/demoPresentation.js';
-import { demoWalkFootIK } from '../src/demo/demoFootTargets.js';
+import { Joint } from '../src/engine/Joint.js';
+import { Rig } from '../src/engine/Rig.js';
 
 const ground = { left: { x: 404, y: 517 }, right: { x: 356, y: 517 } };
 const sides = ['left', 'right'] as const;
@@ -33,14 +33,26 @@ test('walking IK holds contact, releases for heel rise, and blends into the next
 for (const facing of ['left', 'right'] as const) {
   test(`planted walk preserves the authored swing and heel rise facing ${facing}`, () => {
     const rig = new Rig(demoRig);
-    const joints = new Map(rig.bones.map(bone => [bone.id, new Joint(bone.id, bone)]));
+    const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
     const player = new AnimationPlayer(rig, joints);
     player.addAnimation(walk);
     player.play('walk');
-    const constraints = Object.fromEntries(sides.map(side => [side, new TwoBoneIKConstraint({
-      name: `${side}LegIK`, rootBone: `${side}Thigh`,
-      middleBone: `${side}LowerLeg`, endBone: `${side}Foot`, bendDirection: 1,
-    }, rig, joints)])) as Record<(typeof sides)[number], TwoBoneIKConstraint>;
+    const constraints = Object.fromEntries(
+      sides.map((side) => [
+        side,
+        new TwoBoneIKConstraint(
+          {
+            name: `${side}LegIK`,
+            rootBone: `${side}Thigh`,
+            middleBone: `${side}LowerLeg`,
+            endBone: `${side}Foot`,
+            bendDirection: 1,
+          },
+          rig,
+          joints,
+        ),
+      ]),
+    ) as Record<(typeof sides)[number], TwoBoneIKConstraint>;
     const direction = facing === 'right' ? 1 : -1;
     const samples: { x: number; y: number }[] = [];
     for (let time = 0; time < walk.duration; time += 10) {
@@ -54,12 +66,18 @@ for (const facing of ['left', 'right'] as const) {
         const shin = joints.get(`${side}LowerLeg`)!.pose;
         const foot = joints.get(`${side}Foot`)!.pose;
         return {
-          x: bodyX + direction * 1.08 * (thigh.x
-            - shin.y * Math.sin(thigh.rotation)
-            - foot.y * Math.sin(thigh.rotation + shin.rotation)),
-          y: bodyY + 1.08 * (pelvisY + thigh.y
-            + shin.y * Math.cos(thigh.rotation)
-            + foot.y * Math.cos(thigh.rotation + shin.rotation)),
+          x:
+            bodyX +
+            direction *
+              1.08 *
+              (thigh.x - shin.y * Math.sin(thigh.rotation) - foot.y * Math.sin(thigh.rotation + shin.rotation)),
+          y:
+            bodyY +
+            1.08 *
+              (pelvisY +
+                thigh.y +
+                shin.y * Math.cos(thigh.rotation) +
+                foot.y * Math.cos(thigh.rotation + shin.rotation)),
         };
       };
       const animated = { left: ankle('left'), right: ankle('right') };
@@ -70,15 +88,23 @@ for (const facing of ['left', 'right'] as const) {
         const shin = joints.get(`${side}LowerLeg`)!.pose;
         const authored = { thigh: thigh.rotation, shin: shin.rotation };
         constraint.mix = feet[side].mix;
-        constraint.setTarget(feet[side].target).apply({ worldToParent: (_id, point) => ({
-          x: (point.x - bodyX) / (direction * 1.08),
-          y: (point.y - bodyY) / 1.08 - pelvisY,
-        }) });
+        constraint.setTarget(feet[side].target).apply({
+          worldToParent: (_id, point) => ({
+            x: (point.x - bodyX) / (direction * 1.08),
+            y: (point.y - bodyY) / 1.08 - pelvisY,
+          }),
+        });
         const actual = ankle(side);
-        assert.isBelow(Math.abs(thigh.rotation - authored.thigh), 0.2,
-          `${side} thigh strays from the authored walk at ${time}ms`);
-        assert.isBelow(Math.abs(shin.rotation - authored.shin), 0.3,
-          `${side} knee strays from the authored walk at ${time}ms`);
+        assert.isBelow(
+          Math.abs(thigh.rotation - authored.thigh),
+          0.2,
+          `${side} thigh strays from the authored walk at ${time}ms`,
+        );
+        assert.isBelow(
+          Math.abs(shin.rotation - authored.shin),
+          0.3,
+          `${side} knee strays from the authored walk at ${time}ms`,
+        );
         if (feet[side].mix === 1) {
           assert.strictEqual(constraint.status, 'solved', `${side} at ${time}ms`);
           assert.approximately(actual.x, feet[side].target.x, 1e-6);
@@ -95,9 +121,7 @@ for (const facing of ['left', 'right'] as const) {
     }
     const forward = facing === 'right' ? 1 : -1;
     assert.isAbove(forward * (samples[0]!.x - samples[500 / 10]!.x), 50);
-    assert.isBelow(samples[600 / 10]!.y, samples[400 / 10]!.y - 4,
-      'the heel should rise after planted contact');
-    assert.isBelow(samples[700 / 10]!.y, samples[600 / 10]!.y - 8,
-      'the authored return swing should clear the ground');
+    assert.isBelow(samples[600 / 10]!.y, samples[400 / 10]!.y - 4, 'the heel should rise after planted contact');
+    assert.isBelow(samples[700 / 10]!.y, samples[600 / 10]!.y - 8, 'the authored return swing should clear the ground');
   });
 }

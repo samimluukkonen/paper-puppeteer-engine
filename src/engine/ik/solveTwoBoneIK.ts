@@ -33,8 +33,15 @@ export function solveTwoBoneIK(input: TwoBoneIKInput): TwoBoneIKResult {
   const { root, target, lengthA, lengthB, bendDirection } = input;
   const fallback = input.fallbackRotation ?? 0;
   for (const [name, value] of Object.entries({
-    rootX: root.x, rootY: root.y, targetX: target.x, targetY: target.y, lengthA, lengthB, fallback,
-  })) assertFinite(value, `IK ${name}`);
+    rootX: root.x,
+    rootY: root.y,
+    targetX: target.x,
+    targetY: target.y,
+    lengthA,
+    lengthB,
+    fallback,
+  }))
+    assertFinite(value, `IK ${name}`);
   assertBendDirection(bendDirection);
   if (lengthA < 0 || lengthB < 0) throw new Error('IK lengths cannot be negative.');
   const dx = target.x - root.x;
@@ -45,8 +52,7 @@ export function solveTwoBoneIK(input: TwoBoneIKInput): TwoBoneIKResult {
   const direction = distance > IK_EPSILON ? Math.atan2(dy, dx) : fallback;
   let rootRotation = direction;
   let middleRotation = 0;
-  const reachable = distance >= Math.abs(lengthA - lengthB) - IK_EPSILON
-    && distance <= lengthA + lengthB + IK_EPSILON;
+  const reachable = distance >= Math.abs(lengthA - lengthB) - IK_EPSILON && distance <= lengthA + lengthB + IK_EPSILON;
 
   if (lengthA > IK_EPSILON && lengthB > IK_EPSILON) {
     const reach = clamp(distance, Math.abs(lengthA - lengthB), lengthA + lengthB);
@@ -57,12 +63,20 @@ export function solveTwoBoneIK(input: TwoBoneIKInput): TwoBoneIKResult {
     const d = reach / scale;
     const fullyExtended = reach === lengthA + lengthB;
     const fullyFolded = reach === Math.abs(lengthA - lengthB);
-    const shoulder = fullyExtended ? 0
-      : reach <= IK_EPSILON ? Math.PI / 2
-        : fullyFolded ? (lengthA >= lengthB ? 0 : Math.PI)
+    const shoulder = fullyExtended
+      ? 0
+      : reach <= IK_EPSILON
+        ? Math.PI / 2
+        : fullyFolded
+          ? lengthA >= lengthB
+            ? 0
+            : Math.PI
           : Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1));
-    const elbow = fullyExtended ? 0 : fullyFolded ? Math.PI
-      : Math.acos(clamp((d * d - a * a - b * b) / (2 * a * b), -1, 1));
+    const elbow = fullyExtended
+      ? 0
+      : fullyFolded
+        ? Math.PI
+        : Math.acos(clamp((d * d - a * a - b * b) / (2 * a * b), -1, 1));
     rootRotation = direction - bendDirection * shoulder;
     middleRotation = bendDirection * elbow;
   }

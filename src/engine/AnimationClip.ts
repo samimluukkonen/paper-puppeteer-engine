@@ -1,6 +1,6 @@
-import { assertFinite, transformProperties } from './types.js';
-import type { JointTransform, TransformProperty } from './types.js';
 import type { Rig } from './Rig.js';
+import type { JointTransform, TransformProperty } from './types.js';
+import { assertFinite, transformProperties } from './types.js';
 
 export type Interpolation = 'linear';
 

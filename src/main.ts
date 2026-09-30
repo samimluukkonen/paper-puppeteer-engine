@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { DemoScene } from './demo/DemoScene.js';
 import type { DemoState } from './demo/DemoScene.js';
+import { DemoScene } from './demo/DemoScene.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
 import './style.css';
 
@@ -51,9 +51,13 @@ app.innerHTML = `
       <div class="stage" id="stage" aria-label="Paper Puppeteer Engine IK demo; move the mouse to aim the hand"></div>
       <aside class="limb-legend" aria-label="Limb colors">
         <h2>Limb colors</h2>
-        <ul>${Object.values(demoLimbColors).map(({ label, color }) => `
+        <ul>${Object.values(demoLimbColors)
+          .map(
+            ({ label, color }) => `
           <li><span class="limb-swatch" style="--limb-color: #${color.toString(16).padStart(6, '0')}" aria-hidden="true"></span>${label}</li>
-        `).join('')}</ul>
+        `,
+          )
+          .join('')}</ul>
         <p>Colors follow each limb.</p>
       </aside>
       <div class="stage-caption"><span>THE PUPPET LAB</span><span>Mouse to aim · Q / E to turn</span></div>
@@ -64,10 +68,16 @@ app.innerHTML = `
 
 function updateControls(state: DemoState): void {
   const pressed: Record<string, boolean> = {
-    idle: state.animation === 'idle', walk: state.animation === 'walk', sword: state.animation === 'sword',
-    left: state.facing === 'left', right: state.facing === 'right',
-    debug: state.debug, prop: state.attached,
-    handIK: state.handIK, footIK: state.footIK, ikDebug: state.ikDebug,
+    idle: state.animation === 'idle',
+    walk: state.animation === 'walk',
+    sword: state.animation === 'sword',
+    left: state.facing === 'left',
+    right: state.facing === 'right',
+    debug: state.debug,
+    prop: state.attached,
+    handIK: state.handIK,
+    footIK: state.footIK,
+    ikDebug: state.ikDebug,
   };
   for (const [action, value] of Object.entries(pressed)) {
     document.querySelector(`[data-action="${action}"]`)?.setAttribute('aria-pressed', String(value));
@@ -91,16 +101,22 @@ export const game = new Phaser.Game({
 });
 
 const actions: Record<string, () => void> = {
-  idle: () => demo.play('idle'), walk: () => demo.play('walk'),
+  idle: () => demo.play('idle'),
+  walk: () => demo.play('walk'),
   sword: () => demo.play('sword'),
-  left: () => demo.face('left'), right: () => demo.face('right'),
-  debug: () => demo.toggleDebug(), prop: () => demo.toggleProp(),
-  handIK: () => demo.toggleHandIK(), footIK: () => demo.toggleFootIK(), ikDebug: () => demo.toggleIKDebug(),
-  rotateLeft: () => demo.rotateKatana(-0.15), rotateRight: () => demo.rotateKatana(0.15),
+  left: () => demo.face('left'),
+  right: () => demo.face('right'),
+  debug: () => demo.toggleDebug(),
+  prop: () => demo.toggleProp(),
+  handIK: () => demo.toggleHandIK(),
+  footIK: () => demo.toggleFootIK(),
+  ikDebug: () => demo.toggleIKDebug(),
+  rotateLeft: () => demo.rotateKatana(-0.15),
+  rotateRight: () => demo.rotateKatana(0.15),
 };
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
   button.addEventListener('click', () => {
-    const action = button.dataset['action'];
+    const action = button.dataset.action;
     if (action) actions[action]?.();
   });
 }

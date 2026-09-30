@@ -2,7 +2,10 @@ import type { IKTarget } from '../engine/index.js';
 
 /** Translation of the primary grip that brings the secondary grip within arm reach. */
 export function gripReachCorrection(
-  shoulder: IKTarget, grip: IKTarget, upperLength: number, lowerLength: number,
+  shoulder: IKTarget,
+  grip: IKTarget,
+  upperLength: number,
+  lowerLength: number,
   reachReserve = 1.5,
 ): IKTarget {
   const dx = grip.x - shoulder.x;
@@ -18,7 +21,10 @@ export function gripReachCorrection(
 }
 
 /** Horizontal span where a line crosses a transformed cutout. */
-export function horizontalEdgesAtY(corners: readonly IKTarget[], y: number): { left: number; right: number } | undefined {
+export function horizontalEdgesAtY(
+  corners: readonly IKTarget[],
+  y: number,
+): { left: number; right: number } | undefined {
   let left = Infinity;
   let right = -Infinity;
   for (let index = 0; index < corners.length; index += 1) {
@@ -30,7 +36,7 @@ export function horizontalEdgesAtY(corners: readonly IKTarget[], y: number): { l
         right = Math.max(right, a.x, b.x);
       }
     } else if (y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) {
-      const x = a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y);
+      const x = a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y);
       left = Math.min(left, x);
       right = Math.max(right, x);
     }
@@ -40,8 +46,11 @@ export function horizontalEdgesAtY(corners: readonly IKTarget[], y: number): { l
 
 /** Take a bounded step toward a palm target, routing across the head's top corners. */
 export function stepPalmAroundHead(
-  previous: IKTarget, desired: IKTarget,
-  head: { left: number; right: number; top: number }, margin: number, maximumStep: number,
+  previous: IKTarget,
+  desired: IKTarget,
+  head: { left: number; right: number; top: number },
+  margin: number,
+  maximumStep: number,
 ): IKTarget {
   const left = head.left - margin;
   const right = head.right + margin;
@@ -52,11 +61,9 @@ export function stepPalmAroundHead(
     waypoint = { x: right, y: top };
   } else if (previous.x < center && previous.y > top + 1 && desired.x > left) {
     waypoint = { x: left, y: top };
-  } else if (previous.y <= top + 1 && desired.y > top + 1 && desired.x <= left
-    && previous.x > left + 1) {
+  } else if (previous.y <= top + 1 && desired.y > top + 1 && desired.x <= left && previous.x > left + 1) {
     waypoint = { x: left, y: top };
-  } else if (previous.y <= top + 1 && desired.y > top + 1 && desired.x >= right
-    && previous.x < right - 1) {
+  } else if (previous.y <= top + 1 && desired.y > top + 1 && desired.x >= right && previous.x < right - 1) {
     waypoint = { x: right, y: top };
   }
   const dx = waypoint.x - previous.x;

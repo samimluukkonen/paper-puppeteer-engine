@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 import type { IKTarget } from '../engine/index.js';
 
 export interface WeaponGripDefinition {

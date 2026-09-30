@@ -1,5 +1,5 @@
-import { assertFinite, createTransform, transformProperties } from './types.js';
 import type { BoneDefinition, RigDefinition } from './types.js';
+import { assertFinite, createTransform, transformProperties } from './types.js';
 
 /** Validates a data-only rig and orders it so parents always precede children. */
 export class Rig {
@@ -35,10 +35,13 @@ export class Rig {
           }
         }
       }
-      this.definitions.set(bone.id, Object.freeze({
-        ...bone,
-        ...(bone.sprite ? { sprite: Object.freeze({ ...bone.sprite }) } : {}),
-      }));
+      this.definitions.set(
+        bone.id,
+        Object.freeze({
+          ...bone,
+          ...(bone.sprite ? { sprite: Object.freeze({ ...bone.sprite }) } : {}),
+        }),
+      );
     }
     const root = this.getBone(this.root);
     if (root.parent !== undefined) throw new Error('The root bone cannot have a parent.');
@@ -60,11 +63,14 @@ export class Rig {
       const x = bone.x ?? 0;
       const y = bone.y ?? 0;
       const distance = Math.hypot(x, y);
-      this.definitions.set(bone.id, Object.freeze({
-        ...bone,
-        x: distance > 0 ? x / distance * length : 0,
-        y: distance > 0 ? y / distance * length : length,
-      }));
+      this.definitions.set(
+        bone.id,
+        Object.freeze({
+          ...bone,
+          x: distance > 0 ? (x / distance) * length : 0,
+          y: distance > 0 ? (y / distance) * length : length,
+        }),
+      );
     }
 
     const ordered: BoneDefinition[] = [];
@@ -95,7 +101,7 @@ export class Rig {
       const bone = this.getBone(id);
       const entries = [
         { id, depth: bone.sprite?.depth ?? 0, self: true },
-        ...(children.get(id) ?? []).map(child => ({ id: child.id, depth: child.depth ?? 0, self: false })),
+        ...(children.get(id) ?? []).map((child) => ({ id: child.id, depth: child.depth ?? 0, self: false })),
       ].sort((left, right) => left.depth - right.depth);
       for (const entry of entries) {
         if (entry.self) renderOrder.push(entry.id);

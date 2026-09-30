@@ -3,7 +3,11 @@
   "version": "0.2.0",
   "description": "A reusable Phaser engine for hierarchical 2D paper cutout puppets.",
   "type": "module",
-  "files": ["dist/library", "src/engine", "README.md"],
+  "files": [
+    "dist/library",
+    "src/engine",
+    "README.md"
+  ],
   "main": "./dist/library/index.js",
   "module": "./dist/library/index.js",
   "types": "./dist/library/index.d.ts",
@@ -21,15 +25,22 @@
     "build:demo": "vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "preview": "vite preview",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "peerDependencies": {"phaser": "4.2.1"},
+  "peerDependencies": {
+    "phaser": "4.2.1"
+  },
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
     "phaser": "4.2.1",
     "typescript": "7.0.2",
     "vite": "8.3.1",
     "vitest": "5.0.2"
   },
-  "engines": {"node": "^20.19.0 || >=22.12.0"}
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
 }

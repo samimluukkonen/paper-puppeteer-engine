@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
 
@@ -19,8 +19,12 @@ export class PuppetRenderer {
   private readonly projections: TransformProjection[] = [];
   private order: readonly string[] = [];
 
-  constructor(scene: Phaser.Scene, parent: Phaser.GameObjects.Container,
-    private readonly rig: Rig, bones: ReadonlyMap<string, Bone>) {
+  constructor(
+    scene: Phaser.Scene,
+    parent: Phaser.GameObjects.Container,
+    private readonly rig: Rig,
+    bones: ReadonlyMap<string, Bone>,
+  ) {
     this.container = scene.add.container(0, 0).setName('puppet-render');
     parent.add(this.container);
     for (const bone of bones.values()) {
@@ -47,7 +51,9 @@ export class PuppetRenderer {
     this.sync();
   }
 
-  getOrder(): readonly string[] { return [...this.order]; }
+  getOrder(): readonly string[] {
+    return [...this.order];
+  }
 
   /** Complete back-to-front order, including bones without an image. */
   setOrder(order: readonly string[]): void {
@@ -68,8 +74,12 @@ export class PuppetRenderer {
 
   sync(): void {
     for (const { source, target } of this.projections) {
-      target.setPosition(source.x, source.y).setRotation(source.rotation)
-        .setScale(source.scaleX, source.scaleY).setAlpha(source.alpha).setVisible(source.visible);
+      target
+        .setPosition(source.x, source.y)
+        .setRotation(source.rotation)
+        .setScale(source.scaleX, source.scaleY)
+        .setAlpha(source.alpha)
+        .setVisible(source.visible);
     }
   }
 

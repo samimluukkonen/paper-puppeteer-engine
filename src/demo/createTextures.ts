@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 import { demoLimbColors } from './demoLimbColors.js';
 
 const outline = 0x3e433c;
@@ -44,12 +44,24 @@ export function createTextures(scene: Phaser.Scene): void {
   for (const side of ['left', 'right'] as const) {
     const armColor = demoLimbColors[`${side}Arm`].color;
     const legColor = demoLimbColors[`${side}Leg`].color;
-    piece(`paper-${side}-upper-arm`, 28, 78, armColor, () => { pin(14, 12); });
-    piece(`paper-${side}-forearm`, 24, 67, armColor, () => { pin(12, 12); });
-    piece(`paper-${side}-hand`, 26, 34, armColor, () => { pin(13, 6.8); });
-    piece(`paper-${side}-thigh`, 34, 88, legColor, () => { pin(17, 14); });
-    piece(`paper-${side}-shin`, 28, 80, legColor, () => { pin(14, 12); });
-    piece(`paper-${side}-foot`, 52, 26, legColor, () => { pin(14.56, 7.8); });
+    piece(`paper-${side}-upper-arm`, 28, 78, armColor, () => {
+      pin(14, 12);
+    });
+    piece(`paper-${side}-forearm`, 24, 67, armColor, () => {
+      pin(12, 12);
+    });
+    piece(`paper-${side}-hand`, 26, 34, armColor, () => {
+      pin(13, 6.8);
+    });
+    piece(`paper-${side}-thigh`, 34, 88, legColor, () => {
+      pin(17, 14);
+    });
+    piece(`paper-${side}-shin`, 28, 80, legColor, () => {
+      pin(14, 12);
+    });
+    piece(`paper-${side}-foot`, 52, 26, legColor, () => {
+      pin(14.56, 7.8);
+    });
   }
 
   if (!scene.textures.exists('paper-prop')) {

@@ -44,13 +44,14 @@ During walking and idle, the whole left arm draws behind the body when facing ri
 ```bash
 npm run typecheck
 npm test
+npm run check
 npm run build
 npm run preview
 ```
 
-`build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
+`check` runs Biome's formatting, lint, and import checks; `npm run check:fix` applies safe fixes. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
-Direct dependencies use exact versions: Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, and Vitest **5.0.2**. `package-lock.json` locks the resolved dependency graph.
+Direct dependencies use exact versions: Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, and Vitest **5.0.2**. `package-lock.json` locks the resolved dependency graph.
 
 ## Architecture
 
