@@ -6,6 +6,8 @@ import { demoAnimations } from './demoAnimations.js';
 import { demoArmRotations, demoHipPositions, demoRenderOrder, demoShoulderPositions } from './demoPresentation.js';
 import { createTextures } from './createTextures.js';
 import { demoIK } from './demoIK.js';
+import { demoWalkFootIK } from './demoFootTargets.js';
+import type { WalkFootIK } from './demoFootTargets.js';
 import { Katana, katanaGrips } from './Katana.js';
 import type { IKTarget } from '../engine/index.js';
 import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from './katanaArmTarget.js';
@@ -241,21 +243,45 @@ export class DemoScene extends Phaser.Scene {
       this.aimKatana(this.swordAngle);
       return this.katana?.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary);
     });
+    this.puppet.container.setPosition(this.scale.width / 2 + (this.footIK ? 7 * Math.sin(this.elapsed / 1000) : 0),
+      this.scale.height - 278 + (this.footIK ? 3 * Math.sin(this.elapsed / 700) : 0));
+    const walkFeet = this.puppet.currentAnimation === 'walk'
+      ? demoWalkFootIK(this.puppet.animationPlayer.elapsedTime, {
+        left: { ...this.groundTargets.left, y: this.groundTargets.left.y + 7 },
+        right: { ...this.groundTargets.right, y: this.groundTargets.right.y + 7 },
+      }, { left: this.animatedAnkle('left'), right: this.animatedAnkle('right') }) : undefined;
+    const footTargets = walkFeet
+      ? { left: walkFeet.left.target, right: walkFeet.right.target } : this.groundTargets;
     for (const side of ['left', 'right'] as const) {
       const leg = this.puppet.getIK(`${side}LegIK`);
       leg.enabled = this.footIK;
-      leg.setTarget(this.groundTargets[side]);
+      leg.mix = walkFeet?.[side].mix ?? 1;
+      leg.setTarget(footTargets[side]);
     }
-    this.puppet.container.setPosition(this.scale.width / 2 + (this.footIK ? 7 * Math.sin(this.elapsed / 1000) : 0),
-      this.scale.height - 278 + (this.footIK ? 3 * Math.sin(this.elapsed / 700) : 0));
     this.katana?.container.setRotation(this.swordAngle);
     this.puppet.syncPose();
     if (this.attached) this.aimKatana(this.swordAngle);
     this.keepBothHandsOnKatana();
-    this.drawTargets();
+    this.drawTargets(footTargets, walkFeet);
   }
 
-  private drawTargets(): void {
+  private animatedAnkle(side: 'left' | 'right'): IKTarget {
+    const puppet = this.puppet!;
+    const pelvis = puppet.getBone('pelvis').pose;
+    const thigh = puppet.getBone(`${side}Thigh`).pose;
+    const shin = puppet.getBone(`${side}LowerLeg`).pose;
+    const foot = puppet.getBone(`${side}Foot`).pose;
+    // This demo rig has an unrotated pelvis and vertical, unscaled leg links.
+    const x = pelvis.x + thigh.x - shin.y * Math.sin(thigh.rotation)
+      - foot.y * Math.sin(thigh.rotation + shin.rotation);
+    const y = pelvis.y + thigh.y + shin.y * Math.cos(thigh.rotation)
+      + foot.y * Math.cos(thigh.rotation + shin.rotation);
+    return { x: puppet.container.x + puppet.container.scaleX * x,
+      y: puppet.container.y + puppet.container.scaleY * y };
+  }
+
+  private drawTargets(footTargets: Readonly<Record<'left' | 'right', IKTarget>>,
+    walkFeet?: Readonly<Record<'left' | 'right', WalkFootIK>>): void {
     if (!this.markers) return;
     this.markers.clear();
     const mark = (point: IKTarget, color: number): void => {
@@ -264,7 +290,9 @@ export class DemoScene extends Phaser.Scene {
       this.markers!.lineBetween(point.x, point.y - 11, point.x, point.y + 11);
     };
     if (this.handIK) mark(this.handTarget, 0x7652ad);
-    if (this.footIK) for (const point of Object.values(this.groundTargets)) mark(point, 0xcb674f);
+    if (this.footIK) for (const side of ['left', 'right'] as const) {
+      if (!walkFeet || walkFeet[side].mix > 0) mark(footTargets[side], 0xcb674f);
+    }
     if (this.puppet && this.katana) {
       const facing = this.puppet.facingDirection;
       const secondaryArm = this.puppet.getIK(facing === 'right' ? 'leftArmIK' : 'rightArmIK');

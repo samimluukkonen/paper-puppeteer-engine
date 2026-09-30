@@ -31,13 +31,13 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 
 To verify the hierarchy, press `2`, then `B`: elbow, wrist, and hand follow the upper arm; knee, ankle, and foot follow the thigh. Press `A` and `D` to see the entire skeleton mirror while the labels stay readable. Press `Space` to freeze a pose. `P` demonstrates attachment ownership.
 
-Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant both ankle pivots as the body sways. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
+Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant both ankle pivots as the body sways; during walking, the feet alternate between a grounded stance and a lifted return step. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
 
 The two-handed katana stance reuses idle's pelvis bob, leg rotations, and facing-dependent hip positions. This keeps the lower-body pose the same when switching between idle and the stance. If foot IK is enabled, it still adjusts the legs toward the fixed ground targets.
 
 Each limb has a consistent color across all its pieces: left arm blue, right arm purple, left leg coral, and right leg gold. The legend beside the stage identifies them; it moves below the stage on narrower screens.
 
-The walk is authored facing right: thighs swing forward and backward, both knees fold backward during the return swing, and the legs alternate half a cycle apart. Walking uses the same thigh attachment points on the pelvis as idle for each facing direction. Mirroring the root reverses the whole gait for left-facing playback. Right-facing idle tilts the right arm slightly toward screen-left and the left arm slightly toward screen-right.
+The walk is authored facing right: thighs swing forward and backward, knees stay fairly straight through stance and flex for the shorter return swing, and the legs alternate half a cycle apart. A smaller pelvis rise and gentler foot lift keep the knees from folding too deeply. Walking uses the same thigh attachment points on the pelvis as idle for each facing direction. Mirroring the root reverses the whole gait for left-facing playback. Right-facing idle tilts the right arm slightly toward screen-left and the left arm slightly toward screen-right.
 
 During walking and idle, the whole left arm draws behind the body when facing right, and the whole right arm draws behind the body when facing left; the other arm draws in front of the body. The near leg draws in front of the pelvis and the far leg: the right leg when facing right, and the left leg when facing left. During walking and idle in both directions, the left arm attaches to the screen's right-side shoulder and the right arm to the left-side shoulder. Both animations swap hip positions when facing right and keep the default hip positions when facing left. The right elbow bends inward in idle and has a stronger bend during walking; both bends mirror with facing. Props follow their hand's draw slot.
 
@@ -242,7 +242,7 @@ Constraint `status` reports `inactive`, `solved`, `clamped`, `singular-transform
 
 ### Foot planting
 
-The demo's two leg constraints receive fixed world-space ground points. `F` enables them while the puppet's body sways horizontally and vertically and its normal animation continues. Both ankle pivots stay at their markers whenever the points are reachable. The ground points stay fixed when facing changes. This demonstrates planting without terrain detection, ground raycasts, or procedural steps. Foot orientation remains authored; this version constrains endpoint position only.
+In idle and sword stance, the demo's two leg constraints receive fixed world-space ground points. `F` enables them while the puppet's body sways horizontally and vertically. During walking, each ankle target follows the authored horizontal stride. IK limits how low the ankle can sink during contact, then fades out before toe-off so the authored heel rise and return swing remain visible. The legs alternate by half a cycle and mirror with facing. This is an in-place stepping demonstration without terrain detection or ground raycasts. Foot orientation remains authored; this version constrains endpoint position only.
 
 ```ts
 puppet.setIKTarget('leftLegIK', { x: 360, y: 510 });
