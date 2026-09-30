@@ -1,5 +1,8 @@
-export type { AnimationClip, Interpolation, Keyframe } from './AnimationClip.js';
+export type { AnimationClip, AnimationEvent, AnimationPlaybackMode, Interpolation, Keyframe } from './AnimationClip.js';
+export type { AnimationCompletion, FiredAnimationEvent, PlayAnimationOptions } from './AnimationPlayer.js';
 export { AnimationPlayer } from './AnimationPlayer.js';
+export type { AnimationPose } from './AnimationPose.js';
+export { blendPose, evaluateClip, lerpProperty } from './AnimationPose.js';
 export { Bone } from './Bone.js';
 export type { TwoBoneIKInput, TwoBoneIKResult } from './ik/solveTwoBoneIK.js';
 export { blendIKRotation, solveTwoBoneIK } from './ik/solveTwoBoneIK.js';

@@ -63,6 +63,10 @@ export const walk: AnimationClip = {
   name: 'walk',
   duration: walkDuration,
   loop: true,
+  events: [
+    { time: 100, name: 'left-footstep', data: { foot: 'left' } },
+    { time: 600, name: 'right-footstep', data: { foot: 'right' } },
+  ],
   tracks: {
     pelvis: [
       { time: 0, y: 0 },
@@ -93,6 +97,7 @@ export const sword: AnimationClip = {
   name: 'sword',
   duration: 1800,
   loop: true,
+  events: [{ time: 200, name: 'weapon-ready' }],
   tracks: {
     pelvis: idlePelvisKeys,
     torso: [{ time: 0, rotation: -0.08 }],
@@ -103,4 +108,17 @@ export const sword: AnimationClip = {
   },
 };
 
-export const demoAnimations: readonly AnimationClip[] = [idle, walk, sword];
+export const guardUpperBody: AnimationClip = {
+  name: 'guardUpperBody',
+  duration: 1800,
+  loop: true,
+  tracks: {
+    torso: sword.tracks.torso ?? [],
+    leftUpperArm: sword.tracks.leftUpperArm ?? [],
+    leftForearm: sword.tracks.leftForearm ?? [],
+    rightUpperArm: sword.tracks.rightUpperArm ?? [],
+    rightForearm: sword.tracks.rightForearm ?? [],
+  },
+};
+
+export const demoAnimations: readonly AnimationClip[] = [idle, walk, sword, guardUpperBody];

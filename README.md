@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The IK iteration extends v0.1 with analytical two-bone inverse kinematics, fixed foot targets, and a two-handed katana demo. Generated placeholder textures make the skeleton easy to inspect.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.3 adds crossfades, timeline events, stepped playback, and masked animation layers to the existing two-bone IK and katana demo.
 
 ## Install and run
 
@@ -18,6 +18,12 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 | `1` | Play / restart idle |
 | `2` | Play / restart walk |
 | `3` | Two-handed katana stance; enables hand IK |
+| `4` / `5` | Crossfade to idle / walk over 300 ms |
+| `S` | Toggle smooth / stepped playback |
+| `8` / `0` | Set stepped playback to 8 / 10 FPS |
+| `L` | Toggle the masked upper-body sword layer |
+| `P` | Pause / resume animation clocks |
+| `[` / `]` | Decrease / increase playback speed by 0.25× |
 | `A` / `D` | Face left / right |
 | `B` | Toggle joint pivots, hierarchy lines, and bone names |
 | `I` | Toggle IK targets, joints, chain lines, lengths, bend signs and names |
@@ -25,11 +31,13 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 | `F` | Toggle fixed world-space foot targets and gentle body sway |
 | Mouse | Move the hand target while hand IK is enabled |
 | `Q` / `E` | Rotate the katana; the right-facing two-handed rear palm stays visible beside the body |
-| `P` | Detach / reattach the katana to the right hand |
+| `T` | Detach / reattach the katana to the right hand |
 | `Space` | Stop at the current pose / restart |
 | `R` | Restart the current clip |
 
-To verify the hierarchy, press `2`, then `B`: elbow, wrist, and hand follow the upper arm; knee, ankle, and foot follow the thigh. Press `A` and `D` to see the entire skeleton mirror while the labels stay readable. Press `Space` to freeze a pose. `P` demonstrates attachment ownership.
+To compare playback styles, press `2`, then `S` and `8`. The walk pose updates eight times per second while Phaser continues rendering and IK still solves every frame. Press `S` again for smooth motion. Press `4` and `5` to compare crossfades in both directions. Press `L` during walking to keep the legs walking under a sword-ready upper body. The status panel shows the current event, transition progress, playback speed and layer state.
+
+To verify the hierarchy, press `2`, then `B`: elbow, wrist, and hand follow the upper arm; knee, ankle, and foot follow the thigh. Press `A` and `D` to see the entire skeleton mirror while the labels stay readable. Press `Space` to freeze a pose. `T` demonstrates attachment ownership.
 
 Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant both ankle pivots as the body sways; during walking, the feet alternate between a grounded stance and a lifted return step. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
 
@@ -62,7 +70,8 @@ src/engine/
   Joint.ts             Renderer-independent bind pose and mutable local pose
   Bone.ts              Joint backed by a Phaser container and optional image
   AnimationClip.ts      Keyframe types, validation and property-track compilation
-  AnimationPlayer.ts    Playback clock and linear pose sampling
+  AnimationPlayer.ts    Layer clocks, transitions, events and completion
+  AnimationPose.ts      Pure clip evaluation and pose blending
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay
   PuppetRenderer.ts    Independent draw slots retaining ancestor transform chains
@@ -157,9 +166,62 @@ puppet.setFacing('left');
 puppet.setFacing('right');
 ```
 
-Key times and durations are **milliseconds**. Values are **absolute local transforms**, not deltas from the bind pose. All five transform properties support linear interpolation, independently across sparse keys. Each property's first/last value is held outside its key range; a single key holds a constant value. Key times must increase strictly and stay within the duration. Missing properties/bones reset to their bind pose on `play`, preventing pose leakage when changing clips. Playing the same name restarts it. Duplicate clip names and unknown bones/animations throw descriptive errors.
+Key times and durations are **milliseconds**. Values are **absolute local transforms**, not deltas from the bind pose. All five transform properties support interpolation, independently across sparse keys. Rotations take the shortest angular path in radians. Each property's first/last value is held outside its key range; a single key holds a constant value. Key times must increase strictly and stay within the duration. Missing properties/bones use the bind pose on the base layer and the underlying pose on an overlay. Playing the same name restarts it unless `restart: false` is passed. Duplicate clip names and unknown bones/animations throw descriptive errors.
 
-Looping wraps the clock at the duration; use matching start/end poses for a seamless cycle. Nonlooping clips stop at their exact final pose. Rotations interpolate numerically, so authored angles can deliberately exceed a full turn; there is no implicit shortest-angle wrapping.
+Looping wraps the clock at the duration; use matching start/end poses for a seamless cycle. Nonlooping clips stop at their exact final pose. Shortest-path rotation interpolation is intended for joint poses, not authored full-turn spins.
+
+## Playback, events and layers
+
+```ts
+puppet.play('idle');
+puppet.play('walk', { fadeDuration: 250, speed: 1.2 });
+puppet.pauseAnimation();
+puppet.resumeAnimation();
+puppet.setAnimationSpeed(0.5); // Global multiplier; nonnegative.
+
+puppet.setAnimationPlaybackMode({ mode: 'stepped', fps: 10 });
+puppet.setAnimationPlaybackMode({ mode: 'smooth' });
+// Equivalent shortcut for stepped playback:
+puppet.setAnimationFPS(8);
+```
+
+A crossfade evaluates the outgoing and incoming clips at their own advancing times and blends x, y, rotation, scaleX and scaleY. An interrupted fade starts from its currently visible pose. The fade duration uses real elapsed milliseconds; animation speed changes timeline progression but does not change fade duration. The outgoing clip is sampled during a fade but only the incoming clip sends events or completion. The base layer begins at the rig's bind pose, so partial clips also fade cleanly. A weight of zero is the source pose, one is the target pose. Rotation blending uses the shortest path around ±π.
+
+```ts
+const walk: AnimationClip = {
+  name: 'walk', duration: 1000, loop: true,
+  events: [
+    { time: 100, name: 'footstep', data: { foot: 'left' } },
+    { time: 600, name: 'footstep', data: { foot: 'right' } },
+  ],
+  tracks: { /* bone keyframes */ },
+};
+
+const offEvent = puppet.onAnimationEvent(({ name, data, clip, layer }) => {
+  if (name === 'footstep') console.log(clip, layer, data);
+});
+const offComplete = puppet.onAnimationComplete(({ clip, layer }) => {
+  if (clip === 'drawSword' && layer === 'base') puppet.play('combatIdle');
+});
+// Call offEvent() and offComplete() to unsubscribe.
+```
+
+Events fire once per timestamp crossing, including wraps and large frame deltas. They use the continuous timeline, so they fire even when the visible pose is held in stepped mode. A marker at time zero fires when a clip starts and on each loop wrap. Nonlooping completion fires once after the final pose is applied; looping clips do not complete. Pause holds all clocks, events and fades. IK targets can still move and solve while animation is paused.
+
+Stepped playback quantizes pose sample time to `floor(time / (1000 / fps)) * (1000 / fps)`. It also quantizes crossfade weights. At 10 FPS, one authored pose is held for 100 ms across normal Phaser render frames. Clip-specific `playback: { mode: 'stepped', fps: 12 }` or `{ mode: 'smooth' }` overrides the puppet default. The animation clock, event crossings and IK still update at normal frame rate. A nonlooping clip shows its exact final pose at completion.
+
+```ts
+puppet.setLayerMask('upperBody', [
+  'torso', 'head', 'leftUpperArm', 'leftForearm', 'leftHand',
+  'rightUpperArm', 'rightForearm', 'rightHand',
+]);
+puppet.play('walk');
+puppet.play('guardUpperBody', { layer: 'upperBody', fadeDuration: 250 });
+puppet.setLayerWeight('upperBody', 0.7); // Range: 0–1.
+puppet.clearLayer('upperBody');
+```
+
+Additional layers apply in insertion order after the base layer. A layer touches only tracked properties on masked bones; all other properties retain the pose below it. The base layer has a fixed weight of one. Each layer has its own clip, clock and optional transition. The update order is: restore the previous pre-IK pose, advance animation clocks, sample and blend the base clips, apply masked layers, run per-frame host pose adjustments, solve IK constraints in priority order, synchronize world transforms and rendering, then refresh debug overlays. In the demo, foot and hand IK therefore operate on the blended authored pose.
 
 The puppet updates automatically with its scene. For manual scheduling or future constraints:
 
@@ -177,7 +239,7 @@ puppet.syncPose();
 const worldPosition = hand.getWorldPosition();
 ```
 
-An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.preparePose()` to restore the previous pre-IK pose, then `puppet.animationPlayer.update(delta)`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. `animationPlayer.sample(time)` samples the current clip without changing its playback clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
+An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.preparePose()` to restore the previous pre-IK pose, then `puppet.animationPlayer.update(delta)`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
 
 ## Two-bone inverse kinematics
 
@@ -301,7 +363,7 @@ The library includes TypeScript declarations and source maps. Phaser is external
 ## Current limitations
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
-- One active clip, immediate switching, and linear interpolation; no blending, timeline events, or stepped playback yet.
+- One clip per layer with simple masked overlays; no animation graph, blend tree, editor or automatic state machine.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot planting is manual; the walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
@@ -311,9 +373,9 @@ The library includes TypeScript declarations and source maps. Phaser is external
 ## Planned features
 
 - Joint angle limits and optional end-effector rotation alignment.
-- Animation blending, stepped / low-FPS animation (8–12 pose updates per second), and timeline events.
+- More advanced animation state orchestration and editor tooling.
 - Multiple skins, sprite swapping, and runtime weapon swapping through attachments.
 - Visual rig and animation editors.
 - JSON rig and animation loading.
 
-The next useful milestone is joint limits and palm/foot orientation constraints, followed by animation blending and stepped sampling for a more theatrical paper-puppet motion style.
+The next useful milestone is joint limits and palm/foot orientation constraints, plus attachment or facial sprite swapping driven by the new event API.

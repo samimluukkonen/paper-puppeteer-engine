@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
-import type { AnimationClip } from './AnimationClip.js';
-import { AnimationPlayer } from './AnimationPlayer.js';
+import type { AnimationClip, AnimationPlaybackMode } from './AnimationClip.js';
+import {
+  type AnimationCompletion,
+  AnimationPlayer,
+  type FiredAnimationEvent,
+  type PlayAnimationOptions,
+} from './AnimationPlayer.js';
 import { Bone } from './Bone.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { IKPoseState } from './ik/IKPoseState.js';
@@ -123,9 +128,57 @@ export class Puppet {
     return this;
   }
 
-  play(name: string): this {
+  play(name: string, options?: PlayAnimationOptions): this {
     this.preparePose();
-    this.animationPlayer.play(name);
+    this.animationPlayer.play(name, options);
+    this.syncPose();
+    return this;
+  }
+
+  onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
+    return this.animationPlayer.onAnimationEvent(listener);
+  }
+
+  onAnimationComplete(listener: (event: AnimationCompletion) => void): () => void {
+    return this.animationPlayer.onAnimationComplete(listener);
+  }
+
+  pauseAnimation(): this {
+    this.animationPlayer.pause();
+    return this;
+  }
+  resumeAnimation(): this {
+    this.animationPlayer.resume();
+    return this;
+  }
+  setAnimationSpeed(speed: number): this {
+    this.animationPlayer.setSpeed(speed);
+    return this;
+  }
+  setAnimationPlaybackMode(mode: AnimationPlaybackMode): this {
+    this.preparePose();
+    this.animationPlayer.setPlaybackMode(mode);
+    this.syncPose();
+    return this;
+  }
+  setAnimationFPS(fps: number): this {
+    return this.setAnimationPlaybackMode({ mode: 'stepped', fps });
+  }
+  setLayerMask(name: string, bones: readonly string[]): this {
+    this.preparePose();
+    this.animationPlayer.setLayerMask(name, bones);
+    this.syncPose();
+    return this;
+  }
+  setLayerWeight(name: string, weight: number): this {
+    this.preparePose();
+    this.animationPlayer.setLayerWeight(name, weight);
+    this.syncPose();
+    return this;
+  }
+  clearLayer(name: string): this {
+    this.preparePose();
+    this.animationPlayer.clearLayer(name);
     this.syncPose();
     return this;
   }

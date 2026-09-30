@@ -15,7 +15,17 @@ export interface AnimationClip {
   loop: boolean;
   interpolation?: Interpolation;
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
+  events?: readonly AnimationEvent[];
+  playback?: AnimationPlaybackMode;
 }
+
+export interface AnimationEvent {
+  time: number;
+  name: string;
+  data?: unknown;
+}
+
+export type AnimationPlaybackMode = { mode: 'smooth' } | { mode: 'stepped'; fps: number };
 
 export interface PropertyKeyframe {
   readonly time: number;
@@ -32,6 +42,8 @@ export interface CompiledClip {
   readonly duration: number;
   readonly loop: boolean;
   readonly tracks: readonly CompiledTrack[];
+  readonly events: readonly AnimationEvent[];
+  readonly playback?: AnimationPlaybackMode;
 }
 
 /** Compile sparse keys per property once rather than searching them every frame. */
@@ -42,6 +54,19 @@ export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
   if (clip.interpolation !== undefined && clip.interpolation !== 'linear') {
     throw new Error(`Unsupported interpolation: ${String(clip.interpolation)}.`);
   }
+  if (clip.playback?.mode === 'stepped') {
+    assertFinite(clip.playback.fps, `${clip.name}.playback.fps`);
+    if (clip.playback.fps <= 0) throw new Error('Animation FPS must be greater than zero.');
+  }
+  const events = (clip.events ?? [])
+    .map((event) => {
+      assertFinite(event.time, `${clip.name}.event.time`);
+      if (event.time < 0 || event.time > clip.duration || !event.name) {
+        throw new Error(`Invalid event in animation "${clip.name}".`);
+      }
+      return { ...event };
+    })
+    .sort((a, b) => a.time - b.time);
   const tracks: CompiledTrack[] = [];
   for (const [bone, keys] of Object.entries(clip.tracks)) {
     rig.getBone(bone);
@@ -68,10 +93,17 @@ export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
     }
     tracks.push({ bone, properties });
   }
-  return { name: clip.name, duration: clip.duration, loop: clip.loop, tracks };
+  return {
+    name: clip.name,
+    duration: clip.duration,
+    loop: clip.loop,
+    tracks,
+    events,
+    ...(clip.playback ? { playback: { ...clip.playback } } : {}),
+  };
 }
 
-export function sampleProperty(keys: readonly PropertyKeyframe[], time: number): number {
+export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, property?: TransformProperty): number {
   const first = keys[0];
   if (!first) throw new Error('Cannot sample an empty property track.');
   if (time <= first.time) return first.value;
@@ -80,6 +112,11 @@ export function sampleProperty(keys: readonly PropertyKeyframe[], time: number):
     const previous = keys[index - 1];
     if (next && previous && time <= next.time) {
       const progress = (time - previous.time) / (next.time - previous.time);
+      if (property === 'rotation') {
+        const difference =
+          ((((next.value - previous.value + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
+        return previous.value + difference * progress;
+      }
       return previous.value + (next.value - previous.value) * progress;
     }
   }

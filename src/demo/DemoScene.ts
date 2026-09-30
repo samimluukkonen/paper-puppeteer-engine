@@ -25,6 +25,14 @@ export interface DemoState {
   handIK: boolean;
   footIK: boolean;
   ikDebug: boolean;
+  playback: string;
+  fps: number;
+  speed: number;
+  paused: boolean;
+  upperBody: boolean;
+  layerWeight: number;
+  transition: string;
+  lastEvent: string;
 }
 
 export class DemoScene extends Phaser.Scene {
@@ -46,6 +54,9 @@ export class DemoScene extends Phaser.Scene {
   private elapsed = 0;
   private rotateLeft: Phaser.Input.Keyboard.Key | undefined;
   private rotateRight: Phaser.Input.Keyboard.Key | undefined;
+  private steppedFPS = 10;
+  private upperBody = false;
+  private lastEvent = 'none';
 
   constructor(private readonly onChange: (state: DemoState) => void) {
     super('DemoScene');
@@ -56,6 +67,8 @@ export class DemoScene extends Phaser.Scene {
     this.handIK = false;
     this.footIK = false;
     this.elapsed = 0;
+    this.upperBody = false;
+    this.lastEvent = 'none';
     this.swordAngle = -0.65;
     this.rearPalmSide = 'right';
     this.rearPalmOverHead = false;
@@ -65,7 +78,7 @@ export class DemoScene extends Phaser.Scene {
     const floor = this.add.graphics();
     floor.lineStyle(1, 0x9eaa97, 0.45).lineBetween(70, height - 115, width - 70, height - 115);
     floor.fillStyle(0x515e4e, 0.08).fillEllipse(width / 2, height - 115, 170, 18);
-    this.add.text(30, 28, 'FIG. 02 / TWO-BONE IK', {
+    this.add.text(30, 28, 'FIG. 03 / ANIMATION PLAYBACK', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#7e8678',
@@ -90,6 +103,10 @@ export class DemoScene extends Phaser.Scene {
     this.katana = new Katana(this);
     this.attachKatana();
     this.puppet.play('idle');
+    this.puppet.onAnimationEvent((event) => {
+      this.lastEvent = `${event.clip}: ${event.name}`;
+      this.notify();
+    });
     this.handTarget = { x: width / 2 + 55, y: height - 320 };
     this.groundTargets.left = { x: width / 2 + 24, y: height - 130 };
     this.groundTargets.right = { x: width / 2 - 24, y: height - 130 };
@@ -111,13 +128,22 @@ export class DemoScene extends Phaser.Scene {
       keyboard.on('keydown-ONE', () => this.play('idle'));
       keyboard.on('keydown-TWO', () => this.play('walk'));
       keyboard.on('keydown-THREE', () => this.play('sword'));
+      keyboard.on('keydown-FOUR', () => this.crossfade('idle'));
+      keyboard.on('keydown-FIVE', () => this.crossfade('walk'));
+      keyboard.on('keydown-S', () => this.toggleStepped());
+      keyboard.on('keydown-EIGHT', () => this.setSteppedFPS(8));
+      keyboard.on('keydown-ZERO', () => this.setSteppedFPS(10));
+      keyboard.on('keydown-L', () => this.toggleUpperBody());
+      keyboard.on('keydown-P', () => this.togglePause());
+      keyboard.on('keydown-OPEN_BRACKET', () => this.adjustSpeed(-0.25));
+      keyboard.on('keydown-CLOSED_BRACKET', () => this.adjustSpeed(0.25));
       keyboard.on('keydown-A', () => this.face('left'));
       keyboard.on('keydown-D', () => this.face('right'));
       keyboard.on('keydown-B', () => this.toggleDebug());
       keyboard.on('keydown-I', () => this.toggleIKDebug());
       keyboard.on('keydown-F', () => this.toggleFootIK());
       keyboard.on('keydown-H', () => this.toggleHandIK());
-      keyboard.on('keydown-P', () => this.toggleProp());
+      keyboard.on('keydown-T', () => this.toggleProp());
       keyboard.on('keydown-SPACE', () => this.togglePlayback());
       keyboard.on('keydown-R', () => this.restart());
       keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.SPACE]);
@@ -129,14 +155,15 @@ export class DemoScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.puppet) return;
-    if (this.puppet.isPlaying) this.elapsed += delta;
+    if (this.puppet.isPlaying && !this.puppet.animationPlayer.isPaused) this.elapsed += delta;
     const turn = Number(this.rotateRight?.isDown ?? false) - Number(this.rotateLeft?.isDown ?? false);
     this.rotateKatana((turn * delta) / 1000);
     this.puppet.preparePose();
     const playing = this.puppet.isPlaying;
+    const transitioning = this.puppet.animationPlayer.transition !== undefined;
     this.puppet.animationPlayer.update(delta);
     this.updatePresentation();
-    if (playing !== this.puppet.isPlaying) this.notify();
+    if (playing !== this.puppet.isPlaying || transitioning || this.puppet.animationPlayer.transition) this.notify();
   }
 
   play(name: string): void {
@@ -147,6 +174,60 @@ export class DemoScene extends Phaser.Scene {
       this.rearPalmOverHead = false;
       this.previousRearPalm = undefined;
     }
+    this.updatePresentation();
+    this.notify();
+  }
+
+  crossfade(name: 'idle' | 'walk'): void {
+    this.puppet?.play(name, { fadeDuration: 300 });
+    this.handIK = false;
+    this.updatePresentation();
+    this.notify();
+  }
+
+  toggleStepped(): void {
+    if (!this.puppet) return;
+    const stepped = this.puppet.animationPlayer.playbackMode.mode === 'stepped';
+    this.puppet.setAnimationPlaybackMode(stepped ? { mode: 'smooth' } : { mode: 'stepped', fps: this.steppedFPS });
+    this.updatePresentation();
+    this.notify();
+  }
+
+  setSteppedFPS(fps: number): void {
+    this.steppedFPS = fps;
+    this.puppet?.setAnimationFPS(fps);
+    this.updatePresentation();
+    this.notify();
+  }
+
+  togglePause(): void {
+    if (this.puppet?.animationPlayer.isPaused) this.puppet.resumeAnimation();
+    else this.puppet?.pauseAnimation();
+    this.notify();
+  }
+
+  adjustSpeed(change: number): void {
+    if (!this.puppet) return;
+    this.puppet.setAnimationSpeed(Math.max(0, Math.min(2, this.puppet.animationPlayer.playbackSpeed + change)));
+    this.notify();
+  }
+
+  toggleUpperBody(): void {
+    if (!this.puppet) return;
+    this.upperBody = !this.upperBody;
+    if (this.upperBody) {
+      this.puppet.setLayerMask('upperBody', [
+        'torso',
+        'head',
+        'leftUpperArm',
+        'leftForearm',
+        'leftHand',
+        'rightUpperArm',
+        'rightForearm',
+        'rightHand',
+      ]);
+      this.puppet.play('guardUpperBody', { layer: 'upperBody', fadeDuration: 250 });
+    } else this.puppet.clearLayer('upperBody');
     this.updatePresentation();
     this.notify();
   }
@@ -235,6 +316,16 @@ export class DemoScene extends Phaser.Scene {
       handIK: this.handIK,
       footIK: this.footIK,
       ikDebug: this.puppet.isIKDebug,
+      playback: this.puppet.animationPlayer.playbackMode.mode,
+      fps: this.steppedFPS,
+      speed: this.puppet.animationPlayer.playbackSpeed,
+      paused: this.puppet.animationPlayer.isPaused,
+      upperBody: this.upperBody,
+      layerWeight: this.puppet.animationPlayer.getLayerWeight('upperBody'),
+      transition: this.puppet.animationPlayer.transition
+        ? `${this.puppet.animationPlayer.transition.from} → ${this.puppet.animationPlayer.transition.to} ${Math.round(this.puppet.animationPlayer.transition.progress * 100)}%`
+        : 'none',
+      lastEvent: this.lastEvent,
     });
   }
 
@@ -243,7 +334,7 @@ export class DemoScene extends Phaser.Scene {
     this.katana?.container.setPosition(0, 0);
     // Always start from the sampled pose so facing changes cannot accumulate rotations.
     this.puppet.preparePose();
-    this.puppet.animationPlayer.sample(this.puppet.animationPlayer.elapsedTime);
+    this.puppet.animationPlayer.applyCurrentPose();
     this.puppet.setRenderOrder(
       demoRenderOrder(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection),
     );
@@ -253,7 +344,13 @@ export class DemoScene extends Phaser.Scene {
       leftUpperArm: this.puppet.getBone('leftUpperArm').pose.rotation,
       rightUpperArm: this.puppet.getBone('rightUpperArm').pose.rotation,
     });
-    for (const [id, rotation] of Object.entries(arms)) this.puppet.getBone(id).pose.rotation = rotation;
+    const transition = this.puppet.animationPlayer.transition;
+    const fromSign = transition?.from === 'idle' && this.puppet.facingDirection === 'right' ? -1 : 1;
+    const toSign = this.puppet.currentAnimation === 'idle' && this.puppet.facingDirection === 'right' ? -1 : 1;
+    const sign = transition ? fromSign + (toSign - fromSign) * transition.progress : toSign;
+    for (const [id, rotation] of Object.entries(arms)) {
+      this.puppet.getBone(id).pose.rotation = transition ? (rotation * sign) / toSign : rotation;
+    }
     if (
       this.puppet.currentAnimation === 'idle' ||
       this.puppet.currentAnimation === 'walk' ||
@@ -282,7 +379,9 @@ export class DemoScene extends Phaser.Scene {
     secondaryArm.setEndOffset(palmGripOffset);
     primaryArm.enabled = this.handIK;
     primaryArm.setTarget(this.handTarget);
-    secondaryArm.enabled = this.handIK && this.attached && this.puppet.currentAnimation === 'sword';
+    secondaryArm.enabled =
+      (this.handIK || this.upperBody) && this.attached && (this.puppet.currentAnimation === 'sword' || this.upperBody);
+    if (this.upperBody) primaryArm.enabled = true;
     secondaryArm.setTargetProvider(() => {
       this.aimKatana(this.swordAngle);
       return this.katana?.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary);
@@ -341,7 +440,7 @@ export class DemoScene extends Phaser.Scene {
       this.markers!.lineBetween(point.x - 11, point.y, point.x + 11, point.y);
       this.markers!.lineBetween(point.x, point.y - 11, point.x, point.y + 11);
     };
-    if (this.handIK) mark(this.handTarget, 0x7652ad);
+    if (this.handIK || this.upperBody) mark(this.handTarget, 0x7652ad);
     if (this.footIK)
       for (const side of ['left', 'right'] as const) {
         if (!walkFeet || walkFeet[side].mix > 0) mark(footTargets[side], 0xcb674f);
@@ -358,7 +457,13 @@ export class DemoScene extends Phaser.Scene {
   }
 
   private keepBothHandsOnKatana(): void {
-    if (!this.puppet || !this.katana || !this.attached || !this.handIK || this.puppet.currentAnimation !== 'sword') {
+    if (
+      !this.puppet ||
+      !this.katana ||
+      !this.attached ||
+      (!this.handIK && !this.upperBody) ||
+      (this.puppet.currentAnimation !== 'sword' && !this.upperBody)
+    ) {
       this.previousRearPalm = undefined;
       return;
     }

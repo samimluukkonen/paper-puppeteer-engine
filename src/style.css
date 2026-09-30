@@ -216,6 +216,8 @@ button[aria-pressed="true"] .toggle::after {
   gap: 8px;
   font-size: 10px;
   color: #6b7e68;
+  white-space: pre-line;
+  line-height: 1.6;
 }
 .status-dot.stopped {
   background: #b5835c;
