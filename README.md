@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.3 adds external character manifests and a complete sample character. Crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins remain available.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.4 adds static pose presets, bind pose reset, a developer pose inspector, and pose JSON export. Crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins remain available.
 
 ## Install and run
 
@@ -38,6 +38,16 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 | `V` | Toggle slot markers, names, parent bones, and attachment names |
 | `Space` | Stop at the current pose / restart |
 | `R` | Restart the current clip |
+| `O` | Enter / exit pose authoring mode |
+| `C` (pose mode) | Apply the sample combat-ready pose |
+| `R` (pose mode) | Reset to bind pose |
+| `[` / `]` (pose mode) | Select previous / next bone |
+| `←` / `→` (pose mode) | Rotate selected bone by 0.01 radians; `Shift` uses 0.1 |
+| `Alt` + `←` / `→` (pose mode) | Move selected bone's local x by 1; `Shift` uses 5 |
+| `↑` / `↓` (pose mode) | Move selected bone's local y by 1; `Shift` uses 5 |
+| `U` (pose mode) | Reset selected bone to its bind transform |
+| `X` (pose mode) | Print, copy, and download pose JSON |
+| `J` (pose mode) | Print normalized rig JSON to the console |
 
 To compare playback styles, press `2`, then `S` and `8`. The walk pose updates eight times per second while Phaser continues rendering and IK still solves every frame. Press `S` again for smooth motion. Press `4` and `5` to compare crossfades in both directions. Press `L` during walking to keep the legs walking under a sword-ready upper body. The status panel shows the current event, transition progress, playback speed and layer state.
 
@@ -72,7 +82,8 @@ Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser 
 ```text
 src/engine/
   CharacterDefinition.ts  Manifest assembly and cross-file validation (no I/O)
-  CharacterLoader.ts      Fetches manifest, rig, skins, and animations as JSON
+  CharacterLoader.ts      Fetches manifest, rig, skins, animations, and poses as JSON
+  Pose.ts             Static pose validation, blending, and sparse serialization
   queueCharacterTextures.ts  Queues image files with Phaser's scene loader
   types.ts             JSON-friendly rig and transform definitions
   schemas.ts           Zod schemas for rig, animation and IK definitions
@@ -109,11 +120,34 @@ src/main.ts            Demo bootstrap and control panel
 
 The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
 
+## Static poses and authoring
+
+A pose file is a version 1 JSON object with a name and sparse local bone transforms. Rotations are radians. Every property is an absolute local value; properties and bones left out preserve their current underlying pose. The sample is [combat-ready.json](public/characters/demo-puppet/poses/combat-ready.json). List pose paths in the optional `poses` array of `character.json`; `CharacterLoader` loads and validates them against the rig. For programmatic puppets, pass `poses` to the constructor or call `addPose`. Invalid versions, unknown bones, extra fields, and nonfinite values are rejected.
+
+```json
+{ "version": 1, "name": "combat-ready", "bones": { "torso": { "rotation": -0.08 }, "rightForearm": { "rotation": -1.1 } } }
+```
+
+```ts
+puppet.applyPose('combat-ready');
+puppet.applyPose('combat-ready', { mix: 0.5 });
+puppet.clearPose();
+puppet.resetToBindPose();
+const json = JSON.stringify(puppet.exportPose('my-pose'), null, 2);
+const rigValues = puppet.exportRig();
+```
+
+`mix` ranges from 0 to 1. At 0 the pose changes nothing; at 1 it fully replaces named properties. A preset remains active across updates until `clearPose`, another `applyPose`, or bind reset. Each joint's immutable `bindPose` comes from the normalized rig and remains available after reset. Evaluation order is **bind/rest pose → base animation → animation layers → persistent pose preset → IK → rendered pose**. Animation does not advance when paused or stopped. IK is temporary: its changes are restored before the next evaluation and before export. `resetToBindPose()` clears animation layer state and the active preset, resets joint transforms, and disables IK constraints so the displayed result matches the bind pose. It leaves the rig, registered clips, and registered poses intact. Resume IK explicitly if needed.
+
+Press `O` in the demo to enter the developer inspector. It stops animation, resets joints, disables IK, and restores a consistent draw order and limb placement for the current facing. The on-screen panel shows the selected bone's local x, y, rotation, and scales. Use the controls in the table above to select and adjust a bone. `A` / `D` change facing while preserving manual adjustments relative to the facing layout. `C` loads the combat-ready preset as editable values; `R` resets the current facing's rest layout. Pressing `O` again exits the inspector and starts idle. `X` logs JSON, copies it when clipboard access is available, and downloads `exported-pose.json`. Export compares each authored local property with its rig bind value using an epsilon of `0.0001`, so unchanged properties are omitted. The demo's right-facing layout may therefore export shoulder, hip, and arm corrections even before manual edits; those values are needed to recreate that facing-specific pose. Save the result under a character's `poses/` directory and add its path to `character.json`; it will load like the sample pose. `J` logs a versioned rig snapshot with normalized local positions, rotation, logical lengths, slot transforms, sprite offsets, and origins. These exports contain data only, never Phaser objects. The rig snapshot reflects loaded rig definitions; tuning pivots or sprite offsets still requires editing the rig JSON.
+
+The recommended new character workflow is: load the artist's artwork, load its rig, press `B` to inspect bones, tune pivots and sprite offsets in the rig JSON, press `O` to inspect and adjust a pose, press `X` to export it, save the file under `poses/`, then use its name in scripted scenes. The `schemas/` folder has handwritten JSON Schemas for character, rig, skin, animation, and pose files. This repository includes VS Code file associations in `.vscode/settings.json`; external projects can associate the packaged schemas with their own folders.
+
 ## External characters
 
-The primary demo loads [character.json](public/characters/demo-puppet/character.json) from `public/characters/demo-puppet/`. The folder contains `rig.json`, `skins/default.json`, `skins/alternate.json`, `skins/helmet-only.json`, `animations/idle.json`, `animations/walk.json`, `animations/combat-idle.json`, `animations/guard-upper-body.json`, and transparent PNG files under `images/`. The combat idle file has the runtime clip name `sword`; file names and stable animation IDs can differ.
+The primary demo loads [character.json](public/characters/demo-puppet/character.json) from `public/characters/demo-puppet/`. The folder contains `rig.json`, three skin files, four animation files, `poses/combat-ready.json`, and transparent PNG files under `images/`. The combat idle file has the runtime clip name `sword`; file names and stable animation IDs can differ.
 
-The version 1 manifest names a rig path, a default skin key, skin keys mapped to JSON paths, animation JSON paths, and Phaser texture keys mapped to image paths. All paths resolve relative to `character.json`. Texture keys are separate from bone, slot, and attachment IDs. `frame` on an attachment or legacy bone sprite selects an atlas frame when the host has preloaded an atlas under the named texture key. The sample uses ordinary PNGs.
+The version 1 manifest names a rig path, a default skin key, skin keys mapped to JSON paths, animation and optional pose JSON paths, and Phaser texture keys mapped to image paths. All paths resolve relative to `character.json`. Texture keys are separate from bone, slot, and attachment IDs. `frame` on an attachment or legacy bone sprite selects an atlas frame when the host has preloaded an atlas under the named texture key. The sample uses ordinary PNGs.
 
 ```json
 {
@@ -123,6 +157,7 @@ The version 1 manifest names a rig path, a default skin key, skin keys mapped to
   "defaultSkin": "default",
   "skins": { "default": "skins/default.json", "alternate": "skins/alternate.json" },
   "animations": ["animations/idle.json", "animations/walk.json"],
+  "poses": ["poses/combat-ready.json"],
   "textures": { "paper-head": "images/paper-head.png" }
 }
 ```
@@ -142,7 +177,7 @@ scene.load.once(Phaser.Loader.Events.COMPLETE, () => {
 scene.load.start();
 ```
 
-For Phaser `preload`, custom pipelines, generated content, or tests, pass already parsed values to `CharacterDefinition.fromData({ manifest, rig, skins, animations }, optionalManifestUrl)`. The `skins` and `animations` objects are indexed by the paths in the manifest. `queueCharacterTextures` skips texture keys already loaded in the scene, so an app can preload an atlas itself. `definition.textureUrl(key)` resolves a key to a URL when given a manifest URL; without one it returns the authored path. `new Puppet(scene, { rig, animations, skin })` and TypeScript-authored rigs and clips continue to work.
+For Phaser `preload`, custom pipelines, generated content, or tests, pass already parsed values to `CharacterDefinition.fromData({ manifest, rig, skins, animations, poses }, optionalManifestUrl)`. The `skins`, `animations`, and `poses` objects are indexed by the paths in the manifest. `queueCharacterTextures` skips texture keys already loaded in the scene, so an app can preload an atlas itself. `definition.textureUrl(key)` resolves a key to a URL when given a manifest URL; without one it returns the authored path. `new Puppet(scene, { rig, animations, poses, skin })` and TypeScript-authored rigs and clips continue to work.
 
 `validateCharacterDefinition(data)` returns structured `{ severity, path, message }` issues without Phaser. It checks the manifest version and shape, missing files, default skin, skin and slot references, attachment texture keys, duplicate animation names, and animation bone references in addition to the existing rig and timeline rules. `CharacterDefinition.fromData` throws `CharacterValidationError` with those issues. Validation checks declared texture keys and image paths; image bytes and atlas frame existence are checked by Phaser at load or Puppet construction.
 

@@ -4,7 +4,13 @@ import { CharacterLoader, Puppet, queueCharacterTextures } from '../engine/index
 import type { WalkFootIK } from './demoFootTargets.js';
 import { demoWalkFootIK } from './demoFootTargets.js';
 import { demoIK } from './demoIK.js';
-import { demoArmRotations, demoHipPositions, demoRenderOrder, demoShoulderPositions } from './demoPresentation.js';
+import {
+  demoArmRotations,
+  demoAuthoringLayout,
+  demoHipPositions,
+  demoRenderOrder,
+  demoShoulderPositions,
+} from './demoPresentation.js';
 import { Katana, katanaGrips } from './Katana.js';
 import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from './katanaArmTarget.js';
 
@@ -34,6 +40,7 @@ export interface DemoState {
   gripHand: boolean;
   helmet: boolean;
   slotDebug: boolean;
+  poseMode: boolean;
 }
 
 export class DemoScene extends Phaser.Scene {
@@ -63,6 +70,10 @@ export class DemoScene extends Phaser.Scene {
   private gripHand = false;
   private helmet = false;
   private slotKatana = false;
+  private poseMode = false;
+  private selectedBone = 0;
+  private poseText: Phaser.GameObjects.Text | undefined;
+  private poseMarker: Phaser.GameObjects.Graphics | undefined;
 
   constructor(private readonly onChange: (state: DemoState) => void) {
     super('DemoScene');
@@ -157,6 +168,18 @@ export class DemoScene extends Phaser.Scene {
     this.groundTargets.left = { x: width / 2 + 24, y: height - 130 };
     this.groundTargets.right = { x: width / 2 - 24, y: height - 130 };
     this.markers = this.add.graphics().setDepth(100);
+    this.poseMarker = this.add.graphics().setDepth(190);
+    this.poseText = this.add
+      .text(18, 75, '', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#26342b',
+        backgroundColor: '#f5f1df',
+        padding: { x: 10, y: 8 },
+        lineSpacing: 3,
+      })
+      .setDepth(200)
+      .setVisible(false);
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       this.handTarget = { x: pointer.worldX, y: pointer.worldY };
     });
@@ -181,8 +204,8 @@ export class DemoScene extends Phaser.Scene {
       keyboard.on('keydown-ZERO', () => this.setSteppedFPS(10));
       keyboard.on('keydown-L', () => this.toggleUpperBody());
       keyboard.on('keydown-P', () => this.togglePause());
-      keyboard.on('keydown-OPEN_BRACKET', () => this.adjustSpeed(-0.25));
-      keyboard.on('keydown-CLOSED_BRACKET', () => this.adjustSpeed(0.25));
+      keyboard.on('keydown-OPEN_BRACKET', () => (this.poseMode ? this.selectBone(-1) : this.adjustSpeed(-0.25)));
+      keyboard.on('keydown-CLOSED_BRACKET', () => (this.poseMode ? this.selectBone(1) : this.adjustSpeed(0.25)));
       keyboard.on('keydown-A', () => this.face('left'));
       keyboard.on('keydown-D', () => this.face('right'));
       keyboard.on('keydown-B', () => this.toggleDebug());
@@ -196,7 +219,21 @@ export class DemoScene extends Phaser.Scene {
       keyboard.on('keydown-N', () => this.toggleHelmet());
       keyboard.on('keydown-V', () => this.toggleSlotDebug());
       keyboard.on('keydown-SPACE', () => this.togglePlayback());
-      keyboard.on('keydown-R', () => this.restart());
+      keyboard.on('keydown-R', () => (this.poseMode ? this.resetBind() : this.restart()));
+      keyboard.on('keydown-O', () => this.togglePoseMode());
+      keyboard.on('keydown-C', () => this.applyCombatPose());
+      keyboard.on('keydown-X', () => this.exportCurrentPose());
+      keyboard.on('keydown-J', () => this.exportRig());
+      keyboard.on('keydown-U', () => this.resetSelectedBone());
+      keyboard.on('keydown', (event: KeyboardEvent) => {
+        if (!this.poseMode || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const step = event.shiftKey ? 0.1 : 0.01;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          const sign = event.key === 'ArrowRight' ? 1 : -1;
+          this.adjustSelected(event.altKey ? 'x' : 'rotation', sign * (event.altKey ? (event.shiftKey ? 5 : 1) : step));
+        } else this.adjustSelected('y', (event.key === 'ArrowDown' ? 1 : -1) * (event.shiftKey ? 5 : 1));
+      });
       keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.SPACE]);
       this.rotateLeft = keyboard.addKey('Q');
       this.rotateRight = keyboard.addKey('E');
@@ -206,6 +243,7 @@ export class DemoScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.puppet) return;
+    if (this.poseMode) return;
     if (this.puppet.isPlaying && !this.puppet.animationPlayer.isPaused) this.elapsed += delta;
     const turn = Number(this.rotateRight?.isDown ?? false) - Number(this.rotateLeft?.isDown ?? false);
     this.rotateKatana((turn * delta) / 1000);
@@ -217,7 +255,115 @@ export class DemoScene extends Phaser.Scene {
     if (playing !== this.puppet.isPlaying || transitioning || this.puppet.animationPlayer.transition) this.notify();
   }
 
+  togglePoseMode(): void {
+    if (!this.puppet) return;
+    if (this.poseMode) {
+      this.play('idle');
+      return;
+    }
+    this.poseMode = !this.poseMode;
+    this.poseText?.setVisible(this.poseMode);
+    this.poseMarker?.clear();
+    this.handIK = false;
+    this.footIK = false;
+    this.upperBody = false;
+    this.resetAuthoringPose();
+    this.markers?.clear();
+    this.updatePoseText();
+    this.notify();
+  }
+
+  selectBone(direction: number): void {
+    if (!this.poseMode || !this.puppet) return;
+    this.selectedBone = (this.selectedBone + direction + this.puppet.rig.bones.length) % this.puppet.rig.bones.length;
+    this.updatePoseText();
+  }
+
+  adjustSelected(property: 'x' | 'y' | 'rotation', change: number): void {
+    if (!this.poseMode || !this.puppet) return;
+    this.puppet.preparePose();
+    const bone = this.puppet.getBone(this.puppet.rig.bones[this.selectedBone]!.id);
+    bone.pose[property] += change;
+    this.puppet.syncPose();
+    this.updatePoseText();
+  }
+
+  resetSelectedBone(): void {
+    if (!this.poseMode || !this.puppet) return;
+    this.puppet.preparePose();
+    this.puppet.getBone(this.puppet.rig.bones[this.selectedBone]!.id).reset();
+    this.puppet.syncPose();
+    this.updatePoseText();
+  }
+
+  resetBind(): void {
+    if (!this.poseMode || !this.puppet) return;
+    this.resetAuthoringPose();
+    this.updatePoseText();
+  }
+
+  applyCombatPose(): void {
+    if (!this.poseMode || !this.puppet) return;
+    this.resetAuthoringPose();
+    this.puppet.applyPose('combat-ready').commitPoseForEditing();
+    this.updatePoseText();
+  }
+
+  private resetAuthoringPose(): void {
+    if (!this.puppet) return;
+    const layout = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
+    this.puppet.resetToBindPose().setRenderOrder(layout.order);
+    this.puppet.container.setPosition(this.scale.width / 2, this.scale.height - 278);
+    for (const [id, x] of Object.entries(layout.positions)) this.puppet.getBone(id).pose.x = x;
+    for (const [id, rotation] of Object.entries(layout.rotations)) this.puppet.getBone(id).pose.rotation = rotation;
+    this.puppet.syncPose();
+  }
+
+  exportCurrentPose(): void {
+    if (!this.poseMode || !this.puppet) return;
+    const json = JSON.stringify(this.puppet.exportPose('exported-pose'), null, 2);
+    console.log(`Exported pose JSON:\n${json}`);
+    void navigator.clipboard?.writeText(json).catch(() => {});
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'exported-pose.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  exportRig(): void {
+    if (!this.poseMode || !this.puppet) return;
+    console.log(`Normalized rig data:\n${JSON.stringify(this.puppet.exportRig(), null, 2)}`);
+  }
+
+  private updatePoseText(): void {
+    if (!this.poseMode || !this.puppet || !this.poseText) return;
+    const id = this.puppet.rig.bones[this.selectedBone]!.id;
+    const selected = this.puppet.getBone(id);
+    const { x, y, rotation, scaleX, scaleY } = selected.pose;
+    const point = selected.getWorldPosition();
+    this.poseMarker?.clear().lineStyle(2, 0xc04e30, 1).strokeCircle(point.x, point.y, 11);
+    this.poseMarker?.lineBetween(point.x - 16, point.y, point.x + 16, point.y);
+    this.poseMarker?.lineBetween(point.x, point.y - 16, point.x, point.y + 16);
+    this.poseText.setText([
+      'POSE AUTHORING · animation paused · IK off',
+      `Facing: ${this.puppet.facingDirection}`,
+      `Selected bone: ${id} (${this.selectedBone + 1}/${this.puppet.rig.bones.length})`,
+      `x: ${x.toFixed(3)}   y: ${y.toFixed(3)}`,
+      `rotation: ${rotation.toFixed(3)} rad`,
+      `scaleX: ${scaleX.toFixed(3)}   scaleY: ${scaleY.toFixed(3)}`,
+      '[ / ] select · ← / → rotate · Shift coarse',
+      'Alt + ← / → x · ↑ / ↓ y · U reset bone',
+      'C preset · R bind · X export · J rig data',
+    ]);
+  }
+
   play(name: string): void {
+    this.poseMode = false;
+    this.poseText?.setVisible(false);
+    this.poseMarker?.clear();
+    this.puppet?.clearPose();
     this.puppet?.play(name);
     this.handIK = name === 'sword';
     if (name === 'sword') {
@@ -230,6 +376,10 @@ export class DemoScene extends Phaser.Scene {
   }
 
   crossfade(name: 'idle' | 'walk'): void {
+    if (this.poseMode) {
+      this.play(name);
+      return;
+    }
     this.puppet?.play(name, { fadeDuration: 300 });
     this.handIK = false;
     this.updatePresentation();
@@ -265,6 +415,7 @@ export class DemoScene extends Phaser.Scene {
 
   toggleUpperBody(): void {
     if (!this.puppet) return;
+    if (this.poseMode) this.play('idle');
     this.upperBody = !this.upperBody;
     if (this.upperBody) {
       this.puppet.setLayerMask('upperBody', [
@@ -284,6 +435,24 @@ export class DemoScene extends Phaser.Scene {
   }
 
   face(direction: Facing): void {
+    if (this.poseMode && this.puppet) {
+      const previous = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
+      const next = demoAuthoringLayout(this.puppet.rig, direction);
+      this.puppet.preparePose();
+      for (const [id, x] of Object.entries(next.positions)) {
+        const bone = this.puppet.getBone(id);
+        bone.pose.x += x - previous.positions[id as keyof typeof previous.positions];
+      }
+      for (const [id, rotation] of Object.entries(next.rotations)) {
+        const bone = this.puppet.getBone(id);
+        bone.pose.rotation += rotation - previous.rotations[id as keyof typeof previous.rotations];
+      }
+      this.puppet.setRenderOrder(next.order).setFacing(direction);
+      if (this.attached) this.attachKatana();
+      this.updatePoseText();
+      this.notify();
+      return;
+    }
     // setFacing synchronizes the rig; wait until the weapon mount has changed
     // before asking the rear hand to evaluate its grip in the new direction.
     if (this.puppet) {
@@ -307,11 +476,13 @@ export class DemoScene extends Phaser.Scene {
     this.notify();
   }
   toggleHandIK(): void {
+    if (this.poseMode) return;
     this.handIK = !this.handIK;
     this.updatePresentation();
     this.notify();
   }
   toggleFootIK(): void {
+    if (this.poseMode) return;
     this.footIK = !this.footIK;
     this.updatePresentation();
     this.notify();
@@ -320,12 +491,20 @@ export class DemoScene extends Phaser.Scene {
     this.swordAngle += delta;
   }
   restart(): void {
+    if (this.poseMode) {
+      this.resetBind();
+      return;
+    }
     this.puppet?.restart();
     this.updatePresentation();
     this.notify();
   }
 
   togglePlayback(): void {
+    if (this.poseMode) {
+      this.play('idle');
+      return;
+    }
     if (this.puppet?.isPlaying) this.puppet.stop();
     else this.puppet?.restart();
     this.updatePresentation();
@@ -430,11 +609,17 @@ export class DemoScene extends Phaser.Scene {
       gripHand: this.gripHand,
       helmet: this.helmet,
       slotDebug: this.puppet.isSlotDebug,
+      poseMode: this.poseMode,
     });
   }
 
   private updatePresentation(): void {
     if (!this.puppet) return;
+    if (this.poseMode) {
+      this.puppet.syncPose();
+      this.updatePoseText();
+      return;
+    }
     this.syncKatanaMode();
     this.katana?.container.setPosition(0, 0);
     // Always start from the sampled pose so facing changes cannot accumulate rotations.

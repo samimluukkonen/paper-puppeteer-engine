@@ -14,6 +14,7 @@
     "animations/combat-idle.json",
     "animations/guard-upper-body.json"
   ],
+  "poses": ["poses/combat-ready.json"],
   "textures": {
     "paper-pelvis": "images/paper-pelvis.png",
     "paper-armor-pelvis": "images/paper-armor-pelvis.png",

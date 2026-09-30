@@ -30,6 +30,7 @@ const manifest = read('character.json') as {
   rig: string;
   skins: Record<string, string>;
   animations: string[];
+  poses?: string[];
   textures: Record<string, string>;
   defaultSkin: string;
 };
@@ -38,6 +39,7 @@ const bundle = () => ({
   rig: read(manifest.rig),
   skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, read(path)])),
   animations: Object.fromEntries(manifest.animations.map((path) => [path, read(path)])),
+  poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, read(path)])),
 });
 
 test('complete sample character validates and already-parsed data becomes runtime definitions', () => {
@@ -119,6 +121,15 @@ test('character manifest rejects unsupported versions', () => {
   assert.ok(validateCharacterDefinition(data).some((entry) => entry.path === 'manifest.version'));
 });
 
+test('character validation checks pose files against the loaded rig', () => {
+  const data = bundle();
+  const path = manifest.poses![0]!;
+  (data.poses[path] as { bones: Record<string, unknown> }).bones.ghost = { rotation: 1 };
+  assert.ok(validateCharacterDefinition(data).some((entry) => /Unknown bone/.test(entry.message)));
+  (data.poses[path] as { version: number; bones: Record<string, unknown> }).version = 2;
+  assert.ok(validateCharacterDefinition(data).some((entry) => /Unsupported pose format version/.test(entry.message)));
+});
+
 test('loader fetches JSON relative to the manifest and leaves image loading to the host', async () => {
   const requested: string[] = [];
   const fetcher = (async (url: string | URL | Request) => {
@@ -129,7 +140,11 @@ test('loader fetches JSON relative to the manifest and leaves image loading to t
   }) as typeof fetch;
   const definition = await CharacterLoader.load(new URL('character.json', root).href, fetcher);
   assert.equal(definition.animations.length, 4);
-  assert.equal(requested.length, 1 + 1 + Object.keys(manifest.skins).length + manifest.animations.length);
+  assert.equal(definition.poses[0]?.name, 'combat-ready');
+  assert.equal(
+    requested.length,
+    1 + 1 + Object.keys(manifest.skins).length + manifest.animations.length + (manifest.poses?.length ?? 0),
+  );
   assert.equal(definition.textureUrl('paper-head'), new URL('images/paper-head.png', root).href);
   assert.ok(requested.every((path) => path.endsWith('.json')));
 });

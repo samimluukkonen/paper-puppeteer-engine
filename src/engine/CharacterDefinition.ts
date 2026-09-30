@@ -7,6 +7,7 @@ import {
   validateAnimationDefinition,
   validateRigDefinition,
 } from './externalData.js';
+import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import type { Rig } from './Rig.js';
 import { skinDefinitionSchema } from './schemas.js';
 import type { BoneDefinition, SkinDefinition } from './types.js';
@@ -20,6 +21,7 @@ export const characterManifestSchema = z.strictObject({
   defaultSkin: z.string().min(1),
   skins: z.record(z.string().min(1), z.string().min(1)),
   animations: z.array(z.string().min(1)),
+  poses: z.array(z.string().min(1)).optional(),
   /** Phaser texture key -> image path, relative to character.json. */
   textures: z.record(z.string().min(1), z.string().min(1)),
 });
@@ -32,6 +34,7 @@ export interface CharacterData {
   rig?: unknown;
   skins?: Readonly<Record<string, unknown>>;
   animations?: Readonly<Record<string, unknown>>;
+  poses?: Readonly<Record<string, unknown>>;
 }
 
 function prefixed(issues: readonly ValidationIssue[], prefix: string): ValidationIssue[] {
@@ -157,6 +160,22 @@ export function validateCharacterDefinition(data: CharacterData): ValidationIssu
       names.add(value.name);
     }
   }
+  const poseNames = new Set<string>();
+  for (const [index, path] of (manifest.poses ?? []).entries()) {
+    const value = data.poses?.[path];
+    if (value === undefined) {
+      issues.push(issue(`poses[${index}]`, `Missing pose file "${path}".`));
+      continue;
+    }
+    if (!rig) continue;
+    try {
+      const pose = parsePoseDefinition(value, rig);
+      if (poseNames.has(pose.name)) issues.push(issue(`poses[${index}].name`, `Duplicate pose name "${pose.name}".`));
+      poseNames.add(pose.name);
+    } catch (error) {
+      issues.push(issue(`poses[${index}]`, error instanceof Error ? error.message : String(error)));
+    }
+  }
   return issues;
 }
 
@@ -173,6 +192,7 @@ export class CharacterDefinition {
     readonly id: string,
     readonly rig: Rig,
     readonly animations: readonly AnimationClip[],
+    readonly poses: readonly PoseDefinition[],
     readonly defaultSkin: string,
     readonly textures: Readonly<Record<string, string>>,
     readonly baseUrl?: string,
@@ -189,10 +209,12 @@ export class CharacterDefinition {
     });
     const rig = parseRigDefinition({ ...source, skins });
     const animations = manifest.animations.map((path) => parseAnimationClip(data.animations![path], rig));
+    const poses = (manifest.poses ?? []).map((path) => parsePoseDefinition(data.poses![path], rig));
     return new CharacterDefinition(
       manifest.id,
       rig,
       animations,
+      poses,
       manifest.defaultSkin,
       { ...manifest.textures },
       baseUrl,

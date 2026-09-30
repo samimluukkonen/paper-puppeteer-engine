@@ -2,6 +2,7 @@ import { assert, test } from 'vitest';
 import { idle, walk } from '../src/demo/demoAnimations.js';
 import {
   demoArmRotations,
+  demoAuthoringLayout,
   demoHipPositions,
   demoRenderOrder,
   demoShoulderPositions,
@@ -23,6 +24,28 @@ const body = [
   'rightLowerLeg',
   'rightFoot',
 ];
+
+test('authoring layout resets draw order and facing offsets coherently', () => {
+  const left = demoAuthoringLayout(rig, 'left');
+  const right = demoAuthoringLayout(rig, 'right');
+  assert.deepEqual(left.order, demoRenderOrder(rig, 'idle', 'left'));
+  assert.deepEqual(right.order, demoRenderOrder(rig, 'idle', 'right'));
+  assert.deepEqual(left.positions, {
+    ...demoShoulderPositions(rig, 'idle', 'left'),
+    ...demoHipPositions(rig, 'left'),
+  });
+  assert.deepEqual(right.positions, {
+    ...demoShoulderPositions(rig, 'idle', 'right'),
+    ...demoHipPositions(rig, 'right'),
+  });
+  assert.equal(right.rotations.leftUpperArm, -left.rotations.leftUpperArm);
+  assert.equal(right.rotations.rightUpperArm, -left.rotations.rightUpperArm);
+
+  const editedX = left.positions.leftUpperArm + 4;
+  const switchedX = editedX + right.positions.leftUpperArm - left.positions.leftUpperArm;
+  assert.equal(switchedX, right.positions.leftUpperArm + 4);
+  assert.equal(switchedX + left.positions.leftUpperArm - right.positions.leftUpperArm, editedX);
+});
 
 for (const facing of ['left', 'right'] as const) {
   test(`idle facing ${facing} keeps the intended slight shoulder tilt throughout the cycle`, () => {

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Paper Puppeteer rig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "root", "bones"],
+  "properties": {
+    "version": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "root": { "type": "string", "minLength": 1 },
+    "bones": { "type": "array", "items": { "$ref": "#/$defs/bone" } },
+    "slots": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
+    "attachments": { "type": "array", "items": { "$ref": "#/$defs/attachment" } },
+    "skins": { "type": "array", "items": { "$ref": "skin.schema.json" } }
+  },
+  "$defs": {
+    "bone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "parent": { "type": "string" },
+        "length": { "type": "number", "minimum": 0 },
+        "depth": { "type": "number" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "sprite": { "$ref": "#/$defs/sprite" }
+      }
+    },
+    "sprite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["texture"],
+      "properties": {
+        "texture": { "type": "string", "minLength": 1 },
+        "frame": { "type": ["string", "number"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "originX": { "type": "number", "minimum": 0, "maximum": 1 },
+        "originY": { "type": "number", "minimum": 0, "maximum": 1 },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "depth": { "type": "number" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "bone"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "bone": { "type": "string", "minLength": 1 },
+        "depth": { "type": "number" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "texture"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "texture": { "type": "string", "minLength": 1 },
+        "frame": { "type": ["string", "number"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "originX": { "type": "number", "minimum": 0, "maximum": 1 },
+        "originY": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

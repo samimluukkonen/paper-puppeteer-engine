@@ -45,3 +45,25 @@ export function demoHipPositions(rig: Rig, facing: Facing): Readonly<Record<'lef
   const right = rig.getBone('rightThigh').x ?? 0;
   return facing === 'right' ? { leftThigh: right, rightThigh: left } : { leftThigh: left, rightThigh: right };
 }
+
+/** Stable, facing-aware starting layout for the demo's static pose inspector. */
+export function demoAuthoringLayout(
+  rig: Rig,
+  facing: Facing,
+): {
+  order: readonly string[];
+  positions: Readonly<Record<'leftUpperArm' | 'rightUpperArm' | 'leftThigh' | 'rightThigh', number>>;
+  rotations: ArmRotations;
+} {
+  return {
+    order: demoRenderOrder(rig, 'idle', facing),
+    positions: {
+      ...demoShoulderPositions(rig, 'idle', facing),
+      ...demoHipPositions(rig, facing),
+    },
+    rotations: demoArmRotations('idle', facing, {
+      leftUpperArm: rig.getBone('leftUpperArm').rotation ?? 0,
+      rightUpperArm: rig.getBone('rightUpperArm').rotation ?? 0,
+    }),
+  };
+}

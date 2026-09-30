@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Paper Puppeteer skin",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "slots"],
+  "properties": {
+    "version": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "slots": { "type": "object", "additionalProperties": { "type": ["string", "null"] } }
+  }
+}

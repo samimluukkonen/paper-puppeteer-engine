@@ -8,10 +8,12 @@ import {
 } from './AnimationPlayer.js';
 import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
+import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { IKPoseState } from './ik/IKPoseState.js';
 import { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, TwoBoneIKDefinition } from './ik/types.js';
+import { applyPoseToJoints, type PoseDefinition, parsePoseDefinition, serializePose } from './Pose.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
@@ -27,6 +29,7 @@ interface PuppetSettings {
   depth?: number;
   facing?: Facing;
   animations?: readonly AnimationClip[];
+  poses?: readonly PoseDefinition[];
   debug?: boolean;
   ik?: readonly TwoBoneIKDefinition[];
   ikDebug?: boolean;
@@ -52,6 +55,9 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly ikPose = new IKPoseState();
+  private readonly poses = new Map<string, PoseDefinition>();
+  private activePose: { pose: PoseDefinition; mix: number } | undefined;
+  private readonly poseUnderlying = new Map<string, Partial<import('./types.js').JointTransform>>();
   private readonly ikDebugView: IKDebug;
   private facing: Facing;
   private destroyed = false;
@@ -100,6 +106,7 @@ export class Puppet {
     this.slotDebugView = new SlotDebug(scene, this.rig, this.renderer, this.slotState);
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones);
     for (const clip of options.animations ?? options.definition?.animations ?? []) this.addAnimation(clip);
+    for (const pose of options.poses ?? options.definition?.poses ?? []) this.addPose(pose);
     this.debugView = new PuppetDebug(scene, this.bones);
     const skin = options.skin ?? options.definition?.defaultSkin;
     if (skin) this.setSkin(skin);
@@ -147,6 +154,63 @@ export class Puppet {
     bone.pose.rotation = rotation;
     this.syncPose();
     return this;
+  }
+
+  addPose(input: PoseDefinition): this {
+    const pose = parsePoseDefinition(input, this.rig);
+    if (this.poses.has(pose.name)) throw new Error(`Pose "${pose.name}" is already registered.`);
+    this.poses.set(pose.name, pose);
+    return this;
+  }
+
+  /** Persistent sparse override, evaluated after animation layers and before IK. */
+  applyPose(name: string, options: { mix?: number } = {}): this {
+    const pose = this.poses.get(name);
+    if (!pose) throw new Error(`Unknown pose "${name}".`);
+    const mix = options.mix ?? 1;
+    if (!Number.isFinite(mix) || mix < 0 || mix > 1) throw new Error('Pose mix must be between 0 and 1.');
+    this.preparePose();
+    this.activePose = { pose, mix };
+    this.syncPose();
+    return this;
+  }
+
+  clearPose(): this {
+    this.preparePose();
+    this.activePose = undefined;
+    this.syncPose();
+    return this;
+  }
+
+  /** Keep the visible authored preset values and enter direct manual editing. */
+  commitPoseForEditing(): this {
+    this.ikPose.restore();
+    this.poseUnderlying.clear();
+    this.activePose = undefined;
+    this.syncPose();
+    return this;
+  }
+
+  /** Excludes IK by restoring its temporary changes before taking a snapshot. */
+  exportPose(name: string, options?: { epsilon?: number; onlyChanged?: boolean }): PoseDefinition {
+    this.ikPose.restore();
+    const pose = serializePose(name, this.bones, options);
+    this.syncPose();
+    return pose;
+  }
+
+  /** Data only: normalized rig values, including pivots, slots and sprite offsets. */
+  exportRig(): RigJsonDefinition {
+    return JSON.parse(
+      JSON.stringify({
+        version: RIG_FORMAT_VERSION,
+        root: this.rig.root,
+        bones: this.rig.bones,
+        slots: this.rig.slots,
+        attachments: this.rig.attachments,
+        skins: this.rig.skins,
+      }),
+    ) as RigJsonDefinition;
   }
 
   addAnimation(clip: AnimationClip): this {
@@ -225,6 +289,17 @@ export class Puppet {
     this.preparePose();
     this.stop();
     this.animationPlayer.resetPose();
+    this.syncPose();
+    return this;
+  }
+
+  resetToBindPose(): this {
+    this.preparePose();
+    this.activePose = undefined;
+    this.animationPlayer.stop();
+    this.animationPlayer.clearAllLayers();
+    this.animationPlayer.resetPose();
+    for (const constraint of this.ikConstraints.values()) constraint.enabled = false;
     this.syncPose();
     return this;
   }
@@ -419,6 +494,8 @@ export class Puppet {
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
   preparePose(): void {
     this.ikPose.restore();
+    for (const [id, values] of this.poseUnderlying) Object.assign(this.getBone(id).pose, values);
+    this.poseUnderlying.clear();
   }
 
   private orderedIK(): TwoBoneIKConstraint[] {
@@ -429,6 +506,7 @@ export class Puppet {
   syncPose(): void {
     if (this.destroyed) return;
     this.preparePose();
+    if (this.activePose) applyPoseToJoints(this.activePose.pose, this.bones, this.activePose.mix, this.poseUnderlying);
     for (const bone of this.bones.values()) bone.syncTransform();
     this.renderer.sync();
     const constraints = this.orderedIK();

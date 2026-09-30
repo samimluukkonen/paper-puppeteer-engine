@@ -12,7 +12,7 @@ export const CharacterLoader = {
     };
     const manifestData = await read(manifestUrl);
     const manifest = characterManifestSchema.parse(manifestData);
-    const paths = [manifest.rig, ...Object.values(manifest.skins), ...manifest.animations];
+    const paths = [manifest.rig, ...Object.values(manifest.skins), ...manifest.animations, ...(manifest.poses ?? [])];
     const entries = await Promise.all([...new Set(paths)].map(async (path) => [path, await read(path)] as const));
     const files = Object.fromEntries(entries);
     const data: CharacterData = {
@@ -20,6 +20,7 @@ export const CharacterLoader = {
       rig: files[manifest.rig],
       skins: files,
       animations: files,
+      poses: files,
     };
     return CharacterDefinition.fromData(data, manifestUrl);
   },

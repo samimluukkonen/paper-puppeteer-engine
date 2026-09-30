@@ -1,0 +1,9 @@
+{
+  "json.schemas": [
+    { "fileMatch": ["/public/characters/**/character.json"], "url": "./schemas/character.schema.json" },
+    { "fileMatch": ["/public/characters/**/rig.json"], "url": "./schemas/rig.schema.json" },
+    { "fileMatch": ["/public/characters/**/skins/*.json"], "url": "./schemas/skin.schema.json" },
+    { "fileMatch": ["/public/characters/**/animations/*.json"], "url": "./schemas/animation.schema.json" },
+    { "fileMatch": ["/public/characters/**/poses/*.json"], "url": "./schemas/pose.schema.json" }
+  ]
+}

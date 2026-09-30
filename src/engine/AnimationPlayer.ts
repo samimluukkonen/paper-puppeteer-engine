@@ -192,6 +192,12 @@ export class AnimationPlayer {
     this.applyCurrentPose();
   }
 
+  /** Remove clip and layer state without changing registered clips. */
+  clearAllLayers(): void {
+    this.layers.clear();
+    this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
+  }
+
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);

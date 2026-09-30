@@ -43,6 +43,15 @@ export type {
   TwoBoneIKDefinition,
 } from './ik/types.js';
 export { Joint } from './Joint.js';
+export type { PoseDefinition } from './Pose.js';
+export {
+  applyPoseToJoints,
+  POSE_FORMAT_VERSION,
+  PoseValidationError,
+  parsePoseDefinition,
+  poseDefinitionSchema,
+  serializePose,
+} from './Pose.js';
 export type { PuppetOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
 export { queueCharacterTextures } from './queueCharacterTextures.js';

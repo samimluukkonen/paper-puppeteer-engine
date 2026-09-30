@@ -69,7 +69,7 @@ export class AnimationValidationError extends Error {
 
 export class UnsupportedFormatVersionError extends Error {
   constructor(
-    readonly format: 'rig' | 'animation' | 'skin',
+    readonly format: 'rig' | 'animation' | 'skin' | 'pose',
     readonly version: unknown,
     readonly supportedVersion: number,
   ) {
@@ -88,7 +88,12 @@ function childPath(base: string, key: string | number): string {
 }
 
 /** Reject values that JSON.stringify would silently omit, coerce, or recurse through forever. */
-function checkJson(value: unknown, path: string, issues: ValidationIssue[], ancestors = new Set<object>()): void {
+export function checkJson(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+  ancestors = new Set<object>(),
+): void {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) issues.push({ severity: 'error', path, message: 'Must be a finite JSON number.' });

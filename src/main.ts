@@ -10,7 +10,7 @@ if (!app) throw new Error('Missing demo host.');
 app.innerHTML = `
   <header class="masthead">
     <a class="wordmark" href="./"><span class="mark" aria-hidden="true">✳</span> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
-    <span class="version">v0.4.3 <span class="version-dot"></span> External characters</span>
+    <span class="version">v0.4.4 <span class="version-dot"></span> Pose authoring</span>
   </header>
   <section class="workbench">
     <aside class="controls" aria-label="Animation controls">
@@ -69,6 +69,13 @@ app.innerHTML = `
           <button data-action="rotateRight"><kbd>E</kbd> Turn +</button>
         </div>
       </div>
+      <div class="control-section">
+        <h2>05 <span>Pose authoring</span></h2>
+        <button class="wide-button" data-action="poseMode" aria-pressed="false"><span><kbd>O</kbd> Pose inspector</span><span class="toggle" aria-hidden="true"></span></button>
+        <div class="button-pair"><button data-action="combatPose"><kbd>C</kbd> Combat pose</button><button data-action="bindPose"><kbd>R</kbd> Bind pose</button></div>
+        <button class="wide-button" data-action="exportPose"><kbd>X</kbd> Export pose JSON</button>
+        <p class="keyboard-note pose-note">In pose mode: <kbd>[</kbd>/<kbd>]</kbd> select · arrows adjust · Shift coarse · Alt + ←/→ moves x · <kbd>U</kbd> reset bone · <kbd>J</kbd> print rig data</p>
+      </div>
       <p class="keyboard-note"><kbd>Space</kbd> stop / restart <span>·</span> <kbd>R</kbd> restart</p>
       <div class="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">Current animation: idle</span></div>
     </aside>
@@ -111,6 +118,7 @@ function updateControls(state: DemoState): void {
     gripHand: state.gripHand,
     helmet: state.helmet,
     slotDebug: state.slotDebug,
+    poseMode: state.poseMode,
   };
   for (const [action, value] of Object.entries(pressed)) {
     document.querySelector(`[data-action="${action}"]`)?.setAttribute('aria-pressed', String(value));
@@ -161,6 +169,10 @@ const actions: Record<string, () => void> = {
   slotDebug: () => demo.toggleSlotDebug(),
   rotateLeft: () => demo.rotateKatana(-0.15),
   rotateRight: () => demo.rotateKatana(0.15),
+  poseMode: () => demo.togglePoseMode(),
+  combatPose: () => demo.applyCombatPose(),
+  bindPose: () => demo.resetBind(),
+  exportPose: () => demo.exportCurrentPose(),
 };
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
   button.addEventListener('click', () => {
