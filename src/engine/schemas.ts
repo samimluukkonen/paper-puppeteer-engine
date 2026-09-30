@@ -30,6 +30,28 @@ const spriteSchema = z.object({
   depth: finiteNumber.exactOptional(),
 });
 
+export const slotDefinitionSchema = z.object({
+  id: z.string().min(1),
+  bone: z.string().min(1),
+  depth: finiteNumber.exactOptional(),
+  ...transformFields,
+});
+
+export const spriteAttachmentSchema = z.object({
+  id: z.string().min(1),
+  texture: z.string().min(1),
+  frame: z.union([z.string(), finiteNumber]).exactOptional(),
+  ...transformFields,
+  originX: finiteNumber.min(0).max(1).exactOptional(),
+  originY: finiteNumber.min(0).max(1).exactOptional(),
+});
+
+export const skinDefinitionSchema = z.object({
+  version: z.literal(1),
+  name: z.string().min(1),
+  slots: z.record(z.string(), z.string().min(1).nullable()),
+});
+
 /** Shape and scalar validation for plain rig data, including data loaded from JSON. */
 export const rigDefinitionSchema = z.object({
   root: z.string().min(1, 'A rig needs a root id.'),
@@ -43,6 +65,9 @@ export const rigDefinitionSchema = z.object({
       ...transformFields,
     }),
   ),
+  slots: z.array(slotDefinitionSchema).exactOptional(),
+  attachments: z.array(spriteAttachmentSchema).exactOptional(),
+  skins: z.array(skinDefinitionSchema).exactOptional(),
 });
 
 const keyframeSchema = z.object({ time: finiteNumber, ...transformFields });

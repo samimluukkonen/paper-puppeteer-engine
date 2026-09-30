@@ -1,7 +1,13 @@
 import type { AnimationClip, AnimationPlaybackMode, Interpolation, Keyframe } from './AnimationClip.js';
 import { Rig } from './Rig.js';
 import { animationClipSchema, rigDefinitionSchema } from './schemas.js';
-import type { BoneDefinition, RigDefinition } from './types.js';
+import type {
+  BoneDefinition,
+  RigDefinition,
+  SkinDefinition,
+  SlotDefinition,
+  SpriteAttachmentDefinition,
+} from './types.js';
 
 export const RIG_FORMAT_VERSION = 1;
 export const ANIMATION_FORMAT_VERSION = 1;
@@ -14,6 +20,9 @@ export interface RigJsonDefinition {
   name?: string;
   root: string;
   bones: readonly BoneDefinition[];
+  slots?: readonly SlotDefinition[];
+  attachments?: readonly SpriteAttachmentDefinition[];
+  skins?: readonly SkinDefinition[];
 }
 
 export interface AnimationJsonEvent {
@@ -60,7 +69,7 @@ export class AnimationValidationError extends Error {
 
 export class UnsupportedFormatVersionError extends Error {
   constructor(
-    readonly format: 'rig' | 'animation',
+    readonly format: 'rig' | 'animation' | 'skin',
     readonly version: unknown,
     readonly supportedVersion: number,
   ) {
@@ -154,7 +163,7 @@ function shapeIssues(error: { issues: readonly { path: PropertyKey[]; message: s
   }));
 }
 
-function versionIssues(input: unknown, expected: number, format: 'rig' | 'animation'): ValidationIssue[] {
+function versionIssues(input: unknown, expected: number, format: 'rig' | 'animation' | 'skin'): ValidationIssue[] {
   if (!isRecord(input) || !Object.hasOwn(input, 'version'))
     return [{ severity: 'error', path: 'version', message: `${format} format version is required.` }];
   if (input.version !== expected)
@@ -179,7 +188,7 @@ function checkKnownKeys(value: unknown, path: string, allowed: readonly string[]
 }
 
 function checkRigFields(input: unknown, issues: ValidationIssue[]): void {
-  checkKnownKeys(input, '', ['version', 'name', 'root', 'bones'], issues);
+  checkKnownKeys(input, '', ['version', 'name', 'root', 'bones', 'slots', 'attachments', 'skins'], issues);
   if (!isRecord(input) || !Array.isArray(input.bones)) return;
   for (const [index, bone] of input.bones.entries()) {
     const path = `bones[${index}]`;
@@ -192,6 +201,20 @@ function checkRigFields(input: unknown, issues: ValidationIssue[]): void {
         issues,
       );
   }
+  if (Array.isArray(input.slots))
+    for (const [index, slot] of input.slots.entries())
+      checkKnownKeys(slot, `slots[${index}]`, ['id', 'bone', 'depth', ...transformKeys], issues);
+  if (Array.isArray(input.attachments))
+    for (const [index, attachment] of input.attachments.entries())
+      checkKnownKeys(
+        attachment,
+        `attachments[${index}]`,
+        ['id', 'texture', 'frame', ...transformKeys, 'originX', 'originY'],
+        issues,
+      );
+  if (Array.isArray(input.skins))
+    for (const [index, skin] of input.skins.entries())
+      checkKnownKeys(skin, `skins[${index}]`, ['version', 'name', 'slots'], issues);
 }
 
 function checkAnimationFields(input: unknown, issues: ValidationIssue[]): void {
@@ -270,6 +293,44 @@ export function validateRigDefinition(input: unknown): ValidationIssue[] {
     visited.add(id);
   };
   for (const id of ids.keys()) visit(id);
+  const slotIds = new Set<string>();
+  for (const [index, slot] of (parsed.data.slots ?? []).entries()) {
+    if (slotIds.has(slot.id))
+      issues.push({ severity: 'error', path: `slots[${index}].id`, message: `Duplicate slot id "${slot.id}".` });
+    slotIds.add(slot.id);
+    if (!ids.has(slot.bone))
+      issues.push({
+        severity: 'error',
+        path: `slots[${index}].bone`,
+        message: `Slot references unknown bone "${slot.bone}".`,
+      });
+  }
+  const attachmentIds = new Set<string>();
+  for (const [index, attachment] of (parsed.data.attachments ?? []).entries()) {
+    if (attachmentIds.has(attachment.id))
+      issues.push({
+        severity: 'error',
+        path: `attachments[${index}].id`,
+        message: `Duplicate attachment id "${attachment.id}".`,
+      });
+    attachmentIds.add(attachment.id);
+  }
+  const skinNames = new Set<string>();
+  for (const [index, skin] of (parsed.data.skins ?? []).entries()) {
+    if (skinNames.has(skin.name))
+      issues.push({ severity: 'error', path: `skins[${index}].name`, message: `Duplicate skin name "${skin.name}".` });
+    skinNames.add(skin.name);
+    for (const [slot, attachment] of Object.entries(skin.slots)) {
+      if (!slotIds.has(slot))
+        issues.push({ severity: 'error', path: `skins[${index}].slots.${slot}`, message: `Unknown slot "${slot}".` });
+      if (attachment !== null && !attachmentIds.has(attachment))
+        issues.push({
+          severity: 'error',
+          path: `skins[${index}].slots.${slot}`,
+          message: `Unknown attachment "${attachment}".`,
+        });
+    }
+  }
   return issues;
 }
 

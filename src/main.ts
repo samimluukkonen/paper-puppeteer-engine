@@ -10,7 +10,7 @@ if (!app) throw new Error('Missing demo host.');
 app.innerHTML = `
   <header class="masthead">
     <a class="wordmark" href="./"><span class="mark" aria-hidden="true">✳</span> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
-    <span class="version">v0.3 <span class="version-dot"></span> Animation study</span>
+    <span class="version">v0.4.2 <span class="version-dot"></span> Skins & slots</span>
   </header>
   <section class="workbench">
     <aside class="controls" aria-label="Animation controls">
@@ -56,7 +56,14 @@ app.innerHTML = `
         <button class="wide-button" data-action="ikDebug" aria-pressed="false"><span><kbd>I</kbd> IK targets & chains</span><span class="toggle" aria-hidden="true"></span></button>
         <button class="wide-button" data-action="handIK" aria-pressed="false"><span><kbd>H</kbd> Mouse hand target</span><span class="toggle" aria-hidden="true"></span></button>
         <button class="wide-button" data-action="footIK" aria-pressed="false"><span><kbd>F</kbd> Plant feet while walking</span><span class="toggle" aria-hidden="true"></span></button>
-        <button class="wide-button" data-action="prop" aria-pressed="true"><span><kbd>T</kbd> Katana attachment</span><span class="toggle" aria-hidden="true"></span></button>
+        <button class="wide-button" data-action="prop" aria-pressed="true"><span><kbd>T</kbd> Katana</span><span class="toggle" aria-hidden="true"></span></button>
+        <div class="button-pair">
+          <button data-action="defaultSkin" aria-pressed="true"><kbd>K</kbd> Default skin</button>
+          <button data-action="armoredSkin" aria-pressed="false"><kbd>M</kbd> Armor skin</button>
+        </div>
+        <button class="wide-button" data-action="gripHand" aria-pressed="false"><span><kbd>G</kbd> Grip hand</span><span class="toggle" aria-hidden="true"></span></button>
+        <button class="wide-button" data-action="helmet" aria-pressed="false"><span><kbd>N</kbd> Headwear override</span><span class="toggle" aria-hidden="true"></span></button>
+        <button class="wide-button" data-action="slotDebug" aria-pressed="false"><span><kbd>V</kbd> Slots</span><span class="toggle" aria-hidden="true"></span></button>
         <div class="button-pair">
           <button data-action="rotateLeft"><kbd>Q</kbd> Turn −</button>
           <button data-action="rotateRight"><kbd>E</kbd> Turn +</button>
@@ -92,13 +99,18 @@ function updateControls(state: DemoState): void {
     left: state.facing === 'left',
     right: state.facing === 'right',
     debug: state.debug,
-    prop: state.attached,
+    prop: state.katanaVisible,
     handIK: state.handIK,
     footIK: state.footIK,
     ikDebug: state.ikDebug,
     stepped: state.playback === 'stepped',
     upperBody: state.upperBody,
     pause: state.paused,
+    defaultSkin: state.skin === 'default',
+    armoredSkin: state.skin === 'armored',
+    gripHand: state.gripHand,
+    helmet: state.helmet,
+    slotDebug: state.slotDebug,
   };
   for (const [action, value] of Object.entries(pressed)) {
     document.querySelector(`[data-action="${action}"]`)?.setAttribute('aria-pressed', String(value));
@@ -142,6 +154,11 @@ const actions: Record<string, () => void> = {
   handIK: () => demo.toggleHandIK(),
   footIK: () => demo.toggleFootIK(),
   ikDebug: () => demo.toggleIKDebug(),
+  defaultSkin: () => demo.setSkin('default'),
+  armoredSkin: () => demo.setSkin('armored'),
+  gripHand: () => demo.toggleGripHand(),
+  helmet: () => demo.toggleHelmet(),
+  slotDebug: () => demo.toggleSlotDebug(),
   rotateLeft: () => demo.rotateKatana(-0.15),
   rotateRight: () => demo.rotateKatana(0.15),
 };

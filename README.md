@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.1 adds versioned JSON rig and animation definitions with runtime validation. Crossfades, timeline events, stepped playback, masked animation layers, IK, and facing remain available.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.2 adds named visual slots, sprite attachments, and skins. Crossfades, timeline events, stepped playback, masked animation layers, IK, and facing remain available.
 
 ## Install and run
 
@@ -30,14 +30,20 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 | `H` | Toggle mouse-controlled right-hand IK |
 | `F` | Toggle fixed world-space foot targets and gentle body sway |
 | Mouse | Move the hand target while hand IK is enabled |
-| `Q` / `E` | Rotate the katana; the right-facing two-handed rear palm stays visible beside the body |
-| `T` | Detach / reattach the katana to the right hand |
+| `Q` / `E` | Rotate the katana in either pose; the right-facing two-handed rear palm stays visible beside the body |
+| `T` | Hide / show the katana |
+| `K` / `M` | Select default / armored skin |
+| `G` | Swap open / gripping right hand |
+| `N` | Toggle the headwear skin override |
+| `V` | Toggle slot markers, names, parent bones, and attachment names |
 | `Space` | Stop at the current pose / restart |
 | `R` | Restart the current clip |
 
 To compare playback styles, press `2`, then `S` and `8`. The walk pose updates eight times per second while Phaser continues rendering and IK still solves every frame. Press `S` again for smooth motion. Press `4` and `5` to compare crossfades in both directions. Press `L` during walking to keep the legs walking under a sword-ready upper body. The status panel shows the current event, transition progress, playback speed and layer state.
 
 To verify the hierarchy, press `2`, then `B`: elbow, wrist, and hand follow the upper arm; knee, ankle, and foot follow the thigh. Press `A` and `D` to see the entire skeleton mirror while the labels stay readable. Press `Space` to freeze a pose. `T` demonstrates attachment ownership.
+
+The single `T` control shows a sprite attachment in the right-hand item slot during idle and walk. The sword stance uses the existing grip-aware Phaser prop so its second hand can follow the hilt. Both respond to `Q` / `E` with the same facing-aware angle. Switching poses changes the visual representation without showing two swords.
 
 Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant the feet while walking; they alternate between a grounded stance and a lifted return step. Idle and sword use their authored, nearly straight leg pose. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
 
@@ -77,6 +83,8 @@ src/engine/
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay
   PuppetRenderer.ts    Independent draw slots retaining ancestor transform chains
+  SlotState.ts         Attachment selection and base/partial skin application
+  SlotDebug.ts         Scene-space slot position and assignment overlay
   ik/
     types.ts           Targets, constraint definitions and coordinate adapter
     solveTwoBoneIK.ts  Pure law-of-cosines solver and angular blending
@@ -124,6 +132,39 @@ const animationIssues = validateAnimationDefinition(idleJson, rig);
 ```
 
 The parsers accept already-loaded JavaScript values and require no `fetch`. They return the existing `Rig` and `AnimationClip` runtime types. Invalid files throw `RigValidationError` or `AnimationValidationError`, each with an `issues` array of severity, path, and message. Unsupported versions throw `UnsupportedFormatVersionError`. Validation catches duplicate and missing bones, invalid parents and cycles, nonfinite transforms, negative lengths, invalid timeline times, unknown track bones, invalid FPS, and non-JSON values such as functions, `Map`, `Set`, and cyclic references. Existing unversioned TypeScript `RigDefinition` and `AnimationClip` inputs still work through their original constructors and registration APIs. The external format has no migration support yet.
+
+## Slots, sprite attachments, and skins
+
+Bones define the hierarchy and joint geometry. A named slot follows one bone and holds one sprite attachment at a time. Attachments define texture, optional atlas frame, local offset, rotation, scale, and normalized origin. A skin maps slot IDs to attachment IDs. All three are serializable parts of a rig definition; skin format version is `1`.
+
+```ts
+const rig: RigDefinition = {
+  root: 'root',
+  bones: [{ id: 'root' }, { id: 'hand', parent: 'root', y: 40 }],
+  slots: [{ id: 'handVisual', bone: 'hand' }, { id: 'handItem', bone: 'hand', depth: 20 }],
+  attachments: [
+    { id: 'open', texture: 'hand-open', originY: 0.2 },
+    { id: 'grip', texture: 'hand-grip', originY: 0.2 },
+    { id: 'katana', texture: 'katana', x: 4, y: 2, rotation: -0.5 },
+  ],
+  skins: [
+    { version: 1, name: 'default', slots: { handVisual: 'open' } },
+    { version: 1, name: 'sword-hand', slots: { handVisual: 'grip', handItem: 'katana' } },
+  ],
+};
+const puppet = new Puppet(scene, { rig, skin: 'default' });
+puppet.setSkin('default');       // Replace the complete selection; omitted slots become empty.
+puppet.applySkin('sword-hand');   // Override only listed slots.
+puppet.setAttachment('handItem', 'katana');
+puppet.clearAttachment('handItem');
+puppet.getAttachment('handVisual'); // Attachment ID or undefined.
+puppet.getSlotImage('handVisual');  // Current Phaser image or undefined.
+puppet.setSlotDebug(true);
+```
+
+Use `null` in a skin mapping to clear one slot during `applySkin`. Slot `x`, `y`, `rotation`, `scaleX`, and `scaleY` transform the attachment relative to its parent bone. Slot `depth` sets global draw depth; without it, the slot follows its bone in `setRenderOrder`, just in front of the bone's legacy image. Slots attached to the same bone draw in definition order at equal depth. Changing a skin or attachment leaves bone objects, animation tracks, and IK references intact. The puppet's outer facing mirror applies to slots and attachments automatically. Legacy `bone.sprite` definitions and Phaser object `attach`/`detach` continue to work.
+
+Validation reports duplicate slot and attachment IDs, missing parent bones, unknown skin slots or attachments, unsupported skin versions, and malformed transforms. `Puppet` checks texture keys and frame names against the Phaser scene when it is constructed. Texture atlases are optional; an attachment can name an ordinary texture.
 
 ## Define a rig
 
@@ -404,7 +445,6 @@ The library includes TypeScript declarations and source maps. Phaser is external
 
 - Joint angle limits and optional end-effector rotation alignment.
 - More advanced animation state orchestration and editor tooling.
-- Multiple skins, sprite swapping, and runtime weapon swapping through attachments.
 - Visual rig and animation editors.
 - JSON rig and animation loading.
 

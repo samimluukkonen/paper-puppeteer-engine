@@ -1,11 +1,20 @@
 import { rigDefinitionSchema } from './schemas.js';
-import type { BoneDefinition, RigDefinition } from './types.js';
+import type {
+  BoneDefinition,
+  RigDefinition,
+  SkinDefinition,
+  SlotDefinition,
+  SpriteAttachmentDefinition,
+} from './types.js';
 
 /** Validates a data-only rig and orders it so parents always precede children. */
 export class Rig {
   readonly root: string;
   readonly bones: readonly BoneDefinition[];
   readonly renderOrder: readonly string[];
+  readonly slots: readonly SlotDefinition[];
+  readonly attachments: readonly SpriteAttachmentDefinition[];
+  readonly skins: readonly SkinDefinition[];
   private readonly definitions = new Map<string, BoneDefinition>();
 
   constructor(definition: RigDefinition) {
@@ -90,6 +99,39 @@ export class Rig {
     };
     visitRenderOrder(this.root);
     this.renderOrder = Object.freeze(renderOrder);
+    this.slots = Object.freeze((definition.slots ?? []).map((slot) => Object.freeze({ ...slot })));
+    this.attachments = Object.freeze(
+      (definition.attachments ?? []).map((attachment) => Object.freeze({ ...attachment })),
+    );
+    this.skins = Object.freeze(
+      (definition.skins ?? []).map((skin) =>
+        Object.freeze({
+          ...skin,
+          slots: Object.freeze({ ...skin.slots }),
+        }),
+      ),
+    );
+    const slotIds = new Set<string>();
+    for (const slot of this.slots) {
+      if (slotIds.has(slot.id)) throw new Error(`Duplicate slot id "${slot.id}".`);
+      slotIds.add(slot.id);
+      if (!this.hasBone(slot.bone)) throw new Error(`Slot "${slot.id}" references unknown bone "${slot.bone}".`);
+    }
+    const attachmentIds = new Set<string>();
+    for (const attachment of this.attachments) {
+      if (attachmentIds.has(attachment.id)) throw new Error(`Duplicate attachment id "${attachment.id}".`);
+      attachmentIds.add(attachment.id);
+    }
+    const skinNames = new Set<string>();
+    for (const skin of this.skins) {
+      if (skinNames.has(skin.name)) throw new Error(`Duplicate skin name "${skin.name}".`);
+      skinNames.add(skin.name);
+      for (const [slot, attachment] of Object.entries(skin.slots)) {
+        if (!slotIds.has(slot)) throw new Error(`Skin "${skin.name}" references unknown slot "${slot}".`);
+        if (attachment !== null && !attachmentIds.has(attachment))
+          throw new Error(`Skin "${skin.name}" references unknown attachment "${attachment}".`);
+      }
+    }
   }
 
   getBone(id: string): BoneDefinition {

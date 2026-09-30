@@ -37,13 +37,24 @@ export { Joint } from './Joint.js';
 export type { PuppetOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
 export { Rig } from './Rig.js';
-export { animationClipSchema, rigDefinitionSchema, twoBoneIKDefinitionSchema } from './schemas.js';
+export { SlotState } from './SlotState.js';
+export {
+  animationClipSchema,
+  rigDefinitionSchema,
+  skinDefinitionSchema,
+  slotDefinitionSchema,
+  spriteAttachmentSchema,
+  twoBoneIKDefinitionSchema,
+} from './schemas.js';
 export type {
   AttachmentOptions,
   BoneDefinition,
   Facing,
   JointTransform,
   RigDefinition,
+  SkinDefinition,
+  SlotDefinition,
+  SpriteAttachmentDefinition,
   SpriteDefinition,
   TransformProperty,
 } from './types.js';

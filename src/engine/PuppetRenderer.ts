@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
+import type { SpriteAttachmentDefinition } from './types.js';
 
 interface TransformProjection {
   source: Phaser.GameObjects.Container;
@@ -16,6 +17,8 @@ interface RenderBranch {
 export class PuppetRenderer {
   private readonly container: Phaser.GameObjects.Container;
   private readonly branches = new Map<string, RenderBranch>();
+  private readonly slotBranches = new Map<string, RenderBranch>();
+  private readonly slotImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly projections: TransformProjection[] = [];
   private order: readonly string[] = [];
 
@@ -27,14 +30,14 @@ export class PuppetRenderer {
   ) {
     this.container = scene.add.container(0, 0).setName('puppet-render');
     parent.add(this.container);
-    for (const bone of bones.values()) {
+    const makeBranch = (name: string, bone: Bone): RenderBranch => {
       const ancestors: Bone[] = [];
       let ancestor: Bone | undefined = bone;
       while (ancestor) {
         ancestors.unshift(ancestor);
         ancestor = ancestor.parentId === undefined ? undefined : bones.get(ancestor.parentId);
       }
-      const root = scene.add.container(0, 0).setName(`render-${bone.id}`);
+      const root = scene.add.container(0, 0).setName(`render-${name}`);
       this.container.add(root);
       let mount = root;
       // Keeping the chain avoids decomposing a rotated, nonuniformly scaled matrix.
@@ -44,8 +47,21 @@ export class PuppetRenderer {
         this.projections.push({ source: source.container, target });
         mount = target;
       }
-      if (bone.sprite) mount.add(bone.sprite);
-      this.branches.set(bone.id, { root, mount });
+      return { root, mount };
+    };
+    for (const bone of bones.values()) {
+      const branch = makeBranch(bone.id, bone);
+      if (bone.sprite) branch.mount.add(bone.sprite);
+      this.branches.set(bone.id, branch);
+    }
+    for (const slot of rig.slots) {
+      const branch = makeBranch(`slot-${slot.id}`, bones.get(slot.bone)!);
+      const local = scene.add
+        .container(slot.x ?? 0, slot.y ?? 0)
+        .setRotation(slot.rotation ?? 0)
+        .setScale(slot.scaleX ?? 1, slot.scaleY ?? 1);
+      branch.mount.add(local);
+      this.slotBranches.set(slot.id, { root: branch.root, mount: local });
     }
     this.setOrder(rig.renderOrder);
     this.sync();
@@ -61,7 +77,11 @@ export class PuppetRenderer {
       throw new Error('Render order must contain every bone exactly once.');
     }
     for (const id of order) this.rig.getBone(id);
-    for (const [index, id] of order.entries()) this.branches.get(id)!.root.setDepth(index);
+    for (const [index, id] of order.entries()) this.branches.get(id)!.root.setDepth(index * 10);
+    for (const slot of this.rig.slots) {
+      const anchor = order.indexOf(slot.bone) * 10;
+      this.slotBranches.get(slot.id)!.root.setDepth(slot.depth ?? anchor + 1);
+    }
     this.container.sort('depth');
     this.order = [...order];
   }
@@ -70,6 +90,30 @@ export class PuppetRenderer {
     const branch = this.branches.get(id);
     if (!branch) throw new Error(`Unknown bone "${id}".`);
     return branch.mount;
+  }
+
+  getSlotMount(id: string): Phaser.GameObjects.Container {
+    const branch = this.slotBranches.get(id);
+    if (!branch) throw new Error(`Unknown slot "${id}".`);
+    return branch.mount;
+  }
+
+  getSlotImage(id: string): Phaser.GameObjects.Image | undefined {
+    return this.slotImages.get(id);
+  }
+
+  setSlotAttachment(id: string, definition: SpriteAttachmentDefinition | undefined): void {
+    const mount = this.getSlotMount(id);
+    this.slotImages.get(id)?.destroy();
+    this.slotImages.delete(id);
+    if (!definition) return;
+    const image = mount.scene.add
+      .image(definition.x ?? 0, definition.y ?? 0, definition.texture, definition.frame)
+      .setOrigin(definition.originX ?? 0.5, definition.originY ?? 0.5)
+      .setRotation(definition.rotation ?? 0)
+      .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
+    mount.add(image);
+    this.slotImages.set(id, image);
   }
 
   sync(): void {
@@ -86,6 +130,8 @@ export class PuppetRenderer {
   destroy(): void {
     if (!this.container.isDestroyed) this.container.destroy();
     this.branches.clear();
+    this.slotBranches.clear();
+    this.slotImages.clear();
     this.projections.length = 0;
   }
 }

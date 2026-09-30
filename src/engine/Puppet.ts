@@ -14,6 +14,8 @@ import type { IKTarget, TwoBoneIKDefinition } from './ik/types.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
+import { SlotDebug } from './SlotDebug.js';
+import { SlotState } from './SlotState.js';
 import type { AttachmentOptions, Facing, RigDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
@@ -28,6 +30,8 @@ export interface PuppetOptions {
   debug?: boolean;
   ik?: readonly TwoBoneIKDefinition[];
   ikDebug?: boolean;
+  slotDebug?: boolean;
+  skin?: string;
   /** Disable if the host calls update(deltaMilliseconds) itself. */
   autoUpdate?: boolean;
 }
@@ -40,6 +44,9 @@ export class Puppet {
   private readonly attachments = new Map<Phaser.GameObjects.GameObject, Phaser.GameObjects.Container>();
   private readonly debugView: PuppetDebug;
   private readonly renderer: PuppetRenderer;
+  private readonly slotState: SlotState;
+  private readonly slotDebugView: SlotDebug;
+  private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly ikPose = new IKPoseState();
   private readonly ikDebugView: IKDebug;
@@ -55,6 +62,12 @@ export class Puppet {
       if (bone.sprite && !scene.textures.exists(bone.sprite.texture)) {
         throw new Error(`Missing texture "${bone.sprite.texture}" for bone "${bone.id}".`);
       }
+    }
+    for (const attachment of this.rig.attachments) {
+      if (!scene.textures.exists(attachment.texture))
+        throw new Error(`Missing texture "${attachment.texture}" for attachment "${attachment.id}".`);
+      if (attachment.frame !== undefined && !scene.textures.get(attachment.texture).has(String(attachment.frame)))
+        throw new Error(`Missing frame "${attachment.frame}" for attachment "${attachment.id}".`);
     }
     for (const [label, value] of Object.entries({
       x: options.x ?? 0,
@@ -78,15 +91,19 @@ export class Puppet {
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
     this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones);
+    this.slotState = new SlotState(this.rig);
+    this.slotDebugView = new SlotDebug(scene, this.rig, this.renderer, this.slotState);
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones);
     for (const clip of options.animations ?? []) this.addAnimation(clip);
     this.debugView = new PuppetDebug(scene, this.bones);
+    if (options.skin) this.setSkin(options.skin);
     this.ikDebugView = new IKDebug(scene, this.bones);
     for (const definition of options.ik ?? []) this.addIK(definition);
     this.facing = options.facing ?? 'right';
     this.setFacing(this.facing);
     this.setDebug(options.debug ?? false);
     this.setIKDebug(options.ikDebug ?? false);
+    this.setSlotDebug(options.slotDebug ?? false);
     if (options.autoUpdate !== false) scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.container.once(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
@@ -103,6 +120,9 @@ export class Puppet {
   }
   get isIKDebug(): boolean {
     return this.ikDebugView.container.visible;
+  }
+  get isSlotDebug(): boolean {
+    return this.slotDebugView.container.visible;
   }
   get facingDirection(): Facing {
     return this.facing;
@@ -226,6 +246,58 @@ export class Puppet {
     return this.setRenderOrder(this.rig.renderOrder);
   }
 
+  getAttachment(slot: string): string | undefined {
+    return this.slotState.getAttachment(slot);
+  }
+
+  getSlotImage(slot: string): Phaser.GameObjects.Image | undefined {
+    this.slotState.getAttachment(slot);
+    return this.renderer.getSlotImage(slot);
+  }
+
+  setAttachment(slot: string, attachment: string): this {
+    this.slotState.setAttachment(slot, attachment);
+    this.renderSlots();
+    return this;
+  }
+
+  clearAttachment(slot: string): this {
+    this.slotState.clearAttachment(slot);
+    this.renderSlots();
+    return this;
+  }
+
+  setSkin(name: string): this {
+    this.slotState.setSkin(name);
+    this.renderSlots();
+    return this;
+  }
+
+  applySkin(name: string): this {
+    this.slotState.applySkin(name);
+    this.renderSlots();
+    return this;
+  }
+
+  setSlotDebug(enabled: boolean): this {
+    this.slotDebugView.setVisible(enabled);
+    return this;
+  }
+
+  private renderSlots(): void {
+    for (const slot of this.rig.slots) {
+      const id = this.slotState.getAttachment(slot.id);
+      if (this.renderedSlotAttachments.get(slot.id) === id) continue;
+      this.renderer.setSlotAttachment(
+        slot.id,
+        id ? this.rig.attachments.find((attachment) => attachment.id === id) : undefined,
+      );
+      if (id) this.renderedSlotAttachments.set(slot.id, id);
+      else this.renderedSlotAttachments.delete(slot.id);
+    }
+    this.slotDebugView.update();
+  }
+
   attach(boneId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
     const bone = this.getBone(boneId);
     const renderMount = this.renderer.getMount(boneId);
@@ -325,6 +397,7 @@ export class Puppet {
     this.container.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
     this.debugView.destroy();
     this.ikDebugView.destroy();
+    this.slotDebugView.destroy();
     this.renderer.destroy();
     if (!this.container.isDestroyed) this.container.destroy();
     this.attachments.clear();
@@ -382,5 +455,7 @@ export class Puppet {
     this.debugView.update();
     this.ikDebugView.container.setDepth(this.container.depth + 2);
     this.ikDebugView.update(constraints);
+    this.slotDebugView.container.setDepth(this.container.depth + 3);
+    this.slotDebugView.update();
   }
 }

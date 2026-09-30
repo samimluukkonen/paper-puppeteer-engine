@@ -21,7 +21,7 @@ export interface DemoState {
   facing: Facing;
   debug: boolean;
   playing: boolean;
-  attached: boolean;
+  katanaVisible: boolean;
   handIK: boolean;
   footIK: boolean;
   ikDebug: boolean;
@@ -33,12 +33,17 @@ export interface DemoState {
   layerWeight: number;
   transition: string;
   lastEvent: string;
+  skin: string;
+  gripHand: boolean;
+  helmet: boolean;
+  slotDebug: boolean;
 }
 
 export class DemoScene extends Phaser.Scene {
   puppet: Puppet | undefined;
   private katana: Katana | undefined;
-  private attached = true;
+  private attached = false;
+  private katanaEnabled = true;
   private handIK = false;
   private footIK = false;
   private handTarget: IKTarget = { x: 440, y: 320 };
@@ -57,18 +62,27 @@ export class DemoScene extends Phaser.Scene {
   private steppedFPS = 10;
   private upperBody = false;
   private lastEvent = 'none';
+  private skin = 'default';
+  private gripHand = false;
+  private helmet = false;
+  private slotKatana = false;
 
   constructor(private readonly onChange: (state: DemoState) => void) {
     super('DemoScene');
   }
 
   create(): void {
-    this.attached = true;
+    this.attached = false;
+    this.katanaEnabled = true;
     this.handIK = false;
     this.footIK = false;
     this.elapsed = 0;
     this.upperBody = false;
     this.lastEvent = 'none';
+    this.skin = 'default';
+    this.gripHand = false;
+    this.helmet = false;
+    this.slotKatana = false;
     this.swordAngle = -0.65;
     this.rearPalmSide = 'right';
     this.rearPalmOverHead = false;
@@ -99,9 +113,10 @@ export class DemoScene extends Phaser.Scene {
       ik: demoIK,
       scale: 1.08,
       autoUpdate: false,
+      skin: 'default',
     });
     this.katana = new Katana(this);
-    this.attachKatana();
+    this.katana.container.setVisible(false);
     this.puppet.play('idle');
     this.puppet.onAnimationEvent((event) => {
       this.lastEvent = `${event.clip}: ${event.name}`;
@@ -144,6 +159,11 @@ export class DemoScene extends Phaser.Scene {
       keyboard.on('keydown-F', () => this.toggleFootIK());
       keyboard.on('keydown-H', () => this.toggleHandIK());
       keyboard.on('keydown-T', () => this.toggleProp());
+      keyboard.on('keydown-K', () => this.setSkin('default'));
+      keyboard.on('keydown-M', () => this.setSkin('armored'));
+      keyboard.on('keydown-G', () => this.toggleGripHand());
+      keyboard.on('keydown-N', () => this.toggleHelmet());
+      keyboard.on('keydown-V', () => this.toggleSlotDebug());
       keyboard.on('keydown-SPACE', () => this.togglePlayback());
       keyboard.on('keydown-R', () => this.restart());
       keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.SPACE]);
@@ -283,16 +303,65 @@ export class DemoScene extends Phaser.Scene {
 
   toggleProp(): void {
     if (!this.puppet || !this.katana) return;
-    if (this.attached) {
-      this.puppet.detach(this.katana.container);
-      this.katana.container.setVisible(false);
-    } else {
-      this.katana.container.setVisible(true);
-      this.attachKatana();
-    }
-    this.attached = !this.attached;
+    this.katanaEnabled = !this.katanaEnabled;
     this.updatePresentation();
     this.notify();
+  }
+
+  setSkin(name: 'default' | 'armored'): void {
+    if (!this.puppet) return;
+    this.skin = name;
+    this.puppet.setSkin(name);
+    this.syncVisualOverrides();
+    this.notify();
+  }
+
+  toggleGripHand(): void {
+    this.gripHand = !this.gripHand;
+    this.syncVisualOverrides();
+    this.notify();
+  }
+
+  toggleHelmet(): void {
+    this.helmet = !this.helmet;
+    this.syncVisualOverrides();
+    this.notify();
+  }
+
+  toggleSlotDebug(): void {
+    if (this.puppet) this.puppet.setSlotDebug(!this.puppet.isSlotDebug);
+    this.notify();
+  }
+
+  private syncVisualOverrides(): void {
+    if (!this.puppet) return;
+    this.puppet.setAttachment('rightHandVisual', this.gripHand ? 'rightHandGrip' : 'rightHandDefault');
+    if (this.helmet) this.puppet.applySkin('helmet-only');
+    else this.puppet.clearAttachment('headwear');
+    if (this.slotKatana) this.puppet.setAttachment('rightHandItem', 'katana');
+    else this.puppet.clearAttachment('rightHandItem');
+  }
+
+  /** One visible katana: the sprite follows the hand except when grip-aware IK needs the prop. */
+  private syncKatanaMode(): void {
+    if (!this.puppet || !this.katana) return;
+    const needsGripPoints = this.katanaEnabled && (this.puppet.currentAnimation === 'sword' || this.upperBody);
+    if (this.attached !== needsGripPoints) {
+      if (needsGripPoints) {
+        this.katana.container.setVisible(true);
+        this.attachKatana();
+      } else {
+        this.puppet.detach(this.katana.container);
+        this.katana.container.setVisible(false);
+      }
+      this.attached = needsGripPoints;
+    }
+    const useSlot = this.katanaEnabled && !needsGripPoints;
+    if (this.slotKatana !== useSlot) {
+      this.slotKatana = useSlot;
+      if (useSlot) this.puppet.setAttachment('rightHandItem', 'katana');
+      else this.puppet.clearAttachment('rightHandItem');
+    }
   }
 
   private attachKatana(): void {
@@ -312,7 +381,7 @@ export class DemoScene extends Phaser.Scene {
       facing: this.puppet.facingDirection,
       debug: this.puppet.isDebug,
       playing: this.puppet.isPlaying,
-      attached: this.attached,
+      katanaVisible: this.katanaEnabled,
       handIK: this.handIK,
       footIK: this.footIK,
       ikDebug: this.puppet.isIKDebug,
@@ -326,11 +395,16 @@ export class DemoScene extends Phaser.Scene {
         ? `${this.puppet.animationPlayer.transition.from} → ${this.puppet.animationPlayer.transition.to} ${Math.round(this.puppet.animationPlayer.transition.progress * 100)}%`
         : 'none',
       lastEvent: this.lastEvent,
+      skin: this.skin,
+      gripHand: this.gripHand,
+      helmet: this.helmet,
+      slotDebug: this.puppet.isSlotDebug,
     });
   }
 
   private updatePresentation(): void {
     if (!this.puppet) return;
+    this.syncKatanaMode();
     this.katana?.container.setPosition(0, 0);
     // Always start from the sampled pose so facing changes cannot accumulate rotations.
     this.puppet.preparePose();
@@ -411,6 +485,7 @@ export class DemoScene extends Phaser.Scene {
     this.katana?.container.setRotation(this.swordAngle);
     this.puppet.syncPose();
     if (this.attached) this.aimKatana(this.swordAngle);
+    if (this.slotKatana) this.aimSlotKatana(this.swordAngle);
     this.keepBothHandsOnKatana();
     this.drawTargets(footTargets, walkFeet);
   }
@@ -480,7 +555,7 @@ export class DemoScene extends Phaser.Scene {
     const target = { ...this.handTarget };
     // Follow the head's top while crossing between sides. A vertical path
     // avoids the discontinuous left/right projection at the head's corners.
-    const head = this.puppet.getBone('head').sprite;
+    const head = this.puppet.getSlotImage('headVisual');
     let headBounds: { left: number; right: number; top: number } | undefined;
     if (head) {
       const corners = this.cutoutCorners(head);
@@ -603,7 +678,7 @@ export class DemoScene extends Phaser.Scene {
     let left: number | undefined;
     let right: number | undefined;
     for (const id of ['head', 'torso', 'pelvis']) {
-      const sprite = this.puppet.getBone(id).sprite;
+      const sprite = this.puppet.getSlotImage(`${id}Visual`);
       if (!sprite) continue;
       const edges = horizontalEdgesAtY(this.cutoutCorners(sprite), y);
       if (edges) {
@@ -616,23 +691,33 @@ export class DemoScene extends Phaser.Scene {
 
   private aimKatana(angle: number): void {
     if (!this.puppet || !this.katana?.container.parentContainer) return;
-    const world = this.puppet.container.getWorldTransformMatrix();
-    const parent = this.katana.container.parentContainer.getWorldTransformMatrix();
-    const dx = world.a * Math.cos(angle) + world.c * Math.sin(angle);
-    const dy = world.b * Math.cos(angle) + world.d * Math.sin(angle);
-    const determinant = parent.a * parent.d - parent.b * parent.c;
-    if (determinant === 0) return;
-    // Transform a direction (no translation), so the blade aims relative to
-    // facing while the grip mounted to the front palm stays fixed.
-    const rotation = Math.atan2(
-      (parent.a * dy - parent.b * dx) / determinant,
-      (parent.d * dx - parent.c * dy) / determinant,
-    );
+    const rotation = this.katanaRotationIn(this.katana.container.parentContainer, angle);
+    if (rotation === undefined) return;
     this.katana.container.setRotation(rotation);
     const grip = this.puppet.facingDirection === 'right' ? katanaGrips.primary : katanaGrips.secondary;
     this.katana.container.setPosition(
       grip.x - (Math.cos(rotation) * grip.x - Math.sin(rotation) * grip.y),
       grip.y - (Math.sin(rotation) * grip.x + Math.cos(rotation) * grip.y),
     );
+  }
+
+  private aimSlotKatana(angle: number): void {
+    const image = this.puppet?.getSlotImage('rightHandItem');
+    if (!image?.parentContainer) return;
+    const rotation = this.katanaRotationIn(image.parentContainer, angle);
+    if (rotation !== undefined) image.setRotation(rotation);
+  }
+
+  private katanaRotationIn(mount: Phaser.GameObjects.Container, angle: number): number | undefined {
+    if (!this.puppet) return undefined;
+    const world = this.puppet.container.getWorldTransformMatrix();
+    const parent = mount.getWorldTransformMatrix();
+    const dx = world.a * Math.cos(angle) + world.c * Math.sin(angle);
+    const dy = world.b * Math.cos(angle) + world.d * Math.sin(angle);
+    const determinant = parent.a * parent.d - parent.b * parent.c;
+    if (determinant === 0) return undefined;
+    // Transform a direction (no translation), so the blade aims relative to
+    // facing while its sprite or prop grip stays fixed at the palm.
+    return Math.atan2((parent.a * dy - parent.b * dx) / determinant, (parent.d * dx - parent.c * dy) / determinant);
   }
 }

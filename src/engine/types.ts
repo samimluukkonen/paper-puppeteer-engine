@@ -34,9 +34,39 @@ export interface BoneDefinition extends Partial<JointTransform> {
   depth?: number;
 }
 
+export interface SlotDefinition extends Partial<JointTransform> {
+  id: string;
+  bone: string;
+  /** Global draw depth. Omitted slots follow their bone's render order. */
+  depth?: number;
+}
+
+export interface SpriteAttachmentDefinition {
+  id: string;
+  texture: string;
+  frame?: string | number;
+  x?: number;
+  y?: number;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  originX?: number;
+  originY?: number;
+}
+
+export interface SkinDefinition {
+  version: 1;
+  name: string;
+  /** An omitted slot inherits the base skin when applied as an override. */
+  slots: Readonly<Record<string, string | null>>;
+}
+
 export interface RigDefinition {
   root: string;
   bones: readonly BoneDefinition[];
+  slots?: readonly SlotDefinition[];
+  attachments?: readonly SpriteAttachmentDefinition[];
+  skins?: readonly SkinDefinition[];
 }
 
 export type Facing = 'left' | 'right';
