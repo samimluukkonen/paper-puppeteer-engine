@@ -39,9 +39,9 @@ To compare playback styles, press `2`, then `S` and `8`. The walk pose updates e
 
 To verify the hierarchy, press `2`, then `B`: elbow, wrist, and hand follow the upper arm; knee, ankle, and foot follow the thigh. Press `A` and `D` to see the entire skeleton mirror while the labels stay readable. Press `Space` to freeze a pose. `T` demonstrates attachment ownership.
 
-Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant both ankle pivots as the body sways; during walking, the feet alternate between a grounded stance and a lifted return step. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
+Press `H` and move the mouse over the stage to aim the right wrist. Press `I` to inspect the chain and residual line to an unreachable target. Press `F` to plant the feet while walking; they alternate between a grounded stance and a lifted return step. Idle and sword use their authored, nearly straight leg pose. Press `3`, then rotate with `Q` / `E`: the left wrist follows the second katana grip. Switching to idle or walk disables hand IK; foot IK has its own toggle. Turn off `F` to inspect the original authored gait.
 
-The two-handed katana stance reuses idle's pelvis bob, leg rotations, and facing-dependent hip positions. This keeps the lower-body pose the same when switching between idle and the stance. If foot IK is enabled, it still adjusts the legs toward the fixed ground targets.
+The two-handed katana stance reuses idle's pelvis bob, leg rotations, and facing-dependent hip positions. This keeps the lower-body pose the same when switching between idle and the stance, even when foot planting is enabled for walking.
 
 Each limb has a consistent color across all its pieces: left arm blue, right arm purple, left leg coral, and right leg gold. The legend beside the stage identifies them; it moves below the stage on narrower screens.
 

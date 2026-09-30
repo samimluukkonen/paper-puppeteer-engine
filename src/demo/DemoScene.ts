@@ -386,25 +386,25 @@ export class DemoScene extends Phaser.Scene {
       this.aimKatana(this.swordAngle);
       return this.katana?.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary);
     });
+    const plantWalkFeet = this.footIK && this.puppet.currentAnimation === 'walk';
     this.puppet.container.setPosition(
-      this.scale.width / 2 + (this.footIK ? 7 * Math.sin(this.elapsed / 1000) : 0),
-      this.scale.height - 278 + (this.footIK ? 3 * Math.sin(this.elapsed / 700) : 0),
+      this.scale.width / 2 + (plantWalkFeet ? 7 * Math.sin(this.elapsed / 1000) : 0),
+      this.scale.height - 278 + (plantWalkFeet ? 3 * Math.sin(this.elapsed / 700) : 0),
     );
-    const walkFeet =
-      this.puppet.currentAnimation === 'walk'
-        ? demoWalkFootIK(
-            this.puppet.animationPlayer.elapsedTime,
-            {
-              left: { ...this.groundTargets.left, y: this.groundTargets.left.y + 7 },
-              right: { ...this.groundTargets.right, y: this.groundTargets.right.y + 7 },
-            },
-            { left: this.animatedAnkle('left'), right: this.animatedAnkle('right') },
-          )
-        : undefined;
+    const walkFeet = plantWalkFeet
+      ? demoWalkFootIK(
+          this.puppet.animationPlayer.elapsedTime,
+          {
+            left: { ...this.groundTargets.left, y: this.groundTargets.left.y + 7 },
+            right: { ...this.groundTargets.right, y: this.groundTargets.right.y + 7 },
+          },
+          { left: this.animatedAnkle('left'), right: this.animatedAnkle('right') },
+        )
+      : undefined;
     const footTargets = walkFeet ? { left: walkFeet.left.target, right: walkFeet.right.target } : this.groundTargets;
     for (const side of ['left', 'right'] as const) {
       const leg = this.puppet.getIK(`${side}LegIK`);
-      leg.enabled = this.footIK;
+      leg.enabled = plantWalkFeet;
       leg.mix = walkFeet?.[side].mix ?? 1;
       leg.setTarget(footTargets[side]);
     }
@@ -441,9 +441,9 @@ export class DemoScene extends Phaser.Scene {
       this.markers!.lineBetween(point.x, point.y - 11, point.x, point.y + 11);
     };
     if (this.handIK || this.upperBody) mark(this.handTarget, 0x7652ad);
-    if (this.footIK)
+    if (walkFeet)
       for (const side of ['left', 'right'] as const) {
-        if (!walkFeet || walkFeet[side].mix > 0) mark(footTargets[side], 0xcb674f);
+        if (walkFeet[side].mix > 0) mark(footTargets[side], 0xcb674f);
       }
     if (this.puppet && this.katana) {
       const facing = this.puppet.facingDirection;

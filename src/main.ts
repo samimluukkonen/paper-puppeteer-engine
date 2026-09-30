@@ -55,7 +55,7 @@ app.innerHTML = `
         <button class="wide-button" data-action="debug" aria-pressed="false"><span><kbd>B</kbd> Bones & pivots</span><span class="toggle" aria-hidden="true"></span></button>
         <button class="wide-button" data-action="ikDebug" aria-pressed="false"><span><kbd>I</kbd> IK targets & chains</span><span class="toggle" aria-hidden="true"></span></button>
         <button class="wide-button" data-action="handIK" aria-pressed="false"><span><kbd>H</kbd> Mouse hand target</span><span class="toggle" aria-hidden="true"></span></button>
-        <button class="wide-button" data-action="footIK" aria-pressed="false"><span><kbd>F</kbd> Plant the feet</span><span class="toggle" aria-hidden="true"></span></button>
+        <button class="wide-button" data-action="footIK" aria-pressed="false"><span><kbd>F</kbd> Plant feet while walking</span><span class="toggle" aria-hidden="true"></span></button>
         <button class="wide-button" data-action="prop" aria-pressed="true"><span><kbd>T</kbd> Katana attachment</span><span class="toggle" aria-hidden="true"></span></button>
         <div class="button-pair">
           <button data-action="rotateLeft"><kbd>Q</kbd> Turn −</button>
