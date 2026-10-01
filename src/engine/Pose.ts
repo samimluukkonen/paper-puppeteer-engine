@@ -1,25 +1,11 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { checkJson, UnsupportedFormatVersionError, type ValidationIssue } from './externalData.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
+import { POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
 import { type JointTransform, transformProperties } from './types.js';
 
-export const POSE_FORMAT_VERSION = 1;
-const finite = z.number().finite();
-export const poseDefinitionSchema = z.strictObject({
-  version: z.literal(POSE_FORMAT_VERSION),
-  name: z.string().min(1),
-  bones: z.record(
-    z.string(),
-    z.strictObject({
-      x: finite.optional(),
-      y: finite.optional(),
-      rotation: finite.optional(),
-      scaleX: finite.optional(),
-      scaleY: finite.optional(),
-    }),
-  ),
-});
+export { POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
 
 export type PoseDefinition = z.infer<typeof poseDefinitionSchema>;
 

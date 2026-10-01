@@ -1,0 +1,173 @@
+import type { AnimationClip } from './AnimationClip.js';
+import type { RigDefinition, SkinDefinition } from './types.js';
+
+export interface ValidationIssue {
+  severity: 'error' | 'warning';
+  path?: string;
+  message: string;
+}
+
+/** File validation collects issues; runtime entry points throw before building state. */
+export type ReportValidationIssue = (issue: ValidationIssue, runtimeMessage?: string) => void;
+
+export const throwValidationIssue: ReportValidationIssue = (issue, runtimeMessage) => {
+  throw new Error(runtimeMessage ?? issue.message);
+};
+
+/** Semantic checks assume shape and scalar validation has already succeeded. */
+export function checkRigReferences(definition: RigDefinition, report: ReportValidationIssue): void {
+  const { root, bones } = definition;
+  const ids = new Map<string, number>();
+  for (const [index, bone] of bones.entries()) {
+    if (ids.has(bone.id))
+      report(
+        { severity: 'error', path: `bones[${index}].id`, message: `Duplicate bone id "${bone.id}".` },
+        `Empty or duplicate bone id: "${bone.id}".`,
+      );
+    else ids.set(bone.id, index);
+  }
+  if (!ids.has(root))
+    report({ severity: 'error', path: 'root', message: `Root bone "${root}" is missing.` }, `Unknown bone "${root}".`);
+  for (const [index, bone] of bones.entries()) {
+    if (bone.id === root && bone.parent !== undefined)
+      report({
+        severity: 'error',
+        path: `bones[${index}].parent`,
+        message: 'The root bone cannot have a parent.',
+      });
+    if (bone.id !== root && bone.parent === undefined)
+      report({ severity: 'error', path: `bones[${index}].parent`, message: `Bone "${bone.id}" needs a parent.` });
+    if (bone.parent !== undefined && !ids.has(bone.parent))
+      report(
+        {
+          severity: 'error',
+          path: `bones[${index}].parent`,
+          message: `Bone "${bone.id}" references unknown parent "${bone.parent}".`,
+        },
+        `Unknown parent "${bone.parent}" of bone "${bone.id}".`,
+      );
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string): void => {
+    if (visited.has(id) || visiting.has(id)) return;
+    visiting.add(id);
+    const index = ids.get(id);
+    const parent = index === undefined ? undefined : bones[index]?.parent;
+    if (parent !== undefined && ids.has(parent)) {
+      if (visiting.has(parent))
+        report(
+          {
+            severity: 'error',
+            path: `bones[${index}].parent`,
+            message: `Circular hierarchy involving "${id}" and "${parent}".`,
+          },
+          `Rig contains a cycle at "${id}".`,
+        );
+      else visit(parent);
+    }
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of ids.keys()) visit(id);
+  const slotIds = new Set<string>();
+  for (const [index, slot] of (definition.slots ?? []).entries()) {
+    if (slotIds.has(slot.id))
+      report({ severity: 'error', path: `slots[${index}].id`, message: `Duplicate slot id "${slot.id}".` });
+    slotIds.add(slot.id);
+    if (!ids.has(slot.bone))
+      report(
+        {
+          severity: 'error',
+          path: `slots[${index}].bone`,
+          message: `Slot references unknown bone "${slot.bone}".`,
+        },
+        `Slot "${slot.id}" references unknown bone "${slot.bone}".`,
+      );
+  }
+  const attachmentIds = new Set<string>();
+  for (const [index, attachment] of (definition.attachments ?? []).entries()) {
+    if (attachmentIds.has(attachment.id))
+      report({
+        severity: 'error',
+        path: `attachments[${index}].id`,
+        message: `Duplicate attachment id "${attachment.id}".`,
+      });
+    attachmentIds.add(attachment.id);
+  }
+  checkSkinReferences(definition.skins ?? [], definition, report);
+}
+
+export function checkSkinReferences(
+  skins: readonly SkinDefinition[],
+  rig: RigDefinition,
+  report: ReportValidationIssue,
+): void {
+  const slotIds = new Set((rig.slots ?? []).map((slot) => slot.id));
+  const attachmentIds = new Set((rig.attachments ?? []).map((attachment) => attachment.id));
+  const skinNames = new Set<string>();
+  for (const [index, skin] of skins.entries()) {
+    if (skinNames.has(skin.name))
+      report({ severity: 'error', path: `skins[${index}].name`, message: `Duplicate skin name "${skin.name}".` });
+    skinNames.add(skin.name);
+    for (const [slot, attachment] of Object.entries(skin.slots)) {
+      if (!slotIds.has(slot))
+        report(
+          { severity: 'error', path: `skins[${index}].slots.${slot}`, message: `Unknown slot "${slot}".` },
+          `Skin "${skin.name}" references unknown slot "${slot}".`,
+        );
+      if (attachment !== null && !attachmentIds.has(attachment))
+        report(
+          {
+            severity: 'error',
+            path: `skins[${index}].slots.${slot}`,
+            message: `Unknown attachment "${attachment}".`,
+          },
+          `Skin "${skin.name}" references unknown attachment "${attachment}".`,
+        );
+    }
+  }
+}
+
+export function checkAnimationReferences(
+  clip: AnimationClip,
+  rig: Pick<RigDefinition, 'bones'>,
+  report: ReportValidationIssue,
+): void {
+  const boneIds = new Set(rig.bones.map((bone) => bone.id));
+  for (const [bone, keys] of Object.entries(clip.tracks)) {
+    if (!boneIds.has(bone))
+      report(
+        {
+          severity: 'error',
+          path: `tracks.${bone}`,
+          message: `Animation "${clip.name}" references unknown bone "${bone}".`,
+        },
+        `Unknown bone "${bone}".`,
+      );
+    let previousTime = -1;
+    for (const [index, key] of keys.entries()) {
+      if (key.time < 0 || key.time > clip.duration || key.time <= previousTime)
+        report(
+          {
+            severity: 'error',
+            path: `tracks.${bone}[${index}].time`,
+            message: 'Keyframe time must increase strictly and stay within the animation duration.',
+          },
+          `Keys for "${bone}" must have strictly increasing times within the clip.`,
+        );
+      previousTime = key.time;
+    }
+  }
+  for (const [index, event] of (clip.events ?? []).entries()) {
+    if (event.time < 0 || event.time > clip.duration)
+      report(
+        {
+          severity: 'error',
+          path: `events[${index}].time`,
+          message: 'Event time must stay within the animation duration.',
+        },
+        `Invalid event in animation "${clip.name}".`,
+      );
+  }
+}

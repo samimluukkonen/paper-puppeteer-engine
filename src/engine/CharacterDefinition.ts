@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { AnimationClip } from './AnimationClip.js';
 import {
   checkJson,
@@ -10,24 +10,10 @@ import {
 } from './externalData.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { Rig } from './Rig.js';
-import { skinDefinitionSchema } from './schemas.js';
+import { characterManifestSchema, skinFileSchema } from './schemas.js';
 import type { SkinDefinition } from './types.js';
 
-export const CHARACTER_FORMAT_VERSION = 1;
-
-const skinFileSchema = skinDefinitionSchema.strict();
-
-export const characterManifestSchema = z.strictObject({
-  version: z.literal(CHARACTER_FORMAT_VERSION),
-  id: z.string().min(1),
-  rig: z.string().min(1),
-  defaultSkin: z.string().min(1),
-  skins: z.record(z.string().min(1), z.string().min(1)),
-  animations: z.array(z.string().min(1)),
-  poses: z.array(z.string().min(1)).optional(),
-  /** Phaser texture key -> image path, relative to character.json. */
-  textures: z.record(z.string().min(1), z.string().min(1)),
-});
+export { CHARACTER_FORMAT_VERSION, characterManifestSchema } from './schemas.js';
 
 export type CharacterManifest = z.infer<typeof characterManifestSchema>;
 

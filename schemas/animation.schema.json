@@ -1,62 +1,112 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Paper Puppeteer animation",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["version", "name", "duration", "loop", "tracks"],
   "properties": {
-    "version": { "const": 1 },
-    "name": { "type": "string", "minLength": 1 },
-    "duration": { "type": "number", "exclusiveMinimum": 0 },
-    "loop": { "type": "boolean" },
-    "interpolation": { "const": "linear" },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duration": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "loop": {
+      "type": "boolean"
+    },
+    "interpolation": {
+      "type": "string",
+      "const": "linear"
+    },
     "tracks": {
       "type": "object",
-      "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/keyframe" } }
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "number",
+              "minimum": 0
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "rotation": {
+              "type": "number"
+            },
+            "scaleX": {
+              "type": "number"
+            },
+            "scaleY": {
+              "type": "number"
+            }
+          },
+          "required": ["time"],
+          "additionalProperties": false
+        }
+      }
     },
     "events": {
       "type": "array",
       "items": {
         "type": "object",
-        "additionalProperties": false,
-        "required": ["time", "name"],
         "properties": {
-          "time": { "type": "number", "minimum": 0 },
-          "name": { "type": "string", "minLength": 1 },
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
           "data": {}
-        }
+        },
+        "required": ["time", "name"],
+        "additionalProperties": false
       }
     },
     "playback": {
       "oneOf": [
         {
           "type": "object",
-          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "smooth"
+            }
+          },
           "required": ["mode"],
-          "properties": { "mode": { "const": "smooth" } }
+          "additionalProperties": false
         },
         {
           "type": "object",
-          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "stepped"
+            },
+            "fps": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
           "required": ["mode", "fps"],
-          "properties": { "mode": { "const": "stepped" }, "fps": { "type": "number", "exclusiveMinimum": 0 } }
+          "additionalProperties": false
         }
       ]
+    },
+    "version": {
+      "type": "number",
+      "const": 1
     }
   },
-  "$defs": {
-    "keyframe": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["time"],
-      "properties": {
-        "time": { "type": "number", "minimum": 0 },
-        "x": { "type": "number" },
-        "y": { "type": "number" },
-        "rotation": { "type": "number" },
-        "scaleX": { "type": "number" },
-        "scaleY": { "type": "number" }
-      }
-    }
-  }
+  "required": ["name", "duration", "loop", "tracks", "version"],
+  "additionalProperties": false,
+  "title": "Paper Puppeteer animation"
 }

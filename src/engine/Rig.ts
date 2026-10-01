@@ -6,6 +6,7 @@ import type {
   SlotDefinition,
   SpriteAttachmentDefinition,
 } from './types.js';
+import { checkRigReferences, throwValidationIssue } from './validation.js';
 
 /** Resolve the logical joint offset using the parent's explicit length, when present. */
 export function computeBonePosition(bone: BoneDefinition, parent?: BoneDefinition): { x: number; y: number } {
@@ -59,11 +60,9 @@ export class Rig {
 
   constructor(definition: RigDefinition) {
     definition = rigDefinitionSchema.parse(definition);
+    checkRigReferences(definition, throwValidationIssue);
     this.root = definition.root;
     for (const bone of definition.bones) {
-      if (!bone.id || this.definitions.has(bone.id)) {
-        throw new Error(`Empty or duplicate bone id: "${bone.id}".`);
-      }
       this.definitions.set(
         bone.id,
         Object.freeze({
@@ -72,17 +71,6 @@ export class Rig {
         }),
       );
     }
-    const root = this.getBone(this.root);
-    if (root.parent !== undefined) throw new Error('The root bone cannot have a parent.');
-    for (const bone of this.definitions.values()) {
-      if (bone.id !== this.root && bone.parent === undefined) {
-        throw new Error(`Bone "${bone.id}" needs a parent.`);
-      }
-      if (bone.parent !== undefined && !this.definitions.has(bone.parent)) {
-        throw new Error(`Unknown parent "${bone.parent}" of bone "${bone.id}".`);
-      }
-    }
-
     // Explicit lengths define the logical skeleton, rather than asking IK to
     // solve lengths that disagree with the rendered child joint positions.
     for (const bone of this.definitions.values()) {
@@ -99,15 +87,11 @@ export class Rig {
     }
 
     const ordered: BoneDefinition[] = [];
-    const visiting = new Set<string>();
     const visited = new Set<string>();
     const visit = (id: string): void => {
       if (visited.has(id)) return;
-      if (visiting.has(id)) throw new Error(`Rig contains a cycle at "${id}".`);
-      visiting.add(id);
       const bone = this.getBone(id);
       if (bone.parent !== undefined) visit(bone.parent);
-      visiting.delete(id);
       visited.add(id);
       ordered.push(bone);
     };
@@ -126,27 +110,6 @@ export class Rig {
         }),
       ),
     );
-    const slotIds = new Set<string>();
-    for (const slot of this.slots) {
-      if (slotIds.has(slot.id)) throw new Error(`Duplicate slot id "${slot.id}".`);
-      slotIds.add(slot.id);
-      if (!this.hasBone(slot.bone)) throw new Error(`Slot "${slot.id}" references unknown bone "${slot.bone}".`);
-    }
-    const attachmentIds = new Set<string>();
-    for (const attachment of this.attachments) {
-      if (attachmentIds.has(attachment.id)) throw new Error(`Duplicate attachment id "${attachment.id}".`);
-      attachmentIds.add(attachment.id);
-    }
-    const skinNames = new Set<string>();
-    for (const skin of this.skins) {
-      if (skinNames.has(skin.name)) throw new Error(`Duplicate skin name "${skin.name}".`);
-      skinNames.add(skin.name);
-      for (const [slot, attachment] of Object.entries(skin.slots)) {
-        if (!slotIds.has(slot)) throw new Error(`Skin "${skin.name}" references unknown slot "${slot}".`);
-        if (attachment !== null && !attachmentIds.has(attachment))
-          throw new Error(`Skin "${skin.name}" references unknown attachment "${attachment}".`);
-      }
-    }
   }
 
   getBone(id: string): BoneDefinition {

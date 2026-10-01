@@ -26,6 +26,7 @@
     "build:demo": "vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "preview": "vite preview",
+    "schemas:generate": "node scripts/generate-schemas.mjs && biome format --write schemas",
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "test": "vitest run",

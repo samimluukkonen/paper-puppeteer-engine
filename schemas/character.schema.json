@@ -1,17 +1,61 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Paper Puppeteer character manifest",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["version", "id", "rig", "defaultSkin", "skins", "animations", "textures"],
   "properties": {
-    "version": { "const": 1 },
-    "id": { "type": "string", "minLength": 1 },
-    "rig": { "type": "string", "minLength": 1 },
-    "defaultSkin": { "type": "string", "minLength": 1 },
-    "skins": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
-    "animations": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "poses": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "textures": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }
-  }
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rig": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaultSkin": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skins": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "animations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "poses": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "textures": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": ["version", "id", "rig", "defaultSkin", "skins", "animations", "textures"],
+  "additionalProperties": false,
+  "title": "Paper Puppeteer character manifest"
 }

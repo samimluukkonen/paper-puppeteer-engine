@@ -1,28 +1,39 @@
-import type { AnimationClip, AnimationPlaybackMode, Interpolation, Keyframe } from './AnimationClip.js';
+import type { z } from 'zod';
+import type { AnimationClip } from './AnimationClip.js';
 import { Rig } from './Rig.js';
-import { animationClipSchema, rigDefinitionSchema } from './schemas.js';
-import type {
-  BoneDefinition,
-  RigDefinition,
-  SkinDefinition,
-  SlotDefinition,
-  SpriteAttachmentDefinition,
-} from './types.js';
+import {
+  ANIMATION_FORMAT_VERSION,
+  animationClipSchema,
+  animationEventSchema,
+  animationFileSchema,
+  boneDefinitionSchema,
+  keyframeSchema,
+  RIG_FORMAT_VERSION,
+  rigDefinitionSchema,
+  rigFileSchema,
+  skinDefinitionSchema,
+  slotDefinitionSchema,
+  smoothPlaybackSchema,
+  spriteAttachmentSchema,
+  spriteSchema,
+  steppedPlaybackSchema,
+} from './schemas.js';
+import type { RigDefinition, SkinDefinition } from './types.js';
+import {
+  checkAnimationReferences,
+  checkRigReferences,
+  checkSkinReferences,
+  type ValidationIssue,
+} from './validation.js';
 
-export const RIG_FORMAT_VERSION = 1;
-export const ANIMATION_FORMAT_VERSION = 1;
+export { ANIMATION_FORMAT_VERSION, RIG_FORMAT_VERSION } from './schemas.js';
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
 /** File format for a rig. The optional name is metadata; bone ids identify runtime joints. */
-export interface RigJsonDefinition {
+export interface RigJsonDefinition extends RigDefinition {
   version: typeof RIG_FORMAT_VERSION;
   name?: string;
-  root: string;
-  bones: readonly BoneDefinition[];
-  slots?: readonly SlotDefinition[];
-  attachments?: readonly SpriteAttachmentDefinition[];
-  skins?: readonly SkinDefinition[];
 }
 
 export interface AnimationJsonEvent {
@@ -32,22 +43,12 @@ export interface AnimationJsonEvent {
 }
 
 /** File format for a clip; event payloads must be JSON values. */
-export interface AnimationJsonDefinition {
+export interface AnimationJsonDefinition extends AnimationClip {
   version: typeof ANIMATION_FORMAT_VERSION;
-  name: string;
-  duration: number;
-  loop: boolean;
-  interpolation?: Interpolation;
-  tracks: Readonly<Record<string, readonly Keyframe[]>>;
   events?: readonly AnimationJsonEvent[];
-  playback?: AnimationPlaybackMode;
 }
 
-export interface ValidationIssue {
-  severity: 'error' | 'warning';
-  path?: string;
-  message: string;
-}
+export type { ValidationIssue } from './validation.js';
 
 export class RigValidationError extends Error {
   constructor(readonly issues: readonly ValidationIssue[]) {
@@ -182,10 +183,9 @@ function versionIssues(input: unknown, expected: number, format: 'rig' | 'animat
   return [];
 }
 
-const transformKeys = ['x', 'y', 'rotation', 'scaleX', 'scaleY'];
-
-function checkKnownKeys(value: unknown, path: string, allowed: readonly string[], issues: ValidationIssue[]): void {
+function checkKnownKeys(value: unknown, path: string, schema: z.ZodObject, issues: ValidationIssue[]): void {
   if (!isRecord(value)) return;
+  const allowed = Object.keys(schema.shape);
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key))
       issues.push({ severity: 'error', path: childPath(path, key), message: `Unknown field "${key}".` });
@@ -193,54 +193,43 @@ function checkKnownKeys(value: unknown, path: string, allowed: readonly string[]
 }
 
 function checkRigFields(input: unknown, issues: ValidationIssue[]): void {
-  checkKnownKeys(input, '', ['version', 'name', 'root', 'bones', 'slots', 'attachments', 'skins'], issues);
+  checkKnownKeys(input, '', rigFileSchema, issues);
   if (!isRecord(input) || !Array.isArray(input.bones)) return;
   for (const [index, bone] of input.bones.entries()) {
     const path = `bones[${index}]`;
-    checkKnownKeys(bone, path, ['id', 'parent', 'length', 'sprite', 'depth', ...transformKeys], issues);
-    if (isRecord(bone))
-      checkKnownKeys(
-        bone.sprite,
-        `${path}.sprite`,
-        ['texture', 'frame', 'x', 'y', 'originX', 'originY', 'scaleX', 'scaleY', 'depth'],
-        issues,
-      );
+    checkKnownKeys(bone, path, boneDefinitionSchema, issues);
+    if (isRecord(bone)) checkKnownKeys(bone.sprite, `${path}.sprite`, spriteSchema, issues);
   }
   if (Array.isArray(input.slots))
     for (const [index, slot] of input.slots.entries())
-      checkKnownKeys(slot, `slots[${index}]`, ['id', 'bone', 'depth', ...transformKeys], issues);
+      checkKnownKeys(slot, `slots[${index}]`, slotDefinitionSchema, issues);
   if (Array.isArray(input.attachments))
     for (const [index, attachment] of input.attachments.entries())
-      checkKnownKeys(
-        attachment,
-        `attachments[${index}]`,
-        ['id', 'texture', 'frame', ...transformKeys, 'originX', 'originY'],
-        issues,
-      );
+      checkKnownKeys(attachment, `attachments[${index}]`, spriteAttachmentSchema, issues);
   if (Array.isArray(input.skins))
     for (const [index, skin] of input.skins.entries())
-      checkKnownKeys(skin, `skins[${index}]`, ['version', 'name', 'slots'], issues);
+      checkKnownKeys(skin, `skins[${index}]`, skinDefinitionSchema, issues);
 }
 
 function checkAnimationFields(input: unknown, issues: ValidationIssue[]): void {
+  checkKnownKeys(input, '', animationFileSchema, issues);
+  if (!isRecord(input)) return;
   checkKnownKeys(
-    input,
-    '',
-    ['version', 'name', 'duration', 'loop', 'interpolation', 'tracks', 'events', 'playback'],
+    input.playback,
+    'playback',
+    isRecord(input.playback) && input.playback.mode === 'smooth' ? smoothPlaybackSchema : steppedPlaybackSchema,
     issues,
   );
-  if (!isRecord(input)) return;
-  checkKnownKeys(input.playback, 'playback', ['mode', 'fps'], issues);
   if (isRecord(input.tracks)) {
     for (const [bone, keys] of Object.entries(input.tracks)) {
       if (!Array.isArray(keys)) continue;
       for (const [index, key] of keys.entries())
-        checkKnownKeys(key, `tracks.${bone}[${index}]`, ['time', ...transformKeys], issues);
+        checkKnownKeys(key, `tracks.${bone}[${index}]`, keyframeSchema, issues);
     }
   }
   if (Array.isArray(input.events)) {
     for (const [index, event] of input.events.entries())
-      checkKnownKeys(event, `events[${index}]`, ['time', 'name', 'data'], issues);
+      checkKnownKeys(event, `events[${index}]`, animationEventSchema, issues);
   }
 }
 
@@ -257,99 +246,18 @@ export function inspectRigDefinition(input: unknown): ValidationResult<RigDefini
   checkRigFields(input, issues);
   const parsed = rigDefinitionSchema.safeParse(input);
   if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)] };
-  const { root, bones } = parsed.data;
-  if (isRecord(input) && input.name !== undefined && (typeof input.name !== 'string' || input.name.length === 0))
-    issues.push({ severity: 'error', path: 'name', message: 'Rig name must be a nonempty string.' });
-  const ids = new Map<string, number>();
-  for (const [index, bone] of bones.entries()) {
-    if (ids.has(bone.id))
-      issues.push({ severity: 'error', path: `bones[${index}].id`, message: `Duplicate bone id "${bone.id}".` });
-    else ids.set(bone.id, index);
+  if (isRecord(input) && input.name !== undefined) {
+    const name = rigFileSchema.shape.name.safeParse(input.name);
+    if (!name.success) issues.push(...shapeIssues(name.error).map((issue) => ({ ...issue, path: 'name' })));
   }
-  if (!ids.has(root)) issues.push({ severity: 'error', path: 'root', message: `Root bone "${root}" is missing.` });
-  for (const [index, bone] of bones.entries()) {
-    if (bone.id === root && bone.parent !== undefined)
-      issues.push({
-        severity: 'error',
-        path: `bones[${index}].parent`,
-        message: 'The root bone cannot have a parent.',
-      });
-    if (bone.id !== root && bone.parent === undefined)
-      issues.push({ severity: 'error', path: `bones[${index}].parent`, message: `Bone "${bone.id}" needs a parent.` });
-    if (bone.parent !== undefined && !ids.has(bone.parent))
-      issues.push({
-        severity: 'error',
-        path: `bones[${index}].parent`,
-        message: `Bone "${bone.id}" references unknown parent "${bone.parent}".`,
-      });
-  }
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const visit = (id: string): void => {
-    if (visited.has(id) || visiting.has(id)) return;
-    visiting.add(id);
-    const index = ids.get(id);
-    const parent = index === undefined ? undefined : bones[index]?.parent;
-    if (parent !== undefined && ids.has(parent)) {
-      if (visiting.has(parent))
-        issues.push({
-          severity: 'error',
-          path: `bones[${index}].parent`,
-          message: `Circular hierarchy involving "${id}" and "${parent}".`,
-        });
-      else visit(parent);
-    }
-    visiting.delete(id);
-    visited.add(id);
-  };
-  for (const id of ids.keys()) visit(id);
-  const slotIds = new Set<string>();
-  for (const [index, slot] of (parsed.data.slots ?? []).entries()) {
-    if (slotIds.has(slot.id))
-      issues.push({ severity: 'error', path: `slots[${index}].id`, message: `Duplicate slot id "${slot.id}".` });
-    slotIds.add(slot.id);
-    if (!ids.has(slot.bone))
-      issues.push({
-        severity: 'error',
-        path: `slots[${index}].bone`,
-        message: `Slot references unknown bone "${slot.bone}".`,
-      });
-  }
-  const attachmentIds = new Set<string>();
-  for (const [index, attachment] of (parsed.data.attachments ?? []).entries()) {
-    if (attachmentIds.has(attachment.id))
-      issues.push({
-        severity: 'error',
-        path: `attachments[${index}].id`,
-        message: `Duplicate attachment id "${attachment.id}".`,
-      });
-    attachmentIds.add(attachment.id);
-  }
-  issues.push(...validateSkinReferences(parsed.data.skins ?? [], parsed.data));
+  checkRigReferences(parsed.data, (issue) => issues.push(issue));
   return issues.length ? { issues } : { issues, data: parsed.data };
 }
 
 /** @internal Checks standalone skins against an already validated rig. */
 export function validateSkinReferences(skins: readonly SkinDefinition[], rig: RigDefinition): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const slotIds = new Set((rig.slots ?? []).map((slot) => slot.id));
-  const attachmentIds = new Set((rig.attachments ?? []).map((attachment) => attachment.id));
-  const skinNames = new Set<string>();
-  for (const [index, skin] of skins.entries()) {
-    if (skinNames.has(skin.name))
-      issues.push({ severity: 'error', path: `skins[${index}].name`, message: `Duplicate skin name "${skin.name}".` });
-    skinNames.add(skin.name);
-    for (const [slot, attachment] of Object.entries(skin.slots)) {
-      if (!slotIds.has(slot))
-        issues.push({ severity: 'error', path: `skins[${index}].slots.${slot}`, message: `Unknown slot "${slot}".` });
-      if (attachment !== null && !attachmentIds.has(attachment))
-        issues.push({
-          severity: 'error',
-          path: `skins[${index}].slots.${slot}`,
-          message: `Unknown attachment "${attachment}".`,
-        });
-    }
-  }
+  checkSkinReferences(skins, rig, (issue) => issues.push(issue));
   return issues;
 }
 
@@ -378,33 +286,7 @@ export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinit
   const parsed = animationClipSchema.safeParse(input);
   if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)] };
   const clip = parsed.data;
-  const boneIds = new Set(rig.bones.map((bone) => bone.id));
-  for (const [bone, keys] of Object.entries(clip.tracks)) {
-    if (!boneIds.has(bone))
-      issues.push({
-        severity: 'error',
-        path: `tracks.${bone}`,
-        message: `Animation "${clip.name}" references unknown bone "${bone}".`,
-      });
-    let previousTime = -1;
-    for (const [index, key] of keys.entries()) {
-      if (key.time < 0 || key.time > clip.duration || key.time <= previousTime)
-        issues.push({
-          severity: 'error',
-          path: `tracks.${bone}[${index}].time`,
-          message: 'Keyframe time must increase strictly and stay within the animation duration.',
-        });
-      previousTime = key.time;
-    }
-  }
-  for (const [index, event] of (clip.events ?? []).entries()) {
-    if (event.time < 0 || event.time > clip.duration)
-      issues.push({
-        severity: 'error',
-        path: `events[${index}].time`,
-        message: 'Event time must stay within the animation duration.',
-      });
-  }
+  checkAnimationReferences(clip, rig, (issue) => issues.push(issue));
   return issues.length ? { issues } : { issues, data: clip };
 }
 

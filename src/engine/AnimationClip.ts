@@ -2,6 +2,7 @@ import type { Rig } from './Rig.js';
 import { animationClipSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { transformProperties } from './types.js';
+import { checkAnimationReferences, throwValidationIssue } from './validation.js';
 
 export type Interpolation = 'linear';
 
@@ -50,25 +51,11 @@ export interface CompiledClip {
 /** Compile sparse keys per property once rather than searching them every frame. */
 export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
   clip = animationClipSchema.parse(clip);
-  const events = (clip.events ?? [])
-    .map((event) => {
-      if (event.time < 0 || event.time > clip.duration || !event.name) {
-        throw new Error(`Invalid event in animation "${clip.name}".`);
-      }
-      return { ...event };
-    })
-    .sort((a, b) => a.time - b.time);
+  checkAnimationReferences(clip, rig, throwValidationIssue);
+  const events = (clip.events ?? []).map((event) => ({ ...event })).sort((a, b) => a.time - b.time);
   const tracks: CompiledTrack[] = [];
   for (const [bone, keys] of Object.entries(clip.tracks)) {
-    rig.getBone(bone);
     const properties = new Map<TransformProperty, readonly PropertyKeyframe[]>();
-    let previousTime = -1;
-    for (const key of keys) {
-      if (key.time < 0 || key.time > clip.duration || key.time <= previousTime) {
-        throw new Error(`Keys for "${bone}" must have strictly increasing times within the clip.`);
-      }
-      previousTime = key.time;
-    }
     for (const property of transformProperties) {
       const samples: PropertyKeyframe[] = [];
       for (const key of keys) {
