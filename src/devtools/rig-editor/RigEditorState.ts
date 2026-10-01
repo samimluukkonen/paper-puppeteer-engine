@@ -234,8 +234,8 @@ export class RigEditorState {
     };
   }
 
-  markSaved(): void {
-    this.saved = snapshot(this.workingCopy);
+  markSaved(savedSnapshot = snapshot(this.workingCopy)): void {
+    this.saved = savedSnapshot;
   }
 
   exportRig(saveBaseline = true): RigJsonDefinition {

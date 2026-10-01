@@ -256,9 +256,14 @@ const markExported = (): void => {
 };
 action('copy-json', async () => {
   if (!navigator.clipboard?.writeText) throw new Error('Clipboard API is unavailable. Use Download or Log rig JSON.');
+  if (!editor) throw new Error('No rig is loaded.');
+  const exportingEditor = editor;
   const json = prepareJson();
+  const savedSnapshot = JSON.stringify(exportingEditor.state.workingCopy);
   await navigator.clipboard.writeText(json);
-  markExported();
+  if (editor !== exportingEditor) return;
+  exportingEditor.state.markSaved(savedSnapshot);
+  updateStatus(exportingEditor);
   feedback.textContent = 'Rig JSON copied.';
 });
 action('download-json', () => {
