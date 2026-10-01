@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
+import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
@@ -10,6 +11,7 @@ import { RigEditorState } from './RigEditorState.js';
 export class RigEditor {
   readonly state: RigEditorState;
   private overlay: RigEditorOverlay | undefined;
+  private readonly registeredIK = new Map<string, TwoBoneIKConstraint>();
   private panning = false;
   private moved = false;
   private downX = 0;
@@ -30,7 +32,11 @@ export class RigEditor {
     if (this.overlay) return;
     this.puppet.resetToBindPose().setFacing('right');
     for (const chain of this.ikChains) {
-      const constraint = this.puppet.addIK({ ...chain, enabled: false });
+      let constraint = this.registeredIK.get(chain.name);
+      if (!constraint) {
+        constraint = this.puppet.addIK({ ...chain, enabled: false });
+        this.registeredIK.set(chain.name, constraint);
+      }
       constraint.enabled = false;
     }
     this.overlay = new RigEditorOverlay(this.scene, this.puppet, this.state, this.ikChains);
