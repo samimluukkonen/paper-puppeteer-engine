@@ -114,8 +114,9 @@ function render(current: RigEditor): void {
       input.dataset.visibility = key;
       input.checked = state.visibility[key];
       input.addEventListener('change', () => {
-        state.visibility[key] = input.checked;
-        current.refresh();
+        if (!editor) return;
+        editor.state.visibility[key] = input.checked;
+        editor.refresh();
       });
       label.append(input, title);
       visibility.append(label);
