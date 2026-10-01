@@ -12,7 +12,7 @@ import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { IKPoseState } from './ik/IKPoseState.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
-import type { IKTarget, TwoBoneIKDefinition } from './ik/types.js';
+import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
 import { applyPoseToJoints, type PoseDefinition, parsePoseDefinition, serializePose } from './Pose.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
@@ -55,6 +55,17 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly ikPose = new IKPoseState();
+  private readonly sortedIK: TwoBoneIKConstraint[] = [];
+  private readonly ikContext: IKTransformContext = {
+    worldToParent: (id, target) => {
+      const parent = this.getBone(id).container.parentContainer!;
+      const matrix = parent.getWorldTransformMatrix();
+      const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+      if (!Number.isFinite(determinant) || determinant === 0) return undefined;
+      const point = matrix.applyInverse(target.x, target.y);
+      return Number.isFinite(point.x) && Number.isFinite(point.y) ? point : undefined;
+    },
+  };
   private readonly poses = new Map<string, PoseDefinition>();
   private activePose: { pose: PoseDefinition; mix: number } | undefined;
   private readonly poseUnderlying = new Map<string, Partial<import('./types.js').JointTransform>>();
@@ -540,8 +551,28 @@ export class Puppet {
     this.poseUnderlying.clear();
   }
 
-  private orderedIK(): TwoBoneIKConstraint[] {
-    return [...this.ikConstraints.values()].sort((a, b) => a.priority - b.priority);
+  private orderedIK(reuse = false): TwoBoneIKConstraint[] {
+    // Refill in registration order so priority changes retain stable ties.
+    // Debug calls use their own list, including calls made by target providers.
+    const constraints = reuse ? this.sortedIK : [];
+    constraints.length = 0;
+    for (const constraint of this.ikConstraints.values()) constraints.push(constraint);
+    return constraints.sort((a, b) => a.priority - b.priority);
+  }
+
+  private syncIKBone(bone: Bone, rotationBefore: number): void {
+    const { pose, container } = bone;
+    if (
+      pose.x === container.x &&
+      pose.y === container.y &&
+      // Phaser wraps container rotations, so compare the authored values directly.
+      pose.rotation === rotationBefore &&
+      pose.scaleX === container.scaleX &&
+      pose.scaleY === container.scaleY
+    )
+      return;
+    bone.syncTransform();
+    this.renderer.syncBone(bone.id);
   }
 
   /** Apply the evaluated pose, solve IK in priority order, then project rendering. */
@@ -551,27 +582,22 @@ export class Puppet {
     if (this.activePose) applyPoseToJoints(this.activePose.pose, this.bones, this.activePose.mix, this.poseUnderlying);
     for (const bone of this.bones.values()) bone.syncTransform();
     this.renderer.sync();
-    const constraints = this.orderedIK();
-    this.ikPose.capture(
-      constraints.flatMap((constraint) => [this.getBone(constraint.rootBone), this.getBone(constraint.middleBone)]),
-    );
-    const context = {
-      worldToParent: (id: string, target: IKTarget): IKTarget | undefined => {
-        const parent = this.getBone(id).container.parentContainer!;
-        const matrix = parent.getWorldTransformMatrix();
-        const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
-        if (!Number.isFinite(determinant) || determinant === 0) return undefined;
-        const point = matrix.applyInverse(target.x, target.y);
-        return Number.isFinite(point.x) && Number.isFinite(point.y) ? { x: point.x, y: point.y } : undefined;
-      },
-    };
+    const constraints = this.orderedIK(true);
+    for (const constraint of constraints) {
+      this.ikPose.captureJoint(this.getBone(constraint.rootBone));
+      this.ikPose.captureJoint(this.getBone(constraint.middleBone));
+    }
     try {
       for (const constraint of constraints) {
-        constraint.apply(context);
-        this.getBone(constraint.rootBone).syncTransform();
-        this.getBone(constraint.middleBone).syncTransform();
-        // A later target provider may read an attachment in a render mount.
-        this.renderer.sync();
+        const root = this.getBone(constraint.rootBone);
+        const middle = this.getBone(constraint.middleBone);
+        const rootRotation = root.pose.rotation;
+        const middleRotation = middle.pose.rotation;
+        constraint.apply(this.ikContext);
+        // Later providers may read attachments in any descendant render mount.
+        // Project only changed local transforms into all of their copies.
+        this.syncIKBone(root, rootRotation);
+        this.syncIKBone(middle, middleRotation);
       }
     } finally {
       // Even a failing target provider must leave earlier IK passes restorable.

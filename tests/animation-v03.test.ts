@@ -50,6 +50,59 @@ test('crossfade advances source and target, and a new fade does not snap', () =>
   assert.strictEqual(joints.get('arm')!.pose.x, 10);
 });
 
+test('interrupted fades retain independent snapshots across later buffered evaluations', () => {
+  const { player, joints } = fixture();
+  player.play('a');
+  player.play('b', { fadeDuration: 200 });
+  player.update(100);
+  player.play('a', { fadeDuration: 200 });
+  for (const [delta, expected] of [
+    [50, 13.75],
+    [50, 12.5],
+    [100, 10],
+  ]) {
+    player.update(delta!);
+    assert.strictEqual(joints.get('arm')!.pose.x, expected);
+  }
+});
+
+test('shared clips on separate layers keep independent evaluation times and sparse ownership', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'move',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      arm: [
+        { time: 0, x: 0 },
+        { time: 1000, x: 100 },
+      ],
+    },
+  });
+  player.play('move');
+  player.update(100);
+  player.play('move', { layer: 'upper' });
+  player.setLayerWeight('upper', 0.5);
+  joints.get('arm')!.pose.y = 42;
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 15);
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 25);
+  assert.strictEqual(joints.get('arm')!.pose.y, 42);
+});
+
+test('completing a fade releases properties controlled only by its source', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({ name: 'partial', duration: 1000, loop: true, tracks: { leg: [{ time: 0, rotation: 1 }] } });
+  player.play('b');
+  player.play('partial', { fadeDuration: 200 });
+  player.update(200);
+  joints.get('arm')!.pose.x = 42;
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 42);
+  assert.strictEqual(joints.get('leg')!.pose.rotation, 1);
+});
+
 test('partial target fades tracked properties toward bind without touching other bones', () => {
   const { player, joints } = fixture();
   player.addAnimation({ name: 'partial', duration: 1000, loop: true, tracks: { leg: [{ time: 0, rotation: 1 }] } });

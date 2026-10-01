@@ -21,6 +21,7 @@ export class PuppetRenderer {
   private readonly slotImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly slotDepthOverrides = new Map<string, number>();
   private readonly projections: TransformProjection[] = [];
+  private readonly boneProjections = new Map<string, TransformProjection[]>();
   private order: readonly string[] = [];
 
   constructor(
@@ -45,7 +46,11 @@ export class PuppetRenderer {
       for (const source of ancestors) {
         const target = scene.add.container(0, 0).setName(`pose-${source.id}`);
         mount.add(target);
-        this.projections.push({ source: source.container, target });
+        const projection = { source: source.container, target };
+        this.projections.push(projection);
+        const projections = this.boneProjections.get(source.id) ?? [];
+        projections.push(projection);
+        this.boneProjections.set(source.id, projections);
         mount = target;
       }
       return { root, mount };
@@ -145,7 +150,18 @@ export class PuppetRenderer {
   }
 
   sync(): void {
-    for (const { source, target } of this.projections) {
+    this.syncProjections(this.projections);
+  }
+
+  /** Update every copy of a changed local bone transform, including descendant slot branches. */
+  syncBone(id: string): void {
+    const projections = this.boneProjections.get(id);
+    if (!projections) throw new Error(`Unknown bone "${id}".`);
+    this.syncProjections(projections);
+  }
+
+  private syncProjections(projections: readonly TransformProjection[]): void {
+    for (const { source, target } of projections) {
       target
         .setPosition(source.x, source.y)
         .setRotation(source.rotation)
@@ -162,5 +178,6 @@ export class PuppetRenderer {
     this.slotImages.clear();
     this.slotDepthOverrides.clear();
     this.projections.length = 0;
+    this.boneProjections.clear();
   }
 }

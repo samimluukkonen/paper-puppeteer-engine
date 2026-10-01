@@ -1,6 +1,6 @@
 import type { AnimationClip, AnimationEvent, AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
 import { compileClip } from './AnimationClip.js';
-import { type AnimationPose, blendPose, evaluateClip } from './AnimationPose.js';
+import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer, evaluateClip } from './AnimationPose.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
 import { assertFinite, type TransformProperty, transformProperties } from './types.js';
@@ -48,6 +48,12 @@ interface AnimationLayer {
   stopped: boolean;
 }
 
+interface LayerBuffers {
+  target: ClipPoseBuffer;
+  source: ClipPoseBuffer;
+  blended: AnimationPose;
+}
+
 function validateSpeed(speed: number): void {
   assertFinite(speed, 'Animation speed');
   if (speed < 0) throw new Error('Animation speed cannot be negative.');
@@ -61,6 +67,11 @@ export class AnimationPlayer {
   ]);
   private readonly eventListeners = new Set<(event: FiredAnimationEvent) => void>();
   private readonly completionListeners = new Set<(event: AnimationCompletion) => void>();
+  private readonly workingPose: AnimationPose = new Map();
+  private readonly emptyPose: AnimationPose = new Map();
+  private readonly controlled = new Map<string, Set<TransformProperty>>();
+  private controlDirty = true;
+  private readonly layerBuffers = new WeakMap<AnimationLayer, LayerBuffers>();
   private playback: AnimationPlaybackMode = { mode: 'smooth' };
   private speed = 1;
   private paused = false;
@@ -71,6 +82,8 @@ export class AnimationPlayer {
   ) {
     for (const bone of rig.bones) {
       if (!joints.has(bone.id)) throw new Error(`Missing joint "${bone.id}".`);
+      this.workingPose.set(bone.id, { ...joints.get(bone.id)!.bindPose });
+      this.controlled.set(bone.id, new Set());
     }
   }
 
@@ -137,6 +150,7 @@ export class AnimationPlayer {
     layer.state = { clip, time: 0, speed, playing: true };
     layer.transition = source ? { source, elapsed: 0, duration: fade } : undefined;
     layer.stopped = false;
+    this.controlDirty = true;
     if (layerName === 'base' && !source) this.resetPose();
     this.applyCurrentPose();
     this.fireStartEvents(clip, layerName);
@@ -178,6 +192,7 @@ export class AnimationPlayer {
     const layer = this.getOrCreateLayer(name);
     this.resetLayerProperties(layer);
     layer.mask = new Set(bones);
+    this.controlDirty = true;
     this.applyCurrentPose();
   }
 
@@ -188,6 +203,7 @@ export class AnimationPlayer {
     const layer = this.getOrCreateLayer(name);
     if (weight === 0 && layer.weight > 0) this.resetLayerProperties(layer);
     layer.weight = weight;
+    this.controlDirty = true;
     this.applyCurrentPose();
   }
 
@@ -196,6 +212,7 @@ export class AnimationPlayer {
     const layer = this.layers.get(name);
     if (layer) this.resetLayerProperties(layer);
     this.layers.delete(name);
+    this.controlDirty = true;
     this.applyCurrentPose();
   }
 
@@ -203,6 +220,7 @@ export class AnimationPlayer {
   clearAllLayers(): void {
     this.layers.clear();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
+    this.controlDirty = true;
   }
 
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
@@ -222,11 +240,15 @@ export class AnimationPlayer {
   update(delta: number): void {
     assertFinite(delta, 'Animation delta');
     if (delta < 0) throw new Error('Animation delta cannot be negative.');
-    if (
-      this.paused ||
-      ![...this.layers.values()].some((layer) => layer.state?.playing || (layer.transition && !layer.stopped))
-    )
-      return;
+    if (this.paused) return;
+    let advancing = false;
+    for (const layer of this.layers.values()) {
+      if (layer.state?.playing || (layer.transition && !layer.stopped)) {
+        advancing = true;
+        break;
+      }
+    }
+    if (!advancing) return;
     const events: FiredAnimationEvent[] = [];
     const completions: AnimationCompletion[] = [];
     for (const [name, layer] of this.layers) {
@@ -243,7 +265,10 @@ export class AnimationPlayer {
     for (const event of events) for (const listener of [...this.eventListeners]) listener(event);
     for (const event of completions) for (const listener of [...this.completionListeners]) listener(event);
     for (const layer of this.layers.values()) {
-      if (layer.transition && layer.transition.elapsed >= layer.transition.duration) layer.transition = undefined;
+      if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
+        layer.transition = undefined;
+        this.controlDirty = true;
+      }
     }
   }
 
@@ -263,15 +288,21 @@ export class AnimationPlayer {
   /** Reapply the held authored pose; useful before external per-frame adjustments. */
   applyCurrentPose(): void {
     const base = this.layers.get('base');
-    let pose: AnimationPose = this.bindPose();
-    if (base?.state) pose = blendPose(pose, new Map(), this.evaluateLayer(base, pose), 1);
+    const pose = this.workingPose;
+    for (const [id, values] of pose) {
+      const bindPose = this.joints.get(id)!.bindPose;
+      for (const property of transformProperties) values[property] = bindPose[property];
+    }
+    if (base?.state) blendPoseInto(pose, this.emptyPose, this.evaluateBufferedLayer(base, pose), 1);
     for (const [name, layer] of this.layers) {
       if (name === 'base' || !layer.state || layer.weight === 0) continue;
-      pose = blendPose(pose, new Map(), this.evaluateLayer(layer, pose), layer.weight, layer.mask);
+      blendPoseInto(pose, this.emptyPose, this.evaluateBufferedLayer(layer, pose), layer.weight, layer.mask);
     }
-    const controlled = new Map<string, Set<TransformProperty>>();
-    for (const layer of this.layers.values()) {
-      this.markLayerControlled(controlled, layer);
+    const controlled = this.controlled;
+    if (this.controlDirty) {
+      for (const properties of controlled.values()) properties.clear();
+      for (const layer of this.layers.values()) this.markLayerControlled(controlled, layer);
+      this.controlDirty = false;
     }
     for (const [id, values] of pose) {
       const joint = this.joints.get(id)!;
@@ -329,6 +360,32 @@ export class AnimationPlayer {
         ? transition.source
         : evaluateClip(transition.source.clip, this.sampleTime(transition.source.clip, transition.source.time));
     return blendPose(underlying, source, target, this.transitionWeight(state, transition));
+  }
+
+  private evaluateBufferedLayer(layer: AnimationLayer, underlying: AnimationPose): AnimationPose {
+    let buffers = this.layerBuffers.get(layer);
+    if (!buffers) {
+      buffers = { target: new ClipPoseBuffer(), source: new ClipPoseBuffer(), blended: new Map() };
+      this.layerBuffers.set(layer, buffers);
+    }
+    const state = layer.state!;
+    const target = buffers.target.evaluate(state.clip, this.sampleTime(state.clip, state.time));
+    const transition = layer.transition;
+    if (!transition) return target;
+    const source =
+      transition.source instanceof Map
+        ? transition.source
+        : buffers.source.evaluate(
+            transition.source.clip,
+            this.sampleTime(transition.source.clip, transition.source.time),
+          );
+    for (const [id, values] of underlying) {
+      const output = buffers.blended.get(id) ?? {};
+      Object.assign(output, values);
+      buffers.blended.set(id, output);
+    }
+    blendPoseInto(buffers.blended, source, target, this.transitionWeight(state, transition));
+    return buffers.blended;
   }
 
   private transitionWeight(state: AnimationState, transition: AnimationTransition): number {
