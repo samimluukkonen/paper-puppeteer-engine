@@ -187,7 +187,19 @@ export class RigEditorState {
     this.change(() => {
       if (selected.type === 'bone') {
         const index = this.workingCopy.bones.findIndex((bone) => bone.id === selected.id);
-        (this.workingCopy.bones as BoneDefinition[])[index] = structuredClone(this.initialCopy.bones[index]!);
+        const original = this.initialCopy.bones[index]!;
+        if (this.getBone(selected.id).length !== undefined || original.length !== undefined) {
+          // Length edits move direct children; reset those offsets in the same history entry.
+          for (const childId of this.childrenOf(selected.id)) {
+            const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
+            const initialChild = this.initialCopy.bones.find((bone) => bone.id === childId)!;
+            for (const field of ['x', 'y'] as const) {
+              if (initialChild[field] === undefined) delete child[field];
+              else child[field] = initialChild[field];
+            }
+          }
+        }
+        (this.workingCopy.bones as BoneDefinition[])[index] = structuredClone(original);
       } else {
         const index = this.workingCopy.slots!.findIndex((slot) => slot.id === selected.id);
         (this.workingCopy.slots as SlotDefinition[])[index] = structuredClone(this.initialCopy.slots![index]!);

@@ -18,6 +18,87 @@ const file: RigJsonDefinition = {
 };
 const make = () => new RigEditorState(parseRigDefinition(file), file);
 
+test.each([40, 0])('reset selected restores length and child offsets after editing length to %s', (length) => {
+  const state = make();
+  const original = structuredClone(state.workingCopy);
+  state.editBone('arm', 'length', 40);
+  state.editBone('arm', 'length', length);
+  const edited = structuredClone(state.workingCopy);
+  const historyLength = state.historyLength;
+  assert.isTrue(state.dirty);
+  state.selectBone('arm');
+  state.resetSelected();
+  assert.deepEqual(state.workingCopy, original);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, historyLength + 1);
+  assert.deepEqual(new Rig(state.exportRig(false)).getBone('hand'), state.source.getBone('hand'));
+  state.undo();
+  assert.deepEqual(state.workingCopy, edited);
+  assert.isTrue(state.dirty);
+  state.redo();
+  assert.deepEqual(state.workingCopy, original);
+  assert.isFalse(state.dirty);
+});
+
+test('reset after restoring the original length keeps the session clean without a redundant history entry', () => {
+  const state = make();
+  state.editBone('arm', 'length', 40);
+  state.editBone('arm', 'length', 20);
+  assert.isFalse(state.dirty);
+  const historyLength = state.historyLength;
+  state.selectBone('arm');
+  state.resetSelected();
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, historyLength);
+});
+
+test.each([undefined, 20, 0])('length reset from initial length %s restores every direct child offset', (length) => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root', ...(length === undefined ? {} : { length }) },
+        { id: 'diagonal', parent: 'root', x: 12, y: -16 },
+        { id: 'implicit', parent: 'root' },
+        { id: 'tip', parent: 'diagonal', y: 7 },
+      ],
+    }),
+  );
+  const original = structuredClone(state.workingCopy);
+  state.editBone('root', 'length', 40);
+  state.selectBone('root');
+  state.resetSelected();
+  assert.deepEqual(state.workingCopy, original);
+  assert.isFalse(state.dirty);
+});
+
+test('length reset preserves other child edits and descendants', () => {
+  const state = make();
+  state.editBone('arm', 'length', 40);
+  state.editBone('hand', 'rotation', 0.5);
+  state.editBone('hand', 'scaleX', 2);
+  state.editSlot('weapon', 'x', 8);
+  state.selectBone('arm');
+  state.resetSelected();
+  assert.equal(state.getBone('arm').length, 20);
+  assert.equal(state.getBone('hand').x, state.source.getBone('hand').x);
+  assert.equal(state.getBone('hand').y, 20);
+  assert.equal(state.getBone('hand').rotation, 0.5);
+  assert.equal(state.getBone('hand').scaleX, 2);
+  assert.equal(state.getSlot('weapon').x, 8);
+  assert.isTrue(state.dirty);
+});
+
+test('resetting a parent without length preserves independent child translations', () => {
+  const state = make();
+  state.editBone('root', 'rotation', 0.5);
+  state.editBone('arm', 'x', 17);
+  state.selectBone('root');
+  state.resetSelected();
+  assert.isUndefined(state.getBone('root').rotation);
+  assert.equal(state.getBone('arm').x, 17);
+});
+
 test('history covers edits, redo, branch invalidation, and one drag gesture', () => {
   const state = make();
   assert.isFalse(state.dirty);
