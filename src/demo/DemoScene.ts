@@ -1,23 +1,10 @@
 import Phaser from 'phaser';
-import type { CharacterDefinition, Facing, IKTarget } from '../engine/index.js';
+import type { CharacterDefinition, Facing } from '../engine/index.js';
 import { CharacterLoader, Puppet, queueCharacterTextures } from '../engine/index.js';
-import type { WalkFootIK } from './demoFootTargets.js';
-import { demoWalkFootIK } from './demoFootTargets.js';
+import { DemoInput } from './DemoInput.js';
+import { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
+import { createDemoBackdrop, DemoPresenter } from './DemoPresenter.js';
 import { demoIK } from './demoIK.js';
-import {
-  demoArmRotations,
-  demoAuthoringLayout,
-  demoHipPositions,
-  demoRenderOrder,
-  demoShoulderPositions,
-} from './demoPresentation.js';
-import { Katana, katanaGrips } from './Katana.js';
-import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from './katanaArmTarget.js';
-
-// The hand joint is at the wrist; +Y runs along this rig's hand toward its palm.
-const palmGripOffset: IKTarget = { x: 0, y: 15 };
-const palmVisibilityMargin = 8;
-const maximumPalmStep = 8;
 
 export interface DemoState {
   animation: string;
@@ -45,35 +32,21 @@ export interface DemoState {
 
 export class DemoScene extends Phaser.Scene {
   puppet: Puppet | undefined;
-  private katana: Katana | undefined;
-  private attached = false;
-  private katanaEnabled = true;
+  private presentation: DemoPresenter | undefined;
+  private authoring: DemoPoseAuthoring | undefined;
+  private controls: DemoInput | undefined;
   private handIK = false;
   private footIK = false;
-  private handTarget: IKTarget = { x: 440, y: 320 };
-  private readonly groundTargets: Record<'left' | 'right', IKTarget> = {
-    left: { x: 0, y: 0 },
-    right: { x: 0, y: 0 },
-  };
-  private markers: Phaser.GameObjects.Graphics | undefined;
-  private swordAngle = -0.65;
-  private rearPalmSide: 'left' | 'right' = 'right';
-  private rearPalmOverHead = false;
-  private previousRearPalm: IKTarget | undefined;
-  private elapsed = 0;
-  private rotateLeft: Phaser.Input.Keyboard.Key | undefined;
-  private rotateRight: Phaser.Input.Keyboard.Key | undefined;
   private steppedFPS = 10;
   private upperBody = false;
   private lastEvent = 'none';
   private skin = 'default';
   private gripHand = false;
   private helmet = false;
-  private slotKatana = false;
-  private poseMode = false;
-  private selectedBone = 0;
-  private poseText: Phaser.GameObjects.Text | undefined;
-  private poseMarker: Phaser.GameObjects.Graphics | undefined;
+
+  private get poseMode(): boolean {
+    return this.authoring?.active ?? false;
+  }
 
   constructor(private readonly onChange: (state: DemoState) => void) {
     super('DemoScene');
@@ -117,38 +90,15 @@ export class DemoScene extends Phaser.Scene {
   }
 
   private createPuppet(definition: CharacterDefinition): void {
-    this.attached = false;
-    this.katanaEnabled = true;
     this.handIK = false;
     this.footIK = false;
-    this.elapsed = 0;
     this.upperBody = false;
     this.lastEvent = 'none';
     this.skin = 'default';
     this.gripHand = false;
     this.helmet = false;
-    this.slotKatana = false;
-    this.swordAngle = -0.65;
-    this.rearPalmSide = 'right';
-    this.rearPalmOverHead = false;
-    this.previousRearPalm = undefined;
+    createDemoBackdrop(this);
     const { width, height } = this.scale;
-    const floor = this.add.graphics();
-    floor.lineStyle(1, 0x9eaa97, 0.45).lineBetween(70, height - 115, width - 70, height - 115);
-    floor.fillStyle(0x515e4e, 0.08).fillEllipse(width / 2, height - 115, 170, 18);
-    this.add.text(30, 28, 'FIG. 03 / ANIMATION PLAYBACK', {
-      fontFamily: 'monospace',
-      fontSize: '11px',
-      color: '#7e8678',
-      letterSpacing: 1,
-    });
-    this.add
-      .text(width - 30, 28, '16 JOINTS · 4 IK CHAINS', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#7e8678',
-      })
-      .setOrigin(1, 0);
     this.puppet = new Puppet(this, {
       definition,
       x: width / 2,
@@ -157,96 +107,23 @@ export class DemoScene extends Phaser.Scene {
       scale: 1.08,
       autoUpdate: false,
     });
-    this.katana = new Katana(this);
-    this.katana.container.setVisible(false);
+    this.presentation = new DemoPresenter(this, this.puppet);
     this.puppet.play('idle');
     this.puppet.onAnimationEvent((event) => {
       this.lastEvent = `${event.clip}: ${event.name}`;
       this.notify();
     });
-    this.handTarget = { x: width / 2 + 55, y: height - 320 };
-    this.groundTargets.left = { x: width / 2 + 24, y: height - 130 };
-    this.groundTargets.right = { x: width / 2 - 24, y: height - 130 };
-    this.markers = this.add.graphics().setDepth(100);
-    this.poseMarker = this.add.graphics().setDepth(190);
-    this.poseText = this.add
-      .text(18, 75, '', {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: '#26342b',
-        backgroundColor: '#f5f1df',
-        padding: { x: 10, y: 8 },
-        lineSpacing: 3,
-      })
-      .setDepth(200)
-      .setVisible(false);
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      this.handTarget = { x: pointer.worldX, y: pointer.worldY };
-    });
+    this.authoring = new DemoPoseAuthoring(this, this.puppet);
     this.updatePresentation();
-    this.add
-      .text(width / 2, height - 62, 'MOUSE: HAND TARGET · Q / E: KATANA', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#7e8678',
-        letterSpacing: 2,
-      })
-      .setOrigin(0.5);
-    const keyboard = this.input.keyboard;
-    if (keyboard) {
-      keyboard.on('keydown-ONE', () => this.play('idle'));
-      keyboard.on('keydown-TWO', () => this.play('walk'));
-      keyboard.on('keydown-THREE', () => this.play('sword'));
-      keyboard.on('keydown-FOUR', () => this.crossfade('idle'));
-      keyboard.on('keydown-FIVE', () => this.crossfade('walk'));
-      keyboard.on('keydown-S', () => this.toggleStepped());
-      keyboard.on('keydown-EIGHT', () => this.setSteppedFPS(8));
-      keyboard.on('keydown-ZERO', () => this.setSteppedFPS(10));
-      keyboard.on('keydown-L', () => this.toggleUpperBody());
-      keyboard.on('keydown-P', () => this.togglePause());
-      keyboard.on('keydown-OPEN_BRACKET', () => (this.poseMode ? this.selectBone(-1) : this.adjustSpeed(-0.25)));
-      keyboard.on('keydown-CLOSED_BRACKET', () => (this.poseMode ? this.selectBone(1) : this.adjustSpeed(0.25)));
-      keyboard.on('keydown-A', () => this.face('left'));
-      keyboard.on('keydown-D', () => this.face('right'));
-      keyboard.on('keydown-B', () => this.toggleDebug());
-      keyboard.on('keydown-I', () => this.toggleIKDebug());
-      keyboard.on('keydown-F', () => this.toggleFootIK());
-      keyboard.on('keydown-H', () => this.toggleHandIK());
-      keyboard.on('keydown-T', () => this.toggleProp());
-      keyboard.on('keydown-K', () => this.setSkin('default'));
-      keyboard.on('keydown-M', () => this.setSkin('alternate'));
-      keyboard.on('keydown-G', () => this.toggleGripHand());
-      keyboard.on('keydown-N', () => this.toggleHelmet());
-      keyboard.on('keydown-V', () => this.toggleSlotDebug());
-      keyboard.on('keydown-SPACE', () => this.togglePlayback());
-      keyboard.on('keydown-R', () => (this.poseMode ? this.resetBind() : this.restart()));
-      keyboard.on('keydown-O', () => this.togglePoseMode());
-      keyboard.on('keydown-C', () => this.applyCombatPose());
-      keyboard.on('keydown-X', () => this.exportCurrentPose());
-      keyboard.on('keydown-J', () => this.exportRig());
-      keyboard.on('keydown-U', () => this.resetSelectedBone());
-      keyboard.on('keydown', (event: KeyboardEvent) => {
-        if (!this.poseMode || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-        event.preventDefault();
-        const step = event.shiftKey ? 0.1 : 0.01;
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-          const sign = event.key === 'ArrowRight' ? 1 : -1;
-          this.adjustSelected(event.altKey ? 'x' : 'rotation', sign * (event.altKey ? (event.shiftKey ? 5 : 1) : step));
-        } else this.adjustSelected('y', (event.key === 'ArrowDown' ? 1 : -1) * (event.shiftKey ? 5 : 1));
-      });
-      keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.SPACE]);
-      this.rotateLeft = keyboard.addKey('Q');
-      this.rotateRight = keyboard.addKey('E');
-    }
+    this.controls = new DemoInput(this, this.authoring, this.presentation);
     this.notify();
   }
 
   update(_time: number, delta: number): void {
     if (!this.puppet) return;
     if (this.poseMode) return;
-    if (this.puppet.isPlaying && !this.puppet.animationPlayer.isPaused) this.elapsed += delta;
-    const turn = Number(this.rotateRight?.isDown ?? false) - Number(this.rotateLeft?.isDown ?? false);
-    this.rotateKatana((turn * delta) / 1000);
+    this.presentation?.feet.advance(delta);
+    this.rotateKatana(this.controls?.katanaTurn(delta) ?? 0);
     this.puppet.preparePose();
     const playing = this.puppet.isPlaying;
     const transitioning = this.puppet.animationPlayer.transition !== undefined;
@@ -256,120 +133,54 @@ export class DemoScene extends Phaser.Scene {
   }
 
   togglePoseMode(): void {
-    if (!this.puppet) return;
+    if (!this.puppet || !this.authoring) return;
     if (this.poseMode) {
       this.play('idle');
       return;
     }
-    this.poseMode = !this.poseMode;
-    this.poseText?.setVisible(this.poseMode);
-    this.poseMarker?.clear();
     this.handIK = false;
     this.footIK = false;
     this.upperBody = false;
-    this.resetAuthoringPose();
-    this.markers?.clear();
-    this.updatePoseText();
+    this.authoring.enter();
+    this.presentation?.clearTargets();
     this.notify();
   }
 
   selectBone(direction: number): void {
-    if (!this.poseMode || !this.puppet) return;
-    this.selectedBone = (this.selectedBone + direction + this.puppet.rig.bones.length) % this.puppet.rig.bones.length;
-    this.updatePoseText();
+    this.authoring?.selectBone(direction);
   }
 
   adjustSelected(property: 'x' | 'y' | 'rotation', change: number): void {
-    if (!this.poseMode || !this.puppet) return;
-    this.puppet.preparePose();
-    const bone = this.puppet.getBone(this.puppet.rig.bones[this.selectedBone]!.id);
-    bone.pose[property] += change;
-    this.puppet.syncPose();
-    this.updatePoseText();
+    this.authoring?.adjustSelected(property, change);
   }
 
   resetSelectedBone(): void {
-    if (!this.poseMode || !this.puppet) return;
-    this.puppet.preparePose();
-    this.puppet.getBone(this.puppet.rig.bones[this.selectedBone]!.id).reset();
-    this.puppet.syncPose();
-    this.updatePoseText();
+    this.authoring?.resetSelectedBone();
   }
 
   resetBind(): void {
-    if (!this.poseMode || !this.puppet) return;
-    this.resetAuthoringPose();
-    this.updatePoseText();
+    this.authoring?.resetBind();
   }
 
   applyCombatPose(): void {
-    if (!this.poseMode || !this.puppet) return;
-    this.resetAuthoringPose();
-    this.puppet.applyPose('combat-ready').commitPoseForEditing();
-    this.updatePoseText();
-  }
-
-  private resetAuthoringPose(): void {
-    if (!this.puppet) return;
-    const layout = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
-    this.puppet.resetToBindPose().setRenderOrder(layout.order);
-    this.puppet.container.setPosition(this.scale.width / 2, this.scale.height - 278);
-    for (const [id, x] of Object.entries(layout.positions)) this.puppet.getBone(id).pose.x = x;
-    for (const [id, rotation] of Object.entries(layout.rotations)) this.puppet.getBone(id).pose.rotation = rotation;
-    this.puppet.syncPose();
+    this.authoring?.applyCombatPose();
   }
 
   exportCurrentPose(): void {
-    if (!this.poseMode || !this.puppet) return;
-    const json = JSON.stringify(this.puppet.exportPose('exported-pose'), null, 2);
-    console.log(`Exported pose JSON:\n${json}`);
-    void navigator.clipboard?.writeText(json).catch(() => {});
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'exported-pose.json';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.authoring?.exportCurrentPose();
   }
 
   exportRig(): void {
-    if (!this.poseMode || !this.puppet) return;
-    console.log(`Normalized rig data:\n${JSON.stringify(this.puppet.exportRig(), null, 2)}`);
-  }
-
-  private updatePoseText(): void {
-    if (!this.poseMode || !this.puppet || !this.poseText) return;
-    const id = this.puppet.rig.bones[this.selectedBone]!.id;
-    const selected = this.puppet.getBone(id);
-    const { x, y, rotation, scaleX, scaleY } = selected.pose;
-    const point = selected.getWorldPosition();
-    this.poseMarker?.clear().lineStyle(2, 0xc04e30, 1).strokeCircle(point.x, point.y, 11);
-    this.poseMarker?.lineBetween(point.x - 16, point.y, point.x + 16, point.y);
-    this.poseMarker?.lineBetween(point.x, point.y - 16, point.x, point.y + 16);
-    this.poseText.setText([
-      'POSE AUTHORING · animation paused · IK off',
-      `Facing: ${this.puppet.facingDirection}`,
-      `Selected bone: ${id} (${this.selectedBone + 1}/${this.puppet.rig.bones.length})`,
-      `x: ${x.toFixed(3)}   y: ${y.toFixed(3)}`,
-      `rotation: ${rotation.toFixed(3)} rad`,
-      `scaleX: ${scaleX.toFixed(3)}   scaleY: ${scaleY.toFixed(3)}`,
-      '[ / ] select · ← / → rotate · Shift coarse',
-      'Alt + ← / → x · ↑ / ↓ y · U reset bone',
-      'C preset · R bind · X export · J rig data',
-    ]);
+    this.authoring?.exportRig();
   }
 
   play(name: string): void {
-    this.poseMode = false;
-    this.poseText?.setVisible(false);
-    this.poseMarker?.clear();
+    this.authoring?.exit();
     this.puppet?.clearPose();
     this.puppet?.play(name);
     this.handIK = name === 'sword';
     if (name === 'sword') {
-      this.rearPalmSide = this.puppet?.facingDirection ?? 'right';
-      this.rearPalmOverHead = false;
-      this.previousRearPalm = undefined;
+      this.presentation?.katana.resetRearPalm(this.puppet?.facingDirection ?? 'right');
     }
     this.updatePresentation();
     this.notify();
@@ -436,20 +247,9 @@ export class DemoScene extends Phaser.Scene {
 
   face(direction: Facing): void {
     if (this.poseMode && this.puppet) {
-      const previous = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
-      const next = demoAuthoringLayout(this.puppet.rig, direction);
-      this.puppet.preparePose();
-      for (const [id, x] of Object.entries(next.positions)) {
-        const bone = this.puppet.getBone(id);
-        bone.pose.x += x - previous.positions[id as keyof typeof previous.positions];
-      }
-      for (const [id, rotation] of Object.entries(next.rotations)) {
-        const bone = this.puppet.getBone(id);
-        bone.pose.rotation += rotation - previous.rotations[id as keyof typeof previous.rotations];
-      }
-      this.puppet.setRenderOrder(next.order).setFacing(direction);
-      if (this.attached) this.attachKatana();
-      this.updatePoseText();
+      this.authoring?.face(direction);
+      this.presentation?.katana.reattach();
+      this.authoring?.refresh();
       this.notify();
       return;
     }
@@ -460,10 +260,8 @@ export class DemoScene extends Phaser.Scene {
       this.puppet.getIK('rightArmIK').enabled = false;
     }
     this.puppet?.setFacing(direction);
-    this.rearPalmSide = direction;
-    this.rearPalmOverHead = false;
-    this.previousRearPalm = undefined;
-    if (this.attached) this.attachKatana();
+    this.presentation?.katana.resetRearPalm(direction);
+    this.presentation?.katana.reattach();
     this.updatePresentation();
     this.notify();
   }
@@ -488,7 +286,7 @@ export class DemoScene extends Phaser.Scene {
     this.notify();
   }
   rotateKatana(delta: number): void {
-    this.swordAngle += delta;
+    this.presentation?.katana.rotate(delta);
   }
   restart(): void {
     if (this.poseMode) {
@@ -512,8 +310,8 @@ export class DemoScene extends Phaser.Scene {
   }
 
   toggleProp(): void {
-    if (!this.puppet || !this.katana) return;
-    this.katanaEnabled = !this.katanaEnabled;
+    if (!this.presentation) return;
+    this.presentation.katana.enabled = !this.presentation.katana.enabled;
     this.updatePresentation();
     this.notify();
   }
@@ -548,40 +346,7 @@ export class DemoScene extends Phaser.Scene {
     this.puppet.setAttachment('rightHandVisual', this.gripHand ? 'rightHandGrip' : 'rightHandDefault');
     if (this.helmet) this.puppet.applySkin('helmet-only');
     else this.puppet.clearAttachment('headwear');
-    if (this.slotKatana) this.puppet.setAttachment('rightHandItem', 'katana');
-    else this.puppet.clearAttachment('rightHandItem');
-  }
-
-  /** One visible katana: the sprite follows the hand except when grip-aware IK needs the prop. */
-  private syncKatanaMode(): void {
-    if (!this.puppet || !this.katana) return;
-    const needsGripPoints = this.katanaEnabled && (this.puppet.currentAnimation === 'sword' || this.upperBody);
-    if (this.attached !== needsGripPoints) {
-      if (needsGripPoints) {
-        this.katana.container.setVisible(true);
-        this.attachKatana();
-      } else {
-        this.puppet.detach(this.katana.container);
-        this.katana.container.setVisible(false);
-      }
-      this.attached = needsGripPoints;
-    }
-    const useSlot = this.katanaEnabled && !needsGripPoints;
-    if (this.slotKatana !== useSlot) {
-      this.slotKatana = useSlot;
-      if (useSlot) this.puppet.setAttachment('rightHandItem', 'katana');
-      else this.puppet.clearAttachment('rightHandItem');
-    }
-  }
-
-  private attachKatana(): void {
-    if (!this.puppet || !this.katana) return;
-    const facing = this.puppet.facingDirection;
-    const grip = facing === 'right' ? katanaGrips.primary : katanaGrips.secondary;
-    this.puppet.attach(facing === 'right' ? 'rightHand' : 'leftHand', this.katana.container, {
-      x: palmGripOffset.x - grip.x,
-      y: palmGripOffset.y - grip.y,
-    });
+    this.presentation?.katana.syncVisualOverride();
   }
 
   private notify(): void {
@@ -591,7 +356,7 @@ export class DemoScene extends Phaser.Scene {
       facing: this.puppet.facingDirection,
       debug: this.puppet.isDebug,
       playing: this.puppet.isPlaying,
-      katanaVisible: this.katanaEnabled,
+      katanaVisible: this.presentation?.katana.enabled ?? true,
       handIK: this.handIK,
       footIK: this.footIK,
       ikDebug: this.puppet.isIKDebug,
@@ -617,323 +382,9 @@ export class DemoScene extends Phaser.Scene {
     if (!this.puppet) return;
     if (this.poseMode) {
       this.puppet.syncPose();
-      this.updatePoseText();
+      this.authoring?.refresh();
       return;
     }
-    this.syncKatanaMode();
-    this.katana?.container.setPosition(0, 0);
-    // Always start from the sampled pose so facing changes cannot accumulate rotations.
-    this.puppet.preparePose();
-    this.puppet.animationPlayer.applyCurrentPose();
-    this.puppet.setRenderOrder(
-      demoRenderOrder(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection),
-    );
-    const shoulders = demoShoulderPositions(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection);
-    for (const [id, x] of Object.entries(shoulders)) this.puppet.getBone(id).pose.x = x;
-    const arms = demoArmRotations(this.puppet.currentAnimation, this.puppet.facingDirection, {
-      leftUpperArm: this.puppet.getBone('leftUpperArm').pose.rotation,
-      rightUpperArm: this.puppet.getBone('rightUpperArm').pose.rotation,
-    });
-    const transition = this.puppet.animationPlayer.transition;
-    const fromSign = transition?.from === 'idle' && this.puppet.facingDirection === 'right' ? -1 : 1;
-    const toSign = this.puppet.currentAnimation === 'idle' && this.puppet.facingDirection === 'right' ? -1 : 1;
-    const sign = transition ? fromSign + (toSign - fromSign) * transition.progress : toSign;
-    for (const [id, rotation] of Object.entries(arms)) {
-      this.puppet.getBone(id).pose.rotation = transition ? (rotation * sign) / toSign : rotation;
-    }
-    if (
-      this.puppet.currentAnimation === 'idle' ||
-      this.puppet.currentAnimation === 'walk' ||
-      this.puppet.currentAnimation === 'sword'
-    ) {
-      const hips = demoHipPositions(this.puppet.rig, this.puppet.facingDirection);
-      for (const [id, x] of Object.entries(hips)) this.puppet.getBone(id).pose.x = x;
-    }
-    const idle = this.puppet.currentAnimation === 'idle' || this.puppet.currentAnimation === 'sword';
-    this.puppet.setDebugLabelSide(
-      'rightLowerLeg',
-      idle && this.puppet.facingDirection === 'right' ? 'left' : undefined,
-    );
-    this.puppet.setDebugLabelSide('leftLowerLeg', idle && this.puppet.facingDirection === 'left' ? 'right' : undefined);
-    this.puppet.setDebugLabelSide('rightFoot', idle && this.puppet.facingDirection === 'left' ? 'left' : undefined);
-    this.puppet.setDebugLabelSide('leftFoot', idle && this.puppet.facingDirection === 'right' ? 'right' : undefined);
-    const rightArm = this.puppet.getIK('rightArmIK');
-    const leftArm = this.puppet.getIK('leftArmIK');
-    const facing = this.puppet.facingDirection;
-    leftArm.bendDirection = -1;
-    const primaryArm = facing === 'right' ? rightArm : leftArm;
-    const secondaryArm = facing === 'right' ? leftArm : rightArm;
-    primaryArm.priority = 0;
-    secondaryArm.priority = 1;
-    primaryArm.setEndOffset({ x: 0, y: 0 });
-    secondaryArm.setEndOffset(palmGripOffset);
-    primaryArm.enabled = this.handIK;
-    primaryArm.setTarget(this.handTarget);
-    secondaryArm.enabled =
-      (this.handIK || this.upperBody) && this.attached && (this.puppet.currentAnimation === 'sword' || this.upperBody);
-    if (this.upperBody) primaryArm.enabled = true;
-    secondaryArm.setTargetProvider(() => {
-      this.aimKatana(this.swordAngle);
-      return this.katana?.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary);
-    });
-    const plantWalkFeet = this.footIK && this.puppet.currentAnimation === 'walk';
-    this.puppet.container.setPosition(
-      this.scale.width / 2 + (plantWalkFeet ? 7 * Math.sin(this.elapsed / 1000) : 0),
-      this.scale.height - 278 + (plantWalkFeet ? 3 * Math.sin(this.elapsed / 700) : 0),
-    );
-    const walkFeet = plantWalkFeet
-      ? demoWalkFootIK(
-          this.puppet.animationPlayer.elapsedTime,
-          {
-            left: { ...this.groundTargets.left, y: this.groundTargets.left.y + 7 },
-            right: { ...this.groundTargets.right, y: this.groundTargets.right.y + 7 },
-          },
-          { left: this.animatedAnkle('left'), right: this.animatedAnkle('right') },
-        )
-      : undefined;
-    const footTargets = walkFeet ? { left: walkFeet.left.target, right: walkFeet.right.target } : this.groundTargets;
-    for (const side of ['left', 'right'] as const) {
-      const leg = this.puppet.getIK(`${side}LegIK`);
-      leg.enabled = plantWalkFeet;
-      leg.mix = walkFeet?.[side].mix ?? 1;
-      leg.setTarget(footTargets[side]);
-    }
-    this.katana?.container.setRotation(this.swordAngle);
-    this.puppet.syncPose();
-    if (this.attached) this.aimKatana(this.swordAngle);
-    if (this.slotKatana) this.aimSlotKatana(this.swordAngle);
-    this.keepBothHandsOnKatana();
-    this.drawTargets(footTargets, walkFeet);
-  }
-
-  private animatedAnkle(side: 'left' | 'right'): IKTarget {
-    const puppet = this.puppet!;
-    const pelvis = puppet.getBone('pelvis').pose;
-    const thigh = puppet.getBone(`${side}Thigh`).pose;
-    const shin = puppet.getBone(`${side}LowerLeg`).pose;
-    const foot = puppet.getBone(`${side}Foot`).pose;
-    // This demo rig has an unrotated pelvis and vertical, unscaled leg links.
-    const x =
-      pelvis.x + thigh.x - shin.y * Math.sin(thigh.rotation) - foot.y * Math.sin(thigh.rotation + shin.rotation);
-    const y =
-      pelvis.y + thigh.y + shin.y * Math.cos(thigh.rotation) + foot.y * Math.cos(thigh.rotation + shin.rotation);
-    return { x: puppet.container.x + puppet.container.scaleX * x, y: puppet.container.y + puppet.container.scaleY * y };
-  }
-
-  private drawTargets(
-    footTargets: Readonly<Record<'left' | 'right', IKTarget>>,
-    walkFeet?: Readonly<Record<'left' | 'right', WalkFootIK>>,
-  ): void {
-    if (!this.markers) return;
-    this.markers.clear();
-    const mark = (point: IKTarget, color: number): void => {
-      this.markers!.lineStyle(2, color, 0.85).strokeCircle(point.x, point.y, 7);
-      this.markers!.lineBetween(point.x - 11, point.y, point.x + 11, point.y);
-      this.markers!.lineBetween(point.x, point.y - 11, point.x, point.y + 11);
-    };
-    if (this.handIK || this.upperBody) mark(this.handTarget, 0x7652ad);
-    if (walkFeet)
-      for (const side of ['left', 'right'] as const) {
-        if (walkFeet[side].mix > 0) mark(footTargets[side], 0xcb674f);
-      }
-    if (this.puppet && this.katana) {
-      const facing = this.puppet.facingDirection;
-      const secondaryArm = this.puppet.getIK(facing === 'right' ? 'leftArmIK' : 'rightArmIK');
-      if (secondaryArm.enabled)
-        mark(
-          this.katana.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary),
-          0x337db1,
-        );
-    }
-  }
-
-  private keepBothHandsOnKatana(): void {
-    if (
-      !this.puppet ||
-      !this.katana ||
-      !this.attached ||
-      (!this.handIK && !this.upperBody) ||
-      (this.puppet.currentAnimation !== 'sword' && !this.upperBody)
-    ) {
-      this.previousRearPalm = undefined;
-      return;
-    }
-    const leftArm = this.puppet.getIK('leftArmIK');
-    const rightArm = this.puppet.getIK('rightArmIK');
-    const facing = this.puppet.facingDirection;
-    const primaryArm = facing === 'right' ? rightArm : leftArm;
-    const secondaryArm = facing === 'right' ? leftArm : rightArm;
-    const secondaryGrip = facing === 'right' ? katanaGrips.secondary : katanaGrips.primary;
-    const rearPalmBone = this.puppet.getBone(secondaryArm.endBone);
-    const rearPalmOffset = secondaryArm.endOffset;
-    const rearPalm = (): IKTarget =>
-      rearPalmBone.container.getWorldTransformMatrix().transformPoint(rearPalmOffset.x, rearPalmOffset.y);
-    const target = { ...this.handTarget };
-    // Follow the head's top while crossing between sides. A vertical path
-    // avoids the discontinuous left/right projection at the head's corners.
-    const head = this.puppet.getSlotImage('headVisual');
-    let headBounds: { left: number; right: number; top: number } | undefined;
-    if (head) {
-      const corners = this.cutoutCorners(head);
-      headBounds = {
-        left: Math.min(...corners.map((point) => point.x)),
-        right: Math.max(...corners.map((point) => point.x)),
-        top: Math.min(...corners.map((point) => point.y)),
-      };
-      const palm = rearPalm();
-      if (palm.y <= headBounds.top + palmVisibilityMargin && (facing === 'right' || secondaryArm.status === 'solved'))
-        this.rearPalmOverHead = true;
-      if (this.rearPalmOverHead) {
-        this.rearPalmSide = palm.x < (headBounds.left + headBounds.right) / 2 ? 'left' : 'right';
-        const allowedY = this.headOverpassY(headBounds, palm.x);
-        const outside =
-          this.rearPalmSide === 'left'
-            ? palm.x < headBounds.left - palmVisibilityMargin
-            : palm.x > headBounds.right + palmVisibilityMargin;
-        if (outside && palm.y <= allowedY && palm.y > headBounds.top + palmVisibilityMargin) {
-          this.rearPalmOverHead = false;
-        }
-      }
-    }
-    for (let pass = 0; pass < 24; pass += 1) {
-      const shoulder = this.puppet.getBone(secondaryArm.rootBone).getWorldPosition();
-      const elbow = this.puppet.getBone(secondaryArm.middleBone).getWorldPosition();
-      const secondaryPalm = this.puppet
-        .getBone(secondaryArm.endBone)
-        .container.getWorldTransformMatrix()
-        .transformPoint(secondaryArm.endOffset.x, secondaryArm.endOffset.y);
-      const lengthA = Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y);
-      const lengthB = Math.hypot(secondaryPalm.x - elbow.x, secondaryPalm.y - elbow.y);
-      const grip = this.katana.getGripWorldPosition(secondaryGrip);
-      const reachCorrection =
-        secondaryArm.status === 'clamped' ? gripReachCorrection(shoulder, grip, lengthA, lengthB) : { x: 0, y: 0 };
-      const palm = rearPalm();
-      // The rear palm draws behind the body, so keep it outside whichever
-      // cutout intersects its height, on the side reached over the head.
-      const edges = !this.rearPalmOverHead ? this.bodyEdgesAt(palm.y) : undefined;
-      const visibilityPush =
-        edges === undefined
-          ? 0
-          : this.rearPalmSide === 'right'
-            ? Math.max(0, edges.right + palmVisibilityMargin - palm.x)
-            : Math.min(0, edges.left - palmVisibilityMargin - palm.x);
-      const overpassPush =
-        this.rearPalmOverHead && headBounds ? Math.min(0, this.headOverpassY(headBounds, palm.x) - palm.y) : 0;
-      const correction = {
-        x:
-          visibilityPush > 0
-            ? Math.max(reachCorrection.x, visibilityPush)
-            : visibilityPush < 0
-              ? Math.min(reachCorrection.x, visibilityPush)
-              : reachCorrection.x,
-        y: Math.min(reachCorrection.y, overpassPush),
-      };
-      if (Math.hypot(correction.x, correction.y) < 0.01) break;
-      target.x += correction.x;
-      target.y += correction.y;
-      primaryArm.setTarget(target);
-      this.puppet.syncPose();
-    }
-    if (this.previousRearPalm && headBounds) {
-      let palm = rearPalm();
-      const next = stepPalmAroundHead(this.previousRearPalm, palm, headBounds, palmVisibilityMargin, maximumPalmStep);
-      for (let pass = 0; pass < 6 && Math.hypot(next.x - palm.x, next.y - palm.y) > 0.01; pass += 1) {
-        target.x += next.x - palm.x;
-        target.y += next.y - palm.y;
-        primaryArm.setTarget(target);
-        this.puppet.syncPose();
-        palm = rearPalm();
-      }
-      // The bounded path may pass just outside the second arm's reach even
-      // when its endpoints are reachable. Pull that frame back into reach.
-      for (let pass = 0; pass < 12 && secondaryArm.status === 'clamped'; pass += 1) {
-        const shoulder = this.puppet.getBone(secondaryArm.rootBone).getWorldPosition();
-        const elbow = this.puppet.getBone(secondaryArm.middleBone).getWorldPosition();
-        const secondaryPalm = this.puppet
-          .getBone(secondaryArm.endBone)
-          .container.getWorldTransformMatrix()
-          .transformPoint(secondaryArm.endOffset.x, secondaryArm.endOffset.y);
-        const grip = this.katana.getGripWorldPosition(secondaryGrip);
-        const correction = gripReachCorrection(
-          shoulder,
-          grip,
-          Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y),
-          Math.hypot(secondaryPalm.x - elbow.x, secondaryPalm.y - elbow.y),
-        );
-        if (Math.hypot(correction.x, correction.y) < 0.0001) break;
-        target.x += correction.x;
-        target.y += correction.y;
-        primaryArm.setTarget(target);
-        this.puppet.syncPose();
-        palm = rearPalm();
-      }
-    }
-    this.previousRearPalm = rearPalm();
-  }
-
-  private headOverpassY(head: { left: number; right: number; top: number }, x: number): number {
-    return x >= head.left - palmVisibilityMargin && x <= head.right + palmVisibilityMargin
-      ? head.top - palmVisibilityMargin
-      : Infinity;
-  }
-
-  private cutoutCorners(sprite: Phaser.GameObjects.Image): IKTarget[] {
-    const matrix = sprite.getWorldTransformMatrix();
-    const left = -sprite.originX * sprite.width;
-    const top = -sprite.originY * sprite.height;
-    return [
-      matrix.transformPoint(left, top),
-      matrix.transformPoint(left + sprite.width, top),
-      matrix.transformPoint(left + sprite.width, top + sprite.height),
-      matrix.transformPoint(left, top + sprite.height),
-    ];
-  }
-
-  private bodyEdgesAt(y: number): { left: number; right: number } | undefined {
-    if (!this.puppet) return undefined;
-    let left: number | undefined;
-    let right: number | undefined;
-    for (const id of ['head', 'torso', 'pelvis']) {
-      const sprite = this.puppet.getSlotImage(`${id}Visual`);
-      if (!sprite) continue;
-      const edges = horizontalEdgesAtY(this.cutoutCorners(sprite), y);
-      if (edges) {
-        left = Math.min(left ?? Infinity, edges.left);
-        right = Math.max(right ?? -Infinity, edges.right);
-      }
-    }
-    return left === undefined || right === undefined ? undefined : { left, right };
-  }
-
-  private aimKatana(angle: number): void {
-    if (!this.puppet || !this.katana?.container.parentContainer) return;
-    const rotation = this.katanaRotationIn(this.katana.container.parentContainer, angle);
-    if (rotation === undefined) return;
-    this.katana.container.setRotation(rotation);
-    const grip = this.puppet.facingDirection === 'right' ? katanaGrips.primary : katanaGrips.secondary;
-    this.katana.container.setPosition(
-      grip.x - (Math.cos(rotation) * grip.x - Math.sin(rotation) * grip.y),
-      grip.y - (Math.sin(rotation) * grip.x + Math.cos(rotation) * grip.y),
-    );
-  }
-
-  private aimSlotKatana(angle: number): void {
-    const image = this.puppet?.getSlotImage('rightHandItem');
-    if (!image?.parentContainer) return;
-    const rotation = this.katanaRotationIn(image.parentContainer, angle);
-    if (rotation !== undefined) image.setRotation(rotation);
-  }
-
-  private katanaRotationIn(mount: Phaser.GameObjects.Container, angle: number): number | undefined {
-    if (!this.puppet) return undefined;
-    const world = this.puppet.container.getWorldTransformMatrix();
-    const parent = mount.getWorldTransformMatrix();
-    const dx = world.a * Math.cos(angle) + world.c * Math.sin(angle);
-    const dy = world.b * Math.cos(angle) + world.d * Math.sin(angle);
-    const determinant = parent.a * parent.d - parent.b * parent.c;
-    if (determinant === 0) return undefined;
-    // Transform a direction (no translation), so the blade aims relative to
-    // facing while its sprite or prop grip stays fixed at the palm.
-    return Math.atan2((parent.a * dy - parent.b * dx) / determinant, (parent.d * dx - parent.c * dy) / determinant);
+    this.presentation?.update({ handIK: this.handIK, footIK: this.footIK, upperBody: this.upperBody });
   }
 }

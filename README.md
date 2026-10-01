@@ -131,7 +131,12 @@ src/engine/
     IKDebug.ts         Independent world-space IK overlay
   index.ts             Public library entry point
 src/demo/
-  DemoScene.ts         External-character demo, controls and prop
+  DemoScene.ts         Character loading, playback controls and UI state
+  DemoInput.ts         Pointer/keyboard bindings and shutdown cleanup
+  DemoPoseAuthoring.ts  Static pose editing, inspector and export
+  DemoPresenter.ts     Sampled pose layout, IK coordination and target markers
+  DemoFootPlanting.ts  Ground targets, body sway and walk contact constraints
+  DemoKatanaController.ts  Weapon modes, arm targets and continuous rear-palm constraints
   data/                Versioned JSON rig and idle animation
   demoRig.ts           Parsed 16-joint character
   demoAnimations.ts    Parsed idle and TypeScript-authored walk/sword data
