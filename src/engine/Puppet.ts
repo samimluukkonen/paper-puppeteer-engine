@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { AnimationClip, AnimationPlaybackMode } from './AnimationClip.js';
+import { type AnimationClip, type AnimationPlaybackMode, compileClip } from './AnimationClip.js';
 import {
   type AnimationCompletion,
   AnimationPlayer,
@@ -11,7 +11,7 @@ import type { CharacterDefinition } from './CharacterDefinition.js';
 import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { IKPoseState } from './ik/IKPoseState.js';
-import { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
+import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, TwoBoneIKDefinition } from './ik/types.js';
 import { applyPoseToJoints, type PoseDefinition, parsePoseDefinition, serializePose } from './Pose.js';
 import { PuppetDebug } from './PuppetDebug.js';
@@ -89,6 +89,27 @@ export class Puppet {
       assertFinite(value, `Puppet ${label}`);
     if ((options.scale ?? 1) <= 0) throw new Error('Puppet scale must be greater than zero.');
 
+    // Reject authored data before any Phaser objects or scene listeners are created.
+    const animations = options.animations ?? options.definition?.animations ?? [];
+    const animationNames = new Set<string>();
+    for (const clip of animations) {
+      if (animationNames.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
+      compileClip(clip, this.rig);
+      animationNames.add(clip.name);
+    }
+    for (const pose of options.poses ?? options.definition?.poses ?? []) this.addPose(pose);
+    this.slotState = new SlotState(this.rig);
+    const skin = options.skin ?? options.definition?.defaultSkin;
+    if (skin) this.slotState.setSkin(skin);
+    const ikDefinitions = (options.ik ?? []).map((definition) => parseTwoBoneIKDefinition(definition, this.rig));
+    const ikNames = new Set<string>();
+    for (const definition of ikDefinitions) {
+      if (ikNames.has(definition.name)) throw new Error(`IK "${definition.name}" is already registered.`);
+      ikNames.add(definition.name);
+    }
+    this.facing = options.facing ?? 'right';
+    if (this.facing !== 'left' && this.facing !== 'right') throw new Error(`Invalid facing: ${String(this.facing)}.`);
+
     this.container = scene.add
       .container(options.x ?? 0, options.y ?? 0)
       .setName('puppet')
@@ -102,17 +123,13 @@ export class Puppet {
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
     this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones);
-    this.slotState = new SlotState(this.rig);
     this.slotDebugView = new SlotDebug(scene, this.rig, this.renderer, this.slotState);
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones);
-    for (const clip of options.animations ?? options.definition?.animations ?? []) this.addAnimation(clip);
-    for (const pose of options.poses ?? options.definition?.poses ?? []) this.addPose(pose);
+    for (const clip of animations) this.addAnimation(clip);
     this.debugView = new PuppetDebug(scene, this.bones);
-    const skin = options.skin ?? options.definition?.defaultSkin;
-    if (skin) this.setSkin(skin);
+    this.renderSlots();
     this.ikDebugView = new IKDebug(scene, this.bones);
-    for (const definition of options.ik ?? []) this.addIK(definition);
-    this.facing = options.facing ?? 'right';
+    for (const definition of ikDefinitions) this.addIK(definition);
     this.setFacing(this.facing);
     this.setDebug(options.debug ?? false);
     this.setIKDebug(options.ikDebug ?? false);

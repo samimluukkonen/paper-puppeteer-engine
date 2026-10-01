@@ -12,6 +12,18 @@ import type {
   TwoBoneIKDefinition,
 } from './types.js';
 
+/** Validate chain data and rig references without allocating renderer objects. */
+export function parseTwoBoneIKDefinition(definition: TwoBoneIKDefinition, rig: Rig): TwoBoneIKDefinition {
+  const parsed = twoBoneIKDefinitionSchema.parse(definition);
+  const root = rig.getBone(parsed.rootBone);
+  const middle = rig.getBone(parsed.middleBone);
+  const end = rig.getBone(parsed.endBone);
+  if (middle.parent !== root.id || end.parent !== middle.id) {
+    throw new Error(`IK "${parsed.name}" must name three directly connected bones.`);
+  }
+  return parsed;
+}
+
 /** A data-driven chain; the only rendering dependency is a coordinate adapter. */
 export class TwoBoneIKConstraint {
   readonly name: string;
@@ -34,26 +46,20 @@ export class TwoBoneIKConstraint {
   private readonly end: Joint;
 
   constructor(definition: TwoBoneIKDefinition, rig: Rig, joints: ReadonlyMap<string, Joint>) {
-    definition = twoBoneIKDefinitionSchema.parse(definition);
+    definition = parseTwoBoneIKDefinition(definition, rig);
     this.name = definition.name;
     this.rootBone = definition.rootBone;
     this.middleBone = definition.middleBone;
     this.endBone = definition.endBone;
     this.setEndOffset(definition.endOffset ?? { x: 0, y: 0 });
-    const root = rig.getBone(this.rootBone);
-    const middle = rig.getBone(this.middleBone);
-    const end = rig.getBone(this.endBone);
-    if (middle.parent !== root.id || end.parent !== middle.id) {
-      throw new Error(`IK "${this.name}" must name three directly connected bones.`);
-    }
     const getJoint = (id: string): Joint => {
       const joint = joints.get(id);
       if (!joint) throw new Error(`Missing IK joint "${id}".`);
       return joint;
     };
-    this.root = getJoint(root.id);
-    this.middle = getJoint(middle.id);
-    this.end = getJoint(end.id);
+    this.root = getJoint(this.rootBone);
+    this.middle = getJoint(this.middleBone);
+    this.end = getJoint(this.endBone);
     this.influence = 1;
     this.mix = definition.mix ?? 1;
     this.bend = 1;
