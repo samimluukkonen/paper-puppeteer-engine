@@ -15,6 +15,8 @@ import type { BoneDefinition, SkinDefinition } from './types.js';
 
 export const CHARACTER_FORMAT_VERSION = 1;
 
+const skinFileSchema = skinDefinitionSchema.strict();
+
 export const characterManifestSchema = z.strictObject({
   version: z.literal(CHARACTER_FORMAT_VERSION),
   id: z.string().min(1),
@@ -115,7 +117,7 @@ export function validateCharacterDefinition(data: CharacterData): ValidationIssu
     const previousIssueCount = issues.length;
     jsonIssue(value, `skins.${name}`, new Set(), issues);
     if (issues.length !== previousIssueCount) continue;
-    const skin = skinDefinitionSchema.safeParse(value);
+    const skin = skinFileSchema.safeParse(value);
     if (!skin.success) {
       for (const entry of skin.error.issues)
         issues.push(issue(`skins.${name}${entry.path.length ? `.${entry.path.join('.')}` : ''}`, entry.message));
@@ -207,7 +209,7 @@ export class CharacterDefinition {
     const manifest = characterManifestSchema.parse(data.manifest);
     const source = data.rig as object;
     const skins = Object.entries(manifest.skins).map(([name, path]) => {
-      const skin = skinDefinitionSchema.parse(data.skins![path]);
+      const skin = skinFileSchema.parse(data.skins![path]);
       return { ...skin, name };
     });
     const rig = parseRigDefinition({ ...source, skins });

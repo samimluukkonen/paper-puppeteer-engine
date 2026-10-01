@@ -124,6 +124,36 @@ test('character manifest rejects unsupported versions', () => {
   assert.ok(validateCharacterDefinition(data).some((entry) => entry.path === 'manifest.version'));
 });
 
+test.each([
+  ['slot', { torsoVisual: 'torsoDefault' }],
+  ['description', 'Default appearance'],
+])('standalone skin validation rejects unknown field "%s"', (field, value) => {
+  const data = bundle();
+  const path = manifest.skins.default!;
+  data.skins[path] = { ...(data.skins[path] as object), [field]: value };
+
+  const issues = validateCharacterDefinition(data);
+  assert.ok(
+    issues.some(
+      (entry) => entry.severity === 'error' && entry.path === 'skins.default' && entry.message.includes(field),
+    ),
+  );
+  assert.throws(() => CharacterDefinition.fromData(data), CharacterValidationError);
+});
+
+test('standalone skin validation accepts slot mappings and null attachments', () => {
+  const data = bundle();
+  const skin = data.skins[manifest.skins.default!] as { slots: Record<string, string | null> };
+  skin.slots.torsoVisual = null;
+
+  assert.deepEqual(validateCharacterDefinition(data), []);
+  const definition = CharacterDefinition.fromData(data);
+  const slots = new SlotState(definition.rig);
+  slots.setSkin('default');
+  assert.equal(slots.getAttachment('torsoVisual'), null);
+  assert.equal(slots.getAttachment('headVisual'), 'headDefault');
+});
+
 test('character validation checks pose files against the loaded rig', () => {
   const data = bundle();
   const path = manifest.poses![0]!;
