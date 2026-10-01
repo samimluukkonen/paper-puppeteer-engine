@@ -1,4 +1,4 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { localToWorld, worldToLocal } from '../src/devtools/rig-editor/coordinates.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -66,3 +66,48 @@ test('editor rejects invalid numeric edits without making the rig dirty', () => 
   assert.throws(() => state.editBone('root', 'x', Number.POSITIVE_INFINITY));
   assert.isFalse(state.dirty);
 });
+
+test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
+  '%s field edits validate the complete patch once and undo together',
+  (type) => {
+    const state = new RigEditorState(
+      new Rig({
+        root: 'root',
+        bones: [{ id: 'root', sprite: { texture: 'part' } }],
+        slots: [{ id: 'visual', bone: 'root' }],
+        attachments: [{ id: 'part', texture: 'part' }],
+      }),
+    );
+    const edit = (values: { x: number; y: number }) => {
+      if (type === 'bone') state.editBoneFields('root', values);
+      else if (type === 'slot') state.editSlotFields('visual', values);
+      else state.editSpriteFields(type === 'sprite' ? 'root' : 'part', values, type === 'attachment');
+    };
+    const current = () =>
+      type === 'bone'
+        ? state.getBone('root')
+        : type === 'slot'
+          ? state.getSlot('visual')
+          : type === 'sprite'
+            ? state.getBone('root').sprite!
+            : state.getAttachment('part');
+    const validate = vi.spyOn(state, 'validate');
+    assert.throws(() => edit({ x: 10, y: Number.NaN }), /y must be finite/);
+    assert.isFalse(state.dirty);
+    assert.equal(state.historyLength, 0);
+    assert.equal(validate.mock.calls.length, 0);
+
+    edit({ x: 10, y: 20 });
+    assert.equal(current().x, 10);
+    assert.equal(current().y, 20);
+    assert.equal(validate.mock.calls.length, 1);
+    assert.equal(state.historyLength, 1);
+    state.undo();
+    assert.isUndefined(current().x);
+    assert.isUndefined(current().y);
+    assert.isFalse(state.dirty);
+    state.redo();
+    assert.equal(current().x, 10);
+    assert.equal(current().y, 20);
+  },
+);

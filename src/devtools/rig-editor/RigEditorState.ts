@@ -282,35 +282,49 @@ export class RigEditorState {
   }
 
   editBone(id: string, field: BoneField, value: number): void {
-    this.assertValue(field, value);
+    this.editBoneFields(id, { [field]: value });
+  }
+
+  editBoneFields(id: string, values: Partial<Record<BoneField, number>>): void {
+    for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
+    const bone = this.getBone(id);
     this.change(() => {
-      (this.getBone(id) as unknown as Record<string, unknown>)[field] = value;
-      if (field === 'length') {
+      Object.assign(bone, values);
+      if (values.length !== undefined) {
         for (const childId of this.childrenOf(id)) {
           const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
           const x = child.x ?? 0;
           const y = child.y ?? 0;
           const distance = Math.hypot(x, y);
-          child.x = distance ? (x * value) / distance : 0;
-          child.y = distance ? (y * value) / distance : value;
+          child.x = distance ? (x * values.length) / distance : 0;
+          child.y = distance ? (y * values.length) / distance : values.length;
         }
       }
     });
   }
 
   editSlot(id: string, field: SlotField, value: number): void {
-    this.assertValue(field, value);
+    this.editSlotFields(id, { [field]: value });
+  }
+
+  editSlotFields(id: string, values: Partial<Record<SlotField, number>>): void {
+    for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
+    const slot = this.getSlot(id);
     this.change(() => {
-      (this.getSlot(id) as unknown as Record<string, unknown>)[field] = value;
+      Object.assign(slot, values);
     });
   }
 
   editSprite(id: string, field: SpriteField, value: number, attachment = false): void {
-    this.assertValue(field, value);
+    this.editSpriteFields(id, { [field]: value }, attachment);
+  }
+
+  editSpriteFields(id: string, values: Partial<Record<SpriteField, number>>, attachment = false): void {
+    for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
     const sprite = attachment ? this.getAttachment(id) : this.getBone(id).sprite;
     if (!sprite) throw new Error(`No sprite for "${id}".`);
     this.change(() => {
-      (sprite as unknown as Record<string, unknown>)[field] = value;
+      Object.assign(sprite, values);
     });
   }
 

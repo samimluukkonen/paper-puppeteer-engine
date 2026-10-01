@@ -336,13 +336,16 @@ export class Puppet {
     return this.renderer.getSlotImage(slot);
   }
 
-  /** Update supplied slot transform properties, preserving omitted values and its attachment. */
+  /** Update supplied slot transform properties, preserving omitted values and its attachment.
+   * Pass sync = false to batch changes, then call syncPose() after the final edit.
+   */
   setSlotTransform(
     id: string,
     values: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number },
+    sync = true,
   ): this {
     this.renderer.setSlotTransform(id, values);
-    this.syncPose();
+    if (sync) this.syncPose();
     return this;
   }
 

@@ -7,6 +7,46 @@ import type {
   SpriteAttachmentDefinition,
 } from './types.js';
 
+/** Resolve the logical joint offset using the parent's explicit length, when present. */
+export function computeBonePosition(bone: BoneDefinition, parent?: BoneDefinition): { x: number; y: number } {
+  const x = bone.x ?? 0;
+  const y = bone.y ?? 0;
+  const length = parent?.length;
+  if (length === undefined) return { x, y };
+  const distance = Math.hypot(x, y);
+  return {
+    x: distance > 0 ? (x / distance) * length : 0,
+    y: distance > 0 ? (y / distance) * length : length,
+  };
+}
+
+/** Calculate draw order for an already validated, parent-ordered skeleton. */
+export function computeRenderOrder(root: string, bones: readonly BoneDefinition[]): string[] {
+  const definitions = new Map(bones.map((bone) => [bone.id, bone]));
+  const children = new Map<string, BoneDefinition[]>();
+  for (const bone of bones) {
+    if (bone.parent !== undefined) {
+      const siblings = children.get(bone.parent) ?? [];
+      siblings.push(bone);
+      children.set(bone.parent, siblings);
+    }
+  }
+  const renderOrder: string[] = [];
+  const visit = (id: string): void => {
+    const bone = definitions.get(id)!;
+    const entries = [
+      { id, depth: bone.sprite?.depth ?? 0, self: true },
+      ...(children.get(id) ?? []).map((child) => ({ id: child.id, depth: child.depth ?? 0, self: false })),
+    ].sort((left, right) => left.depth - right.depth);
+    for (const entry of entries) {
+      if (entry.self) renderOrder.push(entry.id);
+      else visit(entry.id);
+    }
+  };
+  visit(root);
+  return renderOrder;
+}
+
 /** Validates a data-only rig and orders it so parents always precede children. */
 export class Rig {
   readonly root: string;
@@ -47,17 +87,13 @@ export class Rig {
     // solve lengths that disagree with the rendered child joint positions.
     for (const bone of this.definitions.values()) {
       if (bone.parent === undefined) continue;
-      const length = this.getBone(bone.parent).length;
-      if (length === undefined) continue;
-      const x = bone.x ?? 0;
-      const y = bone.y ?? 0;
-      const distance = Math.hypot(x, y);
+      const parent = this.getBone(bone.parent);
+      if (parent.length === undefined) continue;
       this.definitions.set(
         bone.id,
         Object.freeze({
           ...bone,
-          x: distance > 0 ? (x / distance) * length : 0,
-          y: distance > 0 ? (y / distance) * length : length,
+          ...computeBonePosition(bone, parent),
         }),
       );
     }
@@ -77,28 +113,7 @@ export class Rig {
     };
     for (const id of this.definitions.keys()) visit(id);
     this.bones = Object.freeze(ordered);
-    const children = new Map<string, BoneDefinition[]>();
-    for (const bone of ordered) {
-      if (bone.parent !== undefined) {
-        const siblings = children.get(bone.parent) ?? [];
-        siblings.push(bone);
-        children.set(bone.parent, siblings);
-      }
-    }
-    const renderOrder: string[] = [];
-    const visitRenderOrder = (id: string): void => {
-      const bone = this.getBone(id);
-      const entries = [
-        { id, depth: bone.sprite?.depth ?? 0, self: true },
-        ...(children.get(id) ?? []).map((child) => ({ id: child.id, depth: child.depth ?? 0, self: false })),
-      ].sort((left, right) => left.depth - right.depth);
-      for (const entry of entries) {
-        if (entry.self) renderOrder.push(entry.id);
-        else visitRenderOrder(entry.id);
-      }
-    };
-    visitRenderOrder(this.root);
-    this.renderOrder = Object.freeze(renderOrder);
+    this.renderOrder = Object.freeze(computeRenderOrder(this.root, ordered));
     this.slots = Object.freeze((definition.slots ?? []).map((slot) => Object.freeze({ ...slot })));
     this.attachments = Object.freeze(
       (definition.attachments ?? []).map((attachment) => Object.freeze({ ...attachment })),

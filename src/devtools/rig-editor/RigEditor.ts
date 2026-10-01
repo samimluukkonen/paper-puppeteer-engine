@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
-import { Rig } from '../../engine/Rig.js';
+import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { RigEditorState } from './RigEditorState.js';
@@ -58,13 +58,13 @@ export class RigEditor {
   refresh(notify = true): void {
     this.puppet.preparePose();
     // Preview the same logical joint positions that an exported rig loads with.
-    const previewRig = new Rig(this.state.workingCopy);
-    this.puppet.setRenderOrder(previewRig.renderOrder);
-    for (const edited of previewRig.bones) {
+    const { root, bones } = this.state.workingCopy;
+    const definitions = new Map(bones.map((bone) => [bone.id, bone]));
+    this.puppet.setRenderOrder(computeRenderOrder(root, bones));
+    for (const edited of bones) {
       const runtime = this.puppet.getBone(edited.id);
       Object.assign(runtime.pose, {
-        x: edited.x ?? 0,
-        y: edited.y ?? 0,
+        ...computeBonePosition(edited, edited.parent === undefined ? undefined : definitions.get(edited.parent)),
         rotation: edited.rotation ?? 0,
         scaleX: edited.scaleX ?? 1,
         scaleY: edited.scaleY ?? 1,
@@ -80,13 +80,17 @@ export class RigEditor {
     }
     for (const slot of this.state.rig.slots) {
       const edited = this.state.getSlot(slot.id);
-      this.puppet.setSlotTransform(slot.id, {
-        x: edited.x ?? 0,
-        y: edited.y ?? 0,
-        rotation: edited.rotation ?? 0,
-        scaleX: edited.scaleX ?? 1,
-        scaleY: edited.scaleY ?? 1,
-      });
+      this.puppet.setSlotTransform(
+        slot.id,
+        {
+          x: edited.x ?? 0,
+          y: edited.y ?? 0,
+          rotation: edited.rotation ?? 0,
+          scaleX: edited.scaleX ?? 1,
+          scaleY: edited.scaleY ?? 1,
+        },
+        false,
+      );
       if (edited.depth !== undefined) this.puppet.setSlotDepth(slot.id, edited.depth);
       else this.puppet.clearSlotDepth(slot.id);
       const image = this.puppet.getSlotImage(slot.id);
@@ -324,14 +328,11 @@ export class RigEditor {
       const x = this.state.snapTranslation(value.x + local.x - start.x);
       const y = this.state.snapTranslation(value.y + local.y - start.y);
       if (type === 'bone') {
-        this.state.editBone(id, 'x', x);
-        this.state.editBone(id, 'y', y);
+        this.state.editBoneFields(id, { x, y });
       } else if (type === 'slot') {
-        this.state.editSlot(id, 'x', x);
-        this.state.editSlot(id, 'y', y);
+        this.state.editSlotFields(id, { x, y });
       } else {
-        this.state.editSprite(id, 'x', x, type === 'attachment');
-        this.state.editSprite(id, 'y', y, type === 'attachment');
+        this.state.editSpriteFields(id, { x, y }, type === 'attachment');
       }
       this.refresh();
       return;
@@ -351,7 +352,6 @@ export class RigEditor {
     this.panning = false;
     this.drag = undefined;
     this.state.endOperation();
-    this.state.validate();
     this.onChange();
   }
 

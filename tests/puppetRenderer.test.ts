@@ -98,6 +98,22 @@ test('successive partial slot transforms preserve runtime values and allow compl
   assert.throws(() => renderer.setSlotTransform('missing', {}), /Unknown slot/);
 });
 
+test('slot transforms synchronize immediately by default and can defer synchronization for a batch', () => {
+  const { renderer } = fixture();
+  const syncPose = vi.fn();
+  const puppet = { renderer, syncPose, setSlotTransform: Puppet.prototype.setSlotTransform } as unknown as Puppet;
+  assert.strictEqual(puppet.setSlotTransform('item', { x: 8 }), puppet);
+  assert.equal(syncPose.mock.calls.length, 1);
+  syncPose.mockClear();
+  puppet.setSlotTransform('item', { y: 9 }, false);
+  puppet.setSlotTransform('automatic', { x: 10 }, false);
+  assert.equal(syncPose.mock.calls.length, 0);
+  puppet.syncPose();
+  assert.equal(syncPose.mock.calls.length, 1);
+  assert.equal(slotTransform(renderer, 'item').y, 9);
+  assert.equal(slotTransform(renderer, 'automatic').x, 10);
+});
+
 test('editor restores omitted slot transform defaults through undo and reset', () => {
   const { renderer, rig } = fixture();
   const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
@@ -115,9 +131,12 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     getAttachment: vi.fn(),
   } as unknown as Puppet;
   const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
+  const syncPose = vi.mocked(puppet.syncPose);
   const defaults = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 };
   for (const field of ['x', 'y', 'rotation', 'scaleX', 'scaleY'] as const) {
+    syncPose.mockClear();
     editor.editSlot('automatic', field, 8);
+    assert.equal(syncPose.mock.calls.length, 1, 'refresh synchronizes once for all three slots');
     assert.deepEqual(slotTransform(renderer, 'automatic'), { ...defaults, [field]: 8 });
     editor.undo();
     assert.deepEqual(slotTransform(renderer, 'automatic'), defaults);
