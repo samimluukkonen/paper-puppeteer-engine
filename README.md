@@ -17,6 +17,12 @@ npm run dev
 
 Open the local URL printed by Vite. The demo starts in idle. The control panel also supports clicking/tapping.
 
+## Rig editor (v0.5.1.1)
+
+Open `/rig-editor/` from the demo's **Open Rig Editor** link. The editor loads the sample character with its default skin and shows the bind pose in canonical right facing. The preview uses the demo's right-facing shoulder and hip placement, upper-arm angles, and limb draw order. The inspector still shows the canonical rig values. Animation and IK remain disabled; the IK toggle draws the demo's chain definitions without solving or changing rig values. Select bones by clicking joints or their parent lines, or use the hierarchy. Select slots by clicking their square markers or hierarchy entries. Hold Alt while clicking when a slot overlaps a joint. Exact overlaps use rig order for a predictable choice.
+
+The inspector shows read-only rig values. Visibility controls show artwork, bones, names, logical lengths, slots, sprite origins, and IK status. Artwork opacity has 100%, 50%, and 25% settings. Use the mouse wheel to zoom and middle mouse drag to pan; navigation changes only the camera. The editor makes a deep working copy of the loaded rig before creating its runtime preview, leaving the loaded definition unchanged. This milestone provides selection and inspection only; it has no transform editing, export, or undo.
+
 | Key | Action |
 | --- | --- |
 | `1` | Play / restart idle |
@@ -532,7 +538,7 @@ The library includes TypeScript declarations and source maps. Phaser is external
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
 - Debug name labels can overlap on dense rigs. Independent draw slots duplicate ancestor containers, so very large rigs require profiling.
-- No rig editor or animation editor. Character JSON loading uses `fetch`; apps with another asset pipeline can use `CharacterDefinition.fromData`.
+- The rig editor is read-only and loads the sample character; there is no animation editor. Character JSON loading uses `fetch`; apps with another asset pipeline can use `CharacterDefinition.fromData`.
 
 ## Planned features
 

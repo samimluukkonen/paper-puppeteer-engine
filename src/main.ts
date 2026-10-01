@@ -10,7 +10,7 @@ if (!app) throw new Error('Missing demo host.');
 app.innerHTML = `
   <header class="masthead">
     <a class="wordmark" href="./"><span class="mark" aria-hidden="true">✳</span> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
-    <span class="version">v0.4.4 <span class="version-dot"></span> Pose authoring</span>
+    <span class="version"><a href="./rig-editor/">Open Rig Editor</a> <span class="version-dot"></span> v0.5.1.1</span>
   </header>
   <section class="workbench">
     <aside class="controls" aria-label="Animation controls">
