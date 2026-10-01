@@ -229,6 +229,41 @@ test('masked overlay respects weights and preserves untracked bones', () => {
   assert.strictEqual(joints.get('arm')!.pose.x, 10);
 });
 
+for (const interrupted of [false, true]) {
+  for (const cleanup of ['clear', 'mask'] as const) {
+    test(`${cleanup} layer during ${interrupted ? 'an interrupted' : 'a'} crossfade resets all controlled properties`, () => {
+      const { player, joints } = fixture();
+      player.addAnimation({ name: 'base', duration: 1000, loop: true, tracks: { root: [{ time: 0, x: 5 }] } });
+      player.addAnimation({ name: 'partial', duration: 1000, loop: true, tracks: { leg: [{ time: 0, rotation: 1 }] } });
+      player.play('base');
+      player.setLayerMask('upper', ['arm', 'leg']);
+      joints.get('root')!.pose.rotation = 0.25;
+      player.play('b', { layer: 'upper' });
+      player.play('partial', { layer: 'upper', fadeDuration: 200 });
+      player.update(100);
+      if (interrupted) {
+        player.play('partial', { layer: 'upper', fadeDuration: 200 });
+        player.update(100);
+      }
+      const arm = joints.get('arm')!;
+      const leg = joints.get('leg')!;
+      assert.ok(arm.pose.x > arm.bindPose.x);
+      assert.ok(leg.pose.rotation > leg.bindPose.rotation);
+
+      if (cleanup === 'clear') player.clearLayer('upper');
+      else player.setLayerMask('upper', []);
+
+      assert.deepEqual(arm.pose, arm.bindPose);
+      assert.deepEqual(leg.pose, leg.bindPose);
+      assert.strictEqual(joints.get('root')!.pose.x, 5);
+      assert.strictEqual(joints.get('root')!.pose.rotation, 0.25);
+      player.update(50);
+      assert.deepEqual(arm.pose, arm.bindPose);
+      assert.deepEqual(leg.pose, leg.bindPose);
+    });
+  }
+}
+
 test('a new layer fades in from the pose below it', () => {
   const { player, joints } = fixture();
   player.play('a');

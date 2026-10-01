@@ -261,18 +261,7 @@ export class AnimationPlayer {
     }
     const controlled = new Map<string, Set<TransformProperty>>();
     for (const layer of this.layers.values()) {
-      if (!layer.state) continue;
-      this.markControlled(controlled, layer.state.clip, layer.mask);
-      const source = layer.transition?.source;
-      if (source && !(source instanceof Map)) this.markControlled(controlled, source.clip, layer.mask);
-      else if (source instanceof Map) {
-        for (const [id, values] of source) {
-          if (layer.mask && !layer.mask.has(id)) continue;
-          const properties = controlled.get(id) ?? new Set<TransformProperty>();
-          for (const property of transformProperties) if (values[property] !== undefined) properties.add(property);
-          controlled.set(id, properties);
-        }
-      }
+      this.markLayerControlled(controlled, layer);
     }
     for (const [id, values] of pose) {
       const joint = this.joints.get(id)!;
@@ -281,6 +270,21 @@ export class AnimationPlayer {
       }
     }
     for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
+  }
+
+  private markLayerControlled(controlled: Map<string, Set<TransformProperty>>, layer: AnimationLayer): void {
+    if (!layer.state) return;
+    this.markControlled(controlled, layer.state.clip, layer.mask);
+    const source = layer.transition?.source;
+    if (source && !(source instanceof Map)) this.markControlled(controlled, source.clip, layer.mask);
+    else if (source instanceof Map) {
+      for (const [id, values] of source) {
+        if (layer.mask && !layer.mask.has(id)) continue;
+        const properties = controlled.get(id) ?? new Set<TransformProperty>();
+        for (const property of transformProperties) if (values[property] !== undefined) properties.add(property);
+        controlled.set(id, properties);
+      }
+    }
   }
 
   private markControlled(
@@ -297,11 +301,11 @@ export class AnimationPlayer {
   }
 
   private resetLayerProperties(layer: AnimationLayer): void {
-    if (!layer.state) return;
-    for (const track of layer.state.clip.tracks) {
-      if (layer.mask && !layer.mask.has(track.bone)) continue;
-      const joint = this.joints.get(track.bone)!;
-      for (const property of track.properties.keys()) joint.pose[property] = joint.bindPose[property];
+    const controlled = new Map<string, Set<TransformProperty>>();
+    this.markLayerControlled(controlled, layer);
+    for (const [id, properties] of controlled) {
+      const joint = this.joints.get(id)!;
+      for (const property of properties) joint.pose[property] = joint.bindPose[property];
     }
   }
 
