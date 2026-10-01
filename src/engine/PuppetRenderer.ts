@@ -19,6 +19,7 @@ export class PuppetRenderer {
   private readonly branches = new Map<string, RenderBranch>();
   private readonly slotBranches = new Map<string, RenderBranch>();
   private readonly slotImages = new Map<string, Phaser.GameObjects.Image>();
+  private readonly slotDepthOverrides = new Map<string, number>();
   private readonly projections: TransformProjection[] = [];
   private order: readonly string[] = [];
 
@@ -80,7 +81,7 @@ export class PuppetRenderer {
     for (const [index, id] of order.entries()) this.branches.get(id)!.root.setDepth(index * 10);
     for (const slot of this.rig.slots) {
       const anchor = order.indexOf(slot.bone) * 10;
-      this.slotBranches.get(slot.id)!.root.setDepth(slot.depth ?? anchor + 1);
+      this.slotBranches.get(slot.id)!.root.setDepth(this.slotDepthOverrides.get(slot.id) ?? slot.depth ?? anchor + 1);
     }
     this.container.sort('depth');
     this.order = [...order];
@@ -112,6 +113,7 @@ export class PuppetRenderer {
   setSlotDepth(id: string, depth: number): void {
     const branch = this.slotBranches.get(id);
     if (!branch) throw new Error(`Unknown slot "${id}".`);
+    this.slotDepthOverrides.set(id, depth);
     branch.root.setDepth(depth);
     this.container.sort('depth');
   }
@@ -150,6 +152,7 @@ export class PuppetRenderer {
     this.branches.clear();
     this.slotBranches.clear();
     this.slotImages.clear();
+    this.slotDepthOverrides.clear();
     this.projections.length = 0;
   }
 }
