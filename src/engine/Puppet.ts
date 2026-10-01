@@ -336,7 +336,7 @@ export class Puppet {
     return this.renderer.getSlotImage(slot);
   }
 
-  /** Update an existing slot mount without replacing its attachment. */
+  /** Update supplied slot transform properties, preserving omitted values and its attachment. */
   setSlotTransform(
     id: string,
     values: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number },

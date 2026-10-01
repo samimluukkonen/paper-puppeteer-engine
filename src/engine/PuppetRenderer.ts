@@ -99,15 +99,16 @@ export class PuppetRenderer {
     return branch.mount;
   }
 
+  /** Update supplied transform properties, preserving omitted values. */
   setSlotTransform(
     id: string,
     values: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number },
   ): void {
     const mount = this.getSlotMount(id);
     mount
-      .setPosition(values.x ?? 0, values.y ?? 0)
-      .setRotation(values.rotation ?? 0)
-      .setScale(values.scaleX ?? 1, values.scaleY ?? 1);
+      .setPosition(values.x ?? mount.x, values.y ?? mount.y)
+      .setRotation(values.rotation ?? mount.rotation)
+      .setScale(values.scaleX ?? mount.scaleX, values.scaleY ?? mount.scaleY);
   }
 
   setSlotDepth(id: string, depth: number): void {
