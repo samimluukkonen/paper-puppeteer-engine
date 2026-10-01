@@ -336,6 +336,22 @@ export class Puppet {
     return this.renderer.getSlotImage(slot);
   }
 
+  /** Update an existing slot mount without replacing its attachment. */
+  setSlotTransform(
+    id: string,
+    values: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number },
+  ): this {
+    this.renderer.setSlotTransform(id, values);
+    this.syncPose();
+    return this;
+  }
+
+  setSlotDepth(id: string, depth: number): this {
+    assertFinite(depth, `Slot ${id}.depth`);
+    this.renderer.setSlotDepth(id, depth);
+    return this;
+  }
+
   setAttachment(slot: string, attachment: string): this {
     this.slotState.setAttachment(slot, attachment);
     this.renderSlots();

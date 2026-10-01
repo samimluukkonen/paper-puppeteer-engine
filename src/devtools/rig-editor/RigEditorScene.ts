@@ -3,7 +3,6 @@ import { demoIK } from '../../demo/demoIK.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { queueCharacterTextures } from '../../engine/queueCharacterTextures.js';
-import { applyDemoRightFacingPreview } from './demoPreviewLayout.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
 
@@ -51,7 +50,6 @@ export class RigEditorScene extends Phaser.Scene {
           });
           this.editor = new RigEditor(this, puppet, () => this.onReady(this.editor!), state, demoIK);
           this.editor.enable();
-          applyDemoRightFacingPreview(puppet);
           this.onReady(this.editor);
           this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.editor?.disable());
         } catch (error) {

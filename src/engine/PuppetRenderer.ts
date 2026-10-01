@@ -98,6 +98,24 @@ export class PuppetRenderer {
     return branch.mount;
   }
 
+  setSlotTransform(
+    id: string,
+    values: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number },
+  ): void {
+    const mount = this.getSlotMount(id);
+    mount
+      .setPosition(values.x ?? 0, values.y ?? 0)
+      .setRotation(values.rotation ?? 0)
+      .setScale(values.scaleX ?? 1, values.scaleY ?? 1);
+  }
+
+  setSlotDepth(id: string, depth: number): void {
+    const branch = this.slotBranches.get(id);
+    if (!branch) throw new Error(`Unknown slot "${id}".`);
+    branch.root.setDepth(depth);
+    this.container.sort('depth');
+  }
+
   getSlotImage(id: string): Phaser.GameObjects.Image | undefined {
     return this.slotImages.get(id);
   }

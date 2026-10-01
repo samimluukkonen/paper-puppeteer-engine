@@ -36,7 +36,7 @@ export class RigEditorOverlay {
   }
 
   private slotPoint(id: string): Point {
-    const slot = this.state.rig.slots.find((entry) => entry.id === id)!;
+    const slot = this.state.getSlot(id);
     const matrix = this.puppet.getBone(slot.bone).container.getWorldTransformMatrix();
     return this.screen(matrix.transformPoint(slot.x ?? 0, slot.y ?? 0));
   }
@@ -113,10 +113,12 @@ export class RigEditorOverlay {
         }
         g.fillStyle(0xf8f5e8).fillCircle(p.x, p.y, selected ? 8 : 6);
         g.lineStyle(selected ? 3 : 2, color).strokeCircle(p.x, p.y, selected ? 8 : 6);
-        if (this.state.visibility.boneNames) label(bone.id, p.x + 9, p.y - 18, selected ? '#a53d21' : '#155c65');
-        if (this.state.visibility.boneLengths && bone.length !== undefined) {
+        if (this.state.visibility.boneNames || selected)
+          label(bone.id, p.x + 9, p.y - 18, selected ? '#a53d21' : '#155c65');
+        const edited = this.state.getBone(bone.id);
+        if (this.state.visibility.boneLengths && edited.length !== undefined) {
           const matrix = this.puppet.getBone(bone.id).container.getWorldTransformMatrix();
-          const end = this.screen(matrix.transformPoint(0, bone.length));
+          const end = this.screen(matrix.transformPoint(0, edited.length));
           g.lineStyle(2, 0xdb9e32, 0.9).lineBetween(p.x, p.y, end.x, end.y).strokeCircle(end.x, end.y, 3);
         }
       }
@@ -127,33 +129,36 @@ export class RigEditorOverlay {
         const selected = this.state.selection?.type === 'slot' && this.state.selection.id === slot.id;
         g.lineStyle(selected ? 3 : 2, selected ? 0xe45f35 : 0x713aa0);
         g.strokeRect(p.x - 5, p.y - 5, 10, 10);
-        label(
-          `${slot.id} · ${slot.bone} → ${this.puppet.getAttachment(slot.id) ?? 'empty'}`,
-          p.x + 10,
-          p.y + 7,
-          selected ? '#a53d21' : '#5e2d83',
-        );
+        if (selected)
+          label(
+            `${slot.id} · ${slot.bone} → ${this.puppet.getAttachment(slot.id) ?? 'empty'}`,
+            p.x + 10,
+            p.y + 7,
+            '#a53d21',
+          );
       }
     }
-    if (this.state.visibility.spriteOrigins) {
-      const mark = (point: Point): void => {
+    if (this.state.visibility.spriteOrigins || this.state.editMode === 'sprite') {
+      const mark = (point: Point, selected: boolean): void => {
         const p = this.screen(point);
-        g.lineStyle(2, 0xbd682c)
+        g.lineStyle(selected ? 3 : 2, selected ? 0xe45f35 : 0xbd682c)
           .lineBetween(p.x - 5, p.y, p.x + 5, p.y)
           .lineBetween(p.x, p.y - 5, p.x, p.y + 5);
       };
       for (const bone of this.state.rig.bones) {
         const image = this.puppet.getBone(bone.id).sprite;
-        if (image) {
+        const selected = this.state.selection?.type === 'bone' && this.state.selection.id === bone.id;
+        if (image && (this.state.visibility.spriteOrigins || selected)) {
           const matrix = image.getWorldTransformMatrix();
-          mark({ x: matrix.tx, y: matrix.ty });
+          mark({ x: matrix.tx, y: matrix.ty }, selected);
         }
       }
       for (const slot of this.state.rig.slots) {
         const image = this.puppet.getSlotImage(slot.id);
-        if (image) {
+        const selected = this.state.selection?.type === 'slot' && this.state.selection.id === slot.id;
+        if (image && (this.state.visibility.spriteOrigins || selected)) {
           const matrix = image.getWorldTransformMatrix();
-          mark({ x: matrix.tx, y: matrix.ty });
+          mark({ x: matrix.tx, y: matrix.ty }, selected);
         }
       }
     }
@@ -169,7 +174,7 @@ export class RigEditorOverlay {
         g.strokeCircle(end.x, end.y, 9);
         label(chain.name, end.x + 12, end.y - 10, '#76562b');
       }
-      label('IK chains · solver disabled', 16, 16, '#7b642b');
+      label(this.state.ikPreview ? 'IK preview · fixed targets' : 'IK chains · solver off', 16, 16, '#7b642b');
     }
     for (let i = labelIndex; i < this.labels.length; i += 1) this.labels[i]?.setVisible(false);
   }
