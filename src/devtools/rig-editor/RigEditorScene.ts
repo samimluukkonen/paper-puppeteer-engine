@@ -98,6 +98,14 @@ export class RigEditorScene extends Phaser.Scene {
     const rig = parseRigDefinition({ ...file, skins: file.skins ?? definition.rig.skins });
     if (!rig.skins.some((skin) => skin.name === definition.defaultSkin))
       throw new Error(`Rig needs the character's default skin "${definition.defaultSkin}" for preview.`);
+    // A valid rig can still be incompatible with the editor's preview chains.
+    for (const chain of demoIK) {
+      const root = rig.getBone(chain.rootBone);
+      const middle = rig.getBone(chain.middleBone);
+      const end = rig.getBone(chain.endBone);
+      if (middle.parent !== root.id || end.parent !== middle.id)
+        throw new Error(`IK "${chain.name}" must name three directly connected bones.`);
+    }
     const state = new RigEditorState(rig, file);
     const puppet = new Puppet(this, {
       rig: state.workingCopy,
@@ -106,11 +114,23 @@ export class RigEditorScene extends Phaser.Scene {
       y: 435,
       autoUpdate: false,
     });
+    let editor: RigEditor | undefined;
+    try {
+      editor = new RigEditor(this, puppet, () => this.onReady(this.editor!), state, demoIK);
+      editor.enable();
+    } catch (error) {
+      try {
+        editor?.disable();
+      } finally {
+        puppet.destroy();
+      }
+      throw error;
+    }
+    // Keep the working session alive until the replacement is fully initialized.
     this.editor?.disable();
     this.puppet?.destroy();
     this.puppet = puppet;
-    this.editor = new RigEditor(this, puppet, () => this.onReady(this.editor!), state, demoIK);
-    this.editor.enable();
-    this.onReady(this.editor);
+    this.editor = editor;
+    this.onReady(editor);
   }
 }
