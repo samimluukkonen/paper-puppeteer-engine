@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { demoIK } from '../src/demo/demoIK.js';
 import { demoHipPositions, demoRenderOrder } from '../src/demo/demoPresentation.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
@@ -9,10 +9,12 @@ import {
   validateCharacterDefinition,
 } from '../src/engine/CharacterDefinition.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
+import { checkJson, type ValidationIssue } from '../src/engine/externalData.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
 import { SlotState } from '../src/engine/SlotState.js';
+import { animationClipSchema, rigDefinitionSchema } from '../src/engine/schemas.js';
 
 const root = new URL('../public/characters/demo-puppet/', import.meta.url);
 const files = import.meta.glob('../public/characters/demo-puppet/**/*.json', { eager: true, import: 'default' });
@@ -86,6 +88,68 @@ test('complete sample character validates and already-parsed data becomes runtim
   assert.equal(joints.get('leftThigh')!.pose.rotation, firstStep);
   player.update(20);
   assert.notEqual(joints.get('leftThigh')!.pose.rotation, firstStep);
+});
+
+test('character assembly validates the rig once and reuses parsed clips', () => {
+  const data = bundle();
+  const rigValidation = vi.spyOn(rigDefinitionSchema, 'safeParse');
+  const rigConstruction = vi.spyOn(rigDefinitionSchema, 'parse');
+  const clipValidation = vi.spyOn(animationClipSchema, 'safeParse');
+  const clipParsing = vi.spyOn(animationClipSchema, 'parse');
+  try {
+    const definition = CharacterDefinition.fromData(data);
+    assert.equal(rigValidation.mock.calls.length, 1);
+    assert.equal(rigConstruction.mock.calls.length, 1);
+    assert.equal(clipValidation.mock.calls.length, manifest.animations.length);
+    assert.equal(clipParsing.mock.calls.length, 0);
+    assert.equal(definition.animations.length, manifest.animations.length);
+    assert.equal(definition.poses.length, manifest.poses!.length);
+  } finally {
+    vi.restoreAllMocks();
+  }
+});
+
+test.each([
+  ['extra string key', (array: unknown[]) => Object.assign(array, { extra: 'ignored by JSON' })],
+  ['noncanonical index', (array: unknown[]) => Object.assign(array, { '01': 'ignored by JSON' })],
+  ['symbol key', (array: unknown[]) => Object.assign(array, { [Symbol('extra')]: true })],
+  [
+    'sparse index',
+    (array: unknown[]) => {
+      delete array[0];
+    },
+  ],
+  [
+    'accessor index',
+    (array: unknown[]) =>
+      Object.defineProperty(array, '0', {
+        enumerable: true,
+        get() {
+          throw new Error('JSON validation must not invoke getters.');
+        },
+      }),
+  ],
+])('character arrays use shared JSON validation for %s', (_name, mutate) => {
+  const data = bundle();
+  mutate(data.manifest.animations);
+  const expected: ValidationIssue[] = [];
+  checkJson(data.manifest, 'manifest', expected);
+  assert.ok(expected.length);
+  assert.deepEqual(validateCharacterDefinition(data), expected);
+  assert.throws(() => CharacterDefinition.fromData(data), CharacterValidationError);
+
+  const skinData = bundle();
+  skinData.skins[manifest.skins.default!] = data.manifest.animations;
+  const skinExpected: ValidationIssue[] = [];
+  checkJson(data.manifest.animations, 'skins.default', skinExpected);
+  assert.deepEqual(validateCharacterDefinition(skinData), skinExpected);
+});
+
+test('character arrays accept nonenumerable numeric indexes preserved by JSON', () => {
+  const data = bundle();
+  Object.defineProperty(data.manifest.animations, '0', { enumerable: false });
+  assert.deepEqual(validateCharacterDefinition(data), []);
+  assert.equal(CharacterDefinition.fromData(data).animations.length, manifest.animations.length);
 });
 
 test('character validation reports missing rig, default skin, duplicates and broken references', () => {

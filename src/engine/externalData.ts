@@ -244,14 +244,19 @@ function checkAnimationFields(input: unknown, issues: ValidationIssue[]): void {
   }
 }
 
-/** Reports all detectable file, scalar and hierarchy errors without creating engine state. */
-export function validateRigDefinition(input: unknown): ValidationIssue[] {
+interface ValidationResult<T> {
+  issues: ValidationIssue[];
+  data?: T;
+}
+
+/** @internal Retains validated data so character assembly need not parse the file again. */
+export function inspectRigDefinition(input: unknown): ValidationResult<RigDefinition> {
   const issues = versionIssues(input, RIG_FORMAT_VERSION, 'rig');
   checkJson(input, '', issues);
-  if (issues.some((issue) => issue.message.includes('accessor'))) return issues;
+  if (issues.some((issue) => issue.message.includes('accessor'))) return { issues };
   checkRigFields(input, issues);
   const parsed = rigDefinitionSchema.safeParse(input);
-  if (!parsed.success) return [...issues, ...shapeIssues(parsed.error)];
+  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)] };
   const { root, bones } = parsed.data;
   if (isRecord(input) && input.name !== undefined && (typeof input.name !== 'string' || input.name.length === 0))
     issues.push({ severity: 'error', path: 'name', message: 'Rig name must be a nonempty string.' });
@@ -320,8 +325,17 @@ export function validateRigDefinition(input: unknown): ValidationIssue[] {
       });
     attachmentIds.add(attachment.id);
   }
+  issues.push(...validateSkinReferences(parsed.data.skins ?? [], parsed.data));
+  return issues.length ? { issues } : { issues, data: parsed.data };
+}
+
+/** @internal Checks standalone skins against an already validated rig. */
+export function validateSkinReferences(skins: readonly SkinDefinition[], rig: RigDefinition): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const slotIds = new Set((rig.slots ?? []).map((slot) => slot.id));
+  const attachmentIds = new Set((rig.attachments ?? []).map((attachment) => attachment.id));
   const skinNames = new Set<string>();
-  for (const [index, skin] of (parsed.data.skins ?? []).entries()) {
+  for (const [index, skin] of skins.entries()) {
     if (skinNames.has(skin.name))
       issues.push({ severity: 'error', path: `skins[${index}].name`, message: `Duplicate skin name "${skin.name}".` });
     skinNames.add(skin.name);
@@ -339,25 +353,30 @@ export function validateRigDefinition(input: unknown): ValidationIssue[] {
   return issues;
 }
 
+/** Reports all detectable file, scalar and hierarchy errors without creating engine state. */
+export function validateRigDefinition(input: unknown): ValidationIssue[] {
+  return inspectRigDefinition(input).issues;
+}
+
 /** Validate a versioned file and return the same Rig used by TypeScript-defined puppets. */
 export function parseRigDefinition(input: unknown): Rig {
-  const issues = validateRigDefinition(input);
-  if (issues.length) {
+  const { issues, data } = inspectRigDefinition(input);
+  if (!data) {
     if (isRecord(input) && Object.hasOwn(input, 'version') && input.version !== RIG_FORMAT_VERSION)
       throw new UnsupportedFormatVersionError('rig', input.version, RIG_FORMAT_VERSION);
     throw new RigValidationError(issues);
   }
-  return new Rig(rigDefinitionSchema.parse(input));
+  return new Rig(data);
 }
 
-/** Reports file, scalar, timeline and rig-reference errors. */
-export function validateAnimationDefinition(input: unknown, rig: Rig | RigDefinition): ValidationIssue[] {
+/** @internal Retains validated clips for character assembly. */
+export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinition): ValidationResult<AnimationClip> {
   const issues = versionIssues(input, ANIMATION_FORMAT_VERSION, 'animation');
   checkJson(input, '', issues);
-  if (issues.some((issue) => issue.message.includes('accessor'))) return issues;
+  if (issues.some((issue) => issue.message.includes('accessor'))) return { issues };
   checkAnimationFields(input, issues);
   const parsed = animationClipSchema.safeParse(input);
-  if (!parsed.success) return [...issues, ...shapeIssues(parsed.error)];
+  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)] };
   const clip = parsed.data;
   const boneIds = new Set(rig.bones.map((bone) => bone.id));
   for (const [bone, keys] of Object.entries(clip.tracks)) {
@@ -386,16 +405,21 @@ export function validateAnimationDefinition(input: unknown, rig: Rig | RigDefini
         message: 'Event time must stay within the animation duration.',
       });
   }
-  return issues;
+  return issues.length ? { issues } : { issues, data: clip };
+}
+
+/** Reports file, scalar, timeline and rig-reference errors. */
+export function validateAnimationDefinition(input: unknown, rig: Rig | RigDefinition): ValidationIssue[] {
+  return inspectAnimationDefinition(input, rig).issues;
 }
 
 /** Validate a versioned file and return an ordinary clip for AnimationPlayer.addAnimation. */
 export function parseAnimationClip(input: unknown, rig: Rig | RigDefinition): AnimationClip {
-  const issues = validateAnimationDefinition(input, rig);
-  if (issues.length) {
+  const { issues, data } = inspectAnimationDefinition(input, rig);
+  if (!data) {
     if (isRecord(input) && Object.hasOwn(input, 'version') && input.version !== ANIMATION_FORMAT_VERSION)
       throw new UnsupportedFormatVersionError('animation', input.version, ANIMATION_FORMAT_VERSION);
     throw new AnimationValidationError(issues);
   }
-  return animationClipSchema.parse(input);
+  return data;
 }

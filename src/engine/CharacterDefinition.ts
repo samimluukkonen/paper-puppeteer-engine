@@ -1,17 +1,17 @@
 import { z } from 'zod';
 import type { AnimationClip } from './AnimationClip.js';
 import {
-  parseAnimationClip,
-  parseRigDefinition,
+  checkJson,
+  inspectAnimationDefinition,
+  inspectRigDefinition,
   type RigJsonDefinition,
   type ValidationIssue,
-  validateAnimationDefinition,
-  validateRigDefinition,
+  validateSkinReferences,
 } from './externalData.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
-import type { Rig } from './Rig.js';
+import { Rig } from './Rig.js';
 import { skinDefinitionSchema } from './schemas.js';
-import type { BoneDefinition, SkinDefinition } from './types.js';
+import type { SkinDefinition } from './types.js';
 
 export const CHARACTER_FORMAT_VERSION = 1;
 
@@ -48,64 +48,32 @@ function issue(path: string, message: string): ValidationIssue {
   return { severity: 'error', path, message };
 }
 
-function jsonIssue(value: unknown, path: string, seen: Set<object>, issues: ValidationIssue[]): void {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
-  if (typeof value === 'number' && Number.isFinite(value)) return;
-  if (typeof value !== 'object' || value === null) {
-    issues.push(issue(path, 'Must be a finite JSON value.'));
-    return;
-  }
-  if (seen.has(value)) {
-    issues.push(issue(path, 'Cyclic references are not allowed.'));
-    return;
-  }
-  if (
-    Object.getPrototypeOf(value) !== Object.prototype &&
-    Object.getPrototypeOf(value) !== null &&
-    !Array.isArray(value)
-  ) {
-    issues.push(issue(path, 'Must be a plain JSON object.'));
-    return;
-  }
-  seen.add(value);
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      if (!Object.hasOwn(value, index)) issues.push(issue(`${path}[${index}]`, 'Sparse arrays are not JSON data.'));
-    }
-  }
-  for (const key of Reflect.ownKeys(value)) {
-    if (Array.isArray(value) && key === 'length') continue;
-    if (typeof key === 'symbol') {
-      issues.push(issue(path, 'Symbol keys are not JSON data.'));
-      continue;
-    }
-    const childPath = Array.isArray(value) ? `${path}[${key}]` : `${path}.${key}`;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
-    if (!descriptor.enumerable || !('value' in descriptor)) {
-      issues.push(issue(childPath, 'Hidden or accessor properties are not JSON data.'));
-      continue;
-    }
-    jsonIssue(descriptor.value, childPath, seen, issues);
-  }
-  seen.delete(value);
+interface CharacterInspection {
+  issues: ValidationIssue[];
+  manifest?: CharacterManifest;
+  rig?: Rig;
+  animations: AnimationClip[];
+  poses: PoseDefinition[];
 }
 
-/** Validates manifest shape, all files, and references across files. Requires no Phaser or I/O. */
-export function validateCharacterDefinition(data: CharacterData): ValidationIssue[] {
+function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   const issues: ValidationIssue[] = [];
-  jsonIssue(data.manifest, 'manifest', new Set(), issues);
-  if (issues.length) return issues;
+  const result: CharacterInspection = { issues, animations: [], poses: [] };
+  checkJson(data.manifest, 'manifest', issues);
+  if (issues.length) return result;
   const parsed = characterManifestSchema.safeParse(data.manifest);
   if (!parsed.success) {
     for (const entry of parsed.error.issues) {
       const path = entry.path.length ? `manifest.${entry.path.join('.')}` : 'manifest';
       issues.push(issue(path, entry.message));
     }
-    return issues;
+    return result;
   }
   const manifest = parsed.data;
+  result.manifest = manifest;
   if (data.rig === undefined) issues.push(issue('rig', `Missing rig file "${manifest.rig}".`));
-  else issues.push(...prefixed(validateRigDefinition(data.rig), 'rig'));
+  const source = data.rig === undefined ? undefined : inspectRigDefinition(data.rig);
+  if (source) issues.push(...prefixed(source.issues, 'rig'));
 
   const skins: SkinDefinition[] = [];
   for (const [name, path] of Object.entries(manifest.skins)) {
@@ -115,7 +83,7 @@ export function validateCharacterDefinition(data: CharacterData): ValidationIssu
       continue;
     }
     const previousIssueCount = issues.length;
-    jsonIssue(value, `skins.${name}`, new Set(), issues);
+    checkJson(value, `skins.${name}`, issues);
     if (issues.length !== previousIssueCount) continue;
     const skin = skinFileSchema.safeParse(value);
     if (!skin.success) {
@@ -129,38 +97,37 @@ export function validateCharacterDefinition(data: CharacterData): ValidationIssu
   if (!Object.hasOwn(manifest.skins, manifest.defaultSkin))
     issues.push(issue('manifest.defaultSkin', `Unknown default skin "${manifest.defaultSkin}".`));
 
-  const rigValid = data.rig !== undefined && validateRigDefinition(data.rig).length === 0;
-  if (rigValid) {
-    const combined = { ...(data.rig as object), skins };
-    issues.push(
-      ...prefixed(
-        validateRigDefinition(combined).filter((entry) => entry.path?.startsWith('skins[')),
-        'rig',
-      ),
-    );
-    const rig = parseRigDefinition(data.rig);
+  if (source?.data) {
+    const skinIssues = validateSkinReferences(skins, source.data);
+    issues.push(...prefixed(skinIssues, 'rig'));
+    // Keep checking clips and poses when standalone skins have broken references.
+    result.rig = new Rig({ ...source.data, skins: skinIssues.length ? [] : skins });
     const textures = new Set(Object.keys(manifest.textures));
-    const sourceBones = (data.rig as { bones: readonly BoneDefinition[] }).bones;
-    for (const [index, bone] of sourceBones.entries())
+    for (const [index, bone] of source.data.bones.entries())
       if (bone.sprite && !textures.has(bone.sprite.texture))
         issues.push(issue(`rig.bones[${index}].sprite.texture`, `Missing texture asset "${bone.sprite.texture}".`));
-    for (const [index, attachment] of rig.attachments.entries())
+    for (const [index, attachment] of result.rig.attachments.entries())
       if (!textures.has(attachment.texture))
         issues.push(issue(`rig.attachments[${index}].texture`, `Missing texture asset "${attachment.texture}".`));
   }
   const names = new Set<string>();
-  const rig = rigValid ? parseRigDefinition(data.rig) : undefined;
+  const rig = result.rig;
   for (const [index, path] of manifest.animations.entries()) {
     const value = data.animations?.[path];
     if (value === undefined) {
       issues.push(issue(`animations[${index}]`, `Missing animation file "${path}".`));
       continue;
     }
-    if (rig) issues.push(...prefixed(validateAnimationDefinition(value, rig), `animations[${index}]`));
-    if (typeof value === 'object' && value !== null && 'name' in value && typeof value.name === 'string') {
-      if (names.has(value.name))
-        issues.push(issue(`animations[${index}].name`, `Duplicate animation name "${value.name}".`));
-      names.add(value.name);
+    if (rig) {
+      const clip = inspectAnimationDefinition(value, rig);
+      issues.push(...prefixed(clip.issues, `animations[${index}]`));
+      if (clip.data) result.animations.push(clip.data);
+    }
+    const name =
+      typeof value === 'object' && value !== null ? Object.getOwnPropertyDescriptor(value, 'name')?.value : undefined;
+    if (typeof name === 'string') {
+      if (names.has(name)) issues.push(issue(`animations[${index}].name`, `Duplicate animation name "${name}".`));
+      names.add(name);
     }
   }
   const poseNames = new Set<string>();
@@ -173,13 +140,19 @@ export function validateCharacterDefinition(data: CharacterData): ValidationIssu
     if (!rig) continue;
     try {
       const pose = parsePoseDefinition(value, rig);
+      result.poses.push(pose);
       if (poseNames.has(pose.name)) issues.push(issue(`poses[${index}].name`, `Duplicate pose name "${pose.name}".`));
       poseNames.add(pose.name);
     } catch (error) {
       issues.push(issue(`poses[${index}]`, error instanceof Error ? error.message : String(error)));
     }
   }
-  return issues;
+  return result;
+}
+
+/** Validates manifest shape, all files, and references across files. Requires no Phaser or I/O. */
+export function validateCharacterDefinition(data: CharacterData): ValidationIssue[] {
+  return inspectCharacterDefinition(data).issues;
 }
 
 export class CharacterValidationError extends Error {
@@ -204,17 +177,8 @@ export class CharacterDefinition {
   ) {}
 
   static fromData(data: CharacterData, baseUrl?: string): CharacterDefinition {
-    const issues = validateCharacterDefinition(data);
-    if (issues.length) throw new CharacterValidationError(issues);
-    const manifest = characterManifestSchema.parse(data.manifest);
-    const source = data.rig as object;
-    const skins = Object.entries(manifest.skins).map(([name, path]) => {
-      const skin = skinFileSchema.parse(data.skins![path]);
-      return { ...skin, name };
-    });
-    const rig = parseRigDefinition({ ...source, skins });
-    const animations = manifest.animations.map((path) => parseAnimationClip(data.animations![path], rig));
-    const poses = (manifest.poses ?? []).map((path) => parsePoseDefinition(data.poses![path], rig));
+    const { issues, manifest, rig, animations, poses } = inspectCharacterDefinition(data);
+    if (issues.length || !manifest || !rig) throw new CharacterValidationError(issues);
     return new CharacterDefinition(
       manifest.id,
       rig,
