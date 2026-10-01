@@ -185,7 +185,9 @@ export class AnimationPlayer {
     if (name === 'base') throw new Error('The base layer weight is fixed at 1.');
     assertFinite(weight, 'Layer weight');
     if (weight < 0 || weight > 1) throw new Error('Layer weight must be between 0 and 1.');
-    this.getOrCreateLayer(name).weight = weight;
+    const layer = this.getOrCreateLayer(name);
+    if (weight === 0 && layer.weight > 0) this.resetLayerProperties(layer);
+    layer.weight = weight;
     this.applyCurrentPose();
   }
 
@@ -261,9 +263,8 @@ export class AnimationPlayer {
   /** Reapply the held authored pose; useful before external per-frame adjustments. */
   applyCurrentPose(): void {
     const base = this.layers.get('base');
-    if (!base?.state) return;
     let pose: AnimationPose = this.bindPose();
-    pose = blendPose(pose, new Map(), this.evaluateLayer(base, pose), 1);
+    if (base?.state) pose = blendPose(pose, new Map(), this.evaluateLayer(base, pose), 1);
     for (const [name, layer] of this.layers) {
       if (name === 'base' || !layer.state || layer.weight === 0) continue;
       pose = blendPose(pose, new Map(), this.evaluateLayer(layer, pose), layer.weight, layer.mask);
@@ -282,7 +283,7 @@ export class AnimationPlayer {
   }
 
   private markLayerControlled(controlled: Map<string, Set<TransformProperty>>, layer: AnimationLayer): void {
-    if (!layer.state) return;
+    if (!layer.state || layer.weight === 0) return;
     this.markControlled(controlled, layer.state.clip, layer.mask);
     const source = layer.transition?.source;
     if (source && !(source instanceof Map)) this.markControlled(controlled, source.clip, layer.mask);
@@ -347,7 +348,8 @@ export class AnimationPlayer {
     let pose = this.bindPose();
     for (const [name, layer] of this.layers) {
       if (name === layerName) break;
-      if (layer.state) pose = blendPose(pose, new Map(), this.evaluateLayer(layer, pose), layer.weight, layer.mask);
+      if (layer.state && layer.weight > 0)
+        pose = blendPose(pose, new Map(), this.evaluateLayer(layer, pose), layer.weight, layer.mask);
     }
     return pose;
   }

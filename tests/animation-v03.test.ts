@@ -413,3 +413,89 @@ test('a new layer fades in from the pose below it', () => {
   player.update(100);
   assert.strictEqual(joints.get('arm')!.pose.x, 20);
 });
+
+test.each(['clear', 'mask'] as const)('zero-weight layers preserve manual edits through updates and %s', (cleanup) => {
+  const { player, joints } = fixture();
+  player.addAnimation({ name: 'base', duration: 1000, loop: true, tracks: { root: [{ time: 0, x: 5 }] } });
+  player.play('base');
+  player.setLayerWeight('upper', 0);
+  const arm = joints.get('arm')!;
+  arm.pose.x = 42;
+  player.play('b', { layer: 'upper' });
+  player.update(100);
+  player.applyCurrentPose();
+  assert.strictEqual(arm.pose.x, 42);
+  assert.strictEqual(joints.get('root')!.pose.x, 5);
+  if (cleanup === 'clear') player.clearLayer('upper');
+  else player.setLayerMask('upper', []);
+  assert.strictEqual(arm.pose.x, 42);
+});
+
+test('muting a contributing layer releases its properties while the base retains its own', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({ name: 'base', duration: 1000, loop: true, tracks: { arm: [{ time: 0, rotation: 0.5 }] } });
+  player.play('base');
+  player.play('b', { layer: 'upper' });
+  player.setLayerWeight('upper', 0);
+  assert.strictEqual(joints.get('arm')!.pose.x, 10);
+  assert.strictEqual(joints.get('arm')!.pose.rotation, 0.5);
+  joints.get('arm')!.pose.x = 42;
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 42);
+  player.setLayerWeight('upper', 0.5);
+  assert.strictEqual(joints.get('arm')!.pose.x, 15);
+  assert.strictEqual(joints.get('arm')!.pose.rotation, 1.25);
+});
+
+test('an overlay without a base evaluates masks, weights, clocks, events and its final pose', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'move',
+    duration: 100,
+    loop: false,
+    tracks: {
+      arm: [
+        { time: 0, x: 20 },
+        { time: 100, x: 40 },
+      ],
+      leg: [{ time: 0, x: 99 }],
+    },
+    events: [{ time: 50, name: 'halfway' }],
+  });
+  const events: string[] = [];
+  const completions: string[] = [];
+  player.onAnimationEvent(({ name, layer }) => events.push(`${layer}:${name}`));
+  player.onAnimationComplete(({ clip, layer }) => completions.push(`${layer}:${clip}`));
+  player.setLayerMask('upper', ['arm']);
+  player.setLayerWeight('upper', 0.5);
+  joints.get('arm')!.pose.y = 42;
+  joints.get('leg')!.pose.x = 7;
+  player.play('move', { layer: 'upper' });
+  assert.isUndefined(player.currentAnimation);
+  assert.strictEqual(joints.get('arm')!.pose.x, 15);
+  player.update(50);
+  assert.strictEqual(joints.get('arm')!.pose.x, 20);
+  assert.deepEqual(events, ['upper:halfway']);
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 25);
+  assert.deepEqual(completions, ['upper:move']);
+  assert.strictEqual(joints.get('arm')!.pose.y, 42);
+  assert.strictEqual(joints.get('leg')!.pose.x, 7);
+  player.clearLayer('upper');
+  assert.strictEqual(joints.get('arm')!.pose.x, 10);
+  assert.strictEqual(joints.get('arm')!.pose.y, 42);
+});
+
+test('an overlay without a base fades in and can release ownership at zero weight', () => {
+  const { player, joints } = fixture();
+  player.play('b', { layer: 'upper', fadeDuration: 200 });
+  assert.strictEqual(joints.get('arm')!.pose.x, 10);
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 15);
+  player.setLayerWeight('upper', 0);
+  joints.get('arm')!.pose.x = 42;
+  player.update(100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 42);
+  player.setLayerWeight('upper', 1);
+  assert.strictEqual(joints.get('arm')!.pose.x, 20);
+});
