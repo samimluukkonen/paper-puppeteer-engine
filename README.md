@@ -278,6 +278,8 @@ puppet.clearAttachment('handItem');
 puppet.getAttachment('handVisual'); // Attachment ID or undefined.
 puppet.getSlotImage('handVisual');  // Current Phaser image or undefined.
 puppet.setSlotDebug(true);
+puppet.setSlotDepth('handVisual', 50); // Override draw depth at runtime.
+puppet.clearSlotDepth('handVisual');   // Restore rig depth or automatic placement in the current order.
 ```
 
 Use `null` in a skin mapping to clear one slot during `applySkin`. Slot `x`, `y`, `rotation`, `scaleX`, and `scaleY` transform the attachment relative to its parent bone. Slot `depth` sets global draw depth; without it, the slot follows its bone in `setRenderOrder`, just in front of the bone's legacy image. Slots attached to the same bone draw in definition order at equal depth. Changing a skin or attachment leaves bone objects, animation tracks, and IK references intact. The puppet's outer facing mirror applies to slots and attachments automatically. Legacy `bone.sprite` definitions and Phaser object `attach`/`detach` continue to work.

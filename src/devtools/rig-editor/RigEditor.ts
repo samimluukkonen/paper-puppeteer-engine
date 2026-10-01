@@ -82,6 +82,7 @@ export class RigEditor {
       const edited = this.state.getSlot(slot.id);
       this.puppet.setSlotTransform(slot.id, edited);
       if (edited.depth !== undefined) this.puppet.setSlotDepth(slot.id, edited.depth);
+      else this.puppet.clearSlotDepth(slot.id);
       const image = this.puppet.getSlotImage(slot.id);
       const attachmentId = this.puppet.getAttachment(slot.id);
       if (image && attachmentId) {

@@ -118,6 +118,13 @@ export class PuppetRenderer {
     this.container.sort('depth');
   }
 
+  /** Restore the rig depth, or automatic placement in the current render order. */
+  clearSlotDepth(id: string): void {
+    this.getSlotMount(id);
+    this.slotDepthOverrides.delete(id);
+    this.setOrder(this.order);
+  }
+
   getSlotImage(id: string): Phaser.GameObjects.Image | undefined {
     return this.slotImages.get(id);
   }

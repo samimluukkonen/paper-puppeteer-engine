@@ -1,10 +1,15 @@
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
+import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import type { Bone } from '../src/engine/Bone.js';
+import { Joint } from '../src/engine/Joint.js';
+import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetRenderer } from '../src/engine/PuppetRenderer.js';
 import { Rig } from '../src/engine/Rig.js';
 
-function fixture() {
+vi.mock('phaser', () => ({ default: {} }));
+
+function fixture(depth?: number) {
   const containers = new Map<string, Phaser.GameObjects.Container>();
   const makeContainer = () => {
     const container = {
@@ -34,7 +39,7 @@ function fixture() {
     slots: [
       { id: 'item', bone: 'root' },
       { id: 'fixed', bone: 'root', depth: 40 },
-      { id: 'automatic', bone: 'hand' },
+      { id: 'automatic', bone: 'hand', ...(depth === undefined ? {} : { depth }) },
     ],
   });
   const bones = new Map(
@@ -73,3 +78,75 @@ test.each([50, 0, -5])('render order changes preserve runtime slot depth %s', (d
   assert.equal(slotDepth('item'), 25);
   assert.throws(() => renderer.setSlotDepth('missing', 10), /Unknown slot/);
 });
+
+test.each([50, 0, -5])('clearing depth override %s restores defaults and follows the current render order', (depth) => {
+  const { renderer, rig, slotDepth } = fixture();
+  renderer.setSlotDepth('item', depth);
+  renderer.setSlotDepth('fixed', depth);
+  renderer.setSlotDepth('automatic', 25);
+  renderer.setOrder(['hand', 'root']);
+
+  renderer.clearSlotDepth('item');
+  assert.equal(slotDepth('item'), 11);
+  assert.equal(slotDepth('fixed'), depth);
+  assert.equal(slotDepth('automatic'), 25);
+  renderer.clearSlotDepth('fixed');
+  assert.equal(slotDepth('fixed'), 40);
+  renderer.clearSlotDepth('item');
+  assert.equal(slotDepth('item'), 11);
+
+  renderer.setOrder(rig.renderOrder);
+  assert.equal(slotDepth('item'), 1);
+  assert.equal(slotDepth('fixed'), 40);
+  assert.equal(slotDepth('automatic'), 25);
+  assert.equal(rig.slots[0]!.depth, undefined);
+  assert.equal(rig.slots[1]!.depth, 40);
+  assert.throws(() => renderer.clearSlotDepth('missing'), /Unknown slot/);
+});
+
+test.each([undefined, 0, -5, 40])(
+  'editor restores slot depth %s in export and preview through history and reset',
+  (depth) => {
+    const { renderer, rig, slotDepth } = fixture(depth);
+    const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+    const puppet = {
+      rig,
+      renderer,
+      getBone: (id: string) => joints.get(id)!,
+      preparePose: vi.fn(),
+      syncPose: vi.fn(),
+      setRenderOrder: Puppet.prototype.setRenderOrder,
+      setSlotTransform: Puppet.prototype.setSlotTransform,
+      setSlotDepth: Puppet.prototype.setSlotDepth,
+      clearSlotDepth: Puppet.prototype.clearSlotDepth,
+      getSlotImage: vi.fn(),
+      getAttachment: vi.fn(),
+    } as unknown as Puppet;
+    const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
+    const assertDepth = (expected: number | undefined, automatic = 11) => {
+      assert.equal(editor.exportRig(false).slots!.find((slot) => slot.id === 'automatic')!.depth, expected);
+      assert.equal(slotDepth('automatic'), expected ?? automatic);
+    };
+
+    editor.editSlot('automatic', 'depth', 50);
+    assertDepth(50);
+    editor.undo();
+    assertDepth(depth);
+    editor.redo();
+    assertDepth(50);
+
+    editor.state.selectSlot('automatic');
+    editor.resetSelected();
+    assertDepth(depth);
+    editor.undo();
+    assertDepth(50);
+    editor.resetRig();
+    assertDepth(depth);
+
+    editor.editBone('hand', 'depth', -1);
+    assertDepth(depth, 1);
+    editor.undo();
+    assertDepth(depth);
+    assert.strictEqual(puppet.clearSlotDepth('automatic'), puppet);
+  },
+);

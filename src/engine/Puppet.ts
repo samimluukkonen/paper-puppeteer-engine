@@ -352,6 +352,12 @@ export class Puppet {
     return this;
   }
 
+  /** Clear a runtime depth override and restore the rig's slot placement. */
+  clearSlotDepth(id: string): this {
+    this.renderer.clearSlotDepth(id);
+    return this;
+  }
+
   setAttachment(slot: string, attachment: string): this {
     this.slotState.setAttachment(slot, attachment);
     this.renderSlots();
