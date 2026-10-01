@@ -1,5 +1,10 @@
 export type { AnimationClip, AnimationEvent, AnimationPlaybackMode, Interpolation, Keyframe } from './AnimationClip.js';
-export type { AnimationCompletion, FiredAnimationEvent, PlayAnimationOptions } from './AnimationPlayer.js';
+export type {
+  AnimationCompletion,
+  FiredAnimationEvent,
+  PlayAnimationOptions,
+  SampleAnimationOptions,
+} from './AnimationPlayer.js';
 export { AnimationPlayer } from './AnimationPlayer.js';
 export type { AnimationPose } from './AnimationPose.js';
 export { blendPose, evaluateClip, lerpProperty } from './AnimationPose.js';

@@ -12,6 +12,11 @@ export interface PlayAnimationOptions {
   layer?: string;
 }
 
+export interface SampleAnimationOptions {
+  /** Raw interpolation by default; playback respects clip overrides and the player's playback mode. */
+  mode?: 'raw' | 'playback';
+}
+
 export interface FiredAnimationEvent extends AnimationEvent {
   clip: string;
   layer: string;
@@ -240,12 +245,16 @@ export class AnimationPlayer {
     }
   }
 
-  /** Explicitly sample the base clip at a time without moving its clock. */
-  sample(time: number): void {
+  /** Sample only the base clip, clamping time without moving clocks or firing events. Excludes fades and layers. */
+  sample(time: number, options: SampleAnimationOptions = {}): void {
     assertFinite(time, 'Sample time');
     const state = this.layers.get('base')?.state;
     if (!state) return;
-    const pose = evaluateClip(state.clip, Math.max(0, Math.min(time, state.clip.duration)));
+    const clampedTime = Math.max(0, Math.min(time, state.clip.duration));
+    const pose = evaluateClip(
+      state.clip,
+      options.mode === 'playback' ? this.sampleTime(state.clip, clampedTime) : clampedTime,
+    );
     for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
   }
 
@@ -311,13 +320,13 @@ export class AnimationPlayer {
 
   private evaluateLayer(layer: AnimationLayer, underlying: AnimationPose): AnimationPose {
     const state = layer.state!;
-    const target = evaluateClip(state.clip, this.sampleTime(state));
+    const target = evaluateClip(state.clip, this.sampleTime(state.clip, state.time));
     const transition = layer.transition;
     if (!transition) return target;
     const source =
       transition.source instanceof Map
         ? transition.source
-        : evaluateClip(transition.source.clip, this.sampleTime(transition.source));
+        : evaluateClip(transition.source.clip, this.sampleTime(transition.source.clip, transition.source.time));
     return blendPose(underlying, source, target, this.transitionWeight(state, transition));
   }
 
@@ -343,11 +352,11 @@ export class AnimationPlayer {
     return pose;
   }
 
-  private sampleTime(state: AnimationState): number {
-    const mode = state.clip.playback ?? this.playback;
-    if (mode.mode === 'smooth' || (!state.clip.loop && state.time === state.clip.duration)) return state.time;
+  private sampleTime(clip: CompiledClip, time: number): number {
+    const mode = clip.playback ?? this.playback;
+    if (mode.mode === 'smooth' || (!clip.loop && time === clip.duration)) return time;
     const step = 1000 / mode.fps;
-    return Math.floor((state.time + 1e-9) / step) * step;
+    return Math.floor((time + 1e-9) / step) * step;
   }
 
   private advance(

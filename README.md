@@ -401,6 +401,8 @@ Events fire once per timestamp crossing, including wraps and large frame deltas.
 
 Stepped playback quantizes pose sample time to `floor(time / (1000 / fps)) * (1000 / fps)`. It also quantizes crossfade weights. At 10 FPS, one authored pose is held for 100 ms across normal Phaser render frames. Clip-specific `playback: { mode: 'stepped', fps: 12 }` or `{ mode: 'smooth' }` overrides the puppet default. The animation clock, event crossings and IK still update at normal frame rate. A nonlooping clip shows its exact final pose at completion.
 
+For base-clip previews, `animationPlayer.sample(time, { mode: 'playback' })` uses the same pose timing rules, including clip playback overrides and the exact nonlooping final pose. `sample(time)` (or `{ mode: 'raw' }`) interpolates at the requested time regardless of playback settings. Both paths clamp time to `[0, duration]`, including for looping clips, and leave clocks, playback state, and events unchanged. They sample only the base clip, excluding crossfades, overlay layers, and IK. At 50 ms in a linear clip from x=0 to x=100 over 1000 ms, raw sampling gives x=5; playback sampling at 10 FPS gives x=0.
+
 ```ts
 puppet.setLayerMask('upperBody', [
   'torso', 'head', 'leftUpperArm', 'leftForearm', 'leftHand',

@@ -1,4 +1,5 @@
 import { assert, test } from 'vitest';
+import type { AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { blendPose, lerpProperty } from '../src/engine/AnimationPose.js';
 import { Joint } from '../src/engine/Joint.js';
@@ -103,6 +104,143 @@ test('stepped mode holds poses while the continuous timeline and smooth mode pro
   player.resume();
   player.update(50);
   assert.strictEqual(joints.get('arm')!.pose.x, 20);
+});
+
+test('raw sampling remains available while playback sampling holds the 10 FPS pose at 50 ms', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'move',
+    duration: 1000,
+    loop: false,
+    tracks: {
+      arm: [
+        { time: 0, x: 0 },
+        { time: 1000, x: 100 },
+      ],
+    },
+    events: [{ time: 25, name: 'marker' }],
+  });
+  const events: string[] = [];
+  const completions: string[] = [];
+  player.onAnimationEvent(({ name }) => events.push(name));
+  player.onAnimationComplete(({ clip }) => completions.push(clip));
+  player.setPlaybackMode({ mode: 'stepped', fps: 10 });
+  player.play('move', { speed: 2 });
+  player.setSpeed(2);
+  player.pause();
+  joints.get('leg')!.pose.x = 42;
+
+  player.sample(50);
+  assert.strictEqual(joints.get('arm')!.pose.x, 5);
+  player.sample(50, { mode: 'playback' });
+  assert.strictEqual(joints.get('arm')!.pose.x, 0);
+  player.sample(50, { mode: 'raw' });
+  assert.strictEqual(joints.get('arm')!.pose.x, 5);
+  player.sample(1000, { mode: 'playback' });
+  assert.strictEqual(joints.get('arm')!.pose.x, 100);
+  assert.strictEqual(joints.get('leg')!.pose.x, 42);
+  assert.strictEqual(player.elapsedTime, 0);
+  assert.strictEqual(player.isPlaying, true);
+  assert.strictEqual(player.isPaused, true);
+  assert.deepEqual(events, []);
+  assert.deepEqual(completions, []);
+
+  player.resume();
+  player.update(25);
+  assert.strictEqual(player.elapsedTime, 100);
+  assert.strictEqual(joints.get('arm')!.pose.x, 10);
+  assert.deepEqual(events, ['marker']);
+});
+
+const samplingModes: { name: string; global: AnimationPlaybackMode; clip?: AnimationPlaybackMode }[] = [
+  { name: 'smooth playback', global: { mode: 'smooth' } },
+  { name: 'global stepped playback', global: { mode: 'stepped', fps: 10 } },
+  { name: 'clip stepped override', global: { mode: 'smooth' }, clip: { mode: 'stepped', fps: 12 } },
+  { name: 'clip FPS override', global: { mode: 'stepped', fps: 10 }, clip: { mode: 'stepped', fps: 20 } },
+  { name: 'clip smooth override', global: { mode: 'stepped', fps: 10 }, clip: { mode: 'smooth' } },
+];
+
+for (const mode of samplingModes) {
+  test(`playback sampling matches updates with ${mode.name}, boundaries and nonlooping completion`, () => {
+    const { player, joints } = fixture();
+    player.addAnimation({
+      name: 'move',
+      duration: 1050,
+      loop: false,
+      ...(mode.clip ? { playback: mode.clip } : {}),
+      tracks: {
+        arm: [
+          { time: 0, x: 0 },
+          { time: 1050, x: 105 },
+        ],
+      },
+    });
+    player.setPlaybackMode(mode.global);
+    for (const time of [-50, 0, 50, 99, 100, 125, 1049, 1050, 1500]) {
+      player.play('move');
+      player.sample(time, { mode: 'playback' });
+      const sampled = joints.get('arm')!.pose.x;
+      assert.strictEqual(player.elapsedTime, 0);
+      player.update(Math.max(0, time));
+      assert.strictEqual(sampled, joints.get('arm')!.pose.x, `sample at ${time} ms`);
+      if (time >= 1050) assert.strictEqual(sampled, 105);
+    }
+  });
+}
+
+test('playback sampling clamps looping clips without wrapping or forcing their exact endpoint', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'loop',
+    duration: 1050,
+    loop: true,
+    tracks: {
+      arm: [
+        { time: 0, x: 0 },
+        { time: 1050, x: 105 },
+      ],
+    },
+  });
+  player.setPlaybackMode({ mode: 'stepped', fps: 10 });
+  player.play('loop');
+  player.sample(-50, { mode: 'playback' });
+  assert.strictEqual(joints.get('arm')!.pose.x, 0);
+  for (const time of [1050, 1500]) {
+    player.sample(time, { mode: 'playback' });
+    assert.strictEqual(joints.get('arm')!.pose.x, 100);
+    player.sample(time);
+    assert.strictEqual(joints.get('arm')!.pose.x, 105);
+  }
+});
+
+test('playback sampling excludes active fades and overlay layers without changing their state', () => {
+  const { player, joints } = fixture();
+  player.setPlaybackMode({ mode: 'stepped', fps: 10 });
+  player.play('a');
+  player.play('b', { fadeDuration: 300 });
+  player.play('a', { layer: 'upper' });
+  player.update(150);
+  const pose = { ...joints.get('arm')!.pose };
+  const transition = player.transition;
+  for (const time of [-50, 50, 1500]) {
+    player.sample(time, { mode: 'playback' });
+    assert.strictEqual(joints.get('arm')!.pose.x, 20);
+    assert.strictEqual(player.elapsedTime, 150);
+    assert.deepEqual(player.transition, transition);
+    player.applyCurrentPose();
+    assert.deepEqual(joints.get('arm')!.pose, pose);
+  }
+});
+
+test('both sampling modes reject nonfinite time and allow sampling without an active clip', () => {
+  const { player, joints } = fixture();
+  for (const mode of ['raw', 'playback'] as const) {
+    for (const time of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      assert.throws(() => player.sample(time, { mode }), /Sample time must be a finite number/);
+    }
+    player.sample(50, { mode });
+    assert.deepEqual(joints.get('arm')!.pose, joints.get('arm')!.bindPose);
+  }
 });
 
 test('stepped crossfade also holds its blend factor between pose ticks', () => {
