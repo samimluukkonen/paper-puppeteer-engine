@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
+import * as externalData from '../src/engine/externalData.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -68,7 +69,10 @@ test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
       events: { on: vi.fn(), off: vi.fn() },
       cameras: { main: { getWorldPoint: (x: number, y: number) => ({ x, y }) } },
     };
-    const onChange = vi.fn();
+    const onChange = vi.fn(() => {
+      editor.state.validationIssues();
+      return editor.state.dirty;
+    });
     const editor = new RigEditor(scene as unknown as Phaser.Scene, puppet as unknown as Puppet, onChange);
     const selection =
       type === 'slot' || type === 'attachment'
@@ -83,9 +87,10 @@ test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
       const [, handler, context] = input.on.mock.calls.find(([name]) => name === event)!;
       handler.call(context, { x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });
     };
-    const validate = vi.spyOn(editor.state, 'validate');
+    const validate = vi.spyOn(externalData, 'validateRigDefinition');
     const parse = vi.spyOn(rigDefinitionSchema, 'parse');
     emit('pointerdown', 0, 0);
+    validate.mockClear();
     onChange.mockClear();
     for (const [x, y] of [
       [12, 18],

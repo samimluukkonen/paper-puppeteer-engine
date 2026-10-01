@@ -1,7 +1,10 @@
-import { assert, test, vi } from 'vitest';
+import { afterEach, assert, test, vi } from 'vitest';
 import { localToWorld, worldToLocal } from '../src/devtools/rig-editor/coordinates.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
+import * as externalData from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
+
+afterEach(() => vi.restoreAllMocks());
 
 test('affine coordinate conversion handles translated, rotated and scaled parents independently of camera', () => {
   const parent = { a: 0, b: 2, c: -3, d: 0, tx: 140, ty: -20 };
@@ -91,7 +94,7 @@ test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
           : type === 'sprite'
             ? state.getBone('root').sprite!
             : state.getAttachment('part');
-    const validate = vi.spyOn(state, 'validate');
+    const validate = vi.spyOn(externalData, 'validateRigDefinition');
     assert.throws(() => edit({ x: 10, y: Number.NaN }), /y must be finite/);
     assert.isFalse(state.dirty);
     assert.equal(state.historyLength, 0);

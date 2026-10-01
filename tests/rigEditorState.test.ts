@@ -1,5 +1,6 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
+import * as externalData from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const source = new Rig({
@@ -40,4 +41,80 @@ test('hierarchy is parent first and the working copy is independent', () => {
   assert.equal(source.getBone('arm').sprite?.x, 3);
   assert.equal(source.slots[0]?.y, 5);
   assert.equal(source.skins[0]?.slots.handVisual, 'hand');
+});
+
+test('status and history reuse validation and serialization until the rig changes', () => {
+  const state = new RigEditorState(source);
+  const validation = vi.spyOn(externalData, 'validateRigDefinition');
+  const stringify = vi.spyOn(JSON, 'stringify');
+  try {
+    const issues = state.validationIssues();
+    state.selectBone('arm');
+    state.gridSnap = 5;
+    state.visibility.bones = false;
+    assert.strictEqual(state.validationIssues(), issues);
+    assert.isFalse(state.dirty);
+    assert.isFalse(state.dirty);
+    state.beginOperation();
+    state.endOperation();
+    assert.equal(validation.mock.calls.length, 1);
+    assert.equal(stringify.mock.calls.filter(([value]) => value === state.workingCopy).length, 0);
+
+    state.editBone('arm', 'x', 12);
+    assert.isTrue(state.dirty);
+    assert.isTrue(state.dirty);
+    state.validationIssues();
+    assert.equal(validation.mock.calls.length, 2);
+    assert.equal(stringify.mock.calls.filter(([value]) => value === state.workingCopy).length, 1);
+
+    state.undo();
+    assert.isFalse(state.dirty);
+    state.validationIssues();
+    state.redo();
+    assert.isTrue(state.dirty);
+    state.validationIssues();
+    assert.equal(validation.mock.calls.length, 4);
+    assert.equal(stringify.mock.calls.filter(([value]) => value === state.workingCopy).length, 1);
+  } finally {
+    validation.mockRestore();
+    stringify.mockRestore();
+  }
+});
+
+test('cached status follows grouped edits, resets, and asynchronous save baselines', () => {
+  const state = new RigEditorState(source);
+  state.beginOperation();
+  state.editSlot('handVisual', 'y', 12);
+  const exportedSnapshot = state.workingSnapshot;
+  state.editSprite('arm', 'x', 9);
+  state.endOperation();
+  state.markSaved(exportedSnapshot);
+  assert.isTrue(state.dirty);
+  state.undo();
+  assert.isTrue(state.dirty);
+  state.redo();
+  state.markSaved();
+  assert.isFalse(state.dirty);
+  state.selectBone('arm');
+  state.resetSelected();
+  assert.equal(state.getBone('arm').sprite?.x, 3);
+  assert.isTrue(state.dirty);
+  state.resetRig();
+  assert.equal(state.getSlot('handVisual').y, 5);
+  assert.isTrue(state.dirty);
+  state.markSaved();
+  assert.isFalse(state.dirty);
+});
+
+test('explicit validation refreshes cached status after a direct working-copy mutation', () => {
+  const state = new RigEditorState(source);
+  assert.isFalse(state.dirty);
+  assert.deepEqual(state.validationIssues(), []);
+  (state.workingCopy.slots![0] as { bone: string }).bone = 'missing';
+  // Export must validate its candidate independently of the status cache.
+  assert.throws(() => state.exportJson(false), /unknown bone/);
+  state.validate();
+  assert.isTrue(state.dirty);
+  assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
+  assert.isAbove(state.warnings.length, 0);
 });

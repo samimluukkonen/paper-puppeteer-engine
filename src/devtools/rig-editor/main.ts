@@ -51,13 +51,14 @@ const rotationRows = (value: number | undefined, scope: string): string =>
   row('rotation (deg)', `${format(((value ?? 0) * 180) / Math.PI)}°`);
 
 function updateStatus(current: RigEditor): void {
-  dirty.textContent = current.state.dirty ? 'Unsaved changes *' : 'No changes';
+  const isDirty = current.state.dirty;
+  dirty.textContent = isDirty ? 'Unsaved changes *' : 'No changes';
   document.querySelector('#editor-stage')!.classList.toggle('grid-active', current.state.gridSnap !== 0);
   const issues = current.state.validationIssues();
   validation.textContent = issues.length
     ? issues.map((issue) => `${issue.severity}: ${issue.path ?? 'rig'}: ${issue.message}`).join('\n')
     : 'Validation: OK';
-  session.textContent = `Character: ${scene.characterId}\nRig: ${scene.rigFilename}\nMode: ${current.state.editMode}\nSelected: ${current.state.selection?.id ?? 'none'}\nGrid: ${current.state.gridSnap || 'Off'}\nRotation snap: ${current.state.rotationSnap ? `${current.state.rotationSnap}°` : 'Off'}\nModified: ${current.state.dirty ? 'Yes' : 'No'}\nValidation: ${issues.some((issue) => issue.severity === 'error') ? 'Errors' : 'OK'}`;
+  session.textContent = `Character: ${scene.characterId}\nRig: ${scene.rigFilename}\nMode: ${current.state.editMode}\nSelected: ${current.state.selection?.id ?? 'none'}\nGrid: ${current.state.gridSnap || 'Off'}\nRotation snap: ${current.state.rotationSnap ? `${current.state.rotationSnap}°` : 'Off'}\nModified: ${isDirty ? 'Yes' : 'No'}\nValidation: ${issues.some((issue) => issue.severity === 'error') ? 'Errors' : 'OK'}`;
   document.querySelector<HTMLButtonElement>('#undo')!.disabled = !current.state.canUndo;
   document.querySelector<HTMLButtonElement>('#redo')!.disabled = !current.state.canRedo;
   document.querySelector<HTMLButtonElement>('#reset-selected')!.disabled = !current.state.selection;
@@ -234,6 +235,7 @@ action('reset-rig', () => {
 });
 action('validate-rig', () => {
   if (!editor) return;
+  editor.state.validate();
   const issues = editor.state.validationIssues();
   updateStatus(editor);
   feedback.textContent = issues.length ? `${issues.length} validation issue(s).` : 'Rig validation passed.';
@@ -259,7 +261,7 @@ action('copy-json', async () => {
   if (!editor) throw new Error('No rig is loaded.');
   const exportingEditor = editor;
   const json = prepareJson();
-  const savedSnapshot = JSON.stringify(exportingEditor.state.workingCopy);
+  const savedSnapshot = exportingEditor.state.workingSnapshot;
   await navigator.clipboard.writeText(json);
   if (editor !== exportingEditor) return;
   exportingEditor.state.markSaved(savedSnapshot);

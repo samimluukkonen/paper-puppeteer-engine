@@ -90,6 +90,8 @@ export class RigEditorState {
   private readonly includeSkins: boolean;
   private readonly initialCopy: RigDefinition;
   private saved: string;
+  private cachedSnapshot: string | undefined;
+  private cachedIssues: readonly ValidationIssue[] | undefined;
   private readonly past: string[] = [];
   private readonly future: string[] = [];
   private operation: string | undefined;
@@ -109,6 +111,7 @@ export class RigEditorState {
     this.rig = new Rig(this.workingCopy);
     this.initialCopy = structuredClone(this.workingCopy);
     this.saved = snapshot(this.workingCopy);
+    this.cachedSnapshot = this.saved;
     for (const bone of this.rig.bones) {
       if (bone.parent === undefined) continue;
       const children = this.children.get(bone.parent) ?? [];
@@ -118,7 +121,18 @@ export class RigEditorState {
   }
 
   get dirty(): boolean {
-    return snapshot(this.workingCopy) !== this.saved;
+    return this.workingSnapshot !== this.saved;
+  }
+
+  /** Reused by history, status, and asynchronous export completion. */
+  get workingSnapshot(): string {
+    this.cachedSnapshot ??= snapshot(this.workingCopy);
+    return this.cachedSnapshot;
+  }
+
+  private invalidate(): void {
+    this.cachedSnapshot = undefined;
+    this.cachedIssues = undefined;
   }
 
   get canUndo(): boolean {
@@ -132,7 +146,7 @@ export class RigEditorState {
   }
 
   beginOperation(): void {
-    if (this.operation === undefined) this.operation = snapshot(this.workingCopy);
+    if (this.operation === undefined) this.operation = this.workingSnapshot;
   }
 
   endOperation(): void {
@@ -143,16 +157,20 @@ export class RigEditorState {
   }
 
   private record(before: string): void {
-    if (before === snapshot(this.workingCopy)) return;
+    if (before === this.workingSnapshot) return;
     this.past.push(before);
     this.future.length = 0;
   }
 
   private change(edit: () => void): void {
-    const before = this.operation ?? snapshot(this.workingCopy);
-    edit();
+    const before = this.operation ?? this.workingSnapshot;
+    try {
+      edit();
+    } finally {
+      this.invalidate();
+    }
     if (this.operation === undefined) this.record(before);
-    this.validate();
+    this.updateWarnings();
   }
 
   private restore(json: string): void {
@@ -160,15 +178,17 @@ export class RigEditorState {
     Object.assign(this.workingCopy, copy);
     for (const key of ['slots', 'attachments', 'skins'] as const)
       if (copy[key] === undefined) delete (this.workingCopy as unknown as Record<string, unknown>)[key];
-    this.validate();
+    this.invalidate();
+    this.cachedSnapshot = json;
   }
 
   undo(): boolean {
     this.endOperation();
     const previous = this.past.pop();
     if (previous === undefined) return false;
-    this.future.push(snapshot(this.workingCopy));
+    this.future.push(this.workingSnapshot);
     this.restore(previous);
+    this.updateWarnings();
     return true;
   }
 
@@ -176,8 +196,9 @@ export class RigEditorState {
     this.endOperation();
     const next = this.future.pop();
     if (next === undefined) return false;
-    this.past.push(snapshot(this.workingCopy));
+    this.past.push(this.workingSnapshot);
     this.restore(next);
+    this.updateWarnings();
     return true;
   }
 
@@ -230,8 +251,9 @@ export class RigEditorState {
     return Math.round(value / step) * step;
   }
 
-  validationIssues(): ValidationIssue[] {
-    return validateRigDefinition(this.exportCandidate());
+  validationIssues(): readonly ValidationIssue[] {
+    this.cachedIssues ??= validateRigDefinition(this.exportCandidate());
+    return this.cachedIssues;
   }
 
   private exportCandidate(): RigJsonDefinition {
@@ -246,7 +268,7 @@ export class RigEditorState {
     };
   }
 
-  markSaved(savedSnapshot = snapshot(this.workingCopy)): void {
+  markSaved(savedSnapshot = this.workingSnapshot): void {
     this.saved = savedSnapshot;
   }
 
@@ -347,7 +369,13 @@ export class RigEditorState {
       throw new Error('Origin must be between 0 and 1.');
   }
 
+  /** Explicit validation also refreshes caches after direct working-copy mutations. */
   validate(): void {
+    this.invalidate();
+    this.updateWarnings();
+  }
+
+  private updateWarnings(): void {
     this.warnings = this.validationIssues().map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`);
   }
 
