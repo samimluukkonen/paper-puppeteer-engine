@@ -57,10 +57,11 @@ export class RigEditor {
 
   refresh(notify = true): void {
     this.puppet.preparePose();
-    this.puppet.setRenderOrder(new Rig(this.state.workingCopy).renderOrder);
-    for (const bone of this.state.rig.bones) {
-      const edited = this.state.getBone(bone.id);
-      const runtime = this.puppet.getBone(bone.id);
+    // Preview the same logical joint positions that an exported rig loads with.
+    const previewRig = new Rig(this.state.workingCopy);
+    this.puppet.setRenderOrder(previewRig.renderOrder);
+    for (const edited of previewRig.bones) {
+      const runtime = this.puppet.getBone(edited.id);
       Object.assign(runtime.pose, {
         x: edited.x ?? 0,
         y: edited.y ?? 0,
@@ -73,7 +74,7 @@ export class RigEditor {
         sprite
           .setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0)
           .setOrigin(edited.sprite.originX ?? 0.5, edited.sprite.originY ?? 0.5);
-        const dim = this.state.dimUnselected && this.state.selection?.id !== bone.id;
+        const dim = this.state.dimUnselected && this.state.selection?.id !== edited.id;
         sprite.setAlpha(this.state.visibility.artwork ? this.state.artworkOpacity * (dim ? 0.18 : 1) : 0);
       }
     }
