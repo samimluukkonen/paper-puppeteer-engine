@@ -1,3 +1,9 @@
+import {
+  RIG_FORMAT_VERSION,
+  type RigJsonDefinition,
+  type ValidationIssue,
+  validateRigDefinition,
+} from '../../engine/externalData.js';
 import { Rig } from '../../engine/Rig.js';
 import type { BoneDefinition, RigDefinition, SlotDefinition, SpriteAttachmentDefinition } from '../../engine/types.js';
 
@@ -7,6 +13,56 @@ export type EditMode = 'joint' | 'sprite';
 type BoneField = 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'length' | 'depth';
 type SlotField = 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'depth';
 type SpriteField = 'x' | 'y' | 'originX' | 'originY';
+export type GridSnap = 0 | 1 | 2 | 5 | 10;
+export type RotationSnap = 0 | 1 | 5 | 15;
+
+const snapshot = (rig: RigDefinition): string => JSON.stringify(rig);
+const round = (value: number): number => Number(value.toFixed(6));
+
+/** Order authoring fields consistently without changing array order or untouched numbers. */
+function stable(value: unknown, original: unknown): unknown {
+  if (typeof value === 'number') return value === original ? value : round(value);
+  if (Array.isArray(value))
+    return value.map((entry, index) => stable(entry, Array.isArray(original) ? original[index] : undefined));
+  if (value && typeof value === 'object') {
+    const source = value as Record<string, unknown>;
+    const baseline = original && typeof original === 'object' ? (original as Record<string, unknown>) : {};
+    const order = [
+      'version',
+      'name',
+      'root',
+      'bones',
+      'slots',
+      'attachments',
+      'skins',
+      'id',
+      'parent',
+      'bone',
+      'length',
+      'sprite',
+      'depth',
+      'texture',
+      'frame',
+      'x',
+      'y',
+      'rotation',
+      'scaleX',
+      'scaleY',
+      'originX',
+      'originY',
+    ];
+    return Object.fromEntries(
+      Object.keys(source)
+        .sort((a, b) => {
+          const ai = order.indexOf(a),
+            bi = order.indexOf(b);
+          return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b);
+        })
+        .map((key) => [key, stable(source[key], baseline[key])]),
+    );
+  }
+  return value;
+}
 
 /** Owns editor data; the loaded rig stays untouched. */
 export class RigEditorState {
@@ -28,11 +84,21 @@ export class RigEditorState {
     ik: false,
   };
   artworkOpacity = 1;
-  private readonly initial: string;
+  gridSnap: GridSnap = 0;
+  rotationSnap: RotationSnap = 0;
+  readonly name: string | undefined;
+  private readonly includeSkins: boolean;
+  private readonly initialCopy: RigDefinition;
+  private saved: string;
+  private readonly past: string[] = [];
+  private readonly future: string[] = [];
+  private operation: string | undefined;
   private readonly children = new Map<string, string[]>();
 
-  constructor(source: Rig) {
+  constructor(source: Rig, file?: RigJsonDefinition) {
     this.source = source;
+    this.name = file?.name;
+    this.includeSkins = file ? file.skins !== undefined : true;
     this.workingCopy = structuredClone({
       root: source.root,
       bones: source.bones,
@@ -41,7 +107,8 @@ export class RigEditorState {
       skins: source.skins,
     });
     this.rig = new Rig(this.workingCopy);
-    this.initial = JSON.stringify(this.workingCopy);
+    this.initialCopy = structuredClone(this.workingCopy);
+    this.saved = snapshot(this.workingCopy);
     for (const bone of this.rig.bones) {
       if (bone.parent === undefined) continue;
       const children = this.children.get(bone.parent) ?? [];
@@ -51,7 +118,149 @@ export class RigEditorState {
   }
 
   get dirty(): boolean {
-    return JSON.stringify(this.workingCopy) !== this.initial;
+    return snapshot(this.workingCopy) !== this.saved;
+  }
+
+  get canUndo(): boolean {
+    return this.past.length > 0;
+  }
+  get canRedo(): boolean {
+    return this.future.length > 0;
+  }
+  get historyLength(): number {
+    return this.past.length;
+  }
+
+  beginOperation(): void {
+    if (this.operation === undefined) this.operation = snapshot(this.workingCopy);
+  }
+
+  endOperation(): void {
+    if (this.operation === undefined) return;
+    const before = this.operation;
+    this.operation = undefined;
+    this.record(before);
+  }
+
+  private record(before: string): void {
+    if (before === snapshot(this.workingCopy)) return;
+    this.past.push(before);
+    this.future.length = 0;
+  }
+
+  private change(edit: () => void): void {
+    const before = this.operation ?? snapshot(this.workingCopy);
+    edit();
+    if (this.operation === undefined) this.record(before);
+    this.validate();
+  }
+
+  private restore(json: string): void {
+    const copy = JSON.parse(json) as RigDefinition;
+    Object.assign(this.workingCopy, copy);
+    for (const key of ['slots', 'attachments', 'skins'] as const)
+      if (copy[key] === undefined) delete (this.workingCopy as unknown as Record<string, unknown>)[key];
+    this.validate();
+  }
+
+  undo(): boolean {
+    this.endOperation();
+    const previous = this.past.pop();
+    if (previous === undefined) return false;
+    this.future.push(snapshot(this.workingCopy));
+    this.restore(previous);
+    return true;
+  }
+
+  redo(): boolean {
+    this.endOperation();
+    const next = this.future.pop();
+    if (next === undefined) return false;
+    this.past.push(snapshot(this.workingCopy));
+    this.restore(next);
+    return true;
+  }
+
+  resetSelected(attachmentId?: string): boolean {
+    const selected = this.selection;
+    if (!selected) return false;
+    this.change(() => {
+      if (selected.type === 'bone') {
+        const index = this.workingCopy.bones.findIndex((bone) => bone.id === selected.id);
+        (this.workingCopy.bones as BoneDefinition[])[index] = structuredClone(this.initialCopy.bones[index]!);
+      } else {
+        const index = this.workingCopy.slots!.findIndex((slot) => slot.id === selected.id);
+        (this.workingCopy.slots as SlotDefinition[])[index] = structuredClone(this.initialCopy.slots![index]!);
+        // The inspector's artwork fields belong to the active slot attachment.
+        if (attachmentId) {
+          const attachmentIndex = this.workingCopy.attachments?.findIndex((item) => item.id === attachmentId) ?? -1;
+          if (attachmentIndex >= 0)
+            (this.workingCopy.attachments as SpriteAttachmentDefinition[])[attachmentIndex] = structuredClone(
+              this.initialCopy.attachments![attachmentIndex]!,
+            );
+        }
+      }
+    });
+    return true;
+  }
+
+  resetRig(): void {
+    this.change(() => this.restore(snapshot(this.initialCopy)));
+  }
+
+  snapTranslation(value: number): number {
+    return this.gridSnap ? round(Math.round(value / this.gridSnap) * this.gridSnap) : value;
+  }
+
+  snapRotation(value: number): number {
+    if (!this.rotationSnap) return value;
+    const step = (this.rotationSnap * Math.PI) / 180;
+    return Math.round(value / step) * step;
+  }
+
+  validationIssues(): ValidationIssue[] {
+    return validateRigDefinition(this.exportCandidate());
+  }
+
+  private exportCandidate(): RigJsonDefinition {
+    return {
+      version: RIG_FORMAT_VERSION,
+      ...(this.name === undefined ? {} : { name: this.name }),
+      root: this.workingCopy.root,
+      bones: this.workingCopy.bones,
+      ...(this.workingCopy.slots === undefined ? {} : { slots: this.workingCopy.slots }),
+      ...(this.workingCopy.attachments === undefined ? {} : { attachments: this.workingCopy.attachments }),
+      ...(this.includeSkins && this.workingCopy.skins !== undefined ? { skins: this.workingCopy.skins } : {}),
+    };
+  }
+
+  markSaved(): void {
+    this.saved = snapshot(this.workingCopy);
+  }
+
+  exportRig(saveBaseline = true): RigJsonDefinition {
+    this.endOperation();
+    const candidate = stable(this.exportCandidate(), {
+      ...this.exportCandidate(),
+      bones: this.initialCopy.bones,
+      slots: this.initialCopy.slots,
+      attachments: this.initialCopy.attachments,
+      skins: this.initialCopy.skins,
+    }) as RigJsonDefinition;
+    const issues = validateRigDefinition(candidate);
+    if (issues.some((issue) => issue.severity === 'error'))
+      throw new Error(
+        `Cannot export rig.\nErrors:\n${issues
+          .filter((issue) => issue.severity === 'error')
+          .map((issue) => `- ${issue.path ?? 'rig'}: ${issue.message}`)
+          .join('\n')}`,
+      );
+    if (saveBaseline) this.markSaved();
+    return candidate;
+  }
+
+  exportJson(saveBaseline = true): string {
+    return `${JSON.stringify(this.exportRig(saveBaseline), null, 2)}\n`;
   }
 
   getBone(id: string): BoneDefinition {
@@ -74,32 +283,35 @@ export class RigEditorState {
 
   editBone(id: string, field: BoneField, value: number): void {
     this.assertValue(field, value);
-    (this.getBone(id) as unknown as Record<string, unknown>)[field] = value;
-    if (field === 'length') {
-      for (const childId of this.childrenOf(id)) {
-        const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
-        const x = child.x ?? 0;
-        const y = child.y ?? 0;
-        const distance = Math.hypot(x, y);
-        child.x = distance ? (x * value) / distance : 0;
-        child.y = distance ? (y * value) / distance : value;
+    this.change(() => {
+      (this.getBone(id) as unknown as Record<string, unknown>)[field] = value;
+      if (field === 'length') {
+        for (const childId of this.childrenOf(id)) {
+          const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
+          const x = child.x ?? 0;
+          const y = child.y ?? 0;
+          const distance = Math.hypot(x, y);
+          child.x = distance ? (x * value) / distance : 0;
+          child.y = distance ? (y * value) / distance : value;
+        }
       }
-    }
-    this.validate();
+    });
   }
 
   editSlot(id: string, field: SlotField, value: number): void {
     this.assertValue(field, value);
-    (this.getSlot(id) as unknown as Record<string, unknown>)[field] = value;
-    this.validate();
+    this.change(() => {
+      (this.getSlot(id) as unknown as Record<string, unknown>)[field] = value;
+    });
   }
 
   editSprite(id: string, field: SpriteField, value: number, attachment = false): void {
     this.assertValue(field, value);
     const sprite = attachment ? this.getAttachment(id) : this.getBone(id).sprite;
     if (!sprite) throw new Error(`No sprite for "${id}".`);
-    (sprite as unknown as Record<string, unknown>)[field] = value;
-    this.validate();
+    this.change(() => {
+      (sprite as unknown as Record<string, unknown>)[field] = value;
+    });
   }
 
   private assertValue(field: string, value: number): void {
@@ -110,36 +322,7 @@ export class RigEditorState {
   }
 
   validate(): void {
-    const warnings: string[] = [];
-    const checkNumbers = (label: string, value: object): void => {
-      for (const [field, number] of Object.entries(value))
-        if (typeof number === 'number' && !Number.isFinite(number)) warnings.push(`${label}: invalid ${field}`);
-    };
-    const checkOrigin = (label: string, value: { originX?: number; originY?: number }): void => {
-      for (const field of ['originX', 'originY'] as const) {
-        const origin = value[field];
-        if (origin !== undefined && (origin < 0 || origin > 1)) warnings.push(`${label}: ${field} must be 0–1`);
-      }
-    };
-    for (const bone of this.workingCopy.bones) {
-      if (bone.length !== undefined && (!Number.isFinite(bone.length) || bone.length < 0))
-        warnings.push(`${bone.id}: invalid length`);
-      checkNumbers(bone.id, bone);
-      if (bone.sprite) {
-        checkNumbers(`${bone.id} sprite`, bone.sprite);
-        checkOrigin(`${bone.id} sprite`, bone.sprite);
-      }
-    }
-    for (const slot of this.workingCopy.slots ?? []) {
-      if (!this.workingCopy.bones.some((bone) => bone.id === slot.bone))
-        warnings.push(`${slot.id}: missing bone ${slot.bone}`);
-      checkNumbers(slot.id, slot);
-    }
-    for (const attachment of this.workingCopy.attachments ?? []) {
-      checkNumbers(attachment.id, attachment);
-      checkOrigin(attachment.id, attachment);
-    }
-    this.warnings = warnings;
+    this.warnings = this.validationIssues().map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`);
   }
 
   selectBone(id: string): void {

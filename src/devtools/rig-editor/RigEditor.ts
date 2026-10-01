@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
+import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
+import { Rig } from '../../engine/Rig.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { RigEditorState } from './RigEditorState.js';
@@ -13,8 +15,6 @@ export class RigEditor {
   private downX = 0;
   private downY = 0;
   private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
-  private readonly baseOrder: readonly string[];
-  private readonly editedDepths = new Map<string, number>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -24,7 +24,6 @@ export class RigEditor {
     private readonly ikChains: readonly TwoBoneIKDefinition[] = [],
   ) {
     this.state = state ?? new RigEditorState(puppet.rig);
-    this.baseOrder = puppet.getRenderOrder();
   }
 
   enable(): void {
@@ -58,6 +57,7 @@ export class RigEditor {
 
   refresh(notify = true): void {
     this.puppet.preparePose();
+    this.puppet.setRenderOrder(new Rig(this.state.workingCopy).renderOrder);
     for (const bone of this.state.rig.bones) {
       const edited = this.state.getBone(bone.id);
       const runtime = this.puppet.getBone(bone.id);
@@ -92,18 +92,6 @@ export class RigEditor {
         image.setAlpha(this.state.visibility.artwork ? this.state.artworkOpacity * (dim ? 0.18 : 1) : 0);
       }
     }
-    if (this.editedDepths.size) {
-      const order = [...this.baseOrder].sort(
-        (a, b) =>
-          (this.editedDepths.get(a) ?? this.baseOrder.indexOf(a) * 10) -
-          (this.editedDepths.get(b) ?? this.baseOrder.indexOf(b) * 10),
-      );
-      this.puppet.setRenderOrder(order);
-      for (const slot of this.state.rig.slots) {
-        const edited = this.state.getSlot(slot.id);
-        if (edited.depth !== undefined) this.puppet.setSlotDepth(slot.id, edited.depth);
-      }
-    }
     this.puppet.syncPose();
     this.update();
     if (notify) this.onChange();
@@ -120,7 +108,6 @@ export class RigEditor {
     notify = true,
   ): void {
     this.state.editBone(id, field, value);
-    if (field === 'depth') this.editedDepths.set(id, value);
     this.refresh(notify);
   }
 
@@ -143,6 +130,28 @@ export class RigEditor {
   ): void {
     this.state.editSprite(id, field, value, attachment);
     this.refresh(notify);
+  }
+
+  undo(): void {
+    if (this.state.undo()) this.refresh();
+  }
+  redo(): void {
+    if (this.state.redo()) this.refresh();
+  }
+  resetSelected(): void {
+    const selection = this.state.selection;
+    if (this.state.resetSelected(selection?.type === 'slot' ? this.getAttachment(selection.id) : undefined))
+      this.refresh();
+  }
+  resetRig(): void {
+    this.state.resetRig();
+    this.refresh();
+  }
+  exportRig(saveBaseline = true): RigJsonDefinition {
+    return this.state.exportRig(saveBaseline);
+  }
+  exportJson(saveBaseline = true): string {
+    return this.state.exportJson(saveBaseline);
   }
 
   setIKPreview(enabled: boolean): void {
@@ -179,6 +188,13 @@ export class RigEditor {
   }
 
   private keyDown = (event: KeyboardEvent): void => {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement)?.tagName ?? '')) return;
+      event.preventDefault();
+      if (event.shiftKey) this.redo();
+      else this.undo();
+      return;
+    }
     if (
       event.altKey ||
       event.ctrlKey ||
@@ -190,14 +206,41 @@ export class RigEditor {
     if (selection?.type !== 'bone') return;
     const amount = event.shiftKey ? 10 : 1;
     const bone = this.state.getBone(selection.id);
-    if (event.key === 'ArrowLeft') this.editBone(selection.id, 'x', (bone.x ?? 0) - amount);
-    else if (event.key === 'ArrowRight') this.editBone(selection.id, 'x', (bone.x ?? 0) + amount);
-    else if (event.key === 'ArrowUp') this.editBone(selection.id, 'y', (bone.y ?? 0) - amount);
-    else if (event.key === 'ArrowDown') this.editBone(selection.id, 'y', (bone.y ?? 0) + amount);
+    const gridAmount = this.state.gridSnap ? this.state.gridSnap * (event.shiftKey ? 10 : 1) : amount;
+    if (event.key === 'ArrowLeft')
+      this.editBone(selection.id, 'x', this.state.snapTranslation((bone.x ?? 0) - gridAmount));
+    else if (event.key === 'ArrowRight')
+      this.editBone(selection.id, 'x', this.state.snapTranslation((bone.x ?? 0) + gridAmount));
+    else if (event.key === 'ArrowUp')
+      this.editBone(selection.id, 'y', this.state.snapTranslation((bone.y ?? 0) - gridAmount));
+    else if (event.key === 'ArrowDown')
+      this.editBone(selection.id, 'y', this.state.snapTranslation((bone.y ?? 0) + gridAmount));
     else if (event.key === ',' || event.key === '<')
-      this.editBone(selection.id, 'rotation', (bone.rotation ?? 0) - (event.shiftKey ? 0.1 : 0.01));
+      this.editBone(
+        selection.id,
+        'rotation',
+        this.state.snapRotation(
+          (bone.rotation ?? 0) -
+            (this.state.rotationSnap
+              ? ((this.state.rotationSnap * Math.PI) / 180) * (event.shiftKey ? 10 : 1)
+              : event.shiftKey
+                ? 0.1
+                : 0.01),
+        ),
+      );
     else if (event.key === '.' || event.key === '>')
-      this.editBone(selection.id, 'rotation', (bone.rotation ?? 0) + (event.shiftKey ? 0.1 : 0.01));
+      this.editBone(
+        selection.id,
+        'rotation',
+        this.state.snapRotation(
+          (bone.rotation ?? 0) +
+            (this.state.rotationSnap
+              ? ((this.state.rotationSnap * Math.PI) / 180) * (event.shiftKey ? 10 : 1)
+              : event.shiftKey
+                ? 0.1
+                : 0.01),
+        ),
+      );
     else return;
     event.preventDefault();
   };
@@ -250,6 +293,7 @@ export class RigEditor {
       const bone = this.state.getBone(target.id);
       this.drag = { type: 'bone', id: target.id, start: local, value: { x: bone.x ?? 0, y: bone.y ?? 0 } };
     }
+    if (this.drag) this.state.beginOperation();
     this.onChange();
   }
 
@@ -269,8 +313,8 @@ export class RigEditor {
               : this.puppet.getBone(id).container.parentContainer!;
       const local = this.local(pointer, parent);
       if (!local) return;
-      const x = value.x + local.x - start.x;
-      const y = value.y + local.y - start.y;
+      const x = this.state.snapTranslation(value.x + local.x - start.x);
+      const y = this.state.snapTranslation(value.y + local.y - start.y);
       if (type === 'bone') {
         this.state.editBone(id, 'x', x);
         this.state.editBone(id, 'y', y);
@@ -298,7 +342,9 @@ export class RigEditor {
     }
     this.panning = false;
     this.drag = undefined;
+    this.state.endOperation();
     this.state.validate();
+    this.onChange();
   }
 
   private wheel(pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number): void {

@@ -49,6 +49,9 @@ test('complete sample character validates and already-parsed data becomes runtim
   assert.equal(definition.id, 'demo-puppet');
   assert.equal(definition.rig.bones.length, 16);
   assert.equal(definition.defaultSkin, 'default');
+  assert.equal(definition.rigPath, 'rig.json');
+  assert.equal(definition.rigFile?.name, 'paper-puppet');
+  assert.equal(definition.rigFile?.skins, undefined);
   assert.deepEqual(
     definition.animations.map((clip) => clip.name),
     ['idle', 'walk', 'sword', 'guardUpperBody'],

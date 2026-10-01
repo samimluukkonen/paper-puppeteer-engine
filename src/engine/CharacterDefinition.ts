@@ -3,6 +3,7 @@ import type { AnimationClip } from './AnimationClip.js';
 import {
   parseAnimationClip,
   parseRigDefinition,
+  type RigJsonDefinition,
   type ValidationIssue,
   validateAnimationDefinition,
   validateRigDefinition,
@@ -196,6 +197,8 @@ export class CharacterDefinition {
     readonly defaultSkin: string,
     readonly textures: Readonly<Record<string, string>>,
     readonly baseUrl?: string,
+    readonly rigFile?: RigJsonDefinition,
+    readonly rigPath?: string,
   ) {}
 
   static fromData(data: CharacterData, baseUrl?: string): CharacterDefinition {
@@ -218,6 +221,8 @@ export class CharacterDefinition {
       manifest.defaultSkin,
       { ...manifest.textures },
       baseUrl,
+      structuredClone(data.rig) as RigJsonDefinition,
+      manifest.rig,
     );
   }
 

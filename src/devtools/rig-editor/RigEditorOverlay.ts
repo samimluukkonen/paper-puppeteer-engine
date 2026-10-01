@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
+import { gridLines } from './grid.js';
 import type { RigEditorSelection, RigEditorState } from './RigEditorState.js';
 
 type Point = { x: number; y: number };
@@ -13,8 +14,10 @@ const distanceToSegment = (p: Point, a: Point, b: Point): number => {
 
 /** Screen-space drawing and picking keep handles usable at every camera zoom. */
 export class RigEditorOverlay {
+  private readonly gridGraphics: Phaser.GameObjects.Graphics;
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly labels: Phaser.GameObjects.Text[] = [];
+  private gridSignature = '';
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -22,7 +25,69 @@ export class RigEditorOverlay {
     private readonly state: RigEditorState,
     private readonly ikChains: readonly TwoBoneIKDefinition[],
   ) {
+    this.gridGraphics = scene.add.graphics().setScrollFactor(0).setDepth(-10000);
     this.graphics = scene.add.graphics().setScrollFactor(0).setDepth(10000);
+  }
+
+  private gridFrame(): Phaser.GameObjects.Container {
+    const selected = this.state.selection;
+    if (!selected) return this.puppet.container;
+    if (selected.type === 'slot') {
+      if (this.state.editMode === 'sprite') {
+        const mount = this.puppet.getSlotImage(selected.id)?.parentContainer;
+        if (mount) return mount;
+      }
+      return this.puppet.getBone(this.state.getSlot(selected.id).bone).container;
+    }
+    const bone = this.puppet.getBone(selected.id).container;
+    return this.state.editMode === 'sprite' ? bone : (bone.parentContainer ?? this.puppet.container);
+  }
+
+  private drawGrid(originX: number, originY: number, zoom: number): void {
+    const g = this.gridGraphics;
+    if (!this.state.gridSnap) {
+      if (this.gridSignature !== 'off') g.clear();
+      this.gridSignature = 'off';
+      return;
+    }
+    const matrix = this.gridFrame().getWorldTransformMatrix();
+    const origin = this.screen(matrix.transformPoint(0, 0));
+    const x = this.screen(matrix.transformPoint(1, 0));
+    const y = this.screen(matrix.transformPoint(0, 1));
+    const camera = this.scene.cameras.main;
+    const transform = {
+      a: x.x - origin.x,
+      b: x.y - origin.y,
+      c: y.x - origin.x,
+      d: y.y - origin.y,
+      tx: origin.x,
+      ty: origin.y,
+    };
+    const signature = [
+      this.state.gridSnap,
+      camera.width,
+      camera.height,
+      originX,
+      originY,
+      zoom,
+      ...Object.values(transform),
+    ].join(',');
+    if (signature === this.gridSignature) return;
+    this.gridSignature = signature;
+    g.clear();
+    g.setPosition(originX, originY).setScale(1 / zoom);
+    const snapPixels =
+      Math.min(Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d)) * this.state.gridSnap;
+    const minorAlpha = snapPixels < 2 ? 0.09 : snapPixels < 4 ? 0.14 : snapPixels < 8 ? 0.2 : 0.26;
+    for (const line of gridLines(transform, camera.width, camera.height, this.state.gridSnap)) {
+      const alpha = line.index === 0 ? 0.6 : line.index % 5 === 0 ? 0.45 : minorAlpha;
+      g.lineStyle(line.index === 0 ? 1.5 : 1, 0x719587, alpha).lineBetween(
+        line.start.x,
+        line.start.y,
+        line.end.x,
+        line.end.y,
+      );
+    }
   }
 
   private screen(point: Point): Point {
@@ -79,6 +144,7 @@ export class RigEditorOverlay {
     // Phaser still applies camera zoom to scroll-factor-zero objects.
     g.setPosition(originX, originY).setScale(1 / zoom);
     g.clear();
+    this.drawGrid(originX, originY, zoom);
     let labelIndex = 0;
     const label = (text: string, x: number, y: number, color: string): void => {
       let item = this.labels[labelIndex];
@@ -102,6 +168,7 @@ export class RigEditorOverlay {
         .setVisible(true);
       labelIndex += 1;
     };
+    if (this.state.gridSnap) label(`Grid ${this.state.gridSnap} · local`, 16, 16, '#426f5e');
     if (this.state.visibility.bones) {
       for (const bone of this.state.rig.bones) {
         const p = this.bonePoint(bone.id);
@@ -174,12 +241,18 @@ export class RigEditorOverlay {
         g.strokeCircle(end.x, end.y, 9);
         label(chain.name, end.x + 12, end.y - 10, '#76562b');
       }
-      label(this.state.ikPreview ? 'IK preview · fixed targets' : 'IK chains · solver off', 16, 16, '#7b642b');
+      label(
+        this.state.ikPreview ? 'IK preview · fixed targets' : 'IK chains · solver off',
+        16,
+        this.state.gridSnap ? 34 : 16,
+        '#7b642b',
+      );
     }
     for (let i = labelIndex; i < this.labels.length; i += 1) this.labels[i]?.setVisible(false);
   }
 
   destroy(): void {
+    this.gridGraphics.destroy();
     this.graphics.destroy();
     for (const label of this.labels) label.destroy();
   }

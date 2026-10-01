@@ -17,13 +17,25 @@ npm run dev
 
 Open the local URL printed by Vite. The demo starts in idle. The control panel also supports clicking/tapping.
 
-## Rig editor (v0.5.1.2)
+## Rig editor (v0.5.1.3)
 
 Open `/rig-editor/` from the demo's **Open Rig Editor** link. The editor loads the sample character with its default skin and shows its canonical bind pose in right facing. Select bones by clicking joints or their parent lines, or use the hierarchy. Select slots by clicking their square markers or hierarchy entries. Hold Alt while clicking when a slot overlaps a joint.
 
 Choose **Joint** to drag a joint and change its local position; descendants follow their parent transforms. Choose **Sprite** to drag selected artwork independently of its skeleton joint. A selected slot's square marker moves the slot; in Sprite mode, dragging its artwork moves the attachment offset. The inspector edits local x/y, rotation in radians, scale, logical length, sprite offset and normalized origin. It also shows degrees for reference. Arrow keys nudge a selected joint by one unit; Shift uses ten. Comma and period rotate by 0.01 radians; Shift uses 0.1. Inputs and drags update the preview immediately. Logical length changes reposition direct child joints along their current directions and do not scale images.
 
-Bone depth edits change preview draw order; enter a lower value to move a piece back or a higher value to move it forward. Slot depth is a global numeric draw depth. **Dim unselected artwork** helps expose overlapping parts. **IK Preview** pins the current chain endpoints and runs the existing solver as the rig changes; its temporary pose does not enter the working rig. Visibility controls show artwork, bones, names, lengths, slots, origins, and IK chains. Mouse wheel zoom and middle mouse pan affect only the camera. The editor keeps a deep working copy and shows unsaved changes and validation warnings. Export and undo remain for a later milestone.
+Bone depth edits change preview draw order; enter a lower value to move a piece back or a higher value to move it forward. Slot depth is a global numeric draw depth. **Dim unselected artwork** helps expose overlapping parts. **IK Preview** pins the current chain endpoints and runs the existing solver as the rig changes; its temporary pose does not enter the working rig. Visibility controls show artwork, bones, names, lengths, slots, origins, and IK chains. Mouse wheel zoom and middle mouse pan affect only the camera.
+
+Production workflow:
+
+1. Start the rig editor and load the sample character. Select bones or slots in the hierarchy or canvas.
+2. Position joints, then use Sprite mode or inspector fields to adjust artwork offsets and origins. Set logical bone lengths, slot transforms, and render depth as needed.
+3. Preview IK. Use Grid (Off, 1, 2, 5, 10) for drag and nudge translation, and Rotation Snap (Off, 1°, 5°, 15°) for keyboard rotation. When Grid is on, the canvas shows lines aligned with the selected joint, slot, or artwork's local edit coordinates. At low zoom it shows a readable subset of those snap lines. Numeric fields retain exact values. Snapping never changes untouched values.
+4. Undo with Ctrl/Cmd+Z and redo with Ctrl/Cmd+Shift+Z. A canvas drag or one numeric field focus session makes one history entry. A new edit after undo clears redo. **Reset Selected** restores the selected bone or slot and its active artwork attachment to session-start values; **Reset Rig** restores the whole session-start rig. Both resets are undoable.
+5. Click **Validate**. Export uses the complete versioned rig validator and blocks errors, showing their paths and messages. The session panel reports character, file, mode, selection, snapping, modified state, and validation state.
+6. Click **Copy rig JSON**, **Download rig.json**, or **Log rig JSON**. Each generates readable, stable, version 1 JSON with canonical local transforms. Edited numbers use six decimal places; untouched numbers retain their original precision. Export marks the current working copy as the saved baseline, so Modified becomes No. Further edits become dirty; undoing back to the exported state becomes clean.
+7. Click **Reload exported rig** to rebuild the puppet preview from the last export and verify its appearance. **Reload original rig** starts a new session from the shipped file. **Load rig JSON** accepts a local JSON file for the same character and validates it before rebuilding the preview. The imported rig must use textures already loaded for that character.
+
+The exported file keeps the rig name and IDs. Skin files from `character.json` stay separate unless skins were already embedded in the rig file. Copy needs a browser with clipboard access; Download and Log are alternatives. Reloading starts a new clean history and resets selection and preview controls.
 
 | Key | Action |
 | --- | --- |
@@ -540,7 +552,7 @@ The library includes TypeScript declarations and source maps. Phaser is external
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
 - Debug name labels can overlap on dense rigs. Independent draw slots duplicate ancestor containers, so very large rigs require profiling.
-- The rig editor loads the sample character and edits an in-memory working copy; persistence, undo, and animation editing are not yet available. Character JSON loading uses `fetch`; apps with another asset pipeline can use `CharacterDefinition.fromData`.
+- The rig editor loads the sample character and edits an in-memory working copy. It exports JSON for manual placement in the character folder; it does not write to the project automatically or edit animation timelines. Character JSON loading uses `fetch`; apps with another asset pipeline can use `CharacterDefinition.fromData`.
 
 ## Planned features
 
