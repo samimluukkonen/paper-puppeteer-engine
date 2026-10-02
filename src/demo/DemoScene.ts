@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { CharacterDefinition, Facing } from '../engine/index.js';
-import { CharacterLoader, Puppet, queueCharacterTextures } from '../engine/index.js';
+import { Puppet } from '../engine/index.js';
+import { loadSceneCharacter } from '../shared/loadSceneCharacter.js';
 import { DemoInput } from './DemoInput.js';
 import { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import { createDemoBackdrop, DemoPresenter } from './DemoPresenter.js';
@@ -59,27 +60,8 @@ export class DemoScene extends Phaser.Scene {
   private async loadCharacter(): Promise<void> {
     try {
       const url = `${import.meta.env.BASE_URL}characters/demo-puppet/character.json`;
-      const definition = await CharacterLoader.load(url);
-      if (!this.sys.isActive()) return;
-      queueCharacterTextures(this, definition);
-      let failed = false;
-      const onError = (): void => {
-        failed = true;
-      };
-      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
-        if (!this.sys.isActive()) return;
-        if (failed) this.showLoadError('One or more character images could not be loaded.');
-        else {
-          try {
-            this.createPuppet(definition);
-          } catch (error) {
-            this.showLoadError(String(error));
-          }
-        }
-      });
-      this.load.start();
+      const definition = await loadSceneCharacter(this, url);
+      if (definition && this.sys.isActive()) this.createPuppet(definition);
     } catch (error) {
       this.showLoadError(String(error));
     }

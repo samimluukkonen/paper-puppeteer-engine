@@ -1,10 +1,9 @@
 import Phaser from 'phaser';
 import { demoIK } from '../../demo/demoIK.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { CharacterLoader } from '../../engine/CharacterLoader.js';
 import { parseRigDefinition, type RigJsonDefinition } from '../../engine/externalData.js';
 import { Puppet } from '../../engine/Puppet.js';
-import { queueCharacterTextures } from '../../engine/queueCharacterTextures.js';
+import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
 
@@ -36,33 +35,14 @@ export class RigEditorScene extends Phaser.Scene {
     try {
       // Relative to the editor document, including when hosted under a Vite base path.
       const url = new URL('../characters/demo-puppet/character.json', window.location.href).href;
-      const definition = await CharacterLoader.load(url);
+      const definition = await loadSceneCharacter(this, url);
+      if (!definition || !this.sys.isActive()) return;
       this.definition = definition;
-      if (!this.sys.isActive()) return;
-      queueCharacterTextures(this, definition);
-      let failed = false;
-      const onError = (): void => {
-        failed = true;
-      };
-      this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
-        if (!this.sys.isActive()) return;
-        if (failed) {
-          this.onError('One or more character images could not be loaded.');
-          return;
-        }
-        try {
-          this.installRig(definition.rigFile!);
-          this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-            this.editor?.disable();
-            this.puppet?.destroy();
-          });
-        } catch (error) {
-          this.onError(String(error));
-        }
+      this.installRig(definition.rigFile!);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.editor?.disable();
+        this.puppet?.destroy();
       });
-      this.load.start();
     } catch (error) {
       this.onError(String(error));
     }
