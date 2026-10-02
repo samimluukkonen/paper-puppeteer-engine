@@ -130,6 +130,12 @@ function render(current: RigEditor): void {
   document.querySelector<HTMLInputElement>('#dim-selection')!.checked = state.dimUnselected;
   for (const input of visibility.querySelectorAll<HTMLInputElement>('input'))
     input.checked = state.visibility[input.dataset.visibility as keyof typeof state.visibility];
+  renderInspector(current);
+}
+
+function renderInspector(current: RigEditor): void {
+  const { state } = current;
+  const selection = state.selection;
   if (!selection) {
     inspector.textContent = 'Select a bone or slot to edit its bind values.';
     return;
@@ -176,12 +182,18 @@ inspector.addEventListener('input', (event) => {
   }
 });
 inspector.addEventListener('change', () => {
-  editor?.state.endOperation();
-  if (editor) render(editor);
+  if (editor) updateStatus(editor);
 });
-inspector.addEventListener('focusout', () => {
+inspector.addEventListener('focusout', (event) => {
   editor?.state.endOperation();
   if (editor) updateStatus(editor);
+  // During native Tab navigation activeElement can still be the body at focusout.
+  // Preserve the inputs when the browser is about to focus another inspector field.
+  const next = event.relatedTarget;
+  if (next && next instanceof Element && next.closest('#inspector')) return;
+  queueMicrotask(() => {
+    if (editor && !document.activeElement?.closest('#inspector')) renderInspector(editor);
+  });
 });
 
 document.querySelector<HTMLSelectElement>('#opacity')!.addEventListener('change', (event) => {

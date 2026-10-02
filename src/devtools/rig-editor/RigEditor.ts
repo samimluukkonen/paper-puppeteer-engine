@@ -14,6 +14,7 @@ export class RigEditor {
   private readonly registeredIK = new Map<string, TwoBoneIKConstraint>();
   private panning = false;
   private moved = false;
+  private pointerActive = false;
   private downX = 0;
   private downY = 0;
   private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
@@ -53,6 +54,7 @@ export class RigEditor {
   disable(): void {
     if (!this.overlay) return;
     this.panning = false;
+    this.pointerActive = false;
     this.drag = undefined;
     this.state.endOperation();
     this.scene.input.off('pointerdown', this.pointerDown, this);
@@ -273,6 +275,7 @@ export class RigEditor {
   }
 
   private pointerDown(pointer: Phaser.Input.Pointer): void {
+    this.pointerActive = true;
     this.panning = pointer.middleButtonDown();
     this.moved = false;
     this.downX = pointer.x;
@@ -355,6 +358,9 @@ export class RigEditor {
   }
 
   private pointerUp(pointer: Phaser.Input.Pointer): void {
+    // Phaser also reports window mouse releases from hierarchy and inspector clicks.
+    if (!this.pointerActive) return;
+    this.pointerActive = false;
     if (!this.panning && !this.moved && !this.drag) {
       this.state.selection = this.overlay?.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();

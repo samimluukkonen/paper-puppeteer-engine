@@ -30,13 +30,16 @@
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:browser": "playwright test"
   },
   "peerDependencies": {
     "phaser": "4.2.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
     "phaser": "4.2.1",
     "typescript": "7.0.2",
     "vite": "8.3.1",

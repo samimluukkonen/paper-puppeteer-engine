@@ -99,6 +99,15 @@ npm run preview
 
 `check` runs Biome's formatting, lint, and import checks; `npm run check:fix` applies safe fixes. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
+Run the small browser smoke suite against the real rig editor, Phaser canvas, and shipped character assets:
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+The suite starts its own Vite server and checks dragging outside the canvas, inspector focus and per-field undo, and exported/original/imported rig reloads plus a page reload. It also verifies artwork visibility against canvas screenshots after each rig reload and catches browser exceptions. CI runs it before building. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
+
 Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, and a puppet with active and inactive IK. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements.
 
 A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
@@ -111,7 +120,7 @@ A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scen
 
 Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into all of its render projections before later target providers run. Inactive constraints still update their status without adding projection passes.
 
-Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, and Vitest **5.0.2**. `package-lock.json` locks the resolved dependency graph.
+Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph.
 
 ## Architecture
 
