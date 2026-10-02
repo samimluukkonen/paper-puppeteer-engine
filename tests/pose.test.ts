@@ -85,6 +85,24 @@ test('partial poses preserve underlying values and mix endpoints', () => {
   assert.equal(half.get('arm')!.pose.rotation, 0.5);
 });
 
+test.each([1, -1])('static pose blending takes the shortest rotation across the angle boundary (%s)', (direction) => {
+  const state = joints();
+  const from = (direction * 179 * Math.PI) / 180;
+  const to = -from;
+  state.get('arm')!.pose.rotation = from;
+  const pose = parsePoseDefinition({ ...source, bones: { arm: { rotation: to, x: 9 } } }, rig);
+  const underlying = new Map();
+  applyPoseToJoints(pose, state, 0.5, underlying);
+  assert.closeTo(state.get('arm')!.pose.rotation, direction * Math.PI, 1e-12);
+  assert.equal(state.get('arm')!.pose.x, 7);
+  assert.equal(underlying.get('arm').rotation, from);
+  state.get('arm')!.pose.rotation = from;
+  applyPoseToJoints(pose, state, 0);
+  assert.equal(state.get('arm')!.pose.rotation, from);
+  applyPoseToJoints(pose, state, 1);
+  assert.equal(state.get('arm')!.pose.rotation, to);
+});
+
 test('bind reset, sparse serialization and JSON round trip', () => {
   const state = joints();
   applyPoseToJoints(parsePoseDefinition(source, rig), state);

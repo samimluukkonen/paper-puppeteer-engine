@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { lerpProperty } from './AnimationPose.js';
 import { checkJson, UnsupportedFormatVersionError, type ValidationIssue } from './externalData.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
@@ -58,7 +59,7 @@ export function applyPoseToJoints(
       const value = transform[property];
       if (value === undefined) continue;
       saved[property] = joint.pose[property];
-      joint.pose[property] += (value - joint.pose[property]) * mix;
+      joint.pose[property] = lerpProperty(property, joint.pose[property], value, mix);
     }
     if (underlying) underlying.set(id, saved);
   }
