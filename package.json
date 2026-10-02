@@ -35,7 +35,7 @@
     "check:fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:browser": "playwright test"
+    "test:browser": "npm run build:demo && playwright test"
   },
   "peerDependencies": {
     "phaser": "4.2.1"

@@ -1,22 +1,11 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import type { RigJsonDefinition } from '../../src/engine/externalData.js';
-
-const test = base.extend<{ pageErrors: string[] }>({
-  pageErrors: [
-    async ({ page }, use) => {
-      const errors: string[] = [];
-      page.on('pageerror', (error) => errors.push(error.message));
-      await use(errors);
-      expect(errors).toEqual([]);
-    },
-    { auto: true },
-  ],
-});
+import { test } from './fixtures.js';
 
 const field = (page: Page, name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/rig-editor/');
+  await page.goto('rig-editor/');
   await expect(page.getByRole('treeitem', { name: 'head', exact: true })).toBeVisible();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
 });
@@ -69,7 +58,7 @@ test('hierarchy selection retains button focus and rebuilds for a different impo
   await expect(slot).toBeFocused();
   await expect(slot).toHaveAttribute('aria-selected', 'true');
   await expect(head).toHaveAttribute('aria-selected', 'false');
-  const original = (await (await page.request.get('/characters/demo-puppet/rig.json')).json()) as RigJsonDefinition;
+  const original = (await (await page.request.get('characters/demo-puppet/rig.json')).json()) as RigJsonDefinition;
   const imported: RigJsonDefinition = {
     ...original,
     bones: [
@@ -104,6 +93,7 @@ test('inspector typing keeps focus and Tab groups each field into one undo', asy
   await expect(x).toBeFocused();
   await x.fill('12');
   await x.fill('123');
+  await expect(page.locator('#validation')).toHaveText('Validation: pending until editing finishes.');
   await expect(x).toBeFocused();
   await x.press('ArrowUp');
   await expect(x).toHaveValue('124');
@@ -113,6 +103,7 @@ test('inspector typing keeps focus and Tab groups each field into one undo', asy
   await y.fill('-100');
   await y.fill('-90');
   await page.getByRole('heading', { name: 'Rig Editor Bind Pose' }).click();
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await page.locator('#undo').click();
   await expect(x).toHaveValue('124');
   await expect(y).toHaveValue('-106');
@@ -156,7 +147,7 @@ for (const name of ['head', '◇ headVisual']) {
 }
 
 test('exported, original and imported reloads keep controls attached to the active editor', async ({ page }) => {
-  const original = await (await page.request.get('/characters/demo-puppet/rig.json')).text();
+  const original = await (await page.request.get('characters/demo-puppet/rig.json')).text();
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   await field(page, 'x').fill('12');
   await page.locator('#log-json').click();
