@@ -12,6 +12,7 @@ export class RigEditorScene extends Phaser.Scene {
   private definition: CharacterDefinition | undefined;
   private puppet: Puppet | undefined;
   private loadedFilename: string | undefined;
+  private loadSession = 0;
 
   get characterId(): string {
     return this.definition?.id ?? 'unknown';
@@ -28,23 +29,34 @@ export class RigEditorScene extends Phaser.Scene {
   }
 
   create(): void {
-    void this.loadCharacter();
+    const session = ++this.loadSession;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      ++this.loadSession;
+      const editor = this.editor;
+      const puppet = this.puppet;
+      this.editor = undefined;
+      this.puppet = undefined;
+      this.definition = undefined;
+      this.loadedFilename = undefined;
+      try {
+        editor?.disable();
+      } finally {
+        puppet?.destroy();
+      }
+    });
+    void this.loadCharacter(session);
   }
 
-  private async loadCharacter(): Promise<void> {
+  private async loadCharacter(session: number): Promise<void> {
     try {
       // Relative to the editor document, including when hosted under a Vite base path.
       const url = new URL('../characters/demo-puppet/character.json', window.location.href).href;
       const definition = await loadSceneCharacter(this, url);
-      if (!definition || !this.sys.isActive()) return;
+      if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
       this.definition = definition;
       this.installRig(definition.rigFile!);
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-        this.editor?.disable();
-        this.puppet?.destroy();
-      });
     } catch (error) {
-      this.onError(String(error));
+      if (session === this.loadSession && this.sys.isActive()) this.onError(String(error));
     }
   }
 
