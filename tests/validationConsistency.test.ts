@@ -1,6 +1,11 @@
 import { assert, test } from 'vitest';
 import { type AnimationClip, compileClip } from '../src/engine/AnimationClip.js';
-import { validateAnimationDefinition, validateRigDefinition } from '../src/engine/externalData.js';
+import {
+  inspectAnimationDefinition,
+  inspectRigDefinition,
+  validateAnimationDefinition,
+  validateRigDefinition,
+} from '../src/engine/externalData.js';
 import { generateJsonSchemas } from '../src/engine/jsonSchemas.js';
 import { Rig } from '../src/engine/Rig.js';
 import type { RigDefinition } from '../src/engine/types.js';
@@ -121,7 +126,7 @@ test('file validation derives nested allowed fields while retaining reference di
     attachments: [{ id: 'open', texture: 'hand', extra: true }],
     skins: [{ version: 1, name: 'default', slots: {}, extra: true }],
   });
-  assert.deepEqual(
+  assert.sameMembers(
     issues.filter((issue) => /Unknown field/.test(issue.message)).map((issue) => issue.path),
     ['extra', 'bones[0].extra', 'bones[0].sprite.extra', 'slots[0].extra', 'attachments[0].extra', 'skins[0].extra'],
   );
@@ -138,13 +143,51 @@ test('file validation derives nested allowed fields while retaining reference di
     },
     rig,
   );
-  assert.deepEqual(
+  assert.sameMembers(
     animationIssues.map((issue) => issue.path),
     ['extra', 'playback.fps', 'tracks.arm[0].extra', 'events[0].extra'],
   );
 });
 
 const committedSchemas = import.meta.glob('../schemas/*.schema.json', { eager: true, import: 'default' });
+
+test('strict-file inspection retains unknown-field diagnostics alongside malformed scalars', () => {
+  const rigIssues = validateRigDefinition({
+    version: 1,
+    ...rigDefinition,
+    bones: [{ id: 'root', x: 'bad', typo: 2, sprite: { texture: 'body', typo: 3 } }],
+  });
+  assert.sameMembers(
+    rigIssues.map((issue) => issue.path),
+    ['bones[0].x', 'bones[0].typo', 'bones[0].sprite.typo'],
+  );
+  const animationIssues = validateAnimationDefinition(
+    {
+      version: 1,
+      ...clip,
+      tracks: { arm: [{ time: 0, x: 'bad', typo: 2 }] },
+      playback: { mode: 'stepped', fps: 0, typo: 3 },
+    },
+    rig,
+  );
+  assert.sameMembers(
+    animationIssues.map((issue) => issue.path),
+    ['tracks.arm[0].x', 'tracks.arm[0].typo', 'playback.fps', 'playback.typo'],
+  );
+});
+
+test('strict-file inspection strips file metadata and keeps runtime timeline diagnostics', () => {
+  assert.deepEqual(inspectRigDefinition({ version: 1, name: 'sample', ...rigDefinition }).data, rigDefinition);
+  assert.deepEqual(inspectAnimationDefinition({ version: 1, ...clip }, rig).data, clip);
+  const issues = validateAnimationDefinition({ version: 1, ...clip, tracks: { arm: [{ time: -1 }] } }, rig);
+  assert.deepEqual(issues, [
+    {
+      severity: 'error',
+      path: 'tracks.arm[0].time',
+      message: 'Keyframe time must increase strictly and stay within the animation duration.',
+    },
+  ]);
+});
 
 test('committed editor JSON schemas match the Zod file definitions', () => {
   for (const [filename, schema] of Object.entries(generateJsonSchemas())) {

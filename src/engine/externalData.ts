@@ -4,19 +4,10 @@ import { Rig } from './Rig.js';
 import {
   ANIMATION_FORMAT_VERSION,
   animationClipSchema,
-  animationEventSchema,
   animationFileSchema,
-  boneDefinitionSchema,
-  keyframeSchema,
   RIG_FORMAT_VERSION,
   rigDefinitionSchema,
   rigFileSchema,
-  skinDefinitionSchema,
-  slotDefinitionSchema,
-  smoothPlaybackSchema,
-  spriteAttachmentSchema,
-  spriteSchema,
-  steppedPlaybackSchema,
 } from './schemas.js';
 import type { RigDefinition, SkinDefinition } from './types.js';
 import {
@@ -191,54 +182,33 @@ function inspectVersion(input: unknown, expected: number, format: 'rig' | 'anima
   return { issues: [] };
 }
 
-function checkKnownKeys(value: unknown, path: string, schema: z.ZodObject, issues: ValidationIssue[]): void {
-  if (!isRecord(value)) return;
-  const allowed = Object.keys(schema.shape);
-  for (const key of Object.keys(value)) {
-    if (!allowed.includes(key))
+// Strict file schemas are the authority for nested fields. Strip file metadata
+// from successful parses so callers receive the same runtime data as before.
+const rigFileDataSchema = rigFileSchema.transform(({ version: _version, name: _name, ...data }) => data);
+const animationFileDataSchema = animationFileSchema.transform(({ version: _version, ...data }) => data);
+
+function inspectFileShape<Definition>(
+  input: unknown,
+  fileSchema: z.ZodType<Definition>,
+  runtimeSchema: z.ZodType<Definition>,
+  issues: ValidationIssue[],
+): Definition | undefined {
+  const file = fileSchema.safeParse(input);
+  if (file.success) return file.data;
+  for (const issue of file.error.issues) {
+    if (issue.code !== 'unrecognized_keys') continue;
+    const path = issue.path.reduce<string>((base, key) => childPath(base, key as string | number), '');
+    for (const key of issue.keys)
       issues.push({ severity: 'error', path: childPath(path, key), message: `Unknown field "${key}".` });
   }
-}
-
-function checkRigFields(input: unknown, issues: ValidationIssue[]): void {
-  checkKnownKeys(input, '', rigFileSchema, issues);
-  if (!isRecord(input) || !Array.isArray(input.bones)) return;
-  for (const [index, bone] of input.bones.entries()) {
-    const path = `bones[${index}]`;
-    checkKnownKeys(bone, path, boneDefinitionSchema, issues);
-    if (isRecord(bone)) checkKnownKeys(bone.sprite, `${path}.sprite`, spriteSchema, issues);
+  // Runtime schemas strip unknown fields, allowing reference/timeline diagnostics
+  // to accompany strict-file errors. They retain the shared scalar constraints.
+  const runtime = runtimeSchema.safeParse(input);
+  if (!runtime.success) {
+    issues.push(...shapeIssues(runtime.error));
+    return undefined;
   }
-  if (Array.isArray(input.slots))
-    for (const [index, slot] of input.slots.entries())
-      checkKnownKeys(slot, `slots[${index}]`, slotDefinitionSchema, issues);
-  if (Array.isArray(input.attachments))
-    for (const [index, attachment] of input.attachments.entries())
-      checkKnownKeys(attachment, `attachments[${index}]`, spriteAttachmentSchema, issues);
-  if (Array.isArray(input.skins))
-    for (const [index, skin] of input.skins.entries())
-      checkKnownKeys(skin, `skins[${index}]`, skinDefinitionSchema, issues);
-}
-
-function checkAnimationFields(input: unknown, issues: ValidationIssue[]): void {
-  checkKnownKeys(input, '', animationFileSchema, issues);
-  if (!isRecord(input)) return;
-  checkKnownKeys(
-    input.playback,
-    'playback',
-    isRecord(input.playback) && input.playback.mode === 'smooth' ? smoothPlaybackSchema : steppedPlaybackSchema,
-    issues,
-  );
-  if (isRecord(input.tracks)) {
-    for (const [bone, keys] of Object.entries(input.tracks)) {
-      if (!Array.isArray(keys)) continue;
-      for (const [index, key] of keys.entries())
-        checkKnownKeys(key, `tracks.${bone}[${index}]`, keyframeSchema, issues);
-    }
-  }
-  if (Array.isArray(input.events)) {
-    for (const [index, event] of input.events.entries())
-      checkKnownKeys(event, `events[${index}]`, animationEventSchema, issues);
-  }
+  return runtime.data;
 }
 
 interface ValidationResult<T> {
@@ -253,15 +223,14 @@ export function inspectRigDefinition(input: unknown): ValidationResult<RigDefini
   if (!checkJson(input, '', issues)) return { issues };
   const { issues: versionIssues, versionError } = inspectVersion(input, RIG_FORMAT_VERSION, 'rig');
   issues.push(...versionIssues);
-  checkRigFields(input, issues);
-  const parsed = rigDefinitionSchema.safeParse(input);
-  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)], versionError };
+  const data = inspectFileShape<RigDefinition>(input, rigFileDataSchema, rigDefinitionSchema, issues);
+  if (!data) return { issues, versionError };
   if (isRecord(input) && input.name !== undefined) {
     const name = rigFileSchema.shape.name.safeParse(input.name);
     if (!name.success) issues.push(...shapeIssues(name.error).map((issue) => ({ ...issue, path: 'name' })));
   }
-  checkRigReferences(parsed.data, (issue) => issues.push(issue));
-  return issues.length ? { issues, versionError } : { issues, data: parsed.data };
+  checkRigReferences(data, (issue) => issues.push(issue));
+  return issues.length ? { issues, versionError } : { issues, data };
 }
 
 /** @internal Checks standalone skins against an already validated rig. */
@@ -292,10 +261,8 @@ export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinit
   if (!checkJson(input, '', issues)) return { issues };
   const { issues: versionIssues, versionError } = inspectVersion(input, ANIMATION_FORMAT_VERSION, 'animation');
   issues.push(...versionIssues);
-  checkAnimationFields(input, issues);
-  const parsed = animationClipSchema.safeParse(input);
-  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)], versionError };
-  const clip = parsed.data;
+  const clip = inspectFileShape<AnimationClip>(input, animationFileDataSchema, animationClipSchema, issues);
+  if (!clip) return { issues, versionError };
   checkAnimationReferences(clip, rig, (issue) => issues.push(issue));
   return issues.length ? { issues, versionError } : { issues, data: structuredClone(clip) };
 }

@@ -10,6 +10,7 @@ import {
   validateCharacterDefinition,
 } from '../src/engine/CharacterDefinition.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
+import * as externalData from '../src/engine/externalData.js';
 import { checkJson, type ValidationIssue } from '../src/engine/externalData.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
@@ -109,15 +110,19 @@ test('complete sample character validates and already-parsed data becomes runtim
 
 test('character assembly validates the rig once and reuses parsed clips', () => {
   const data = bundle();
+  const rigInspection = vi.spyOn(externalData, 'inspectRigDefinition');
+  const clipInspection = vi.spyOn(externalData, 'inspectAnimationDefinition');
   const rigValidation = vi.spyOn(rigDefinitionSchema, 'safeParse');
   const rigConstruction = vi.spyOn(rigDefinitionSchema, 'parse');
   const clipValidation = vi.spyOn(animationClipSchema, 'safeParse');
   const clipParsing = vi.spyOn(animationClipSchema, 'parse');
   try {
     const definition = CharacterDefinition.fromData(data);
-    assert.equal(rigValidation.mock.calls.length, 1);
+    assert.equal(rigInspection.mock.calls.length, 1);
+    assert.equal(rigValidation.mock.calls.length, 0, 'valid files do not need a fallback runtime parse');
     assert.equal(rigConstruction.mock.calls.length, 1);
-    assert.equal(clipValidation.mock.calls.length, manifest.animations.length);
+    assert.equal(clipInspection.mock.calls.length, manifest.animations.length);
+    assert.equal(clipValidation.mock.calls.length, 0, 'strictly parsed clips are reused');
     assert.equal(clipParsing.mock.calls.length, 0);
     assert.equal(definition.animations.length, manifest.animations.length);
     assert.equal(definition.poses.length, manifest.poses!.length);
