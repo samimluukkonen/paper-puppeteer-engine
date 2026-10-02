@@ -91,9 +91,10 @@ export class PuppetRenderer {
         else this.slotDepthOverrides.set(id, depth);
       }
     }
-    for (const [index, id] of order.entries()) this.branches.get(id)!.root.setDepth(index * 10);
+    const boneDepths = new Map(order.map((id, index) => [id, index * 10]));
+    for (const [id, depth] of boneDepths) this.branches.get(id)!.root.setDepth(depth);
     for (const slot of this.rig.slots) {
-      const anchor = order.indexOf(slot.bone) * 10;
+      const anchor = boneDepths.get(slot.bone)!;
       this.slotBranches.get(slot.id)!.root.setDepth(this.slotDepthOverrides.get(slot.id) ?? slot.depth ?? anchor + 1);
     }
     this.container.sort('depth');

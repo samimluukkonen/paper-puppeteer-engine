@@ -4,6 +4,7 @@ import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
+import type { RigDefinition } from '../../engine/types.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { RigEditorState } from './RigEditorState.js';
@@ -12,6 +13,8 @@ export class RigEditor {
   readonly state: RigEditorState;
   private overlay: RigEditorOverlay | undefined;
   private readonly registeredIK = new Map<string, TwoBoneIKConstraint>();
+  private appliedRig: RigDefinition | undefined;
+  private renderOrder: readonly string[] = [];
   private panning = false;
   private moved = false;
   private pointerActive = false;
@@ -32,6 +35,7 @@ export class RigEditor {
   enable(): void {
     if (this.overlay) return;
     this.puppet.resetToBindPose().setFacing('right');
+    this.appliedRig = undefined;
     for (const chain of this.ikChains) {
       let constraint = this.registeredIK.get(chain.name);
       if (!constraint) {
@@ -69,12 +73,21 @@ export class RigEditor {
   }
 
   refresh(notify = true): void {
+    const rig = this.state.workingCopy;
+    if (rig !== this.appliedRig) {
+      this.applyRig(rig);
+      this.appliedRig = rig;
+    }
+    this.updateArtwork();
+    this.update();
+    if (notify) this.onChange();
+  }
+
+  private applyRig(rig: RigDefinition): void {
     this.puppet.preparePose();
     // Preview the same logical joint positions that an exported rig loads with.
-    const { root, bones } = this.state.workingCopy;
-    const definitions = new Map(bones.map((bone) => [bone.id, bone]));
-    const slotDepths = new Map<string, number | undefined>();
-    for (const edited of bones) {
+    const definitions = new Map(rig.bones.map((bone) => [bone.id, bone]));
+    for (const edited of rig.bones) {
       const runtime = this.puppet.getBone(edited.id);
       Object.assign(runtime.pose, {
         ...computeBonePosition(edited, edited.parent === undefined ? undefined : definitions.get(edited.parent)),
@@ -82,29 +95,23 @@ export class RigEditor {
         scaleX: edited.scaleX ?? 1,
         scaleY: edited.scaleY ?? 1,
       });
-      const sprite = runtime.sprite;
-      if (sprite && edited.sprite) {
-        sprite
+      if (runtime.sprite && edited.sprite)
+        runtime.sprite
           .setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0)
           .setOrigin(edited.sprite.originX ?? 0.5, edited.sprite.originY ?? 0.5);
-        const dim = this.state.dimUnselected && this.state.selection?.id !== edited.id;
-        sprite.setAlpha(this.state.visibility.artwork ? this.state.artworkOpacity * (dim ? 0.18 : 1) : 0);
-      }
     }
-    for (const slot of this.state.rig.slots) {
-      const edited = this.state.getSlot(slot.id);
+    for (const slot of rig.slots ?? []) {
       this.puppet.setSlotTransform(
         slot.id,
         {
-          x: edited.x ?? 0,
-          y: edited.y ?? 0,
-          rotation: edited.rotation ?? 0,
-          scaleX: edited.scaleX ?? 1,
-          scaleY: edited.scaleY ?? 1,
+          x: slot.x ?? 0,
+          y: slot.y ?? 0,
+          rotation: slot.rotation ?? 0,
+          scaleX: slot.scaleX ?? 1,
+          scaleY: slot.scaleY ?? 1,
         },
         false,
       );
-      slotDepths.set(slot.id, edited.depth);
       const image = this.puppet.getSlotImage(slot.id);
       const attachmentId = this.puppet.getAttachment(slot.id);
       if (image && attachmentId) {
@@ -112,14 +119,36 @@ export class RigEditor {
         image
           .setPosition(attachment.x ?? 0, attachment.y ?? 0)
           .setOrigin(attachment.originX ?? 0.5, attachment.originY ?? 0.5);
-        const dim = this.state.dimUnselected && this.state.selection?.id !== slot.id;
-        image.setAlpha(this.state.visibility.artwork ? this.state.artworkOpacity * (dim ? 0.18 : 1) : 0);
       }
     }
-    this.puppet.setRenderOrder(computeRenderOrder(root, bones), slotDepths);
+    this.updateRenderOrder(rig);
     this.puppet.syncPose();
-    this.update();
-    if (notify) this.onChange();
+  }
+
+  private updateRenderOrder(rig: RigDefinition): void {
+    const previous = this.appliedRig;
+    // Editor sessions preserve topology; only authored depths affect draw order.
+    const boneDepthChanged =
+      !previous ||
+      rig.bones.some((bone, index) => {
+        const before = previous.bones[index]!;
+        return bone.depth !== before.depth || bone.sprite?.depth !== before.sprite?.depth;
+      });
+    const slotDepthChanged =
+      !previous || (rig.slots ?? []).some((slot, index) => slot.depth !== previous.slots?.[index]?.depth);
+    if (boneDepthChanged) this.renderOrder = computeRenderOrder(rig.root, rig.bones);
+    if (boneDepthChanged || slotDepthChanged)
+      this.puppet.setRenderOrder(this.renderOrder, new Map((rig.slots ?? []).map((slot) => [slot.id, slot.depth])));
+  }
+
+  private updateArtwork(): void {
+    const { state } = this;
+    const alpha = (type: 'bone' | 'slot', id: string): number => {
+      const selected = state.selection?.type === type && state.selection.id === id;
+      return state.visibility.artwork ? state.artworkOpacity * (state.dimUnselected && !selected ? 0.18 : 1) : 0;
+    };
+    for (const bone of state.rig.bones) this.puppet.getBone(bone.id).sprite?.setAlpha(alpha('bone', bone.id));
+    for (const slot of state.rig.slots) this.puppet.getSlotImage(slot.id)?.setAlpha(alpha('slot', slot.id));
   }
 
   getAttachment(id: string): string | undefined {

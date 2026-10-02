@@ -18,6 +18,9 @@ function fixture(definition: RigDefinition) {
     preparePose: vi.fn(),
     syncPose: vi.fn(),
     setRenderOrder: vi.fn(),
+    setSlotTransform: vi.fn(),
+    getSlotImage: vi.fn(),
+    getAttachment: vi.fn(),
   };
   const editor = new RigEditor({} as Phaser.Scene, puppet as unknown as Puppet, vi.fn());
   const assertReloadMatchesPreview = () => {
@@ -30,7 +33,7 @@ function fixture(definition: RigDefinition) {
     }
     assert.deepEqual(puppet.setRenderOrder.mock.lastCall?.[0], loaded.renderOrder);
   };
-  return { editor, joints, assertReloadMatchesPreview };
+  return { editor, joints, puppet, assertReloadMatchesPreview };
 }
 
 test('edited child preview respects parent length and matches export reload through undo and redo', () => {
@@ -88,4 +91,53 @@ test('preview shares runtime rules for zero offsets, zero length, roots and unco
   assert.equal(joints.get('arm')!.pose.x, 0);
   assert.equal(joints.get('arm')!.pose.y, 0);
   assertReloadMatchesPreview();
+});
+
+test('presentation changes skip pose work and transform edits preserve cached draw order', () => {
+  const { editor, joints, puppet } = fixture({
+    root: 'root',
+    bones: [{ id: 'root' }, { id: 'arm', parent: 'root' }],
+  });
+  editor.refresh();
+  editor.state.selectBone('arm');
+  editor.state.visibility.boneNames = true;
+  editor.state.artworkOpacity = 0.5;
+  editor.state.gridSnap = 5;
+  editor.refresh();
+  assert.equal(puppet.preparePose.mock.calls.length, 1);
+  assert.equal(puppet.syncPose.mock.calls.length, 1);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 1);
+
+  editor.editBone('arm', 'x', 12);
+  assert.equal(joints.get('arm')!.pose.x, 12);
+  assert.equal(puppet.syncPose.mock.calls.length, 2);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 1);
+  editor.editBone('arm', 'depth', -1);
+  assert.deepEqual(puppet.setRenderOrder.mock.lastCall?.[0], ['arm', 'root']);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 2);
+  editor.undo();
+  assert.deepEqual(puppet.setRenderOrder.mock.lastCall?.[0], ['root', 'arm']);
+  editor.redo();
+  assert.deepEqual(puppet.setRenderOrder.mock.lastCall?.[0], ['arm', 'root']);
+  editor.resetRig();
+  assert.deepEqual(puppet.setRenderOrder.mock.lastCall?.[0], ['root', 'arm']);
+});
+
+test('slot depth changes update placement while slot transforms retain cached depths', () => {
+  const { editor, puppet } = fixture({
+    root: 'root',
+    bones: [{ id: 'root' }],
+    slots: [{ id: 'visual', bone: 'root' }],
+  });
+  editor.refresh();
+  editor.editSlot('visual', 'x', 12);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 1);
+  editor.editSlot('visual', 'depth', 25);
+  assert.equal(puppet.setRenderOrder.mock.lastCall?.[1]?.get('visual'), 25);
+  editor.editSlot('visual', 'depth', undefined);
+  assert.isUndefined(puppet.setRenderOrder.mock.lastCall?.[1]?.get('visual'));
+  editor.undo();
+  assert.equal(puppet.setRenderOrder.mock.lastCall?.[1]?.get('visual'), 25);
+  editor.redo();
+  assert.isUndefined(puppet.setRenderOrder.mock.lastCall?.[1]?.get('visual'));
 });
