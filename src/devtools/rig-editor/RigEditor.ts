@@ -61,6 +61,7 @@ export class RigEditor {
         constraint.enabled = true;
       }
       this.puppet.syncPose();
+      this.overlay.invalidate();
       this.update();
     }
   }
@@ -89,6 +90,7 @@ export class RigEditor {
       this.appliedRig = rig;
     }
     this.updateArtwork();
+    this.overlay?.invalidate();
     this.update();
     if (notify) this.onChange();
   }

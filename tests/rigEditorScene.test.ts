@@ -76,6 +76,7 @@ vi.mock('../src/engine/Puppet.js', () => ({
 
 vi.mock('../src/devtools/rig-editor/RigEditorOverlay.js', () => ({
   RigEditorOverlay: class {
+    invalidate() {}
     draw() {}
     destroy = vi.fn();
   },

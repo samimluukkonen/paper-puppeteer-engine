@@ -116,6 +116,8 @@ The command builds the demo, then runs every scenario against both the Vite deve
 
 Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, active/inactive IK, and the full demo presentation loop with walk, steady sword grip, out-of-reach targets, head crossings, and upper-body grip in both facings. Demo cases use shipped PNG dimensions and real affine transforms, animation, IK, and render projection. They report mean/maximum `syncPose()` and `syncIK()` calls and the percentage of frames requiring katana corrections. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements. Add `VITE_PROFILE_UNCACHED=1` to recreate unconditional render-order application, or `VITE_PROFILE_FULL_IK_SYNC=1` to compare corrections using the previous full-puppet synchronization path.
 
+The rig editor caches unchanged overlay geometry and labels, redrawing after edits, selection/visibility changes, camera changes, or preview invalidation. Run `VITE_PROFILE=1 npx vitest run tests/rigEditorOverlay.test.ts --reporter=verbose` to compare cached idle frames with forced redraws. This profile uses 33 joints and a minimal scene, excluding browser/GPU costs, and reports timings without performance thresholds.
+
 One local run of the earlier full-sync correction path on Node 24.19.0 measured the following. Sync counts include warmup:
 
 | Katana workload | Left: µs/frame | Right: µs/frame | Left: mean/max syncs | Right: mean/max syncs |

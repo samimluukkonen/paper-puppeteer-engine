@@ -11,6 +11,7 @@ import { Rig } from '../src/engine/Rig.js';
 vi.mock('phaser', () => ({ default: { Scenes: { Events: { UPDATE: 'update' } } } }));
 vi.mock('../src/devtools/rig-editor/RigEditorOverlay.js', () => ({
   RigEditorOverlay: class {
+    invalidate() {}
     draw() {}
     destroy() {}
   },

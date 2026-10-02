@@ -18,6 +18,7 @@ export class RigEditorOverlay {
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly labels: Phaser.GameObjects.Text[] = [];
   private gridSignature = '';
+  private drawSnapshot: readonly unknown[] | undefined;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -135,9 +136,48 @@ export class RigEditorOverlay {
     return candidates[0]?.selection ?? null;
   }
 
+  /** Preview transforms/artwork can change without changing the authored working copy. */
+  invalidate(): void {
+    this.drawSnapshot = undefined;
+  }
+
   draw(): void {
     const g = this.graphics;
     const camera = this.scene.cameras.main;
+    const world = this.puppet.container.getWorldTransformMatrix();
+    const view = camera.matrixCombined;
+    const snapshot = [
+      this.state.workingCopy,
+      this.state.selection?.type,
+      this.state.selection?.id,
+      this.state.editMode,
+      this.state.gridSnap,
+      this.state.ikPreview,
+      ...Object.values(this.state.visibility),
+      camera.x,
+      camera.y,
+      camera.width,
+      camera.height,
+      camera.scrollX,
+      camera.scrollY,
+      camera.zoom,
+      camera.originX,
+      camera.originY,
+      // Camera matrices refresh during preRender, after scroll/zoom setters.
+      view.a,
+      view.b,
+      view.c,
+      view.d,
+      view.tx,
+      view.ty,
+      world.a,
+      world.b,
+      world.c,
+      world.d,
+      world.tx,
+      world.ty,
+    ];
+    if (this.drawSnapshot && snapshot.every((value, index) => value === this.drawSnapshot![index])) return;
     const zoom = camera.zoom;
     const originX = camera.width * 0.5 * (1 - 1 / zoom);
     const originY = camera.height * 0.5 * (1 - 1 / zoom);
@@ -249,6 +289,8 @@ export class RigEditorOverlay {
       );
     }
     for (let i = labelIndex; i < this.labels.length; i += 1) this.labels[i]?.setVisible(false);
+    // Cache only a completed draw so a failing renderer can be retried.
+    this.drawSnapshot = snapshot;
   }
 
   destroy(): void {
