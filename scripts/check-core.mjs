@@ -17,7 +17,7 @@ assert.equal(typeof globalThis.window, 'undefined');
 // Consumers and the library must share the installed Zod runtime and error class.
 assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root', x: NaN }] }), z.ZodError);
 const character = await CharacterLoader.load(
-  new URL('../public/characters/demo-puppet/character.json', import.meta.url).href,
+  process.argv[2] ?? new URL('../public/characters/demo-puppet/character.json', import.meta.url).href,
   async (url) => new Response(await readFile(new URL(url), 'utf8')),
 );
 const rig = character.rig;
