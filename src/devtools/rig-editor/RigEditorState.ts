@@ -209,7 +209,7 @@ export class RigEditorState {
       if (selected.type === 'bone') {
         const index = this.workingCopy.bones.findIndex((bone) => bone.id === selected.id);
         const original = this.initialCopy.bones[index]!;
-        if (this.getBone(selected.id).length !== undefined || original.length !== undefined) {
+        if (this.getBone(selected.id).length !== original.length) {
           // Length edits move direct children; reset those offsets in the same history entry.
           for (const childId of this.childrenOf(selected.id)) {
             const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };

@@ -99,6 +99,33 @@ test('resetting a parent without length preserves independent child translations
   assert.equal(state.getBone('arm').x, 17);
 });
 
+test.each([false, true])(
+  'reset with unchanged explicit length preserves child translations (length restored: %s)',
+  (restoreLength) => {
+    const state = make();
+    if (restoreLength) {
+      state.editBone('arm', 'length', 40);
+      state.editBone('arm', 'length', 20);
+    }
+    state.editBoneFields('hand', { x: 12, y: 16 });
+    state.editBone('arm', 'rotation', 0.5);
+    const edited = structuredClone(state.workingCopy);
+    const historyLength = state.historyLength;
+    state.selectBone('arm');
+    state.resetSelected();
+    assert.deepEqual(state.getBone('arm'), state.source.getBone('arm'));
+    assert.equal(state.getBone('hand').x, 12);
+    assert.equal(state.getBone('hand').y, 16);
+    assert.isTrue(state.dirty);
+    assert.equal(state.historyLength, historyLength + 1);
+    const reset = structuredClone(state.workingCopy);
+    state.undo();
+    assert.deepEqual(state.workingCopy, edited);
+    state.redo();
+    assert.deepEqual(state.workingCopy, reset);
+  },
+);
+
 test('history covers edits, redo, branch invalidation, and one drag gesture', () => {
   const state = make();
   assert.isFalse(state.dirty);
