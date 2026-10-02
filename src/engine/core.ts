@@ -1,4 +1,14 @@
-export type { AnimationClip, AnimationEvent, AnimationPlaybackMode, Interpolation, Keyframe } from './AnimationClip.js';
+export type {
+  AnimationClip,
+  AnimationEvent,
+  AnimationPlaybackMode,
+  CompiledClip,
+  CompiledTrack,
+  Interpolation,
+  Keyframe,
+  PropertyKeyframe,
+} from './AnimationClip.js';
+export { compileClip } from './AnimationClip.js';
 export type {
   AnimationCompletion,
   FiredAnimationEvent,

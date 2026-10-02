@@ -1,5 +1,27 @@
 import { assert, test } from 'vitest';
 import { sampleProperty } from '../src/engine/AnimationClip.js';
+import { type CompiledClip, compileClip, evaluateClip, Rig } from '../src/engine/core.js';
+
+test('the public core API compiles and evaluates an authored clip without runtime player state', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 3 }] });
+  const compiled: CompiledClip = compileClip(
+    {
+      name: 'preview',
+      duration: 1000,
+      loop: false,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 1000, x: 10 },
+        ],
+      },
+    },
+    rig,
+  );
+  assert.deepEqual(evaluateClip(compiled, 500).get('root'), { x: 5 });
+  assert.deepEqual(evaluateClip(compiled, 200).get('root'), { x: 2 });
+  assert.equal(rig.getBone('root').x, 3);
+});
 
 test('dense tracks interpolate the correct interval when seeking in both directions', () => {
   const keys = Array.from({ length: 512 }, (_, index) => ({ time: index * 17, value: index ** 2 }));

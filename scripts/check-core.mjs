@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import {
   AnimationPlayer,
   CharacterLoader,
+  compileClip,
+  evaluateClip,
   Joint,
   Rig,
   solveTwoBoneIK,
@@ -23,7 +25,7 @@ assert.deepEqual(validateRigDefinition({ version: 1, root: rig.root, bones: rig.
 assert.ok(validateRigDefinition({ version: 1, root: 'missing', bones: rig.bones }).length > 0);
 const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
 const player = new AnimationPlayer(rig, joints);
-player.addAnimation({
+const clip = {
   name: 'test',
   duration: 1000,
   loop: false,
@@ -33,7 +35,10 @@ player.addAnimation({
       { time: 1000, x: 10 },
     ],
   },
-});
+};
+const compiled = compileClip(clip, rig);
+assert.equal(evaluateClip(compiled, 500).get(rig.root).x, 5);
+player.addAnimation(clip);
 player.play('test');
 player.update(500);
 assert.equal(joints.get(rig.root).pose.x, 5);
