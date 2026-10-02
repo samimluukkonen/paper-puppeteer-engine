@@ -14,6 +14,8 @@ export function createSessionController(
   const feedback = app.querySelector<HTMLElement>('#action-feedback')!;
   let lastExport: RigJsonDefinition | undefined;
   let lastExportFilename: string | undefined;
+  let exportSequence = 0;
+  let committedExportSequence = 0;
   function updateStatus(current: RigEditor): void {
     editor = current;
     const isDirty = current.state.dirty;
@@ -63,49 +65,54 @@ export function createSessionController(
     updateStatus(editor);
     feedback.textContent = issues.length ? `${issues.length} validation issue(s).` : 'Rig validation passed.';
   });
-  const prepareJson = (): string => {
+  const prepareExport = () => {
     if (!editor) throw new Error('No rig is loaded.');
     const json = editor.exportJson(false);
-    lastExport = JSON.parse(json) as RigJsonDefinition;
-    lastExportFilename = getScene().rigFilename;
     const warnings = editor.state.validationIssues().filter((issue) => issue.severity === 'warning');
     feedback.textContent = warnings.length
-      ? `Exported with warnings: ${warnings.map((issue) => issue.message).join(' · ')}`
+      ? `Ready with warnings: ${warnings.map((issue) => issue.message).join(' · ')}`
       : 'Rig JSON ready.';
-    return json;
+    return {
+      editor,
+      json,
+      rig: JSON.parse(json) as RigJsonDefinition,
+      filename: getScene().rigFilename,
+      snapshot: editor.state.workingSnapshot,
+      sequence: ++exportSequence,
+    };
   };
-  const markExported = (): void => {
-    if (!editor) return;
-    editor.state.markSaved();
-    updateStatus(editor);
+  const commitExport = (prepared: ReturnType<typeof prepareExport>): boolean => {
+    // A delayed copy must not replace a newer successful export or another session.
+    if (editor !== prepared.editor || prepared.sequence < committedExportSequence) return false;
+    lastExport = prepared.rig;
+    lastExportFilename = prepared.filename;
+    committedExportSequence = prepared.sequence;
+    prepared.editor.state.markSaved(prepared.snapshot);
+    updateStatus(prepared.editor);
+    return true;
   };
   action('copy-json', async () => {
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard API is unavailable. Use Download or Log rig JSON.');
     if (!editor) throw new Error('No rig is loaded.');
-    const exportingEditor = editor;
-    const json = prepareJson();
-    const savedSnapshot = exportingEditor.state.workingSnapshot;
-    await navigator.clipboard.writeText(json);
-    if (editor !== exportingEditor) return;
-    exportingEditor.state.markSaved(savedSnapshot);
-    updateStatus(exportingEditor);
-    feedback.textContent = 'Rig JSON copied.';
+    const prepared = prepareExport();
+    await navigator.clipboard.writeText(prepared.json);
+    if (commitExport(prepared)) feedback.textContent = 'Rig JSON copied.';
   });
   action('download-json', () => {
-    const json = prepareJson();
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const prepared = prepareExport();
+    const url = URL.createObjectURL(new Blob([prepared.json], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = getScene().rigFilename;
+    link.download = prepared.filename;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    markExported();
+    commitExport(prepared);
     feedback.textContent = 'Rig JSON download started.';
   });
   action('log-json', () => {
-    const json = prepareJson();
-    console.log(json);
-    markExported();
+    const prepared = prepareExport();
+    console.log(prepared.json);
+    commitExport(prepared);
     feedback.textContent = 'Rig JSON logged to the console.';
   });
   action('reload-exported', () => {

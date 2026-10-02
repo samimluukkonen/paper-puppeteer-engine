@@ -5,6 +5,7 @@ import { createSessionController } from '../src/devtools/rig-editor/SessionContr
 import { Rig } from '../src/engine/Rig.js';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -39,12 +40,14 @@ async function fixture() {
   });
   const writeText = vi.fn((_json: string) => pending);
   vi.stubGlobal('navigator', { clipboard: { writeText } });
-  const session = createSessionController({ querySelector } as unknown as HTMLElement, () => ({
+  const scene = {
     characterId: 'test-character',
     rigFilename: 'rig.json',
     reloadRig: vi.fn(),
     reloadOriginal: vi.fn(),
-  }));
+  };
+  vi.stubGlobal('window', { confirm: () => true });
+  const session = createSessionController({ querySelector } as unknown as HTMLElement, () => scene);
   const load = () => {
     const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root', x: 0 }] }));
     const editor = { state, exportJson: (save: boolean) => state.exportJson(save) } as RigEditor;
@@ -54,7 +57,7 @@ async function fixture() {
   const state = load();
   const copy = () => querySelector('#copy-json').click();
   const feedback = querySelector('#action-feedback');
-  return { state, load, copy, writeText, resolve, reject, feedback, querySelector };
+  return { state, load, copy, writeText, resolve, reject, feedback, querySelector, scene };
 }
 
 test('clipboard completion saves the captured snapshot and leaves later edits dirty', async () => {
@@ -106,4 +109,45 @@ test('clipboard completion clears dirty state when the exported rig is unchanged
   await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
   assert.isFalse(state.dirty);
   assert.equal(querySelector('#dirty-status').textContent, 'No changes');
+});
+
+test('a rejected copy preserves the last successfully exported rig and filename', async () => {
+  const { state, copy, reject, feedback, querySelector, scene } = await fixture();
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  querySelector('#log-json').click();
+  state.editBone('root', 'x', 25);
+  scene.rigFilename = 'failed-copy.json';
+  copy();
+  reject(new Error('Clipboard write failed'));
+  await vi.waitFor(() => assert.include(feedback.textContent, 'Clipboard write failed'));
+  querySelector('#reload-exported').click();
+  const [rig, filename] = scene.reloadRig.mock.calls[0]!;
+  assert.equal((rig as { bones: { x: number }[] }).bones[0]!.x, 0);
+  assert.equal(filename, 'rig.json');
+});
+
+test('a rejected first copy does not create an exported rig', async () => {
+  const { copy, reject, feedback, querySelector, scene } = await fixture();
+  copy();
+  reject(new Error('Clipboard write failed'));
+  await vi.waitFor(() => assert.include(feedback.textContent, 'Clipboard write failed'));
+  querySelector('#reload-exported').click();
+  assert.include(feedback.textContent, 'Export the rig first');
+  assert.equal(scene.reloadRig.mock.calls.length, 0);
+});
+
+test('an older pending copy cannot replace a newer successful export', async () => {
+  const { state, copy, resolve, writeText, feedback, querySelector, scene } = await fixture();
+  state.editBone('root', 'x', 1);
+  copy();
+  state.editBone('root', 'x', 2);
+  writeText.mockResolvedValueOnce(undefined);
+  copy();
+  await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
+  resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.isFalse(state.dirty);
+  querySelector('#reload-exported').click();
+  assert.equal((scene.reloadRig.mock.calls[0]![0] as { bones: { x: number }[] }).bones[0]!.x, 2);
 });
