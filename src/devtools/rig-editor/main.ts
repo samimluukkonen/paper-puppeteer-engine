@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import packageInfo from '../../../package.json';
 import { type RigJsonDefinition, validateRigDefinition } from '../../engine/externalData.js';
 import type { RigEditor } from './RigEditor.js';
 import { RigEditorScene } from './RigEditorScene.js';
@@ -8,7 +9,7 @@ import './style.css';
 const app = document.querySelector<HTMLElement>('#editor-app');
 if (!app) throw new Error('Missing rig editor host.');
 app.innerHTML = `
-  <header class="editor-header"><div><a href="../">← Engine demo</a><h1>Rig Editor <span>Bind Pose</span></h1><p>Edit local rig values · right facing</p><p id="dirty-status"></p></div><span>v0.5.1.3</span></header>
+  <header class="editor-header"><div><a href="../">← Engine demo</a><h1>Rig Editor <span>Bind Pose</span></h1><p>Edit local rig values · right facing</p><p id="dirty-status"></p></div><span>v${packageInfo.version}</span></header>
   <div class="editor-layout">
     <aside class="editor-panel"><h2>Hierarchy</h2><div id="hierarchy" role="tree"></div><h2>Editing</h2><div class="edit-controls"><label>Edit <select id="edit-mode"><option value="joint">Joint</option><option value="sprite">Sprite</option></select></label><label>Grid <select id="grid-snap"><option value="0">Off</option><option value="1">1</option><option value="2">2</option><option value="5">5</option><option value="10">10</option></select></label><label>Rotation snap <select id="rotation-snap"><option value="0">Off</option><option value="1">1°</option><option value="5">5°</option><option value="15">15°</option></select></label><label><input id="dim-selection" type="checkbox"> Dim unselected artwork</label><label><input id="ik-preview" type="checkbox"> IK Preview</label></div><h2>History and reset</h2><div class="action-grid"><button id="undo" type="button">Undo</button><button id="redo" type="button">Redo</button><button id="reset-selected" type="button">Reset Selected</button><button id="reset-rig" type="button">Reset Rig</button></div><h2>Visibility</h2><div id="visibility"></div><label class="opacity-label">Artwork opacity <select id="opacity"><option value="1">100%</option><option value="0.5">50%</option><option value="0.25">25%</option></select></label></aside>
     <section class="editor-center"><div id="editor-stage" aria-label="Rig canvas"></div><details class="shortcut-help"><summary>Controls and shortcuts</summary><div class="shortcut-table-wrap"><table><thead><tr><th scope="col">Action</th><th scope="col">Control</th></tr></thead><tbody>

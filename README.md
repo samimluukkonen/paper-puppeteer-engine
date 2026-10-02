@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. v0.4.4 adds static pose presets, bind pose reset, a developer pose inspector, and pose JSON export. Crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins remain available.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, a developer pose inspector, pose JSON export, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The demo and editor display the version from `package.json`.
 
 **Live demo:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
@@ -17,7 +17,7 @@ npm run dev
 
 Open the local URL printed by Vite. The demo starts in idle. The control panel also supports clicking/tapping.
 
-## Rig editor (v0.5.1.3)
+## Rig editor
 
 Open `/rig-editor/` from the demo's **Open Rig Editor** link. The editor loads the sample character with its default skin and shows its canonical bind pose in right facing. Select bones by clicking joints or their parent lines, or use the hierarchy. Select slots by clicking their square markers or hierarchy entries. Hold Alt while clicking when a slot overlaps a joint.
 
@@ -249,7 +249,7 @@ Export near and far limbs separately, as well as weapons and alternate hand stat
 
 ## Load versioned JSON
 
-Identifiers (bone, slot, attachment, texture, skin, animation, pose, character, and IK names and references) are nonempty strings. `__proto__` is reserved and rejected before parsing or pose serialization because record parsers discard that key. Other names, including `toString`, `constructor`, and `prototype`, are allowed. Dictionary lookups use only own entries; inherited texture and file names do not resolve. File paths and descriptive metadata are separate from identifiers.
+Identifiers (bone, slot, attachment, texture, skin, animation, event, pose, character, and IK names and references) are nonempty strings. `__proto__` is reserved and rejected before parsing or pose serialization because record parsers discard that key. Other names, including `toString`, `constructor`, and `prototype`, are allowed. Dictionary lookups use only own entries; inherited texture and file names do not resolve. File paths and descriptive metadata are separate from identifiers.
 
 The external formats currently use `RIG_FORMAT_VERSION = 1` and `ANIMATION_FORMAT_VERSION = 1`. A rig file has `version`, optional `name`, `root`, and `bones`. Bone records use `id`, optional `parent`, local `x`, `y`, `rotation`, `scaleX`, `scaleY`, optional nonnegative `length`, optional `depth`, and optional `sprite` with texture/frame, offsets, normalized origins, scales, and depth. The bone container origin is its pivot. An animation file has `version`, `name`, positive `duration` in milliseconds, `loop`, `tracks` keyed by bone id, optional `events`, and optional `playback` (`{ "mode": "smooth" }` or `{ "mode": "stepped", "fps": 10 }`). Keyframes have `time` and any of the five local transform properties. See [demo-rig.json](src/demo/data/demo-rig.json) and [idle.json](src/demo/data/idle.json).
 
@@ -455,7 +455,7 @@ puppet.syncPose();
 const worldPosition = hand.getWorldPosition();
 ```
 
-An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.preparePose()` to restore the previous pre-IK pose, then `puppet.animationPlayer.update(delta)`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
+An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.preparePose()` to restore the previous pre-IK pose, then `puppet.animationPlayer.update(delta)`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. `animationPlayer.update(delta)` returns `true` when it evaluated a pose and `false` when playback was paused or no layer advanced; hosts can use this result to avoid evaluating again before presentation. `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
 
 ## Two-bone inverse kinematics
 
@@ -521,7 +521,7 @@ Constraint `status` reports `inactive`, `solved`, `clamped`, `singular-transform
 
 ### Foot planting
 
-In idle and sword stance, the demo's two leg constraints receive fixed world-space ground points. `F` enables them while the puppet's body sways horizontally and vertically. During walking, each ankle target follows the authored horizontal stride. IK limits how low the ankle can sink during contact, then fades out before toe-off so the authored heel rise and return swing remain visible. The legs alternate by half a cycle and mirror with facing. This is an in-place stepping demonstration without terrain detection or ground raycasts. Foot orientation remains authored; this version constrains endpoint position only.
+`F` enables foot planting only while walking, when the puppet's body sways horizontally and vertically. Idle and sword stance keep their authored leg poses, leave leg IK disabled, and recenter the puppet. During walking, each ankle target follows the authored horizontal stride. IK limits how low the ankle can sink during contact, then fades out before toe-off so the authored heel rise and return swing remain visible. The legs alternate by half a cycle and mirror with facing. This is an in-place stepping demonstration without terrain detection or ground raycasts. Foot orientation remains authored; this version constrains endpoint position only.
 
 ```ts
 puppet.setIKTarget('leftLegIK', { x: 360, y: 510 });

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import packageInfo from '../package.json';
 import type { DemoState } from './demo/DemoScene.js';
 import { DemoScene } from './demo/DemoScene.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
@@ -10,7 +11,7 @@ if (!app) throw new Error('Missing demo host.');
 app.innerHTML = `
   <header class="masthead">
     <a class="wordmark" href="./"><span class="mark" aria-hidden="true">✳</span> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
-    <span class="version"><a href="./rig-editor/">Open Rig Editor</a> <span class="version-dot"></span> v0.5.1.1</span>
+    <span class="version"><a href="./rig-editor/">Open Rig Editor</a> <span class="version-dot"></span> v${packageInfo.version}</span>
   </header>
   <section class="workbench">
     <aside class="controls" aria-label="Animation controls">
