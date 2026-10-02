@@ -8,14 +8,61 @@ const escapeHtml = (value: string | number): string =>
   );
 const row = (name: string, value: string | number | undefined): string =>
   `<div class="property"><span>${escapeHtml(name)}</span><strong>${escapeHtml(value ?? '—')}</strong></div>`;
-const numberRow = (name: string, value: number | undefined, scope: string, field: string, fallback = 0): string => {
-  const automatic = field === 'length' || (scope === 'slot' && field === 'depth');
-  const displayed = value ?? (automatic ? '' : fallback);
-  return `<label class="property"><span>${escapeHtml(name)}</span><input type="number" step="any" value="${displayed}" data-scope="${scope}" data-field="${field}" placeholder="${automatic ? 'Auto' : fallback}" title="Clear to remove this override"></label>`;
+type ScopeFields = {
+  bone: Parameters<RigEditor['editBone']>[1];
+  slot: Parameters<RigEditor['editSlot']>[1];
+  sprite: Parameters<RigEditor['editSprite']>[1];
+  attachment: Parameters<RigEditor['editSprite']>[1];
 };
-const rotationRows = (value: number | undefined, scope: string): string =>
-  numberRow('rotation (rad)', value, scope, 'rotation') +
-  `<div class="property"><span>rotation (deg)</span><strong data-derived="rotation-degrees">${format(((value ?? 0) * 180) / Math.PI)}°</strong></div>`;
+interface NumberField<Field extends string> {
+  field: Field;
+  label: string;
+  fallback: number | 'Auto';
+  degrees?: boolean;
+}
+
+const transformFields: readonly NumberField<ScopeFields['bone'] & ScopeFields['slot']>[] = [
+  { field: 'x', label: 'x', fallback: 0 },
+  { field: 'y', label: 'y', fallback: 0 },
+  { field: 'rotation', label: 'rotation (rad)', fallback: 0, degrees: true },
+  { field: 'scaleX', label: 'scaleX', fallback: 1 },
+  { field: 'scaleY', label: 'scaleY', fallback: 1 },
+];
+const boneFields: readonly NumberField<ScopeFields['bone']>[] = [
+  ...transformFields,
+  { field: 'length', label: 'length', fallback: 'Auto' },
+];
+const depthField = { field: 'depth', label: 'depth', fallback: 0 } as const;
+const artworkFields: readonly NumberField<ScopeFields['sprite']>[] = [
+  { field: 'x', label: 'spriteOffsetX', fallback: 0 },
+  { field: 'y', label: 'spriteOffsetY', fallback: 0 },
+  { field: 'originX', label: 'originX', fallback: 0.5 },
+  { field: 'originY', label: 'originY', fallback: 0.5 },
+];
+const fieldsByScope = {
+  bone: [...boneFields, depthField],
+  slot: [...transformFields, { ...depthField, fallback: 'Auto' }],
+  sprite: artworkFields,
+  attachment: artworkFields,
+} satisfies { [Scope in keyof ScopeFields]: readonly NumberField<ScopeFields[Scope]>[] };
+
+function numberRows<Scope extends keyof ScopeFields>(
+  scope: Scope,
+  values: Partial<Record<ScopeFields[Scope], number>>,
+  fields: readonly NumberField<ScopeFields[Scope]>[],
+): string {
+  return fields
+    .map(({ field, label, fallback, degrees }) => {
+      const value = values[field];
+      const displayed = value ?? (fallback === 'Auto' ? '' : fallback);
+      const input = `<label class="property"><span>${escapeHtml(label)}</span><input type="number" step="any" value="${displayed}" data-scope="${scope}" data-field="${field}" placeholder="${fallback}" title="Clear to remove this override"></label>`;
+      return degrees
+        ? input +
+            `<div class="property"><span>rotation (deg)</span><strong data-derived="rotation-degrees">${format(((value ?? 0) * 180) / Math.PI)}°</strong></div>`
+        : input;
+    })
+    .join('');
+}
 
 /** Inspector fields, derived labels, validation feedback, and focus-based undo grouping. */
 export function createInspectorController(inspector: HTMLElement, updateStatus: (editor: RigEditor) => void) {
@@ -39,12 +86,25 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     if (selection.type === 'bone') {
       const bone = state.getBone(selection.id);
       const sprite = bone.sprite;
-      inspector.innerHTML = `<h3>Bone: ${escapeHtml(bone.id)}</h3>${row('Parent', bone.parent ?? 'none')}${numberRow('x', bone.x, 'bone', 'x')}${numberRow('y', bone.y, 'bone', 'y')}${rotationRows(bone.rotation, 'bone')}${numberRow('scaleX', bone.scaleX, 'bone', 'scaleX', 1)}${numberRow('scaleY', bone.scaleY, 'bone', 'scaleY', 1)}${numberRow('length', bone.length, 'bone', 'length')}${sprite ? numberRow('spriteOffsetX', sprite.x, 'sprite', 'x') + numberRow('spriteOffsetY', sprite.y, 'sprite', 'y') + numberRow('originX', sprite.originX, 'sprite', 'originX', 0.5) + numberRow('originY', sprite.originY, 'sprite', 'originY', 0.5) : ''}${numberRow('depth', bone.depth, 'bone', 'depth')}`;
+      inspector.innerHTML = [
+        `<h3>Bone: ${escapeHtml(bone.id)}</h3>`,
+        row('Parent', bone.parent ?? 'none'),
+        numberRows('bone', bone, boneFields),
+        sprite ? numberRows('sprite', sprite, fieldsByScope.sprite) : '',
+        numberRows('bone', bone, [depthField]),
+      ].join('');
     } else {
       const slot = state.getSlot(selection.id);
       const attachmentId = current.getAttachment(slot.id);
       const attachment = attachmentId ? state.getAttachment(attachmentId) : undefined;
-      inspector.innerHTML = `<h3>Slot: ${escapeHtml(slot.id)}</h3>${row('Parent bone', slot.bone)}${row('Attachment', attachmentId ?? 'empty')}${numberRow('x', slot.x, 'slot', 'x')}${numberRow('y', slot.y, 'slot', 'y')}${rotationRows(slot.rotation, 'slot')}${numberRow('scaleX', slot.scaleX, 'slot', 'scaleX', 1)}${numberRow('scaleY', slot.scaleY, 'slot', 'scaleY', 1)}${numberRow('depth', slot.depth, 'slot', 'depth')}${row('texture', attachment?.texture)}${attachment ? numberRow('spriteOffsetX', attachment.x, 'attachment', 'x') + numberRow('spriteOffsetY', attachment.y, 'attachment', 'y') + numberRow('originX', attachment.originX, 'attachment', 'originX', 0.5) + numberRow('originY', attachment.originY, 'attachment', 'originY', 0.5) : ''}`;
+      inspector.innerHTML = [
+        `<h3>Slot: ${escapeHtml(slot.id)}</h3>`,
+        row('Parent bone', slot.bone),
+        row('Attachment', attachmentId ?? 'empty'),
+        numberRows('slot', slot, fieldsByScope.slot),
+        row('texture', attachment?.texture),
+        attachment ? numberRows('attachment', attachment, fieldsByScope.attachment) : '',
+      ].join('');
     }
   }
 
@@ -56,16 +116,21 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     const { scope, field } = input.dataset;
     const id = editor.state.selection.id;
     try {
-      if (scope === 'bone') editor.editBone(id, field as Parameters<RigEditor['editBone']>[1], value, false);
-      else if (scope === 'slot') editor.editSlot(id, field as Parameters<RigEditor['editSlot']>[1], value, false);
-      else
-        editor.editSprite(
-          scope === 'attachment' ? editor.getAttachment(id)! : id,
-          field as Parameters<RigEditor['editSprite']>[1],
-          value,
-          scope === 'attachment',
-          false,
-        );
+      if (scope === 'bone') {
+        const definition = fieldsByScope.bone.find((entry) => entry.field === field);
+        if (!definition) throw new Error(`Unknown bone field "${field}".`);
+        editor.editBone(id, definition.field, value, false);
+      } else if (scope === 'slot') {
+        const definition = fieldsByScope.slot.find((entry) => entry.field === field);
+        if (!definition) throw new Error(`Unknown slot field "${field}".`);
+        editor.editSlot(id, definition.field, value, false);
+      } else if (scope === 'sprite' || scope === 'attachment') {
+        const definition = fieldsByScope[scope].find((entry) => entry.field === field);
+        if (!definition) throw new Error(`Unknown artwork field "${field}".`);
+        const spriteId = scope === 'attachment' ? editor.getAttachment(id) : id;
+        if (!spriteId) throw new Error(`No active attachment for "${id}".`);
+        editor.editSprite(spriteId, definition.field, value, scope === 'attachment', false);
+      } else throw new Error(`Unknown inspector scope "${scope}".`);
       input.setCustomValidity('');
       updateStatus(editor);
       updateInspectorLabels(editor);
