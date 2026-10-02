@@ -313,6 +313,7 @@ export class Puppet {
 
   resetPose(): this {
     this.preparePose();
+    this.activePose = undefined;
     this.stop();
     this.animationPlayer.resetPose();
     this.syncPose();

@@ -34,6 +34,35 @@ function fixture() {
   return { puppet, constraint };
 }
 
+test.each([false, true])('resetPose clears presets and restores bind transforms with active IK: %s', (withIK) => {
+  const { puppet, constraint } = fixture();
+  if (withIK) constraint.setTarget(60, 70);
+  puppet.syncPose();
+  const expected = puppet.rig.bones.map(({ id }) => ({ ...puppet.getBone(id).pose }));
+  puppet
+    .addAnimation({
+      name: 'move',
+      duration: 1000,
+      loop: true,
+      tracks: { upper: [{ time: 0, rotation: 0.7 }] },
+    })
+    .play('move');
+  puppet.addPose({ version: 1, name: 'preset', bones: { upper: { rotation: 1, x: 10 } } }).applyPose('preset');
+  puppet.resetPose();
+  assert.isFalse(puppet.isPlaying);
+  assert.isTrue(constraint.enabled);
+  assert.deepEqual(
+    puppet.rig.bones.map(({ id }) => ({ ...puppet.getBone(id).pose })),
+    expected,
+  );
+  puppet.update(16);
+  assert.deepEqual(
+    puppet.rig.bones.map(({ id }) => ({ ...puppet.getBone(id).pose })),
+    expected,
+  );
+  puppet.destroy();
+});
+
 test.each(['disabled', 'zero mix', 'no target', 'empty provider', 'unsupported scale', 'singular parent'] as const)(
   '%s IK clears status without extra transform or projection passes',
   (mode) => {
