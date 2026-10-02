@@ -2,7 +2,7 @@ import type { CompiledClip } from './AnimationClip.js';
 import { sampleProperty } from './AnimationClip.js';
 import { shortestRotationDelta } from './animationMath.js';
 import type { JointTransform, TransformProperty } from './types.js';
-import { transformProperties } from './types.js';
+import { assertFinite, transformProperties } from './types.js';
 
 export type AnimationPose = Map<string, Partial<JointTransform>>;
 
@@ -14,6 +14,7 @@ export function lerpProperty(property: TransformProperty, from: number, to: numb
 }
 
 export function evaluateClip(clip: CompiledClip, time: number): AnimationPose {
+  assertFinite(time, 'Sample time');
   const pose: AnimationPose = new Map();
   for (const track of clip.tracks) {
     const values: Partial<JointTransform> = {};
@@ -29,6 +30,7 @@ export class ClipPoseBuffer {
   private pose: AnimationPose = new Map();
 
   evaluate(clip: CompiledClip, time: number): AnimationPose {
+    assertFinite(time, 'Sample time');
     if (this.clip !== clip) {
       this.clip = clip;
       this.pose = evaluateClip(clip, time);

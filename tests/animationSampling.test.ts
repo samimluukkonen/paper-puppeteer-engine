@@ -1,6 +1,35 @@
 import { assert, test } from 'vitest';
 import { sampleProperty } from '../src/engine/AnimationClip.js';
+import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
 import { type CompiledClip, compileClip, evaluateClip, Rig } from '../src/engine/core.js';
+
+test.each([NaN, Infinity, -Infinity])('sampling rejects nonfinite time %s before changing buffered poses', (time) => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip = compileClip(
+    {
+      name: 'preview',
+      duration: 1000,
+      loop: false,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 1000, x: 10 },
+        ],
+      },
+    },
+    rig,
+  );
+  const empty = compileClip({ name: 'empty', duration: 1000, loop: false, tracks: {} }, rig);
+  for (const compiled of [clip, empty]) {
+    assert.throws(() => evaluateClip(compiled, time), /Sample time must be a finite number/);
+    const buffer = new ClipPoseBuffer();
+    assert.throws(() => buffer.evaluate(compiled, time), /Sample time must be a finite number/);
+    const held = buffer.evaluate(compiled, 500);
+    const snapshot = structuredClone(held);
+    assert.throws(() => buffer.evaluate(compiled, time), /Sample time must be a finite number/);
+    assert.deepEqual(held, snapshot);
+  }
+});
 
 test('the public core API compiles and evaluates an authored clip without runtime player state', () => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 3 }] });
