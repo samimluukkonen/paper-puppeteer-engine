@@ -13,6 +13,10 @@ import type {
   SpriteAttachmentDefinition,
 } from '../../engine/types.js';
 
+import { freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
+import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { serializeRigData } from './rigSerialization.js';
+
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
 export type EditMode = 'joint' | 'sprite';
@@ -29,7 +33,7 @@ export interface RigEditorStateOptions {
 
 type HistoryEntry = { rig: string; directions: [string, { x: number; y: number }][] };
 
-export type ReadonlyRigData<T> = T extends object ? { readonly [Key in keyof T]: ReadonlyRigData<T[Key]> } : T;
+export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
   root: string;
   bones: BoneDefinition[];
@@ -38,61 +42,7 @@ type WorkingRig = {
   skins?: SkinDefinition[];
 };
 
-function freezeData<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
-    for (const child of Object.values(value)) freezeData(child);
-    Object.freeze(value);
-  }
-  return value;
-}
-
 const snapshot = (rig: RigDefinition): string => JSON.stringify(rig);
-const round = (value: number): number => Number(value.toFixed(6));
-
-/** Order authoring fields consistently without changing array order or untouched numbers. */
-function stable(value: unknown, original: unknown): unknown {
-  if (typeof value === 'number') return value === original ? value : round(value);
-  if (Array.isArray(value))
-    return value.map((entry, index) => stable(entry, Array.isArray(original) ? original[index] : undefined));
-  if (value && typeof value === 'object') {
-    const source = value as Record<string, unknown>;
-    const baseline = original && typeof original === 'object' ? (original as Record<string, unknown>) : {};
-    const order = [
-      'version',
-      'name',
-      'root',
-      'bones',
-      'slots',
-      'attachments',
-      'skins',
-      'id',
-      'parent',
-      'bone',
-      'length',
-      'sprite',
-      'depth',
-      'texture',
-      'frame',
-      'x',
-      'y',
-      'rotation',
-      'scaleX',
-      'scaleY',
-      'originX',
-      'originY',
-    ];
-    return Object.fromEntries(
-      Object.keys(source)
-        .sort((a, b) => {
-          const ai = order.indexOf(a),
-            bi = order.indexOf(b);
-          return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b);
-        })
-        .map((key) => [key, stable(source[key], baseline[key])]),
-    );
-  }
-  return value;
-}
 
 /** Undefined removes an optional authored field rather than serializing a placeholder value. */
 function patchFields<Field extends string>(
@@ -130,16 +80,13 @@ export class RigEditorState {
   gridSnap: GridSnap = 0;
   rotationSnap: RotationSnap = 0;
   readonly name: string | undefined;
-  readonly historyLimit: number;
   private readonly includeSkins: boolean;
   private readonly initialCopy: RigDefinition;
   private saved: string;
   private cachedSnapshot: string | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
   private validationDirty = true;
-  private readonly past: HistoryEntry[] = [];
-  private readonly future: HistoryEntry[] = [];
-  private operation: HistoryEntry | undefined;
+  private readonly history: SnapshotHistory<HistoryEntry>;
   private readonly childDirections = new Map<string, { x: number; y: number }>();
   private readonly children = new Map<string, string[]>();
   private readonly boneIndices = new Map<string, number>();
@@ -147,9 +94,12 @@ export class RigEditorState {
   private readonly attachmentIndices = new Map<string, number>();
 
   constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
-    this.historyLimit = options.historyLimit ?? 100;
-    if (!Number.isSafeInteger(this.historyLimit) || this.historyLimit < 0)
-      throw new Error('History limit must be a nonnegative safe integer.');
+    this.history = new SnapshotHistory(
+      () => this.historyEntry(),
+      (entry) => this.restoreHistory(entry),
+      (left, right) => left.rig === right.rig,
+      options.historyLimit ?? 100,
+    );
     this.source = source;
     this.name = file?.name;
     this.includeSkins = file ? file.skins !== undefined : true;
@@ -219,56 +169,43 @@ export class RigEditorState {
       this.attachmentIndices.set(attachment.id, index);
   }
 
+  get historyLimit(): number {
+    return this.history.limit;
+  }
   get canUndo(): boolean {
-    return this.past.length > 0;
+    return this.history.canUndo;
   }
   get canRedo(): boolean {
-    return this.future.length > 0;
+    return this.history.canRedo;
   }
   get historyLength(): number {
-    return this.past.length;
+    return this.history.length;
   }
 
   beginOperation(): void {
-    if (this.operation === undefined) {
+    if (!this.history.inOperation) {
       this.validationIssues();
-      this.operation = this.historyEntry();
+      this.history.beginOperation();
     }
   }
 
   endOperation(): void {
-    if (this.operation === undefined) return;
-    const before = this.operation;
-    this.operation = undefined;
-    this.record(before);
-    this.updateWarnings();
+    if (this.history.endOperation()) this.updateWarnings();
   }
 
   private historyEntry(): HistoryEntry {
     return { rig: this.workingSnapshot, directions: [...this.childDirections] };
   }
 
-  private record(before: HistoryEntry): void {
-    if (before.rig === this.workingSnapshot) return;
-    this.pushPast(before);
-    this.future.length = 0;
-  }
-
-  private pushPast(entry: HistoryEntry): void {
-    if (this.historyLimit === 0) return;
-    this.past.push(entry);
-    if (this.past.length > this.historyLimit) this.past.splice(0, this.past.length - this.historyLimit);
-  }
-
   private change(edit: () => void): void {
-    const before = this.operation ?? this.historyEntry();
-    try {
-      edit();
-    } finally {
-      this.invalidate();
-    }
-    if (this.operation === undefined) this.record(before);
-    if (this.operation === undefined) this.updateWarnings();
+    this.history.change(() => {
+      try {
+        edit();
+      } finally {
+        this.invalidate();
+      }
+    });
+    if (!this.history.inOperation) this.updateWarnings();
   }
 
   private restore(json: string): void {
@@ -289,20 +226,14 @@ export class RigEditorState {
 
   undo(): boolean {
     this.endOperation();
-    const previous = this.past.pop();
-    if (previous === undefined) return false;
-    this.future.push(this.historyEntry());
-    this.restoreHistory(previous);
+    if (!this.history.undo()) return false;
     this.updateWarnings();
     return true;
   }
 
   redo(): boolean {
     this.endOperation();
-    const next = this.future.pop();
-    if (next === undefined) return false;
-    this.pushPast(this.historyEntry());
-    this.restoreHistory(next);
+    if (!this.history.redo()) return false;
     this.updateWarnings();
     return true;
   }
@@ -352,7 +283,7 @@ export class RigEditorState {
   }
 
   snapTranslation(value: number): number {
-    return this.gridSnap ? round(Math.round(value / this.gridSnap) * this.gridSnap) : value;
+    return this.gridSnap ? roundEditorNumber(Math.round(value / this.gridSnap) * this.gridSnap) : value;
   }
 
   snapRotation(value: number): number {
@@ -362,12 +293,12 @@ export class RigEditorState {
   }
 
   get validationPending(): boolean {
-    return this.operation !== undefined && this.validationDirty;
+    return this.history.inOperation && this.validationDirty;
   }
 
   /** During a grouped edit, retain the last full result until the operation finishes. */
   validationIssues(): readonly ValidationIssue[] {
-    if (this.cachedIssues === undefined || (this.validationDirty && this.operation === undefined)) {
+    if (this.cachedIssues === undefined || (this.validationDirty && !this.history.inOperation)) {
       this.cachedIssues = validateRigDefinition(this.exportCandidate());
       this.validationDirty = false;
     }
@@ -392,13 +323,7 @@ export class RigEditorState {
 
   exportRig(saveBaseline = true): RigJsonDefinition {
     this.endOperation();
-    const candidate = stable(this.exportCandidate(), {
-      ...this.exportCandidate(),
-      bones: this.initialCopy.bones,
-      slots: this.initialCopy.slots,
-      attachments: this.initialCopy.attachments,
-      skins: this.initialCopy.skins,
-    }) as RigJsonDefinition;
+    const candidate = serializeRigData(this.exportCandidate(), this.initialCopy);
     const issues = validateRigDefinition(candidate);
     if (issues.some((issue) => issue.severity === 'error'))
       throw new Error(
