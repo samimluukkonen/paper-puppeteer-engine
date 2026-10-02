@@ -16,7 +16,9 @@ export function createSessionController(
   let lastExportFilename: string | undefined;
   let exportSequence = 0;
   let committedExportSequence = 0;
+  let importSequence = 0;
   function updateStatus(current: RigEditor): void {
+    if (editor !== current) ++importSequence;
     editor = current;
     const isDirty = current.state.dirty;
     dirty.textContent = isDirty ? 'Unsaved changes *' : 'No changes';
@@ -118,11 +120,13 @@ export function createSessionController(
   action('reload-exported', () => {
     if (!lastExport) throw new Error('Export the rig first.');
     if (editor?.state.dirty && !window.confirm('Discard edits made since the last export?')) return;
+    ++importSequence;
     getScene().reloadRig(lastExport, lastExportFilename);
     feedback.textContent = 'Exported rig reloaded and validated.';
   });
   action('reload-original', () => {
     if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and reload the original?')) return;
+    ++importSequence;
     getScene().reloadOriginal();
     feedback.textContent = 'Original rig reloaded.';
   });
@@ -130,21 +134,26 @@ export function createSessionController(
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+    // Capture the file before clearing so selecting it again starts a new request.
+    input.value = '';
+    const sequence = ++importSequence;
+    const sessionEditor = editor;
+    const isCurrent = (): boolean => sequence === importSequence && editor === sessionEditor;
     try {
-      const json = JSON.parse(await file.text()) as RigJsonDefinition;
+      const text = await file.text();
+      if (!isCurrent()) return;
+      const json = JSON.parse(text) as RigJsonDefinition;
       const issues = validateRigDefinition(json);
       if (issues.some((issue) => issue.severity === 'error'))
         throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));
       if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and load this file?')) {
-        input.value = '';
         return;
       }
       getScene().reloadRig(json, file.name);
       feedback.textContent = `${file.name} loaded and validated.`;
     } catch (error) {
-      feedback.textContent = `Could not load rig: ${String(error)}`;
+      if (isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
     }
-    input.value = '';
   });
 
   return { updateStatus, hasUnsavedChanges: () => editor?.state.dirty ?? false };

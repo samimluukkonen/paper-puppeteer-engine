@@ -346,3 +346,55 @@ test.each(['malformed JSON', 'invalid rig', 'incompatible preview', 'enable fail
     assert.equal(element('#dirty-status').textContent, 'No changes');
   },
 );
+
+test.each(['success', 'failure'] as const)(
+  'an older import %s cannot replace a newer import or its feedback',
+  async (outcome) => {
+    const { scene, file, element } = await panelFixture();
+    let finish!: (json: string) => void;
+    let fail!: (error: Error) => void;
+    const pending = new Promise<string>((resolve, reject) => {
+      finish = resolve;
+      fail = reject;
+    });
+    const input = element('#load-json');
+    input.files = [{ name: 'older.json', text: () => pending }];
+    const first = input.dispatch('change');
+    input.files = [{ name: 'newer.json', text: async () => JSON.stringify(file) }];
+    await input.dispatch('change');
+    const replacement = scene.editor;
+    const feedback = element('#action-feedback').textContent;
+    if (outcome === 'success') finish(JSON.stringify(file));
+    else fail(new Error('Stale read failed'));
+    await first;
+    assert.strictEqual(scene.editor, replacement);
+    assert.equal(scene.rigFilename, 'newer.json');
+    assert.equal(element('#action-feedback').textContent, feedback);
+  },
+);
+
+test.each(['original', 'exported', 'replacement'] as const)(
+  'reloading %s invalidates a pending import',
+  async (source) => {
+    const { scene, file, element } = await panelFixture();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await element('#log-json').click();
+    let finish!: (json: string) => void;
+    const pending = new Promise<string>((resolve) => {
+      finish = resolve;
+    });
+    const input = element('#load-json');
+    input.files = [{ name: 'stale.json', text: () => pending }];
+    const first = input.dispatch('change');
+    if (source === 'replacement') scene.reloadRig(file, 'replacement.json');
+    else await element(`#reload-${source}`).click();
+    const replacement = scene.editor;
+    const filename = scene.rigFilename;
+    const feedback = element('#action-feedback').textContent;
+    finish(JSON.stringify(file));
+    await first;
+    assert.strictEqual(scene.editor, replacement);
+    assert.equal(scene.rigFilename, filename);
+    assert.equal(element('#action-feedback').textContent, feedback);
+  },
+);
