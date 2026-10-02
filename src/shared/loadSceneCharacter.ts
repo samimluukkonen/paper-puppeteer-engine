@@ -10,11 +10,13 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
     let settled = false;
     let failed = false;
     let definition: CharacterDefinition | undefined;
+    let releaseTextures: (() => void) | undefined;
     const cleanup = (): void => {
       settled = true;
       scene.events.off(Phaser.Scenes.Events.SHUTDOWN, onShutdown);
       scene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
       scene.load.off(Phaser.Loader.Events.COMPLETE, onComplete);
+      releaseTextures?.();
     };
     const succeed = (character?: CharacterDefinition): void => {
       if (settled) return;
@@ -51,7 +53,7 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
       }
       scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
       scene.load.once(Phaser.Loader.Events.COMPLETE, onComplete);
-      queueCharacterTextures(scene, definition);
+      releaseTextures = queueCharacterTextures(scene, definition);
       scene.load.start();
     };
     void load().catch(fail);

@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { demoIK } from '../src/demo/demoIK.js';
@@ -266,7 +267,8 @@ test('Phaser queue uses stable texture keys and preserves host-preloaded atlas k
   const queued: [string, string][] = [];
   const scene = {
     textures: { exists: (key: string) => key === 'paper-head' },
-    load: { image: (key: string, url: string) => queued.push([key, url]) },
+    load: Object.assign(new EventEmitter(), { image: (key: string, url: string) => queued.push([key, url]) }),
+    events: new EventEmitter(),
   } as unknown as Phaser.Scene;
   queueCharacterTextures(scene, definition);
   assert.equal(queued.length, Object.keys(manifest.textures).length - 1);
