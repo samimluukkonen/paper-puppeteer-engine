@@ -79,7 +79,13 @@ export class AnimationPlayer {
   constructor(
     private readonly rig: Rig,
     private readonly joints: ReadonlyMap<string, Joint>,
+    compiledClips: readonly CompiledClip[] = [],
   ) {
+    // Puppet passes clips already validated for this rig before creating scene objects.
+    for (const clip of compiledClips) {
+      if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
+      this.clips.set(clip.name, clip);
+    }
     for (const bone of rig.bones) {
       if (!joints.has(bone.id)) throw new Error(`Missing joint "${bone.id}".`);
       this.workingPose.set(bone.id, { ...joints.get(bone.id)!.bindPose });
@@ -144,7 +150,9 @@ export class AnimationPlayer {
     let source: AnimationState | AnimationPose | undefined;
     if (fade > 0) {
       if (layer.state)
-        source = layer.transition ? this.evaluateLayer(layer, this.underlyingPose(layerName)) : { ...layer.state };
+        source = layer.transition
+          ? this.evaluateLayer(layer, this.underlyingPose(layerName), true)
+          : { ...layer.state };
       else if (layerName !== 'base') source = new Map();
     }
     if (layerName !== 'base' && !source) this.resetLayerProperties(layer);
@@ -294,10 +302,10 @@ export class AnimationPlayer {
       const bindPose = this.joints.get(id)!.bindPose;
       for (const property of transformProperties) values[property] = bindPose[property];
     }
-    if (base?.state) blendPoseInto(pose, this.emptyPose, this.evaluateBufferedLayer(base, pose), 1);
+    if (base?.state) blendPoseInto(pose, this.emptyPose, this.evaluateLayer(base, pose), 1);
     for (const [name, layer] of this.layers) {
       if (name === 'base' || !layer.state || layer.weight === 0) continue;
-      blendPoseInto(pose, this.emptyPose, this.evaluateBufferedLayer(layer, pose), layer.weight, layer.mask);
+      blendPoseInto(pose, this.emptyPose, this.evaluateLayer(layer, pose), layer.weight, layer.mask);
     }
     const controlled = this.controlled;
     if (this.controlDirty) {
@@ -351,29 +359,8 @@ export class AnimationPlayer {
     }
   }
 
-  private evaluateLayer(layer: AnimationLayer, underlying: AnimationPose): AnimationPose {
-    const state = layer.state!;
-    const target = evaluateClip(state.clip, this.sampleTime(state.clip, state.time));
-    const transition = layer.transition;
-    if (!transition) return target;
-    const source =
-      transition.source instanceof Map
-        ? transition.source
-        : evaluateClip(transition.source.clip, this.sampleTime(transition.source.clip, transition.source.time));
-    const blended = blendPose(underlying, source, target, this.transitionWeight(state, transition));
-    // Keep ownership sparse when this evaluated pose becomes an interrupted fade's source.
-    const pose: AnimationPose = new Map();
-    for (const [id, values] of source) pose.set(id, { ...values });
-    for (const [id, values] of target) pose.set(id, { ...pose.get(id), ...values });
-    for (const [id, values] of pose) {
-      for (const property of transformProperties) {
-        if (values[property] !== undefined) values[property] = blended.get(id)![property]!;
-      }
-    }
-    return pose;
-  }
-
-  private evaluateBufferedLayer(layer: AnimationLayer, underlying: AnimationPose): AnimationPose {
+  /** Reuse per-layer buffers; interrupted fades request an independent snapshot with sparse ownership. */
+  private evaluateLayer(layer: AnimationLayer, underlying: AnimationPose, snapshot = false): AnimationPose {
     let buffers = this.layerBuffers.get(layer);
     if (!buffers) {
       buffers = { target: new ClipPoseBuffer(), source: new ClipPoseBuffer(), blended: new Map() };
@@ -382,7 +369,7 @@ export class AnimationPlayer {
     const state = layer.state!;
     const target = buffers.target.evaluate(state.clip, this.sampleTime(state.clip, state.time));
     const transition = layer.transition;
-    if (!transition) return target;
+    if (!transition) return snapshot ? new Map([...target].map(([id, values]) => [id, { ...values }])) : target;
     const source =
       transition.source instanceof Map
         ? transition.source
@@ -396,7 +383,17 @@ export class AnimationPlayer {
       buffers.blended.set(id, output);
     }
     blendPoseInto(buffers.blended, source, target, this.transitionWeight(state, transition));
-    return buffers.blended;
+    if (!snapshot) return buffers.blended;
+    // Copy only properties owned by the fade, excluding underlying fallback properties.
+    const pose: AnimationPose = new Map();
+    for (const [id, values] of source) pose.set(id, { ...values });
+    for (const [id, values] of target) pose.set(id, { ...pose.get(id), ...values });
+    for (const [id, values] of pose) {
+      for (const property of transformProperties) {
+        if (values[property] !== undefined) values[property] = buffers.blended.get(id)![property]!;
+      }
+    }
+    return pose;
   }
 
   private transitionWeight(state: AnimationState, transition: AnimationTransition): number {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { type AnimationClip, type AnimationPlaybackMode, compileClip } from './AnimationClip.js';
+import { type AnimationClip, type AnimationPlaybackMode, type CompiledClip, compileClip } from './AnimationClip.js';
 import {
   type AnimationCompletion,
   AnimationPlayer,
@@ -102,10 +102,11 @@ export class Puppet {
 
     // Reject authored data before any Phaser objects or scene listeners are created.
     const animations = options.animations ?? options.definition?.animations ?? [];
+    const compiledAnimations: CompiledClip[] = [];
     const animationNames = new Set<string>();
     for (const clip of animations) {
       if (animationNames.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
-      compileClip(clip, this.rig);
+      compiledAnimations.push(compileClip(clip, this.rig));
       animationNames.add(clip.name);
     }
     for (const pose of options.poses ?? options.definition?.poses ?? []) this.addPose(pose);
@@ -135,8 +136,7 @@ export class Puppet {
     for (const bone of this.bones.values()) bone.container.sort('depth');
     this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones);
     this.slotDebugView = new SlotDebug(scene, this.rig, this.renderer, this.slotState);
-    this.animationPlayer = new AnimationPlayer(this.rig, this.bones);
-    for (const clip of animations) this.addAnimation(clip);
+    this.animationPlayer = new AnimationPlayer(this.rig, this.bones, compiledAnimations);
     this.debugView = new PuppetDebug(scene, this.bones);
     this.renderSlots();
     this.ikDebugView = new IKDebug(scene, this.bones);

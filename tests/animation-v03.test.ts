@@ -66,6 +66,41 @@ test('interrupted fades retain independent snapshots across later buffered evalu
   }
 });
 
+test('an interrupted stepped overlay keeps its snapshot sparse while the underlying pose advances', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'move',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      arm: [
+        { time: 0, y: 0 },
+        { time: 1000, y: 100 },
+      ],
+    },
+  });
+  player.addAnimation({ name: 'raise', duration: 1000, loop: true, tracks: { arm: [{ time: 0, x: 20 }] } });
+  player.addAnimation({ name: 'reach', duration: 1000, loop: true, tracks: { arm: [{ time: 0, x: 40 }] } });
+  player.setPlaybackMode({ mode: 'stepped', fps: 10 });
+  player.setLayerWeight('upper', 0.5);
+  player.play('move');
+  player.play('raise', { layer: 'upper', fadeDuration: 200 });
+  player.update(100);
+  assert.equal(joints.get('arm')!.pose.x, 12.5);
+  player.play('reach', { layer: 'upper', fadeDuration: 200 });
+  assert.equal(joints.get('arm')!.pose.x, 12.5);
+  for (const [delta, x, y] of [
+    [50, 12.5, 10],
+    [50, 18.75, 20],
+    [50, 18.75, 20],
+    [50, 25, 30],
+  ]) {
+    player.update(delta!);
+    assert.equal(joints.get('arm')!.pose.x, x);
+    assert.equal(joints.get('arm')!.pose.y, y, 'the snapshot does not take ownership of underlying properties');
+  }
+});
+
 test.each([1, 0.5, 0])('interrupted arm-only overlay fades preserve sparse ownership at weight %s', (weight) => {
   const { player, joints } = fixture();
   player.addAnimation({
