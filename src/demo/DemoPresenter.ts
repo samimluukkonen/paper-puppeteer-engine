@@ -61,12 +61,12 @@ export class DemoPresenter {
     this.markers.clear();
   }
 
-  update(options: DemoPresenterOptions): void {
+  update(options: DemoPresenterOptions, poseEvaluated = false): void {
     this.katana.syncMode(options.upperBody);
     this.katana.resetPosition();
-    // Always start from the sampled pose so facing changes cannot accumulate rotations.
+    // Reuse this frame's sample, or restore it for paused frames and control changes.
     this.puppet.preparePose();
-    this.puppet.animationPlayer.applyCurrentPose();
+    if (!poseEvaluated) this.puppet.animationPlayer.applyCurrentPose();
     this.puppet.setRenderOrder(
       demoRenderOrder(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection),
     );

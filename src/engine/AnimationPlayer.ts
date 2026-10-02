@@ -246,10 +246,11 @@ export class AnimationPlayer {
     for (const joint of this.joints.values()) joint.reset();
   }
 
-  update(delta: number): void {
+  /** Advance playback and return whether this call evaluated the authored pose. */
+  update(delta: number): boolean {
     assertFinite(delta, 'Animation delta');
     if (delta < 0) throw new Error('Animation delta cannot be negative.');
-    if (this.paused) return;
+    if (this.paused) return false;
     let advancing = false;
     for (const layer of this.layers.values()) {
       if (layer.state?.playing || (layer.transition && !layer.stopped)) {
@@ -257,7 +258,7 @@ export class AnimationPlayer {
         break;
       }
     }
-    if (!advancing) return;
+    if (!advancing) return false;
     const events: FiredAnimationEvent[] = [];
     const completions: AnimationCompletion[] = [];
     for (const [name, layer] of this.layers) {
@@ -279,6 +280,7 @@ export class AnimationPlayer {
         this.controlDirty = true;
       }
     }
+    return true;
   }
 
   /** Sample only the base clip, clamping time without moving clocks or firing events. Excludes fades and layers. */

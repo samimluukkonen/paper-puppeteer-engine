@@ -127,8 +127,8 @@ export class DemoScene extends Phaser.Scene {
     this.puppet.preparePose();
     const playing = this.puppet.isPlaying;
     const transitioning = this.puppet.animationPlayer.transition !== undefined;
-    this.puppet.animationPlayer.update(delta);
-    this.updatePresentation();
+    const poseEvaluated = this.puppet.animationPlayer.update(delta);
+    this.updatePresentation(poseEvaluated);
     if (playing !== this.puppet.isPlaying || transitioning || this.puppet.animationPlayer.transition) this.notify();
   }
 
@@ -378,13 +378,13 @@ export class DemoScene extends Phaser.Scene {
     });
   }
 
-  private updatePresentation(): void {
+  private updatePresentation(poseEvaluated = false): void {
     if (!this.puppet) return;
     if (this.poseMode) {
       this.puppet.syncPose();
       this.authoring?.refresh();
       return;
     }
-    this.presentation?.update({ handIK: this.handIK, footIK: this.footIK, upperBody: this.upperBody });
+    this.presentation?.update({ handIK: this.handIK, footIK: this.footIK, upperBody: this.upperBody }, poseEvaluated);
   }
 }

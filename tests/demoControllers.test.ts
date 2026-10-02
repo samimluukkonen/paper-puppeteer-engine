@@ -114,6 +114,31 @@ function fixture() {
   return { scene, puppet, presenter, bones, constraints, slots, display };
 }
 
+test('advancing presentation evaluates once while paused and stopped frames restore the held pose', () => {
+  const { presenter, puppet } = fixture();
+  const player = puppet.animationPlayer;
+  const evaluate = vi.spyOn(player, 'applyCurrentPose');
+  const options = { handIK: false, footIK: false, upperBody: false };
+  const frame = () => {
+    evaluate.mockClear();
+    const evaluated = player.update(50);
+    presenter.update(options, evaluated);
+    assert.equal(evaluate.mock.calls.length, 1);
+    return evaluated;
+  };
+  assert.isTrue(frame());
+  const authored = puppet.getBone('leftUpperArm').pose.rotation;
+  player.pause();
+  puppet.getBone('leftUpperArm').pose.rotation = 99;
+  assert.isFalse(frame());
+  assert.equal(puppet.getBone('leftUpperArm').pose.rotation, authored);
+  assert.isFalse(frame());
+  player.resume();
+  assert.isTrue(frame());
+  player.stop();
+  assert.isFalse(frame());
+});
+
 for (const facing of ['left', 'right'] as const) {
   test(`presentation facing ${facing} samples before foot planting and does not accumulate arm rotations`, () => {
     const { presenter, puppet, constraints } = fixture();
