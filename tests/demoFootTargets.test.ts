@@ -1,32 +1,37 @@
 import { assert, test } from 'vitest';
-import { walk } from '../src/demo/demoAnimations.js';
 import { demoWalkFootIK } from '../src/demo/demoFootTargets.js';
 import { demoHipPositions } from '../src/demo/demoPresentation.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
+import { demoRig, walk } from './helpers/demoCharacter.js';
 
 const ground = { left: { x: 404, y: 517 }, right: { x: 356, y: 517 } };
 const sides = ['left', 'right'] as const;
 
+test('walking contact follows the supplied duration when wrapping and seeking backward', () => {
+  const animated = { left: { x: 420, y: 520 }, right: { x: 340, y: 506 } };
+  const expected = demoWalkFootIK(500, 1000, ground, animated);
+  for (const time of [1000, 3000, -1000]) assert.deepEqual(demoWalkFootIK(time, 2000, ground, animated), expected);
+});
+
 test('walking IK holds contact, releases for heel rise, and blends into the next step', () => {
   const animated = { left: { x: 420, y: 520 }, right: { x: 340, y: 506 } };
-  const contact = demoWalkFootIK(0, ground, animated);
+  const contact = demoWalkFootIK(0, walk.duration, ground, animated);
   assert.strictEqual(contact.left.mix, 1);
   assert.strictEqual(contact.left.target.x, animated.left.x);
   assert.strictEqual(contact.left.target.y, ground.left.y);
   assert.strictEqual(contact.right.target.y, animated.right.y);
-  const toeOff = demoWalkFootIK(500, ground, animated);
+  const toeOff = demoWalkFootIK(500, walk.duration, ground, animated);
   assert.isAbove(toeOff.left.mix, 0);
   assert.isBelow(toeOff.left.mix, 1);
-  assert.strictEqual(demoWalkFootIK(600, ground, animated).left.mix, 0);
-  assert.strictEqual(demoWalkFootIK(800, ground, animated).left.mix, 0);
-  const landing = demoWalkFootIK(950, ground, animated);
+  assert.strictEqual(demoWalkFootIK(600, walk.duration, ground, animated).left.mix, 0);
+  assert.strictEqual(demoWalkFootIK(800, walk.duration, ground, animated).left.mix, 0);
+  const landing = demoWalkFootIK(950, walk.duration, ground, animated);
   assert.isAbove(landing.left.mix, 0);
   assert.isBelow(landing.left.mix, 1);
-  assert.deepEqual(demoWalkFootIK(1000, ground, animated), contact);
+  assert.deepEqual(demoWalkFootIK(1000, walk.duration, ground, animated), contact);
   assert.strictEqual(contact.right.mix, toeOff.left.mix);
 });
 
@@ -81,7 +86,7 @@ for (const facing of ['left', 'right'] as const) {
         };
       };
       const animated = { left: ankle('left'), right: ankle('right') };
-      const feet = demoWalkFootIK(time, ground, animated);
+      const feet = demoWalkFootIK(time, walk.duration, ground, animated);
       for (const side of sides) {
         const constraint = constraints[side];
         const thigh = joints.get(`${side}Thigh`)!.pose;

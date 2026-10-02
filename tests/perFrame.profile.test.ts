@@ -1,13 +1,12 @@
 import { assert, test, vi } from 'vitest';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
-import { idle, sword, walk } from '../src/demo/demoAnimations.js';
 import { demoIK } from '../src/demo/demoIK.js';
 import { demoRenderOrder } from '../src/demo/demoPresentation.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
+import { demoRig, idle, sword, walk } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 import { puppetScene } from './helpers/puppetScene.js';
 

@@ -2,16 +2,15 @@ import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
-import { idle, walk } from '../src/demo/demoAnimations.js';
 import { demoIK } from '../src/demo/demoIK.js';
 import { demoAuthoringLayout } from '../src/demo/demoPresentation.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import type { Facing } from '../src/engine/types.js';
+import { demoRig, idle, walk } from './helpers/demoCharacter.js';
 
 function container() {
   return {
@@ -45,7 +44,7 @@ function container() {
   };
 }
 
-function fixture() {
+function fixture(walkClip = walk) {
   const display = {
     setDepth: vi.fn().mockReturnThis(),
     setVisible: vi.fn().mockReturnThis(),
@@ -74,7 +73,7 @@ function fixture() {
     ]),
   );
   const player = new AnimationPlayer(rig, bones);
-  player.addAnimation(walk);
+  player.addAnimation(walkClip);
   player.addAnimation(idle);
   player.play('walk');
   const constraints = new Map(
@@ -119,6 +118,14 @@ function fixture() {
   const presenter = new DemoPresenter(scene, puppet as unknown as Puppet);
   return { scene, puppet, presenter, bones, constraints, slots, display };
 }
+
+test('foot planting uses the loaded walk duration instead of a fixed demo duration', () => {
+  const { presenter, puppet } = fixture({ ...walk, duration: 2000 });
+  puppet.animationPlayer.update(1000);
+  const frame = presenter.feet.update(true);
+  assert.equal(puppet.animationPlayer.duration, 2000);
+  assert.approximately(frame.walkFeet!.left.mix, 0.5, 1e-12);
+});
 
 test('advancing presentation evaluates once while paused and stopped frames restore the held pose', () => {
   const { presenter, puppet } = fixture();

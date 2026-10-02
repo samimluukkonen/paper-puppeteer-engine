@@ -1,11 +1,10 @@
 import { assert, test } from 'vitest';
-import { demoAnimations, walk } from '../src/demo/demoAnimations.js';
 import { demoHipPositions } from '../src/demo/demoPresentation.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
 import { transformProperties } from '../src/engine/types.js';
+import { demoAnimations, demoRig, walk } from './helpers/demoCharacter.js';
 
 interface LegPositions {
   hip: { x: number; y: number };

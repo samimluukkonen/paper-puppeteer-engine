@@ -38,6 +38,7 @@ export class DemoFootPlanting {
     const walkFeet = plantWalkFeet
       ? demoWalkFootIK(
           this.puppet.animationPlayer.elapsedTime,
+          this.puppet.animationPlayer.duration,
           {
             left: { ...this.groundTargets.left, y: this.groundTargets.left.y + 7 },
             right: { ...this.groundTargets.right, y: this.groundTargets.right.y + 7 },

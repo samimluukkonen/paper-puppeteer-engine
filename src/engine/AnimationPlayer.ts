@@ -111,6 +111,10 @@ export class AnimationPlayer {
   get elapsedTime(): number {
     return this.layers.get('base')?.state?.time ?? 0;
   }
+  /** Duration in milliseconds of the active base clip, or zero when none is selected. */
+  get duration(): number {
+    return this.layers.get('base')?.state?.clip.duration ?? 0;
+  }
   get isPlaying(): boolean {
     return this.layers.get('base')?.state?.playing ?? false;
   }

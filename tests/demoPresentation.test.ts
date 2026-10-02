@@ -1,5 +1,4 @@
 import { assert, test } from 'vitest';
-import { idle, walk } from '../src/demo/demoAnimations.js';
 import {
   demoArmRotations,
   demoAuthoringLayout,
@@ -7,10 +6,10 @@ import {
   demoRenderOrder,
   demoShoulderPositions,
 } from '../src/demo/demoPresentation.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
+import { demoRig, idle, walk } from './helpers/demoCharacter.js';
 
 const rig = new Rig(demoRig);
 const body = [

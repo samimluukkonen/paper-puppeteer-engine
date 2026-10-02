@@ -1,10 +1,10 @@
 import { assert, test } from 'vitest';
 import { demoAuthoringLayout } from '../src/demo/demoPresentation.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { applyDemoRightFacingPreview } from '../src/devtools/rig-editor/demoPreviewLayout.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
+import { demoRig } from './helpers/demoCharacter.js';
 
 test('rig editor preview matches the demo right-facing limb layout without changing authored values', () => {
   const source = new Rig(demoRig);

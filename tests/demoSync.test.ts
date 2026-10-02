@@ -1,13 +1,12 @@
 import { afterEach, assert, test, vi } from 'vitest';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
-import { guardUpperBody, sword } from '../src/demo/demoAnimations.js';
 import { demoIK } from '../src/demo/demoIK.js';
-import { demoRig } from '../src/demo/demoRig.js';
 import { IKDebug } from '../src/engine/ik/IKDebug.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { SlotDebug } from '../src/engine/SlotDebug.js';
 import type { Facing } from '../src/engine/types.js';
+import { demoRig, guardUpperBody, sword } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 
 vi.mock('phaser', () => ({
