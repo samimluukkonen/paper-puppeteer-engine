@@ -13,6 +13,24 @@ const rig = new Rig({
 const joints = () => new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
 const source = { version: 1 as const, name: 'guard', bones: { arm: { rotation: 1, x: 8 } } };
 
+test('reserved bone identifiers fail explicitly while own Object prototype names round trip', () => {
+  assert.throws(() => new Rig({ root: '__proto__', bones: [{ id: '__proto__' }] }), /reserved/);
+  assert.throws(
+    () => parsePoseDefinition(JSON.parse('{"version":1,"name":"bad","bones":{"__proto__":{"x":1}}}'), rig),
+    /reserved/,
+  );
+  const invalid = new Map([['__proto__', new Joint('__proto__', {})]]);
+  assert.throws(() => serializePose('saved', invalid, { onlyChanged: false }), /reserved/);
+  for (const id of ['toString', 'constructor', 'prototype']) {
+    const namedRig = new Rig({ root: id, bones: [{ id }] });
+    const state = new Map([[id, new Joint(id, {})]]);
+    state.get(id)!.pose.x = 5;
+    const pose = serializePose('saved', state);
+    assert.ok(Object.hasOwn(pose.bones, id));
+    assert.deepEqual(parsePoseDefinition(JSON.parse(JSON.stringify(pose)), namedRig), pose);
+  }
+});
+
 test('parse valid sparse pose and reject unknown bones, versions and scalar values', () => {
   assert.deepEqual(parsePoseDefinition(source, rig), source);
   assert.throws(() => parsePoseDefinition({ ...source, version: 2 }, rig), /Unsupported pose format version/);

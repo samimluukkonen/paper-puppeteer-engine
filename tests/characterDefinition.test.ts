@@ -44,6 +44,21 @@ const bundle = () => ({
   poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, read(path)])),
 });
 
+test('character texture and file lookups require own entries', () => {
+  const definition = CharacterDefinition.fromData(bundle());
+  for (const key of ['toString', 'constructor', '__proto__'])
+    assert.throws(() => definition.textureUrl(key), /Unknown character texture/);
+  const data = bundle();
+  Object.defineProperty(data.manifest.textures, 'toString', { value: 'images/paper-head.png', enumerable: true });
+  assert.equal(CharacterDefinition.fromData(data).textureUrl('toString'), 'images/paper-head.png');
+  for (const collection of ['skins', 'animations', 'poses'] as const) {
+    const inherited = bundle();
+    const path = collection === 'skins' ? inherited.manifest.skins.default! : inherited.manifest[collection]![0]!;
+    inherited[collection] = Object.create({ [path]: inherited[collection][path] });
+    assert.ok(validateCharacterDefinition(inherited).some((issue) => /Missing .* file/.test(issue.message)));
+  }
+});
+
 test('complete sample character validates and already-parsed data becomes runtime definitions', () => {
   const data = bundle();
   assert.deepEqual(validateCharacterDefinition(data), []);

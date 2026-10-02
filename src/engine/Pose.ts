@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { checkJson, UnsupportedFormatVersionError, type ValidationIssue } from './externalData.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
-import { POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
+import { identifierSchema, POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
 import { type JointTransform, transformProperties } from './types.js';
 
 export { POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
@@ -68,7 +68,7 @@ export function serializePose(
   joints: ReadonlyMap<string, Joint>,
   options: { epsilon?: number; onlyChanged?: boolean } = {},
 ): PoseDefinition {
-  if (!name) throw new Error('Pose name is required.');
+  identifierSchema.parse(name);
   const epsilon = options.epsilon ?? 1e-4;
   if (!Number.isFinite(epsilon) || epsilon < 0) throw new Error('Pose epsilon must be nonnegative and finite.');
   const bones: Record<string, Partial<JointTransform>> = {};
@@ -80,6 +80,7 @@ export function serializePose(
       if (options.onlyChanged === false || Math.abs(value - joint.bindPose[property]) > epsilon)
         values[property] = value;
     }
+    identifierSchema.parse(id);
     if (Object.keys(values).length) bones[id] = values;
   }
   return { version: POSE_FORMAT_VERSION, name, bones };

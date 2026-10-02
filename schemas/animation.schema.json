@@ -4,7 +4,8 @@
   "properties": {
     "name": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "^(?!__proto__$)[\\s\\S]+$"
     },
     "duration": {
       "type": "number",
@@ -20,7 +21,9 @@
     "tracks": {
       "type": "object",
       "propertyNames": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!__proto__$)[\\s\\S]+$"
       },
       "additionalProperties": {
         "type": "array",
@@ -63,7 +66,8 @@
           },
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "data": {}
         },

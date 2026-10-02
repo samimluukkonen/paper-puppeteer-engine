@@ -249,6 +249,8 @@ Export near and far limbs separately, as well as weapons and alternate hand stat
 
 ## Load versioned JSON
 
+Identifiers (bone, slot, attachment, texture, skin, animation, pose, character, and IK names and references) are nonempty strings. `__proto__` is reserved and rejected before parsing or pose serialization because record parsers discard that key. Other names, including `toString`, `constructor`, and `prototype`, are allowed. Dictionary lookups use only own entries; inherited texture and file names do not resolve. File paths and descriptive metadata are separate from identifiers.
+
 The external formats currently use `RIG_FORMAT_VERSION = 1` and `ANIMATION_FORMAT_VERSION = 1`. A rig file has `version`, optional `name`, `root`, and `bones`. Bone records use `id`, optional `parent`, local `x`, `y`, `rotation`, `scaleX`, `scaleY`, optional nonnegative `length`, optional `depth`, and optional `sprite` with texture/frame, offsets, normalized origins, scales, and depth. The bone container origin is its pivot. An animation file has `version`, `name`, positive `duration` in milliseconds, `loop`, `tracks` keyed by bone id, optional `events`, and optional `playback` (`{ "mode": "smooth" }` or `{ "mode": "stepped", "fps": 10 }`). Keyframes have `time` and any of the five local transform properties. See [demo-rig.json](src/demo/data/demo-rig.json) and [idle.json](src/demo/data/idle.json).
 
 ```ts

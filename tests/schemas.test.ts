@@ -5,8 +5,52 @@ import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../src/engine/ik/types.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
-import { animationClipSchema, rigDefinitionSchema, twoBoneIKDefinitionSchema } from '../src/engine/schemas.js';
+import {
+  animationClipSchema,
+  characterManifestSchema,
+  poseDefinitionSchema,
+  rigDefinitionSchema,
+  skinDefinitionSchema,
+  twoBoneIKDefinitionSchema,
+} from '../src/engine/schemas.js';
 import type { RigDefinition } from '../src/engine/types.js';
+
+test('identifier dictionaries reject reserved keys before record parsing drops them', () => {
+  const dictionary = JSON.parse('{"__proto__":null}');
+  for (const [schema, input] of [
+    [skinDefinitionSchema, { version: 1, name: 'default', slots: dictionary }],
+    [animationClipSchema, { name: 'idle', duration: 100, loop: true, tracks: dictionary }],
+    [poseDefinitionSchema, { version: 1, name: 'rest', bones: dictionary }],
+    [
+      characterManifestSchema,
+      {
+        version: 1,
+        id: 'test',
+        rig: 'rig.json',
+        defaultSkin: 'default',
+        skins: dictionary,
+        animations: [],
+        textures: {},
+      },
+    ],
+    [
+      characterManifestSchema,
+      {
+        version: 1,
+        id: 'test',
+        rig: 'rig.json',
+        defaultSkin: 'default',
+        skins: {},
+        animations: [],
+        textures: dictionary,
+      },
+    ],
+  ] as const) {
+    const parsed = schema.safeParse(input);
+    assert.isFalse(parsed.success);
+    if (!parsed.success) assert.ok(parsed.error.issues.some((issue) => /reserved/.test(issue.message)));
+  }
+});
 
 test('schemas parse plain rig and animation data with useful nested error paths', () => {
   const rig = rigDefinitionSchema.parse({ root: 'root', bones: [{ id: 'root', sprite: { texture: 'body' } }] });

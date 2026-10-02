@@ -63,7 +63,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
 
   const skins: SkinDefinition[] = [];
   for (const [name, path] of Object.entries(manifest.skins)) {
-    const value = data.skins?.[path];
+    const value = data.skins && Object.hasOwn(data.skins, path) ? data.skins[path] : undefined;
     if (value === undefined) {
       issues.push(issue(`skins.${name}`, `Missing skin file "${path}".`));
       continue;
@@ -99,7 +99,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   const names = new Set<string>();
   const rig = result.rig;
   for (const [index, path] of manifest.animations.entries()) {
-    const value = data.animations?.[path];
+    const value = data.animations && Object.hasOwn(data.animations, path) ? data.animations[path] : undefined;
     if (value === undefined) {
       issues.push(issue(`animations[${index}]`, `Missing animation file "${path}".`));
       continue;
@@ -118,7 +118,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   }
   const poseNames = new Set<string>();
   for (const [index, path] of (manifest.poses ?? []).entries()) {
-    const value = data.poses?.[path];
+    const value = data.poses && Object.hasOwn(data.poses, path) ? data.poses[path] : undefined;
     if (value === undefined) {
       issues.push(issue(`poses[${index}]`, `Missing pose file "${path}".`));
       continue;
@@ -179,8 +179,8 @@ export class CharacterDefinition {
   }
 
   textureUrl(key: string): string {
-    const path = this.textures[key];
-    if (!path) throw new Error(`Unknown character texture "${key}".`);
+    if (!Object.hasOwn(this.textures, key)) throw new Error(`Unknown character texture "${key}".`);
+    const path = this.textures[key]!;
     return this.baseUrl ? new URL(path, this.baseUrl).href : path;
   }
 }

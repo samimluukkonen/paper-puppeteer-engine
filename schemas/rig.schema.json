@@ -4,7 +4,8 @@
   "properties": {
     "root": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "^(?!__proto__$)[\\s\\S]+$"
     },
     "bones": {
       "type": "array",
@@ -13,10 +14,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "parent": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "length": {
             "type": "number",
@@ -27,7 +31,8 @@
             "properties": {
               "texture": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
               },
               "frame": {
                 "type": ["string", "number"]
@@ -91,11 +96,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "bone": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "depth": {
             "type": "number"
@@ -127,11 +134,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "texture": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "frame": {
             "type": ["string", "number"]
@@ -177,18 +186,22 @@
           },
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
           },
           "slots": {
             "type": "object",
             "propertyNames": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!__proto__$)[\\s\\S]+$"
             },
             "additionalProperties": {
               "anyOf": [
                 {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "pattern": "^(?!__proto__$)[\\s\\S]+$"
                 },
                 {
                   "type": "null"

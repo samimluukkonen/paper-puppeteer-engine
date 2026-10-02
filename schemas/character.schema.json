@@ -8,7 +8,8 @@
     },
     "id": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "^(?!__proto__$)[\\s\\S]+$"
     },
     "rig": {
       "type": "string",
@@ -16,13 +17,15 @@
     },
     "defaultSkin": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "^(?!__proto__$)[\\s\\S]+$"
     },
     "skins": {
       "type": "object",
       "propertyNames": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^(?!__proto__$)[\\s\\S]+$"
       },
       "additionalProperties": {
         "type": "string",
@@ -47,7 +50,8 @@
       "type": "object",
       "propertyNames": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^(?!__proto__$)[\\s\\S]+$"
       },
       "additionalProperties": {
         "type": "string",
