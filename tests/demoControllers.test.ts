@@ -81,6 +81,7 @@ function fixture() {
     demoIK.map((definition) => [definition.name, new TwoBoneIKConstraint(definition, rig, bones)]),
   );
   const slots = new Map<string, string>();
+  let renderOrder = rig.renderOrder;
   const puppet = {
     rig,
     facingDirection: 'right' as Facing,
@@ -93,7 +94,11 @@ function fixture() {
     preparePose: vi.fn(),
     syncPose: vi.fn(),
     setDebugLabelSide: vi.fn(),
-    setRenderOrder: vi.fn().mockReturnThis(),
+    getRenderOrder: () => renderOrder,
+    setRenderOrder: vi.fn((order: readonly string[]) => {
+      renderOrder = order;
+      return puppet;
+    }),
     setFacing(direction: Facing) {
       this.facingDirection = direction;
       this.container.scaleX = direction === 'right' ? 1.08 : -1.08;
@@ -137,6 +142,29 @@ test('advancing presentation evaluates once while paused and stopped frames rest
   assert.isTrue(frame());
   player.stop();
   assert.isFalse(frame());
+});
+
+test('presentation reuses render order until facing, order, or animation layout changes', () => {
+  const { presenter, puppet } = fixture();
+  const options = { handIK: false, footIK: false, upperBody: false };
+  presenter.update(options);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 1);
+  presenter.update(options);
+  puppet.currentAnimation = 'idle';
+  presenter.update(options);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 1, 'idle and walk share the same order');
+  puppet.setFacing('left');
+  presenter.update(options);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 2);
+  puppet.currentAnimation = 'custom';
+  presenter.update(options);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 3);
+  presenter.update(options);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 3);
+  puppet.setRenderOrder([...puppet.getRenderOrder()].reverse());
+  presenter.update(options);
+  assert.deepEqual(puppet.getRenderOrder(), puppet.rig.renderOrder);
+  assert.equal(puppet.setRenderOrder.mock.calls.length, 5, 'restores changes made outside the presenter');
 });
 
 for (const facing of ['left', 'right'] as const) {

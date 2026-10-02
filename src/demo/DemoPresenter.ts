@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { IKTarget, Puppet } from '../engine/index.js';
+import type { Facing, IKTarget, Puppet } from '../engine/index.js';
 import { DemoFootPlanting } from './DemoFootPlanting.js';
 import { DemoKatanaController } from './DemoKatanaController.js';
 import type { WalkFootIK } from './demoFootTargets.js';
@@ -46,6 +46,9 @@ export class DemoPresenter {
   readonly feet: DemoFootPlanting;
   handTarget: IKTarget;
   private readonly markers: Phaser.GameObjects.Graphics;
+  private renderOrder: readonly string[] | undefined;
+  private orderAnimation: string | undefined;
+  private orderFacing: Facing | undefined;
 
   constructor(
     scene: Phaser.Scene,
@@ -67,9 +70,7 @@ export class DemoPresenter {
     // Reuse this frame's sample, or restore it for paused frames and control changes.
     this.puppet.preparePose();
     if (!poseEvaluated) this.puppet.animationPlayer.applyCurrentPose();
-    this.puppet.setRenderOrder(
-      demoRenderOrder(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection),
-    );
+    this.syncRenderOrder();
     const shoulders = demoShoulderPositions(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection);
     for (const [id, x] of Object.entries(shoulders)) this.puppet.getBone(id).pose.x = x;
     const arms = demoArmRotations(this.puppet.currentAnimation, this.puppet.facingDirection, {
@@ -105,6 +106,20 @@ export class DemoPresenter {
     this.puppet.syncPose();
     this.katana.solveGrip(this.handTarget, options.handIK, options.upperBody);
     this.drawTargets(options, feet.targets, feet.walkFeet);
+  }
+
+  private syncRenderOrder(): void {
+    const animation = this.puppet.currentAnimation;
+    const facing = this.puppet.facingDirection;
+    if (!this.renderOrder || this.orderAnimation !== animation || this.orderFacing !== facing) {
+      this.renderOrder = demoRenderOrder(this.puppet.rig, animation, facing);
+      this.orderAnimation = animation;
+      this.orderFacing = facing;
+    }
+    // Authoring controls can change the puppet order between presentation frames.
+    const current = this.puppet.getRenderOrder();
+    if (current.length !== this.renderOrder.length || current.some((id, index) => id !== this.renderOrder![index]))
+      this.puppet.setRenderOrder(this.renderOrder);
   }
 
   private drawTargets(

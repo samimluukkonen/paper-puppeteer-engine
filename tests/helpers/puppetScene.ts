@@ -7,6 +7,7 @@ interface Matrix {
   d: number;
   tx: number;
   ty: number;
+  transformPoint(x: number, y: number): { x: number; y: number };
   applyInverse(x: number, y: number): { x: number; y: number };
 }
 
@@ -21,6 +22,10 @@ class Container {
   visible = true;
   depth = 0;
   isDestroyed = false;
+  width = 100;
+  height = 100;
+  originX = 0.5;
+  originY = 0.5;
   parentContainer: Container | null = null;
   readonly list: Container[] = [];
 
@@ -55,10 +60,36 @@ class Container {
   setName(_name: string) {
     return this;
   }
-  setOrigin(_x: number, _y: number) {
+  setOrigin(x: number, y: number) {
+    this.originX = x;
+    this.originY = y;
     return this;
   }
   sort(_property: string) {
+    return this;
+  }
+  clear() {
+    return this;
+  }
+  lineStyle() {
+    return this;
+  }
+  lineBetween() {
+    return this;
+  }
+  strokeCircle() {
+    return this;
+  }
+  fillStyle() {
+    return this;
+  }
+  fillRoundedRect() {
+    return this;
+  }
+  fillTriangle() {
+    return this;
+  }
+  fillCircle() {
     return this;
   }
   once() {
@@ -105,6 +136,9 @@ class Container {
       : local;
     return {
       ...matrix,
+      transformPoint(x: number, y: number) {
+        return { x: matrix.a * x + matrix.c * y + matrix.tx, y: matrix.b * x + matrix.d * y + matrix.ty };
+      },
       applyInverse(x: number, y: number) {
         const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
         return {
@@ -122,9 +156,10 @@ export function puppetScene(): Phaser.Scene {
     add: {
       container: makeContainer,
       image: makeContainer,
-      graphics: () => ({}),
+      graphics: makeContainer,
       text: (x = 0, y = 0) => new Container().setPosition(x, y),
     },
+    scale: { width: 760, height: 640 },
     textures: { exists: () => true },
     events: { on() {}, once() {}, off() {} },
   } as unknown as Phaser.Scene;

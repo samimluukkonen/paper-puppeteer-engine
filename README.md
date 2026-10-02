@@ -108,7 +108,18 @@ npm run test:browser
 
 The suite starts its own Vite server and checks dragging outside the canvas, inspector focus and per-field undo, and exported/original/imported rig reloads plus a page reload. It also verifies artwork visibility against canvas screenshots after each rig reload and catches browser exceptions. CI runs it before building. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
 
-Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, and a puppet with active and inactive IK. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements.
+Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, active/inactive IK, and the full demo presentation loop with walk, steady sword grip, out-of-reach targets, head crossings, and upper-body grip in both facings. Demo cases use shipped PNG dimensions and real affine transforms, animation, IK, and render projection. They report mean/maximum `syncPose()` calls and the percentage of frames requiring katana corrections. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements. Add `VITE_PROFILE_UNCACHED=1` to recreate unconditional render-order application for comparison.
+
+One local run of the extended profile on Node 24.19.0 measured the following. Sync counts include warmup:
+
+| Katana workload | Left: µs/frame | Right: µs/frame | Left: mean/max syncs | Right: mean/max syncs |
+| --- | ---: | ---: | ---: | ---: |
+| Steady reachable grip | 93.04 | 64.51 | 1.00 / 1 | 1.00 / 1 |
+| Out-of-reach target sweep | 230.99 | 120.66 | 5.73 / 25 | 2.92 / 8 |
+| Head crossing sweep | 79.76 | 77.25 | 1.02 / 2 | 1.39 / 3 |
+| Upper-body grip | 82.71 | 74.18 | 1.00 / 1 | 1.00 / 1 |
+
+The correction loops can dominate out-of-reach frames: each extra sync restores the pose, projects all bones, executes IK, and updates debug views. Their existing iteration limits preserve grip behavior; this change caches demo render order and skips depth updates/sorting when the order is already applied. The profile covers the remaining cost for future targeted optimization.
 
 A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
 
