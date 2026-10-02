@@ -27,6 +27,51 @@ function fixture() {
   return { player, joints };
 }
 
+test.each([0, 50])('JSON event payloads at %s are isolated from source data, listeners and later loops', (time) => {
+  const { player } = fixture();
+  const data = { nested: { values: [1] } };
+  player.addAnimation({
+    name: 'payload',
+    duration: 100,
+    loop: true,
+    tracks: {},
+    events: [{ time, name: 'hit', data }],
+  });
+  data.nested.values.push(2);
+  const observed: number[][] = [];
+  player.onAnimationEvent((event) => {
+    (event.data as typeof data).nested.values.push(99);
+    event.name = 'changed';
+  });
+  player.onAnimationEvent((event) => {
+    assert.equal(event.name, 'hit');
+    observed.push((event.data as typeof data).nested.values);
+  });
+  player.play('payload');
+  player.update(150);
+  assert.deepEqual(observed, [[1], [1]]);
+  assert.notStrictEqual(observed[0], observed[1]);
+  assert.deepEqual(data.nested.values, [1, 2]);
+});
+
+test('non-JSON TypeScript event payloads retain reference semantics', () => {
+  const { player } = fixture();
+  const data = { callback: () => 42 };
+  player.addAnimation({
+    name: 'runtime-payload',
+    duration: 100,
+    loop: true,
+    tracks: {},
+    events: [{ time: 0, name: 'hit', data }],
+  });
+  const delivered: unknown[] = [];
+  player.onAnimationEvent((event) => delivered.push(event.data));
+  player.play('runtime-payload');
+  player.update(100);
+  assert.deepEqual(delivered, [data, data]);
+  for (const payload of delivered) assert.strictEqual(payload, data);
+});
+
 test('pose blending includes all transforms, endpoints and shortest rotation path', () => {
   const from = new Map([['arm', { x: 10, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }]]);
   const to = new Map([['arm', { x: 20, y: 10, rotation: 2, scaleX: 3, scaleY: 2 }]]);

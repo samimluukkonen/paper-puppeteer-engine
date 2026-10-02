@@ -41,6 +41,19 @@ const clipFile: AnimationJsonDefinition = {
   events: [{ time: 250, name: 'step', data: { side: 'left', count: 1 } }],
 };
 
+test('parsed JSON event payloads are independent of source objects in both directions', () => {
+  const file = {
+    ...clipFile,
+    events: [{ time: 0, name: 'hit', data: { nested: { values: [1] } } }],
+  };
+  const clip = parseAnimationClip(file, new Rig(rigFile));
+  const data = clip.events![0]!.data as { nested: { values: number[] } };
+  file.events[0]!.data.nested.values.push(2);
+  assert.deepEqual(data.nested.values, [1]);
+  data.nested.values.push(3);
+  assert.deepEqual(file.events[0]!.data.nested.values, [1, 2]);
+});
+
 test('file validators reject root and nested accessors without invoking getters', () => {
   const rig = new Rig(rigFile);
   for (const field of ['version', 'bones', 'root']) {

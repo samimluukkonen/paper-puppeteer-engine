@@ -469,6 +469,8 @@ const offComplete = puppet.onAnimationComplete(({ clip, layer }) => {
 
 Events fire once per timestamp crossing, including wraps and large frame deltas. They use the continuous timeline, so they fire even when the visible pose is held in stepped mode. A marker at time zero fires when a clip starts and on each loop wrap. Nonlooping completion fires once after the final pose is applied; looping clips do not complete. Pause holds all clocks, events and fades. IK targets can still move and solve while animation is paused.
 
+JSON-compatible event payloads are deep-copied when parsing files, compiling clips, and delivering each event to each listener. Changing source data after registration or mutating a delivered payload does not change playback data, other listeners, or later events. TypeScript-authored clips may also carry non-JSON runtime payloads such as functions or class instances; those payloads intentionally retain reference semantics. External animation files still require JSON data.
+
 Updates reject overflowing timeline arithmetic, unsafe event cycle bounds, or more than 10,000 crossed events across all layers in one call. Rejected updates leave clocks, fades, poses, and event delivery unchanged. Reduce the delta or playback speed before retrying; events are never silently dropped.
 
 Stepped playback quantizes pose sample time to `floor(time / (1000 / fps)) * (1000 / fps)`. It also quantizes crossfade weights. At 10 FPS, one authored pose is held for 100 ms across normal Phaser render frames. Clip-specific `playback: { mode: 'stepped', fps: 12 }` or `{ mode: 'smooth' }` overrides the puppet default. The animation clock, event crossings and IK still update at normal frame rate. A nonlooping clip shows its exact final pose at completion.

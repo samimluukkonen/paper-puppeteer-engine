@@ -1,3 +1,4 @@
+import { checkJson, type ValidationIssue } from './externalData.js';
 import type { Rig } from './Rig.js';
 import { animationClipSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
@@ -24,7 +25,15 @@ export interface AnimationClip {
 export interface AnimationEvent {
   time: number;
   name: string;
+  /** JSON payloads are copied at ownership boundaries; other runtime values retain reference semantics. */
   data?: unknown;
+}
+
+/** Keep JSON event data independent without rejecting arbitrary TypeScript runtime payloads. */
+export function copyAnimationEvent<Event extends AnimationEvent>(event: Event): Event {
+  const issues: ValidationIssue[] = [];
+  if (!Object.hasOwn(event, 'data') || !checkJson(event.data, '', issues) || issues.length) return { ...event };
+  return { ...event, data: structuredClone(event.data) };
 }
 
 export type AnimationPlaybackMode = { mode: 'smooth' } | { mode: 'stepped'; fps: number };
@@ -52,7 +61,7 @@ export interface CompiledClip {
 export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
   clip = animationClipSchema.parse(clip);
   checkAnimationReferences(clip, rig, throwValidationIssue);
-  const events = (clip.events ?? []).map((event) => ({ ...event })).sort((a, b) => a.time - b.time);
+  const events = (clip.events ?? []).map(copyAnimationEvent).sort((a, b) => a.time - b.time);
   const tracks: CompiledTrack[] = [];
   for (const [bone, keys] of Object.entries(clip.tracks)) {
     const properties = new Map<TransformProperty, readonly PropertyKeyframe[]>();

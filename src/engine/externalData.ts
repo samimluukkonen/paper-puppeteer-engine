@@ -297,7 +297,7 @@ export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinit
   if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)], versionError };
   const clip = parsed.data;
   checkAnimationReferences(clip, rig, (issue) => issues.push(issue));
-  return issues.length ? { issues, versionError } : { issues, data: clip };
+  return issues.length ? { issues, versionError } : { issues, data: structuredClone(clip) };
 }
 
 /** Reports file, scalar, timeline and rig-reference errors. */

@@ -1,5 +1,5 @@
 import type { AnimationClip, AnimationEvent, AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
-import { compileClip } from './AnimationClip.js';
+import { compileClip, copyAnimationEvent } from './AnimationClip.js';
 import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer, evaluateClip } from './AnimationPose.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
@@ -303,7 +303,7 @@ export class AnimationPlayer {
       }
     }
     this.applyCurrentPose();
-    for (const event of events) for (const listener of [...this.eventListeners]) listener(event);
+    for (const event of events) for (const listener of [...this.eventListeners]) listener(copyAnimationEvent(event));
     for (const event of completions) for (const listener of [...this.completionListeners]) listener(event);
     for (const layer of this.layers.values()) {
       if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
@@ -500,7 +500,8 @@ export class AnimationPlayer {
   private fireStartEvents(clip: CompiledClip, layer: string): void {
     for (const marker of clip.events) {
       if (marker.time === 0)
-        for (const listener of [...this.eventListeners]) listener({ ...marker, clip: clip.name, layer });
+        for (const listener of [...this.eventListeners])
+          listener(copyAnimationEvent({ ...marker, clip: clip.name, layer }));
     }
   }
 
