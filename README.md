@@ -605,7 +605,7 @@ npm install /absolute/path/to/paper-puppeteer-engine
 import { Puppet, type RigDefinition, type AnimationClip } from 'paper-puppeteer-engine';
 ```
 
-The library includes TypeScript declarations and source maps. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
+The library includes TypeScript declarations and source maps. Zod is externalized and supplied through the package dependency, so consumers share its validation runtime and error classes. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
 
 For Node scripts and asset tooling, import the renderer-independent entry point:
 

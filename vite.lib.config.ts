@@ -5,7 +5,7 @@ export default defineConfig({
     copyPublicDir: false,
     outDir: 'dist/library',
     lib: { entry: { index: 'src/engine/index.ts', core: 'src/engine/core.ts' }, formats: ['es'] },
-    rollupOptions: { external: ['phaser'] },
+    rollupOptions: { external: ['phaser', 'zod'] },
     sourcemap: true,
   },
 });
