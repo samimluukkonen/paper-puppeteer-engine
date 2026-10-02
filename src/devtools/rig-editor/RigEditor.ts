@@ -43,6 +43,7 @@ export class RigEditor {
     this.scene.input.on('pointerdown', this.pointerDown, this);
     this.scene.input.on('pointermove', this.pointerMove, this);
     this.scene.input.on('pointerup', this.pointerUp, this);
+    this.scene.input.on('pointerupoutside', this.pointerUp, this);
     this.scene.input.on('wheel', this.wheel, this);
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
     window.addEventListener('keydown', this.keyDown);
@@ -51,9 +52,13 @@ export class RigEditor {
 
   disable(): void {
     if (!this.overlay) return;
+    this.panning = false;
+    this.drag = undefined;
+    this.state.endOperation();
     this.scene.input.off('pointerdown', this.pointerDown, this);
     this.scene.input.off('pointermove', this.pointerMove, this);
     this.scene.input.off('pointerup', this.pointerUp, this);
+    this.scene.input.off('pointerupoutside', this.pointerUp, this);
     this.scene.input.off('wheel', this.wheel, this);
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
     window.removeEventListener('keydown', this.keyDown);

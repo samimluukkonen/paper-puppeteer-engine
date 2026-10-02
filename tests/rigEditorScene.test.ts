@@ -170,7 +170,7 @@ test.each(['reloadRig', 'reloadOriginal'] as const)('%s cleans up a replacement 
   assert.equal(vi.mocked(replacementOverlay!.destroy).mock.calls.length, 1);
   assert.deepEqual(
     off.mock.calls.map(([event]) => event),
-    ['pointerdown', 'pointermove', 'pointerup', 'wheel'],
+    ['pointerdown', 'pointermove', 'pointerup', 'pointerupoutside', 'wheel'],
   );
   assert.equal(vi.mocked(scene.events.off).mock.calls[0]?.[0], 'update');
   assert.equal(vi.mocked(window.removeEventListener).mock.calls[0]?.[0], 'keydown');

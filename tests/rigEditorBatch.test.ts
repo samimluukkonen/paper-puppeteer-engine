@@ -22,9 +22,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
-  '%s drag validates and synchronizes once per move with one undo for the gesture',
-  (type) => {
+const dragCases = (['pointerup', 'pointerupoutside', 'disable'] as const).flatMap((finish) =>
+  (['bone', 'slot', 'sprite', 'attachment'] as const).map((type) => ({ type, finish })),
+);
+
+test.each(dragCases)(
+  '$type drag validates and synchronizes once per move with one undo after $finish',
+  ({ type, finish }) => {
     vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
     const rig = new Rig({
       root: 'root',
@@ -102,8 +106,18 @@ test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
     assert.equal(puppet.syncPose.mock.calls.length, 2);
     assert.equal(parse.mock.calls.length, 0, 'refresh does not rebuild and parse a rig');
     assert.equal(onChange.mock.calls.length, 2);
-    emit('pointerup', 22, 28);
-    assert.equal(validate.mock.calls.length, 2, 'pointerup does not revalidate the same edit');
+    assert.isFalse(editor.state.canUndo);
+    if (finish === 'disable') {
+      editor.disable();
+      editor.disable();
+      editor.enable();
+    } else {
+      emit(finish, 22, 28);
+      emit('pointerup', 22, 28);
+    }
+    emit('pointermove', 100, 100);
+    assert.equal(validate.mock.calls.length, 2, 'finishing the drag does not revalidate the same edit');
+    assert.isTrue(editor.state.canUndo);
     assert.equal(editor.state.historyLength, 1);
     const current = () =>
       type === 'bone'
