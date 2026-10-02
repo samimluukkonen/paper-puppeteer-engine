@@ -74,6 +74,40 @@ test('inspector typing keeps focus and Tab groups each field into one undo', asy
   await expect(page.locator('#undo')).toBeDisabled();
 });
 
+for (const name of ['head', '◇ headVisual']) {
+  test(`${name} degree readout updates while typing and tabbing without replacing inputs`, async ({ page }) => {
+    await page.getByRole('treeitem', { name, exact: true }).click();
+    const rotation = page.locator('#inspector input[data-field="rotation"]');
+    const scaleX = page.locator('#inspector input[data-field="scaleX"]');
+    const degrees = page.locator('#inspector [data-derived="rotation-degrees"]');
+    const originalRotation = await rotation.elementHandle();
+    const originalScaleX = await scaleX.elementHandle();
+    await expect(degrees).toHaveText('0°');
+    await rotation.fill('0.5');
+    await expect(rotation).toBeFocused();
+    await expect(degrees).toHaveText('28.6479°');
+    await rotation.press('Tab');
+    await expect(scaleX).toBeFocused();
+    await expect(degrees).toHaveText('28.6479°');
+    expect(
+      await originalRotation!.evaluate(
+        (input) => input === document.querySelector('#inspector input[data-field="rotation"]'),
+      ),
+    ).toBe(true);
+    expect(
+      await originalScaleX!.evaluate(
+        (input) => input === document.querySelector('#inspector input[data-field="scaleX"]'),
+      ),
+    ).toBe(true);
+    await page.locator('#undo').click();
+    await expect(rotation).toHaveValue('0');
+    await expect(degrees).toHaveText('0°');
+    await page.locator('#redo').click();
+    await expect(rotation).toHaveValue('0.5');
+    await expect(degrees).toHaveText('28.6479°');
+  });
+}
+
 test('exported, original and imported reloads keep controls attached to the active editor', async ({ page }) => {
   const original = await (await page.request.get('/characters/demo-puppet/rig.json')).text();
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();

@@ -49,7 +49,16 @@ const numberRow = (name: string, value: number | undefined, scope: string, field
   `<label class="property"><span>${escapeHtml(name)}</span><input type="number" step="any" value="${format(value, fallback)}" data-scope="${scope}" data-field="${field}"></label>`;
 const rotationRows = (value: number | undefined, scope: string): string =>
   numberRow('rotation (rad)', value, scope, 'rotation') +
-  row('rotation (deg)', `${format(((value ?? 0) * 180) / Math.PI)}°`);
+  `<div class="property"><span>rotation (deg)</span><strong data-derived="rotation-degrees">${format(((value ?? 0) * 180) / Math.PI)}°</strong></div>`;
+
+function updateInspectorLabels(current: RigEditor): void {
+  const { state } = current;
+  const selection = state.selection;
+  if (!selection) return;
+  const selected = selection.type === 'bone' ? state.getBone(selection.id) : state.getSlot(selection.id);
+  for (const label of inspector.querySelectorAll<HTMLElement>('[data-derived="rotation-degrees"]'))
+    label.textContent = `${format(((selected.rotation ?? 0) * 180) / Math.PI)}°`;
+}
 
 function updateStatus(current: RigEditor): void {
   const isDirty = current.state.dirty;
@@ -178,17 +187,24 @@ inspector.addEventListener('input', (event) => {
       );
     input.setCustomValidity('');
     updateStatus(editor);
+    updateInspectorLabels(editor);
   } catch (error) {
     input.setCustomValidity(String(error));
     input.reportValidity();
   }
 });
 inspector.addEventListener('change', () => {
-  if (editor) updateStatus(editor);
+  if (editor) {
+    updateStatus(editor);
+    updateInspectorLabels(editor);
+  }
 });
 inspector.addEventListener('focusout', (event) => {
   editor?.state.endOperation();
-  if (editor) updateStatus(editor);
+  if (editor) {
+    updateStatus(editor);
+    updateInspectorLabels(editor);
+  }
   // During native Tab navigation activeElement can still be the body at focusout.
   // Preserve the inputs when the browser is about to focus another inspector field.
   const next = event.relatedTarget;
