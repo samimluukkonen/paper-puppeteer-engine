@@ -20,6 +20,32 @@ const rig = new Rig({
 const animation = { name: 'idle', duration: 100, loop: true, tracks: {} };
 const pose = { version: 1 as const, name: 'rest', bones: {} };
 const ik = { name: 'armIK', rootBone: 'root', middleBone: 'arm', endBone: 'hand' };
+
+test.each(['bone', 'attachment'])('%s assets validate textures and frames before allocating objects', (owner) => {
+  for (const frame of ['missing', 0]) {
+    const sprite = { texture: 'atlas', frame };
+    const assetRig = new Rig({
+      root: 'root',
+      bones: [{ id: 'root', ...(owner === 'bone' ? { sprite } : {}) }],
+      attachments: owner === 'attachment' ? [{ id: 'item', ...sprite }] : [],
+    });
+    const scene = puppetScene();
+    const allocate = vi.spyOn(scene.add, 'container');
+    const has = vi.fn(() => false);
+    scene.textures.get = vi.fn(() => ({ has })) as unknown as typeof scene.textures.get;
+    assert.throws(() => new Puppet(scene, { rig: assetRig }), new RegExp(`Missing frame.*${owner}`));
+    assert.deepEqual(has.mock.calls, [[String(frame)]]);
+    assert.equal(allocate.mock.calls.length, 0);
+    has.mockClear();
+    scene.textures.exists = () => false;
+    assert.throws(() => new Puppet(scene, { rig: assetRig }), new RegExp(`Missing texture.*${owner}`));
+    assert.equal(has.mock.calls.length, 0);
+    assert.equal(allocate.mock.calls.length, 0);
+    scene.textures.exists = () => true;
+    has.mockImplementation(() => true);
+    new Puppet(scene, { rig: assetRig, autoUpdate: false }).destroy();
+  }
+});
 const cases: { name: string; options: PuppetOptions; error: RegExp }[] = [
   { name: 'invalid animation', options: { rig, animations: [{ ...animation, duration: 0 }] }, error: /duration/ },
   {

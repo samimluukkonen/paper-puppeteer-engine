@@ -80,17 +80,16 @@ export class Puppet {
     const rig = options.rig ?? options.definition?.rig;
     if (!rig) throw new Error('Puppet requires a rig or character definition.');
     this.rig = rig instanceof Rig ? rig : new Rig(rig);
+    const validateSpriteAsset = (sprite: { texture: string; frame?: string | number }, owner: string): void => {
+      if (!scene.textures.exists(sprite.texture))
+        throw new Error(`Missing texture "${sprite.texture}" for ${owner}.`);
+      if (sprite.frame !== undefined && !scene.textures.get(sprite.texture).has(String(sprite.frame)))
+        throw new Error(`Missing frame "${sprite.frame}" for ${owner}.`);
+    };
     for (const bone of this.rig.bones) {
-      if (bone.sprite && !scene.textures.exists(bone.sprite.texture)) {
-        throw new Error(`Missing texture "${bone.sprite.texture}" for bone "${bone.id}".`);
-      }
+      if (bone.sprite) validateSpriteAsset(bone.sprite, `bone "${bone.id}"`);
     }
-    for (const attachment of this.rig.attachments) {
-      if (!scene.textures.exists(attachment.texture))
-        throw new Error(`Missing texture "${attachment.texture}" for attachment "${attachment.id}".`);
-      if (attachment.frame !== undefined && !scene.textures.get(attachment.texture).has(String(attachment.frame)))
-        throw new Error(`Missing frame "${attachment.frame}" for attachment "${attachment.id}".`);
-    }
+    for (const attachment of this.rig.attachments) validateSpriteAsset(attachment, `attachment "${attachment.id}"`);
     for (const [label, value] of Object.entries({
       x: options.x ?? 0,
       y: options.y ?? 0,
