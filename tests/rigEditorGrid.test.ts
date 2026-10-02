@@ -31,3 +31,19 @@ test('normal zoom shows distinct line spacing for each grid size', () => {
   assert.isAbove(counts[1]!, counts[2]!);
   assert.isAbove(counts[2]!, counts[3]!);
 });
+
+test.each([1e20, -(2 ** 53)])('grid generation terminates when translation %s loses stride precision', (tx) => {
+  const lines = gridLines({ a: 1, b: 0, c: 0, d: 1, tx, ty: 0 }, 800, 600, 1);
+  assert.isAbove(lines.length, 0);
+  assert.isAtMost(lines.length, 1602);
+  for (const line of lines)
+    assert.isTrue([line.index, line.start.x, line.start.y, line.end.x, line.end.y].every(Number.isFinite));
+});
+
+test('grid ignores nonfinite inputs and overflowing inverse coordinates', () => {
+  const transform = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
+  assert.deepEqual(gridLines(transform, Infinity, 600, 1), []);
+  assert.deepEqual(gridLines(transform, 800, NaN, 1), []);
+  assert.deepEqual(gridLines({ ...transform, tx: Infinity }, 800, 600, 1), []);
+  assert.deepEqual(gridLines({ ...transform, a: 0.0001, d: 0.0001, tx: 1e308 }, 800, 600, 1), []);
+});
