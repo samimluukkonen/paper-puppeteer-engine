@@ -93,6 +93,7 @@ function fixture() {
     getIK: (id: string) => constraints.get(id)!,
     preparePose: vi.fn(),
     syncPose: vi.fn(),
+    refreshDebugViews: vi.fn(),
     setDebugLabelSide: vi.fn(),
     getRenderOrder: () => renderOrder,
     setRenderOrder: vi.fn((order: readonly string[]) => {

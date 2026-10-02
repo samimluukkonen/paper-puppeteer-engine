@@ -125,7 +125,7 @@ One local run of the extended profile on Node 24.19.0 measured the following. Sy
 | Head crossing sweep | 79.76 | 77.25 | 1.02 / 2 | 1.39 / 3 |
 | Upper-body grip | 82.71 | 74.18 | 1.00 / 1 | 1.00 / 1 |
 
-The correction loops can dominate out-of-reach frames: each extra sync restores the pose, projects all bones, executes IK, and updates debug views. Their existing iteration limits preserve grip behavior; this change caches demo render order and skips depth updates/sorting when the order is already applied. The profile covers the remaining cost for future targeted optimization.
+The correction loops can dominate out-of-reach frames: each extra sync restores the pose, projects all bones, and executes IK. The demo defers debug overlays until the final corrected pose and caches render order to skip depth updates/sorting when the order is already applied. Existing iteration limits preserve grip behavior. The profile reports debug refreshes as well as pose synchronization counts and covers the remaining cost for future targeted optimization. Each profiling case has a 30-second timeout to accommodate slower machines.
 
 A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
 
@@ -543,6 +543,8 @@ puppet.animationPlayer.update(delta);
 // Apply any custom procedural pose edits here.
 puppet.syncPose();
 ```
+
+Hosts making several corrective IK passes in a frame can call `puppet.syncPose({ updateDebug: false })`, then `puppet.refreshDebugViews()` after the final pass. Bone and attachment transforms remain synchronized for dependent target providers during every pass; overlays read the final pose without running another solve.
 
 Constraint `status` reports `inactive`, `solved`, `clamped`, `singular-transform`, or `unsupported-scale`. `resolvedTarget`, `lengthA`, and `lengthB` expose the last solve's diagnostics. `puppet.setIKDebug(true)` controls the separate IK overlay; `setDebug(true)` still controls the existing bone overlay. Displayed lengths are in the chain parent's solve coordinates.
 

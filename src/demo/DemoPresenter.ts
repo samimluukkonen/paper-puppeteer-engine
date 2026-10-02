@@ -103,8 +103,9 @@ export class DemoPresenter {
     this.katana.configureArms(this.handTarget, options.handIK, options.upperBody);
     const feet = this.feet.update(options.footIK);
     this.katana.setInitialRotation();
-    this.puppet.syncPose();
-    this.katana.solveGrip(this.handTarget, options.handIK, options.upperBody);
+    this.puppet.syncPose({ updateDebug: false });
+    this.katana.solveGrip(this.handTarget, options.handIK, options.upperBody, { updateDebug: false });
+    this.puppet.refreshDebugViews();
     this.drawTargets(options, feet.targets, feet.walkFeet);
   }
 

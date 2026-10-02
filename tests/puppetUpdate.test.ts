@@ -1,6 +1,9 @@
 import { afterEach, assert, test, vi } from 'vitest';
+import { IKDebug } from '../src/engine/ik/IKDebug.js';
 import { Puppet } from '../src/engine/Puppet.js';
+import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { PuppetRenderer } from '../src/engine/PuppetRenderer.js';
+import { SlotDebug } from '../src/engine/SlotDebug.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -96,7 +99,7 @@ test.each(['disabled', 'zero mix', 'no target', 'empty provider', 'unsupported s
   },
 );
 
-test('later providers see both bone and descendant slot projections after earlier IK', () => {
+test.each([false, true])('later providers see synchronized projections with deferred debug: %s', (deferred) => {
   const { puppet, constraint } = fixture();
   constraint.setTarget(60, 70);
   const image = puppet.getSlotImage('item')!;
@@ -118,12 +121,21 @@ test('later providers see both bone and descendant slot projections after earlie
   });
   const sync = vi.spyOn(PuppetRenderer.prototype, 'sync');
   const partial = vi.spyOn(PuppetRenderer.prototype, 'syncBone');
-  for (let frame = 0; frame < 5; frame += 1) puppet.update(16);
+  const debug = [PuppetDebug, IKDebug, SlotDebug].map((view) => vi.spyOn(view.prototype, 'update'));
+  for (let frame = 0; frame < 5; frame += 1) {
+    if (deferred) puppet.syncPose({ updateDebug: false });
+    else puppet.update(16);
+  }
   assert.equal(sync.mock.calls.length, 5);
   assert.equal(partial.mock.calls.length, 20);
   const end = puppet.getBone('otherHand').container.getWorldTransformMatrix();
   assert.approximately(end.tx, observed!.x, 1e-8);
   assert.approximately(end.ty, observed!.y, 1e-8);
+  for (const update of debug) assert.equal(update.mock.calls.length, deferred ? 0 : 5);
+  const solved = { ...puppet.getBone('otherUpper').pose };
+  puppet.refreshDebugViews();
+  for (const update of debug) assert.equal(update.mock.calls.length, deferred ? 1 : 6);
+  assert.deepEqual(puppet.getBone('otherUpper').pose, solved);
 });
 
 test('dynamic priorities retain registration order for ties', () => {

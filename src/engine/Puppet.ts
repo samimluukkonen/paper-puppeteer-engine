@@ -42,6 +42,11 @@ interface PuppetSettings {
 export type PuppetOptions = PuppetSettings &
   ({ rig: RigDefinition | Rig; definition?: never } | { definition: CharacterDefinition; rig?: never });
 
+export interface SyncPoseOptions {
+  /** Defer overlays during repeated solves; call refreshDebugViews() after the final pass. */
+  updateDebug?: boolean;
+}
+
 export class Puppet {
   readonly rig: Rig;
   readonly container: Phaser.GameObjects.Container;
@@ -579,7 +584,7 @@ export class Puppet {
   }
 
   /** Apply the evaluated pose, solve IK in priority order, then project rendering. */
-  syncPose(): void {
+  syncPose(options: SyncPoseOptions = {}): void {
     if (this.destroyed) return;
     this.preparePose();
     if (this.activePose) applyPoseToJoints(this.activePose.pose, this.bones, this.activePose.mix, this.poseUnderlying);
@@ -606,6 +611,15 @@ export class Puppet {
       // Even a failing target provider must leave earlier IK passes restorable.
       this.ikPose.commit();
     }
+    if (options.updateDebug !== false) this.updateDebugViews(constraints);
+  }
+
+  /** Refresh overlays from the final synchronized pose without running animation or IK again. */
+  refreshDebugViews(): void {
+    if (!this.destroyed) this.updateDebugViews(this.orderedIK());
+  }
+
+  private updateDebugViews(constraints: readonly TwoBoneIKConstraint[]): void {
     this.debugView.container.setDepth(this.container.depth + 1);
     this.debugView.update();
     this.ikDebugView.container.setDepth(this.container.depth + 2);

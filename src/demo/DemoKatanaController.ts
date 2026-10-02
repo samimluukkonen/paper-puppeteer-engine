@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Facing, IKTarget, Puppet } from '../engine/index.js';
+import type { Facing, IKTarget, Puppet, SyncPoseOptions } from '../engine/index.js';
 import type { Katana } from './Katana.js';
 import { katanaGrips } from './Katana.js';
 import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from './katanaArmTarget.js';
@@ -53,10 +53,10 @@ export class DemoKatanaController {
     this.katana.container.setRotation(this.swordAngle);
   }
 
-  solveGrip(handTarget: IKTarget, handIK: boolean, upperBody: boolean): void {
+  solveGrip(handTarget: IKTarget, handIK: boolean, upperBody: boolean, syncOptions: SyncPoseOptions = {}): void {
     if (this.attached) this.aimKatana(this.swordAngle);
     if (this.slotKatana) this.aimSlotKatana(this.swordAngle);
-    this.keepBothHandsOnKatana(handTarget, handIK, upperBody);
+    this.keepBothHandsOnKatana(handTarget, handIK, upperBody, syncOptions);
   }
 
   getSecondaryTarget(): IKTarget | undefined {
@@ -118,7 +118,12 @@ export class DemoKatanaController {
     });
   }
 
-  private keepBothHandsOnKatana(handTarget: IKTarget, handIK: boolean, upperBody: boolean): void {
+  private keepBothHandsOnKatana(
+    handTarget: IKTarget,
+    handIK: boolean,
+    upperBody: boolean,
+    syncOptions: SyncPoseOptions,
+  ): void {
     if (!this.attached || (!handIK && !upperBody) || (this.puppet.currentAnimation !== 'sword' && !upperBody)) {
       this.previousRearPalm = undefined;
       return;
@@ -197,7 +202,7 @@ export class DemoKatanaController {
       target.x += correction.x;
       target.y += correction.y;
       primaryArm.setTarget(target);
-      this.puppet.syncPose();
+      this.puppet.syncPose(syncOptions);
     }
     if (this.previousRearPalm && headBounds) {
       let palm = rearPalm();
@@ -206,7 +211,7 @@ export class DemoKatanaController {
         target.x += next.x - palm.x;
         target.y += next.y - palm.y;
         primaryArm.setTarget(target);
-        this.puppet.syncPose();
+        this.puppet.syncPose(syncOptions);
         palm = rearPalm();
       }
       // The bounded path may pass just outside the second arm's reach even
@@ -229,7 +234,7 @@ export class DemoKatanaController {
         target.x += correction.x;
         target.y += correction.y;
         primaryArm.setTarget(target);
-        this.puppet.syncPose();
+        this.puppet.syncPose(syncOptions);
         palm = rearPalm();
       }
     }

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { assert, test, vi } from 'vitest';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { idle, sword, walk } from '../src/demo/demoAnimations.js';
@@ -9,6 +8,7 @@ import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
+import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -29,7 +29,7 @@ vi.mock('phaser', () => ({
 // Run with VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose.
 // Warmed medians measure CPU evaluation with a minimal scene, excluding browser/GPU costs.
 function profile(name: string, frame: () => void, report?: () => string) {
-  test.skipIf(import.meta.env.VITE_PROFILE !== '1')(name, () => {
+  test.skipIf(import.meta.env.VITE_PROFILE !== '1')(name, { timeout: 30000 }, () => {
     for (let index = 0; index < 1000; index += 1) frame();
     const samples: number[] = [];
     for (let batch = 0; batch < 7; batch += 1) {
@@ -99,15 +99,7 @@ profile('36 bones, one active and 12 inactive IK constraints', () => puppet.upda
 
 for (const facing of ['left', 'right'] as const) {
   for (const workload of ['walk', 'sword-reachable', 'sword-clamped', 'sword-head-sweep', 'upper-body'] as const) {
-    const scene = puppetScene();
-    const originalImage = scene.add.image.bind(scene.add);
-    scene.add.image = (x, y, texture, frame) => {
-      const image = originalImage(x, y, texture, frame);
-      const png = readFileSync(new URL(`../public/characters/demo-puppet/images/${texture}.png`, import.meta.url));
-      image.width = png.readUInt32BE(16);
-      image.height = png.readUInt32BE(20);
-      return image;
-    };
+    const scene = demoPuppetScene();
     const demo = new Puppet(scene, {
       rig: demoRig,
       animations: [idle, walk, sword],
@@ -121,9 +113,15 @@ for (const facing of ['left', 'right'] as const) {
     const presenter = new DemoPresenter(scene, demo);
     const syncPose = demo.syncPose.bind(demo);
     let syncs = 0;
-    demo.syncPose = () => {
+    demo.syncPose = (options) => {
       syncs += 1;
-      syncPose();
+      syncPose(options);
+    };
+    const refreshDebugViews = demo.refreshDebugViews.bind(demo);
+    let debugRefreshes = 0;
+    demo.refreshDebugViews = () => {
+      debugRefreshes += 1;
+      refreshDebugViews();
     };
     let frames = 0,
       totalSyncs = 0,
@@ -157,9 +155,10 @@ for (const facing of ['left', 'right'] as const) {
         frames += 1;
       },
       () => {
+        assert.equal(debugRefreshes, frames, 'overlays refresh once per final presentation frame');
         if (workload === 'sword-head-sweep' || workload === 'sword-clamped')
           assert.isAbove(correctionFrames, 0, 'profile exercises the katana correction loops');
-        return `syncPose/frame: mean ${(totalSyncs / frames).toFixed(2)}, max ${maxSyncs}; corrections on ${((correctionFrames / frames) * 100).toFixed(1)}% of frames (includes warmup)`;
+        return `syncPose/frame: mean ${(totalSyncs / frames).toFixed(2)}, max ${maxSyncs}; debug refreshes/frame: ${(debugRefreshes / frames).toFixed(2)}; corrections on ${((correctionFrames / frames) * 100).toFixed(1)}% of frames (includes warmup)`;
       },
     );
   }
