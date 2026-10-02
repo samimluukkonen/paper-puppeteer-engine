@@ -1,4 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test';
+import type { RigJsonDefinition } from '../../src/engine/externalData.js';
 
 const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
@@ -21,6 +22,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('a canvas drag released outside commits one undo and stops moving', async ({ page }) => {
+  const hierarchy = page.locator('#hierarchy');
+  const originalEntries = await hierarchy.getByRole('treeitem').elementHandles();
   const canvas = page.locator('#editor-stage canvas');
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
@@ -47,6 +50,50 @@ test('a canvas drag released outside commits one undo and stops moving', async (
   await page.locator('#redo').click();
   await expect(field(page, 'x')).toHaveValue(editedX);
   await expect(field(page, 'y')).toHaveValue(editedY);
+  expect(
+    await hierarchy.evaluate(
+      (tree, entries) =>
+        tree.children.length === entries.length && entries.every((entry, index) => tree.children[index] === entry),
+      originalEntries,
+    ),
+  ).toBe(true);
+});
+
+test('hierarchy selection retains button focus and rebuilds for a different imported rig', async ({ page }) => {
+  const head = page.getByRole('treeitem', { name: 'head', exact: true });
+  const slot = page.getByRole('treeitem', { name: '◇ headVisual', exact: true });
+  await head.click();
+  await expect(head).toBeFocused();
+  await expect(head).toHaveAttribute('aria-selected', 'true');
+  await slot.click();
+  await expect(slot).toBeFocused();
+  await expect(slot).toHaveAttribute('aria-selected', 'true');
+  await expect(head).toHaveAttribute('aria-selected', 'false');
+  const original = (await (await page.request.get('/characters/demo-puppet/rig.json')).json()) as RigJsonDefinition;
+  const imported: RigJsonDefinition = {
+    ...original,
+    bones: [
+      ...original.bones,
+      { id: 'importedRoot', parent: original.root },
+      { id: 'importedChild', parent: 'importedRoot', y: 20 },
+    ],
+    slots: [...(original.slots ?? []), { id: 'importedVisual', bone: 'importedChild' }],
+  };
+  await page.locator('#load-json').setInputFiles({
+    name: 'different.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(imported)),
+  });
+  const hierarchy = page.locator('#hierarchy');
+  await expect(page.locator('#action-feedback')).toHaveText('different.json loaded and validated.');
+  await expect(hierarchy.getByRole('treeitem')).toHaveCount(imported.bones.length + imported.slots!.length);
+  await expect(hierarchy.locator('[aria-selected="true"]')).toHaveCount(0);
+  await page.getByRole('treeitem', { name: 'importedChild', exact: true }).click();
+  await expect(page.locator('#inspector h3')).toHaveText('Bone: importedChild');
+  await expect(field(page, 'y')).toHaveValue('20');
+  await page.getByRole('treeitem', { name: '◇ importedVisual', exact: true }).click();
+  await expect(page.locator('#inspector h3')).toHaveText('Slot: importedVisual');
+  await expect(hierarchy.locator('[aria-selected="true"]')).toHaveText('◇ importedVisual');
 });
 
 test('inspector typing keeps focus and Tab groups each field into one undo', async ({ page }) => {
