@@ -359,7 +359,17 @@ export class AnimationPlayer {
       transition.source instanceof Map
         ? transition.source
         : evaluateClip(transition.source.clip, this.sampleTime(transition.source.clip, transition.source.time));
-    return blendPose(underlying, source, target, this.transitionWeight(state, transition));
+    const blended = blendPose(underlying, source, target, this.transitionWeight(state, transition));
+    // Keep ownership sparse when this evaluated pose becomes an interrupted fade's source.
+    const pose: AnimationPose = new Map();
+    for (const [id, values] of source) pose.set(id, { ...values });
+    for (const [id, values] of target) pose.set(id, { ...pose.get(id), ...values });
+    for (const [id, values] of pose) {
+      for (const property of transformProperties) {
+        if (values[property] !== undefined) values[property] = blended.get(id)![property]!;
+      }
+    }
+    return pose;
   }
 
   private evaluateBufferedLayer(layer: AnimationLayer, underlying: AnimationPose): AnimationPose {

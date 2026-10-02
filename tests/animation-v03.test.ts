@@ -66,6 +66,48 @@ test('interrupted fades retain independent snapshots across later buffered evalu
   }
 });
 
+test.each([1, 0.5, 0])('interrupted arm-only overlay fades preserve sparse ownership at weight %s', (weight) => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'walk',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      leg: [
+        { time: 0, x: 0 },
+        { time: 1000, x: 100 },
+      ],
+    },
+  });
+  player.addAnimation({ name: 'raise', duration: 1000, loop: true, tracks: { arm: [{ time: 0, x: 20 }] } });
+  player.addAnimation({ name: 'reach', duration: 1000, loop: true, tracks: { arm: [{ time: 0, x: 40 }] } });
+  player.play('walk');
+  player.setLayerWeight('upper', weight);
+  const arm = joints.get('arm')!;
+  arm.pose.y = 42;
+  joints.get('root')!.pose.rotation = 0.25;
+  player.play('raise', { layer: 'upper', fadeDuration: 200 });
+  player.update(100);
+  assert.strictEqual(arm.pose.x, 10 + 5 * weight);
+  player.play('reach', { layer: 'upper', fadeDuration: 200 });
+  assert.strictEqual(arm.pose.x, 10 + 5 * weight);
+  player.update(50);
+  assert.strictEqual(joints.get('leg')!.pose.x, 15);
+  assert.strictEqual(arm.pose.x, 10 + 11.25 * weight);
+  assert.strictEqual(arm.pose.y, 42);
+  assert.strictEqual(joints.get('root')!.pose.rotation, 0.25);
+  player.setLayerWeight('upper', 1);
+  assert.strictEqual(arm.pose.x, 21.25);
+  player.play('raise', { layer: 'upper', fadeDuration: 200 });
+  player.update(50);
+  assert.strictEqual(joints.get('leg')!.pose.x, 20);
+  assert.strictEqual(arm.pose.y, 42);
+  player.clearLayer('upper');
+  assert.strictEqual(arm.pose.x, 10);
+  assert.strictEqual(arm.pose.y, 42);
+  assert.strictEqual(joints.get('root')!.pose.rotation, 0.25);
+});
+
 test('shared clips on separate layers keep independent evaluation times and sparse ownership', () => {
   const { player, joints } = fixture();
   player.addAnimation({
