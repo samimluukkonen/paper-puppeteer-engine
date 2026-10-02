@@ -39,6 +39,8 @@ The exported file keeps the rig name and IDs. Skin files from `character.json` s
 
 Undo history retains the most recent 100 operations by default, dropping the oldest entries as the limit is reached. Embedded editors can configure this with `new RigEditorState(rig, rigFile, { historyLimit: 250 })`; pass that state to `RigEditor`. The limit must be a nonnegative safe integer; zero disables undo/redo. Grouped drags and field edits count as one operation. Saved baselines and full-rig reset remain available after older history is dropped.
 
+Field values are checked immediately while editing. Full rig validation runs when a drag or numeric field session finishes; the panel shows Pending during edits. Validate and export always check the current rig, including unfinished edits.
+
 | Key | Action |
 | --- | --- |
 | `1` | Play / restart idle |

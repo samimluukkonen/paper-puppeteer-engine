@@ -100,6 +100,7 @@ export class RigEditorState {
   private saved: string;
   private cachedSnapshot: string | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
+  private validationDirty = true;
   private readonly past: HistoryEntry[] = [];
   private readonly future: HistoryEntry[] = [];
   private operation: HistoryEntry | undefined;
@@ -148,7 +149,7 @@ export class RigEditorState {
 
   private invalidate(): void {
     this.cachedSnapshot = undefined;
-    this.cachedIssues = undefined;
+    this.validationDirty = true;
   }
 
   /** Store array positions so replacing an entry during reset cannot leave stale object references. */
@@ -173,7 +174,10 @@ export class RigEditorState {
   }
 
   beginOperation(): void {
-    if (this.operation === undefined) this.operation = this.historyEntry();
+    if (this.operation === undefined) {
+      this.validationIssues();
+      this.operation = this.historyEntry();
+    }
   }
 
   endOperation(): void {
@@ -181,6 +185,7 @@ export class RigEditorState {
     const before = this.operation;
     this.operation = undefined;
     this.record(before);
+    this.updateWarnings();
   }
 
   private historyEntry(): HistoryEntry {
@@ -207,7 +212,7 @@ export class RigEditorState {
       this.invalidate();
     }
     if (this.operation === undefined) this.record(before);
-    this.updateWarnings();
+    if (this.operation === undefined) this.updateWarnings();
   }
 
   private restore(json: string): void {
@@ -299,8 +304,16 @@ export class RigEditorState {
     return Math.round(value / step) * step;
   }
 
+  get validationPending(): boolean {
+    return this.operation !== undefined && this.validationDirty;
+  }
+
+  /** During a grouped edit, retain the last full result until the operation finishes. */
   validationIssues(): readonly ValidationIssue[] {
-    this.cachedIssues ??= validateRigDefinition(this.exportCandidate());
+    if (this.cachedIssues === undefined || (this.validationDirty && this.operation === undefined)) {
+      this.cachedIssues = validateRigDefinition(this.exportCandidate());
+      this.validationDirty = false;
+    }
     return this.cachedIssues;
   }
 
@@ -428,6 +441,7 @@ export class RigEditorState {
   validate(): void {
     this.rebuildIndexes();
     this.invalidate();
+    this.cachedIssues = undefined;
     this.updateWarnings();
   }
 

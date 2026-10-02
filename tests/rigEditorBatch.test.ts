@@ -27,7 +27,7 @@ const dragCases = (['pointerup', 'pointerupoutside', 'disable'] as const).flatMa
 );
 
 test.each(dragCases)(
-  '$type drag validates and synchronizes once per move with one undo after $finish',
+  '$type drag synchronizes once per move and validates the final grouped edit after $finish',
   ({ type, finish }) => {
     vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
     const rig = new Rig({
@@ -102,7 +102,8 @@ test.each(dragCases)(
     ]) {
       emit('pointermove', x!, y!);
     }
-    assert.equal(validate.mock.calls.length, 2);
+    assert.equal(validate.mock.calls.length, 0, 'full validation waits until the drag finishes');
+    assert.isTrue(editor.state.validationPending);
     assert.equal(puppet.syncPose.mock.calls.length, 2);
     assert.equal(parse.mock.calls.length, 0, 'refresh does not rebuild and parse a rig');
     assert.equal(onChange.mock.calls.length, 2);
@@ -116,7 +117,8 @@ test.each(dragCases)(
       emit('pointerup', 22, 28);
     }
     emit('pointermove', 100, 100);
-    assert.equal(validate.mock.calls.length, 2, 'finishing the drag does not revalidate the same edit');
+    assert.equal(validate.mock.calls.length, 1, 'finishing the drag validates the final edit once');
+    assert.isFalse(editor.state.validationPending);
     assert.isTrue(editor.state.canUndo);
     assert.equal(editor.state.historyLength, 1);
     const current = () =>

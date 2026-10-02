@@ -20,10 +20,17 @@ export function createSessionController(
     dirty.textContent = isDirty ? 'Unsaved changes *' : 'No changes';
     app.querySelector('#editor-stage')!.classList.toggle('grid-active', current.state.gridSnap !== 0);
     const issues = current.state.validationIssues();
-    validation.textContent = issues.length
-      ? issues.map((issue) => `${issue.severity}: ${issue.path ?? 'rig'}: ${issue.message}`).join('\n')
-      : 'Validation: OK';
-    session.textContent = `Character: ${getScene().characterId}\nRig: ${getScene().rigFilename}\nMode: ${current.state.editMode}\nSelected: ${current.state.selection?.id ?? 'none'}\nGrid: ${current.state.gridSnap || 'Off'}\nRotation snap: ${current.state.rotationSnap ? `${current.state.rotationSnap}°` : 'Off'}\nModified: ${isDirty ? 'Yes' : 'No'}\nValidation: ${issues.some((issue) => issue.severity === 'error') ? 'Errors' : 'OK'}`;
+    const validationStatus = current.state.validationPending
+      ? 'Pending'
+      : issues.some((issue) => issue.severity === 'error')
+        ? 'Errors'
+        : 'OK';
+    validation.textContent = current.state.validationPending
+      ? 'Validation: pending until editing finishes.'
+      : issues.length
+        ? issues.map((issue) => `${issue.severity}: ${issue.path ?? 'rig'}: ${issue.message}`).join('\n')
+        : 'Validation: OK';
+    session.textContent = `Character: ${getScene().characterId}\nRig: ${getScene().rigFilename}\nMode: ${current.state.editMode}\nSelected: ${current.state.selection?.id ?? 'none'}\nGrid: ${current.state.gridSnap || 'Off'}\nRotation snap: ${current.state.rotationSnap ? `${current.state.rotationSnap}°` : 'Off'}\nModified: ${isDirty ? 'Yes' : 'No'}\nValidation: ${validationStatus}`;
     app.querySelector<HTMLButtonElement>('#undo')!.disabled = !current.state.canUndo;
     app.querySelector<HTMLButtonElement>('#redo')!.disabled = !current.state.canRedo;
     app.querySelector<HTMLButtonElement>('#reset-selected')!.disabled = !current.state.selection;

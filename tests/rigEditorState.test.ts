@@ -145,6 +145,51 @@ test('cached status follows grouped edits, resets, and asynchronous save baselin
   assert.isFalse(state.dirty);
 });
 
+test('a grouped edit validates a large rig once on completion while scalar checks stay immediate', () => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [{ id: 'root' }, ...Array.from({ length: 500 }, (_, i) => ({ id: `bone${i}`, parent: 'root' }))],
+    }),
+  );
+  const validation = vi.spyOn(externalData, 'validateRigDefinition');
+  try {
+    const originalIssues = state.validationIssues();
+    state.beginOperation();
+    for (let x = 1; x <= 100; x += 1) {
+      state.editBone('bone499', 'x', x);
+      assert.strictEqual(state.validationIssues(), originalIssues);
+      assert.isTrue(state.validationPending);
+    }
+    assert.equal(validation.mock.calls.length, 1);
+    assert.throws(() => state.editBone('bone499', 'length', -1), /negative/);
+    assert.throws(() => state.editBone('bone499', 'x', Number.NaN), /finite/);
+    assert.equal(state.getBone('bone499').x, 100);
+    state.endOperation();
+    assert.equal(validation.mock.calls.length, 2);
+    assert.isFalse(state.validationPending);
+    assert.deepEqual(state.validationIssues(), []);
+    assert.equal(state.historyLength, 1);
+  } finally {
+    validation.mockRestore();
+  }
+});
+
+test('explicit validation and export detect errors before a grouped edit finishes', () => {
+  const state = new RigEditorState(source);
+  state.beginOperation();
+  state.editSlot('handVisual', 'y', 12);
+  (state.getSlot('handVisual') as { bone: string }).bone = 'missing';
+  state.validate();
+  assert.isFalse(state.validationPending);
+  assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
+  state.editSlot('handVisual', 'y', 15);
+  assert.isTrue(state.validationPending);
+  assert.throws(() => state.exportJson(false), /unknown bone/);
+  assert.isFalse(state.validationPending);
+  assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
+});
+
 test('explicit validation refreshes cached status after a direct working-copy mutation', () => {
   const state = new RigEditorState(source);
   assert.isFalse(state.dirty);
