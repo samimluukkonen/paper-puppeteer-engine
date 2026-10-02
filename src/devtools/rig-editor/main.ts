@@ -127,6 +127,7 @@ function render(current: RigEditor): void {
   document.querySelector<HTMLSelectElement>('#edit-mode')!.value = state.editMode;
   document.querySelector<HTMLSelectElement>('#grid-snap')!.value = String(state.gridSnap);
   document.querySelector<HTMLSelectElement>('#rotation-snap')!.value = String(state.rotationSnap);
+  document.querySelector<HTMLSelectElement>('#opacity')!.value = String(state.artworkOpacity);
   document.querySelector<HTMLInputElement>('#dim-selection')!.checked = state.dimUnselected;
   for (const input of visibility.querySelectorAll<HTMLInputElement>('input'))
     input.checked = state.visibility[input.dataset.visibility as keyof typeof state.visibility];

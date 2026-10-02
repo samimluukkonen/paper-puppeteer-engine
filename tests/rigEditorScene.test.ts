@@ -227,6 +227,10 @@ test.each(['original', 'exported', 'imported'] as const)(
     artwork.checked = false;
     await artwork.dispatch('change');
     assert.isFalse(editor.state.visibility.artwork);
+    const opacity = element('#opacity');
+    opacity.value = '0.25';
+    await opacity.dispatch('change');
+    assert.equal(editor.state.artworkOpacity, 0.25);
 
     if (source === 'exported') {
       vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -243,6 +247,15 @@ test.each(['original', 'exported', 'imported'] as const)(
     assert.notStrictEqual(replacement, editor);
     assert.deepEqual(element('#visibility').querySelectorAll('input'), controls);
     assert.isTrue(artwork.checked);
+    assert.equal(opacity.value, '1');
+    assert.equal(replacement.state.artworkOpacity, 1);
+    opacity.value = '0.5';
+    await opacity.dispatch('change');
+    assert.equal(replacement.state.artworkOpacity, 0.5);
+    assert.equal(puppet.getBone('root').sprite!.alpha, 0.5);
+    assert.equal(editor.state.artworkOpacity, 0.25);
+    opacity.value = '1';
+    await opacity.dispatch('change');
     for (const control of controls) {
       const key = control.dataset.visibility as keyof typeof replacement.state.visibility;
       const previous = editor.state.visibility[key];

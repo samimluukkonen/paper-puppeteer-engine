@@ -85,6 +85,7 @@ test('exported, original and imported reloads keep controls attached to the acti
     await page.locator('#edit-mode').selectOption('sprite');
     await page.locator('#grid-snap').selectOption('5');
     await page.locator('#dim-selection').check();
+    await page.locator('#opacity').selectOption('0.25');
     await page.locator('input[data-visibility="artwork"]').uncheck();
     if (source === 'imported') {
       await page.locator('#load-json').setInputFiles({
@@ -106,6 +107,7 @@ test('exported, original and imported reloads keep controls attached to the acti
     await expect(page.locator('#edit-mode')).toHaveValue('joint');
     await expect(page.locator('#grid-snap')).toHaveValue('0');
     await expect(page.locator('#dim-selection')).not.toBeChecked();
+    await expect(page.locator('#opacity')).toHaveValue('1');
     const artwork = page.locator('input[data-visibility="artwork"]');
     await expect(artwork).toBeChecked();
     const canvas = page.locator('#editor-stage canvas');
