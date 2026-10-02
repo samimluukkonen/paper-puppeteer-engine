@@ -4,6 +4,30 @@ import { test } from './fixtures.js';
 
 const field = (page: Page, name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
 
+test('unsaved edits block navigation and refresh until exported', async ({ page }) => {
+  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await field(page, 'x').fill('12');
+  const originalUrl = page.url();
+  const rejectNavigation = async () => {
+    const dialog = await page.waitForEvent('dialog');
+    expect(dialog.type()).toBe('beforeunload');
+    await dialog.dismiss();
+  };
+  await Promise.all([rejectNavigation(), page.getByRole('link', { name: 'Engine demo' }).click()]);
+  expect(page.url()).toBe(originalUrl);
+  await expect(field(page, 'x')).toHaveValue('12');
+  await Promise.all([
+    rejectNavigation(),
+    page.evaluate(() => {
+      setTimeout(() => window.location.reload(), 0);
+    }),
+  ]);
+  await expect(field(page, 'x')).toHaveValue('12');
+  await page.locator('#log-json').click();
+  await page.getByRole('link', { name: 'Engine demo' }).click();
+  await expect(page.locator('#status-text')).toContainText('Current: idle');
+});
+
 test.beforeEach(async ({ page }) => {
   await page.goto('rig-editor/');
   await expect(page.getByRole('treeitem', { name: 'head', exact: true })).toBeVisible();

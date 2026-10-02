@@ -147,5 +147,5 @@ export function createSessionController(
     input.value = '';
   });
 
-  return { updateStatus };
+  return { updateStatus, hasUnsavedChanges: () => editor?.state.dirty ?? false };
 }

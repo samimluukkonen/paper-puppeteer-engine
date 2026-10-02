@@ -196,6 +196,7 @@ test('replaces the session only after the new editor enables successfully', () =
 
 async function panelFixture() {
   const element = stubRigEditorDom();
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
   vi.resetModules();
   await import('../src/devtools/rig-editor/main.js');
   const scene = vi.mocked(Phaser.Game).mock.lastCall![0]!.scene as RigEditorScene[];
