@@ -16,6 +16,7 @@ import { Joint } from '../src/engine/Joint.js';
 import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
 import { SlotState } from '../src/engine/SlotState.js';
 import { animationClipSchema, rigDefinitionSchema } from '../src/engine/schemas.js';
+import type { RigDefinition } from '../src/engine/types.js';
 
 const root = new URL('../public/characters/demo-puppet/', import.meta.url);
 const files = import.meta.glob('../public/characters/demo-puppet/**/*.json', { eager: true, import: 'default' });
@@ -123,6 +124,24 @@ test('character assembly validates the rig once and reuses parsed clips', () => 
   } finally {
     vi.restoreAllMocks();
   }
+});
+
+test('character assembly preserves embedded skins and lets standalone skins override matching names', () => {
+  const data = bundle();
+  const embedded = { version: 1 as const, name: 'embedded', slots: { headVisual: 'headDefault' } };
+  data.rig = {
+    ...(data.rig as RigDefinition),
+    skins: [embedded, { version: 1, name: 'default', slots: { headVisual: null } }],
+  };
+  const definition = CharacterDefinition.fromData(data);
+  const slots = new SlotState(definition.rig);
+  slots.setSkin('embedded');
+  assert.equal(slots.getAttachment('headVisual'), 'headDefault');
+  slots.setSkin('default');
+  assert.equal(slots.getAttachment('headVisual'), 'headDefault');
+  assert.equal(definition.rig.skins.filter((skin) => skin.name === 'default').length, 1);
+  assert.deepEqual(definition.rigFile?.skins, (data.rig as RigDefinition).skins);
+  assert.deepEqual(CharacterDefinition.fromData({ ...data, rig: definition.rigFile }).rig.skins, definition.rig.skins);
 });
 
 test.each([

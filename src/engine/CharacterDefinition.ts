@@ -87,7 +87,10 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     const skinIssues = validateSkinReferences(skins, source.data);
     issues.push(...prefixed(skinIssues, 'rig'));
     // Keep checking clips and poses when standalone skins have broken references.
-    result.rig = new Rig({ ...source.data, skins: skinIssues.length ? [] : skins });
+    // Standalone skins override matching names while preserving rig-only skins.
+    const mergedSkins = new Map((source.data.skins ?? []).map((skin) => [skin.name, skin]));
+    if (!skinIssues.length) for (const skin of skins) mergedSkins.set(skin.name, skin);
+    result.rig = new Rig({ ...source.data, skins: [...mergedSkins.values()] });
     const textures = new Set(Object.keys(manifest.textures));
     for (const [index, bone] of source.data.bones.entries())
       if (bone.sprite && !textures.has(bone.sprite.texture))
