@@ -12,11 +12,14 @@ export class IKPoseState {
   private readonly captured = new Set<Joint>();
   private count = 0;
 
-  restore(): void {
+  restore(onRestore?: (joint: Joint) => void): void {
     for (let index = 0; index < this.count; index += 1) {
       const state = this.rotations[index]!;
       // An explicit external pose edit takes precedence over last pass's output.
-      if (state.joint.pose.rotation === state.solved) state.joint.pose.rotation = state.base;
+      if (state.joint.pose.rotation === state.solved && state.solved !== state.base) {
+        state.joint.pose.rotation = state.base;
+        onRestore?.(state.joint);
+      }
     }
     this.count = 0;
     this.captured.clear();

@@ -590,6 +590,24 @@ export class Puppet {
     if (this.activePose) applyPoseToJoints(this.activePose.pose, this.bones, this.activePose.mix, this.poseUnderlying);
     for (const bone of this.bones.values()) bone.syncTransform();
     this.renderer.sync();
+    this.solveIK(options);
+  }
+
+  /** Rerun constraints after changing targets, mix, enabled state, offsets, bend direction, or priorities.
+   * Use syncPose() first whenever authored poses or skeleton transforms have changed.
+   * Retains active pose presets and projects only the restored/solved IK joints.
+   */
+  syncIK(options: SyncPoseOptions = {}): void {
+    if (this.destroyed) return;
+    this.ikPose.restore((joint) => {
+      const bone = this.getBone(joint.id);
+      bone.syncTransform();
+      this.renderer.syncBone(bone.id);
+    });
+    this.solveIK(options);
+  }
+
+  private solveIK(options: SyncPoseOptions): void {
     const constraints = this.orderedIK(true);
     for (const constraint of constraints) {
       this.ikPose.captureJoint(this.getBone(constraint.rootBone));

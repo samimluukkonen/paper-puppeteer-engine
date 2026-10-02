@@ -132,6 +132,14 @@ for (const facing of ['left', 'right'] as const) {
       syncs += 1;
       syncPose(options);
     };
+    const syncIK = demo.syncIK.bind(demo);
+    let ikSyncs = 0;
+    demo.syncIK = (options) => {
+      ikSyncs += 1;
+      // Compare the same correction workload with the previous full-sync path.
+      if (import.meta.env.VITE_PROFILE_FULL_IK_SYNC === '1') demo.syncPose(options);
+      else syncIK(options);
+    };
     const refreshDebugViews = demo.refreshDebugViews.bind(demo);
     let debugRefreshes = 0;
     demo.refreshDebugViews = () => {
@@ -141,6 +149,8 @@ for (const facing of ['left', 'right'] as const) {
     let frames = 0,
       totalSyncs = 0,
       maxSyncs = 0,
+      totalIKSyncs = 0,
+      maxIKSyncs = 0,
       correctionFrames = 0;
     profile(
       `demo ${facing}, ${workload}`,
@@ -154,6 +164,7 @@ for (const facing of ['left', 'right'] as const) {
               ? { x: 380 + direction * Math.sin(phase) * 100, y: 220 + Math.cos(phase) * 50 }
               : { x: 380 + direction * 55, y: 320 };
         syncs = 0;
+        ikSyncs = 0;
         demo.preparePose();
         const evaluated = demo.animationPlayer.update(16);
         // Optional comparison recreates the old unconditional order application.
@@ -166,14 +177,18 @@ for (const facing of ['left', 'right'] as const) {
         );
         totalSyncs += syncs;
         maxSyncs = Math.max(maxSyncs, syncs);
-        if (syncs > 1) correctionFrames += 1;
+        totalIKSyncs += ikSyncs;
+        maxIKSyncs = Math.max(maxIKSyncs, ikSyncs);
+        if (ikSyncs > 0) correctionFrames += 1;
         frames += 1;
       },
       () => {
         assert.equal(debugRefreshes, frames, 'overlays refresh once per final presentation frame');
+        if (import.meta.env.VITE_PROFILE_FULL_IK_SYNC !== '1')
+          assert.equal(totalSyncs, frames, 'correction passes avoid full synchronization');
         if (workload === 'sword-head-sweep' || workload === 'sword-clamped')
           assert.isAbove(correctionFrames, 0, 'profile exercises the katana correction loops');
-        return `syncPose/frame: mean ${(totalSyncs / frames).toFixed(2)}, max ${maxSyncs}; debug refreshes/frame: ${(debugRefreshes / frames).toFixed(2)}; corrections on ${((correctionFrames / frames) * 100).toFixed(1)}% of frames (includes warmup)`;
+        return `syncPose/frame: mean ${(totalSyncs / frames).toFixed(2)}, max ${maxSyncs}; syncIK/frame: mean ${(totalIKSyncs / frames).toFixed(2)}, max ${maxIKSyncs}; debug refreshes/frame: ${(debugRefreshes / frames).toFixed(2)}; corrections on ${((correctionFrames / frames) * 100).toFixed(1)}% of frames (includes warmup)`;
       },
     );
   }

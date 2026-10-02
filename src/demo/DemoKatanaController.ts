@@ -181,7 +181,7 @@ export class DemoKatanaController {
       target.x += correction.x;
       target.y += correction.y;
       primaryArm.setTarget(target);
-      this.puppet.syncPose(syncOptions);
+      this.puppet.syncIK(syncOptions);
     }
     if (this.previousRearPalm && headBounds) {
       let palm = rearPalm();
@@ -190,7 +190,7 @@ export class DemoKatanaController {
         target.x += next.x - palm.x;
         target.y += next.y - palm.y;
         primaryArm.setTarget(target);
-        this.puppet.syncPose(syncOptions);
+        this.puppet.syncIK(syncOptions);
         palm = rearPalm();
       }
       // The bounded path may pass just outside the second arm's reach even
@@ -201,7 +201,7 @@ export class DemoKatanaController {
         target.x += correction.x;
         target.y += correction.y;
         primaryArm.setTarget(target);
-        this.puppet.syncPose(syncOptions);
+        this.puppet.syncIK(syncOptions);
         palm = rearPalm();
       }
     }
