@@ -34,6 +34,30 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
 });
 
+test('numeric inputs retain precision and clearing length removes the override', async ({ page }) => {
+  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await field(page, 'x').fill('0.123456789');
+  await page.getByRole('heading', { name: 'Rig Editor Bind Pose' }).click();
+  await expect(field(page, 'x')).toHaveValue('0.123456789');
+  const length = field(page, 'length');
+  await expect(length).toHaveValue('');
+  await expect(length).toHaveAttribute('placeholder', 'Auto');
+  await length.fill('25');
+  await length.press('Tab');
+  await length.fill('');
+  await length.press('Tab');
+  await page.getByRole('heading', { name: 'Rig Editor Bind Pose' }).click();
+  await expect(length).toHaveValue('');
+  await page.locator('#undo').click();
+  await expect(length).toHaveValue('25');
+  await page.locator('#redo').click();
+  await expect(length).toHaveValue('');
+  const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
+  await page.locator('#log-json').click();
+  const rig = JSON.parse((await logged).text()) as RigJsonDefinition;
+  expect(rig.bones.find((bone) => bone.id === 'head')).not.toHaveProperty('length');
+});
+
 test('a canvas drag released outside commits one undo and stops moving', async ({ page }) => {
   const hierarchy = page.locator('#hierarchy');
   const originalEntries = await hierarchy.getByRole('treeitem').elementHandles();

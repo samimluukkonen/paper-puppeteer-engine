@@ -129,7 +129,7 @@ export class RigEditor {
   editBone(
     id: string,
     field: 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'length' | 'depth',
-    value: number,
+    value: number | undefined,
     notify = true,
   ): void {
     this.state.editBone(id, field, value);
@@ -139,7 +139,7 @@ export class RigEditor {
   editSlot(
     id: string,
     field: 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'depth',
-    value: number,
+    value: number | undefined,
     notify = true,
   ): void {
     this.state.editSlot(id, field, value);
@@ -149,7 +149,7 @@ export class RigEditor {
   editSprite(
     id: string,
     field: 'x' | 'y' | 'originX' | 'originY',
-    value: number,
+    value: number | undefined,
     attachment = false,
     notify = true,
   ): void {

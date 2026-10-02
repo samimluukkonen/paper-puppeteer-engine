@@ -8,8 +8,11 @@ const escapeHtml = (value: string | number): string =>
   );
 const row = (name: string, value: string | number | undefined): string =>
   `<div class="property"><span>${escapeHtml(name)}</span><strong>${escapeHtml(value ?? '—')}</strong></div>`;
-const numberRow = (name: string, value: number | undefined, scope: string, field: string, fallback = 0): string =>
-  `<label class="property"><span>${escapeHtml(name)}</span><input type="number" step="any" value="${format(value, fallback)}" data-scope="${scope}" data-field="${field}"></label>`;
+const numberRow = (name: string, value: number | undefined, scope: string, field: string, fallback = 0): string => {
+  const automatic = field === 'length' || (scope === 'slot' && field === 'depth');
+  const displayed = value ?? (automatic ? '' : fallback);
+  return `<label class="property"><span>${escapeHtml(name)}</span><input type="number" step="any" value="${displayed}" data-scope="${scope}" data-field="${field}" placeholder="${automatic ? 'Auto' : fallback}" title="Clear to remove this override"></label>`;
+};
 const rotationRows = (value: number | undefined, scope: string): string =>
   numberRow('rotation (rad)', value, scope, 'rotation') +
   `<div class="property"><span>rotation (deg)</span><strong data-derived="rotation-degrees">${format(((value ?? 0) * 180) / Math.PI)}°</strong></div>`;
@@ -48,12 +51,8 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
   inspector.addEventListener('focusin', (event) => {
     if ((event.target as HTMLElement).matches('input[type="number"]')) editor?.state.beginOperation();
   });
-  inspector.addEventListener('input', (event) => {
+  const applyInput = (input: HTMLInputElement, value: number | undefined): void => {
     if (!editor?.state.selection) return;
-    const input = event.target as HTMLInputElement;
-    if (!input.matches('input[type="number"]') || input.value === '') return;
-    const value = Number(input.value);
-    if (!Number.isFinite(value)) return;
     const { scope, field } = input.dataset;
     const id = editor.state.selection.id;
     try {
@@ -74,8 +73,18 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       input.setCustomValidity(String(error));
       input.reportValidity();
     }
+  };
+  inspector.addEventListener('input', (event) => {
+    const input = event.target as HTMLInputElement;
+    if (!input.matches('input[type="number"]') || input.value === '') return;
+    const value = Number(input.value);
+    if (Number.isFinite(value)) applyInput(input, value);
   });
-  inspector.addEventListener('change', () => {
+  inspector.addEventListener('change', (event) => {
+    const input = event.target as HTMLInputElement;
+    // Empty values are navigation through an unfinished edit until the field is committed.
+    if (input.matches('input[type="number"]') && input.value === '' && !input.validity.badInput)
+      applyInput(input, undefined);
     if (editor) {
       updateStatus(editor);
       updateInspectorLabels(editor);

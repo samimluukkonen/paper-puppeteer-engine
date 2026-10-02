@@ -94,6 +94,18 @@ function stable(value: unknown, original: unknown): unknown {
   return value;
 }
 
+/** Undefined removes an optional authored field rather than serializing a placeholder value. */
+function patchFields<Field extends string>(
+  target: Partial<Record<Field, number>>,
+  values: Partial<Record<Field, number | undefined>>,
+): void {
+  for (const field of Object.keys(values) as Field[]) {
+    const value = values[field];
+    if (value === undefined) delete target[field];
+    else target[field] = value;
+  }
+}
+
 /** Owns editor data; the loaded rig stays untouched. */
 export class RigEditorState {
   readonly source: Rig;
@@ -428,15 +440,15 @@ export class RigEditorState {
     this.data.bones[this.boneIndices.get(bone.id)!] = freezeData(bone);
   }
 
-  editBone(id: string, field: BoneField, value: number): void {
+  editBone(id: string, field: BoneField, value: number | undefined): void {
     this.editBoneFields(id, { [field]: value });
   }
 
-  editBoneFields(id: string, values: Partial<Record<BoneField, number>>): void {
-    for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
+  editBoneFields(id: string, values: Partial<Record<BoneField, number | undefined>>): void {
+    for (const [field, value] of Object.entries(values)) if (value !== undefined) this.assertValue(field, value);
     const bone = { ...this.getBone(id) };
     this.change(() => {
-      Object.assign(bone, values);
+      patchFields(bone, values);
       this.replaceBone(bone);
       if (values.length !== undefined) {
         for (const childId of this.childrenOf(id)) {
@@ -456,32 +468,32 @@ export class RigEditorState {
     });
   }
 
-  editSlot(id: string, field: SlotField, value: number): void {
+  editSlot(id: string, field: SlotField, value: number | undefined): void {
     this.editSlotFields(id, { [field]: value });
   }
 
-  editSlotFields(id: string, values: Partial<Record<SlotField, number>>): void {
-    for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
+  editSlotFields(id: string, values: Partial<Record<SlotField, number | undefined>>): void {
+    for (const [field, value] of Object.entries(values)) if (value !== undefined) this.assertValue(field, value);
     const slot = { ...this.getSlot(id) };
     this.change(() => {
-      Object.assign(slot, values);
+      patchFields(slot, values);
       this.data.slots![this.slotIndices.get(id)!] = freezeData(slot);
     });
   }
 
-  editSprite(id: string, field: SpriteField, value: number, attachment = false): void {
+  editSprite(id: string, field: SpriteField, value: number | undefined, attachment = false): void {
     this.editSpriteFields(id, { [field]: value }, attachment);
   }
 
-  editSpriteFields(id: string, values: Partial<Record<SpriteField, number>>, attachment = false): void {
-    for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
+  editSpriteFields(id: string, values: Partial<Record<SpriteField, number | undefined>>, attachment = false): void {
+    for (const [field, value] of Object.entries(values)) if (value !== undefined) this.assertValue(field, value);
     const original = attachment ? this.getAttachment(id) : this.getBone(id).sprite;
     const sprite = original ? { ...original } : undefined;
     if (!sprite) throw new Error(`No sprite for "${id}".`);
     this.change(() => {
-      Object.assign(sprite, values);
+      patchFields(sprite, values);
       if (attachment)
-        this.data.attachments![this.attachmentIndices.get(id)!] = freezeData({ ...this.getAttachment(id), ...sprite });
+        this.data.attachments![this.attachmentIndices.get(id)!] = freezeData(sprite as SpriteAttachmentDefinition);
       else this.replaceBone({ ...this.getBone(id), sprite });
     });
   }

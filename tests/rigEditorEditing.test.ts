@@ -6,6 +6,59 @@ import { Rig } from '../src/engine/Rig.js';
 
 afterEach(() => vi.restoreAllMocks());
 
+test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
+  'removing a %s override preserves other fields and supports undo and export',
+  (type) => {
+    const state = new RigEditorState(
+      new Rig({
+        root: 'root',
+        bones: [{ id: 'root', x: 12, y: 7, sprite: { texture: 'part', x: 12, y: 7 } }],
+        slots: [{ id: 'visual', bone: 'root', x: 12, y: 7 }],
+        attachments: [{ id: 'part', texture: 'part', x: 12, y: 7 }],
+      }),
+    );
+    const read = () =>
+      type === 'bone'
+        ? state.getBone('root')
+        : type === 'slot'
+          ? state.getSlot('visual')
+          : type === 'sprite'
+            ? state.getBone('root').sprite!
+            : state.getAttachment('part');
+    if (type === 'bone') state.editBone('root', 'x', undefined);
+    else if (type === 'slot') state.editSlot('visual', 'x', undefined);
+    else state.editSprite(type === 'sprite' ? 'root' : 'part', 'x', undefined, type === 'attachment');
+    assert.isFalse(Object.hasOwn(read(), 'x'));
+    assert.equal(read().y, 7);
+    assert.isTrue(state.dirty);
+    state.exportRig(false);
+    state.undo();
+    assert.equal(read().x, 12);
+    assert.isFalse(state.dirty);
+    state.redo();
+    assert.isFalse(Object.hasOwn(read(), 'x'));
+  },
+);
+
+test('removing logical length keeps child positions and restores length on undo', () => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root', length: 20 },
+        { id: 'child', parent: 'root', y: 20 },
+      ],
+    }),
+  );
+  state.editBone('root', 'length', 30);
+  state.editBone('root', 'length', undefined);
+  assert.isUndefined(state.getBone('root').length);
+  assert.equal(state.getBone('child').y, 30);
+  assert.equal(new Rig(state.exportRig(false)).getBone('child').y, 30);
+  state.undo();
+  assert.equal(state.getBone('root').length, 30);
+});
+
 test('affine coordinate conversion handles translated, rotated and scaled parents independently of camera', () => {
   const parent = { a: 0, b: 2, c: -3, d: 0, tx: 140, ty: -20 };
   const local = { x: 7, y: -4 };
