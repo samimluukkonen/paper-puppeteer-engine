@@ -159,6 +159,7 @@ src/engine/
   AnimationPlayer.ts    Layer clocks, transitions, events and completion
   AnimationPose.ts      Pure clip evaluation and pose blending
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
+  PuppetPoseController.ts  Pose overrides, restoration, IK ordering and projection passes
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay
   PuppetRenderer.ts    Independent draw slots retaining ancestor transform chains
   SlotState.ts         Attachment selection and base/partial skin application

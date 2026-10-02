@@ -10,17 +10,20 @@ import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
-import { IKPoseState } from './ik/IKPoseState.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
-import { applyPoseToJoints, type PoseDefinition, parsePoseDefinition, serializePose } from './Pose.js';
+import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { PuppetDebug } from './PuppetDebug.js';
+import { PuppetPoseController, type SyncPoseOptions } from './PuppetPoseController.js';
+
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
 import { SlotDebug } from './SlotDebug.js';
 import { SlotState } from './SlotState.js';
 import type { AttachmentOptions, Facing, RigDefinition } from './types.js';
 import { assertFinite } from './types.js';
+
+export type { SyncPoseOptions } from './PuppetPoseController.js';
 
 interface PuppetSettings {
   x?: number;
@@ -42,11 +45,6 @@ interface PuppetSettings {
 export type PuppetOptions = PuppetSettings &
   ({ rig: RigDefinition | Rig; definition?: never } | { definition: CharacterDefinition; rig?: never });
 
-export interface SyncPoseOptions {
-  /** Defer overlays during repeated solves; call refreshDebugViews() after the final pass. */
-  updateDebug?: boolean;
-}
-
 export class Puppet {
   readonly rig: Rig;
   readonly container: Phaser.GameObjects.Container;
@@ -59,8 +57,7 @@ export class Puppet {
   private readonly slotDebugView: SlotDebug;
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
-  private readonly ikPose = new IKPoseState();
-  private readonly sortedIK: TwoBoneIKConstraint[] = [];
+  private readonly poseController: PuppetPoseController;
   private readonly ikContext: IKTransformContext = {
     worldToParent: (id, target) => {
       const parent = this.getBone(id).container.parentContainer!;
@@ -72,8 +69,6 @@ export class Puppet {
     },
   };
   private readonly poses = new Map<string, PoseDefinition>();
-  private activePose: { pose: PoseDefinition; mix: number } | undefined;
-  private readonly poseUnderlying = new Map<string, Partial<import('./types.js').JointTransform>>();
   private readonly ikDebugView: IKDebug;
   private facing: Facing;
   private destroyed = false;
@@ -143,6 +138,13 @@ export class Puppet {
     this.debugView = new PuppetDebug(scene, this.bones);
     this.renderSlots();
     this.ikDebugView = new IKDebug(scene, this.bones);
+    this.poseController = new PuppetPoseController(
+      this.bones,
+      this.ikConstraints,
+      this.ikContext,
+      this.renderer,
+      (constraints) => this.updateDebugViews(constraints),
+    );
     for (const definition of ikDefinitions) this.addIK(definition);
     this.setFacing(this.facing);
     this.setDebug(options.debug ?? false);
@@ -201,31 +203,28 @@ export class Puppet {
     const mix = options.mix ?? 1;
     if (!Number.isFinite(mix) || mix < 0 || mix > 1) throw new Error('Pose mix must be between 0 and 1.');
     this.preparePose();
-    this.activePose = { pose, mix };
+    this.poseController.setActivePose(pose, mix);
     this.syncPose();
     return this;
   }
 
   clearPose(): this {
     this.preparePose();
-    this.activePose = undefined;
+    this.poseController.clearActivePose();
     this.syncPose();
     return this;
   }
 
   /** Keep the visible authored preset values and enter direct manual editing. */
   commitPoseForEditing(): this {
-    this.ikPose.restore();
-    this.poseUnderlying.clear();
-    this.activePose = undefined;
+    this.poseController.commitPoseForEditing();
     this.syncPose();
     return this;
   }
 
   /** Excludes IK by restoring its temporary changes before taking a snapshot. */
   exportPose(name: string, options?: { epsilon?: number; onlyChanged?: boolean }): PoseDefinition {
-    this.ikPose.restore();
-    const pose = serializePose(name, this.bones, options);
+    const pose = this.poseController.exportPose(name, options);
     this.syncPose();
     return pose;
   }
@@ -318,7 +317,7 @@ export class Puppet {
 
   resetPose(): this {
     this.preparePose();
-    this.activePose = undefined;
+    this.poseController.clearActivePose();
     this.stop();
     this.animationPlayer.resetPose();
     this.syncPose();
@@ -327,7 +326,7 @@ export class Puppet {
 
   resetToBindPose(): this {
     this.preparePose();
-    this.activePose = undefined;
+    this.poseController.clearActivePose();
     this.animationPlayer.stop();
     this.animationPlayer.clearAllLayers();
     this.animationPlayer.resetPose();
@@ -514,7 +513,7 @@ export class Puppet {
 
   setIKDebug(enabled: boolean): this {
     this.ikDebugView.container.setVisible(enabled);
-    this.ikDebugView.update(this.orderedIK());
+    this.ikDebugView.update(this.poseController.getOrderedConstraints());
     return this;
   }
 
@@ -545,7 +544,7 @@ export class Puppet {
     this.attachments.clear();
     this.bones.clear();
     this.ikConstraints.clear();
-    this.ikPose.restore();
+    this.poseController.destroy();
   }
 
   private onUpdate(_time: number, delta: number): void {
@@ -554,43 +553,12 @@ export class Puppet {
 
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
   preparePose(): void {
-    this.ikPose.restore();
-    for (const [id, values] of this.poseUnderlying) Object.assign(this.getBone(id).pose, values);
-    this.poseUnderlying.clear();
-  }
-
-  private orderedIK(reuse = false): TwoBoneIKConstraint[] {
-    // Refill in registration order so priority changes retain stable ties.
-    // Debug calls use their own list, including calls made by target providers.
-    const constraints = reuse ? this.sortedIK : [];
-    constraints.length = 0;
-    for (const constraint of this.ikConstraints.values()) constraints.push(constraint);
-    return constraints.sort((a, b) => a.priority - b.priority);
-  }
-
-  private syncIKBone(bone: Bone, rotationBefore: number): void {
-    const { pose, container } = bone;
-    if (
-      pose.x === container.x &&
-      pose.y === container.y &&
-      // Phaser wraps container rotations, so compare the authored values directly.
-      pose.rotation === rotationBefore &&
-      pose.scaleX === container.scaleX &&
-      pose.scaleY === container.scaleY
-    )
-      return;
-    bone.syncTransform();
-    this.renderer.syncBone(bone.id);
+    this.poseController.preparePose();
   }
 
   /** Apply the evaluated pose, solve IK in priority order, then project rendering. */
   syncPose(options: SyncPoseOptions = {}): void {
-    if (this.destroyed) return;
-    this.preparePose();
-    if (this.activePose) applyPoseToJoints(this.activePose.pose, this.bones, this.activePose.mix, this.poseUnderlying);
-    for (const bone of this.bones.values()) bone.syncTransform();
-    this.renderer.sync();
-    this.solveIK(options);
+    if (!this.destroyed) this.poseController.syncPose(options);
   }
 
   /** Rerun constraints after changing targets, mix, enabled state, offsets, bend direction, or priorities.
@@ -598,43 +566,12 @@ export class Puppet {
    * Retains active pose presets and projects only the restored/solved IK joints.
    */
   syncIK(options: SyncPoseOptions = {}): void {
-    if (this.destroyed) return;
-    this.ikPose.restore((joint) => {
-      const bone = this.getBone(joint.id);
-      bone.syncTransform();
-      this.renderer.syncBone(bone.id);
-    });
-    this.solveIK(options);
-  }
-
-  private solveIK(options: SyncPoseOptions): void {
-    const constraints = this.orderedIK(true);
-    for (const constraint of constraints) {
-      this.ikPose.captureJoint(this.getBone(constraint.rootBone));
-      this.ikPose.captureJoint(this.getBone(constraint.middleBone));
-    }
-    try {
-      for (const constraint of constraints) {
-        const root = this.getBone(constraint.rootBone);
-        const middle = this.getBone(constraint.middleBone);
-        const rootRotation = root.pose.rotation;
-        const middleRotation = middle.pose.rotation;
-        constraint.apply(this.ikContext);
-        // Later providers may read attachments in any descendant render mount.
-        // Project only changed local transforms into all of their copies.
-        this.syncIKBone(root, rootRotation);
-        this.syncIKBone(middle, middleRotation);
-      }
-    } finally {
-      // Even a failing target provider must leave earlier IK passes restorable.
-      this.ikPose.commit();
-    }
-    if (options.updateDebug !== false) this.updateDebugViews(constraints);
+    if (!this.destroyed) this.poseController.syncIK(options);
   }
 
   /** Refresh overlays from the final synchronized pose without running animation or IK again. */
   refreshDebugViews(): void {
-    if (!this.destroyed) this.updateDebugViews(this.orderedIK());
+    if (!this.destroyed) this.updateDebugViews(this.poseController.getOrderedConstraints());
   }
 
   private updateDebugViews(constraints: readonly TwoBoneIKConstraint[]): void {
