@@ -74,6 +74,20 @@ function slotTransform(renderer: PuppetRenderer, id: string) {
   return { x, y, rotation, scaleX, scaleY };
 }
 
+test('invalid slot patches leave every transform unchanged and do not synchronize', () => {
+  const { renderer } = fixture();
+  const syncPose = vi.fn();
+  const puppet = { renderer, syncPose, setSlotTransform: Puppet.prototype.setSlotTransform } as unknown as Puppet;
+  const initial = slotTransform(renderer, 'item');
+  for (const property of ['x', 'y', 'rotation', 'scaleX', 'scaleY']) {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      assert.throws(() => puppet.setSlotTransform('item', { x: 99, y: 99, [property]: value }), /finite/);
+      assert.deepEqual(slotTransform(renderer, 'item'), initial);
+    }
+  }
+  assert.equal(syncPose.mock.calls.length, 0);
+});
+
 test.each([{ x: 8 }, { y: 0 }, { rotation: 0 }, { scaleX: 0 }, { scaleY: -2 }, {}])(
   'slot transform update %j preserves omitted values',
   (values) => {

@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
 import type { SpriteAttachmentDefinition } from './types.js';
+import { assertFinite } from './types.js';
 
 interface TransformProjection {
   source: Phaser.GameObjects.Container;
@@ -117,10 +118,14 @@ export class PuppetRenderer {
     values: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number },
   ): void {
     const mount = this.getSlotMount(id);
+    const { x, y, rotation, scaleX, scaleY } = values;
+    const patch = { x, y, rotation, scaleX, scaleY };
+    for (const [property, value] of Object.entries(patch))
+      if (value !== undefined) assertFinite(value, `Slot ${id}.${property}`);
     mount
-      .setPosition(values.x ?? mount.x, values.y ?? mount.y)
-      .setRotation(values.rotation ?? mount.rotation)
-      .setScale(values.scaleX ?? mount.scaleX, values.scaleY ?? mount.scaleY);
+      .setPosition(x ?? mount.x, y ?? mount.y)
+      .setRotation(rotation ?? mount.rotation)
+      .setScale(scaleX ?? mount.scaleX, scaleY ?? mount.scaleY);
   }
 
   setSlotDepth(id: string, depth: number): void {
