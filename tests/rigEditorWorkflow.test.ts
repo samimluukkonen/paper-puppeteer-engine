@@ -235,10 +235,15 @@ test('export is stable, data-only, valid, and preserves unedited precision', () 
   assert.equal(parseRigDefinition(result).getBone('arm').rotation, 0.5);
 });
 
-test('invalid rig blocks export with issue details', () => {
+test('invalid edits are rejected without corrupting the exported rig', () => {
   const state = make();
-  (state.workingCopy.slots![0] as { bone: string }).bone = 'missing';
-  assert.throws(() => state.exportJson(), /slots\[0\]\.bone.*unknown bone/);
+  assert.throws(() => state.editBone('arm', 'length', -1), /negative/);
+  assert.throws(() => state.editSprite('arm', 'originX', 2), /Origin/);
+  assert.throws(() => {
+    (state.workingCopy.slots![0] as { bone: string }).bone = 'missing';
+  }, TypeError);
+  assert.deepEqual(validateRigDefinition(state.exportRig(false)), []);
+  assert.isFalse(state.dirty);
 });
 
 test('sample rig edits survive serialize, parse, and runtime rig recreation', () => {

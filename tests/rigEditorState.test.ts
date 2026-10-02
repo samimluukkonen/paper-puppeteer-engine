@@ -35,9 +35,8 @@ test('hierarchy is parent first and the working copy is independent', () => {
     { id: 'pelvis', depth: 1 },
     { id: 'arm', depth: 2 },
   ]);
-  (state.workingCopy.bones[2]!.sprite as { x: number }).x = 99;
-  (state.workingCopy.slots![0] as { y: number }).y = 88;
-  (state.workingCopy.skins![0]!.slots as Record<string, string>).handVisual = 'other';
+  state.editSprite('arm', 'x', 99);
+  state.editSlot('handVisual', 'y', 88);
   assert.equal(source.getBone('arm').sprite?.x, 3);
   assert.equal(source.slots[0]?.y, 5);
   assert.equal(source.skins[0]?.slots.handVisual, 'hand');
@@ -97,14 +96,14 @@ test('status and history reuse validation and serialization until the rig change
     state.beginOperation();
     state.endOperation();
     assert.equal(validation.mock.calls.length, 1);
-    assert.equal(stringify.mock.calls.filter(([value]) => value === state.workingCopy).length, 0);
+    assert.equal(stringify.mock.calls.length, 0);
 
     state.editBone('arm', 'x', 12);
     assert.isTrue(state.dirty);
     assert.isTrue(state.dirty);
     state.validationIssues();
     assert.equal(validation.mock.calls.length, 2);
-    assert.equal(stringify.mock.calls.filter(([value]) => value === state.workingCopy).length, 1);
+    assert.equal(stringify.mock.calls.length, 1);
 
     state.undo();
     assert.isFalse(state.dirty);
@@ -113,7 +112,7 @@ test('status and history reuse validation and serialization until the rig change
     assert.isTrue(state.dirty);
     state.validationIssues();
     assert.equal(validation.mock.calls.length, 4);
-    assert.equal(stringify.mock.calls.filter(([value]) => value === state.workingCopy).length, 1);
+    assert.equal(stringify.mock.calls.length, 1);
   } finally {
     validation.mockRestore();
     stringify.mockRestore();
@@ -175,32 +174,69 @@ test('a grouped edit validates a large rig once on completion while scalar check
   }
 });
 
-test('explicit validation and export detect errors before a grouped edit finishes', () => {
+test('explicit validation and export check the current data before a grouped edit finishes', () => {
   const state = new RigEditorState(source);
-  state.beginOperation();
-  state.editSlot('handVisual', 'y', 12);
-  (state.getSlot('handVisual') as { bone: string }).bone = 'missing';
-  state.validate();
-  assert.isFalse(state.validationPending);
-  assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
-  state.editSlot('handVisual', 'y', 15);
-  assert.isTrue(state.validationPending);
-  assert.throws(() => state.exportJson(false), /unknown bone/);
-  assert.isFalse(state.validationPending);
-  assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
+  const validation = vi.spyOn(externalData, 'validateRigDefinition');
+  try {
+    state.beginOperation();
+    state.editSlot('handVisual', 'y', 12);
+    state.validate();
+    assert.isFalse(state.validationPending);
+    assert.equal((validation.mock.calls.at(-1)![0] as externalData.RigJsonDefinition).slots![0]!.y, 12);
+    state.editSlot('handVisual', 'y', 15);
+    assert.isTrue(state.validationPending);
+    assert.equal(JSON.parse(state.exportJson(false)).slots[0].y, 15);
+    assert.isFalse(state.validationPending);
+    assert.equal((validation.mock.calls.at(-1)![0] as externalData.RigJsonDefinition).slots![0]!.y, 15);
+  } finally {
+    validation.mockRestore();
+  }
 });
 
-test('explicit validation refreshes cached status after a direct working-copy mutation', () => {
+test('readonly views reject direct mutations without corrupting cached status or history', () => {
   const state = new RigEditorState(source);
+  const original = state.workingCopy;
+  const issues = state.validationIssues();
+  const mutations = [
+    () => {
+      (state.getBone('root') as { x: number }).x = 10;
+    },
+    () => {
+      (state.getBone('arm').sprite as { x: number }).x = 99;
+    },
+    () => {
+      (state.getSlot('handVisual') as { bone: string }).bone = 'missing';
+    },
+    () => {
+      (state.getAttachment('hand') as { texture: string }).texture = 'other';
+    },
+    () => {
+      (state.workingCopy.bones as unknown[]).pop();
+    },
+    () => {
+      (state.workingCopy.skins![0]!.slots as Record<string, string>).handVisual = 'other';
+    },
+  ];
+  for (const mutate of mutations) assert.throws(mutate, TypeError);
+  assert.strictEqual(state.workingCopy, original);
+  assert.strictEqual(state.validationIssues(), issues);
   assert.isFalse(state.dirty);
-  assert.deepEqual(state.validationIssues(), []);
-  (state.workingCopy.slots![0] as { bone: string }).bone = 'missing';
-  // Export must validate its candidate independently of the status cache.
-  assert.throws(() => state.exportJson(false), /unknown bone/);
-  state.validate();
+  assert.isFalse(state.canUndo);
+  assert.deepEqual(state.exportRig(false).bones, original.bones);
+  state.editBone('root', 'x', 10);
   assert.isTrue(state.dirty);
-  assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
-  assert.isAbove(state.warnings.length, 0);
+  assert.isTrue(state.canUndo);
+  assert.isUndefined(original.bones[0]!.x);
+  assert.strictEqual(state.workingCopy.bones[2], original.bones[2]);
+  state.undo();
+  assert.isUndefined(state.getBone('root').x);
+  assert.isFalse(state.dirty);
+  state.redo();
+  assert.equal(state.getBone('root').x, 10);
+  assert.isTrue(Object.isFrozen(state.getBone('root')));
+  const clone = structuredClone(state.workingCopy);
+  (clone.bones[0] as { x: number }).x = 20;
+  assert.equal(state.getBone('root').x, 10);
 });
 
 test('history drops the oldest entries and bounds undo/redo across grouped edits and branches', () => {

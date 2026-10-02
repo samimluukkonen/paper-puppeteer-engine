@@ -5,7 +5,13 @@ import {
   validateRigDefinition,
 } from '../../engine/externalData.js';
 import { Rig } from '../../engine/Rig.js';
-import type { BoneDefinition, RigDefinition, SlotDefinition, SpriteAttachmentDefinition } from '../../engine/types.js';
+import type {
+  BoneDefinition,
+  RigDefinition,
+  SkinDefinition,
+  SlotDefinition,
+  SpriteAttachmentDefinition,
+} from '../../engine/types.js';
 
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
@@ -22,6 +28,23 @@ export interface RigEditorStateOptions {
 }
 
 type HistoryEntry = { rig: string; directions: [string, { x: number; y: number }][] };
+
+export type ReadonlyRigData<T> = T extends object ? { readonly [Key in keyof T]: ReadonlyRigData<T[Key]> } : T;
+type WorkingRig = {
+  root: string;
+  bones: BoneDefinition[];
+  slots?: SlotDefinition[];
+  attachments?: SpriteAttachmentDefinition[];
+  skins?: SkinDefinition[];
+};
+
+function freezeData<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) freezeData(child);
+    Object.freeze(value);
+  }
+  return value;
+}
 
 const snapshot = (rig: RigDefinition): string => JSON.stringify(rig);
 const round = (value: number): number => Number(value.toFixed(6));
@@ -74,7 +97,8 @@ function stable(value: unknown, original: unknown): unknown {
 /** Owns editor data; the loaded rig stays untouched. */
 export class RigEditorState {
   readonly source: Rig;
-  readonly workingCopy: RigDefinition;
+  private readonly data: WorkingRig;
+  private cachedWorkingCopy: ReadonlyRigData<RigDefinition> | undefined;
   readonly rig: Rig;
   selection: RigEditorSelection = null;
   editMode: EditMode = 'joint';
@@ -117,13 +141,14 @@ export class RigEditorState {
     this.source = source;
     this.name = file?.name;
     this.includeSkins = file ? file.skins !== undefined : true;
-    this.workingCopy = structuredClone({
+    this.data = structuredClone({
       root: source.root,
-      bones: source.bones,
-      slots: source.slots,
-      attachments: source.attachments,
-      skins: source.skins,
+      bones: [...source.bones],
+      slots: [...source.slots],
+      attachments: [...source.attachments],
+      skins: [...source.skins],
     });
+    this.freezeEntries();
     this.rig = new Rig(this.workingCopy);
     this.rebuildIndexes();
     this.initialCopy = structuredClone(this.workingCopy);
@@ -135,10 +160,28 @@ export class RigEditorState {
       children.push(bone.id);
       this.children.set(bone.parent, children);
     }
+    for (const children of this.children.values()) Object.freeze(children);
   }
 
   get dirty(): boolean {
     return this.workingSnapshot !== this.saved;
+  }
+
+  /** Immutable data view; edits replace only changed entries and preserve older views. */
+  get workingCopy(): ReadonlyRigData<RigDefinition> {
+    this.cachedWorkingCopy ??= freezeData({
+      ...this.data,
+      bones: [...this.data.bones],
+      ...(this.data.slots === undefined ? {} : { slots: [...this.data.slots] }),
+      ...(this.data.attachments === undefined ? {} : { attachments: [...this.data.attachments] }),
+      ...(this.data.skins === undefined ? {} : { skins: [...this.data.skins] }),
+    });
+    return this.cachedWorkingCopy;
+  }
+
+  private freezeEntries(): void {
+    for (const entries of [this.data.bones, this.data.slots, this.data.attachments, this.data.skins])
+      for (const entry of entries ?? []) freezeData(entry);
   }
 
   /** Reused by history, status, and asynchronous export completion. */
@@ -148,6 +191,7 @@ export class RigEditorState {
   }
 
   private invalidate(): void {
+    this.cachedWorkingCopy = undefined;
     this.cachedSnapshot = undefined;
     this.validationDirty = true;
   }
@@ -216,12 +260,12 @@ export class RigEditorState {
   }
 
   private restore(json: string): void {
-    const copy = JSON.parse(json) as RigDefinition;
-    Object.assign(this.workingCopy, copy);
-    for (const key of ['slots', 'attachments', 'skins'] as const)
-      if (copy[key] === undefined) delete (this.workingCopy as unknown as Record<string, unknown>)[key];
-    this.rebuildIndexes();
+    const copy = JSON.parse(json) as WorkingRig;
+    Object.assign(this.data, copy);
+    for (const key of ['slots', 'attachments', 'skins'] as const) if (copy[key] === undefined) delete this.data[key];
+    this.freezeEntries();
     this.invalidate();
+    this.rebuildIndexes();
     this.cachedSnapshot = json;
   }
 
@@ -261,25 +305,26 @@ export class RigEditorState {
         if (this.getBone(selected.id).length !== original.length) {
           // Length edits move direct children; reset those offsets in the same history entry.
           for (const childId of this.childrenOf(selected.id)) {
-            const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
+            const child = { ...this.getBone(childId) };
             this.childDirections.delete(childId);
             const initialChild = this.initialCopy.bones[this.boneIndices.get(childId)!]!;
             for (const field of ['x', 'y'] as const) {
               if (initialChild[field] === undefined) delete child[field];
               else child[field] = initialChild[field];
             }
+            this.replaceBone(child);
           }
         }
-        (this.workingCopy.bones as BoneDefinition[])[index] = structuredClone(original);
+        this.data.bones[index] = freezeData(structuredClone(original));
       } else {
         const index = this.slotIndices.get(selected.id)!;
-        (this.workingCopy.slots as SlotDefinition[])[index] = structuredClone(this.initialCopy.slots![index]!);
+        this.data.slots![index] = freezeData(structuredClone(this.initialCopy.slots![index]!));
         // The inspector's artwork fields belong to the active slot attachment.
         if (attachmentId) {
           const attachmentIndex = this.attachmentIndices.get(attachmentId);
           if (attachmentIndex !== undefined)
-            (this.workingCopy.attachments as SpriteAttachmentDefinition[])[attachmentIndex] = structuredClone(
-              this.initialCopy.attachments![attachmentIndex]!,
+            this.data.attachments![attachmentIndex] = freezeData(
+              structuredClone(this.initialCopy.attachments![attachmentIndex]!),
             );
         }
       }
@@ -358,25 +403,29 @@ export class RigEditorState {
     return `${JSON.stringify(this.exportRig(saveBaseline), null, 2)}\n`;
   }
 
-  getBone(id: string): BoneDefinition {
+  getBone(id: string): ReadonlyRigData<BoneDefinition> {
     const index = this.boneIndices.get(id);
-    const bone = index === undefined ? undefined : this.workingCopy.bones[index];
+    const bone = index === undefined ? undefined : this.data.bones[index];
     if (!bone) throw new Error(`Unknown bone "${id}".`);
     return bone;
   }
 
-  getSlot(id: string): SlotDefinition {
+  getSlot(id: string): ReadonlyRigData<SlotDefinition> {
     const index = this.slotIndices.get(id);
-    const slot = index === undefined ? undefined : this.workingCopy.slots?.[index];
+    const slot = index === undefined ? undefined : this.data.slots?.[index];
     if (!slot) throw new Error(`Unknown slot "${id}".`);
     return slot;
   }
 
-  getAttachment(id: string): SpriteAttachmentDefinition {
+  getAttachment(id: string): ReadonlyRigData<SpriteAttachmentDefinition> {
     const index = this.attachmentIndices.get(id);
-    const attachment = index === undefined ? undefined : this.workingCopy.attachments?.[index];
+    const attachment = index === undefined ? undefined : this.data.attachments?.[index];
     if (!attachment) throw new Error(`Unknown attachment "${id}".`);
     return attachment;
+  }
+
+  private replaceBone(bone: BoneDefinition): void {
+    this.data.bones[this.boneIndices.get(bone.id)!] = freezeData(bone);
   }
 
   editBone(id: string, field: BoneField, value: number): void {
@@ -385,12 +434,13 @@ export class RigEditorState {
 
   editBoneFields(id: string, values: Partial<Record<BoneField, number>>): void {
     for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
-    const bone = this.getBone(id);
+    const bone = { ...this.getBone(id) };
     this.change(() => {
       Object.assign(bone, values);
+      this.replaceBone(bone);
       if (values.length !== undefined) {
         for (const childId of this.childrenOf(id)) {
-          const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
+          const child = { ...this.getBone(childId) };
           const x = child.x ?? 0;
           const y = child.y ?? 0;
           const distance = Math.hypot(x, y);
@@ -400,6 +450,7 @@ export class RigEditorState {
           this.childDirections.set(childId, direction);
           child.x = direction.x * values.length;
           child.y = direction.y * values.length;
+          this.replaceBone(child);
         }
       }
     });
@@ -411,9 +462,10 @@ export class RigEditorState {
 
   editSlotFields(id: string, values: Partial<Record<SlotField, number>>): void {
     for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
-    const slot = this.getSlot(id);
+    const slot = { ...this.getSlot(id) };
     this.change(() => {
       Object.assign(slot, values);
+      this.data.slots![this.slotIndices.get(id)!] = freezeData(slot);
     });
   }
 
@@ -423,10 +475,14 @@ export class RigEditorState {
 
   editSpriteFields(id: string, values: Partial<Record<SpriteField, number>>, attachment = false): void {
     for (const [field, value] of Object.entries(values)) this.assertValue(field, value);
-    const sprite = attachment ? this.getAttachment(id) : this.getBone(id).sprite;
+    const original = attachment ? this.getAttachment(id) : this.getBone(id).sprite;
+    const sprite = original ? { ...original } : undefined;
     if (!sprite) throw new Error(`No sprite for "${id}".`);
     this.change(() => {
       Object.assign(sprite, values);
+      if (attachment)
+        this.data.attachments![this.attachmentIndices.get(id)!] = freezeData({ ...this.getAttachment(id), ...sprite });
+      else this.replaceBone({ ...this.getBone(id), sprite });
     });
   }
 
@@ -437,7 +493,7 @@ export class RigEditorState {
       throw new Error('Origin must be between 0 and 1.');
   }
 
-  /** Explicit validation also refreshes caches after direct working-copy mutations. */
+  /** Force full validation, including while a grouped edit is still in progress. */
   validate(): void {
     this.rebuildIndexes();
     this.invalidate();

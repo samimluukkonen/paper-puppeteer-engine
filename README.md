@@ -41,6 +41,8 @@ Undo history retains the most recent 100 operations by default, dropping the old
 
 Field values are checked immediately while editing. Full rig validation runs when a drag or numeric field session finishes; the panel shows Pending during edits. Validate and export always check the current rig, including unfinished edits.
 
+For embedded editors, `workingCopy`, `getBone()`, `getSlot()`, and `getAttachment()` return frozen readonly data. Use the state's `editBoneFields()`, `editSlotFields()`, and `editSpriteFields()` methods to preserve validation, dirty tracking, and undo history. Retained views keep their previous values after edits; request a fresh view to read the current data, or use `structuredClone(state.workingCopy)` for an independent mutable copy.
+
 | Key | Action |
 | --- | --- |
 | `1` | Play / restart idle |
