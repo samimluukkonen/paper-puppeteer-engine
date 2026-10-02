@@ -71,7 +71,7 @@ export class RigEditor {
     // Preview the same logical joint positions that an exported rig loads with.
     const { root, bones } = this.state.workingCopy;
     const definitions = new Map(bones.map((bone) => [bone.id, bone]));
-    this.puppet.setRenderOrder(computeRenderOrder(root, bones));
+    const slotDepths = new Map<string, number | undefined>();
     for (const edited of bones) {
       const runtime = this.puppet.getBone(edited.id);
       Object.assign(runtime.pose, {
@@ -102,8 +102,7 @@ export class RigEditor {
         },
         false,
       );
-      if (edited.depth !== undefined) this.puppet.setSlotDepth(slot.id, edited.depth);
-      else this.puppet.clearSlotDepth(slot.id);
+      slotDepths.set(slot.id, edited.depth);
       const image = this.puppet.getSlotImage(slot.id);
       const attachmentId = this.puppet.getAttachment(slot.id);
       if (image && attachmentId) {
@@ -115,6 +114,7 @@ export class RigEditor {
         image.setAlpha(this.state.visibility.artwork ? this.state.artworkOpacity * (dim ? 0.18 : 1) : 0);
       }
     }
+    this.puppet.setRenderOrder(computeRenderOrder(root, bones), slotDepths);
     this.puppet.syncPose();
     this.update();
     if (notify) this.onChange();

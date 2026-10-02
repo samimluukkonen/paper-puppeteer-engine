@@ -77,12 +77,19 @@ export class PuppetRenderer {
     return [...this.order];
   }
 
-  /** Complete back-to-front order, including bones without an image. */
-  setOrder(order: readonly string[]): void {
+  /** Apply bone order and supplied slot overrides together, then sort once. Undefined restores the rig depth. */
+  setOrder(order: readonly string[], slotDepths?: ReadonlyMap<string, number | undefined>): void {
     if (order.length !== this.rig.bones.length || new Set(order).size !== order.length) {
       throw new Error('Render order must contain every bone exactly once.');
     }
     for (const id of order) this.rig.getBone(id);
+    if (slotDepths) {
+      for (const id of slotDepths.keys()) this.getSlotMount(id);
+      for (const [id, depth] of slotDepths) {
+        if (depth === undefined) this.slotDepthOverrides.delete(id);
+        else this.slotDepthOverrides.set(id, depth);
+      }
+    }
     for (const [index, id] of order.entries()) this.branches.get(id)!.root.setDepth(index * 10);
     for (const slot of this.rig.slots) {
       const anchor = order.indexOf(slot.bone) * 10;
@@ -126,9 +133,12 @@ export class PuppetRenderer {
 
   /** Restore the rig depth, or automatic placement in the current render order. */
   clearSlotDepth(id: string): void {
-    this.getSlotMount(id);
+    const branch = this.slotBranches.get(id);
+    if (!branch) throw new Error(`Unknown slot "${id}".`);
     this.slotDepthOverrides.delete(id);
-    this.setOrder(this.order);
+    const slot = this.rig.slots.find((slot) => slot.id === id)!;
+    branch.root.setDepth(slot.depth ?? this.order.indexOf(slot.bone) * 10 + 1);
+    this.container.sort('depth');
   }
 
   getSlotImage(id: string): Phaser.GameObjects.Image | undefined {

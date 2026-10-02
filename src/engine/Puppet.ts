@@ -346,8 +346,12 @@ export class Puppet {
     return this.renderer.getOrder();
   }
 
-  setRenderOrder(order: readonly string[]): this {
-    this.renderer.setOrder(order);
+  /** Batch slot depths with the bone order; undefined clears an override and omitted slots keep theirs. */
+  setRenderOrder(order: readonly string[], slotDepths?: ReadonlyMap<string, number | undefined>): this {
+    if (slotDepths) {
+      for (const [id, depth] of slotDepths) if (depth !== undefined) assertFinite(depth, `Slot ${id}.depth`);
+    }
+    this.renderer.setOrder(order, slotDepths);
     return this;
   }
 

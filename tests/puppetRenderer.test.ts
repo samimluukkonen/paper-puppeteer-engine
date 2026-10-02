@@ -66,7 +66,7 @@ function fixture(depth?: number) {
   );
   const renderer = new PuppetRenderer(scene, makeContainer(), rig, bones);
   const slotDepth = (id: string) => containers.get(`render-slot-${id}`)!.depth;
-  return { renderer, rig, slotDepth };
+  return { renderer, rig, slotDepth, containers };
 }
 
 function slotTransform(renderer: PuppetRenderer, id: string) {
@@ -174,6 +174,54 @@ test.each([50, 0, -5])('render order changes preserve runtime slot depth %s', (d
   assert.throws(() => renderer.setSlotDepth('missing', 10), /Unknown slot/);
 });
 
+test('render order batches explicit and restored slot depths with one sort', () => {
+  const { renderer, rig, slotDepth, containers } = fixture();
+  const puppet = { renderer, setRenderOrder: Puppet.prototype.setRenderOrder } as unknown as Puppet;
+  renderer.setSlotDepth('item', 50);
+  renderer.setSlotDepth('fixed', -5);
+  renderer.setSlotDepth('automatic', 25);
+  const sort = vi.mocked(containers.get('puppet-render')!.sort);
+  sort.mockClear();
+  const order = vi.spyOn(renderer, 'setOrder');
+  assert.strictEqual(
+    puppet.setRenderOrder(
+      ['hand', 'root'],
+      new Map([
+        ['item', undefined],
+        ['fixed', 0],
+      ]),
+    ),
+    puppet,
+  );
+  assert.equal(order.mock.calls.length, 1);
+  assert.equal(sort.mock.calls.length, 1);
+  assert.equal(slotDepth('item'), 11);
+  assert.equal(slotDepth('fixed'), 0);
+  assert.equal(slotDepth('automatic'), 25, 'omitted overrides are preserved');
+  assert.isUndefined(rig.slots[0]!.depth);
+  assert.equal(rig.slots[1]!.depth, 40);
+
+  sort.mockClear();
+  assert.throws(() => puppet.setRenderOrder(rig.renderOrder, new Map([['fixed', Number.NaN]])), /finite/);
+  assert.throws(
+    () =>
+      puppet.setRenderOrder(
+        rig.renderOrder,
+        new Map([
+          ['fixed', 99],
+          ['missing', 1],
+        ]),
+      ),
+    /Unknown slot/,
+  );
+  assert.throws(() => puppet.setRenderOrder(['root'], new Map([['fixed', 99]])), /every bone/);
+  assert.equal(sort.mock.calls.length, 0);
+  assert.deepEqual(renderer.getOrder(), ['hand', 'root']);
+  assert.equal(slotDepth('fixed'), 0);
+  renderer.setOrder(rig.renderOrder);
+  assert.equal(slotDepth('fixed'), 0, 'invalid batches do not change overrides');
+});
+
 test.each([50, 0, -5])('clearing depth override %s restores defaults and follows the current render order', (depth) => {
   const { renderer, rig, slotDepth } = fixture();
   renderer.setSlotDepth('item', depth);
@@ -202,7 +250,7 @@ test.each([50, 0, -5])('clearing depth override %s restores defaults and follows
 test.each([undefined, 0, -5, 40])(
   'editor restores slot depth %s in export and preview through history and reset',
   (depth) => {
-    const { renderer, rig, slotDepth } = fixture(depth);
+    const { renderer, rig, slotDepth, containers } = fixture(depth);
     const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
     const puppet = {
       rig,
@@ -218,9 +266,16 @@ test.each([undefined, 0, -5, 40])(
       getAttachment: vi.fn(),
     } as unknown as Puppet;
     const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
+    const sort = vi.mocked(containers.get('puppet-render')!.sort);
+    sort.mockClear();
+    const order = vi.spyOn(renderer, 'setOrder');
     const assertDepth = (expected: number | undefined, automatic = 11) => {
       assert.equal(editor.exportRig(false).slots!.find((slot) => slot.id === 'automatic')!.depth, expected);
       assert.equal(slotDepth('automatic'), expected ?? automatic);
+      assert.equal(sort.mock.calls.length, 1, 'each editor refresh sorts once');
+      assert.equal(order.mock.calls.length, 1, 'each editor refresh updates the render order once');
+      sort.mockClear();
+      order.mockClear();
     };
 
     editor.editSlot('automatic', 'depth', 50);
