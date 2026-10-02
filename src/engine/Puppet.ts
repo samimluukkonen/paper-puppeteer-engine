@@ -81,8 +81,7 @@ export class Puppet {
     if (!rig) throw new Error('Puppet requires a rig or character definition.');
     this.rig = rig instanceof Rig ? rig : new Rig(rig);
     const validateSpriteAsset = (sprite: { texture: string; frame?: string | number }, owner: string): void => {
-      if (!scene.textures.exists(sprite.texture))
-        throw new Error(`Missing texture "${sprite.texture}" for ${owner}.`);
+      if (!scene.textures.exists(sprite.texture)) throw new Error(`Missing texture "${sprite.texture}" for ${owner}.`);
       if (sprite.frame !== undefined && !scene.textures.get(sprite.texture).has(String(sprite.frame)))
         throw new Error(`Missing frame "${sprite.frame}" for ${owner}.`);
     };
