@@ -11,6 +11,7 @@ import type {
   SkinDefinition,
   SlotDefinition,
   SpriteAttachmentDefinition,
+  TransformProperty,
 } from '../../engine/types.js';
 
 import { freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
@@ -20,9 +21,9 @@ import { serializeRigData } from './rigSerialization.js';
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
 export type EditMode = 'joint' | 'sprite';
-type BoneField = 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'length' | 'depth';
-type SlotField = 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'depth';
-type SpriteField = 'x' | 'y' | 'originX' | 'originY';
+export type BoneField = TransformProperty | 'length' | 'depth';
+export type SlotField = TransformProperty | 'depth';
+export type SpriteField = 'x' | 'y' | 'originX' | 'originY';
 export type GridSnap = 0 | 1 | 2 | 5 | 10;
 export type RotationSnap = 0 | 1 | 5 | 15;
 

@@ -1,4 +1,5 @@
 import type { RigEditor } from './RigEditor.js';
+import type { BoneField, SlotField, SpriteField } from './RigEditorState.js';
 
 const format = (value: number | undefined, fallback = 0): string => String(Number((value ?? fallback).toFixed(4)));
 const escapeHtml = (value: string | number): string =>
@@ -9,10 +10,10 @@ const escapeHtml = (value: string | number): string =>
 const row = (name: string, value: string | number | undefined): string =>
   `<div class="property"><span>${escapeHtml(name)}</span><strong>${escapeHtml(value ?? '—')}</strong></div>`;
 type ScopeFields = {
-  bone: Parameters<RigEditor['editBone']>[1];
-  slot: Parameters<RigEditor['editSlot']>[1];
-  sprite: Parameters<RigEditor['editSprite']>[1];
-  attachment: Parameters<RigEditor['editSprite']>[1];
+  bone: BoneField;
+  slot: SlotField;
+  sprite: SpriteField;
+  attachment: SpriteField;
 };
 interface NumberField<Field extends string> {
   field: Field;

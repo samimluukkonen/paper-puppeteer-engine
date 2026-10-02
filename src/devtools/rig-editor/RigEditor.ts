@@ -4,10 +4,10 @@ import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
-import type { RigDefinition } from '../../engine/types.js';
+import { createTransform, type RigDefinition } from '../../engine/types.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
-import { RigEditorState } from './RigEditorState.js';
+import { type BoneField, RigEditorState, type SlotField, type SpriteField } from './RigEditorState.js';
 
 export class RigEditor {
   readonly state: RigEditorState;
@@ -100,10 +100,8 @@ export class RigEditor {
     for (const edited of rig.bones) {
       const runtime = this.puppet.getBone(edited.id);
       Object.assign(runtime.pose, {
+        ...createTransform(edited),
         ...computeBonePosition(edited, edited.parent === undefined ? undefined : definitions.get(edited.parent)),
-        rotation: edited.rotation ?? 0,
-        scaleX: edited.scaleX ?? 1,
-        scaleY: edited.scaleY ?? 1,
       });
       if (runtime.sprite && edited.sprite)
         runtime.sprite
@@ -111,17 +109,7 @@ export class RigEditor {
           .setOrigin(edited.sprite.originX ?? 0.5, edited.sprite.originY ?? 0.5);
     }
     for (const slot of rig.slots ?? []) {
-      this.puppet.setSlotTransform(
-        slot.id,
-        {
-          x: slot.x ?? 0,
-          y: slot.y ?? 0,
-          rotation: slot.rotation ?? 0,
-          scaleX: slot.scaleX ?? 1,
-          scaleY: slot.scaleY ?? 1,
-        },
-        false,
-      );
+      this.puppet.setSlotTransform(slot.id, createTransform(slot), false);
       const image = this.puppet.getSlotImage(slot.id);
       const attachmentId = this.puppet.getAttachment(slot.id);
       if (image && attachmentId) {
@@ -165,33 +153,17 @@ export class RigEditor {
     return this.puppet.getAttachment(id);
   }
 
-  editBone(
-    id: string,
-    field: 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'length' | 'depth',
-    value: number | undefined,
-    notify = true,
-  ): void {
+  editBone(id: string, field: BoneField, value: number | undefined, notify = true): void {
     this.state.editBone(id, field, value);
     this.refresh(notify);
   }
 
-  editSlot(
-    id: string,
-    field: 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY' | 'depth',
-    value: number | undefined,
-    notify = true,
-  ): void {
+  editSlot(id: string, field: SlotField, value: number | undefined, notify = true): void {
     this.state.editSlot(id, field, value);
     this.refresh(notify);
   }
 
-  editSprite(
-    id: string,
-    field: 'x' | 'y' | 'originX' | 'originY',
-    value: number | undefined,
-    attachment = false,
-    notify = true,
-  ): void {
+  editSprite(id: string, field: SpriteField, value: number | undefined, attachment = false, notify = true): void {
     this.state.editSprite(id, field, value, attachment);
     this.refresh(notify);
   }
