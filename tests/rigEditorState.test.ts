@@ -118,3 +118,68 @@ test('explicit validation refreshes cached status after a direct working-copy mu
   assert.isTrue(state.validationIssues().some((issue) => issue.severity === 'error'));
   assert.isAbove(state.warnings.length, 0);
 });
+
+test('history drops the oldest entries and bounds undo/redo across grouped edits and branches', () => {
+  const state = new RigEditorState(source, undefined, { historyLimit: 2 });
+  for (const x of [1, 2, 3]) state.editBone('arm', 'x', x);
+  assert.equal(state.historyLength, 2);
+  assert.isTrue(state.undo());
+  assert.equal(state.getBone('arm').x, 2);
+  assert.isTrue(state.undo());
+  assert.equal(state.getBone('arm').x, 1);
+  assert.isFalse(state.undo());
+  assert.isTrue(state.redo());
+  assert.isTrue(state.redo());
+  assert.isFalse(state.redo());
+  assert.equal(state.historyLength, 2);
+  state.beginOperation();
+  for (const x of [4, 5, 6]) state.editBone('arm', 'x', x);
+  state.endOperation();
+  assert.equal(state.historyLength, 2);
+  state.undo();
+  assert.equal(state.getBone('arm').x, 3);
+  state.editBone('arm', 'x', 9);
+  assert.isFalse(state.canRedo);
+  state.undo();
+  state.undo();
+  assert.equal(state.getBone('arm').x, 2);
+  assert.isFalse(state.canUndo);
+  state.resetRig();
+  assert.isFalse(state.dirty);
+  state.undo();
+  assert.equal(state.getBone('arm').x, 2);
+});
+
+test('the default history limit bounds long sessions without losing the saved baseline', () => {
+  const state = new RigEditorState(source);
+  const baseline = state.workingSnapshot;
+  assert.equal(state.historyLimit, 100);
+  for (let x = 1; x <= 120; x += 1) state.editBone('arm', 'x', x);
+  assert.equal(state.historyLength, 100);
+  state.markSaved(baseline);
+  assert.isTrue(state.dirty);
+  state.resetRig();
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 100);
+});
+
+test('zero disables history while grouped edits, saving, and resets still work', () => {
+  const state = new RigEditorState(source, undefined, { historyLimit: 0 });
+  state.beginOperation();
+  state.editBone('arm', 'x', 9);
+  state.endOperation();
+  assert.isTrue(state.dirty);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.undo());
+  assert.isFalse(state.redo());
+  state.markSaved();
+  assert.isFalse(state.dirty);
+  state.resetRig();
+  assert.isTrue(state.dirty);
+  assert.isFalse(state.canUndo);
+});
+
+test.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+  'invalid history limit %s is rejected',
+  (historyLimit) => assert.throws(() => new RigEditorState(source, undefined, { historyLimit }), /History limit/),
+);

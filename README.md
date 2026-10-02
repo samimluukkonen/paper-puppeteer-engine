@@ -37,6 +37,8 @@ Production workflow:
 
 The exported file keeps the rig name and IDs. Skin files from `character.json` stay separate unless skins were already embedded in the rig file. Copy needs a browser with clipboard access; Download and Log are alternatives. Reloading starts a new clean history and resets selection and preview controls.
 
+Undo history retains the most recent 100 operations by default, dropping the oldest entries as the limit is reached. Embedded editors can configure this with `new RigEditorState(rig, rigFile, { historyLimit: 250 })`; pass that state to `RigEditor`. The limit must be a nonnegative safe integer; zero disables undo/redo. Grouped drags and field edits count as one operation. Saved baselines and full-rig reset remain available after older history is dropped.
+
 | Key | Action |
 | --- | --- |
 | `1` | Play / restart idle |

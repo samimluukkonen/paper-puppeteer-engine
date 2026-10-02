@@ -16,6 +16,11 @@ type SpriteField = 'x' | 'y' | 'originX' | 'originY';
 export type GridSnap = 0 | 1 | 2 | 5 | 10;
 export type RotationSnap = 0 | 1 | 5 | 15;
 
+export interface RigEditorStateOptions {
+  /** Maximum undo entries, including grouped operations. Defaults to 100; zero disables history. */
+  historyLimit?: number;
+}
+
 type HistoryEntry = { rig: string; directions: [string, { x: number; y: number }][] };
 
 const snapshot = (rig: RigDefinition): string => JSON.stringify(rig);
@@ -89,6 +94,7 @@ export class RigEditorState {
   gridSnap: GridSnap = 0;
   rotationSnap: RotationSnap = 0;
   readonly name: string | undefined;
+  readonly historyLimit: number;
   private readonly includeSkins: boolean;
   private readonly initialCopy: RigDefinition;
   private saved: string;
@@ -100,7 +106,10 @@ export class RigEditorState {
   private readonly childDirections = new Map<string, { x: number; y: number }>();
   private readonly children = new Map<string, string[]>();
 
-  constructor(source: Rig, file?: RigJsonDefinition) {
+  constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
+    this.historyLimit = options.historyLimit ?? 100;
+    if (!Number.isSafeInteger(this.historyLimit) || this.historyLimit < 0)
+      throw new Error('History limit must be a nonnegative safe integer.');
     this.source = source;
     this.name = file?.name;
     this.includeSkins = file ? file.skins !== undefined : true;
@@ -165,8 +174,14 @@ export class RigEditorState {
 
   private record(before: HistoryEntry): void {
     if (before.rig === this.workingSnapshot) return;
-    this.past.push(before);
+    this.pushPast(before);
     this.future.length = 0;
+  }
+
+  private pushPast(entry: HistoryEntry): void {
+    if (this.historyLimit === 0) return;
+    this.past.push(entry);
+    if (this.past.length > this.historyLimit) this.past.splice(0, this.past.length - this.historyLimit);
   }
 
   private change(edit: () => void): void {
@@ -209,7 +224,7 @@ export class RigEditorState {
     this.endOperation();
     const next = this.future.pop();
     if (next === undefined) return false;
-    this.past.push(this.historyEntry());
+    this.pushPast(this.historyEntry());
     this.restoreHistory(next);
     this.updateWarnings();
     return true;
