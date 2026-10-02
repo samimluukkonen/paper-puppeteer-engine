@@ -87,6 +87,7 @@ test.each(dragCases)(
     editor.state.gridSnap = 5;
     vi.spyOn(RigEditorOverlay.prototype, 'pick').mockReturnValue(type === 'attachment' ? null : selection);
     editor.enable();
+    puppet.syncPose.mockClear();
     const emit = (event: string, x: number, y: number) => {
       const [, handler, context] = input.on.mock.calls.find(([name]) => name === event)!;
       handler.call(context, { x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });

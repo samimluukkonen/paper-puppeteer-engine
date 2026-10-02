@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
+import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import type { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -34,6 +35,10 @@ test('editor activation reuses IK constraints and balances overlay and listener 
     bones,
     addIK: vi.fn(Puppet.prototype.addIK),
     getIK: Puppet.prototype.getIK,
+    getBone: (id: string) => bones.get(id)!,
+    preparePose: vi.fn(),
+    syncPose: vi.fn(),
+    setRenderOrder: vi.fn(),
     resetToBindPose: vi.fn().mockReturnThis(),
     setFacing: vi.fn().mockReturnThis(),
   };
@@ -73,4 +78,62 @@ test('editor activation reuses IK constraints and balances overlay and listener 
   assert.deepEqual(events.off.mock.calls, events.on.mock.calls);
   assert.deepEqual(browser.removeEventListener.mock.calls, browser.addEventListener.mock.calls);
   assert.equal(destroyOverlay.mock.calls.length, 4);
+});
+
+test.each([false, true])('activation restores edited state and IK preview (%s) without changing history', (preview) => {
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const rig = new Rig({
+    root: 'root',
+    bones: [{ id: 'root' }, { id: 'arm', parent: 'root', y: 20 }, { id: 'hand', parent: 'arm', y: 20 }],
+  });
+  const bones = new Map(
+    rig.bones.map((bone) => [
+      bone.id,
+      Object.assign(new Joint(bone.id, bone), { getWorldPosition: () => ({ x: bones.get('root')!.pose.x, y: 40 }) }),
+    ]),
+  );
+  const puppet = {
+    rig,
+    bones,
+    ikConstraints: new Map<string, TwoBoneIKConstraint>(),
+    addIK: Puppet.prototype.addIK,
+    getIK: Puppet.prototype.getIK,
+    getBone: (id: string) => bones.get(id)!,
+    resetToBindPose() {
+      for (const bone of bones.values()) bone.reset();
+      return this;
+    },
+    setFacing() {
+      return this;
+    },
+    preparePose() {},
+    syncPose() {},
+    setRenderOrder: vi.fn(),
+  };
+  const state = new RigEditorState(rig);
+  state.editBone('root', 'x', 42);
+  state.ikPreview = preview;
+  state.visibility.ik = preview;
+  const scene = { input: { on() {}, off() {} }, events: { on() {}, off() {} } };
+  const onChange = vi.fn();
+  const editor = new RigEditor(scene as unknown as Phaser.Scene, puppet as unknown as Puppet, onChange, state, [
+    { name: 'armIK', rootBone: 'root', middleBone: 'arm', endBone: 'hand' },
+  ]);
+  editor.enable();
+  const constraint = puppet.getIK('armIK');
+  assert.equal(bones.get('root')!.pose.x, 42);
+  assert.equal(constraint.enabled, preview);
+  if (preview) {
+    assert.deepEqual(constraint.target, { x: 42, y: 40 });
+    constraint.setTarget(12, 34);
+  }
+  editor.disable();
+  editor.enable();
+  assert.equal(bones.get('root')!.pose.x, 42);
+  assert.equal(constraint.enabled, preview);
+  if (preview) assert.deepEqual(constraint.target, { x: 12, y: 34 });
+  assert.isTrue(state.dirty);
+  assert.equal(state.historyLength, 1);
+  assert.equal(onChange.mock.calls.length, 0, 'activation happens before the scene installs the new editor');
+  editor.disable();
 });

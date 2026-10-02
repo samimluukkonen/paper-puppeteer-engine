@@ -52,7 +52,17 @@ export class RigEditor {
     this.scene.input.on('wheel', this.wheel, this);
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
     window.addEventListener('keydown', this.keyDown);
-    this.update();
+    // Activation must project retained edits before drawing or capturing IK targets.
+    this.refresh(false);
+    if (this.state.ikPreview) {
+      for (const chain of this.ikChains) {
+        const constraint = this.puppet.getIK(chain.name);
+        if (!constraint.target) constraint.setTarget(this.puppet.getBone(chain.endBone).getWorldPosition());
+        constraint.enabled = true;
+      }
+      this.puppet.syncPose();
+      this.update();
+    }
   }
 
   disable(): void {
