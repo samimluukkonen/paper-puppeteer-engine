@@ -74,7 +74,9 @@ export class UnsupportedFormatVersionError extends Error {
     readonly version: unknown,
     readonly supportedVersion: number,
   ) {
-    super(`Unsupported ${format} format version ${String(version)}; supported version is ${supportedVersion}.`);
+    super(
+      `Unsupported ${format} format version ${typeof version === 'object' ? JSON.stringify(version) : String(version)}; supported version is ${supportedVersion}.`,
+    );
     this.name = 'UnsupportedFormatVersionError';
   }
 }
@@ -88,17 +90,17 @@ function childPath(base: string, key: string | number): string {
   return base ? `${base}.${key}` : key;
 }
 
-/** Reject values that JSON.stringify would silently omit, coerce, or recurse through forever. */
+/** Reject non-JSON data using descriptors. Returns whether schema reads are safe; nonfinite numbers remain safe to inspect. */
 export function checkJson(
   value: unknown,
   path: string,
   issues: ValidationIssue[],
   ancestors = new Set<object>(),
-): void {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) issues.push({ severity: 'error', path, message: 'Must be a finite JSON number.' });
-    return;
+    return true;
   }
   if (typeof value !== 'object') {
     issues.push({
@@ -106,11 +108,11 @@ export function checkJson(
       path,
       message: 'Must be a JSON value (no functions, undefined, bigint, or symbols).',
     });
-    return;
+    return false;
   }
   if (ancestors.has(value)) {
     issues.push({ severity: 'error', path, message: 'Cyclic references are not allowed.' });
-    return;
+    return false;
   }
   if (
     !Array.isArray(value) &&
@@ -118,21 +120,24 @@ export function checkJson(
     Object.getPrototypeOf(value) !== null
   ) {
     issues.push({ severity: 'error', path, message: 'Must be a plain JSON object (no class instances, Map, or Set).' });
-    return;
+    return false;
   }
+  let safeToInspect = true;
   ancestors.add(value);
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
       const descriptor = Object.getOwnPropertyDescriptor(value, index);
-      if (!descriptor)
+      if (!descriptor) {
+        safeToInspect = false;
         issues.push({ severity: 'error', path: childPath(path, index), message: 'Sparse arrays are not JSON data.' });
-      else if (!('value' in descriptor))
+      } else if (!('value' in descriptor)) {
+        safeToInspect = false;
         issues.push({
           severity: 'error',
           path: childPath(path, index),
           message: 'Accessor properties are not JSON data.',
         });
-      else checkJson(descriptor.value, childPath(path, index), issues, ancestors);
+      } else if (!checkJson(descriptor.value, childPath(path, index), issues, ancestors)) safeToInspect = false;
     }
     for (const key of Reflect.ownKeys(value)) {
       if (key === 'length') continue;
@@ -140,25 +145,29 @@ export function checkJson(
         const index = Number(key);
         if (Number.isInteger(index) && index >= 0 && index < value.length && String(index) === key) continue;
       }
+      safeToInspect = false;
       issues.push({ severity: 'error', path, message: 'Array properties outside numeric indexes are not JSON data.' });
     }
   } else {
     for (const key of Reflect.ownKeys(value)) {
       if (typeof key === 'symbol') {
+        safeToInspect = false;
         issues.push({ severity: 'error', path, message: 'Symbol keys are not JSON data.' });
         continue;
       }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor?.enumerable || !('value' in descriptor))
+      if (!descriptor?.enumerable || !('value' in descriptor)) {
+        safeToInspect = false;
         issues.push({
           severity: 'error',
           path: childPath(path, key),
           message: 'Hidden or accessor properties are not JSON data.',
         });
-      else checkJson(descriptor.value, childPath(path, key), issues, ancestors);
+      } else if (!checkJson(descriptor.value, childPath(path, key), issues, ancestors)) safeToInspect = false;
     }
   }
   ancestors.delete(value);
+  return safeToInspect;
 }
 
 function shapeIssues(error: { issues: readonly { path: PropertyKey[]; message: string }[] }): ValidationIssue[] {
@@ -169,18 +178,17 @@ function shapeIssues(error: { issues: readonly { path: PropertyKey[]; message: s
   }));
 }
 
-function versionIssues(input: unknown, expected: number, format: 'rig' | 'animation' | 'skin'): ValidationIssue[] {
-  if (!isRecord(input) || !Object.hasOwn(input, 'version'))
-    return [{ severity: 'error', path: 'version', message: `${format} format version is required.` }];
-  if (input.version !== expected)
-    return [
-      {
-        severity: 'error',
-        path: 'version',
-        message: `Unsupported ${format} format version ${String(input.version)}; supported version is ${expected}.`,
-      },
-    ];
-  return [];
+function inspectVersion(input: unknown, expected: number, format: 'rig' | 'animation' | 'skin') {
+  const descriptor = isRecord(input) ? Object.getOwnPropertyDescriptor(input, 'version') : undefined;
+  if (!descriptor)
+    return {
+      issues: [{ severity: 'error' as const, path: 'version', message: `${format} format version is required.` }],
+    };
+  if (descriptor.value !== expected) {
+    const versionError = new UnsupportedFormatVersionError(format, descriptor.value, expected);
+    return { issues: [{ severity: 'error' as const, path: 'version', message: versionError.message }], versionError };
+  }
+  return { issues: [] };
 }
 
 function checkKnownKeys(value: unknown, path: string, schema: z.ZodObject, issues: ValidationIssue[]): void {
@@ -236,22 +244,24 @@ function checkAnimationFields(input: unknown, issues: ValidationIssue[]): void {
 interface ValidationResult<T> {
   issues: ValidationIssue[];
   data?: T;
+  versionError?: UnsupportedFormatVersionError | undefined;
 }
 
 /** @internal Retains validated data so character assembly need not parse the file again. */
 export function inspectRigDefinition(input: unknown): ValidationResult<RigDefinition> {
-  const issues = versionIssues(input, RIG_FORMAT_VERSION, 'rig');
-  checkJson(input, '', issues);
-  if (issues.some((issue) => issue.message.includes('accessor'))) return { issues };
+  const issues: ValidationIssue[] = [];
+  if (!checkJson(input, '', issues)) return { issues };
+  const { issues: versionIssues, versionError } = inspectVersion(input, RIG_FORMAT_VERSION, 'rig');
+  issues.push(...versionIssues);
   checkRigFields(input, issues);
   const parsed = rigDefinitionSchema.safeParse(input);
-  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)] };
+  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)], versionError };
   if (isRecord(input) && input.name !== undefined) {
     const name = rigFileSchema.shape.name.safeParse(input.name);
     if (!name.success) issues.push(...shapeIssues(name.error).map((issue) => ({ ...issue, path: 'name' })));
   }
   checkRigReferences(parsed.data, (issue) => issues.push(issue));
-  return issues.length ? { issues } : { issues, data: parsed.data };
+  return issues.length ? { issues, versionError } : { issues, data: parsed.data };
 }
 
 /** @internal Checks standalone skins against an already validated rig. */
@@ -268,10 +278,9 @@ export function validateRigDefinition(input: unknown): ValidationIssue[] {
 
 /** Validate a versioned file and return the same Rig used by TypeScript-defined puppets. */
 export function parseRigDefinition(input: unknown): Rig {
-  const { issues, data } = inspectRigDefinition(input);
+  const { issues, data, versionError } = inspectRigDefinition(input);
   if (!data) {
-    if (isRecord(input) && Object.hasOwn(input, 'version') && input.version !== RIG_FORMAT_VERSION)
-      throw new UnsupportedFormatVersionError('rig', input.version, RIG_FORMAT_VERSION);
+    if (versionError) throw versionError;
     throw new RigValidationError(issues);
   }
   return new Rig(data);
@@ -279,15 +288,16 @@ export function parseRigDefinition(input: unknown): Rig {
 
 /** @internal Retains validated clips for character assembly. */
 export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinition): ValidationResult<AnimationClip> {
-  const issues = versionIssues(input, ANIMATION_FORMAT_VERSION, 'animation');
-  checkJson(input, '', issues);
-  if (issues.some((issue) => issue.message.includes('accessor'))) return { issues };
+  const issues: ValidationIssue[] = [];
+  if (!checkJson(input, '', issues)) return { issues };
+  const { issues: versionIssues, versionError } = inspectVersion(input, ANIMATION_FORMAT_VERSION, 'animation');
+  issues.push(...versionIssues);
   checkAnimationFields(input, issues);
   const parsed = animationClipSchema.safeParse(input);
-  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)] };
+  if (!parsed.success) return { issues: [...issues, ...shapeIssues(parsed.error)], versionError };
   const clip = parsed.data;
   checkAnimationReferences(clip, rig, (issue) => issues.push(issue));
-  return issues.length ? { issues } : { issues, data: clip };
+  return issues.length ? { issues, versionError } : { issues, data: clip };
 }
 
 /** Reports file, scalar, timeline and rig-reference errors. */
@@ -297,10 +307,9 @@ export function validateAnimationDefinition(input: unknown, rig: Rig | RigDefini
 
 /** Validate a versioned file and return an ordinary clip for AnimationPlayer.addAnimation. */
 export function parseAnimationClip(input: unknown, rig: Rig | RigDefinition): AnimationClip {
-  const { issues, data } = inspectAnimationDefinition(input, rig);
+  const { issues, data, versionError } = inspectAnimationDefinition(input, rig);
   if (!data) {
-    if (isRecord(input) && Object.hasOwn(input, 'version') && input.version !== ANIMATION_FORMAT_VERSION)
-      throw new UnsupportedFormatVersionError('animation', input.version, ANIMATION_FORMAT_VERSION);
+    if (versionError) throw versionError;
     throw new AnimationValidationError(issues);
   }
   return data;

@@ -18,13 +18,15 @@ export class PoseValidationError extends Error {
 
 /** A pose is sparse and uses absolute local joint values, in radians for rotation. */
 export function parsePoseDefinition(input: unknown, rig: Rig): PoseDefinition {
-  if (typeof input === 'object' && input !== null && 'version' in input && input.version !== POSE_FORMAT_VERSION) {
-    throw new UnsupportedFormatVersionError('pose', input.version, POSE_FORMAT_VERSION);
-  }
   const jsonIssues: ValidationIssue[] = [];
   checkJson(input, '', jsonIssues);
   if (jsonIssues.length)
     throw new PoseValidationError(jsonIssues.map(({ path, message }) => ({ path: path ?? '', message })));
+  const version =
+    typeof input === 'object' && input !== null ? Object.getOwnPropertyDescriptor(input, 'version') : undefined;
+  if (version && version.value !== POSE_FORMAT_VERSION) {
+    throw new UnsupportedFormatVersionError('pose', version.value, POSE_FORMAT_VERSION);
+  }
   const parsed = poseDefinitionSchema.safeParse(input);
   if (!parsed.success) {
     throw new PoseValidationError(

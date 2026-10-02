@@ -41,6 +41,54 @@ const clipFile: AnimationJsonDefinition = {
   events: [{ time: 250, name: 'step', data: { side: 'left', count: 1 } }],
 };
 
+test('file validators reject root and nested accessors without invoking getters', () => {
+  const rig = new Rig(rigFile);
+  for (const field of ['version', 'bones', 'root']) {
+    let reads = 0;
+    const input = Object.defineProperty({ ...rigFile }, field, {
+      enumerable: true,
+      get() {
+        reads++;
+        throw new Error('getter invoked');
+      },
+    });
+    assert.ok(validateRigDefinition(input).some((issue) => issue.path === field && /accessor/.test(issue.message)));
+    assert.throws(() => parseRigDefinition(input), RigValidationError);
+    assert.equal(reads, 0);
+  }
+  for (const field of ['version', 'tracks', 'name']) {
+    let reads = 0;
+    const input = Object.defineProperty({ ...clipFile }, field, {
+      enumerable: true,
+      get() {
+        reads++;
+        throw new Error('getter invoked');
+      },
+    });
+    assert.ok(
+      validateAnimationDefinition(input, rig).some((issue) => issue.path === field && /accessor/.test(issue.message)),
+    );
+    assert.throws(() => parseAnimationClip(input, rig), AnimationValidationError);
+    assert.equal(reads, 0);
+  }
+  const nested = Object.defineProperty({ id: 'root' }, 'x', {
+    enumerable: true,
+    get() {
+      throw new Error('getter invoked');
+    },
+  });
+  assert.throws(() => parseRigDefinition({ ...rigFile, bones: [nested] }), RigValidationError);
+  const inherited = Object.create({
+    get version() {
+      throw new Error('inherited getter invoked');
+    },
+  });
+  assert.throws(() => parseRigDefinition(inherited), RigValidationError);
+  assert.throws(() => parseAnimationClip(inherited, rig), AnimationValidationError);
+  const coercion = { toString: 'invalid coercion' };
+  assert.throws(() => parseRigDefinition({ ...rigFile, version: coercion }), UnsupportedFormatVersionError);
+});
+
 test('versioned rig round trips through JSON into the runtime rig', () => {
   const rig = parseRigDefinition(JSON.parse(JSON.stringify(rigFile)));
   assert.deepEqual(

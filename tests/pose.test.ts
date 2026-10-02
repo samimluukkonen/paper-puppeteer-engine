@@ -1,6 +1,6 @@
 import { assert, test } from 'vitest';
 import { Joint } from '../src/engine/Joint.js';
-import { applyPoseToJoints, parsePoseDefinition, serializePose } from '../src/engine/Pose.js';
+import { applyPoseToJoints, PoseValidationError, parsePoseDefinition, serializePose } from '../src/engine/Pose.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({
@@ -12,6 +12,34 @@ const rig = new Rig({
 });
 const joints = () => new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
 const source = { version: 1 as const, name: 'guard', bones: { arm: { rotation: 1, x: 8 } } };
+
+test('pose parsing rejects throwing accessors before reading versions or transforms', () => {
+  for (const field of ['version', 'name', 'bones']) {
+    let reads = 0;
+    const input = Object.defineProperty({ ...source }, field, {
+      enumerable: true,
+      get() {
+        reads++;
+        throw new Error('getter invoked');
+      },
+    });
+    assert.throws(() => parsePoseDefinition(input, rig), PoseValidationError);
+    assert.equal(reads, 0);
+  }
+  const transform = Object.defineProperty({}, 'rotation', {
+    enumerable: true,
+    get() {
+      throw new Error('getter invoked');
+    },
+  });
+  assert.throws(() => parsePoseDefinition({ ...source, bones: { arm: transform } }, rig), PoseValidationError);
+  const inherited = Object.create({
+    get version() {
+      throw new Error('inherited getter invoked');
+    },
+  });
+  assert.throws(() => parsePoseDefinition(inherited, rig), PoseValidationError);
+});
 
 test('reserved bone identifiers fail explicitly while own Object prototype names round trip', () => {
   assert.throws(() => new Rig({ root: '__proto__', bones: [{ id: '__proto__' }] }), /reserved/);
