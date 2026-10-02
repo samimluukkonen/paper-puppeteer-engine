@@ -178,6 +178,16 @@ src/demo/
   createTextures.ts    Legacy generated cutouts for TypeScript demos
   demoIK.ts            Arm/leg chains with explicit execution priorities
   Katana.ts            Placeholder weapon transform and two data-defined grips
+src/devtools/rig-editor/
+  main.ts              Page bootstrap and controller wiring
+  editorMarkup.ts      Static page shell
+  InspectorController.ts  Numeric editing, derived labels, and field undo grouping
+  HierarchyController.ts  Cached tree rendering and selection
+  ControlsController.ts   Editing, snapping, visibility, and preview controls
+  SessionController.ts    Status, validation, history actions, export, reload, and import
+  RigEditorScene.ts    Character loading and preview session lifecycle
+  RigEditor.ts         Canvas editing and working-rig preview synchronization
+  RigEditorState.ts    Working rig, validation, bounded history, and serialization
 src/main.ts            Demo bootstrap and control panel
 ```
 

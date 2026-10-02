@@ -1,22 +1,8 @@
 import { afterEach, assert, test, vi } from 'vitest';
 import type { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
+import { createSessionController } from '../src/devtools/rig-editor/SessionController.js';
 import { Rig } from '../src/engine/Rig.js';
-
-const scene = vi.hoisted(() => ({ ready: undefined as ((editor: RigEditor) => void) | undefined }));
-
-vi.mock('phaser', () => ({
-  default: { Game: vi.fn(), Scale: { FIT: 0, CENTER_BOTH: 0 } },
-}));
-vi.mock('../src/devtools/rig-editor/RigEditorScene.js', () => ({
-  RigEditorScene: class {
-    characterId = 'test-character';
-    rigFilename = 'rig.json';
-    constructor(ready: (editor: RigEditor) => void) {
-      scene.ready = ready;
-    }
-  },
-}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -53,12 +39,16 @@ async function fixture() {
   });
   const writeText = vi.fn((_json: string) => pending);
   vi.stubGlobal('navigator', { clipboard: { writeText } });
-  vi.resetModules();
-  await import('../src/devtools/rig-editor/main.js');
+  const session = createSessionController({ querySelector } as unknown as HTMLElement, () => ({
+    characterId: 'test-character',
+    rigFilename: 'rig.json',
+    reloadRig: vi.fn(),
+    reloadOriginal: vi.fn(),
+  }));
   const load = () => {
     const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root', x: 0 }] }));
     const editor = { state, exportJson: (save: boolean) => state.exportJson(save) } as RigEditor;
-    scene.ready!(editor);
+    session.updateStatus(editor);
     return state;
   };
   const state = load();
