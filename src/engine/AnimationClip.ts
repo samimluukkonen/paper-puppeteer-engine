@@ -1,3 +1,4 @@
+import { shortestRotationDelta } from './animationMath.js';
 import { checkJson, type ValidationIssue } from './externalData.js';
 import type { Rig } from './Rig.js';
 import { animationClipSchema } from './schemas.js';
@@ -103,9 +104,7 @@ export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, 
   const previous = keys[low - 1]!;
   const progress = (time - previous.time) / (next.time - previous.time);
   if (property === 'rotation') {
-    const difference =
-      ((((next.value - previous.value + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
-    return previous.value + difference * progress;
+    return previous.value + shortestRotationDelta(previous.value, next.value) * progress;
   }
   return previous.value + (next.value - previous.value) * progress;
 }

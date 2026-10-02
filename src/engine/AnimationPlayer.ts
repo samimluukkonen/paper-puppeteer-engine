@@ -1,6 +1,7 @@
 import type { AnimationClip, AnimationEvent, AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
 import { compileClip, copyAnimationEvent } from './AnimationClip.js';
 import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer, evaluateClip } from './AnimationPose.js';
+import { quantizePlaybackTime } from './animationMath.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
 import { assertFinite, type TransformProperty, transformProperties } from './types.js';
@@ -432,9 +433,7 @@ export class AnimationPlayer {
   private transitionWeight(state: AnimationState, transition: AnimationTransition): number {
     const mode = state.clip.playback ?? this.playback;
     const blendTime =
-      mode.mode === 'stepped' && transition.elapsed < transition.duration
-        ? Math.floor((transition.elapsed + 1e-9) / (1000 / mode.fps)) * (1000 / mode.fps)
-        : transition.elapsed;
+      transition.elapsed < transition.duration ? quantizePlaybackTime(transition.elapsed, mode) : transition.elapsed;
     return Math.min(1, blendTime / transition.duration);
   }
 
@@ -454,9 +453,8 @@ export class AnimationPlayer {
 
   private sampleTime(clip: CompiledClip, time: number): number {
     const mode = clip.playback ?? this.playback;
-    if (mode.mode === 'smooth' || (!clip.loop && time === clip.duration)) return time;
-    const step = 1000 / mode.fps;
-    return Math.floor((time + 1e-9) / step) * step;
+    if (!clip.loop && time === clip.duration) return time;
+    return quantizePlaybackTime(time, mode);
   }
 
   private advance(

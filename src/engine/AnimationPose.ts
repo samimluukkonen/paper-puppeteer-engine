@@ -1,5 +1,6 @@
 import type { CompiledClip } from './AnimationClip.js';
 import { sampleProperty } from './AnimationClip.js';
+import { shortestRotationDelta } from './animationMath.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { transformProperties } from './types.js';
 
@@ -9,8 +10,7 @@ export function lerpProperty(property: TransformProperty, from: number, to: numb
   if (weight <= 0) return from;
   if (weight >= 1) return to;
   if (property !== 'rotation') return from + (to - from) * weight;
-  const difference = ((((to - from + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
-  return from + difference * weight;
+  return from + shortestRotationDelta(from, to) * weight;
 }
 
 export function evaluateClip(clip: CompiledClip, time: number): AnimationPose {
