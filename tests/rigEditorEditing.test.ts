@@ -70,6 +70,78 @@ test('editor rejects invalid numeric edits without making the rig dirty', () => 
   assert.isFalse(state.dirty);
 });
 
+test('length edits preserve child directions through zero, history, and resets', () => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'arm',
+      bones: [
+        { id: 'arm', length: 20 },
+        { id: 'hand', parent: 'arm', x: 12, y: -16 },
+        { id: 'other', parent: 'arm', x: -16, y: 12 },
+      ],
+    }),
+  );
+  const offsets = () => state.workingCopy.bones.slice(1).map(({ x, y }) => [x, y]);
+  state.selectBone('arm');
+  state.editBone('arm', 'length', 0);
+  assert.deepEqual(offsets(), [
+    [0, -0],
+    [-0, 0],
+  ]);
+  state.editBone('arm', 'length', 20);
+  assert.deepEqual(offsets(), [
+    [12, -16],
+    [-16, 12],
+  ]);
+  state.resetSelected();
+  assert.deepEqual(offsets(), [
+    [12, -16],
+    [-16, 12],
+  ]);
+  state.undo();
+  state.redo();
+  state.undo();
+  state.editBone('arm', 'length', 40);
+  assert.deepEqual(offsets(), [
+    [24, -32],
+    [-32, 24],
+  ]);
+  state.resetSelected();
+  assert.deepEqual(offsets(), [
+    [12, -16],
+    [-16, 12],
+  ]);
+
+  // A different direction on a discarded branch must not leak into a redo at zero.
+  state.editBone('arm', 'length', 0);
+  state.undo();
+  state.editBoneFields('hand', { x: -20, y: 0 });
+  state.editBone('arm', 'length', 0);
+  state.undo();
+  state.undo();
+  state.redo();
+  state.redo();
+  state.editBone('arm', 'length', 20);
+  assert.deepEqual(offsets(), [
+    [-20, 0],
+    [-16, 12],
+  ]);
+  state.resetRig();
+  state.beginOperation();
+  state.editBone('arm', 'length', 0);
+  state.editBone('arm', 'length', 40);
+  state.endOperation();
+  assert.deepEqual(offsets(), [
+    [24, -32],
+    [-32, 24],
+  ]);
+  state.undo();
+  assert.deepEqual(offsets(), [
+    [12, -16],
+    [-16, 12],
+  ]);
+});
+
 test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
   '%s field edits validate the complete patch once and undo together',
   (type) => {

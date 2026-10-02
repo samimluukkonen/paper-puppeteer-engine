@@ -16,6 +16,8 @@ type SpriteField = 'x' | 'y' | 'originX' | 'originY';
 export type GridSnap = 0 | 1 | 2 | 5 | 10;
 export type RotationSnap = 0 | 1 | 5 | 15;
 
+type HistoryEntry = { rig: string; directions: [string, { x: number; y: number }][] };
+
 const snapshot = (rig: RigDefinition): string => JSON.stringify(rig);
 const round = (value: number): number => Number(value.toFixed(6));
 
@@ -92,9 +94,10 @@ export class RigEditorState {
   private saved: string;
   private cachedSnapshot: string | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
-  private readonly past: string[] = [];
-  private readonly future: string[] = [];
-  private operation: string | undefined;
+  private readonly past: HistoryEntry[] = [];
+  private readonly future: HistoryEntry[] = [];
+  private operation: HistoryEntry | undefined;
+  private readonly childDirections = new Map<string, { x: number; y: number }>();
   private readonly children = new Map<string, string[]>();
 
   constructor(source: Rig, file?: RigJsonDefinition) {
@@ -146,7 +149,7 @@ export class RigEditorState {
   }
 
   beginOperation(): void {
-    if (this.operation === undefined) this.operation = this.workingSnapshot;
+    if (this.operation === undefined) this.operation = this.historyEntry();
   }
 
   endOperation(): void {
@@ -156,14 +159,18 @@ export class RigEditorState {
     this.record(before);
   }
 
-  private record(before: string): void {
-    if (before === this.workingSnapshot) return;
+  private historyEntry(): HistoryEntry {
+    return { rig: this.workingSnapshot, directions: [...this.childDirections] };
+  }
+
+  private record(before: HistoryEntry): void {
+    if (before.rig === this.workingSnapshot) return;
     this.past.push(before);
     this.future.length = 0;
   }
 
   private change(edit: () => void): void {
-    const before = this.operation ?? this.workingSnapshot;
+    const before = this.operation ?? this.historyEntry();
     try {
       edit();
     } finally {
@@ -182,12 +189,18 @@ export class RigEditorState {
     this.cachedSnapshot = json;
   }
 
+  private restoreHistory(entry: HistoryEntry): void {
+    this.restore(entry.rig);
+    this.childDirections.clear();
+    for (const [id, direction] of entry.directions) this.childDirections.set(id, direction);
+  }
+
   undo(): boolean {
     this.endOperation();
     const previous = this.past.pop();
     if (previous === undefined) return false;
-    this.future.push(this.workingSnapshot);
-    this.restore(previous);
+    this.future.push(this.historyEntry());
+    this.restoreHistory(previous);
     this.updateWarnings();
     return true;
   }
@@ -196,8 +209,8 @@ export class RigEditorState {
     this.endOperation();
     const next = this.future.pop();
     if (next === undefined) return false;
-    this.past.push(this.workingSnapshot);
-    this.restore(next);
+    this.past.push(this.historyEntry());
+    this.restoreHistory(next);
     this.updateWarnings();
     return true;
   }
@@ -213,6 +226,7 @@ export class RigEditorState {
           // Length edits move direct children; reset those offsets in the same history entry.
           for (const childId of this.childrenOf(selected.id)) {
             const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
+            this.childDirections.delete(childId);
             const initialChild = this.initialCopy.bones.find((bone) => bone.id === childId)!;
             for (const field of ['x', 'y'] as const) {
               if (initialChild[field] === undefined) delete child[field];
@@ -238,7 +252,10 @@ export class RigEditorState {
   }
 
   resetRig(): void {
-    this.change(() => this.restore(snapshot(this.initialCopy)));
+    this.change(() => {
+      this.restore(snapshot(this.initialCopy));
+      this.childDirections.clear();
+    });
   }
 
   snapTranslation(value: number): number {
@@ -330,8 +347,12 @@ export class RigEditorState {
           const x = child.x ?? 0;
           const y = child.y ?? 0;
           const distance = Math.hypot(x, y);
-          child.x = distance ? (x * values.length) / distance : 0;
-          child.y = distance ? (y * values.length) / distance : values.length;
+          const direction = distance
+            ? { x: x / distance, y: y / distance }
+            : (this.childDirections.get(childId) ?? { x: 0, y: 1 });
+          this.childDirections.set(childId, direction);
+          child.x = direction.x * values.length;
+          child.y = direction.y * values.length;
         }
       }
     });
