@@ -1,5 +1,60 @@
 import type { IKTarget } from '../engine/index.js';
 
+export interface HeadBounds {
+  left: number;
+  right: number;
+  top: number;
+}
+
+export interface PalmPathState {
+  side: 'left' | 'right';
+  overHead: boolean;
+}
+
+export function headOverpassY(head: HeadBounds, x: number, margin: number): number {
+  return x >= head.left - margin && x <= head.right + margin ? head.top - margin : Infinity;
+}
+
+/** Keep the chosen side until a palm crosses above the head, then allow a descent outside it. */
+export function updatePalmPath(
+  previous: PalmPathState,
+  palm: IKTarget,
+  head: HeadBounds,
+  canPassOverHead: boolean,
+  margin: number,
+): PalmPathState {
+  let { side, overHead } = previous;
+  if (palm.y <= head.top + margin && canPassOverHead) overHead = true;
+  if (overHead) {
+    side = palm.x < (head.left + head.right) / 2 ? 'left' : 'right';
+    const outside = side === 'left' ? palm.x < head.left - margin : palm.x > head.right + margin;
+    if (outside && palm.y <= headOverpassY(head, palm.x, margin) && palm.y > head.top + margin) overHead = false;
+  }
+  return { side, overHead };
+}
+
+/** Combine reach with silhouette clearance; the stronger outward correction wins. */
+export function palmClearanceCorrection(
+  palm: IKTarget,
+  reach: IKTarget,
+  path: PalmPathState,
+  edges: { left: number; right: number } | undefined,
+  head: HeadBounds | undefined,
+  margin: number,
+): IKTarget {
+  const push =
+    path.overHead || !edges
+      ? 0
+      : path.side === 'right'
+        ? Math.max(0, edges.right + margin - palm.x)
+        : Math.min(0, edges.left - margin - palm.x);
+  const overpass = path.overHead && head ? Math.min(0, headOverpassY(head, palm.x, margin) - palm.y) : 0;
+  return {
+    x: push > 0 ? Math.max(reach.x, push) : push < 0 ? Math.min(reach.x, push) : reach.x,
+    y: Math.min(reach.y, overpass),
+  };
+}
+
 /** Translation of the primary grip that brings the secondary grip within arm reach. */
 export function gripReachCorrection(
   shoulder: IKTarget,
@@ -48,7 +103,7 @@ export function horizontalEdgesAtY(
 export function stepPalmAroundHead(
   previous: IKTarget,
   desired: IKTarget,
-  head: { left: number; right: number; top: number },
+  head: HeadBounds,
   margin: number,
   maximumStep: number,
 ): IKTarget {

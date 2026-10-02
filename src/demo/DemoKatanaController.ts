@@ -1,8 +1,16 @@
 import type Phaser from 'phaser';
-import type { Facing, IKTarget, Puppet, SyncPoseOptions } from '../engine/index.js';
+import type { Facing, IKTarget, Puppet, SyncPoseOptions, TwoBoneIKConstraint } from '../engine/index.js';
 import type { Katana } from './Katana.js';
 import { katanaGrips } from './Katana.js';
-import { gripReachCorrection, horizontalEdgesAtY, stepPalmAroundHead } from './katanaArmTarget.js';
+import {
+  gripReachCorrection,
+  type HeadBounds,
+  horizontalEdgesAtY,
+  type PalmPathState,
+  palmClearanceCorrection,
+  stepPalmAroundHead,
+  updatePalmPath,
+} from './katanaArmTarget.js';
 
 // The hand joint is at the wrist; +Y runs along this rig's hand toward its palm.
 const palmGripOffset: IKTarget = { x: 0, y: 15 };
@@ -15,8 +23,7 @@ export class DemoKatanaController {
   private attached = false;
   private slotKatana = false;
   private swordAngle = -0.65;
-  private rearPalmSide: Facing = 'right';
-  private rearPalmOverHead = false;
+  private rearPalmPath: PalmPathState = { side: 'right', overHead: false };
   private previousRearPalm: IKTarget | undefined;
 
   constructor(
@@ -31,8 +38,7 @@ export class DemoKatanaController {
   }
 
   resetRearPalm(direction: Facing): void {
-    this.rearPalmSide = direction;
-    this.rearPalmOverHead = false;
+    this.rearPalmPath = { side: direction, overHead: false };
     this.previousRearPalm = undefined;
   }
 
@@ -142,7 +148,7 @@ export class DemoKatanaController {
     // Follow the head's top while crossing between sides. A vertical path
     // avoids the discontinuous left/right projection at the head's corners.
     const head = this.puppet.getSlotImage('headVisual');
-    let headBounds: { left: number; right: number; top: number } | undefined;
+    let headBounds: HeadBounds | undefined;
     if (head) {
       const corners = this.cutoutCorners(head);
       headBounds = {
@@ -150,54 +156,27 @@ export class DemoKatanaController {
         right: Math.max(...corners.map((point) => point.x)),
         top: Math.min(...corners.map((point) => point.y)),
       };
-      const palm = rearPalm();
-      if (palm.y <= headBounds.top + palmVisibilityMargin && (facing === 'right' || secondaryArm.status === 'solved'))
-        this.rearPalmOverHead = true;
-      if (this.rearPalmOverHead) {
-        this.rearPalmSide = palm.x < (headBounds.left + headBounds.right) / 2 ? 'left' : 'right';
-        const allowedY = this.headOverpassY(headBounds, palm.x);
-        const outside =
-          this.rearPalmSide === 'left'
-            ? palm.x < headBounds.left - palmVisibilityMargin
-            : palm.x > headBounds.right + palmVisibilityMargin;
-        if (outside && palm.y <= allowedY && palm.y > headBounds.top + palmVisibilityMargin) {
-          this.rearPalmOverHead = false;
-        }
-      }
+      this.rearPalmPath = updatePalmPath(
+        this.rearPalmPath,
+        rearPalm(),
+        headBounds,
+        facing === 'right' || secondaryArm.status === 'solved',
+        palmVisibilityMargin,
+      );
     }
     for (let pass = 0; pass < 24; pass += 1) {
-      const shoulder = this.puppet.getBone(secondaryArm.rootBone).getWorldPosition();
-      const elbow = this.puppet.getBone(secondaryArm.middleBone).getWorldPosition();
-      const secondaryPalm = this.puppet
-        .getBone(secondaryArm.endBone)
-        .container.getWorldTransformMatrix()
-        .transformPoint(secondaryArm.endOffset.x, secondaryArm.endOffset.y);
-      const lengthA = Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y);
-      const lengthB = Math.hypot(secondaryPalm.x - elbow.x, secondaryPalm.y - elbow.y);
       const grip = this.katana.getGripWorldPosition(secondaryGrip);
       const reachCorrection =
-        secondaryArm.status === 'clamped' ? gripReachCorrection(shoulder, grip, lengthA, lengthB) : { x: 0, y: 0 };
+        secondaryArm.status === 'clamped' ? this.secondaryReachCorrection(secondaryArm, grip) : { x: 0, y: 0 };
       const palm = rearPalm();
-      // The rear palm draws behind the body, so keep it outside whichever
-      // cutout intersects its height, on the side reached over the head.
-      const edges = !this.rearPalmOverHead ? this.bodyEdgesAt(palm.y) : undefined;
-      const visibilityPush =
-        edges === undefined
-          ? 0
-          : this.rearPalmSide === 'right'
-            ? Math.max(0, edges.right + palmVisibilityMargin - palm.x)
-            : Math.min(0, edges.left - palmVisibilityMargin - palm.x);
-      const overpassPush =
-        this.rearPalmOverHead && headBounds ? Math.min(0, this.headOverpassY(headBounds, palm.x) - palm.y) : 0;
-      const correction = {
-        x:
-          visibilityPush > 0
-            ? Math.max(reachCorrection.x, visibilityPush)
-            : visibilityPush < 0
-              ? Math.min(reachCorrection.x, visibilityPush)
-              : reachCorrection.x,
-        y: Math.min(reachCorrection.y, overpassPush),
-      };
+      const correction = palmClearanceCorrection(
+        palm,
+        reachCorrection,
+        this.rearPalmPath,
+        this.rearPalmPath.overHead ? undefined : this.bodyEdgesAt(palm.y),
+        headBounds,
+        palmVisibilityMargin,
+      );
       if (Math.hypot(correction.x, correction.y) < 0.01) break;
       target.x += correction.x;
       target.y += correction.y;
@@ -217,19 +196,7 @@ export class DemoKatanaController {
       // The bounded path may pass just outside the second arm's reach even
       // when its endpoints are reachable. Pull that frame back into reach.
       for (let pass = 0; pass < 12 && secondaryArm.status === 'clamped'; pass += 1) {
-        const shoulder = this.puppet.getBone(secondaryArm.rootBone).getWorldPosition();
-        const elbow = this.puppet.getBone(secondaryArm.middleBone).getWorldPosition();
-        const secondaryPalm = this.puppet
-          .getBone(secondaryArm.endBone)
-          .container.getWorldTransformMatrix()
-          .transformPoint(secondaryArm.endOffset.x, secondaryArm.endOffset.y);
-        const grip = this.katana.getGripWorldPosition(secondaryGrip);
-        const correction = gripReachCorrection(
-          shoulder,
-          grip,
-          Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y),
-          Math.hypot(secondaryPalm.x - elbow.x, secondaryPalm.y - elbow.y),
-        );
+        const correction = this.secondaryReachCorrection(secondaryArm, this.katana.getGripWorldPosition(secondaryGrip));
         if (Math.hypot(correction.x, correction.y) < 0.0001) break;
         target.x += correction.x;
         target.y += correction.y;
@@ -241,10 +208,19 @@ export class DemoKatanaController {
     this.previousRearPalm = rearPalm();
   }
 
-  private headOverpassY(head: { left: number; right: number; top: number }, x: number): number {
-    return x >= head.left - palmVisibilityMargin && x <= head.right + palmVisibilityMargin
-      ? head.top - palmVisibilityMargin
-      : Infinity;
+  private secondaryReachCorrection(arm: TwoBoneIKConstraint, grip: IKTarget): IKTarget {
+    const shoulder = this.puppet.getBone(arm.rootBone).getWorldPosition();
+    const elbow = this.puppet.getBone(arm.middleBone).getWorldPosition();
+    const palm = this.puppet
+      .getBone(arm.endBone)
+      .container.getWorldTransformMatrix()
+      .transformPoint(arm.endOffset.x, arm.endOffset.y);
+    return gripReachCorrection(
+      shoulder,
+      grip,
+      Math.hypot(elbow.x - shoulder.x, elbow.y - shoulder.y),
+      Math.hypot(palm.x - elbow.x, palm.y - elbow.y),
+    );
   }
 
   private cutoutCorners(sprite: Phaser.GameObjects.Image): IKTarget[] {
