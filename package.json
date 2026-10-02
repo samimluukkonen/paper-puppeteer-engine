@@ -13,6 +13,10 @@
   "module": "./dist/library/index.js",
   "types": "./dist/library/index.d.ts",
   "exports": {
+    "./core": {
+      "types": "./dist/library/core.d.ts",
+      "import": "./dist/library/core.js"
+    },
     ".": {
       "types": "./dist/library/index.d.ts",
       "import": "./dist/library/index.js"
@@ -24,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm run build:demo && npm run build:lib",
     "build:demo": "vite build",
-    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/check-core.mjs",
     "preview": "vite preview",
     "schemas:generate": "node scripts/generate-schemas.mjs && biome format --write schemas",
     "check": "biome check .",

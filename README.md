@@ -576,6 +576,18 @@ import { Puppet, type RigDefinition, type AnimationClip } from 'paper-puppeteer-
 
 The library includes TypeScript declarations and source maps. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
 
+For Node scripts and asset tooling, import the renderer-independent entry point:
+
+```ts
+import { CharacterLoader, validateRigDefinition, Joint, AnimationPlayer, solveTwoBoneIK } from 'paper-puppeteer-engine/core';
+
+const character = await CharacterLoader.load('https://example.com/characters/hero/character.json');
+const joints = new Map(character.rig.bones.map(bone => [bone.id, new Joint(bone.id, bone)]));
+const player = new AnimationPlayer(character.rig, joints);
+```
+
+`/core` exports character loading and validation, rig/slot data, pose and animation APIs, and IK without loading Phaser or requiring browser globals. `CharacterLoader.load` accepts an optional fetch implementation for file system or custom I/O. Every library build checks the built `/core` package in plain Node.
+
 ## Current limitations
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
