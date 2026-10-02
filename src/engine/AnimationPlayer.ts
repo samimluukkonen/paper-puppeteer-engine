@@ -59,6 +59,17 @@ function validateSpeed(speed: number): void {
   if (speed < 0) throw new Error('Animation speed cannot be negative.');
 }
 
+const maximumEventsPerUpdate = 10_000;
+
+function eventCycles(clip: CompiledClip, previous: number, end: number, time: number): [number, number] {
+  if (!clip.loop) return time > previous && time <= end ? [0, 0] : [1, 0];
+  const first = Math.max(0, Math.floor((previous - time) / clip.duration) + 1);
+  const last = Math.floor((end - time) / clip.duration);
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last))
+    throw new Error('Animation event cycle bounds must be safe integers. Reduce the delta or playback speed.');
+  return [first, last];
+}
+
 /** Evaluates authored poses and layers. Puppet applies IK after this player writes the pose. */
 export class AnimationPlayer {
   private readonly clips = new Map<string, CompiledClip>();
@@ -259,6 +270,26 @@ export class AnimationPlayer {
       }
     }
     if (!advancing) return false;
+    // Validate every clock and the total catch-up work before mutating any layer.
+    let eventCount = 0;
+    for (const layer of this.layers.values()) {
+      const state = layer.state;
+      if (state?.playing) {
+        const end = this.advanceEnd(state, delta);
+        if (end !== state.time) {
+          for (const marker of state.clip.events) {
+            const [first, last] = eventCycles(state.clip, state.time, end, marker.time);
+            eventCount += Math.max(0, last - first + 1);
+            if (eventCount > maximumEventsPerUpdate)
+              throw new Error(
+                `Animation update exceeds ${maximumEventsPerUpdate} events. Reduce the delta or playback speed.`,
+              );
+          }
+        }
+      }
+      const source = layer.transition?.source;
+      if (!layer.stopped && source && !(source instanceof Map) && source.playing) this.advanceEnd(source, delta);
+    }
     const events: FiredAnimationEvent[] = [];
     const completions: AnimationCompletion[] = [];
     for (const [name, layer] of this.layers) {
@@ -436,14 +467,12 @@ export class AnimationPlayer {
     completions?: AnimationCompletion[],
   ): void {
     const previous = state.time;
-    const distance = delta * this.speed * state.speed;
-    if (distance === 0) return;
-    const end = state.clip.loop ? previous + distance : Math.min(previous + distance, state.clip.duration);
+    const end = this.advanceEnd(state, delta);
+    if (end === previous) return;
     if (layer && events) {
       const crossed: { time: number; marker: AnimationEvent }[] = [];
       for (const marker of state.clip.events) {
-        const first = state.clip.loop ? Math.max(0, Math.floor((previous - marker.time) / state.clip.duration) + 1) : 0;
-        const last = state.clip.loop ? Math.floor((end - marker.time) / state.clip.duration) : 0;
+        const [first, last] = eventCycles(state.clip, previous, end, marker.time);
         for (let cycle = first; cycle <= last; cycle += 1) {
           const crossing = cycle * state.clip.duration + marker.time;
           if (crossing > previous && crossing <= end) crossed.push({ time: crossing, marker });
@@ -457,6 +486,15 @@ export class AnimationPlayer {
       state.playing = false;
       if (layer && completions) completions.push({ clip: state.clip.name, layer });
     }
+  }
+
+  private advanceEnd(state: AnimationState, delta: number): number {
+    if (delta === 0 || this.speed === 0 || state.speed === 0) return state.time;
+    const distance = delta * this.speed * state.speed;
+    assertFinite(distance, 'Animation advancement distance');
+    const end = state.time + distance;
+    assertFinite(end, 'Animation advancement time');
+    return state.clip.loop ? end : Math.min(end, state.clip.duration);
   }
 
   private fireStartEvents(clip: CompiledClip, layer: string): void {

@@ -1,4 +1,4 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import type { AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { blendPose, lerpProperty } from '../src/engine/AnimationPose.js';
@@ -687,4 +687,60 @@ test('an overlay without a base fades in and can release ownership at zero weigh
   assert.strictEqual(joints.get('arm')!.pose.x, 42);
   player.setLayerWeight('upper', 1);
   assert.strictEqual(joints.get('arm')!.pose.x, 20);
+});
+
+test.each([false, true])('overflowing advancement leaves all layers unchanged (events: %s)', (withEvents) => {
+  const { player, joints } = fixture();
+  const listener = vi.fn();
+  player.onAnimationEvent(listener);
+  player.play('a');
+  player.play('b', { fadeDuration: 200 });
+  player.addAnimation({
+    name: 'overflow',
+    duration: 1000,
+    loop: true,
+    tracks: { arm: [{ time: 0, x: 99 }] },
+    ...(withEvents ? { events: [{ time: 1, name: 'marker' }] } : {}),
+  });
+  player.play('overflow', { layer: 'upper', speed: Number.MAX_VALUE });
+  const before = { ...joints.get('arm')!.pose };
+  const transition = player.transition;
+  assert.throws(() => player.update(16), /advancement distance.*finite/);
+  assert.equal(player.elapsedTime, 0);
+  assert.deepEqual(player.transition, transition);
+  assert.deepEqual(joints.get('arm')!.pose, before);
+  assert.equal(listener.mock.calls.length, 0);
+  player.clearLayer('upper');
+  player.update(16);
+  assert.equal(player.elapsedTime, 16);
+});
+
+test.each([1e-300, 1e-10])('unsafe or excessive event catch-up rejects promptly for duration %s', (duration) => {
+  const { player } = fixture();
+  player.addAnimation({ name: 'events', duration, loop: true, tracks: {}, events: [{ time: 0, name: 'cycle' }] });
+  player.play('events');
+  assert.throws(() => player.update(1e10), /finite|safe integers|exceeds/);
+  assert.equal(player.elapsedTime, 0);
+});
+
+test('event catch-up is bounded across layers and preserves ordinary large-delta delivery', () => {
+  const { player } = fixture();
+  player.addAnimation({ name: 'events', duration: 1, loop: true, tracks: {}, events: [{ time: 0, name: 'cycle' }] });
+  player.play('events');
+  player.play('events', { layer: 'upper' });
+  const listener = vi.fn();
+  player.onAnimationEvent(listener);
+  assert.throws(() => player.update(5001), /exceeds 10000 events/);
+  assert.equal(player.elapsedTime, 0);
+  assert.equal(listener.mock.calls.length, 0);
+  player.update(5000);
+  assert.equal(listener.mock.calls.length, 10_000);
+});
+
+test('zero playback speed does not overflow intermediate multiplication', () => {
+  const { player } = fixture();
+  player.play('a', { speed: 0 });
+  player.setSpeed(Number.MAX_VALUE);
+  player.update(Number.MAX_VALUE);
+  assert.equal(player.elapsedTime, 0);
 });
