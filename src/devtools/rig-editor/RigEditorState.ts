@@ -105,6 +105,9 @@ export class RigEditorState {
   private operation: HistoryEntry | undefined;
   private readonly childDirections = new Map<string, { x: number; y: number }>();
   private readonly children = new Map<string, string[]>();
+  private readonly boneIndices = new Map<string, number>();
+  private readonly slotIndices = new Map<string, number>();
+  private readonly attachmentIndices = new Map<string, number>();
 
   constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
     this.historyLimit = options.historyLimit ?? 100;
@@ -121,6 +124,7 @@ export class RigEditorState {
       skins: source.skins,
     });
     this.rig = new Rig(this.workingCopy);
+    this.rebuildIndexes();
     this.initialCopy = structuredClone(this.workingCopy);
     this.saved = snapshot(this.workingCopy);
     this.cachedSnapshot = this.saved;
@@ -145,6 +149,17 @@ export class RigEditorState {
   private invalidate(): void {
     this.cachedSnapshot = undefined;
     this.cachedIssues = undefined;
+  }
+
+  /** Store array positions so replacing an entry during reset cannot leave stale object references. */
+  private rebuildIndexes(): void {
+    this.boneIndices.clear();
+    this.slotIndices.clear();
+    this.attachmentIndices.clear();
+    for (const [index, bone] of this.workingCopy.bones.entries()) this.boneIndices.set(bone.id, index);
+    for (const [index, slot] of (this.workingCopy.slots ?? []).entries()) this.slotIndices.set(slot.id, index);
+    for (const [index, attachment] of (this.workingCopy.attachments ?? []).entries())
+      this.attachmentIndices.set(attachment.id, index);
   }
 
   get canUndo(): boolean {
@@ -200,6 +215,7 @@ export class RigEditorState {
     Object.assign(this.workingCopy, copy);
     for (const key of ['slots', 'attachments', 'skins'] as const)
       if (copy[key] === undefined) delete (this.workingCopy as unknown as Record<string, unknown>)[key];
+    this.rebuildIndexes();
     this.invalidate();
     this.cachedSnapshot = json;
   }
@@ -235,14 +251,14 @@ export class RigEditorState {
     if (!selected) return false;
     this.change(() => {
       if (selected.type === 'bone') {
-        const index = this.workingCopy.bones.findIndex((bone) => bone.id === selected.id);
+        const index = this.boneIndices.get(selected.id)!;
         const original = this.initialCopy.bones[index]!;
         if (this.getBone(selected.id).length !== original.length) {
           // Length edits move direct children; reset those offsets in the same history entry.
           for (const childId of this.childrenOf(selected.id)) {
             const child = this.getBone(childId) as BoneDefinition & { x?: number; y?: number };
             this.childDirections.delete(childId);
-            const initialChild = this.initialCopy.bones.find((bone) => bone.id === childId)!;
+            const initialChild = this.initialCopy.bones[this.boneIndices.get(childId)!]!;
             for (const field of ['x', 'y'] as const) {
               if (initialChild[field] === undefined) delete child[field];
               else child[field] = initialChild[field];
@@ -251,12 +267,12 @@ export class RigEditorState {
         }
         (this.workingCopy.bones as BoneDefinition[])[index] = structuredClone(original);
       } else {
-        const index = this.workingCopy.slots!.findIndex((slot) => slot.id === selected.id);
+        const index = this.slotIndices.get(selected.id)!;
         (this.workingCopy.slots as SlotDefinition[])[index] = structuredClone(this.initialCopy.slots![index]!);
         // The inspector's artwork fields belong to the active slot attachment.
         if (attachmentId) {
-          const attachmentIndex = this.workingCopy.attachments?.findIndex((item) => item.id === attachmentId) ?? -1;
-          if (attachmentIndex >= 0)
+          const attachmentIndex = this.attachmentIndices.get(attachmentId);
+          if (attachmentIndex !== undefined)
             (this.workingCopy.attachments as SpriteAttachmentDefinition[])[attachmentIndex] = structuredClone(
               this.initialCopy.attachments![attachmentIndex]!,
             );
@@ -330,19 +346,22 @@ export class RigEditorState {
   }
 
   getBone(id: string): BoneDefinition {
-    const bone = this.workingCopy.bones.find((item) => item.id === id);
+    const index = this.boneIndices.get(id);
+    const bone = index === undefined ? undefined : this.workingCopy.bones[index];
     if (!bone) throw new Error(`Unknown bone "${id}".`);
     return bone;
   }
 
   getSlot(id: string): SlotDefinition {
-    const slot = this.workingCopy.slots?.find((item) => item.id === id);
+    const index = this.slotIndices.get(id);
+    const slot = index === undefined ? undefined : this.workingCopy.slots?.[index];
     if (!slot) throw new Error(`Unknown slot "${id}".`);
     return slot;
   }
 
   getAttachment(id: string): SpriteAttachmentDefinition {
-    const attachment = this.workingCopy.attachments?.find((item) => item.id === id);
+    const index = this.attachmentIndices.get(id);
+    const attachment = index === undefined ? undefined : this.workingCopy.attachments?.[index];
     if (!attachment) throw new Error(`Unknown attachment "${id}".`);
     return attachment;
   }
@@ -407,6 +426,7 @@ export class RigEditorState {
 
   /** Explicit validation also refreshes caches after direct working-copy mutations. */
   validate(): void {
+    this.rebuildIndexes();
     this.invalidate();
     this.updateWarnings();
   }
@@ -421,7 +441,7 @@ export class RigEditorState {
   }
 
   selectSlot(id: string): void {
-    if (!this.rig.slots.some((slot) => slot.id === id)) throw new Error(`Unknown slot "${id}".`);
+    this.getSlot(id);
     this.selection = { type: 'slot', id };
   }
 

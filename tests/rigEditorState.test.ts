@@ -43,6 +43,45 @@ test('hierarchy is parent first and the working copy is independent', () => {
   assert.equal(source.skins[0]?.slots.handVisual, 'hand');
 });
 
+test('indexed edits follow replacement objects through resets, undo and redo', () => {
+  const state = new RigEditorState(source);
+  const edit = () => {
+    state.beginOperation();
+    state.editBone('root', 'x', 7);
+    state.editBone('arm', 'x', 12);
+    state.editSlot('handVisual', 'y', 15);
+    state.editSprite('hand', 'x', 9, true);
+    state.endOperation();
+  };
+  const check = (edited: boolean) => {
+    assert.equal(state.getBone('root').x, edited ? 7 : undefined);
+    assert.equal(state.getBone('arm').x, edited ? 12 : undefined);
+    assert.equal(state.getSlot('handVisual').y, edited ? 15 : 5);
+    assert.equal(state.getAttachment('hand').x, edited ? 9 : undefined);
+  };
+  edit();
+  check(true);
+  state.undo();
+  check(false);
+  state.redo();
+  check(true);
+  state.selectBone('arm');
+  state.resetSelected();
+  assert.equal(state.getBone('arm').x, undefined);
+  state.selectSlot('handVisual');
+  state.resetSelected('hand');
+  assert.equal(state.getSlot('handVisual').y, 5);
+  assert.equal(state.getAttachment('hand').x, undefined);
+  edit();
+  check(true);
+  state.resetRig();
+  check(false);
+  edit();
+  check(true);
+  for (const get of [state.getBone.bind(state), state.getSlot.bind(state), state.getAttachment.bind(state)])
+    assert.throws(() => get('missing'), /Unknown/);
+});
+
 test('status and history reuse validation and serialization until the rig changes', () => {
   const state = new RigEditorState(source);
   const validation = vi.spyOn(externalData, 'validateRigDefinition');
