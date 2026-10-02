@@ -54,6 +54,13 @@ export class DemoScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Phaser reuses this scene instance across restarts, but destroys its objects.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.puppet = undefined;
+      this.presentation = undefined;
+      this.authoring = undefined;
+      this.controls = undefined;
+    });
     void this.loadCharacter();
   }
 
@@ -63,7 +70,7 @@ export class DemoScene extends Phaser.Scene {
       const definition = await loadSceneCharacter(this, url);
       if (definition && this.sys.isActive()) this.createPuppet(definition);
     } catch (error) {
-      this.showLoadError(String(error));
+      if (this.sys.isActive()) this.showLoadError(String(error));
     }
   }
 
