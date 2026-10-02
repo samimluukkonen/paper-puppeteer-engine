@@ -67,6 +67,7 @@ export {
   serializePose,
 } from './Pose.js';
 export { Rig } from './Rig.js';
+export type { DeepReadonly } from './readonlyData.js';
 export { SlotState } from './SlotState.js';
 export {
   animationClipSchema,

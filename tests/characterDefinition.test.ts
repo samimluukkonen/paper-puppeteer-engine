@@ -11,7 +11,12 @@ import {
 } from '../src/engine/CharacterDefinition.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import * as externalData from '../src/engine/externalData.js';
-import { checkJson, type ValidationIssue } from '../src/engine/externalData.js';
+import {
+  type AnimationJsonDefinition,
+  checkJson,
+  type RigJsonDefinition,
+  type ValidationIssue,
+} from '../src/engine/externalData.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
@@ -45,6 +50,47 @@ const bundle = () => ({
   skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, read(path)])),
   animations: Object.fromEntries(manifest.animations.map((path) => [path, read(path)])),
   poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, read(path)])),
+});
+
+test('character JSON data is deeply readonly, frozen, and independently owned', () => {
+  const data = bundle();
+  const definition = CharacterDefinition.fromData(data);
+  const walk = definition.animations.find((clip) => clip.name === 'walk')!;
+  const duration = walk.duration;
+  const sourceWalk = data.animations[manifest.animations[1]!] as AnimationJsonDefinition;
+  sourceWalk.duration = 2000;
+  (data.rig as RigJsonDefinition).bones[0]!.x = 123;
+  data.manifest.textures['paper-head'] = 'other.png';
+  assert.equal(walk.duration, duration);
+  assert.notEqual(definition.rigFile!.bones[0]!.x, 123);
+  assert.notEqual(definition.textures['paper-head'], 'other.png');
+
+  assert.throws(() => {
+    // @ts-expect-error Character animation fields are readonly as well as frozen.
+    walk.duration = 1;
+  }, TypeError);
+  assert.throws(() => {
+    // @ts-expect-error Nested track transforms cannot mutate the character source.
+    walk.tracks.pelvis![0]!.y = 123;
+  }, TypeError);
+  for (const value of [
+    definition,
+    definition.animations,
+    definition.poses,
+    definition.poses[0]!.bones,
+    definition.textures,
+    definition.rigFile!,
+    definition.rigFile!.bones[0]!,
+    walk.events![0]!.data as object,
+  ]) {
+    assert.isTrue(Object.isFrozen(value));
+    assert.throws(() => Object.defineProperty(value, 'extra', { value: 1 }), TypeError);
+  }
+  const edited = structuredClone(walk) as AnimationJsonDefinition;
+  edited.duration = 3000;
+  edited.tracks.pelvis![0]!.y = 123;
+  assert.equal(walk.duration, duration);
+  assert.notEqual(walk.tracks.pelvis![0]!.y, 123);
 });
 
 test('character texture and file lookups require own entries', () => {

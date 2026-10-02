@@ -10,6 +10,7 @@ import {
 } from './externalData.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { Rig } from './Rig.js';
+import { type DeepReadonly, freezeData } from './readonlyData.js';
 import { characterManifestSchema, skinFileSchema } from './schemas.js';
 import type { SkinDefinition } from './types.js';
 
@@ -151,33 +152,35 @@ export class CharacterValidationError extends Error {
   }
 }
 
-/** Fully assembled runtime data. No fetch or Phaser dependency. */
+/** Fully assembled immutable runtime data. Clone JSON data before authoring changes. */
 export class CharacterDefinition {
   private constructor(
     readonly id: string,
     readonly rig: Rig,
-    readonly animations: readonly AnimationClip[],
-    readonly poses: readonly PoseDefinition[],
+    readonly animations: DeepReadonly<readonly AnimationClip[]>,
+    readonly poses: DeepReadonly<readonly PoseDefinition[]>,
     readonly defaultSkin: string,
     readonly textures: Readonly<Record<string, string>>,
     readonly baseUrl?: string,
-    readonly rigFile?: RigJsonDefinition,
+    readonly rigFile?: DeepReadonly<RigJsonDefinition>,
     readonly rigPath?: string,
   ) {}
 
   static fromData(data: CharacterData, baseUrl?: string): CharacterDefinition {
     const { issues, manifest, rig, animations, poses } = inspectCharacterDefinition(data);
     if (issues.length || !manifest || !rig) throw new CharacterValidationError(issues);
-    return new CharacterDefinition(
-      manifest.id,
-      rig,
-      animations,
-      poses,
-      manifest.defaultSkin,
-      { ...manifest.textures },
-      baseUrl,
-      structuredClone(data.rig) as RigJsonDefinition,
-      manifest.rig,
+    return Object.freeze(
+      new CharacterDefinition(
+        manifest.id,
+        rig,
+        freezeData(animations),
+        freezeData(poses),
+        manifest.defaultSkin,
+        freezeData({ ...manifest.textures }),
+        baseUrl,
+        freezeData(structuredClone(data.rig) as RigJsonDefinition),
+        manifest.rig,
+      ),
     );
   }
 
