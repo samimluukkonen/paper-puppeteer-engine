@@ -80,18 +80,23 @@ export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, 
   const first = keys[0];
   if (!first) throw new Error('Cannot sample an empty property track.');
   if (time <= first.time) return first.value;
-  for (let index = 1; index < keys.length; index += 1) {
-    const next = keys[index];
-    const previous = keys[index - 1];
-    if (next && previous && time <= next.time) {
-      const progress = (time - previous.time) / (next.time - previous.time);
-      if (property === 'rotation') {
-        const difference =
-          ((((next.value - previous.value + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
-        return previous.value + difference * progress;
-      }
-      return previous.value + (next.value - previous.value) * progress;
-    }
+  // Find the first key at or after time, including exact keys for angular interpolation.
+  // This also supports backward scrubbing without a mutable playback cursor.
+  let low = 1;
+  let high = keys.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (time <= keys[middle]!.time) high = middle;
+    else low = middle + 1;
   }
-  return keys[keys.length - 1]?.value ?? first.value;
+  const next = keys[low];
+  if (!next) return keys[keys.length - 1]!.value;
+  const previous = keys[low - 1]!;
+  const progress = (time - previous.time) / (next.time - previous.time);
+  if (property === 'rotation') {
+    const difference =
+      ((((next.value - previous.value + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
+    return previous.value + difference * progress;
+  }
+  return previous.value + (next.value - previous.value) * progress;
 }

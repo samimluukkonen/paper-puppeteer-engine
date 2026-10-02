@@ -55,20 +55,22 @@ const rig = new Rig({
     })),
   ],
 });
-function player(layers: number) {
+function player(layers: number, keyCount = 2) {
+  // Dense clips represent several seconds of authoring at 30 keys/second.
+  const duration = keyCount === 2 ? 1000 : ((keyCount - 1) * 1000) / 30;
   const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
   const result = new AnimationPlayer(rig, joints);
   for (let layer = 0; layer < layers; layer += 1) {
     const tracks = Object.fromEntries(
       rig.bones.slice(1).map((bone) => [
         bone.id,
-        [
-          { time: 0, rotation: layer * 0.2, x: 0 },
-          { time: 1000, rotation: 1, x: 10 },
-        ],
+        Array.from({ length: keyCount }, (_, index) => {
+          const progress = index / (keyCount - 1);
+          return { time: progress * duration, rotation: layer * 0.2 + (1 - layer * 0.2) * progress, x: 10 * progress };
+        }),
       ]),
     );
-    result.addAnimation({ name: `clip${layer}`, duration: 1000, loop: true, tracks });
+    result.addAnimation({ name: `clip${layer}`, duration, loop: true, tracks });
     result.play(`clip${layer}`, { layer: layer === 0 ? 'base' : `layer${layer}`, fadeDuration: layer ? 1e9 : 0 });
   }
   return result;
@@ -77,6 +79,19 @@ const base = player(1),
   layered = player(3);
 profile('32 tracked bones, base animation', () => base.update(16));
 profile('32 tracked bones, three layers with fades', () => layered.update(16));
+
+for (const keyCount of [128, 512]) {
+  const denseBase = player(1, keyCount);
+  const denseLayers = player(3, keyCount);
+  const denseScrub = player(1, keyCount);
+  let scrubFrame = 0;
+  profile(`32 tracked bones, dense ${keyCount}-key base animation`, () => denseBase.update(16));
+  profile(`32 tracked bones, dense ${keyCount}-key three layers with fades`, () => denseLayers.update(16));
+  profile(`32 tracked bones, dense ${keyCount}-key nonsequential scrubbing`, () => {
+    // Visit both earlier and later intervals without relying on a playback cursor.
+    denseScrub.sample((((scrubFrame++ * 139) % keyCount) * 1000) / 30);
+  });
+}
 
 const puppet = new Puppet(puppetScene(), {
   autoUpdate: false,
