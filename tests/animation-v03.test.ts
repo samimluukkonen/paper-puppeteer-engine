@@ -462,6 +462,65 @@ test('masked overlay respects weights and preserves untracked bones', () => {
   assert.strictEqual(joints.get('arm')!.pose.x, 10);
 });
 
+for (const withBase of [false, true]) {
+  test.each(['clip', 'fade', 'interrupted fade'] as const)(
+    `switching an overlay from a %s releases previous properties ${withBase ? 'with' : 'without'} a base`,
+    (previous) => {
+      const { player, joints } = fixture();
+      player.addAnimation({ name: 'armY', duration: 1000, loop: true, tracks: { arm: [{ time: 0, y: 8 }] } });
+      player.addAnimation({ name: 'leg', duration: 1000, loop: true, tracks: { leg: [{ time: 0, rotation: 1 }] } });
+      player.addAnimation({
+        name: 'accent',
+        duration: 1000,
+        loop: true,
+        tracks: { arm: [{ time: 0, rotation: 0.5 }] },
+      });
+      if (withBase) player.play('a');
+      player.play('b', { layer: 'upper' });
+      player.setLayerWeight('upper', 0.5);
+      player.play('accent', { layer: 'accent' });
+      if (previous !== 'clip') {
+        player.play('armY', { layer: 'upper', fadeDuration: 200 });
+        player.update(50);
+        if (previous === 'interrupted fade') {
+          player.play('armY', { layer: 'upper', fadeDuration: 200 });
+          player.update(50);
+        }
+      }
+      const arm = joints.get('arm')!;
+      const leg = joints.get('leg')!;
+      assert.ok(arm.pose.x > arm.bindPose.x);
+      leg.pose.y = 42;
+      joints.get('root')!.pose.x = 7;
+      player.play('leg', { layer: 'upper' });
+      assert.deepEqual(arm.pose, { ...arm.bindPose, rotation: 0.5 });
+      assert.strictEqual(leg.pose.rotation, 0.5);
+      assert.strictEqual(leg.pose.y, 42);
+      assert.strictEqual(joints.get('root')!.pose.x, 7);
+      arm.pose.x = withBase ? 10 : 99;
+      player.update(50);
+      assert.strictEqual(arm.pose.x, withBase ? 10 : 99);
+      assert.strictEqual(arm.pose.rotation, 0.5);
+    },
+  );
+}
+
+test('switching a muted masked overlay preserves manual edits and restores only its contributions', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({ name: 'leg', duration: 1000, loop: true, tracks: { leg: [{ time: 0, rotation: 1 }] } });
+  player.setLayerMask('upper', ['arm']);
+  player.play('b', { layer: 'upper' });
+  player.setLayerWeight('upper', 0);
+  joints.get('arm')!.pose.x = 42;
+  joints.get('leg')!.pose.rotation = 0.25;
+  player.play('leg', { layer: 'upper' });
+  assert.strictEqual(joints.get('arm')!.pose.x, 42);
+  assert.strictEqual(joints.get('leg')!.pose.rotation, 0.25);
+  player.setLayerWeight('upper', 1);
+  assert.strictEqual(joints.get('arm')!.pose.x, 42);
+  assert.strictEqual(joints.get('leg')!.pose.rotation, 0.25);
+});
+
 for (const interrupted of [false, true]) {
   for (const cleanup of ['clear', 'mask'] as const) {
     test(`${cleanup} layer during ${interrupted ? 'an interrupted' : 'a'} crossfade resets all controlled properties`, () => {

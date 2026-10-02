@@ -147,6 +147,7 @@ export class AnimationPlayer {
         source = layer.transition ? this.evaluateLayer(layer, this.underlyingPose(layerName)) : { ...layer.state };
       else if (layerName !== 'base') source = new Map();
     }
+    if (layerName !== 'base' && !source) this.resetLayerProperties(layer);
     layer.state = { clip, time: 0, speed, playing: true };
     layer.transition = source ? { source, elapsed: 0, duration: fade } : undefined;
     layer.stopped = false;
