@@ -54,6 +54,26 @@ test.each([0, 50])('JSON event payloads at %s are isolated from source data, lis
   assert.deepEqual(data.nested.values, [1, 2]);
 });
 
+test('completion listeners receive independent events for base and overlay clips', () => {
+  const { player } = fixture();
+  player.addAnimation({ name: 'once', duration: 100, loop: false, tracks: {} });
+  const observed: { clip: string; layer: string }[] = [];
+  player.onAnimationComplete((event) => {
+    event.clip = 'changed';
+    event.layer = 'changed';
+  });
+  player.onAnimationComplete((event) => observed.push(event));
+  player.play('once');
+  player.play('once', { layer: 'upper' });
+  player.update(100);
+  player.update(100);
+  assert.deepEqual(observed, [
+    { clip: 'once', layer: 'base' },
+    { clip: 'once', layer: 'upper' },
+  ]);
+  assert.notStrictEqual(observed[0], observed[1]);
+});
+
 test('non-JSON TypeScript event payloads retain reference semantics', () => {
   const { player } = fixture();
   const data = { callback: () => 42 };

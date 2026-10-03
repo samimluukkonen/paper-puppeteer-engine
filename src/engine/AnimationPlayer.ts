@@ -309,7 +309,7 @@ export class AnimationPlayer {
     }
     this.applyCurrentPose();
     for (const event of events) for (const listener of [...this.eventListeners]) listener(copyAnimationEvent(event));
-    for (const event of completions) for (const listener of [...this.completionListeners]) listener(event);
+    for (const event of completions) for (const listener of [...this.completionListeners]) listener({ ...event });
     for (const layer of this.layers.values()) {
       if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
         layer.transition = undefined;
