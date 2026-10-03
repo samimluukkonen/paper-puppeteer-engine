@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { Facing, IKTarget, Puppet, SyncPoseOptions, TwoBoneIKConstraint } from '../engine/index.js';
-import type { Katana } from './Katana.js';
+import type { Katana, WeaponGripDefinition } from './Katana.js';
 import { katanaGrips } from './Katana.js';
 import {
   gripReachCorrection,
@@ -17,6 +17,16 @@ import {
 const palmGripOffset: IKTarget = { x: 0, y: 15 };
 const palmVisibilityMargin = 8;
 const maximumPalmStep = 8;
+
+/** Targets and adapters shared by the three correction phases of one solve. */
+interface GripSolve {
+  readonly primaryArm: TwoBoneIKConstraint;
+  readonly secondaryArm: TwoBoneIKConstraint;
+  readonly secondaryGrip: WeaponGripDefinition;
+  readonly target: IKTarget;
+  readonly rearPalm: () => IKTarget;
+  readonly syncOptions: SyncPoseOptions;
+}
 
 /** Owns the single visible weapon and the rear hand's continuous path around the body. */
 export class DemoKatanaController {
@@ -145,7 +155,14 @@ export class DemoKatanaController {
     const rearPalmOffset = secondaryArm.endOffset;
     const rearPalm = (): IKTarget =>
       rearPalmBone.container.getWorldTransformMatrix().transformPoint(rearPalmOffset.x, rearPalmOffset.y);
-    const target = { ...handTarget };
+    const solve: GripSolve = {
+      primaryArm,
+      secondaryArm,
+      secondaryGrip,
+      target: { ...handTarget },
+      rearPalm,
+      syncOptions,
+    };
     // Follow the head's top while crossing between sides. A vertical path
     // avoids the discontinuous left/right projection at the head's corners.
     const head = this.puppet.getSlotImage('headVisual');
@@ -169,11 +186,33 @@ export class DemoKatanaController {
         palmVisibilityMargin,
       );
     }
+    this.correctPalmClearance(solve, bodyCorners, headBounds);
+    if (this.previousRearPalm && headBounds) {
+      this.smoothPalmPath(solve, this.previousRearPalm, headBounds);
+      this.recoverSecondaryReach(solve);
+    }
+    this.previousRearPalm = rearPalm();
+  }
+
+  private applyGripCorrection(solve: GripSolve, correction: IKTarget): boolean {
+    if (!translateGripTarget(solve.target, correction)) return false;
+    solve.primaryArm.setTarget(solve.target);
+    this.puppet.syncIK(solve.syncOptions);
+    return true;
+  }
+
+  private correctPalmClearance(
+    solve: GripSolve,
+    bodyCorners: Map<string, readonly IKTarget[] | undefined>,
+    headBounds: HeadBounds | undefined,
+  ): void {
     for (let pass = 0; pass < 24; pass += 1) {
-      const grip = this.katana.getGripWorldPosition(secondaryGrip);
+      const grip = this.katana.getGripWorldPosition(solve.secondaryGrip);
       const reachCorrection =
-        secondaryArm.status === 'clamped' ? this.secondaryReachCorrection(secondaryArm, grip) : { x: 0, y: 0 };
-      const palm = rearPalm();
+        solve.secondaryArm.status === 'clamped'
+          ? this.secondaryReachCorrection(solve.secondaryArm, grip)
+          : { x: 0, y: 0 };
+      const palm = solve.rearPalm();
       const correction = palmClearanceCorrection(
         palm,
         reachCorrection,
@@ -183,31 +222,29 @@ export class DemoKatanaController {
         palmVisibilityMargin,
       );
       if (Math.hypot(correction.x, correction.y) < 0.01) break;
-      if (!translateGripTarget(target, correction)) break;
-      primaryArm.setTarget(target);
-      this.puppet.syncIK(syncOptions);
+      if (!this.applyGripCorrection(solve, correction)) break;
     }
-    if (this.previousRearPalm && headBounds) {
-      let palm = rearPalm();
-      const next = stepPalmAroundHead(this.previousRearPalm, palm, headBounds, palmVisibilityMargin, maximumPalmStep);
-      for (let pass = 0; pass < 6 && Math.hypot(next.x - palm.x, next.y - palm.y) > 0.01; pass += 1) {
-        if (!translateGripTarget(target, { x: next.x - palm.x, y: next.y - palm.y })) break;
-        primaryArm.setTarget(target);
-        this.puppet.syncIK(syncOptions);
-        palm = rearPalm();
-      }
-      // The bounded path may pass just outside the second arm's reach even
-      // when its endpoints are reachable. Pull that frame back into reach.
-      for (let pass = 0; pass < 12 && secondaryArm.status === 'clamped'; pass += 1) {
-        const correction = this.secondaryReachCorrection(secondaryArm, this.katana.getGripWorldPosition(secondaryGrip));
-        if (Math.hypot(correction.x, correction.y) < 0.0001) break;
-        if (!translateGripTarget(target, correction)) break;
-        primaryArm.setTarget(target);
-        this.puppet.syncIK(syncOptions);
-        palm = rearPalm();
-      }
+  }
+
+  private smoothPalmPath(solve: GripSolve, previousPalm: IKTarget, headBounds: HeadBounds): void {
+    let palm = solve.rearPalm();
+    const next = stepPalmAroundHead(previousPalm, palm, headBounds, palmVisibilityMargin, maximumPalmStep);
+    for (let pass = 0; pass < 6 && Math.hypot(next.x - palm.x, next.y - palm.y) > 0.01; pass += 1) {
+      if (!this.applyGripCorrection(solve, { x: next.x - palm.x, y: next.y - palm.y })) break;
+      palm = solve.rearPalm();
     }
-    this.previousRearPalm = rearPalm();
+  }
+
+  private recoverSecondaryReach(solve: GripSolve): void {
+    // The bounded path can leave the second arm's reach even when its endpoints are reachable.
+    for (let pass = 0; pass < 12 && solve.secondaryArm.status === 'clamped'; pass += 1) {
+      const correction = this.secondaryReachCorrection(
+        solve.secondaryArm,
+        this.katana.getGripWorldPosition(solve.secondaryGrip),
+      );
+      if (Math.hypot(correction.x, correction.y) < 0.0001) break;
+      if (!this.applyGripCorrection(solve, correction)) break;
+    }
   }
 
   private secondaryReachCorrection(arm: TwoBoneIKConstraint, grip: IKTarget): IKTarget {
