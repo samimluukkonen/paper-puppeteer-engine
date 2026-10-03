@@ -50,6 +50,20 @@ function fixture() {
   return { puppet, prop, events, mount };
 }
 
+test('invalid attachments do not allocate lazy render branches or wrappers', () => {
+  const { puppet, prop } = fixture();
+  const create = vi.spyOn(prop.scene!.add, 'container');
+  const foreign = puppetScene().add.container(0, 0);
+  assert.throws(() => puppet.attach('hand', prop, { x: Number.NaN }), /finite/);
+  assert.throws(() => puppet.attach('hand', foreign), /puppet scene/);
+  assert.throws(() => puppet.attach('hand', puppet.container), /ancestor/);
+  assert.equal(create.mock.calls.length, 0);
+  assert.doesNotThrow(() => puppet.attach('hand', prop));
+  assert.isAbove(create.mock.calls.length, 0);
+  create.mockRestore();
+  puppet.destroy();
+});
+
 test('destroying an attached prop releases its registration and destroys the empty wrapper', () => {
   const { puppet, prop, events, mount } = fixture();
   puppet.attach('root', prop);

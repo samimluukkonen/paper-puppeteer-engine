@@ -50,6 +50,23 @@ A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scen
 
 Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into all of its render projections before later target providers run. Inactive constraints still update their status without adding projection passes.
 
+Profile renderer scaling separately from animation and IK:
+
+```bash
+VITE_PROFILE=1 npx vitest run tests/puppetRenderer.profile.test.ts --reporter=verbose
+```
+
+The profile compares 32- and 128-bone chains with a leaf slot, chains with artwork on every bone, and shallow rigs with a leaf slot. It reports actual container/transform-copy allocations and warmed CPU synchronization medians, excluding browser/GPU costs. Timings are diagnostic and have no test thresholds.
+
+Bones without authored sprites allocate an independent render branch only when `attach()` needs a prop mount. Slot branches and sprite branches still retain full ancestor chains, preserving affine transforms and shear. Lazy mounts initialize from the current pose and render order immediately, and participate in subsequent full and partial synchronization. A deep chain with one leaf slot now needs one transform copy per bone, instead of copies for every empty joint's ancestor chain:
+
+| Bones | Previous transform copies | Current transform copies | Previous containers | Current containers |
+| --- | ---: | ---: | ---: | ---: |
+| 32 | 560 | 32 | 628 | 68 |
+| 128 | 8,384 | 128 | 8,644 | 260 |
+
+Container counts include the source skeleton and fixture root. Every additional prop mount allocates its ancestor chain once and reuses it thereafter. Chains with artwork on every bone still require quadratic transform-copy counts; use the dense-artwork profile to assess those rigs before changing their projection strategy.
+
 Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph.
 
 ## Architecture

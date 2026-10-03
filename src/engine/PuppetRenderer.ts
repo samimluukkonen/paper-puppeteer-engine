@@ -26,43 +26,22 @@ export class PuppetRenderer {
   private order: readonly string[] = Object.freeze([]);
 
   constructor(
-    scene: Phaser.Scene,
+    private readonly scene: Phaser.Scene,
     parent: Phaser.GameObjects.Container,
     private readonly rig: Rig,
-    bones: ReadonlyMap<string, Bone>,
+    private readonly bones: ReadonlyMap<string, Bone>,
   ) {
     this.container = scene.add.container(0, 0).setName('puppet-render');
     parent.add(this.container);
-    const makeBranch = (name: string, bone: Bone): RenderBranch => {
-      const ancestors: Bone[] = [];
-      let ancestor: Bone | undefined = bone;
-      while (ancestor) {
-        ancestors.unshift(ancestor);
-        ancestor = ancestor.parentId === undefined ? undefined : bones.get(ancestor.parentId);
-      }
-      const root = scene.add.container(0, 0).setName(`render-${name}`);
-      this.container.add(root);
-      let mount = root;
-      // Keeping the chain avoids decomposing a rotated, nonuniformly scaled matrix.
-      for (const source of ancestors) {
-        const target = scene.add.container(0, 0).setName(`pose-${source.id}`);
-        mount.add(target);
-        const projection = { source: source.container, target };
-        this.projections.push(projection);
-        const projections = this.boneProjections.get(source.id) ?? [];
-        projections.push(projection);
-        this.boneProjections.set(source.id, projections);
-        mount = target;
-      }
-      return { root, mount };
-    };
     for (const bone of bones.values()) {
-      const branch = makeBranch(bone.id, bone);
-      if (bone.sprite) branch.mount.add(bone.sprite);
+      // Empty joints need no independent draw branch until a host attaches a prop.
+      if (!bone.sprite) continue;
+      const branch = this.makeBranch(bone.id, bone);
+      branch.mount.add(bone.sprite);
       this.branches.set(bone.id, branch);
     }
     for (const slot of rig.slots) {
-      const branch = makeBranch(`slot-${slot.id}`, bones.get(slot.bone)!);
+      const branch = this.makeBranch(`slot-${slot.id}`, bones.get(slot.bone)!);
       const local = scene.add
         .container(slot.x ?? 0, slot.y ?? 0)
         .setRotation(slot.rotation ?? 0)
@@ -71,7 +50,34 @@ export class PuppetRenderer {
       this.slotBranches.set(slot.id, { root: branch.root, mount: local });
     }
     this.setOrder(rig.renderOrder);
-    this.sync();
+  }
+
+  private makeBranch(name: string, bone: Bone): RenderBranch {
+    const ancestors: Bone[] = [];
+    let ancestor: Bone | undefined = bone;
+    while (ancestor) {
+      ancestors.push(ancestor);
+      ancestor = ancestor.parentId === undefined ? undefined : this.bones.get(ancestor.parentId);
+    }
+    const root = this.scene.add.container(0, 0).setName(`render-${name}`);
+    this.container.add(root);
+    let mount = root;
+    const newProjections: TransformProjection[] = [];
+    // Keeping the chain avoids decomposing a rotated, nonuniformly scaled matrix.
+    for (const source of ancestors.reverse()) {
+      const target = this.scene.add.container(0, 0).setName(`pose-${source.id}`);
+      mount.add(target);
+      const projection = { source: source.container, target };
+      this.projections.push(projection);
+      newProjections.push(projection);
+      const projections = this.boneProjections.get(source.id) ?? [];
+      projections.push(projection);
+      this.boneProjections.set(source.id, projections);
+      mount = target;
+    }
+    // A lazy attachment can be created between pose updates; initialize it immediately.
+    this.syncProjections(newProjections);
+    return { root, mount };
   }
 
   getOrder(): readonly string[] {
@@ -92,7 +98,7 @@ export class PuppetRenderer {
       }
     }
     const boneDepths = new Map(order.map((id, index) => [id, index * 10]));
-    for (const [id, depth] of boneDepths) this.branches.get(id)!.root.setDepth(depth);
+    for (const [id, depth] of boneDepths) this.branches.get(id)?.root.setDepth(depth);
     for (const slot of this.rig.slots) {
       const anchor = boneDepths.get(slot.bone)!;
       this.slotBranches.get(slot.id)!.root.setDepth(this.slotDepthOverrides.get(slot.id) ?? slot.depth ?? anchor + 1);
@@ -103,8 +109,16 @@ export class PuppetRenderer {
   }
 
   getMount(id: string): Phaser.GameObjects.Container {
-    const branch = this.branches.get(id);
-    if (!branch) throw new Error(`Unknown bone "${id}".`);
+    if (this.container.isDestroyed) throw new Error('Puppet renderer has been destroyed.');
+    let branch = this.branches.get(id);
+    if (!branch) {
+      const bone = this.bones.get(id);
+      if (!bone) throw new Error(`Unknown bone "${id}".`);
+      branch = this.makeBranch(id, bone);
+      branch.root.setDepth(this.order.indexOf(id) * 10);
+      this.branches.set(id, branch);
+      this.container.sort('depth');
+    }
     return branch.mount;
   }
 
@@ -172,9 +186,9 @@ export class PuppetRenderer {
 
   /** Update every copy of a changed local bone transform, including descendant slot branches. */
   syncBone(id: string): void {
+    if (!this.rig.hasBone(id)) throw new Error(`Unknown bone "${id}".`);
     const projections = this.boneProjections.get(id);
-    if (!projections) throw new Error(`Unknown bone "${id}".`);
-    this.syncProjections(projections);
+    if (projections) this.syncProjections(projections);
   }
 
   private syncProjections(projections: readonly TransformProjection[]): void {

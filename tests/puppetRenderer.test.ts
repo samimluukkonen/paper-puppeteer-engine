@@ -6,8 +6,92 @@ import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetRenderer } from '../src/engine/PuppetRenderer.js';
 import { Rig } from '../src/engine/Rig.js';
+import { rendererFixture } from './helpers/rendererFixture.js';
 
 vi.mock('phaser', () => ({ default: {} }));
+
+test('a deep slot rig allocates only the visible chain and creates reusable prop mounts on demand', () => {
+  const count = 128;
+  const { renderer, allocations } = rendererFixture({
+    root: 'bone0',
+    bones: Array.from({ length: count }, (_, index) => ({
+      id: `bone${index}`,
+      ...(index ? { parent: `bone${index - 1}`, y: 10 } : {}),
+    })),
+    slots: [{ id: 'item', bone: `bone${count - 1}` }],
+  });
+  assert.equal(allocations.projections, count, 'one ancestor chain for the slot');
+  const mount = renderer.getMount('bone63');
+  assert.equal(allocations.projections, count + 64, 'a prop mount adds only its own chain');
+  const containers = allocations.containers;
+  assert.strictEqual(renderer.getMount('bone63'), mount);
+  assert.equal(allocations.containers, containers, 'reusing a prop mount creates no containers');
+});
+
+test('unrendered joints need no projections and unknown or destroyed mounts cannot allocate', () => {
+  const { renderer, allocations } = rendererFixture({
+    root: 'root',
+    bones: [{ id: 'root' }, { id: 'child', parent: 'root' }],
+  });
+  assert.equal(allocations.projections, 0);
+  assert.doesNotThrow(() => renderer.syncBone('child'));
+  assert.throws(() => renderer.syncBone('missing'), /Unknown bone/);
+  const containers = allocations.containers;
+  assert.throws(() => renderer.getMount('missing'), /Unknown bone/);
+  renderer.destroy();
+  assert.throws(() => renderer.getMount('root'), /destroyed/);
+  assert.equal(allocations.containers, containers);
+});
+
+test('lazy prop mounts immediately preserve affine transforms, current depth, and subsequent partial syncs', () => {
+  const { renderer, bones, parent } = rendererFixture({
+    root: 'root',
+    bones: [
+      { id: 'root', x: 10, rotation: 0.3, scaleX: 2, scaleY: 0.7 },
+      { id: 'upper', parent: 'root', y: 30, rotation: -0.6, scaleX: 0.6, scaleY: 2 },
+      { id: 'hand', parent: 'upper', x: 5, y: 10, rotation: 0.2 },
+    ],
+  });
+  parent.setPosition(100, 70).setRotation(0.4).setScale(-1.2, 0.8);
+  renderer.setOrder(['hand', 'upper', 'root']);
+  const renderContainer = parent.list.at(-1)!;
+  const mount = renderer.getMount('hand');
+  let branch = mount;
+  while (branch.parentContainer !== renderContainer) branch = branch.parentContainer!;
+  assert.equal(branch.depth, 0, 'the lazy branch uses the current order');
+  const assertTransform = () => {
+    const actual = mount.getWorldTransformMatrix();
+    const expected = bones.get('hand')!.container.getWorldTransformMatrix();
+    for (const field of ['a', 'b', 'c', 'd', 'tx', 'ty'] as const)
+      assert.closeTo(actual[field], expected[field], 1e-12, field);
+  };
+  assertTransform();
+  const upper = bones.get('upper')!;
+  upper.pose.rotation = 0.7;
+  upper.syncTransform();
+  renderer.syncBone('upper');
+  assertTransform();
+  const root = bones.get('root')!.container;
+  root.setAlpha(0.2).setVisible(false);
+  renderer.syncBone('root');
+  assert.equal(mount.parentContainer!.parentContainer!.alpha, 0.2);
+  assert.isFalse(mount.parentContainer!.parentContainer!.visible);
+  renderer.setOrder(['root', 'upper', 'hand']);
+  assert.equal(branch.depth, 20, 'later order changes update the existing prop branch');
+});
+
+test('bones with authored sprites retain eagerly initialized mounts', () => {
+  const { renderer, bones, allocations } = rendererFixture({
+    root: 'root',
+    bones: [{ id: 'root', x: 12, sprite: { texture: 'part' } }],
+  });
+  assert.equal(allocations.projections, 1);
+  const containers = allocations.containers;
+  const mount = renderer.getMount('root');
+  assert.strictEqual(bones.get('root')!.sprite!.parentContainer, mount);
+  assert.equal(mount.x, 12);
+  assert.equal(allocations.containers, containers);
+});
 
 function fixture(depth?: number) {
   const containers = new Map<string, Phaser.GameObjects.Container>();

@@ -432,7 +432,6 @@ export class Puppet {
 
   attach(boneId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
     const bone = this.getBone(boneId);
-    const renderMount = this.renderer.getMount(boneId);
     if (object.scene !== this.scene) throw new Error('Attachments must belong to the puppet scene.');
     for (
       let ancestor: Phaser.GameObjects.Container | null = bone.container;
@@ -441,6 +440,8 @@ export class Puppet {
     ) {
       if (ancestor === object) throw new Error('Cannot attach an ancestor of the target bone.');
     }
+    for (const [label, value] of Object.entries(options)) assertFinite(value, `Attachment ${label}`);
+    const renderMount = this.renderer.getMount(boneId);
     for (
       let ancestor: Phaser.GameObjects.Container | null = renderMount;
       ancestor;
@@ -448,7 +449,6 @@ export class Puppet {
     ) {
       if (ancestor === object) throw new Error('Cannot attach an ancestor of the render mount.');
     }
-    for (const [label, value] of Object.entries(options)) assertFinite(value, `Attachment ${label}`);
     this.detach(object);
     // A wrapper permits any Phaser GameObject without changing its own transform.
     const mount = this.scene.add
