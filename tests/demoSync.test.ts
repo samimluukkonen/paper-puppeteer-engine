@@ -29,6 +29,7 @@ function fixture(facing: Facing) {
   const scene = demoPuppetScene();
   const puppet = new Puppet(scene, {
     rig: demoRig,
+    skin: 'default',
     animations: [sword, guardUpperBody],
     ik: demoIK,
     x: 380,
@@ -86,3 +87,37 @@ test.each([
   assert.isTrue(sync.mock.calls.every(([options]) => options?.updateDebug === false));
   assert.isTrue(corrections.mock.calls.every(([options]) => options?.updateDebug === false));
 });
+
+test.each(['left', 'right'] as const)(
+  'grip corrections reuse body geometry within a frame and refresh it facing %s',
+  (facing) => {
+    const { puppet, presenter } = fixture(facing);
+    const corrections = vi.spyOn(puppet, 'syncIK');
+    let maximumPasses = 0;
+    for (let frame = 0; frame < 30; frame += 1) {
+      if (frame === 10) puppet.setSkin('alternate');
+      if (frame === 20) puppet.setSkin('default');
+      puppet.preparePose();
+      puppet.animationPlayer.update(16);
+      puppet.getBone('head').pose.rotation += Math.sin(frame) * 0.1;
+      puppet.container.setPosition(380 + frame, 362);
+      const matrices = ['head', 'torso', 'pelvis'].map((id) =>
+        vi.spyOn(puppet.getSlotImage(`${id}Visual`)!, 'getWorldTransformMatrix'),
+      );
+      const phase = (frame / 30) * Math.PI * 2;
+      presenter.handTarget = {
+        x: 380 + (facing === 'right' ? 1 : -1) * Math.sin(phase) * 250,
+        y: 280 + Math.cos(phase) * 180,
+      };
+      corrections.mockClear();
+      presenter.update({ handIK: true, footIK: false, upperBody: false }, true);
+      maximumPasses = Math.max(maximumPasses, corrections.mock.calls.length);
+      assert.equal(matrices[0]!.mock.calls.length, 1, 'head geometry reflects this frame');
+      for (const matrix of matrices) {
+        assert.isAtMost(matrix.mock.calls.length, 1, 'body transforms are independent of the correction count');
+        matrix.mockRestore();
+      }
+    }
+    assert.isAbove(maximumPasses, 1, 'the sweep exercises repeated correction passes');
+  },
+);

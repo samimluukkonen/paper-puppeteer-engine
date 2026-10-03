@@ -11,6 +11,16 @@ export interface PalmPathState {
   overHead: boolean;
 }
 
+/** Advance an owned grip target, reporting when rounding prevents any further correction. */
+export function translateGripTarget(target: IKTarget, correction: IKTarget): boolean {
+  const x = target.x + correction.x;
+  const y = target.y + correction.y;
+  if (x === target.x && y === target.y) return false;
+  target.x = x;
+  target.y = y;
+  return true;
+}
+
 export function headOverpassY(head: HeadBounds, x: number, margin: number): number {
   return x >= head.left - margin && x <= head.right + margin ? head.top - margin : Infinity;
 }

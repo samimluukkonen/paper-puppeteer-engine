@@ -9,6 +9,7 @@ import {
   type PalmPathState,
   palmClearanceCorrection,
   stepPalmAroundHead,
+  translateGripTarget,
   updatePalmPath,
 } from './katanaArmTarget.js';
 
@@ -148,9 +149,13 @@ export class DemoKatanaController {
     // Follow the head's top while crossing between sides. A vertical path
     // avoids the discontinuous left/right projection at the head's corners.
     const head = this.puppet.getSlotImage('headVisual');
+    // Corrections solve only arm/leg rotations. Body cutouts stay fixed within this pass;
+    // rebuild lazily on the next frame so animation, facing, and skin changes remain visible.
+    const bodyCorners = new Map<string, readonly IKTarget[] | undefined>();
     let headBounds: HeadBounds | undefined;
     if (head) {
       const corners = this.cutoutCorners(head);
+      bodyCorners.set('head', corners);
       headBounds = {
         left: Math.min(...corners.map((point) => point.x)),
         right: Math.max(...corners.map((point) => point.x)),
@@ -173,13 +178,12 @@ export class DemoKatanaController {
         palm,
         reachCorrection,
         this.rearPalmPath,
-        this.rearPalmPath.overHead ? undefined : this.bodyEdgesAt(palm.y),
+        this.rearPalmPath.overHead ? undefined : this.bodyEdgesAt(palm.y, bodyCorners),
         headBounds,
         palmVisibilityMargin,
       );
       if (Math.hypot(correction.x, correction.y) < 0.01) break;
-      target.x += correction.x;
-      target.y += correction.y;
+      if (!translateGripTarget(target, correction)) break;
       primaryArm.setTarget(target);
       this.puppet.syncIK(syncOptions);
     }
@@ -187,8 +191,7 @@ export class DemoKatanaController {
       let palm = rearPalm();
       const next = stepPalmAroundHead(this.previousRearPalm, palm, headBounds, palmVisibilityMargin, maximumPalmStep);
       for (let pass = 0; pass < 6 && Math.hypot(next.x - palm.x, next.y - palm.y) > 0.01; pass += 1) {
-        target.x += next.x - palm.x;
-        target.y += next.y - palm.y;
+        if (!translateGripTarget(target, { x: next.x - palm.x, y: next.y - palm.y })) break;
         primaryArm.setTarget(target);
         this.puppet.syncIK(syncOptions);
         palm = rearPalm();
@@ -198,8 +201,7 @@ export class DemoKatanaController {
       for (let pass = 0; pass < 12 && secondaryArm.status === 'clamped'; pass += 1) {
         const correction = this.secondaryReachCorrection(secondaryArm, this.katana.getGripWorldPosition(secondaryGrip));
         if (Math.hypot(correction.x, correction.y) < 0.0001) break;
-        target.x += correction.x;
-        target.y += correction.y;
+        if (!translateGripTarget(target, correction)) break;
         primaryArm.setTarget(target);
         this.puppet.syncIK(syncOptions);
         palm = rearPalm();
@@ -235,13 +237,20 @@ export class DemoKatanaController {
     ];
   }
 
-  private bodyEdgesAt(y: number): { left: number; right: number } | undefined {
+  private bodyEdgesAt(
+    y: number,
+    bodyCorners: Map<string, readonly IKTarget[] | undefined>,
+  ): { left: number; right: number } | undefined {
     let left: number | undefined;
     let right: number | undefined;
     for (const id of ['head', 'torso', 'pelvis']) {
-      const sprite = this.puppet.getSlotImage(`${id}Visual`);
-      if (!sprite) continue;
-      const edges = horizontalEdgesAtY(this.cutoutCorners(sprite), y);
+      if (!bodyCorners.has(id)) {
+        const sprite = this.puppet.getSlotImage(`${id}Visual`);
+        bodyCorners.set(id, sprite ? this.cutoutCorners(sprite) : undefined);
+      }
+      const corners = bodyCorners.get(id);
+      if (!corners) continue;
+      const edges = horizontalEdgesAtY(corners, y);
       if (edges) {
         left = Math.min(left ?? Infinity, edges.left);
         right = Math.max(right ?? -Infinity, edges.right);

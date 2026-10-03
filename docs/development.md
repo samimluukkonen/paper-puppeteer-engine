@@ -36,7 +36,9 @@ One local run of the earlier full-sync correction path on Node 24.19.0 measured 
 | Head crossing sweep | 79.76 | 77.25 | 1.02 / 2 | 1.39 / 3 |
 | Upper-body grip | 82.71 | 74.18 | 1.00 / 1 | 1.00 / 1 |
 
-The correction loops can dominate out-of-reach frames. The demo now performs one full `syncPose()` per frame, then uses `syncIK()` for target corrections, restoring and projecting only affected IK joints. It defers debug overlays until the final corrected pose and caches render order to skip depth updates/sorting when the order is already applied. Existing iteration limits preserve grip behavior: the clamped sweeps still reach 24 corrective passes on the left and 7 on the right, while full synchronizations remain at one. The profile reports both kinds of passes and debug refreshes. Each profiling case has a 30-second timeout to accommodate slower machines.
+The correction loops can dominate out-of-reach frames. The demo now performs one full `syncPose()` per frame, then uses `syncIK()` for target corrections, restoring and projecting only affected IK joints. It defers debug overlays until the final corrected pose and caches render order to skip depth updates/sorting when the order is already applied. The three correction loops remain bounded at 24, 6, and 12 passes, while full synchronizations remain at one. The current profile selects the default skin so body silhouette checks run against the visible cutouts. The profile reports both kinds of passes and debug refreshes. Each profiling case has a 30-second timeout to accommodate slower machines.
+
+Grip correction also reuses transformed head, torso, and pelvis corners within each solve. Only the arms and legs rotate during these passes, so body geometry stays fixed; the next frame rebuilds the cache to reflect animation, placement, facing, and skin changes. Corrections stop when floating-point rounding can no longer move the target, while useful corrections retain the existing iteration limits.
 
 A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
 

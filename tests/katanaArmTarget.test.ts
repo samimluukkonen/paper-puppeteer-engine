@@ -4,8 +4,24 @@ import {
   horizontalEdgesAtY,
   palmClearanceCorrection,
   stepPalmAroundHead,
+  translateGripTarget,
   updatePalmPath,
 } from '../src/demo/katanaArmTarget.js';
+
+test('grip corrections stop when rounding cannot move the target', () => {
+  const target = { x: 1e20, y: -1e20 };
+  assert.isFalse(translateGripTarget(target, { x: 1, y: -1 }));
+  assert.deepEqual(target, { x: 1e20, y: -1e20 });
+  assert.isFalse(translateGripTarget(target, { x: 0, y: 0 }));
+});
+
+test('grip corrections continue while either coordinate makes progress', () => {
+  const target = { x: 1e20, y: 2 };
+  assert.isTrue(translateGripTarget(target, { x: 1, y: -0.5 }));
+  assert.deepEqual(target, { x: 1e20, y: 1.5 });
+  assert.isTrue(translateGripTarget(target, { x: -1e20, y: 0 }));
+  assert.deepEqual(target, { x: 0, y: 1.5 });
+});
 
 test('palm path switches sides above the head and descends only outside its margin', () => {
   const head = { left: 0, right: 60, top: 0 };

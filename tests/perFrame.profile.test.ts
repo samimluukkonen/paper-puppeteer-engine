@@ -116,6 +116,7 @@ for (const facing of ['left', 'right'] as const) {
     const scene = demoPuppetScene();
     const demo = new Puppet(scene, {
       rig: demoRig,
+      skin: 'default',
       animations: [idle, walk, sword],
       ik: demoIK,
       x: 380,
@@ -123,6 +124,7 @@ for (const facing of ['left', 'right'] as const) {
       scale: 1.08,
       autoUpdate: false,
     });
+    assert.isDefined(demo.getSlotImage('headVisual'), 'profiles include the body silhouette used by grip correction');
     demo.setFacing(facing).play(workload.startsWith('sword') ? 'sword' : 'walk');
     const presenter = new DemoPresenter(scene, demo);
     const syncPose = demo.syncPose.bind(demo);
