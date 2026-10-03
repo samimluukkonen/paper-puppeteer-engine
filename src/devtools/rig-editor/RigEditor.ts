@@ -5,7 +5,7 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
 import { createTransform, type RigDefinition } from '../../engine/types.js';
-import { type Point, worldToLocal } from './coordinates.js';
+import { RigEditorInputController } from './RigEditorInputController.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { type BoneField, RigEditorState, type SlotField, type SpriteField } from './RigEditorState.js';
 
@@ -15,12 +15,7 @@ export class RigEditor {
   private readonly registeredIK = new Map<string, TwoBoneIKConstraint>();
   private appliedRig: RigDefinition | undefined;
   private renderOrder: readonly string[] = [];
-  private panning = false;
-  private moved = false;
-  private pointerActive = false;
-  private downX = 0;
-  private downY = 0;
-  private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
+  private inputController: RigEditorInputController | undefined;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -45,13 +40,16 @@ export class RigEditor {
       constraint.enabled = false;
     }
     this.overlay = new RigEditorOverlay(this.scene, this.puppet, this.state, this.ikChains);
-    this.scene.input.on('pointerdown', this.pointerDown, this);
-    this.scene.input.on('pointermove', this.pointerMove, this);
-    this.scene.input.on('pointerup', this.pointerUp, this);
-    this.scene.input.on('pointerupoutside', this.pointerUp, this);
-    this.scene.input.on('wheel', this.wheel, this);
+    this.inputController = new RigEditorInputController(
+      this.scene,
+      this.puppet,
+      this,
+      this.overlay,
+      this.onChange,
+      () => this.update(),
+    );
+    this.inputController.enable();
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
-    window.addEventListener('keydown', this.keyDown);
     // Activation must project retained edits before drawing or capturing IK targets.
     this.refresh(false);
     if (this.state.ikPreview) {
@@ -68,17 +66,9 @@ export class RigEditor {
 
   disable(): void {
     if (!this.overlay) return;
-    this.panning = false;
-    this.pointerActive = false;
-    this.drag = undefined;
-    this.state.endOperation();
-    this.scene.input.off('pointerdown', this.pointerDown, this);
-    this.scene.input.off('pointermove', this.pointerMove, this);
-    this.scene.input.off('pointerup', this.pointerUp, this);
-    this.scene.input.off('pointerupoutside', this.pointerUp, this);
-    this.scene.input.off('wheel', this.wheel, this);
+    this.inputController?.disable();
+    this.inputController = undefined;
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
-    window.removeEventListener('keydown', this.keyDown);
     this.overlay.destroy();
     this.overlay = undefined;
   }
@@ -205,193 +195,7 @@ export class RigEditor {
     this.refresh();
   }
 
-  private world(pointer: Phaser.Input.Pointer): Point {
-    return this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
-  }
-
-  private local(pointer: Phaser.Input.Pointer, parent: Phaser.GameObjects.Container): Point | undefined {
-    return worldToLocal(this.world(pointer), parent.getWorldTransformMatrix());
-  }
-
-  private imageContains(pointer: Phaser.Input.Pointer, image: Phaser.GameObjects.Image | undefined): boolean {
-    if (!image) return false;
-    const point = worldToLocal(this.world(pointer), image.getWorldTransformMatrix());
-    return (
-      !!point &&
-      point.x >= -image.width * image.originX &&
-      point.x <= image.width * (1 - image.originX) &&
-      point.y >= -image.height * image.originY &&
-      point.y <= image.height * (1 - image.originY)
-    );
-  }
-
-  private keyDown = (event: KeyboardEvent): void => {
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
-      if (/^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement)?.tagName ?? '')) return;
-      event.preventDefault();
-      if (event.shiftKey) this.redo();
-      else this.undo();
-      return;
-    }
-    if (
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      /^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement)?.tagName ?? '')
-    )
-      return;
-    const selection = this.state.selection;
-    if (selection?.type !== 'bone') return;
-    const amount = event.shiftKey ? 10 : 1;
-    const bone = this.state.getBone(selection.id);
-    const gridAmount = this.state.gridSnap ? this.state.gridSnap * (event.shiftKey ? 10 : 1) : amount;
-    if (event.key === 'ArrowLeft')
-      this.editBone(selection.id, 'x', this.state.snapTranslation((bone.x ?? 0) - gridAmount));
-    else if (event.key === 'ArrowRight')
-      this.editBone(selection.id, 'x', this.state.snapTranslation((bone.x ?? 0) + gridAmount));
-    else if (event.key === 'ArrowUp')
-      this.editBone(selection.id, 'y', this.state.snapTranslation((bone.y ?? 0) - gridAmount));
-    else if (event.key === 'ArrowDown')
-      this.editBone(selection.id, 'y', this.state.snapTranslation((bone.y ?? 0) + gridAmount));
-    else if (event.key === ',' || event.key === '<')
-      this.editBone(
-        selection.id,
-        'rotation',
-        this.state.snapRotation(
-          (bone.rotation ?? 0) -
-            (this.state.rotationSnap
-              ? ((this.state.rotationSnap * Math.PI) / 180) * (event.shiftKey ? 10 : 1)
-              : event.shiftKey
-                ? 0.1
-                : 0.01),
-        ),
-      );
-    else if (event.key === '.' || event.key === '>')
-      this.editBone(
-        selection.id,
-        'rotation',
-        this.state.snapRotation(
-          (bone.rotation ?? 0) +
-            (this.state.rotationSnap
-              ? ((this.state.rotationSnap * Math.PI) / 180) * (event.shiftKey ? 10 : 1)
-              : event.shiftKey
-                ? 0.1
-                : 0.01),
-        ),
-      );
-    else return;
-    event.preventDefault();
-  };
-
   private update(): void {
     this.overlay?.draw();
-  }
-
-  private pointerDown(pointer: Phaser.Input.Pointer): void {
-    this.pointerActive = true;
-    this.panning = pointer.middleButtonDown();
-    this.moved = false;
-    this.downX = pointer.x;
-    this.downY = pointer.y;
-    this.drag = undefined;
-    if (this.panning || !pointer.leftButtonDown()) return;
-    const selected = this.state.selection;
-    const picked = this.overlay?.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false);
-    const target = picked ?? selected;
-    if (!target) return;
-    const image = target.type === 'bone' ? this.puppet.getBone(target.id).sprite : this.puppet.getSlotImage(target.id);
-    if (!picked && !(this.state.editMode === 'sprite' && this.imageContains(pointer, image))) return;
-    if (picked) this.state.selection = picked;
-    const parent =
-      target.type === 'slot'
-        ? this.puppet.getBone(this.state.getSlot(target.id).bone).container
-        : this.puppet.getBone(target.id).container.parentContainer!;
-    const local = this.local(pointer, parent);
-    if (!local) return;
-    if (target.type === 'slot' && this.state.editMode === 'sprite' && !picked && this.imageContains(pointer, image)) {
-      const attachmentId = this.puppet.getAttachment(target.id);
-      const attachment = attachmentId ? this.state.getAttachment(attachmentId) : undefined;
-      const mount = image?.parentContainer;
-      const inMount = mount ? this.local(pointer, mount) : undefined;
-      if (attachment && inMount)
-        this.drag = {
-          type: 'attachment',
-          id: attachmentId!,
-          start: inMount,
-          value: { x: attachment.x ?? 0, y: attachment.y ?? 0 },
-        };
-    } else if (target.type === 'slot') {
-      const slot = this.state.getSlot(target.id);
-      this.drag = { type: 'slot', id: target.id, start: local, value: { x: slot.x ?? 0, y: slot.y ?? 0 } };
-    } else if (this.state.editMode === 'sprite' && this.state.getBone(target.id).sprite) {
-      const sprite = this.state.getBone(target.id).sprite!;
-      const inBone = this.local(pointer, this.puppet.getBone(target.id).container);
-      if (inBone)
-        this.drag = { type: 'sprite', id: target.id, start: inBone, value: { x: sprite.x ?? 0, y: sprite.y ?? 0 } };
-    } else if (this.state.editMode === 'joint') {
-      const bone = this.state.getBone(target.id);
-      this.drag = { type: 'bone', id: target.id, start: local, value: { x: bone.x ?? 0, y: bone.y ?? 0 } };
-    }
-    if (this.drag) this.state.beginOperation();
-    this.onChange();
-  }
-
-  private pointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!pointer.isDown) return;
-    if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
-    if (!this.panning) {
-      if (!this.drag) return;
-      const { type, id, start, value } = this.drag;
-      const parent =
-        type === 'slot'
-          ? this.puppet.getBone(this.state.getSlot(id).bone).container
-          : type === 'sprite'
-            ? this.puppet.getBone(id).container
-            : type === 'attachment'
-              ? this.puppet.getSlotImage(this.state.selection!.id)!.parentContainer!
-              : this.puppet.getBone(id).container.parentContainer!;
-      const local = this.local(pointer, parent);
-      if (!local) return;
-      const x = this.state.snapTranslation(value.x + local.x - start.x);
-      const y = this.state.snapTranslation(value.y + local.y - start.y);
-      if (type === 'bone') {
-        this.state.editBoneFields(id, { x, y });
-      } else if (type === 'slot') {
-        this.state.editSlotFields(id, { x, y });
-      } else {
-        this.state.editSpriteFields(id, { x, y }, type === 'attachment');
-      }
-      this.refresh();
-      return;
-    }
-    const camera = this.scene.cameras.main;
-    camera.scrollX -= (pointer.x - pointer.prevPosition.x) / camera.zoom;
-    camera.scrollY -= (pointer.y - pointer.prevPosition.y) / camera.zoom;
-    this.update();
-  }
-
-  private pointerUp(pointer: Phaser.Input.Pointer): void {
-    // Phaser also reports window mouse releases from hierarchy and inspector clicks.
-    if (!this.pointerActive) return;
-    this.pointerActive = false;
-    if (!this.panning && !this.moved && !this.drag) {
-      this.state.selection = this.overlay?.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
-      this.onChange();
-      this.update();
-    }
-    this.panning = false;
-    this.drag = undefined;
-    this.state.endOperation();
-    this.onChange();
-  }
-
-  private wheel(pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number): void {
-    const camera = this.scene.cameras.main;
-    const oldZoom = camera.zoom;
-    const nextZoom = Phaser.Math.Clamp(oldZoom * Math.exp(-dy * 0.001), 0.35, 4);
-    camera.scrollX += (pointer.x - camera.width / 2) * (1 / oldZoom - 1 / nextZoom);
-    camera.scrollY += (pointer.y - camera.height / 2) * (1 / oldZoom - 1 / nextZoom);
-    camera.setZoom(nextZoom);
-    this.update();
   }
 }

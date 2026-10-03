@@ -101,10 +101,12 @@ src/devtools/rig-editor/
   ControlsController.ts   Editing, snapping, visibility, and preview controls
   SessionController.ts    Status, validation, history actions, export, reload, and import
   RigEditorScene.ts    Character loading and preview session lifecycle
-  RigEditor.ts         Canvas editing and working-rig preview synchronization
+  RigEditor.ts         Editor activation and working-rig preview synchronization
+  RigEditorInputController.ts  Dragging, keyboard commands, and input listener lifecycle
   RigEditorState.ts    Working rig, validation, bounded history, and serialization
 src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
+  editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
   editorData.ts        Readonly data and editor number rounding
 src/shared/
   downloadJson.ts       Browser JSON download and temporary URL cleanup
