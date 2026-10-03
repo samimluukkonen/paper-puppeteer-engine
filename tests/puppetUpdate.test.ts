@@ -100,6 +100,127 @@ test.each(rejectedCommands)('rejected %s preserves the preset, IK, playback, and
   puppet.destroy();
 });
 
+test('start, timeline, and completion callbacks see synchronized transforms, presets, slots, and IK', () => {
+  const { puppet, constraint } = fixture();
+  constraint.setTarget(60, 70);
+  puppet.addPose({ version: 1, name: 'preset', bones: { upper: { y: 5 } } }).applyPose('preset');
+  puppet.addAnimation({
+    name: 'move',
+    duration: 100,
+    loop: false,
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 100, x: 20 },
+      ],
+    },
+    events: [
+      { time: 0, name: 'start' },
+      { time: 50, name: 'middle' },
+    ],
+  });
+  const observed: string[] = [];
+  const checkProjection = (name: string): void => {
+    observed.push(name);
+    const root = puppet.getBone('root');
+    assert.equal(root.container.x, root.pose.x);
+    const upper = puppet.getBone('upper');
+    assert.equal(upper.pose.y, 5);
+    assert.equal(upper.container.y, 5);
+    assert.equal(constraint.status, 'solved');
+    assert.approximately(Math.sin(upper.container.rotation), Math.sin(upper.pose.rotation), 1e-12);
+    const hand = puppet.getBone('hand').container.getWorldTransformMatrix();
+    const expected = hand.transformPoint(3, 4);
+    const image = puppet.getSlotImage('item')!.getWorldTransformMatrix();
+    assert.approximately(image.tx, expected.x, 1e-10);
+    assert.approximately(image.ty, expected.y, 1e-10);
+  };
+  puppet.onAnimationEvent(({ name }) => checkProjection(name));
+  puppet.onAnimationComplete(() => checkProjection('complete'));
+  puppet.play('move');
+  puppet.update(50);
+  puppet.update(50);
+  assert.deepEqual(observed, ['start', 'middle', 'complete']);
+  puppet.destroy();
+});
+
+test('throwing listeners preserve rendering, finish fades, and deliver remaining events and completion once', () => {
+  const { puppet } = fixture();
+  puppet.addAnimation({ name: 'held', duration: 100, loop: true, tracks: { root: [{ time: 0, x: 0 }] } });
+  puppet.addAnimation({
+    name: 'move',
+    duration: 100,
+    loop: false,
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 100, x: 100 },
+      ],
+    },
+    events: [
+      { time: 50, name: 'middle' },
+      { time: 100, name: 'end' },
+    ],
+  });
+  puppet.play('held').play('move', { fadeDuration: 100 });
+  const failure = new Error('listener failed');
+  const observed: string[] = [];
+  puppet.onAnimationEvent(({ name }) => {
+    if (name === 'middle') throw failure;
+  });
+  puppet.onAnimationEvent(({ name }) => {
+    assert.equal(puppet.getBone('root').container.x, 100);
+    observed.push(name);
+  });
+  puppet.onAnimationComplete(() => observed.push('complete'));
+  assert.throws(() => puppet.update(100), /listener failed/);
+  assert.equal(puppet.getBone('root').pose.x, 100);
+  assert.equal(puppet.getBone('root').container.x, 100);
+  assert.isUndefined(puppet.animationPlayer.transition);
+  assert.deepEqual(observed, ['middle', 'end', 'complete']);
+  puppet.update(100);
+  assert.deepEqual(observed, ['middle', 'end', 'complete']);
+  puppet.destroy();
+});
+
+test('a throwing time-zero listener leaves the new clip rendered and other listeners notified', () => {
+  const { puppet } = fixture();
+  puppet.addAnimation({
+    name: 'move',
+    duration: 100,
+    loop: false,
+    tracks: { root: [{ time: 0, x: 25 }] },
+    events: [{ time: 0, name: 'start' }],
+  });
+  puppet.onAnimationEvent(() => {
+    throw new Error('start failed');
+  });
+  const observed = vi.fn(() => assert.equal(puppet.getBone('root').container.x, 25));
+  puppet.onAnimationEvent(observed);
+  assert.throws(() => puppet.play('move'), /start failed/);
+  assert.equal(puppet.getBone('root').pose.x, 25);
+  assert.equal(puppet.getBone('root').container.x, 25);
+  assert.equal(observed.mock.calls.length, 1);
+  puppet.destroy();
+});
+
+test('a completion callback can start a new clip without overwriting its synchronized pose', () => {
+  const { puppet } = fixture();
+  puppet.addAnimation({ name: 'once', duration: 100, loop: false, tracks: { root: [{ time: 0, x: 10 }] } });
+  puppet.addAnimation({ name: 'next', duration: 100, loop: true, tracks: { root: [{ time: 0, x: 20 }] } });
+  puppet.onAnimationComplete(() => {
+    assert.equal(puppet.getBone('root').container.x, 10);
+    puppet.play('next', { fadeDuration: 50 });
+  });
+  puppet.play('once').update(100);
+  assert.equal(puppet.currentAnimation, 'next');
+  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.animationPlayer.transition?.progress, 0);
+  puppet.update(50);
+  assert.equal(puppet.getBone('root').container.x, 20);
+  puppet.destroy();
+});
+
 test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit'] as const)(
   'rejected updates preserve presets, IK, clocks, transitions, and rendering: %s',
   (reason) => {

@@ -59,6 +59,7 @@ export class Puppet {
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
   private readonly prepareAnimationPose = (): void => this.preparePose();
+  private readonly synchronizeAnimationPose = (): void => this.syncPose();
   private readonly ikContext: IKTransformContext = {
     worldToParent: (id, target) => {
       const parent = this.getBone(id).container.parentContainer!;
@@ -250,8 +251,7 @@ export class Puppet {
   }
 
   play(name: string, options?: PlayAnimationOptions): this {
-    this.animationPlayer.play(name, options, this.prepareAnimationPose);
-    this.syncPose();
+    this.animationPlayer.play(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
     return this;
   }
 
@@ -305,8 +305,7 @@ export class Puppet {
   }
 
   restart(): this {
-    this.animationPlayer.restart(this.prepareAnimationPose);
-    this.syncPose();
+    this.animationPlayer.restart(this.prepareAnimationPose, this.synchronizeAnimationPose);
     return this;
   }
 
@@ -517,8 +516,8 @@ export class Puppet {
 
   update(delta: number): void {
     if (this.destroyed) return;
-    this.animationPlayer.update(delta, this.prepareAnimationPose);
-    this.syncPose();
+    const evaluated = this.animationPlayer.update(delta, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    if (!evaluated) this.syncPose();
   }
 
   destroy(): void {

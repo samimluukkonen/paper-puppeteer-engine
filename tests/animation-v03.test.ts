@@ -74,6 +74,52 @@ test('completion listeners receive independent events for base and overlay clips
   assert.notStrictEqual(observed[0], observed[1]);
 });
 
+test('standalone hosts synchronize before notifications and receive all listener failures', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'once',
+    duration: 100,
+    loop: false,
+    tracks: {
+      arm: [
+        { time: 0, x: 10 },
+        { time: 100, x: 20 },
+      ],
+    },
+    events: [{ time: 50, name: 'marker' }],
+  });
+  player.play('once');
+  const order: string[] = [];
+  const eventFailure = new Error('event failed');
+  const completionFailure = new Error('completion failed');
+  player.onAnimationEvent(() => {
+    order.push('event');
+    throw eventFailure;
+  });
+  player.onAnimationComplete(() => {
+    order.push('complete');
+    throw completionFailure;
+  });
+  let thrown: unknown;
+  try {
+    player.update(
+      100,
+      () => order.push('prepare'),
+      () => {
+        assert.equal(joints.get('arm')!.pose.x, 20);
+        order.push('synchronize');
+      },
+    );
+  } catch (error) {
+    thrown = error;
+  }
+  assert.instanceOf(thrown, AggregateError);
+  assert.deepEqual((thrown as AggregateError).errors, [eventFailure, completionFailure]);
+  assert.deepEqual(order, ['prepare', 'synchronize', 'event', 'complete']);
+  player.update(100);
+  assert.deepEqual(order, ['prepare', 'synchronize', 'event', 'complete']);
+});
+
 test('non-JSON TypeScript event payloads retain reference semantics', () => {
   const { player } = fixture();
   const data = { callback: () => 42 };

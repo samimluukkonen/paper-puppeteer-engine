@@ -146,8 +146,10 @@ export class AnimationPlayer {
     this.clips.set(clip.name, compileClip(clip, this.rig));
   }
 
-  /** Existing play(name) semantics restart the clip. restart:false keeps an already active clip. */
-  play(name: string, options: PlayAnimationOptions = {}, preparePose?: () => void): void {
+  /** Restart the clip unless restart:false keeps it active. Host hooks prepare after validation
+   * and synchronize the evaluated pose before time-zero events are delivered.
+   */
+  play(name: string, options: PlayAnimationOptions = {}, preparePose?: () => void, synchronizePose?: () => void): void {
     const clip = this.clips.get(name);
     if (!clip) throw new Error(`Unknown animation "${name}".`);
     const layerName = options.layer ?? 'base';
@@ -157,7 +159,10 @@ export class AnimationPlayer {
     if (fade < 0) throw new Error('Fade duration cannot be negative.');
     const speed = options.speed ?? 1;
     validateSpeed(speed);
-    if (options.restart === false && this.layers.get(layerName)?.state?.clip.name === name) return;
+    if (options.restart === false && this.layers.get(layerName)?.state?.clip.name === name) {
+      synchronizePose?.();
+      return;
+    }
     preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
     let source: AnimationState | AnimationPose | undefined;
@@ -175,6 +180,7 @@ export class AnimationPlayer {
     this.controlDirty = true;
     if (layerName === 'base' && !source) this.resetPose();
     this.applyCurrentPose();
+    synchronizePose?.();
     this.fireStartEvents(clip, layerName);
   }
 
@@ -184,9 +190,10 @@ export class AnimationPlayer {
       layer.stopped = true;
     }
   }
-  restart(preparePose?: () => void): void {
+  restart(preparePose?: () => void, synchronizePose?: () => void): void {
     const name = this.currentAnimation;
-    if (name) this.play(name, {}, preparePose);
+    if (name) this.play(name, {}, preparePose, synchronizePose);
+    else synchronizePose?.();
   }
   pause(): void {
     this.paused = true;
@@ -269,8 +276,9 @@ export class AnimationPlayer {
   /** Advance playback and return whether this call evaluated the authored pose.
    * The optional preparation callback runs after validation, before clocks or poses change.
    * Paused or stopped playback does not invoke it.
+   * The synchronization callback runs after evaluation and before notifications.
    */
-  update(delta: number, preparePose?: () => void): boolean {
+  update(delta: number, preparePose?: () => void, synchronizePose?: () => void): boolean {
     assertFinite(delta, 'Animation delta');
     if (delta < 0) throw new Error('Animation delta cannot be negative.');
     if (this.paused) return false;
@@ -312,14 +320,17 @@ export class AnimationPlayer {
       }
     }
     this.applyCurrentPose();
-    for (const event of events) for (const listener of [...this.eventListeners]) listener(copyAnimationEvent(event));
-    for (const event of completions) for (const listener of [...this.completionListeners]) listener({ ...event });
-    for (const layer of this.layers.values()) {
-      if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
-        layer.transition = undefined;
-        this.controlDirty = true;
+    try {
+      synchronizePose?.();
+    } finally {
+      for (const layer of this.layers.values()) {
+        if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
+          layer.transition = undefined;
+          this.controlDirty = true;
+        }
       }
     }
+    this.dispatchNotifications(events, completions);
     return true;
   }
 
@@ -486,11 +497,38 @@ export class AnimationPlayer {
   }
 
   private fireStartEvents(clip: CompiledClip, layer: string): void {
-    for (const marker of clip.events) {
-      if (marker.time === 0)
-        for (const listener of [...this.eventListeners])
-          listener(copyAnimationEvent({ ...marker, clip: clip.name, layer }));
+    this.dispatchNotifications(
+      clip.events.filter((marker) => marker.time === 0).map((marker) => ({ ...marker, clip: clip.name, layer })),
+      [],
+    );
+  }
+
+  /** Listener failures must not prevent other markers or completion notifications. */
+  private dispatchNotifications(
+    events: readonly FiredAnimationEvent[],
+    completions: readonly AnimationCompletion[],
+  ): void {
+    const errors: unknown[] = [];
+    for (const event of events) {
+      for (const listener of [...this.eventListeners]) {
+        try {
+          listener(copyAnimationEvent(event));
+        } catch (error) {
+          errors.push(error);
+        }
+      }
     }
+    for (const event of completions) {
+      for (const listener of [...this.completionListeners]) {
+        try {
+          listener({ ...event });
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Animation listeners failed.');
   }
 
   private getOrCreateLayer(name: string): AnimationLayer {
