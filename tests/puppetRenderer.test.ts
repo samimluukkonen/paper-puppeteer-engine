@@ -74,6 +74,31 @@ function slotTransform(renderer: PuppetRenderer, id: string) {
   return { x, y, rotation, scaleX, scaleY };
 }
 
+test('render order reads reuse an immutable snapshot while previous orders remain stable', () => {
+  const { renderer, rig, slotDepth } = fixture();
+  const initial = renderer.getOrder();
+  assert.strictEqual(renderer.getOrder(), initial);
+  assert.isTrue(Object.isFrozen(initial));
+  assert.isFalse(Reflect.set(initial, '0', 'hand'));
+  const next = ['hand', 'root'];
+  renderer.setOrder(next);
+  const current = renderer.getOrder();
+  next.reverse();
+  assert.notStrictEqual(current, initial);
+  assert.deepEqual(initial, rig.renderOrder);
+  assert.deepEqual(current, ['hand', 'root']);
+  assert.isTrue(Object.isFrozen(current));
+  assert.strictEqual(renderer.getOrder(), current);
+
+  // An unchanged bone order must still apply and clear supplied slot overrides.
+  renderer.setOrder(current, new Map([['item', 25]]));
+  assert.equal(slotDepth('item'), 25);
+  assert.strictEqual(renderer.getOrder(), current);
+  renderer.setOrder([...current], new Map([['item', undefined]]));
+  assert.equal(slotDepth('item'), 11);
+  assert.strictEqual(renderer.getOrder(), current);
+});
+
 test('invalid slot patches leave every transform unchanged and do not synchronize', () => {
   const { renderer } = fixture();
   const syncPose = vi.fn();

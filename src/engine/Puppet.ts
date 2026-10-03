@@ -338,7 +338,7 @@ export class Puppet {
     return this;
   }
 
-  /** Bone ids in back-to-front order, independent of joint parenting. */
+  /** Immutable snapshot of bone ids in back-to-front order, stable until the order changes. */
   getRenderOrder(): readonly string[] {
     return this.renderer.getOrder();
   }

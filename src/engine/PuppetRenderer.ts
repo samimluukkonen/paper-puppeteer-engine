@@ -23,7 +23,7 @@ export class PuppetRenderer {
   private readonly slotDepthOverrides = new Map<string, number>();
   private readonly projections: TransformProjection[] = [];
   private readonly boneProjections = new Map<string, TransformProjection[]>();
-  private order: readonly string[] = [];
+  private order: readonly string[] = Object.freeze([]);
 
   constructor(
     scene: Phaser.Scene,
@@ -75,7 +75,7 @@ export class PuppetRenderer {
   }
 
   getOrder(): readonly string[] {
-    return [...this.order];
+    return this.order;
   }
 
   /** Apply bone order and supplied slot overrides together, then sort once. Undefined restores the rig depth. */
@@ -98,7 +98,8 @@ export class PuppetRenderer {
       this.slotBranches.get(slot.id)!.root.setDepth(this.slotDepthOverrides.get(slot.id) ?? slot.depth ?? anchor + 1);
     }
     this.container.sort('depth');
-    this.order = [...order];
+    if (this.order.length !== order.length || this.order.some((id, index) => id !== order[index]))
+      this.order = Object.freeze([...order]);
   }
 
   getMount(id: string): Phaser.GameObjects.Container {
