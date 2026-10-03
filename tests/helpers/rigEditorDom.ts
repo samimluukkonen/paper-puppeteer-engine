@@ -1,3 +1,4 @@
+import { setMaxListeners } from 'node:events';
 import { vi } from 'vitest';
 
 /** Minimal DOM adapter for exercising the editor panel's event handlers in Node. */
@@ -22,8 +23,28 @@ export class EditorElement {
     return this.children.length;
   }
 
-  addEventListener(event: string, listener: (event: { target: EditorElement }) => unknown): void {
+  addEventListener(
+    event: string,
+    listener: (event: { target: EditorElement }) => unknown,
+    options?: AddEventListenerOptions,
+  ): void {
+    const signal = options?.signal;
+    if (signal?.aborted) return;
     this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
+    if (signal) {
+      // One controller can own many DOM listeners; browsers do not impose Node's listener warning limit.
+      setMaxListeners(0, signal);
+      signal.addEventListener(
+        'abort',
+        () => {
+          this.listeners.set(
+            event,
+            (this.listeners.get(event) ?? []).filter((entry) => entry !== listener),
+          );
+        },
+        { once: true },
+      );
+    }
   }
 
   async dispatch(event: string, target: EditorElement = this): Promise<void> {

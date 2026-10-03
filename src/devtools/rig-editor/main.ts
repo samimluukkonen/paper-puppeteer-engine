@@ -39,5 +39,9 @@ const game = new Phaser.Game({
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
     releaseNavigationGuard();
+    inspector.dispose();
+    controls.dispose();
+    hierarchy.dispose();
+    session.dispose();
     game.destroy(true);
   });

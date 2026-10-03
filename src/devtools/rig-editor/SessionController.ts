@@ -8,6 +8,7 @@ export function createSessionController(
   app: HTMLElement,
   getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
 ) {
+  const lifetime = new AbortController();
   let editor: RigEditor | undefined;
   const dirty = app.querySelector<HTMLElement>('#dirty-status')!;
   const session = app.querySelector<HTMLElement>('#session-status')!;
@@ -19,6 +20,7 @@ export function createSessionController(
   let committedExportSequence = 0;
   let importSequence = 0;
   function updateStatus(current: RigEditor): void {
+    if (lifetime.signal.aborted) return;
     if (editor !== current) ++importSequence;
     editor = current;
     const isDirty = current.state.dirty;
@@ -42,17 +44,21 @@ export function createSessionController(
   }
 
   const action = (id: string, run: () => void | Promise<void>): void => {
-    app.querySelector<HTMLButtonElement>(`#${id}`)!.addEventListener('click', () => {
-      try {
-        const result = run();
-        if (result instanceof Promise)
-          void result.catch((error) => {
-            feedback.textContent = String(error);
-          });
-      } catch (error) {
-        feedback.textContent = String(error);
-      }
-    });
+    app.querySelector<HTMLButtonElement>(`#${id}`)!.addEventListener(
+      'click',
+      () => {
+        try {
+          const result = run();
+          if (result instanceof Promise)
+            void result.catch((error) => {
+              if (!lifetime.signal.aborted) feedback.textContent = String(error);
+            });
+        } catch (error) {
+          if (!lifetime.signal.aborted) feedback.textContent = String(error);
+        }
+      },
+      { signal: lifetime.signal },
+    );
   };
   action('undo', () => editor?.undo());
   action('redo', () => editor?.redo());
@@ -86,7 +92,8 @@ export function createSessionController(
   };
   const commitExport = (prepared: ReturnType<typeof prepareExport>): boolean => {
     // A delayed copy must not replace a newer successful export or another session.
-    if (editor !== prepared.editor || prepared.sequence < committedExportSequence) return false;
+    if (lifetime.signal.aborted || editor !== prepared.editor || prepared.sequence < committedExportSequence)
+      return false;
     lastExport = prepared.rig;
     lastExportFilename = prepared.filename;
     committedExportSequence = prepared.sequence;
@@ -132,31 +139,45 @@ export function createSessionController(
     getScene().reloadOriginal();
     feedback.textContent = 'Original rig reloaded.';
   });
-  app.querySelector<HTMLInputElement>('#load-json')!.addEventListener('change', async (event) => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    // Capture the file before clearing so selecting it again starts a new request.
-    input.value = '';
-    const sequence = ++importSequence;
-    const sessionEditor = editor;
-    const isCurrent = (): boolean => sequence === importSequence && editor === sessionEditor;
-    try {
-      const text = await file.text();
-      if (!isCurrent()) return;
-      const json = JSON.parse(text) as RigJsonDefinition;
-      const issues = validateRigDefinition(json);
-      if (issues.some((issue) => issue.severity === 'error'))
-        throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));
-      if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and load this file?')) {
-        return;
+  app.querySelector<HTMLInputElement>('#load-json')!.addEventListener(
+    'change',
+    async (event) => {
+      const input = event.target as HTMLInputElement;
+      const file = input.files?.[0];
+      if (!file) return;
+      // Capture the file before clearing so selecting it again starts a new request.
+      input.value = '';
+      const sequence = ++importSequence;
+      const sessionEditor = editor;
+      const isCurrent = (): boolean =>
+        !lifetime.signal.aborted && sequence === importSequence && editor === sessionEditor;
+      try {
+        const text = await file.text();
+        if (!isCurrent()) return;
+        const json = JSON.parse(text) as RigJsonDefinition;
+        const issues = validateRigDefinition(json);
+        if (issues.some((issue) => issue.severity === 'error'))
+          throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));
+        if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and load this file?')) {
+          return;
+        }
+        getScene().reloadRig(json, file.name);
+        feedback.textContent = `${file.name} loaded and validated.`;
+      } catch (error) {
+        if (isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
       }
-      getScene().reloadRig(json, file.name);
-      feedback.textContent = `${file.name} loaded and validated.`;
-    } catch (error) {
-      if (isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
-    }
-  });
+    },
+    { signal: lifetime.signal },
+  );
 
-  return { updateStatus, hasUnsavedChanges: () => editor?.state.dirty ?? false };
+  return {
+    updateStatus,
+    hasUnsavedChanges: () => editor?.state.dirty ?? false,
+    dispose(): void {
+      lifetime.abort();
+      editor = undefined;
+      lastExport = undefined;
+      lastExportFilename = undefined;
+    },
+  };
 }

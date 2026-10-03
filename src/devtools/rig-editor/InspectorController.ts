@@ -67,6 +67,7 @@ function numberRows<Scope extends keyof ScopeFields>(
 
 /** Inspector fields, derived labels, validation feedback, and focus-based undo grouping. */
 export function createInspectorController(inspector: HTMLElement, updateStatus: (editor: RigEditor) => void) {
+  const lifetime = new AbortController();
   let editor: RigEditor | undefined;
   function updateInspectorLabels(current: RigEditor): void {
     const { state } = current;
@@ -109,9 +110,13 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     }
   }
 
-  inspector.addEventListener('focusin', (event) => {
-    if ((event.target as HTMLElement).matches('input[type="number"]')) editor?.state.beginOperation();
-  });
+  inspector.addEventListener(
+    'focusin',
+    (event) => {
+      if ((event.target as HTMLElement).matches('input[type="number"]')) editor?.state.beginOperation();
+    },
+    { signal: lifetime.signal },
+  );
   const applyInput = (input: HTMLInputElement, value: number | undefined): void => {
     if (!editor?.state.selection) return;
     const { scope, field } = input.dataset;
@@ -140,44 +145,65 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       input.reportValidity();
     }
   };
-  inspector.addEventListener('input', (event) => {
-    const input = event.target as HTMLInputElement;
-    if (!input.matches('input[type="number"]') || input.value === '') return;
-    const value = Number(input.value);
-    if (Number.isFinite(value)) applyInput(input, value);
-  });
-  inspector.addEventListener('change', (event) => {
-    const input = event.target as HTMLInputElement;
-    // Empty values are navigation through an unfinished edit until the field is committed.
-    if (input.matches('input[type="number"]') && input.value === '' && !input.validity.badInput)
-      applyInput(input, undefined);
-    if (editor) {
-      updateStatus(editor);
-      updateInspectorLabels(editor);
-    }
-  });
-  inspector.addEventListener('focusout', (event) => {
-    editor?.state.endOperation();
-    if (editor) {
-      updateStatus(editor);
-      updateInspectorLabels(editor);
-    }
-    // During native Tab navigation activeElement can still be the body at focusout.
-    // Preserve the inputs when the browser is about to focus another inspector field.
-    const next = event.relatedTarget;
-    if (next && next instanceof Element && next.closest('#inspector')) return;
-    queueMicrotask(() => {
-      if (editor && !document.activeElement?.closest('#inspector')) renderInspector(editor);
-    });
-  });
+  inspector.addEventListener(
+    'input',
+    (event) => {
+      const input = event.target as HTMLInputElement;
+      if (!input.matches('input[type="number"]') || input.value === '') return;
+      const value = Number(input.value);
+      if (Number.isFinite(value)) applyInput(input, value);
+    },
+    { signal: lifetime.signal },
+  );
+  inspector.addEventListener(
+    'change',
+    (event) => {
+      const input = event.target as HTMLInputElement;
+      // Empty values are navigation through an unfinished edit until the field is committed.
+      if (input.matches('input[type="number"]') && input.value === '' && !input.validity.badInput)
+        applyInput(input, undefined);
+      if (editor) {
+        updateStatus(editor);
+        updateInspectorLabels(editor);
+      }
+    },
+    { signal: lifetime.signal },
+  );
+  inspector.addEventListener(
+    'focusout',
+    (event) => {
+      editor?.state.endOperation();
+      if (editor) {
+        updateStatus(editor);
+        updateInspectorLabels(editor);
+      }
+      // During native Tab navigation activeElement can still be the body at focusout.
+      // Preserve the inputs when the browser is about to focus another inspector field.
+      const next = event.relatedTarget;
+      if (next && next instanceof Element && next.closest('#inspector')) return;
+      queueMicrotask(() => {
+        if (!lifetime.signal.aborted && editor && !document.activeElement?.closest('#inspector'))
+          renderInspector(editor);
+      });
+    },
+    { signal: lifetime.signal },
+  );
 
   return {
     render(current: RigEditor): void {
+      if (lifetime.signal.aborted) return;
       editor = current;
       renderInspector(current);
     },
     showError(message: string): void {
+      if (lifetime.signal.aborted) return;
       inspector.textContent = `Character load failed: ${message}`;
+    },
+    dispose(): void {
+      if (lifetime.signal.aborted) return;
+      lifetime.abort();
+      editor?.state.endOperation();
+      editor = undefined;
     },
   };
 }

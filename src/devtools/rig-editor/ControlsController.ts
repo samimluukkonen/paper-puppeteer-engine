@@ -3,9 +3,11 @@ import type { GridSnap, RotationSnap } from './RigEditorState.js';
 
 /** Editing, snapping, visibility, opacity, and preview controls. */
 export function createControlsController(app: HTMLElement, updateStatus: (editor: RigEditor) => void) {
+  const lifetime = new AbortController();
   let editor: RigEditor | undefined;
   const visibility = app.querySelector<HTMLElement>('#visibility')!;
   function render(current: RigEditor): void {
+    if (lifetime.signal.aborted) return;
     editor = current;
     const { state } = current;
     if (!visibility.childElementCount) {
@@ -24,11 +26,15 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
         input.type = 'checkbox';
         input.dataset.visibility = key;
         input.checked = state.visibility[key];
-        input.addEventListener('change', () => {
-          if (!editor) return;
-          editor.state.visibility[key] = input.checked;
-          editor.refresh();
-        });
+        input.addEventListener(
+          'change',
+          () => {
+            if (!editor) return;
+            editor.state.visibility[key] = input.checked;
+            editor.refresh();
+          },
+          { signal: lifetime.signal },
+        );
         label.append(input, title);
         visibility.append(label);
       }
@@ -42,35 +48,67 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     for (const input of visibility.querySelectorAll<HTMLInputElement>('input'))
       input.checked = state.visibility[input.dataset.visibility as keyof typeof state.visibility];
   }
-  app.querySelector<HTMLSelectElement>('#opacity')!.addEventListener('change', (event) => {
-    if (!editor) return;
-    editor.state.artworkOpacity = Number((event.target as HTMLSelectElement).value);
-    editor.refresh();
-  });
-  app.querySelector<HTMLSelectElement>('#edit-mode')!.addEventListener('change', (event) => {
-    if (!editor) return;
-    editor.state.editMode = (event.target as HTMLSelectElement).value as 'joint' | 'sprite';
-    editor.refresh();
-  });
-  app.querySelector<HTMLSelectElement>('#grid-snap')!.addEventListener('change', (event) => {
-    if (!editor) return;
-    editor.state.gridSnap = Number((event.target as HTMLSelectElement).value) as GridSnap;
-    editor.refresh(false);
-    updateStatus(editor);
-  });
-  app.querySelector<HTMLSelectElement>('#rotation-snap')!.addEventListener('change', (event) => {
-    if (!editor) return;
-    editor.state.rotationSnap = Number((event.target as HTMLSelectElement).value) as RotationSnap;
-    updateStatus(editor);
-  });
-  app.querySelector<HTMLInputElement>('#dim-selection')!.addEventListener('change', (event) => {
-    if (!editor) return;
-    editor.state.dimUnselected = (event.target as HTMLInputElement).checked;
-    editor.refresh();
-  });
-  app.querySelector<HTMLInputElement>('#ik-preview')!.addEventListener('change', (event) => {
-    editor?.setIKPreview((event.target as HTMLInputElement).checked);
-  });
+  app.querySelector<HTMLSelectElement>('#opacity')!.addEventListener(
+    'change',
+    (event) => {
+      if (!editor) return;
+      editor.state.artworkOpacity = Number((event.target as HTMLSelectElement).value);
+      editor.refresh();
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLSelectElement>('#edit-mode')!.addEventListener(
+    'change',
+    (event) => {
+      if (!editor) return;
+      editor.state.editMode = (event.target as HTMLSelectElement).value as 'joint' | 'sprite';
+      editor.refresh();
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLSelectElement>('#grid-snap')!.addEventListener(
+    'change',
+    (event) => {
+      if (!editor) return;
+      editor.state.gridSnap = Number((event.target as HTMLSelectElement).value) as GridSnap;
+      editor.refresh(false);
+      updateStatus(editor);
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLSelectElement>('#rotation-snap')!.addEventListener(
+    'change',
+    (event) => {
+      if (!editor) return;
+      editor.state.rotationSnap = Number((event.target as HTMLSelectElement).value) as RotationSnap;
+      updateStatus(editor);
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLInputElement>('#dim-selection')!.addEventListener(
+    'change',
+    (event) => {
+      if (!editor) return;
+      editor.state.dimUnselected = (event.target as HTMLInputElement).checked;
+      editor.refresh();
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLInputElement>('#ik-preview')!.addEventListener(
+    'change',
+    (event) => {
+      editor?.setIKPreview((event.target as HTMLInputElement).checked);
+    },
+    { signal: lifetime.signal },
+  );
 
-  return { render };
+  return {
+    render,
+    dispose(): void {
+      if (lifetime.signal.aborted) return;
+      lifetime.abort();
+      editor = undefined;
+      visibility.replaceChildren();
+    },
+  };
 }
