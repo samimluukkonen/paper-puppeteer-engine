@@ -1,7 +1,79 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { sampleProperty } from '../src/engine/AnimationClip.js';
 import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
 import { AnimationPlayer, type CompiledClip, compileClip, evaluateClip, Joint, Rig } from '../src/engine/core.js';
+import { animationClipSchema } from '../src/engine/schemas.js';
+
+const externalClip = (patch: Partial<CompiledClip> = {}): CompiledClip => ({
+  name: 'external',
+  duration: 100,
+  loop: true,
+  tracks: [],
+  events: [],
+  ...patch,
+});
+
+test.each([0, -1, NaN, Infinity])('external compiled clips reject duration %s before changing poses', (duration) => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const joint = new Joint('root');
+  joint.pose.x = 42;
+  assert.throws(() => new AnimationPlayer(rig, new Map([['root', joint]]), [externalClip({ duration })]));
+  assert.equal(joint.pose.x, 42);
+});
+
+test.each(
+  [
+    [{ time: -1, value: 0 }],
+    [{ time: 101, value: 0 }],
+    [{ time: NaN, value: 0 }],
+    [{ time: 0, value: Infinity }],
+    [
+      { time: 50, value: 0 },
+      { time: 0, value: 1 },
+    ],
+    [
+      { time: 0, value: 0 },
+      { time: 0, value: 1 },
+    ],
+    [],
+  ].map((keys) => ({ keys })),
+)('external compiled clips reject invalid property keys %j', ({ keys }) => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip = externalClip({ tracks: [{ bone: 'root', properties: new Map([['x', keys]]) }] });
+  assert.throws(() => new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [clip]));
+});
+
+test.each([
+  { events: [{ time: -1, name: 'marker' }] },
+  { events: [{ time: 101, name: 'marker' }] },
+  { events: [{ time: NaN, name: 'marker' }] },
+  { playback: { mode: 'stepped' as const, fps: 0 } },
+  { playback: { mode: 'stepped' as const, fps: Infinity } },
+  {
+    tracks: [
+      { bone: 'root', properties: new Map() },
+      { bone: 'root', properties: new Map() },
+    ],
+  },
+])('external compiled clips reject invalid metadata %j', (patch) => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  assert.throws(() => new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [externalClip(patch)]));
+});
+
+test('compiler-owned clips bypass repeated scalar validation', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip = compileClip({ name: 'owned', duration: 100, loop: true, tracks: {} }, rig);
+  const parse = vi.spyOn(animationClipSchema, 'parse');
+  try {
+    const player = new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [clip]);
+    player.play('owned');
+    player.update(50);
+    assert.equal(player.elapsedTime, 50);
+    assert.equal(parse.mock.calls.length, 0);
+  } finally {
+    parse.mockRestore();
+  }
+});
 
 test('precompiled clips reject unknown bones before changing joint poses', () => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 3 }] });

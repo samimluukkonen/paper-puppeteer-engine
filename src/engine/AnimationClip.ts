@@ -2,9 +2,9 @@ import { shortestRotationDelta } from './animationMath.js';
 import { checkJson, type ValidationIssue } from './externalData.js';
 import type { Rig } from './Rig.js';
 import { freezeData, readonlyMap } from './readonlyData.js';
-import { animationClipSchema } from './schemas.js';
+import { animationClipSchema, identifierSchema, keyframeSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
-import { transformProperties } from './types.js';
+import { assertFinite, transformProperties } from './types.js';
 import { checkAnimationReferences, throwValidationIssue } from './validation.js';
 
 export type Interpolation = 'linear';
@@ -64,6 +64,33 @@ const ownedClips = new WeakSet<CompiledClip>();
 /** @internal Share compiler-owned immutable clips; snapshot externally assembled compiled data. */
 export function ownCompiledClip(clip: CompiledClip): CompiledClip {
   if (ownedClips.has(clip)) return clip;
+  const metadata = animationClipSchema.parse({ ...clip, tracks: {} });
+  checkAnimationReferences(metadata, { bones: [] }, throwValidationIssue);
+  const bones = new Set<string>();
+  for (const track of clip.tracks) {
+    identifierSchema.parse(track.bone);
+    if (bones.has(track.bone)) throw new Error(`Duplicate compiled track for bone "${track.bone}".`);
+    bones.add(track.bone);
+    for (const [property, keys] of track.properties) {
+      if (!transformProperties.includes(property)) throw new Error(`Unknown compiled property "${property}".`);
+      if (!keys.length) throw new Error(`Compiled property "${track.bone}.${property}" needs at least one key.`);
+      const authoredKeys = keys.map((key) => {
+        assertFinite(key.value, `Compiled property ${track.bone}.${property}`);
+        return keyframeSchema.parse({ time: key.time, [property]: key.value });
+      });
+      // Reuse authored timeline rules for each independently compiled property.
+      checkAnimationReferences(
+        { ...metadata, tracks: { [track.bone]: authoredKeys }, events: [] },
+        { bones: [{ id: track.bone }] },
+        throwValidationIssue,
+      );
+    }
+  }
+  return snapshotCompiledClip(clip);
+}
+
+/** Compiler output has already passed scalar and timeline validation. */
+function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
   const owned: CompiledClip = Object.freeze({
     name: clip.name,
     duration: clip.duration,
@@ -116,7 +143,7 @@ export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
     }
     tracks.push({ bone, properties });
   }
-  return ownCompiledClip({
+  return snapshotCompiledClip({
     name: clip.name,
     duration: clip.duration,
     loop: clip.loop,
