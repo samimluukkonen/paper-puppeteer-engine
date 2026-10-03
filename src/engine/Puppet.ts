@@ -523,6 +523,7 @@ export class Puppet {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.animationPlayer.dispose();
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.container.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
@@ -532,6 +533,8 @@ export class Puppet {
     this.renderer.destroy();
     if (!this.container.isDestroyed) this.container.destroy();
     this.attachments.clear();
+    this.renderedSlotAttachments.clear();
+    this.poses.clear();
     this.bones.clear();
     this.ikConstraints.clear();
     this.poseController.destroy();

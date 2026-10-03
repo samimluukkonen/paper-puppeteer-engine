@@ -138,6 +138,87 @@ test('non-JSON TypeScript event payloads retain reference semantics', () => {
   for (const payload of delivered) assert.strictEqual(payload, data);
 });
 
+test('disposing a player releases playback state without changing the held joints', () => {
+  const { player, joints } = fixture();
+  player.play('a');
+  player.play('b', { layer: 'upper', fadeDuration: 200, speed: 2 });
+  player.update(100);
+  player.setSpeed(0.5);
+  player.setPlaybackMode({ mode: 'stepped', fps: 10 });
+  player.pause();
+  const held = [...joints].map(([id, joint]) => [id, { ...joint.pose }]);
+  const offEvent = player.onAnimationEvent(() => assert.fail('Disposed player fired an event'));
+  const offComplete = player.onAnimationComplete(() => assert.fail('Disposed player completed an animation'));
+  player.dispose();
+  player.dispose();
+  assert.isTrue(player.isDisposed);
+  assert.isUndefined(player.currentAnimation);
+  assert.isUndefined(player.getLayerAnimation('upper'));
+  assert.equal(player.getLayerWeight('upper'), 0);
+  assert.equal(player.duration, 0);
+  assert.equal(player.elapsedTime, 0);
+  assert.isFalse(player.isPlaying);
+  assert.isUndefined(player.transition);
+  assert.isFalse(player.update(100));
+  assert.deepEqual(
+    [...joints].map(([id, joint]) => [id, { ...joint.pose }]),
+    held,
+  );
+  assert.doesNotThrow(offEvent);
+  assert.doesNotThrow(offComplete);
+  const commands = [
+    () => player.addAnimation({ name: 'new', duration: 100, loop: true, tracks: {} }),
+    () => player.play('a'),
+    () => player.restart(),
+    () => player.stop(),
+    () => player.pause(),
+    () => player.resume(),
+    () => player.setSpeed(1),
+    () => player.setPlaybackMode({ mode: 'smooth' }),
+    () => player.setLayerMask('upper', ['arm']),
+    () => player.setLayerWeight('upper', 1),
+    () => player.clearLayer('upper'),
+    () => player.clearAllLayers(),
+    () => player.resetPose(),
+    () => player.sample(0),
+    () => player.applyCurrentPose(),
+    () => player.onAnimationEvent(() => {}),
+    () => player.onAnimationComplete(() => {}),
+  ];
+  for (const command of commands) assert.throws(command, /disposed/);
+  assert.deepEqual(
+    [...joints].map(([id, joint]) => [id, { ...joint.pose }]),
+    held,
+  );
+});
+
+test.each(['start', 'event', 'complete'] as const)('disposal in a %s callback cancels remaining delivery', (mode) => {
+  const { player } = fixture();
+  player.addAnimation({
+    name: 'once',
+    duration: 100,
+    loop: false,
+    tracks: {},
+    events: [
+      { time: mode === 'start' ? 0 : 25, name: 'first' },
+      { time: 75, name: 'second' },
+    ],
+  });
+  const trailing = vi.fn();
+  if (mode === 'complete') {
+    player.onAnimationComplete(() => player.dispose());
+    player.onAnimationComplete(trailing);
+  } else {
+    player.onAnimationEvent(() => player.dispose());
+    player.onAnimationEvent(trailing);
+    player.onAnimationComplete(trailing);
+  }
+  player.play('once');
+  player.update(100);
+  assert.isTrue(player.isDisposed);
+  assert.equal(trailing.mock.calls.length, 0);
+});
+
 test('pose blending includes all transforms, endpoints and shortest rotation path', () => {
   const from = new Map([['arm', { x: 10, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }]]);
   const to = new Map([['arm', { x: 20, y: 10, rotation: 2, scaleX: 3, scaleY: 2 }]]);

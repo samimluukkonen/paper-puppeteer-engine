@@ -79,10 +79,11 @@ export class AnimationPlayer {
   private playback: AnimationPlaybackMode = { mode: 'smooth' };
   private speed = 1;
   private paused = false;
+  private disposed = false;
 
   constructor(
     private readonly rig: Rig,
-    private readonly joints: ReadonlyMap<string, Joint>,
+    private joints: ReadonlyMap<string, Joint>,
     compiledClips: readonly CompiledClip[] = [],
   ) {
     // Reuse compiled tracks, but check their references against this player's rig.
@@ -117,6 +118,9 @@ export class AnimationPlayer {
   get isPaused(): boolean {
     return this.paused;
   }
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
   get playbackSpeed(): number {
     return this.speed;
   }
@@ -146,6 +150,7 @@ export class AnimationPlayer {
   }
 
   addAnimation(clip: AnimationClip): void {
+    this.assertActive();
     if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
     this.clips.set(clip.name, compileClip(clip, this.rig));
   }
@@ -154,6 +159,7 @@ export class AnimationPlayer {
    * and synchronize the evaluated pose before time-zero events are delivered.
    */
   play(name: string, options: PlayAnimationOptions = {}, preparePose?: () => void, synchronizePose?: () => void): void {
+    this.assertActive();
     const clip = this.clips.get(name);
     if (!clip) throw new Error(`Unknown animation "${name}".`);
     const layerName = options.layer ?? 'base';
@@ -189,28 +195,34 @@ export class AnimationPlayer {
   }
 
   stop(): void {
+    this.assertActive();
     for (const layer of this.layers.values()) {
       if (layer.state) layer.state.playing = false;
       layer.stopped = true;
     }
   }
   restart(preparePose?: () => void, synchronizePose?: () => void): void {
+    this.assertActive();
     const name = this.currentAnimation;
     if (name) this.play(name, {}, preparePose, synchronizePose);
     else synchronizePose?.();
   }
   pause(): void {
+    this.assertActive();
     this.paused = true;
   }
   resume(): void {
+    this.assertActive();
     this.paused = false;
   }
   setSpeed(speed: number): void {
+    this.assertActive();
     validateSpeed(speed);
     this.speed = speed;
   }
 
   setPlaybackMode(mode: AnimationPlaybackMode, preparePose?: () => void): void {
+    this.assertActive();
     if (mode.mode === 'stepped') {
       assertFinite(mode.fps, 'Animation FPS');
       if (mode.fps <= 0) throw new Error('Animation FPS must be greater than zero.');
@@ -221,6 +233,7 @@ export class AnimationPlayer {
   }
 
   setLayerMask(name: string, bones: readonly string[], preparePose?: () => void): void {
+    this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot have a bone mask.');
     for (const id of bones) this.rig.getBone(id);
@@ -233,6 +246,7 @@ export class AnimationPlayer {
   }
 
   setLayerWeight(name: string, weight: number, preparePose?: () => void): void {
+    this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer weight is fixed at 1.');
     assertFinite(weight, 'Layer weight');
@@ -246,6 +260,7 @@ export class AnimationPlayer {
   }
 
   clearLayer(name: string, preparePose?: () => void): void {
+    this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot be cleared.');
     preparePose?.();
@@ -258,22 +273,26 @@ export class AnimationPlayer {
 
   /** Remove clip and layer state without changing registered clips. */
   clearAllLayers(): void {
+    this.assertActive();
     this.layers.clear();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
     this.controlDirty = true;
   }
 
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
+    this.assertActive();
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
   }
 
   onAnimationComplete(listener: (event: AnimationCompletion) => void): () => void {
+    this.assertActive();
     this.completionListeners.add(listener);
     return () => this.completionListeners.delete(listener);
   }
 
   resetPose(): void {
+    this.assertActive();
     for (const joint of this.joints.values()) joint.reset();
   }
 
@@ -283,6 +302,7 @@ export class AnimationPlayer {
    * The synchronization callback runs after evaluation and before notifications.
    */
   update(delta: number, preparePose?: () => void, synchronizePose?: () => void): boolean {
+    if (this.disposed) return false;
     assertFinite(delta, 'Animation delta');
     if (delta < 0) throw new Error('Animation delta cannot be negative.');
     if (this.paused) return false;
@@ -340,6 +360,7 @@ export class AnimationPlayer {
 
   /** Sample only the base clip, clamping time without moving clocks or firing events. Excludes fades and layers. */
   sample(time: number, options: SampleAnimationOptions = {}): void {
+    this.assertActive();
     assertFinite(time, 'Sample time');
     const state = this.layers.get('base')?.state;
     if (!state) return;
@@ -353,6 +374,7 @@ export class AnimationPlayer {
 
   /** Reapply the held authored pose; useful before external per-frame adjustments. */
   applyCurrentPose(): void {
+    this.assertActive();
     const base = this.layers.get('base');
     const pose = this.workingPose;
     for (const [id, values] of pose) {
@@ -515,6 +537,7 @@ export class AnimationPlayer {
     const errors: unknown[] = [];
     for (const event of events) {
       for (const listener of [...this.eventListeners]) {
+        if (this.disposed) break;
         try {
           listener(copyAnimationEvent(event));
         } catch (error) {
@@ -524,6 +547,7 @@ export class AnimationPlayer {
     }
     for (const event of completions) {
       for (const listener of [...this.completionListeners]) {
+        if (this.disposed) break;
         try {
           listener({ ...event });
         } catch (error) {
@@ -533,6 +557,27 @@ export class AnimationPlayer {
     }
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) throw new AggregateError(errors, 'Animation listeners failed.');
+  }
+
+  /** Release listeners, clips, layers, and joint references without changing the host's held pose. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.eventListeners.clear();
+    this.completionListeners.clear();
+    this.clips.clear();
+    this.layers.clear();
+    this.workingPose.clear();
+    this.emptyPose.clear();
+    this.controlled.clear();
+    this.joints = new Map();
+    this.playback = { mode: 'smooth' };
+    this.speed = 1;
+    this.paused = false;
+  }
+
+  private assertActive(): void {
+    if (this.disposed) throw new Error('AnimationPlayer has been disposed.');
   }
 
   private getOrCreateLayer(name: string): AnimationLayer {

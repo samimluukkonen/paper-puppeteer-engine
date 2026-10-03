@@ -221,6 +221,31 @@ test('a completion callback can start a new clip without overwriting its synchro
   puppet.destroy();
 });
 
+test('destroying a puppet disposes playback and cancels callbacks that would access its destroyed bones', () => {
+  const { puppet } = fixture();
+  const player = puppet.animationPlayer;
+  puppet.addAnimation({
+    name: 'once',
+    duration: 100,
+    loop: false,
+    tracks: { root: [{ time: 0, x: 10 }] },
+    events: [{ time: 50, name: 'destroy' }],
+  });
+  puppet.onAnimationEvent(() => puppet.destroy());
+  const trailing = vi.fn(() => puppet.getBone('root'));
+  puppet.onAnimationEvent(trailing);
+  puppet.onAnimationComplete(trailing);
+  puppet.play('once');
+  assert.doesNotThrow(() => puppet.update(100));
+  assert.isTrue(player.isDisposed);
+  assert.isUndefined(player.currentAnimation);
+  assert.equal(trailing.mock.calls.length, 0);
+  assert.doesNotThrow(() => puppet.destroy());
+  assert.doesNotThrow(() => puppet.update(100));
+  assert.isFalse(player.update(100));
+  assert.throws(() => player.play('once'), /disposed/);
+});
+
 test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit'] as const)(
   'rejected updates preserve presets, IK, clocks, transitions, and rendering: %s',
   (reason) => {
