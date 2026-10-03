@@ -472,6 +472,36 @@ test('clip playback overrides global mode and speed affects stepped time', () =>
   assert.strictEqual(joints.get('arm')!.pose.x, 10);
 });
 
+test.each([Number.MIN_VALUE, 1e-308, Number.MAX_VALUE])(
+  'stepped playback remains finite at FPS %s for player and clip settings',
+  (fps) => {
+    for (const clipOverride of [false, true]) {
+      const { player, joints } = fixture();
+      player.addAnimation({
+        name: 'extreme',
+        duration: 100,
+        loop: false,
+        tracks: {
+          arm: [
+            { time: 0, x: 0 },
+            { time: 100, x: 100 },
+          ],
+        },
+        ...(clipOverride ? { playback: { mode: 'stepped' as const, fps } } : {}),
+      });
+      player.play('extreme');
+      if (!clipOverride) player.setPlaybackMode({ mode: 'stepped', fps });
+      assert.equal(joints.get('arm')!.pose.x, 0);
+      player.update(50);
+      assert.equal(joints.get('arm')!.pose.x, fps === Number.MAX_VALUE ? 50 : 0);
+      player.sample(50, { mode: 'playback' });
+      assert.equal(joints.get('arm')!.pose.x, fps === Number.MAX_VALUE ? 50 : 0);
+      player.update(50);
+      assert.equal(joints.get('arm')!.pose.x, 100);
+    }
+  },
+);
+
 test('events cross timestamps once, loop with large deltas, obey speed and exclude fade source', () => {
   const { player } = fixture();
   const seen: string[] = [];
