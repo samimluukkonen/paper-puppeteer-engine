@@ -1,7 +1,54 @@
 import { assert, test } from 'vitest';
 import { sampleProperty } from '../src/engine/AnimationClip.js';
 import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
-import { type CompiledClip, compileClip, evaluateClip, Rig } from '../src/engine/core.js';
+import { AnimationPlayer, type CompiledClip, compileClip, evaluateClip, Joint, Rig } from '../src/engine/core.js';
+
+test('precompiled clips reject unknown bones before changing joint poses', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 3 }] });
+  const otherRig = new Rig({ root: 'other', bones: [{ id: 'other' }] });
+  const joint = new Joint('root', rig.getBone('root'));
+  joint.pose.x = 42;
+  const clip = compileClip(
+    { name: 'incompatible', duration: 100, loop: false, tracks: { other: [{ time: 0, x: 10 }] } },
+    otherRig,
+  );
+  assert.throws(
+    () => new AnimationPlayer(rig, new Map([['root', joint]]), [clip]),
+    /Animation "incompatible" references unknown bone "other"/,
+  );
+  assert.equal(joint.pose.x, 42);
+});
+
+test('precompiled clips can be reused by compatible rigs without recompilation', () => {
+  const sourceRig = new Rig({ root: 'root', bones: [{ id: 'root', x: 3 }] });
+  const rig = new Rig({
+    root: 'root',
+    bones: [
+      { id: 'root', x: 8 },
+      { id: 'extra', parent: 'root' },
+    ],
+  });
+  const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+  const clip = compileClip(
+    {
+      name: 'move',
+      duration: 100,
+      loop: false,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 100, x: 10 },
+        ],
+      },
+    },
+    sourceRig,
+  );
+  const player = new AnimationPlayer(rig, joints, [clip]);
+  player.play('move');
+  player.update(50);
+  assert.equal(joints.get('root')!.pose.x, 5);
+  assert.deepEqual(joints.get('extra')!.pose, joints.get('extra')!.bindPose);
+});
 
 test.each([NaN, Infinity, -Infinity])('sampling rejects nonfinite time %s before changing buffered poses', (time) => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });

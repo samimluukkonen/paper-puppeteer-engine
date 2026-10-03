@@ -85,9 +85,13 @@ export class AnimationPlayer {
     private readonly joints: ReadonlyMap<string, Joint>,
     compiledClips: readonly CompiledClip[] = [],
   ) {
-    // Puppet passes clips already validated for this rig before creating scene objects.
+    // Reuse compiled tracks, but check their references against this player's rig.
     for (const clip of compiledClips) {
       if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
+      for (const track of clip.tracks) {
+        if (!rig.hasBone(track.bone))
+          throw new Error(`Animation "${clip.name}" references unknown bone "${track.bone}".`);
+      }
       this.clips.set(clip.name, clip);
     }
     for (const bone of rig.bones) {
