@@ -79,8 +79,12 @@ export function checkOwnership(character: CharacterDefinition, rig: DeepReadonly
   character.rig.getBone(character.rig.root).sprite!.originX = 0;
   // @ts-expect-error Runtime slots expose immutable transforms.
   character.rig.slots[0]!.x = 1;
+  // @ts-expect-error Slot getters preserve immutable transforms.
+  character.rig.getSlot('visual').x = 1;
   // @ts-expect-error Runtime attachments expose immutable artwork.
   character.rig.attachments[0]!.texture = 'changed';
+  // @ts-expect-error Attachment getters preserve immutable artwork.
+  character.rig.getAttachment('art').texture = 'changed';
   // @ts-expect-error Runtime skins expose immutable metadata.
   character.rig.skins[0]!.name = 'changed';
 }

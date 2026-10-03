@@ -58,6 +58,8 @@ export class Rig {
   readonly attachments: DeepReadonly<readonly SpriteAttachmentDefinition[]>;
   readonly skins: DeepReadonly<readonly SkinDefinition[]>;
   private readonly definitions = new Map<string, DeepReadonly<BoneDefinition>>();
+  private readonly slotDefinitions = new Map<string, DeepReadonly<SlotDefinition>>();
+  private readonly attachmentDefinitions = new Map<string, DeepReadonly<SpriteAttachmentDefinition>>();
 
   constructor(definition: RigDefinition) {
     definition = rigDefinitionSchema.parse(definition);
@@ -103,6 +105,8 @@ export class Rig {
     this.attachments = Object.freeze(
       (definition.attachments ?? []).map((attachment) => Object.freeze({ ...attachment })),
     );
+    for (const slot of this.slots) this.slotDefinitions.set(slot.id, slot);
+    for (const attachment of this.attachments) this.attachmentDefinitions.set(attachment.id, attachment);
     this.skins = Object.freeze(
       (definition.skins ?? []).map((skin) =>
         Object.freeze({
@@ -121,5 +125,17 @@ export class Rig {
 
   hasBone(id: string): boolean {
     return this.definitions.has(id);
+  }
+
+  getSlot(id: string): DeepReadonly<SlotDefinition> {
+    const slot = this.slotDefinitions.get(id);
+    if (!slot) throw new Error(`Unknown slot "${id}".`);
+    return slot;
+  }
+
+  getAttachment(id: string): DeepReadonly<SpriteAttachmentDefinition> {
+    const attachment = this.attachmentDefinitions.get(id);
+    if (!attachment) throw new Error(`Unknown attachment "${id}".`);
+    return attachment;
   }
 }

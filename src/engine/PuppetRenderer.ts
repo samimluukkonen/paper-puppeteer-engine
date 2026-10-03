@@ -142,7 +142,7 @@ export class PuppetRenderer {
     const branch = this.slotBranches.get(id);
     if (!branch) throw new Error(`Unknown slot "${id}".`);
     this.slotDepthOverrides.delete(id);
-    const slot = this.rig.slots.find((slot) => slot.id === id)!;
+    const slot = this.rig.getSlot(id);
     branch.root.setDepth(slot.depth ?? this.order.indexOf(slot.bone) * 10 + 1);
     this.container.sort('depth');
   }

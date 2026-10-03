@@ -41,6 +41,20 @@ test('slot and skin data round trips through versioned JSON', () => {
   assert.equal(rig.skins[2]?.slots.headwear, 'helmet');
   assert.ok(Object.isFrozen(rig.slots));
   assert.ok(Object.isFrozen(rig.skins[0]?.slots));
+  assert.strictEqual(rig.getSlot('handVisual'), rig.slots[0]);
+  assert.strictEqual(rig.getAttachment('open'), rig.attachments[0]);
+  for (const id of ['missing', 'toString', 'constructor']) {
+    assert.throws(() => rig.getSlot(id), /Unknown slot/);
+    assert.throws(() => rig.getAttachment(id), /Unknown attachment/);
+  }
+  assert.throws(() => {
+    // @ts-expect-error Definition getters retain the rig's immutable ownership.
+    rig.getSlot('handVisual').x = 99;
+  }, TypeError);
+  assert.throws(() => {
+    // @ts-expect-error Definition getters retain the rig's immutable ownership.
+    rig.getAttachment('open').texture = 'changed';
+  }, TypeError);
 });
 
 test('validation finds slot, attachment, and skin references and versions', () => {

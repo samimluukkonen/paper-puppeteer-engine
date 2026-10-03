@@ -430,10 +430,7 @@ export class Puppet {
     for (const slot of this.rig.slots) {
       const id = this.slotState.getAttachment(slot.id);
       if (this.renderedSlotAttachments.get(slot.id) === id) continue;
-      this.renderer.setSlotAttachment(
-        slot.id,
-        id ? this.rig.attachments.find((attachment) => attachment.id === id) : undefined,
-      );
+      this.renderer.setSlotAttachment(slot.id, id ? this.rig.getAttachment(id) : undefined);
       if (id) this.renderedSlotAttachments.set(slot.id, id);
       else this.renderedSlotAttachments.delete(slot.id);
     }
