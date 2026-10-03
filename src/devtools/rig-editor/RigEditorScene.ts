@@ -3,7 +3,9 @@ import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { parseRigDefinition, type RigJsonDefinition } from '../../engine/externalData.js';
 import { parseTwoBoneIKDefinition } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Puppet } from '../../engine/Puppet.js';
+import { Rig } from '../../engine/Rig.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
@@ -99,15 +101,16 @@ export class RigEditorScene extends Phaser.Scene {
   private installRig(file: RigJsonDefinition): void {
     const definition = this.definition;
     if (!definition) throw new Error('No character is loaded.');
-    // Skin files remain owned by the character manifest and are available to the preview.
-    const rig = parseRigDefinition({ ...file, skins: file.skins ?? definition.rig.skins });
-    if (!rig.skins.some((skin) => skin.name === definition.defaultSkin))
+    const rig = parseRigDefinition(file);
+    // Preview uses runtime skin precedence; authored/exported skins remain owned by the rig file.
+    const previewRig = new Rig({ ...rig, skins: mergeSkins(rig.skins, definition.standaloneSkins) });
+    if (!previewRig.skins.some((skin) => skin.name === definition.defaultSkin))
       throw new Error(`Rig needs the character's default skin "${definition.defaultSkin}" for preview.`);
     // A valid rig can still be incompatible with the editor's preview chains.
     const ikChains = this.ikChains.map((chain) => parseTwoBoneIKDefinition(chain, rig));
     const state = new RigEditorState(rig, file);
     const puppet = new Puppet(this, {
-      rig: state.workingCopy,
+      rig: previewRig,
       skin: definition.defaultSkin,
       x: 380,
       y: 435,

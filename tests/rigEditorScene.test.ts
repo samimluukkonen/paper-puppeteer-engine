@@ -4,12 +4,14 @@ import { demoIK } from '../src/demo/demoIK.js';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
 import { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
+import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { parseRigDefinition, type RigJsonDefinition } from '../src/engine/externalData.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../src/engine/ik/types.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
+import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
@@ -31,9 +33,12 @@ vi.mock('../src/engine/Puppet.js', () => ({
       readonly rig: Rig;
       private readonly joints: Map<string, Joint>;
       private readonly constraints = new Map<string, TwoBoneIKConstraint>();
+      private readonly slots: SlotState;
       destroy = vi.fn();
-      constructor(_scene: unknown, options: { rig: RigDefinition }) {
+      constructor(_scene: unknown, options: { rig: RigDefinition; skin?: string }) {
         this.rig = new Rig(options.rig);
+        this.slots = new SlotState(this.rig);
+        if (options.skin) this.slots.setSkin(options.skin);
         this.joints = new Map(
           this.rig.bones.map((bone) => [
             bone.id,
@@ -60,6 +65,13 @@ vi.mock('../src/engine/Puppet.js', () => ({
       getBone(id: string) {
         return this.joints.get(id)!;
       }
+      getAttachment(id: string) {
+        return this.slots.getAttachment(id);
+      }
+      getSlotImage() {
+        return undefined;
+      }
+      setSlotTransform = vi.fn();
       preparePose = vi.fn();
       syncPose = vi.fn();
       setRenderOrder = vi.fn();
@@ -96,6 +108,49 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
+
+test.each(['matching', 'rig-only', 'absent'] as const)(
+  'preview merges standalone skins with %s embedded skins while exports preserve authored skins',
+  (kind) => {
+    vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const file: RigJsonDefinition = {
+      version: 1,
+      root: 'root',
+      bones: [{ id: 'root' }],
+      slots: [{ id: 'visual', bone: 'root' }],
+      attachments: [{ id: 'art', texture: 'part' }],
+      ...(kind === 'absent'
+        ? {}
+        : { skins: [{ version: 1, name: kind === 'matching' ? 'default' : 'embedded', slots: { visual: null } }] }),
+    };
+    const definition = CharacterDefinition.fromData({
+      manifest: {
+        version: 1,
+        id: 'test',
+        rig: 'rig.json',
+        defaultSkin: 'default',
+        skins: { default: 'skin.json' },
+        textures: { part: 'part.png' },
+        animations: [],
+      },
+      rig: file,
+      skins: { 'skin.json': { version: 1, name: 'default', slots: { visual: 'art' } } },
+    });
+    const scene = new RigEditorScene(vi.fn(), vi.fn());
+    Reflect.set(scene, 'definition', definition);
+    for (const load of [() => scene.reloadRig(file), () => scene.reloadOriginal()]) {
+      load();
+      const puppet = vi.mocked(Puppet).mock.results.at(-1)!.value as Puppet;
+      assert.equal(puppet.getAttachment('visual'), 'art');
+      assert.deepEqual(puppet.rig.skins, definition.rig.skins);
+      assert.deepEqual(scene.editor!.exportRig(false).skins, file.skins);
+    }
+    const editor = scene.editor;
+    assert.throws(() => scene.reloadRig({ ...file, attachments: [] }), /unknown attachment/i);
+    assert.strictEqual(scene.editor, editor, 'incompatible standalone skins preserve the working session');
+    assert.deepEqual(file.skins, definition.rigFile!.skins);
+  },
+);
 
 function fixture(sceneOverride?: RigEditorScene) {
   vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), confirm: vi.fn(() => true) });

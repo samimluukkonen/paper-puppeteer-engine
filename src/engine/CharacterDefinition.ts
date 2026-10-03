@@ -8,6 +8,7 @@ import {
   type ValidationIssue,
   validateSkinReferences,
 } from './externalData.js';
+import { mergeSkins } from './mergeSkins.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { Rig } from './Rig.js';
 import { type DeepReadonly, freezeData } from './readonlyData.js';
@@ -41,11 +42,12 @@ interface CharacterInspection {
   rig?: Rig;
   animations: AnimationClip[];
   poses: PoseDefinition[];
+  skins: SkinDefinition[];
 }
 
 function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   const issues: ValidationIssue[] = [];
-  const result: CharacterInspection = { issues, animations: [], poses: [] };
+  const result: CharacterInspection = { issues, animations: [], poses: [], skins: [] };
   checkJson(data.manifest, 'manifest', issues);
   if (issues.length) return result;
   const parsed = characterManifestSchema.safeParse(data.manifest);
@@ -62,7 +64,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   const source = data.rig === undefined ? undefined : inspectRigDefinition(data.rig);
   if (source) issues.push(...prefixed(source.issues, 'rig'));
 
-  const skins: SkinDefinition[] = [];
+  const skins = result.skins;
   for (const [name, path] of Object.entries(manifest.skins)) {
     const value = data.skins && Object.hasOwn(data.skins, path) ? data.skins[path] : undefined;
     if (value === undefined) {
@@ -88,10 +90,10 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     const skinIssues = validateSkinReferences(skins, source.data);
     issues.push(...prefixed(skinIssues, 'rig'));
     // Keep checking clips and poses when standalone skins have broken references.
-    // Standalone skins override matching names while preserving rig-only skins.
-    const mergedSkins = new Map((source.data.skins ?? []).map((skin) => [skin.name, skin]));
-    if (!skinIssues.length) for (const skin of skins) mergedSkins.set(skin.name, skin);
-    result.rig = new Rig({ ...source.data, skins: [...mergedSkins.values()] });
+    result.rig = new Rig({
+      ...source.data,
+      skins: mergeSkins(source.data.skins ?? [], skinIssues.length ? [] : skins),
+    });
     const textures = new Set(Object.keys(manifest.textures));
     for (const [index, bone] of source.data.bones.entries())
       if (bone.sprite && !textures.has(bone.sprite.texture))
@@ -161,13 +163,15 @@ export class CharacterDefinition {
     readonly poses: DeepReadonly<readonly PoseDefinition[]>,
     readonly defaultSkin: string,
     readonly textures: Readonly<Record<string, string>>,
+    /** Manifest-owned skins, retained separately from the authored rig for editor previews. */
+    readonly standaloneSkins: DeepReadonly<readonly SkinDefinition[]>,
     readonly baseUrl?: string,
     readonly rigFile?: DeepReadonly<RigJsonDefinition>,
     readonly rigPath?: string,
   ) {}
 
   static fromData(data: CharacterData, baseUrl?: string): CharacterDefinition {
-    const { issues, manifest, rig, animations, poses } = inspectCharacterDefinition(data);
+    const { issues, manifest, rig, animations, poses, skins } = inspectCharacterDefinition(data);
     if (issues.length || !manifest || !rig) throw new CharacterValidationError(issues);
     return Object.freeze(
       new CharacterDefinition(
@@ -177,6 +181,7 @@ export class CharacterDefinition {
         freezeData(poses),
         manifest.defaultSkin,
         freezeData({ ...manifest.textures }),
+        freezeData(skins),
         baseUrl,
         freezeData(structuredClone(data.rig) as RigJsonDefinition),
         manifest.rig,

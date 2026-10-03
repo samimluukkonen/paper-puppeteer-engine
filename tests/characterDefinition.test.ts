@@ -79,6 +79,8 @@ test('character JSON data is deeply readonly, frozen, and independently owned', 
     definition.poses,
     definition.poses[0]!.bones,
     definition.textures,
+    definition.standaloneSkins,
+    definition.standaloneSkins[0]!.slots,
     definition.rigFile!,
     definition.rigFile!.bones[0]!,
     walk.events![0]!.data as object,
@@ -192,6 +194,11 @@ test('character assembly preserves embedded skins and lets standalone skins over
   assert.equal(slots.getAttachment('headVisual'), 'headDefault');
   assert.equal(definition.rig.skins.filter((skin) => skin.name === 'default').length, 1);
   assert.deepEqual(definition.rigFile?.skins, (data.rig as RigDefinition).skins);
+  assert.deepEqual(
+    definition.standaloneSkins.map((skin) => skin.name),
+    Object.keys(data.manifest.skins),
+  );
+  assert.equal(definition.standaloneSkins.find((skin) => skin.name === 'default')!.slots.headVisual, 'headDefault');
   assert.deepEqual(CharacterDefinition.fromData({ ...data, rig: definition.rigFile }).rig.skins, definition.rig.skins);
 });
 
