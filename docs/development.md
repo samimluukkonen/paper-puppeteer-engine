@@ -135,6 +135,8 @@ These are diagnostic measurements from one machine, not CI timing thresholds. Th
 
 ## Use as a local package
 
+`new Rig(existingRig)` shares its validated immutable skeleton and indexes. Pass a second skin array to create a rig with independently validated, owned skins: `new Rig(existingRig, skins)`. The rig editor uses this to retain authored skins separately from preview skins, and its working copy stays independent of the shared source skeleton. New JSON imports still receive full rig validation.
+
 Build this repository first, then in another Phaser TypeScript project:
 
 ```bash

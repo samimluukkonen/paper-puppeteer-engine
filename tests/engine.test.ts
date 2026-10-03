@@ -1,7 +1,8 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
+import { rigDefinitionSchema } from '../src/engine/schemas.js';
 import type { RigDefinition } from '../src/engine/types.js';
 
 const definition: RigDefinition = {
@@ -29,6 +30,46 @@ test('rig accepts unordered definitions and creates an immutable parent-first sn
   assert.ok(Object.isFrozen(rig.bones));
   assert.ok(Object.isFrozen(rig.getBone('hand')));
   assert.throws(() => rig.getBone('absent'), /Unknown bone/);
+});
+
+test('existing rigs share validated skeleton data while skin overrides remain independent', () => {
+  const source = new Rig({
+    ...definition,
+    slots: [{ id: 'visual', bone: 'hand' }],
+    attachments: [{ id: 'art', texture: 'hand' }],
+    skins: [{ version: 1, name: 'default', slots: { visual: null } }],
+  });
+  const skins = [{ version: 1 as const, name: 'default', slots: { visual: 'art' } }];
+  const parse = vi.spyOn(rigDefinitionSchema, 'parse');
+  try {
+    const copy = new Rig(source);
+    const preview = new Rig(source, skins);
+    assert.equal(parse.mock.calls.length, 0);
+    for (const rig of [copy, preview]) {
+      assert.strictEqual(rig.bones, source.bones);
+      assert.strictEqual(rig.slots, source.slots);
+      assert.strictEqual(rig.attachments, source.attachments);
+      assert.strictEqual(rig.renderOrder, source.renderOrder);
+      assert.strictEqual(rig.getBone('hand'), source.getBone('hand'));
+      assert.strictEqual(rig.getSlot('visual'), source.getSlot('visual'));
+      assert.strictEqual(rig.getAttachment('art'), source.getAttachment('art'));
+    }
+    assert.strictEqual(copy.skins, source.skins);
+    skins[0]!.slots.visual = 'changed';
+    assert.equal(preview.skins[0]!.slots.visual, 'art');
+    assert.isTrue(Object.isFrozen(preview.skins[0]!.slots));
+    assert.isNull(source.skins[0]!.slots.visual);
+    assert.throws(() => new Rig(source, [{ version: 1, name: 'bad', slots: { missing: 'art' } }]), /unknown slot/i);
+    assert.throws(
+      () => new Rig(source, [{ version: 1, name: 'bad', slots: { visual: 'missing' } }]),
+      /unknown attachment/i,
+    );
+    assert.throws(() => new Rig(source, [{ version: 1, name: '', slots: {} }]));
+    const duplicate = { version: 1 as const, name: 'same', slots: {} };
+    assert.throws(() => new Rig(source, [duplicate, duplicate]), /Duplicate skin/);
+  } finally {
+    parse.mockRestore();
+  }
 });
 
 test('rig rejects missing roots, duplicate ids, missing parents, extra roots and cycles', () => {

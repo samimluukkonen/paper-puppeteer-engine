@@ -4,7 +4,7 @@ import {
   type ValidationIssue,
   validateRigDefinition,
 } from '../../engine/externalData.js';
-import { Rig } from '../../engine/Rig.js';
+import type { Rig } from '../../engine/Rig.js';
 import type {
   BoneDefinition,
   RigDefinition,
@@ -112,7 +112,7 @@ export class RigEditorState {
       skins: [...source.skins],
     });
     this.freezeEntries();
-    this.rig = new Rig(this.workingCopy);
+    this.rig = source;
     this.rebuildIndexes();
     this.initialCopy = structuredClone(this.workingCopy);
     this.saved = snapshot(this.workingCopy);

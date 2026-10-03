@@ -1,5 +1,5 @@
 import type { DeepReadonly } from './readonlyData.js';
-import { rigDefinitionSchema } from './schemas.js';
+import { rigDefinitionSchema, skinDefinitionSchema } from './schemas.js';
 import type {
   BoneDefinition,
   RigDefinition,
@@ -7,7 +7,17 @@ import type {
   SlotDefinition,
   SpriteAttachmentDefinition,
 } from './types.js';
-import { checkRigReferences, throwValidationIssue } from './validation.js';
+import { checkRigReferences, checkSkinReferences, throwValidationIssue } from './validation.js';
+
+function ownSkins(skins: readonly SkinDefinition[]): DeepReadonly<readonly SkinDefinition[]> {
+  return Object.freeze(skins.map((skin) => Object.freeze({ ...skin, slots: Object.freeze({ ...skin.slots }) })));
+}
+
+function skinOverrides(skins: readonly SkinDefinition[], rig: RigDefinition): DeepReadonly<readonly SkinDefinition[]> {
+  const parsed = skinDefinitionSchema.array().parse(skins);
+  checkSkinReferences(parsed, rig, throwValidationIssue);
+  return ownSkins(parsed);
+}
 
 /** Resolve the logical joint offset using the parent's explicit length, when present. */
 export function computeBonePosition(bone: BoneDefinition, parent?: BoneDefinition): { x: number; y: number } {
@@ -57,14 +67,30 @@ export class Rig {
   readonly slots: DeepReadonly<readonly SlotDefinition[]>;
   readonly attachments: DeepReadonly<readonly SpriteAttachmentDefinition[]>;
   readonly skins: DeepReadonly<readonly SkinDefinition[]>;
-  private readonly definitions = new Map<string, DeepReadonly<BoneDefinition>>();
-  private readonly slotDefinitions = new Map<string, DeepReadonly<SlotDefinition>>();
-  private readonly attachmentDefinitions = new Map<string, DeepReadonly<SpriteAttachmentDefinition>>();
+  private readonly definitions: Map<string, DeepReadonly<BoneDefinition>>;
+  private readonly slotDefinitions: Map<string, DeepReadonly<SlotDefinition>>;
+  private readonly attachmentDefinitions: Map<string, DeepReadonly<SpriteAttachmentDefinition>>;
 
-  constructor(definition: RigDefinition) {
+  /** Existing rigs share validated immutable skeleton data; optional skins are validated independently. */
+  constructor(definition: RigDefinition, skins?: readonly SkinDefinition[]) {
+    if (definition instanceof Rig) {
+      this.root = definition.root;
+      this.bones = definition.bones;
+      this.renderOrder = definition.renderOrder;
+      this.slots = definition.slots;
+      this.attachments = definition.attachments;
+      this.definitions = definition.definitions;
+      this.slotDefinitions = definition.slotDefinitions;
+      this.attachmentDefinitions = definition.attachmentDefinitions;
+      this.skins = skins === undefined ? definition.skins : skinOverrides(skins, definition);
+      return;
+    }
     definition = rigDefinitionSchema.parse(definition);
     checkRigReferences(definition, throwValidationIssue);
     this.root = definition.root;
+    this.definitions = new Map();
+    this.slotDefinitions = new Map();
+    this.attachmentDefinitions = new Map();
     for (const bone of definition.bones) {
       this.definitions.set(
         bone.id,
@@ -107,14 +133,7 @@ export class Rig {
     );
     for (const slot of this.slots) this.slotDefinitions.set(slot.id, slot);
     for (const attachment of this.attachments) this.attachmentDefinitions.set(attachment.id, attachment);
-    this.skins = Object.freeze(
-      (definition.skins ?? []).map((skin) =>
-        Object.freeze({
-          ...skin,
-          slots: Object.freeze({ ...skin.slots }),
-        }),
-      ),
-    );
+    this.skins = skins === undefined ? ownSkins(definition.skins ?? []) : skinOverrides(skins, definition);
   }
 
   getBone(id: string): DeepReadonly<BoneDefinition> {

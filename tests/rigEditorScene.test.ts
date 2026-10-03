@@ -12,6 +12,7 @@ import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { SlotState } from '../src/engine/SlotState.js';
+import { rigDefinitionSchema } from '../src/engine/schemas.js';
 import type { RigDefinition } from '../src/engine/types.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
@@ -141,10 +142,16 @@ test.each(['matching', 'rig-only', 'absent'] as const)(
     for (const load of [() => scene.reloadRig(file), () => scene.reloadOriginal()]) {
       load();
       const puppet = vi.mocked(Puppet).mock.results.at(-1)!.value as Puppet;
+      assert.strictEqual(puppet.rig.bones, scene.editor!.state.rig.bones);
       assert.equal(puppet.getAttachment('visual'), 'art');
       assert.deepEqual(puppet.rig.skins, definition.rig.skins);
       assert.deepEqual(scene.editor!.exportRig(false).skins, file.skins);
     }
+    const parse = vi.spyOn(rigDefinitionSchema, 'parse');
+    scene.reloadOriginal();
+    assert.equal(parse.mock.calls.length, 0, 'original reload reuses the validated character skeleton');
+    assert.strictEqual(scene.editor!.state.rig.bones, definition.rig.bones);
+    parse.mockRestore();
     const editor = scene.editor;
     assert.throws(() => scene.reloadRig({ ...file, attachments: [] }), /unknown attachment/i);
     assert.strictEqual(scene.editor, editor, 'incompatible standalone skins preserve the working session');

@@ -2,6 +2,7 @@ import { assert, test, vi } from 'vitest';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import * as externalData from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
+import { rigDefinitionSchema } from '../src/engine/schemas.js';
 
 const source = new Rig({
   root: 'root',
@@ -13,6 +14,22 @@ const source = new Rig({
   slots: [{ id: 'handVisual', bone: 'arm', y: 5 }],
   attachments: [{ id: 'hand', texture: 'hand' }],
   skins: [{ version: 1, name: 'default', slots: { handVisual: 'hand' } }],
+});
+
+test('editor state reuses the validated source rig and keeps edits in its working copy', () => {
+  const parse = vi.spyOn(rigDefinitionSchema, 'parse');
+  try {
+    const state = new RigEditorState(source);
+    assert.strictEqual(state.rig, source);
+    assert.equal(parse.mock.calls.length, 0);
+    state.editBone('arm', 'x', 12);
+    assert.isUndefined(source.getBone('arm').x);
+    assert.equal(state.getBone('arm').x, 12);
+    state.undo();
+    assert.isUndefined(state.getBone('arm').x);
+  } finally {
+    parse.mockRestore();
+  }
 });
 
 test('editor selection validates bones and slots and can be cleared', () => {

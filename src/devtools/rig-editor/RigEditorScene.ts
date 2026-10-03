@@ -101,9 +101,10 @@ export class RigEditorScene extends Phaser.Scene {
   private installRig(file: RigJsonDefinition): void {
     const definition = this.definition;
     if (!definition) throw new Error('No character is loaded.');
-    const rig = parseRigDefinition(file);
+    // The original file and character skeleton are already validated and owned.
+    const rig = file === definition.rigFile ? new Rig(definition.rig, file.skins ?? []) : parseRigDefinition(file);
     // Preview uses runtime skin precedence; authored/exported skins remain owned by the rig file.
-    const previewRig = new Rig({ ...rig, skins: mergeSkins(rig.skins, definition.standaloneSkins) });
+    const previewRig = new Rig(rig, mergeSkins(rig.skins, definition.standaloneSkins));
     if (!previewRig.skins.some((skin) => skin.name === definition.defaultSkin))
       throw new Error(`Rig needs the character's default skin "${definition.defaultSkin}" for preview.`);
     // A valid rig can still be incompatible with the editor's preview chains.
