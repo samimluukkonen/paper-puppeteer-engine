@@ -458,13 +458,23 @@ export class Puppet {
     mount.add(object);
     renderMount.add(mount).sort('depth');
     this.attachments.set(object, mount);
+    object.once(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     return this;
+  }
+
+  private onAttachmentDestroyed(object: Phaser.GameObjects.GameObject): void {
+    const mount = this.attachments.get(object);
+    if (!mount) return;
+    this.attachments.delete(object);
+    // Phaser removes the child first. Its wrapper may already be tearing down.
+    if (!this.destroyed && !mount.isDestroyed) mount.destroy();
   }
 
   /** Release to the scene display list; the object's local transform is retained. */
   detach(object: Phaser.GameObjects.GameObject): boolean {
     const mount = this.attachments.get(object);
     if (!mount) return false;
+    object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     mount.remove(object);
     mount.destroy();
     this.attachments.delete(object);
@@ -530,6 +540,8 @@ export class Puppet {
     this.debugView.destroy();
     this.ikDebugView.destroy();
     this.slotDebugView.destroy();
+    for (const object of this.attachments.keys())
+      object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     this.renderer.destroy();
     if (!this.container.isDestroyed) this.container.destroy();
     this.attachments.clear();
