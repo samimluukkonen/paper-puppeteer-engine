@@ -58,11 +58,36 @@ test('character loading waits for artwork and cleans up after success', async ()
 test('an image failure rejects the character after loading completes', async () => {
   const { load, start, assertClean } = fixture();
   const pending = start();
-  const rejection = rejects(pending, /One or more character images/);
+  const rejection = rejects(pending, /Could not load character images: "part" \(part\.png\)/);
   await vi.waitFor(() => assert.equal(load.start.mock.calls.length, 1));
-  load.emit('loaderror');
+  load.emit('loaderror', { key: 'part', type: 'image' });
   load.emit('complete');
   await rejection;
+  assertClean();
+});
+
+test.each([
+  { key: 'unrelated', type: 'image' },
+  { key: 'part', type: 'audio' },
+])('unrelated $type failures do not reject character loading', async (file) => {
+  const { load, start, assertClean } = fixture();
+  const pending = start();
+  await vi.waitFor(() => assert.equal(load.start.mock.calls.length, 1));
+  load.emit('loaderror', file);
+  load.emit('complete');
+  assert.strictEqual(await pending, definition);
+  assertClean();
+});
+
+test('preloaded character keys do not claim failures from new image requests', async () => {
+  const { scene, load, start, assertClean } = fixture();
+  scene.textures.exists = () => true;
+  const pending = start();
+  await vi.waitFor(() => assert.equal(load.start.mock.calls.length, 1));
+  load.emit('loaderror', { key: 'part', type: 'image' });
+  load.emit('complete');
+  assert.strictEqual(await pending, definition);
+  assert.equal(load.image.mock.calls.length, 0);
   assertClean();
 });
 

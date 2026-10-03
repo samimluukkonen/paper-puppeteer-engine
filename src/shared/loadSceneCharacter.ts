@@ -8,7 +8,8 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
     let settled = false;
-    let failed = false;
+    const characterImages = new Map<string, string>();
+    const failedImages = new Set<string>();
     let definition: CharacterDefinition | undefined;
     let releaseTextures: (() => void) | undefined;
     const cleanup = (): void => {
@@ -32,12 +33,19 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
       controller.abort();
       succeed();
     };
-    const onError = (): void => {
-      failed = true;
+    const onError = (file: Phaser.Loader.File): void => {
+      if (file.type === 'image' && characterImages.has(file.key)) failedImages.add(file.key);
     };
     const onComplete = (): void => {
       if (!scene.sys.isActive()) succeed();
-      else if (failed) fail(new Error('One or more character images could not be loaded.'));
+      else if (failedImages.size)
+        fail(
+          new Error(
+            `Could not load character images: ${[...failedImages]
+              .map((key) => `"${key}" (${characterImages.get(key)})`)
+              .join(', ')}.`,
+          ),
+        );
       else succeed(definition);
     };
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, onShutdown);
@@ -51,6 +59,8 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
         succeed();
         return;
       }
+      for (const key of Object.keys(definition.textures))
+        if (!scene.textures.exists(key)) characterImages.set(key, definition.textureUrl(key));
       scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
       scene.load.once(Phaser.Loader.Events.COMPLETE, onComplete);
       releaseTextures = queueCharacterTextures(scene, definition);
