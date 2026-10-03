@@ -90,7 +90,6 @@ src/demo/
   DemoFootPlanting.ts  Ground targets, body sway and walk contact constraints
   DemoKatanaController.ts  Weapon modes, arm targets and continuous rear-palm constraints
   demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
-  createTextures.ts    Legacy generated cutouts for TypeScript demos
   demoIK.ts            Arm/leg chains with explicit execution priorities
   Katana.ts            Placeholder weapon transform and two data-defined grips
 src/devtools/rig-editor/
