@@ -1,6 +1,6 @@
 import type { CompiledClip } from './AnimationClip.js';
 import { sampleProperty } from './AnimationClip.js';
-import { shortestRotationDelta } from './animationMath.js';
+import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { assertFinite, transformProperties } from './types.js';
 
@@ -9,7 +9,7 @@ export type AnimationPose = Map<string, Partial<JointTransform>>;
 export function lerpProperty(property: TransformProperty, from: number, to: number, weight: number): number {
   if (weight <= 0) return from;
   if (weight >= 1) return to;
-  if (property !== 'rotation') return from + (to - from) * weight;
+  if (property !== 'rotation') return interpolateNumber(from, to, weight);
   return from + shortestRotationDelta(from, to) * weight;
 }
 

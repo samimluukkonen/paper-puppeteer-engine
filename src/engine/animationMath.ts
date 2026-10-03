@@ -3,7 +3,18 @@ import type { AnimationPlaybackMode } from './AnimationClip.js';
 /** Use the same negative half-turn tie for keyframe interpolation and pose blending. */
 export function shortestRotationDelta(from: number, to: number): number {
   const turn = 2 * Math.PI;
-  return ((((to - from + Math.PI) % turn) + turn) % turn) - Math.PI;
+  const difference = to - from;
+  // Opposite finite extremes can overflow subtraction; reduce them before subtracting.
+  const delta = Number.isFinite(difference) ? difference : (to % turn) - (from % turn);
+  return ((((delta + Math.PI) % turn) + turn) % turn) - Math.PI;
+}
+
+/** Preserve ordinary interpolation precision, avoiding an overflowing difference at finite extremes. */
+export function interpolateNumber(from: number, to: number, weight: number): number {
+  if (weight <= 0) return from;
+  if (weight >= 1) return to;
+  const difference = to - from;
+  return Number.isFinite(difference) ? from + difference * weight : from * (1 - weight) + to * weight;
 }
 
 /** Quantize milliseconds with a small tolerance at frame boundaries. Callers retain exact endpoints. */

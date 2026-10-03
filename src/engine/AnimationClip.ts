@@ -1,4 +1,4 @@
-import { shortestRotationDelta } from './animationMath.js';
+import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
 import { checkJson, type ValidationIssue } from './externalData.js';
 import type { Rig } from './Rig.js';
 import { freezeData, readonlyMap } from './readonlyData.js';
@@ -173,5 +173,5 @@ export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, 
   if (property === 'rotation') {
     return previous.value + shortestRotationDelta(previous.value, next.value) * progress;
   }
-  return previous.value + (next.value - previous.value) * progress;
+  return interpolateNumber(previous.value, next.value, progress);
 }

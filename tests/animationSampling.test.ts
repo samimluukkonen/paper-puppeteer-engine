@@ -1,7 +1,16 @@
 import { assert, test, vi } from 'vitest';
 import { sampleProperty } from '../src/engine/AnimationClip.js';
 import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
-import { AnimationPlayer, type CompiledClip, compileClip, evaluateClip, Joint, Rig } from '../src/engine/core.js';
+import { shortestRotationDelta } from '../src/engine/animationMath.js';
+import {
+  AnimationPlayer,
+  type CompiledClip,
+  compileClip,
+  evaluateClip,
+  Joint,
+  lerpProperty,
+  Rig,
+} from '../src/engine/core.js';
 import { animationClipSchema } from '../src/engine/schemas.js';
 
 const externalClip = (patch: Partial<CompiledClip> = {}): CompiledClip => ({
@@ -286,3 +295,39 @@ test('exact angular keys retain the shortest-path equivalent angle until past th
   assert.closeTo(sampleProperty(keys, 100, 'rotation'), degrees(181), 1e-12);
   assert.equal(sampleProperty(keys, 101, 'rotation'), degrees(-179));
 });
+
+test.each([-1, 1])(
+  'opposite finite extremes remain finite during sampling and blending (direction %s)',
+  (direction) => {
+    const from = direction * Number.MAX_VALUE;
+    const to = -from;
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const compiled = compileClip(
+      {
+        name: 'extremes',
+        duration: 100,
+        loop: false,
+        tracks: {
+          root: [
+            { time: 0, x: from, rotation: from },
+            { time: 100, x: to, rotation: to },
+          ],
+        },
+      },
+      rig,
+    );
+    for (const weight of [0, 0.25, 0.5, 0.75, 1]) {
+      const pose = evaluateClip(compiled, weight * 100).get('root')!;
+      assert.isTrue(Number.isFinite(pose.x));
+      assert.isTrue(Number.isFinite(pose.rotation));
+      assert.isTrue(Number.isFinite(lerpProperty('x', from, to, weight)));
+      assert.isTrue(Number.isFinite(lerpProperty('rotation', from, to, weight)));
+      assert.equal(pose.x, lerpProperty('x', from, to, weight));
+    }
+    assert.equal(evaluateClip(compiled, 50).get('root')!.x, 0);
+    const delta = shortestRotationDelta(from, to);
+    assert.isTrue(Number.isFinite(delta));
+    assert.isAtLeast(delta, -Math.PI);
+    assert.isBelow(delta, Math.PI);
+  },
+);
