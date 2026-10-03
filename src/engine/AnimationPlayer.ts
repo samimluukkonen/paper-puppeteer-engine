@@ -147,7 +147,7 @@ export class AnimationPlayer {
   }
 
   /** Existing play(name) semantics restart the clip. restart:false keeps an already active clip. */
-  play(name: string, options: PlayAnimationOptions = {}): void {
+  play(name: string, options: PlayAnimationOptions = {}, preparePose?: () => void): void {
     const clip = this.clips.get(name);
     if (!clip) throw new Error(`Unknown animation "${name}".`);
     const layerName = options.layer ?? 'base';
@@ -157,8 +157,9 @@ export class AnimationPlayer {
     if (fade < 0) throw new Error('Fade duration cannot be negative.');
     const speed = options.speed ?? 1;
     validateSpeed(speed);
+    if (options.restart === false && this.layers.get(layerName)?.state?.clip.name === name) return;
+    preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
-    if (options.restart === false && layer.state?.clip.name === name) return;
     let source: AnimationState | AnimationPose | undefined;
     if (fade > 0) {
       if (layer.state)
@@ -183,9 +184,9 @@ export class AnimationPlayer {
       layer.stopped = true;
     }
   }
-  restart(): void {
+  restart(preparePose?: () => void): void {
     const name = this.currentAnimation;
-    if (name) this.play(name);
+    if (name) this.play(name, {}, preparePose);
   }
   pause(): void {
     this.paused = true;
@@ -198,18 +199,21 @@ export class AnimationPlayer {
     this.speed = speed;
   }
 
-  setPlaybackMode(mode: AnimationPlaybackMode): void {
+  setPlaybackMode(mode: AnimationPlaybackMode, preparePose?: () => void): void {
     if (mode.mode === 'stepped') {
       assertFinite(mode.fps, 'Animation FPS');
       if (mode.fps <= 0) throw new Error('Animation FPS must be greater than zero.');
     } else if (mode.mode !== 'smooth') throw new Error('Unsupported playback mode.');
+    preparePose?.();
     this.playback = { ...mode };
     this.applyCurrentPose();
   }
 
-  setLayerMask(name: string, bones: readonly string[]): void {
+  setLayerMask(name: string, bones: readonly string[], preparePose?: () => void): void {
+    if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot have a bone mask.');
     for (const id of bones) this.rig.getBone(id);
+    preparePose?.();
     const layer = this.getOrCreateLayer(name);
     this.resetLayerProperties(layer);
     layer.mask = new Set(bones);
@@ -217,10 +221,12 @@ export class AnimationPlayer {
     this.applyCurrentPose();
   }
 
-  setLayerWeight(name: string, weight: number): void {
+  setLayerWeight(name: string, weight: number, preparePose?: () => void): void {
+    if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer weight is fixed at 1.');
     assertFinite(weight, 'Layer weight');
     if (weight < 0 || weight > 1) throw new Error('Layer weight must be between 0 and 1.');
+    preparePose?.();
     const layer = this.getOrCreateLayer(name);
     if (weight === 0 && layer.weight > 0) this.resetLayerProperties(layer);
     layer.weight = weight;
@@ -228,8 +234,10 @@ export class AnimationPlayer {
     this.applyCurrentPose();
   }
 
-  clearLayer(name: string): void {
+  clearLayer(name: string, preparePose?: () => void): void {
+    if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot be cleared.');
+    preparePose?.();
     const layer = this.layers.get(name);
     if (layer) this.resetLayerProperties(layer);
     this.layers.delete(name);

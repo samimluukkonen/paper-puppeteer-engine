@@ -183,8 +183,8 @@ export class Puppet {
 
   setBoneRotation(id: string, rotation: number): this {
     assertFinite(rotation, `${id}.rotation`);
-    this.preparePose();
     const bone = this.getBone(id);
+    this.preparePose();
     bone.pose.rotation = rotation;
     this.syncPose();
     return this;
@@ -250,8 +250,7 @@ export class Puppet {
   }
 
   play(name: string, options?: PlayAnimationOptions): this {
-    this.preparePose();
-    this.animationPlayer.play(name, options);
+    this.animationPlayer.play(name, options, this.prepareAnimationPose);
     this.syncPose();
     return this;
   }
@@ -277,8 +276,7 @@ export class Puppet {
     return this;
   }
   setAnimationPlaybackMode(mode: AnimationPlaybackMode): this {
-    this.preparePose();
-    this.animationPlayer.setPlaybackMode(mode);
+    this.animationPlayer.setPlaybackMode(mode, this.prepareAnimationPose);
     this.syncPose();
     return this;
   }
@@ -286,20 +284,17 @@ export class Puppet {
     return this.setAnimationPlaybackMode({ mode: 'stepped', fps });
   }
   setLayerMask(name: string, bones: readonly string[]): this {
-    this.preparePose();
-    this.animationPlayer.setLayerMask(name, bones);
+    this.animationPlayer.setLayerMask(name, bones, this.prepareAnimationPose);
     this.syncPose();
     return this;
   }
   setLayerWeight(name: string, weight: number): this {
-    this.preparePose();
-    this.animationPlayer.setLayerWeight(name, weight);
+    this.animationPlayer.setLayerWeight(name, weight, this.prepareAnimationPose);
     this.syncPose();
     return this;
   }
   clearLayer(name: string): this {
-    this.preparePose();
-    this.animationPlayer.clearLayer(name);
+    this.animationPlayer.clearLayer(name, this.prepareAnimationPose);
     this.syncPose();
     return this;
   }
@@ -310,8 +305,7 @@ export class Puppet {
   }
 
   restart(): this {
-    this.preparePose();
-    this.animationPlayer.restart();
+    this.animationPlayer.restart(this.prepareAnimationPose);
     this.syncPose();
     return this;
   }

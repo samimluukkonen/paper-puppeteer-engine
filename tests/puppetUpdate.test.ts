@@ -37,6 +37,69 @@ function fixture() {
   return { puppet, constraint };
 }
 
+const rejectedCommands: [string, (puppet: Puppet) => unknown][] = [
+  ['unknown clip', (puppet) => puppet.play('missing')],
+  ['negative fade', (puppet) => puppet.play('held', { fadeDuration: -1 })],
+  ['nonfinite fade', (puppet) => puppet.play('held', { fadeDuration: NaN })],
+  ['negative clip speed', (puppet) => puppet.play('held', { speed: -1 })],
+  ['empty playback layer', (puppet) => puppet.play('held', { layer: '' })],
+  ['invalid FPS', (puppet) => puppet.setAnimationFPS(0)],
+  ['nonfinite FPS', (puppet) => puppet.setAnimationFPS(NaN)],
+  ['base mask', (puppet) => puppet.setLayerMask('base', ['upper'])],
+  ['unknown masked bone', (puppet) => puppet.setLayerMask('upper', ['upper', 'missing'])],
+  ['empty masked layer', (puppet) => puppet.setLayerMask('', ['upper'])],
+  ['base weight', (puppet) => puppet.setLayerWeight('base', 0.5)],
+  ['invalid weight', (puppet) => puppet.setLayerWeight('upper', 2)],
+  ['nonfinite weight', (puppet) => puppet.setLayerWeight('upper', NaN)],
+  ['empty weighted layer', (puppet) => puppet.setLayerWeight('', 0.5)],
+  ['clear base', (puppet) => puppet.clearLayer('base')],
+  ['clear empty layer', (puppet) => puppet.clearLayer('')],
+  ['unknown rotated bone', (puppet) => puppet.setBoneRotation('missing', 1)],
+];
+
+test.each(rejectedCommands)('rejected %s preserves the preset, IK, playback, and rendering', (_name, command) => {
+  const { puppet, constraint } = fixture();
+  puppet.addAnimation({
+    name: 'held',
+    duration: 1000,
+    loop: true,
+    tracks: { upper: [{ time: 0, rotation: 0.7 }] },
+  });
+  puppet.play('held').play('held', { fadeDuration: 1000 });
+  puppet.addPose({ version: 1, name: 'preset', bones: { upper: { x: 5, rotation: 1 } } }).applyPose('preset');
+  constraint.setTarget(60, 70);
+  puppet.syncPose();
+  const snapshot = () => ({
+    bones: puppet.rig.bones.map(({ id }) => {
+      const bone = puppet.getBone(id);
+      const mount = puppet.getSlotImage('item')!.getWorldTransformMatrix();
+      return {
+        pose: { ...bone.pose },
+        x: bone.container.x,
+        rotation: bone.container.rotation,
+        slot: { x: mount.tx, y: mount.ty },
+      };
+    }),
+    time: puppet.animationPlayer.elapsedTime,
+    transition: puppet.animationPlayer.transition,
+    mode: puppet.animationPlayer.playbackMode,
+    ikStatus: constraint.status,
+  });
+  const before = snapshot();
+  const prepare = vi.spyOn(puppet, 'preparePose');
+  assert.throws(() => command(puppet));
+  assert.equal(prepare.mock.calls.length, 0);
+  assert.deepEqual(snapshot(), before);
+  puppet.syncPose();
+  assert.deepEqual(snapshot(), before);
+  puppet.clearPose();
+  constraint.enabled = false;
+  puppet.syncPose();
+  assert.equal(puppet.getBone('upper').pose.rotation, 0.7);
+  assert.equal(puppet.getBone('upper').pose.x, 0);
+  puppet.destroy();
+});
+
 test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit'] as const)(
   'rejected updates preserve presets, IK, clocks, transitions, and rendering: %s',
   (reason) => {
