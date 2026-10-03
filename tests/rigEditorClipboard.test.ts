@@ -100,6 +100,32 @@ test('clipboard rejection preserves the previous saved baseline', async () => {
   assert.isFalse(state.dirty);
 });
 
+test('a rejected copy cannot overwrite feedback from a replacement session', async () => {
+  const { load, copy, reject, feedback } = await fixture();
+  copy();
+  const replacement = load();
+  replacement.editBone('root', 'x', 2);
+  feedback.textContent = 'Replacement session ready.';
+  reject(new Error('Old clipboard write failed'));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(feedback.textContent, 'Replacement session ready.');
+  assert.isTrue(replacement.dirty);
+});
+
+test('an older rejected copy cannot overwrite a newer successful export', async () => {
+  const { state, copy, reject, writeText, feedback } = await fixture();
+  state.editBone('root', 'x', 1);
+  copy();
+  state.editBone('root', 'x', 2);
+  writeText.mockResolvedValueOnce(undefined);
+  copy();
+  await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
+  reject(new Error('Old clipboard write failed'));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(feedback.textContent, 'Rig JSON copied.');
+  assert.isFalse(state.dirty);
+});
+
 test('clipboard completion clears dirty state when the exported rig is unchanged', async () => {
   const { state, copy, resolve, feedback, querySelector } = await fixture();
   state.editBone('root', 'x', 1);

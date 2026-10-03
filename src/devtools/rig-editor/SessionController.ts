@@ -98,7 +98,13 @@ export function createSessionController(
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard API is unavailable. Use Download or Log rig JSON.');
     if (!editor) throw new Error('No rig is loaded.');
     const prepared = prepareExport();
-    await navigator.clipboard.writeText(prepared.json);
+    try {
+      await navigator.clipboard.writeText(prepared.json);
+    } catch (error) {
+      // Failed requests must not overwrite feedback from a replacement session or newer export.
+      if (editor === prepared.editor && prepared.sequence === exportSequence) throw error;
+      return;
+    }
     if (commitExport(prepared)) feedback.textContent = 'Rig JSON copied.';
   });
   action('download-json', () => {
