@@ -39,10 +39,33 @@ export class SnapshotHistory<Entry> {
     return true;
   }
 
+  /** Failed edits roll back the whole operation, preserving existing undo/redo entries. */
   change(edit: () => void): void {
     const before = this.operation ? this.operation.before : this.capture();
-    edit();
-    if (!this.operation) this.record(before);
+    try {
+      edit();
+      if (!this.operation) this.record(before);
+    } catch (error) {
+      this.operation = undefined;
+      this.rollback(before, error);
+    }
+  }
+
+  private rollback(before: Entry, error: unknown): never {
+    try {
+      this.restore(before);
+    } catch (rollbackError) {
+      throw new AggregateError([error, rollbackError], 'History operation and rollback failed.');
+    }
+    throw error;
+  }
+
+  private restoreEntry(entry: Entry, before: Entry): void {
+    try {
+      this.restore(entry);
+    } catch (error) {
+      this.rollback(before, error);
+    }
   }
 
   private record(before: Entry): void {
@@ -60,18 +83,22 @@ export class SnapshotHistory<Entry> {
   undo(): boolean {
     this.endOperation();
     if (!this.past.length) return false;
-    const previous = this.past.pop()!;
-    this.future.push(this.capture());
-    this.restore(previous);
+    const previous = this.past[this.past.length - 1]!;
+    const current = this.capture();
+    this.restoreEntry(previous, current);
+    this.past.pop();
+    this.future.push(current);
     return true;
   }
 
   redo(): boolean {
     this.endOperation();
     if (!this.future.length) return false;
-    const next = this.future.pop()!;
-    this.pushPast(this.capture());
-    this.restore(next);
+    const next = this.future[this.future.length - 1]!;
+    const current = this.capture();
+    this.restoreEntry(next, current);
+    this.future.pop();
+    this.pushPast(current);
     return true;
   }
 }
