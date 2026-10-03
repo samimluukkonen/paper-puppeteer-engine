@@ -1,3 +1,4 @@
+import type { DeepReadonly } from './readonlyData.js';
 import { rigDefinitionSchema } from './schemas.js';
 import type {
   BoneDefinition,
@@ -51,12 +52,12 @@ export function computeRenderOrder(root: string, bones: readonly BoneDefinition[
 /** Validates a data-only rig and orders it so parents always precede children. */
 export class Rig {
   readonly root: string;
-  readonly bones: readonly BoneDefinition[];
+  readonly bones: DeepReadonly<readonly BoneDefinition[]>;
   readonly renderOrder: readonly string[];
-  readonly slots: readonly SlotDefinition[];
-  readonly attachments: readonly SpriteAttachmentDefinition[];
-  readonly skins: readonly SkinDefinition[];
-  private readonly definitions = new Map<string, BoneDefinition>();
+  readonly slots: DeepReadonly<readonly SlotDefinition[]>;
+  readonly attachments: DeepReadonly<readonly SpriteAttachmentDefinition[]>;
+  readonly skins: DeepReadonly<readonly SkinDefinition[]>;
+  private readonly definitions = new Map<string, DeepReadonly<BoneDefinition>>();
 
   constructor(definition: RigDefinition) {
     definition = rigDefinitionSchema.parse(definition);
@@ -86,7 +87,7 @@ export class Rig {
       );
     }
 
-    const ordered: BoneDefinition[] = [];
+    const ordered: DeepReadonly<BoneDefinition>[] = [];
     const visited = new Set<string>();
     const visit = (id: string): void => {
       if (visited.has(id)) return;
@@ -112,7 +113,7 @@ export class Rig {
     );
   }
 
-  getBone(id: string): BoneDefinition {
+  getBone(id: string): DeepReadonly<BoneDefinition> {
     const bone = this.definitions.get(id);
     if (!bone) throw new Error(`Unknown bone "${id}".`);
     return bone;

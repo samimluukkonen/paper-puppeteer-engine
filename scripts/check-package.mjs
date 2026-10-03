@@ -73,6 +73,16 @@ export function checkOwnership(character: CharacterDefinition, rig: DeepReadonly
   character.animations[0]!.duration = 1;
   // @ts-expect-error Readonly rig data includes nested bone transforms.
   rig.bones[0]!.x = 1;
+  // @ts-expect-error Runtime rig bones expose immutable transforms.
+  character.rig.bones[0]!.x = 1;
+  // @ts-expect-error Bone getters preserve nested artwork immutability.
+  character.rig.getBone(character.rig.root).sprite!.originX = 0;
+  // @ts-expect-error Runtime slots expose immutable transforms.
+  character.rig.slots[0]!.x = 1;
+  // @ts-expect-error Runtime attachments expose immutable artwork.
+  character.rig.attachments[0]!.texture = 'changed';
+  // @ts-expect-error Runtime skins expose immutable metadata.
+  character.rig.skins[0]!.name = 'changed';
 }
 `,
   );
