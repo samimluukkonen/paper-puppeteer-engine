@@ -44,6 +44,7 @@ export class DemoScene extends Phaser.Scene {
   private skin = 'default';
   private gripHand = false;
   private helmet = false;
+  private readonly prepareAnimationPose = (): void => this.puppet?.preparePose();
 
   private get poseMode(): boolean {
     return this.authoring?.active ?? false;
@@ -113,10 +114,9 @@ export class DemoScene extends Phaser.Scene {
     if (this.poseMode) return;
     this.presentation?.feet.advance(delta);
     this.rotateKatana(this.controls?.katanaTurn(delta) ?? 0);
-    this.puppet.preparePose();
     const playing = this.puppet.isPlaying;
     const transitioning = this.puppet.animationPlayer.transition !== undefined;
-    const poseEvaluated = this.puppet.animationPlayer.update(delta);
+    const poseEvaluated = this.puppet.animationPlayer.update(delta, this.prepareAnimationPose);
     this.updatePresentation(poseEvaluated);
     if (playing !== this.puppet.isPlaying || transitioning || this.puppet.animationPlayer.transition) this.notify();
   }

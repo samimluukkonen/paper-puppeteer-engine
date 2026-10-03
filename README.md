@@ -513,7 +513,7 @@ puppet.syncPose();
 const worldPosition = hand.getWorldPosition();
 ```
 
-An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.preparePose()` to restore the previous pre-IK pose, then `puppet.animationPlayer.update(delta)`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. `animationPlayer.update(delta)` returns `true` when it evaluated a pose and `false` when playback was paused or no layer advanced; hosts can use this result to avoid evaluating again before presentation. `animationPlayer.duration` exposes the active base clip duration in milliseconds (zero when none is selected). `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
+An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.animationPlayer.update(delta, () => puppet.preparePose())`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. The optional preparation callback restores the previous pre-IK pose after validation succeeds, so rejected updates leave poses unchanged. `animationPlayer.update(delta)` returns `true` when it evaluated a pose and `false` when playback was paused or no layer advanced; the callback runs only when a pose will be evaluated. Hosts can use this result to avoid evaluating again before presentation. Before direct manual edits while paused or stopped, call `preparePose()` explicitly. `animationPlayer.duration` exposes the active base clip duration in milliseconds (zero when none is selected). `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
 
 ## Two-bone inverse kinematics
 
@@ -569,8 +569,8 @@ The normal `puppet.update(delta)` pass is:
 IK modifies the evaluated pose, never animation keys or bind poses. Restoring before each pass prevents partial influence from accumulating on stopped animation or untracked bones. Disabling IK restores the authored pose on the next pass. `syncPose()` also restores the previous pass before resolving constraints; explicit changed pose rotations are retained. For externally scheduled animation, call `preparePose()` before sampling so the evaluation starts from the authored pose:
 
 ```ts
-puppet.preparePose();
-puppet.animationPlayer.update(delta);
+puppet.animationPlayer.update(delta, () => puppet.preparePose());
+puppet.preparePose(); // Also restore before manual edits while playback is paused or stopped.
 // Apply any custom procedural pose edits here.
 puppet.syncPose();
 ```

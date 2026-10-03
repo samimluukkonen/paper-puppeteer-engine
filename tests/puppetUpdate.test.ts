@@ -37,6 +37,53 @@ function fixture() {
   return { puppet, constraint };
 }
 
+test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit'] as const)(
+  'rejected updates preserve presets, IK, clocks, transitions, and rendering: %s',
+  (reason) => {
+    const { puppet, constraint } = fixture();
+    puppet.addAnimation({
+      name: 'held',
+      duration: 1000,
+      loop: true,
+      tracks: { upper: [{ time: 0, rotation: 0.7 }] },
+      events: [{ time: 50, name: 'marker' }],
+    });
+    puppet.play('held').play('held', { fadeDuration: 1000 }).setAnimationSpeed(2);
+    puppet.addPose({ version: 1, name: 'preset', bones: { upper: { x: 5, rotation: 1 } } }).applyPose('preset');
+    constraint.setTarget(60, 70);
+    puppet.syncPose();
+    const snapshot = () =>
+      puppet.rig.bones.map(({ id }) => {
+        const bone = puppet.getBone(id);
+        return { pose: { ...bone.pose }, x: bone.container.x, rotation: bone.container.rotation };
+      });
+    const before = snapshot();
+    const transition = puppet.animationPlayer.transition;
+    const prepare = vi.spyOn(puppet, 'preparePose');
+    const event = vi.fn();
+    puppet.onAnimationEvent(event);
+    const delta =
+      reason === 'negative delta'
+        ? -1
+        : reason === 'nonfinite delta'
+          ? NaN
+          : reason === 'clock overflow'
+            ? Number.MAX_VALUE
+            : 10_001_000;
+    assert.throws(() => puppet.update(delta));
+    assert.equal(prepare.mock.calls.length, 0);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(puppet.animationPlayer.elapsedTime, 0);
+    assert.deepEqual(puppet.animationPlayer.transition, transition);
+    assert.equal(event.mock.calls.length, 0);
+    // Retrying must still restore the correct pre-IK/preset baseline.
+    puppet.update(10);
+    assert.equal(puppet.animationPlayer.elapsedTime, 20);
+    assert.deepEqual(snapshot(), before);
+    puppet.destroy();
+  },
+);
+
 test.each([false, true])('resetPose clears presets and restores bind transforms with active IK: %s', (withIK) => {
   const { puppet, constraint } = fixture();
   if (withIK) constraint.setTarget(60, 70);

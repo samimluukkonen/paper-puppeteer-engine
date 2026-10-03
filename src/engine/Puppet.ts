@@ -58,6 +58,7 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
+  private readonly prepareAnimationPose = (): void => this.preparePose();
   private readonly ikContext: IKTransformContext = {
     worldToParent: (id, target) => {
       const parent = this.getBone(id).container.parentContainer!;
@@ -525,8 +526,7 @@ export class Puppet {
 
   update(delta: number): void {
     if (this.destroyed) return;
-    this.preparePose();
-    this.animationPlayer.update(delta);
+    this.animationPlayer.update(delta, this.prepareAnimationPose);
     this.syncPose();
   }
 

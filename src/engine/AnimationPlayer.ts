@@ -254,8 +254,11 @@ export class AnimationPlayer {
     for (const joint of this.joints.values()) joint.reset();
   }
 
-  /** Advance playback and return whether this call evaluated the authored pose. */
-  update(delta: number): boolean {
+  /** Advance playback and return whether this call evaluated the authored pose.
+   * The optional preparation callback runs after validation, before clocks or poses change.
+   * Paused or stopped playback does not invoke it.
+   */
+  update(delta: number, preparePose?: () => void): boolean {
     assertFinite(delta, 'Animation delta');
     if (delta < 0) throw new Error('Animation delta cannot be negative.');
     if (this.paused) return false;
@@ -283,6 +286,7 @@ export class AnimationPlayer {
       if (!layer.stopped && source && !(source instanceof Map) && source.playing)
         advanceAnimationTime(source, delta, this.speed);
     }
+    preparePose?.();
     const events: FiredAnimationEvent[] = [];
     const completions: AnimationCompletion[] = [];
     for (const [name, layer] of this.layers) {
