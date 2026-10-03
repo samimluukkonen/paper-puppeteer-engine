@@ -1,6 +1,7 @@
 import { shortestRotationDelta } from './animationMath.js';
 import { checkJson, type ValidationIssue } from './externalData.js';
 import type { Rig } from './Rig.js';
+import { freezeData, readonlyMap } from './readonlyData.js';
 import { animationClipSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { transformProperties } from './types.js';
@@ -54,15 +55,54 @@ export interface CompiledClip {
   readonly duration: number;
   readonly loop: boolean;
   readonly tracks: readonly CompiledTrack[];
-  readonly events: readonly AnimationEvent[];
-  readonly playback?: AnimationPlaybackMode;
+  readonly events: readonly Readonly<AnimationEvent>[];
+  readonly playback?: Readonly<AnimationPlaybackMode>;
+}
+
+const ownedClips = new WeakSet<CompiledClip>();
+
+/** @internal Share compiler-owned immutable clips; snapshot externally assembled compiled data. */
+export function ownCompiledClip(clip: CompiledClip): CompiledClip {
+  if (ownedClips.has(clip)) return clip;
+  const owned: CompiledClip = Object.freeze({
+    name: clip.name,
+    duration: clip.duration,
+    loop: clip.loop,
+    tracks: Object.freeze(
+      clip.tracks.map((track) =>
+        Object.freeze({
+          bone: track.bone,
+          properties: readonlyMap(
+            [...track.properties].map(
+              ([property, keys]) =>
+                [
+                  property,
+                  Object.freeze(keys.map((key) => Object.freeze({ time: key.time, value: key.value }))),
+                ] as const,
+            ),
+          ),
+        }),
+      ),
+    ),
+    events: Object.freeze(
+      clip.events.map((event) => {
+        const copy = copyAnimationEvent(event);
+        // JSON data is owned and can be frozen. Arbitrary runtime payloads keep reference semantics.
+        if (copy.data !== event.data) freezeData(copy.data);
+        return Object.freeze(copy);
+      }),
+    ),
+    ...(clip.playback ? { playback: Object.freeze({ ...clip.playback }) } : {}),
+  });
+  ownedClips.add(owned);
+  return owned;
 }
 
 /** Compile sparse keys per property once rather than searching them every frame. */
 export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
   clip = animationClipSchema.parse(clip);
   checkAnimationReferences(clip, rig, throwValidationIssue);
-  const events = (clip.events ?? []).map(copyAnimationEvent).sort((a, b) => a.time - b.time);
+  const events = [...(clip.events ?? [])].sort((a, b) => a.time - b.time);
   const tracks: CompiledTrack[] = [];
   for (const [bone, keys] of Object.entries(clip.tracks)) {
     const properties = new Map<TransformProperty, readonly PropertyKeyframe[]>();
@@ -76,14 +116,14 @@ export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
     }
     tracks.push({ bone, properties });
   }
-  return {
+  return ownCompiledClip({
     name: clip.name,
     duration: clip.duration,
     loop: clip.loop,
     tracks,
     events,
     ...(clip.playback ? { playback: { ...clip.playback } } : {}),
-  };
+  });
 }
 
 export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, property?: TransformProperty): number {

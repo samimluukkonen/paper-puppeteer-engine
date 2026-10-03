@@ -1,5 +1,5 @@
 import type { AnimationClip, AnimationEvent, AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
-import { compileClip, copyAnimationEvent } from './AnimationClip.js';
+import { compileClip, copyAnimationEvent, ownCompiledClip } from './AnimationClip.js';
 import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer, evaluateClip } from './AnimationPose.js';
 import { quantizePlaybackTime } from './animationMath.js';
 import { advanceAnimationTime, collectAnimationEvents, countAnimationEvents } from './animationTimeline.js';
@@ -92,7 +92,7 @@ export class AnimationPlayer {
         if (!rig.hasBone(track.bone))
           throw new Error(`Animation "${clip.name}" references unknown bone "${track.bone}".`);
       }
-      this.clips.set(clip.name, clip);
+      this.clips.set(clip.name, ownCompiledClip(clip));
     }
     for (const bone of rig.bones) {
       if (!joints.has(bone.id)) throw new Error(`Missing joint "${bone.id}".`);

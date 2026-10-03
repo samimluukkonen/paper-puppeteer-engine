@@ -56,7 +56,7 @@ try {
     join(consumer, 'core.ts'),
     `
 import { AnimationPlayer, Joint, Rig, compileClip, evaluateClip } from 'paper-puppeteer-engine/core';
-import type { AnimationClip, CharacterDefinition, DeepReadonly, RigJsonDefinition } from 'paper-puppeteer-engine/core';
+import type { AnimationClip, CharacterDefinition, CompiledClip, DeepReadonly, RigJsonDefinition } from 'paper-puppeteer-engine/core';
 
 export function sample(): number | undefined {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
@@ -87,6 +87,19 @@ export function checkOwnership(character: CharacterDefinition, rig: DeepReadonly
   character.rig.getAttachment('art').texture = 'changed';
   // @ts-expect-error Runtime skins expose immutable metadata.
   character.rig.skins[0]!.name = 'changed';
+}
+
+export function checkCompiledOwnership(clip: CompiledClip): void {
+  // @ts-expect-error Compiled event metadata is readonly.
+  clip.events[0]!.time = 1;
+  if (clip.playback?.mode === 'stepped') {
+    // @ts-expect-error Compiled playback settings are readonly.
+    clip.playback.fps = 1;
+  }
+  // @ts-expect-error Compiled property maps expose no mutation methods.
+  clip.tracks[0]!.properties.clear();
+  // @ts-expect-error Compiled key values are readonly.
+  clip.tracks[0]!.properties.get('x')![0]!.value = 1;
 }
 `,
   );

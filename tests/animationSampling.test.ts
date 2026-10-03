@@ -50,6 +50,86 @@ test('precompiled clips can be reused by compatible rigs without recompilation',
   assert.deepEqual(joints.get('extra')!.pose, joints.get('extra')!.bindPose);
 });
 
+test('compiled metadata and tracks are immutable, including the property map and JSON event data', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip = compileClip(
+    {
+      name: 'move',
+      duration: 100,
+      loop: false,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 100, x: 10 },
+        ],
+      },
+      events: [{ time: 50, name: 'marker', data: { nested: [1] } }],
+      playback: { mode: 'stepped', fps: 10 },
+    },
+    rig,
+  );
+  assert.isFalse(Reflect.set(clip, 'duration', 1));
+  assert.isFalse(Reflect.set(clip.events[0]!, 'time', 75));
+  assert.isFalse(Reflect.set(clip.playback!, 'fps', 1));
+  const track = clip.tracks[0]!;
+  assert.isFalse(Reflect.set(track, 'bone', 'missing'));
+  assert.isFalse(Reflect.set(track.properties.get('x')![0]!, 'value', 99));
+  assert.throws(() => (track.properties as Map<string, unknown>).clear(), TypeError);
+  assert.throws(() => Map.prototype.set.call(track.properties, 'x', []), TypeError);
+  assert.throws(() => (clip.events[0]!.data as { nested: number[] }).nested.push(2), TypeError);
+  const entries: unknown[] = [];
+  track.properties.forEach((value, key, map) => {
+    assert.strictEqual(map, track.properties);
+    entries.push([key, value]);
+  });
+  assert.deepEqual(entries, [...track.properties]);
+  assert.deepEqual([...track.properties.keys()], ['x']);
+  assert.deepEqual(
+    [...track.properties.values()],
+    [
+      [
+        { time: 0, value: 0 },
+        { time: 100, value: 10 },
+      ],
+    ],
+  );
+  assert.deepEqual(evaluateClip(clip, 50).get('root'), { x: 5 });
+});
+
+test('players own externally assembled compiled clips without freezing caller data', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const joint = new Joint('root');
+  const keys = [
+    { time: 0, value: 0 },
+    { time: 100, value: 10 },
+  ];
+  const properties = new Map([['x' as const, keys]]);
+  const event = { time: 50, name: 'marker', data: { value: 1 } };
+  const clip = {
+    name: 'move',
+    duration: 100,
+    loop: false,
+    tracks: [{ bone: 'root', properties }],
+    events: [event],
+    playback: { mode: 'stepped' as const, fps: 20 },
+  };
+  const player = new AnimationPlayer(rig, new Map([['root', joint]]), [clip]);
+  clip.duration = 200;
+  keys[0]!.value = 99;
+  properties.clear();
+  event.time = 75;
+  event.name = 'changed';
+  event.data.value = 2;
+  clip.playback.fps = 1;
+  const seen: unknown[] = [];
+  player.onAnimationEvent((marker) => seen.push(marker));
+  player.play('move');
+  player.update(50);
+  assert.equal(player.duration, 100);
+  assert.equal(joint.pose.x, 5);
+  assert.deepEqual(seen, [{ time: 50, name: 'marker', data: { value: 1 }, clip: 'move', layer: 'base' }]);
+});
+
 test.each([NaN, Infinity, -Infinity])('sampling rejects nonfinite time %s before changing buffered poses', (time) => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
   const clip = compileClip(
