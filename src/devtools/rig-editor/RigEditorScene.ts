@@ -1,11 +1,19 @@
 import Phaser from 'phaser';
-import { demoIK } from '../../demo/demoIK.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { parseRigDefinition, type RigJsonDefinition } from '../../engine/externalData.js';
+import { parseTwoBoneIKDefinition } from '../../engine/ik/TwoBoneIKConstraint.js';
+import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
+
+export interface RigEditorSceneOptions {
+  /** Manifest URL, resolved relative to the editor document. Defaults to the sample character. */
+  readonly characterUrl?: string;
+  /** Optional preview chains. Omit to edit rigs without requiring particular bone names. */
+  readonly ikChains?: readonly TwoBoneIKDefinition[];
+}
 
 export class RigEditorScene extends Phaser.Scene {
   editor: RigEditor | undefined;
@@ -13,6 +21,8 @@ export class RigEditorScene extends Phaser.Scene {
   private puppet: Puppet | undefined;
   private loadedFilename: string | undefined;
   private loadSession = 0;
+  private readonly characterUrl: string;
+  private readonly ikChains: readonly TwoBoneIKDefinition[];
 
   get characterId(): string {
     return this.definition?.id ?? 'unknown';
@@ -24,8 +34,11 @@ export class RigEditorScene extends Phaser.Scene {
   constructor(
     private readonly onReady: (editor: RigEditor) => void,
     private readonly onError: (message: string) => void,
+    options: RigEditorSceneOptions = {},
   ) {
     super('RigEditorScene');
+    this.characterUrl = options.characterUrl ?? '../characters/demo-puppet/character.json';
+    this.ikChains = structuredClone(options.ikChains ?? []);
   }
 
   create(): void {
@@ -50,7 +63,7 @@ export class RigEditorScene extends Phaser.Scene {
   private async loadCharacter(session: number): Promise<void> {
     try {
       // Relative to the editor document, including when hosted under a Vite base path.
-      const url = new URL('../characters/demo-puppet/character.json', window.location.href).href;
+      const url = new URL(this.characterUrl, window.location.href).href;
       const definition = await loadSceneCharacter(this, url);
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
       this.definition = definition;
@@ -91,13 +104,7 @@ export class RigEditorScene extends Phaser.Scene {
     if (!rig.skins.some((skin) => skin.name === definition.defaultSkin))
       throw new Error(`Rig needs the character's default skin "${definition.defaultSkin}" for preview.`);
     // A valid rig can still be incompatible with the editor's preview chains.
-    for (const chain of demoIK) {
-      const root = rig.getBone(chain.rootBone);
-      const middle = rig.getBone(chain.middleBone);
-      const end = rig.getBone(chain.endBone);
-      if (middle.parent !== root.id || end.parent !== middle.id)
-        throw new Error(`IK "${chain.name}" must name three directly connected bones.`);
-    }
+    const ikChains = this.ikChains.map((chain) => parseTwoBoneIKDefinition(chain, rig));
     const state = new RigEditorState(rig, file);
     const puppet = new Puppet(this, {
       rig: state.workingCopy,
@@ -108,7 +115,7 @@ export class RigEditorScene extends Phaser.Scene {
     });
     let editor: RigEditor | undefined;
     try {
-      editor = new RigEditor(this, puppet, () => this.onReady(this.editor!), state, demoIK);
+      editor = new RigEditor(this, puppet, () => this.onReady(this.editor!), state, ikChains);
       editor.enable();
     } catch (error) {
       try {

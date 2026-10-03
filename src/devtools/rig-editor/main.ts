@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { demoIK } from '../../demo/demoIK.js';
 import { createControlsController } from './ControlsController.js';
 import { mountEditorMarkup } from './editorMarkup.js';
 import { createHierarchyController } from './HierarchyController.js';
@@ -24,7 +25,7 @@ const render = (editor: RigEditor): void => {
   controls.render(editor);
   inspector.render(editor);
 };
-const scene = new RigEditorScene(render, inspector.showError);
+const scene = new RigEditorScene(render, inspector.showError, { ikChains: demoIK });
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'editor-stage',

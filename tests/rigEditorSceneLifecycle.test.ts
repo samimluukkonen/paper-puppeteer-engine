@@ -20,13 +20,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function fixture() {
+function fixture(characterUrl?: string) {
   vi.stubGlobal('window', { location: { href: 'https://example.test/rig-editor/' } });
   vi.mocked(loadSceneCharacter).mockImplementation(() => new Promise(() => {}));
   const error = vi.fn();
-  const scene = new RigEditorScene(vi.fn(), error);
+  const scene = new RigEditorScene(vi.fn(), error, characterUrl === undefined ? {} : { characterUrl });
   return { scene, error };
 }
+
+test.each([
+  ['../characters/custom/character.json', 'https://example.test/characters/custom/character.json'],
+  ['https://assets.example.test/hero.json', 'https://assets.example.test/hero.json'],
+])('loads a configured character URL %s', (path, expected) => {
+  const { scene } = fixture(path);
+  scene.create();
+  assert.deepEqual(vi.mocked(loadSceneCharacter).mock.calls, [[scene, expected]]);
+});
 
 test('shutdown releases editor state, filename, and character even while metadata loads', () => {
   const { scene } = fixture();

@@ -30,6 +30,7 @@ vi.mock('../src/engine/Puppet.js', () => ({
     class {
       readonly rig: Rig;
       private readonly joints: Map<string, Joint>;
+      private readonly constraints = new Map<string, TwoBoneIKConstraint>();
       destroy = vi.fn();
       constructor(_scene: unknown, options: { rig: RigDefinition }) {
         this.rig = new Rig(options.rig);
@@ -38,6 +39,7 @@ vi.mock('../src/engine/Puppet.js', () => ({
             bone.id,
             Object.assign(
               new Joint(bone.id, bone),
+              { getWorldPosition: () => ({ x: 0, y: 40 }) },
               bone.sprite
                 ? {
                     sprite: {
@@ -68,7 +70,14 @@ vi.mock('../src/engine/Puppet.js', () => ({
         return this;
       }
       addIK(chain: TwoBoneIKDefinition) {
-        return new TwoBoneIKConstraint(chain, this.rig, this.joints);
+        const constraint = new TwoBoneIKConstraint(chain, this.rig, this.joints);
+        this.constraints.set(constraint.name, constraint);
+        return constraint;
+      }
+      getIK(name: string) {
+        const constraint = this.constraints.get(name);
+        if (!constraint) throw new Error(`Unknown IK "${name}".`);
+        return constraint;
       }
     },
   ),
@@ -104,7 +113,7 @@ function fixture(sceneOverride?: RigEditorScene) {
     skins: [{ version: 1, name: 'default', slots: {} }],
   };
   const onReady = vi.fn();
-  const scene = sceneOverride ?? new RigEditorScene(onReady, vi.fn());
+  const scene = sceneOverride ?? new RigEditorScene(onReady, vi.fn(), { ikChains: demoIK });
   Reflect.set(scene, 'definition', {
     id: 'test-character',
     defaultSkin: 'default',
@@ -140,6 +149,57 @@ test.each(demoIK)('rejects a valid rig with a disconnected $name chain before cr
   assert.throws(() => scene.reloadRig(incompatible, 'incompatible.json'), /three directly connected bones/);
   assert.equal(vi.mocked(Puppet).mock.calls.length, 1);
   assertPreserved();
+});
+
+test.each([false, true])('accepts a different character with optional custom preview chains (IK: %s)', (withIK) => {
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const chains: TwoBoneIKDefinition[] = withIK
+    ? [{ name: 'arm', rootBone: 'shoulder', middleBone: 'elbow', endBone: 'hand' }]
+    : [];
+  const onReady = vi.fn();
+  const scene = new RigEditorScene(onReady, vi.fn(), withIK ? { ikChains: chains } : {});
+  // Scene configuration is owned independently of the caller's array and definitions.
+  if (withIK) {
+    chains[0]!.rootBone = 'missing';
+    chains.length = 0;
+  }
+  const file: RigJsonDefinition = {
+    version: 1,
+    root: 'body',
+    bones: [
+      { id: 'body' },
+      { id: 'shoulder', parent: 'body' },
+      { id: 'elbow', parent: 'shoulder', y: 20 },
+      { id: 'hand', parent: 'elbow', y: 20 },
+    ],
+    skins: [{ version: 1, name: 'default', slots: {} }],
+  };
+  Reflect.set(scene, 'definition', {
+    id: 'custom-character',
+    defaultSkin: 'default',
+    rig: parseRigDefinition(file),
+    rigFile: file,
+  });
+  scene.reloadRig(file, 'custom.json');
+  const puppet = vi.mocked(Puppet).mock.results[0]!.value as Puppet;
+  assert.equal(scene.characterId, 'custom-character');
+  assert.equal(scene.editor!.state.rig.root, 'body');
+  assert.equal(scene.rigFilename, 'custom.json');
+  assert.deepEqual(onReady.mock.calls, [[scene.editor]]);
+  if (withIK) {
+    const constraint = puppet.getIK('arm');
+    assert.equal(constraint.rootBone, 'shoulder');
+    assert.isFalse(constraint.enabled);
+    scene.editor!.setIKPreview(true);
+    assert.isTrue(constraint.enabled);
+    assert.deepEqual(constraint.target, { x: 0, y: 40 });
+    scene.editor!.setIKPreview(false);
+    assert.isFalse(constraint.enabled);
+  } else {
+    assert.throws(() => puppet.getIK('arm'), /Unknown IK/);
+    scene.editor!.setIKPreview(true);
+    assert.isTrue(scene.editor!.state.ikPreview);
+  }
 });
 
 test('rejects missing preview bones without replacing the working session', () => {

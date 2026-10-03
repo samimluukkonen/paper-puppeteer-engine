@@ -43,6 +43,8 @@ Field values are checked immediately while editing. Full rig validation runs whe
 
 For embedded editors, `workingCopy`, `getBone()`, `getSlot()`, and `getAttachment()` return frozen readonly data. Use the state's `editBoneFields()`, `editSlotFields()`, and `editSpriteFields()` methods to preserve validation, dirty tracking, and undo history. Retained views keep their previous values after edits; request a fresh view to read the current data, or use `structuredClone(state.workingCopy)` for an independent mutable copy.
 
+`RigEditorScene` accepts a third options argument with `characterUrl` and optional `ikChains`. URLs resolve relative to the editor document. Preview chains default to an empty list, so other rigs can load without the demo's bone names; configured chains must be valid direct two-bone chains. The shipped editor passes the demo chains explicitly and continues to load the sample character. Scene options are copied when constructed.
+
 | Key | Action |
 | --- | --- |
 | `1` | Play / restart idle |
