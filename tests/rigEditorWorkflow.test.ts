@@ -235,6 +235,48 @@ test('export is stable, data-only, valid, and preserves unedited precision', () 
   assert.equal(parseRigDefinition(result).getBone('arm').rotation, 0.5);
 });
 
+test.each([0.0000004, -0.0000004, 0.123456789])(
+  'export preserves authored scale %s and small offsets through reload',
+  (value) => {
+    const state = make();
+    state.editBone('arm', 'scaleX', value);
+    state.editSlot('weapon', 'scaleY', value);
+    state.editBone('arm', 'y', 0.0000004);
+    const exported = state.exportRig();
+    const reloaded = parseRigDefinition(exported);
+    assert.equal(reloaded.getBone('arm').scaleX, value);
+    assert.equal(reloaded.getSlot('weapon').scaleY, value);
+    assert.equal(reloaded.getBone('arm').y, 0.0000004);
+    assert.isFalse(state.dirty);
+  },
+);
+
+test('export preserves tiny explicit lengths and joint offsets', () => {
+  const state = make();
+  state.editBone('arm', 'length', 0.0000004);
+  const reloaded = parseRigDefinition(state.exportRig());
+  assert.equal(reloaded.getBone('arm').length, 0.0000004);
+  assert.equal(reloaded.getBone('hand').y, 0.0000004);
+});
+
+test('export preserves close authored depths so reload retains draw order', () => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [{ id: 'root' }, { id: 'first', parent: 'root' }, { id: 'second', parent: 'root' }],
+      slots: [{ id: 'item', bone: 'root' }],
+    }),
+  );
+  state.editBone('first', 'depth', 1.0000004);
+  state.editBone('second', 'depth', 1.0000003);
+  state.editSlot('item', 'depth', 0.0000004);
+  const expected = new Rig(state.workingCopy);
+  const reloaded = parseRigDefinition(state.exportRig());
+  assert.deepEqual(reloaded.renderOrder, ['root', 'second', 'first']);
+  assert.deepEqual(reloaded.renderOrder, expected.renderOrder);
+  assert.equal(reloaded.getSlot('item').depth, 0.0000004);
+});
+
 test('invalid edits are rejected without corrupting the exported rig', () => {
   const state = make();
   assert.throws(() => state.editBone('arm', 'length', -1), /negative/);

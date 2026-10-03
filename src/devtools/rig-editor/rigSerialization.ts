@@ -2,9 +2,17 @@ import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { RigDefinition } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 
+// Rounding these fields can collapse transforms, reorder artwork, or change a frame id.
+const exactNumberFields = new Set(['scaleX', 'scaleY', 'length', 'depth', 'frame']);
+
 /** Order authoring fields consistently without changing array order or untouched numbers. */
-function stable(value: unknown, original: unknown): unknown {
-  if (typeof value === 'number') return value === original ? value : roundEditorNumber(value);
+function stable(value: unknown, original: unknown, field?: string): unknown {
+  if (typeof value === 'number') {
+    if (value === original || (field !== undefined && exactNumberFields.has(field))) return value;
+    const rounded = roundEditorNumber(value);
+    // A small authored offset or angle must not silently become exactly zero either.
+    return rounded === 0 && value !== 0 ? value : rounded;
+  }
   if (Array.isArray(value))
     return value.map((entry, index) => stable(entry, Array.isArray(original) ? original[index] : undefined));
   if (value && typeof value === 'object') {
@@ -41,7 +49,7 @@ function stable(value: unknown, original: unknown): unknown {
             bi = order.indexOf(b);
           return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b);
         })
-        .map((key) => [key, stable(source[key], baseline[key])]),
+        .map((key) => [key, stable(source[key], baseline[key], key)]),
     );
   }
   return value;
