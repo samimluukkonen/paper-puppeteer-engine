@@ -120,6 +120,10 @@ export class AnimationPlayer {
   get playbackSpeed(): number {
     return this.speed;
   }
+  /** Clip-specific speed multiplier of the active base animation, or 1 when none is selected. */
+  get currentAnimationSpeed(): number {
+    return this.layers.get('base')?.state?.speed ?? 1;
+  }
   get playbackMode(): AnimationPlaybackMode {
     return { ...this.playback };
   }

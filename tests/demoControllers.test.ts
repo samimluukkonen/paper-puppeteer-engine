@@ -127,6 +127,36 @@ test('foot planting uses the loaded walk duration instead of a fixed demo durati
   assert.approximately(frame.walkFeet!.left.mix, 0.5, 1e-12);
 });
 
+test.each([
+  [0, 1],
+  [0.5, 1],
+  [2, 1],
+  [1, 0],
+  [1, 0.5],
+  [1, 2],
+  [0.5, 2],
+])('body sway and foot contacts follow global speed %s and clip speed %s', (speed, clipSpeed) => {
+  const actual = fixture();
+  const reference = fixture();
+  const player = actual.puppet.animationPlayer;
+  player.play('walk', { speed: clipSpeed });
+  player.setSpeed(speed);
+  assert.equal(player.currentAnimationSpeed, clipSpeed);
+  for (let frame = 0; frame < 5; frame += 1) {
+    actual.presenter.feet.advance(125);
+    player.update(125);
+    const actualFeet = actual.presenter.feet.update(true);
+    const elapsed = 125 * speed * clipSpeed;
+    reference.presenter.feet.advance(elapsed);
+    reference.puppet.animationPlayer.update(elapsed);
+    const referenceFeet = reference.presenter.feet.update(true);
+    assert.equal(player.elapsedTime, reference.puppet.animationPlayer.elapsedTime);
+    assert.equal(actual.puppet.container.x, reference.puppet.container.x);
+    assert.equal(actual.puppet.container.y, reference.puppet.container.y);
+    assert.deepEqual(actualFeet, referenceFeet);
+  }
+});
+
 test('advancing presentation evaluates once while paused and stopped frames restore the held pose', () => {
   const { presenter, puppet } = fixture();
   const player = puppet.animationPlayer;

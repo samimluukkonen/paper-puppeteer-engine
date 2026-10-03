@@ -77,6 +77,8 @@ puppet.setAnimationFPS(8);
 
 A crossfade evaluates the outgoing and incoming clips at their own advancing times and blends x, y, rotation, scaleX and scaleY. An interrupted fade starts from its currently visible pose. The fade duration uses real elapsed milliseconds; animation speed changes timeline progression but does not change fade duration. The outgoing clip is sampled during a fade but only the incoming clip sends events or completion. The base layer begins at the rig's bind pose, so partial clips also fade cleanly. A weight of zero is the source pose, one is the target pose. Rotation blending uses the shortest path around ±π.
 
+`animationPlayer.playbackSpeed` exposes the global multiplier; `animationPlayer.currentAnimationSpeed` exposes the active base clip's multiplier from `play()` (1 without an active clip). The demo's walking body sway follows both multipliers, including zero speed, so it stays in step with foot contacts.
+
 ```ts
 const walk: AnimationClip = {
   name: 'walk', duration: 1000, loop: true,

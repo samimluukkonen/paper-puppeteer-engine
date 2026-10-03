@@ -26,7 +26,9 @@ export class DemoFootPlanting {
   }
 
   advance(delta: number): void {
-    if (this.puppet.isPlaying && !this.puppet.animationPlayer.isPaused) this.elapsed += delta;
+    const player = this.puppet.animationPlayer;
+    if (this.puppet.isPlaying && !player.isPaused)
+      this.elapsed += delta * player.playbackSpeed * player.currentAnimationSpeed;
   }
 
   update(enabled: boolean): DemoFootPlantingFrame {
