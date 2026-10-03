@@ -1,10 +1,12 @@
 import type { z } from 'zod';
 import { lerpProperty } from './AnimationPose.js';
-import { checkJson, UnsupportedFormatVersionError, type ValidationIssue } from './externalData.js';
+import { UnsupportedFormatVersionError } from './externalData.js';
 import type { Joint } from './Joint.js';
+import { checkJson } from './jsonData.js';
 import type { Rig } from './Rig.js';
 import { identifierSchema, POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
 import { type JointTransform, transformProperties } from './types.js';
+import type { ValidationIssue } from './validation.js';
 
 export { POSE_FORMAT_VERSION, poseDefinitionSchema } from './schemas.js';
 

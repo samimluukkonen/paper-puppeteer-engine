@@ -1,13 +1,13 @@
 import type { z } from 'zod';
 import type { AnimationClip } from './AnimationClip.js';
 import {
-  checkJson,
   inspectAnimationDefinition,
   inspectRigDefinition,
   type RigJsonDefinition,
   type ValidationIssue,
   validateSkinReferences,
 } from './externalData.js';
+import { checkJson } from './jsonData.js';
 import { mergeSkins } from './mergeSkins.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { Rig } from './Rig.js';

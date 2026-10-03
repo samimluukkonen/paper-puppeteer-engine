@@ -1,5 +1,5 @@
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
-import { checkJson, type ValidationIssue } from './externalData.js';
+import { copyJsonData } from './jsonData.js';
 import type { Rig } from './Rig.js';
 import { freezeData, readonlyMap } from './readonlyData.js';
 import { animationClipSchema, identifierSchema, keyframeSchema } from './schemas.js';
@@ -33,9 +33,7 @@ export interface AnimationEvent {
 
 /** Keep JSON event data independent without rejecting arbitrary TypeScript runtime payloads. */
 export function copyAnimationEvent<Event extends AnimationEvent>(event: Event): Event {
-  const issues: ValidationIssue[] = [];
-  if (!Object.hasOwn(event, 'data') || !checkJson(event.data, '', issues) || issues.length) return { ...event };
-  return { ...event, data: structuredClone(event.data) };
+  return Object.hasOwn(event, 'data') ? { ...event, data: copyJsonData(event.data) } : { ...event };
 }
 
 export type AnimationPlaybackMode = { mode: 'smooth' } | { mode: 'stepped'; fps: number };
