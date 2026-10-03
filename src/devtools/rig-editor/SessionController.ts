@@ -1,4 +1,5 @@
 import { type RigJsonDefinition, validateRigDefinition } from '../../engine/externalData.js';
+import { downloadJson } from '../../shared/downloadJson.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigEditorScene } from './RigEditorScene.js';
 
@@ -102,12 +103,7 @@ export function createSessionController(
   });
   action('download-json', () => {
     const prepared = prepareExport();
-    const url = URL.createObjectURL(new Blob([prepared.json], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = prepared.filename;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadJson(prepared.json, prepared.filename);
     commitExport(prepared);
     feedback.textContent = 'Rig JSON download started.';
   });

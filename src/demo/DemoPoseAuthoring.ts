@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { Facing, Puppet } from '../engine/index.js';
+import { downloadJson } from '../shared/downloadJson.js';
 import { demoAuthoringLayout } from './demoPresentation.js';
 
 /** Static pose editing and the scene-space authoring inspector. */
@@ -106,12 +107,7 @@ export class DemoPoseAuthoring {
     const json = JSON.stringify(this.puppet.exportPose('exported-pose'), null, 2);
     console.log(`Exported pose JSON:\n${json}`);
     void navigator.clipboard?.writeText(json).catch(() => {});
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'exported-pose.json';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadJson(json, 'exported-pose.json');
   }
 
   exportRig(): void {
