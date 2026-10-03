@@ -554,6 +554,54 @@ test('playback sampling excludes active fades and overlay layers without changin
   }
 });
 
+test.each(['raw', 'playback'] as const)(
+  '%s sampling clears disjoint fade/overlay properties while retaining manual edits and playback state',
+  (mode) => {
+    const { player, joints } = fixture();
+    player.addAnimation({ name: 'source', duration: 1000, loop: true, tracks: { arm: [{ time: 0, y: 40 }] } });
+    player.addAnimation({
+      name: 'target',
+      duration: 1000,
+      loop: true,
+      tracks: { arm: [{ time: 0, x: 20 }] },
+      events: [{ time: 100, name: 'marker' }],
+    });
+    player.addAnimation({ name: 'overlay', duration: 1000, loop: true, tracks: { leg: [{ time: 0, rotation: 1 }] } });
+    player.play('source');
+    player.play('target', { fadeDuration: 300 });
+    player.play('overlay', { layer: 'upper' });
+    player.update(150);
+    player.pause();
+    joints.get('root')!.pose.x = 42;
+    const heldPose = [...joints.values()].map((joint) => ({ ...joint.pose }));
+    const transition = player.transition;
+    const event = vi.fn();
+    const complete = vi.fn();
+    player.onAnimationEvent(event);
+    player.onAnimationComplete(complete);
+    for (const time of [-50, 500, 1500]) {
+      player.sample(time, { mode });
+      assert.equal(joints.get('arm')!.pose.x, 20);
+      assert.equal(joints.get('arm')!.pose.y, joints.get('arm')!.bindPose.y);
+      assert.equal(joints.get('leg')!.pose.rotation, joints.get('leg')!.bindPose.rotation);
+      assert.equal(joints.get('root')!.pose.x, 42);
+      assert.equal(player.elapsedTime, 150);
+      assert.equal(player.currentAnimation, 'target');
+      assert.equal(player.getLayerAnimation('upper'), 'overlay');
+      assert.isTrue(player.isPaused);
+      assert.isTrue(player.isPlaying);
+      assert.deepEqual(player.transition, transition);
+      player.applyCurrentPose();
+      assert.deepEqual(
+        [...joints.values()].map((joint) => ({ ...joint.pose })),
+        heldPose,
+      );
+    }
+    assert.equal(event.mock.calls.length, 0);
+    assert.equal(complete.mock.calls.length, 0);
+  },
+);
+
 test('both sampling modes reject nonfinite time and allow sampling without an active clip', () => {
   const { player, joints } = fixture();
   for (const mode of ['raw', 'playback'] as const) {

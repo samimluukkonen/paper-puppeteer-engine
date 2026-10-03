@@ -358,7 +358,9 @@ export class AnimationPlayer {
     return true;
   }
 
-  /** Sample only the base clip, clamping time without moving clocks or firing events. Excludes fades and layers. */
+  /** Sample only the base clip, clamping time without moving clocks or firing events.
+   * Reset properties owned by fades/layers to bind values; retain untracked manual edits.
+   */
   sample(time: number, options: SampleAnimationOptions = {}): void {
     this.assertActive();
     assertFinite(time, 'Sample time');
@@ -369,6 +371,11 @@ export class AnimationPlayer {
       state.clip,
       options.mode === 'playback' ? this.sampleTime(state.clip, clampedTime) : clampedTime,
     );
+    this.updateControlledProperties();
+    for (const [id, properties] of this.controlled) {
+      const joint = this.joints.get(id)!;
+      for (const property of properties) joint.pose[property] = joint.bindPose[property];
+    }
     for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
   }
 
@@ -386,12 +393,8 @@ export class AnimationPlayer {
       if (name === 'base' || !layer.state || layer.weight === 0) continue;
       blendPoseInto(pose, this.emptyPose, this.evaluateLayer(layer, pose), layer.weight, layer.mask);
     }
+    this.updateControlledProperties();
     const controlled = this.controlled;
-    if (this.controlDirty) {
-      for (const properties of controlled.values()) properties.clear();
-      for (const layer of this.layers.values()) this.markLayerControlled(controlled, layer);
-      this.controlDirty = false;
-    }
     for (const [id, values] of pose) {
       const joint = this.joints.get(id)!;
       for (const property of transformProperties) {
@@ -399,6 +402,13 @@ export class AnimationPlayer {
       }
     }
     for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
+  }
+
+  private updateControlledProperties(): void {
+    if (!this.controlDirty) return;
+    for (const properties of this.controlled.values()) properties.clear();
+    for (const layer of this.layers.values()) this.markLayerControlled(this.controlled, layer);
+    this.controlDirty = false;
   }
 
   private markLayerControlled(controlled: Map<string, Set<TransformProperty>>, layer: AnimationLayer): void {
