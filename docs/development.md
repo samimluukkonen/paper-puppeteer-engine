@@ -1,0 +1,163 @@
+# Development, architecture, and package usage
+
+[All guides](../README.md#guides)
+
+## Checks and profiling
+
+```bash
+npm run typecheck
+npm test
+npm run check
+npm run build
+npm run preview
+```
+
+`check` runs Biome's formatting, lint, and import checks; `npm run check:fix` applies safe fixes. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
+
+Run the small browser smoke suite against the real rig editor, Phaser canvas, and shipped character assets:
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+The command builds the demo, then runs every scenario against both the Vite development server and the production preview under `/paper-puppeteer-engine/`. Tests cover demo playback, facing, skins, IK controls, navigation between demo and editor, dragging outside the canvas, inspector focus and per-field undo, and exported/original/imported rig reloads plus a page reload. They verify artwork changes through canvas screenshots and catch browser exceptions and failed local asset requests. CI builds first, then runs `npx playwright test` against that artifact. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
+
+Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, active/inactive IK, and the full demo presentation loop with walk, steady sword grip, out-of-reach targets, head crossings, and upper-body grip in both facings. Demo cases use shipped PNG dimensions and real affine transforms, animation, IK, and render projection. They report mean/maximum `syncPose()` and `syncIK()` calls and the percentage of frames requiring katana corrections. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements. Add `VITE_PROFILE_UNCACHED=1` to recreate unconditional render-order application, or `VITE_PROFILE_FULL_IK_SYNC=1` to compare corrections using the previous full-puppet synchronization path.
+
+The rig editor caches unchanged overlay geometry and labels, redrawing after edits, selection/visibility changes, camera changes, or preview invalidation. Run `VITE_PROFILE=1 npx vitest run tests/rigEditorOverlay.test.ts --reporter=verbose` to compare cached idle frames with forced redraws. This profile uses 33 joints and a minimal scene, excluding browser/GPU costs, and reports timings without performance thresholds.
+
+One local run of the earlier full-sync correction path on Node 24.19.0 measured the following. Sync counts include warmup:
+
+| Katana workload | Left: µs/frame | Right: µs/frame | Left: mean/max syncs | Right: mean/max syncs |
+| --- | ---: | ---: | ---: | ---: |
+| Steady reachable grip | 93.04 | 64.51 | 1.00 / 1 | 1.00 / 1 |
+| Out-of-reach target sweep | 230.99 | 120.66 | 5.73 / 25 | 2.92 / 8 |
+| Head crossing sweep | 79.76 | 77.25 | 1.02 / 2 | 1.39 / 3 |
+| Upper-body grip | 82.71 | 74.18 | 1.00 / 1 | 1.00 / 1 |
+
+The correction loops can dominate out-of-reach frames. The demo now performs one full `syncPose()` per frame, then uses `syncIK()` for target corrections, restoring and projecting only affected IK joints. It defers debug overlays until the final corrected pose and caches render order to skip depth updates/sorting when the order is already applied. Existing iteration limits preserve grip behavior: the clamped sweeps still reach 24 corrective passes on the left and 7 on the right, while full synchronizations remain at one. The profile reports both kinds of passes and debug refreshes. Each profiling case has a 30-second timeout to accommodate slower machines.
+
+A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
+
+| Scenario | Before | After |
+| --- | ---: | ---: |
+| 32 tracked bones, base animation | 56.61 | 40.65 |
+| 32 tracked bones, three layers with fades | 170.53 | 114.17 |
+| 36 bones, one active and 12 inactive IK constraints | 41.19 | 10.37 |
+
+Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into all of its render projections before later target providers run. Inactive constraints still update their status without adding projection passes.
+
+Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph.
+
+## Architecture
+
+```text
+src/engine/
+  CharacterDefinition.ts  Manifest assembly and cross-file validation (no I/O)
+  CharacterLoader.ts      Fetches manifest, rig, skins, animations, and poses as JSON
+  Pose.ts             Static pose validation, blending, and sparse serialization
+  queueCharacterTextures.ts  Queues image files with Phaser's scene loader
+  mergeSkins.ts         Shared embedded/standalone skin precedence
+  types.ts             JSON-friendly rig and transform definitions
+  schemas.ts           Zod schemas for rig, animation and IK definitions
+  externalData.ts      Versioned JSON formats, validation and parsing
+  Rig.ts               Validation, immutable rig snapshot, indexed definitions, parent-first ordering
+  Joint.ts             Renderer-independent bind pose and mutable local pose
+  Bone.ts              Joint backed by a Phaser container and optional image
+  AnimationClip.ts      Keyframe types, validation and property-track compilation
+  AnimationPlayer.ts    Layer clocks, transitions, events and completion
+  AnimationPose.ts      Pure clip evaluation and pose blending
+  Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
+  PuppetPoseController.ts  Pose overrides, restoration, IK ordering and projection passes
+  PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay
+  PuppetRenderer.ts    Independent draw slots retaining ancestor transform chains
+  SlotState.ts         Attachment selection and base/partial skin application
+  SlotDebug.ts         Scene-space slot position and assignment overlay
+  ik/
+    types.ts           Targets, constraint definitions and coordinate adapter
+    solveTwoBoneIK.ts  Pure law-of-cosines solver and angular blending
+    TwoBoneIKConstraint.ts  Chain validation, effective lengths and pose solving
+    IKPoseState.ts     Pre-IK rotation restoration between passes
+    IKDebug.ts         Independent world-space IK overlay
+  index.ts             Public library entry point
+  core.ts              Renderer-independent public entry point for Node and asset tooling
+src/demo/
+  DemoScene.ts         Character loading, playback controls and UI state
+  DemoInput.ts         Pointer/keyboard bindings and shutdown cleanup
+  DemoPoseAuthoring.ts  Static pose editing, inspector and export
+  DemoPresenter.ts     Sampled pose layout, IK coordination and target markers
+  DemoFootPlanting.ts  Ground targets, body sway and walk contact constraints
+  DemoKatanaController.ts  Weapon modes, arm targets and continuous rear-palm constraints
+  demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
+  createTextures.ts    Legacy generated cutouts for TypeScript demos
+  demoIK.ts            Arm/leg chains with explicit execution priorities
+  Katana.ts            Placeholder weapon transform and two data-defined grips
+src/devtools/rig-editor/
+  main.ts              Page bootstrap and controller wiring
+  editorMarkup.ts      Static page shell
+  InspectorController.ts  Numeric editing, derived labels, and field undo grouping
+  HierarchyController.ts  Cached tree rendering and selection
+  ControlsController.ts   Editing, snapping, visibility, and preview controls
+  SessionController.ts    Status, validation, history actions, export, reload, and import
+  RigEditorScene.ts    Character loading and preview session lifecycle
+  RigEditor.ts         Canvas editing and working-rig preview synchronization
+  RigEditorState.ts    Working rig, validation, bounded history, and serialization
+src/devtools/shared/
+  SnapshotHistory.ts   Bounded snapshot history and operation grouping
+  editorData.ts        Readonly data and editor number rounding
+src/shared/
+  downloadJson.ts       Browser JSON download and temporary URL cleanup
+  loadSceneCharacter.ts  Cancelable metadata and artwork loading for a scene session
+public/characters/demo-puppet/  Shipped rig, skins, animations, poses, and artwork
+docs/                  Focused user and developer guides
+src/main.ts            Demo bootstrap and control panel
+```
+
+The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
+
+To profile dense animation playback and nonsequential scrubbing, run:
+
+```bash
+VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose -t dense
+```
+
+The profiles cover 32 tracked bones with two properties per track, 128 or 512 keys, base playback, three layers with fades, and backward/forward scrubbing. Property sampling uses binary search without a mutable cursor. A local comparison of warmed CPU medians (microseconds per frame, excluding browser/GPU costs) measured:
+
+| 512-key workload | Linear scan | Binary search |
+| --- | ---: | ---: |
+| Base animation | 156.72 | 47.22 |
+| Three layers with fades | 656.91 | 155.48 |
+| Nonsequential scrubbing | 135.47 | 33.35 |
+
+These are diagnostic measurements from one machine, not CI timing thresholds. The two-key control profiles remain available by omitting `-t dense`.
+
+## Use as a local package
+
+Build this repository first, then in another Phaser TypeScript project:
+
+```bash
+npm install /absolute/path/to/paper-puppeteer-engine
+```
+
+```ts
+import { Puppet, type RigDefinition, type AnimationClip } from 'paper-puppeteer-engine';
+```
+
+`npm pack` rebuilds the library through the `prepack` hook before creating a tarball. Run `npm run test:package` to install that tarball into a temporary consumer and verify Node `/core` imports, public TypeScript APIs, and browser bundling. The check reuses installed dependencies offline and removes its temporary files afterward. CI runs it after the build. Core declarations receive a full type check; browser consumer types use the repository's `skipLibCheck` setting for Phaser declarations.
+
+The library includes TypeScript declarations and source maps. Zod is externalized and supplied through the package dependency, so consumers share its validation runtime and error classes. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
+
+For Node scripts and asset tooling, import the renderer-independent entry point:
+
+```ts
+import { CharacterLoader, validateRigDefinition, Joint, AnimationPlayer, solveTwoBoneIK } from 'paper-puppeteer-engine/core';
+
+const character = await CharacterLoader.load('https://example.com/characters/hero/character.json');
+const joints = new Map(character.rig.bones.map(bone => [bone.id, new Joint(bone.id, bone)]));
+const player = new AnimationPlayer(character.rig, joints);
+```
+
+`/core` exports character loading and validation, rig/slot data, pose and animation APIs, and IK without loading Phaser or requiring browser globals. `CharacterLoader.load` accepts an optional fetch implementation for file system or custom I/O. Every library build checks the built `/core` package in plain Node.
+
+For stateless pose tooling, import `compileClip` and `evaluateClip` from `/core`: `compileClip(clip, rig)` validates and prepares an authored clip, and `evaluateClip(compiled, timeMilliseconds)` returns its sparse interpolated pose. `CompiledClip`, `CompiledTrack`, and `PropertyKeyframe` are also exported types. This evaluator uses raw interpolation; use `AnimationPlayer.sample(time, { mode: 'playback' })` for playback-aware previews.
