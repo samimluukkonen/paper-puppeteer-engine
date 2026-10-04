@@ -109,6 +109,18 @@ test('mix zero preserves authored rotation, mix one matches IK, and half mix use
   assert.approximately(blendIKRotation(4 * Math.PI, 0.2, 1), 4 * Math.PI + 0.2, 1e-8);
 });
 
+test.each([Number.MAX_VALUE, -Number.MAX_VALUE])(
+  'IK blending stays finite for opposite extreme rotations (%s)',
+  (from) => {
+    for (const mix of [0, 0.5, 1]) assert.isTrue(Number.isFinite(blendIKRotation(from, -from, mix)));
+  },
+);
+
+test('IK blending retains its signed half-turn convention', () => {
+  assert.closeTo(blendIKRotation(0, Math.PI, 0.5), Math.PI / 2, 1e-12);
+  assert.closeTo(blendIKRotation(0, -Math.PI, 0.5), -Math.PI / 2, 1e-12);
+});
+
 test('large lengths avoid overflow in law-of-cosines intermediates', () => {
   finite(
     solveTwoBoneIK({ ...input, root: { x: 0, y: 0 }, target: { x: 1e100, y: 1e100 }, lengthA: 1e100, lengthB: 1e100 }),

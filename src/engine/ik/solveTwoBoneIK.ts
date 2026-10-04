@@ -1,3 +1,4 @@
+import { rotationDifference } from '../animationMath.js';
 import { assertFinite } from '../types.js';
 import type { BendDirection, IKTarget } from './types.js';
 
@@ -99,6 +100,7 @@ export function blendIKRotation(from: number, to: number, mix: number): number {
   assertFinite(mix, 'IK mix');
   if (mix < 0 || mix > 1) throw new Error('IK mix must be between 0 and 1.');
   if (mix === 0) return from;
-  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  const difference = rotationDifference(from, to);
+  const delta = Math.atan2(Math.sin(difference), Math.cos(difference));
   return from + delta * mix;
 }

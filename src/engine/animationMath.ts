@@ -1,11 +1,16 @@
 import type { AnimationPlaybackMode } from './AnimationClip.js';
 
+/** Preserve ordinary angle differences; reduce finite extremes before their subtraction can overflow. */
+export function rotationDifference(from: number, to: number): number {
+  const difference = to - from;
+  const turn = 2 * Math.PI;
+  return Number.isFinite(difference) ? difference : (to % turn) - (from % turn);
+}
+
 /** Use the same negative half-turn tie for keyframe interpolation and pose blending. */
 export function shortestRotationDelta(from: number, to: number): number {
   const turn = 2 * Math.PI;
-  const difference = to - from;
-  // Opposite finite extremes can overflow subtraction; reduce them before subtracting.
-  const delta = Number.isFinite(difference) ? difference : (to % turn) - (from % turn);
+  const delta = rotationDifference(from, to);
   return ((((delta + Math.PI) % turn) + turn) % turn) - Math.PI;
 }
 
