@@ -1,5 +1,5 @@
 import packageInfo from '../../package.json';
-import puppetLogo from './images/puppet-running.png';
+import puppetLogo from './images/puppet-running-header.png';
 import './viewShell.css';
 
 const views = {
