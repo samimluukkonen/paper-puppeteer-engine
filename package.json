@@ -1,6 +1,6 @@
 {
   "name": "paper-puppeteer-engine",
-  "version": "0.5.2.2.1",
+  "version": "0.5.2-2.1",
   "description": "A reusable Phaser engine for hierarchical 2D paper cutout puppets.",
   "type": "module",
   "files": [
@@ -30,10 +30,11 @@
     "build": "npm run typecheck && npm run build:demo && npm run build:lib",
     "build:demo": "vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/check-core.mjs",
-    "prepack": "npm run build:lib",
+    "prepack": "npm run check:version && npm run build:lib",
     "preview": "vite preview",
     "schemas:generate": "node scripts/generate-schemas.mjs && biome format --write schemas",
     "check": "biome check .",
+    "check:version": "node scripts/check-version.mjs",
     "check:fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
