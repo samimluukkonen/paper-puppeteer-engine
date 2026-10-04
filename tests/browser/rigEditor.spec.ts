@@ -96,6 +96,45 @@ test('a canvas drag released outside commits one undo and stops moving', async (
   ).toBe(true);
 });
 
+for (const mode of ['joint', 'sprite']) {
+  test(`background dragging repositions the character without editing the rig in ${mode} mode`, async ({ page }) => {
+    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    await page.locator('#edit-mode').selectOption(mode);
+    const canvas = page.locator('#editor-stage canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('Missing editor canvas');
+    const point = (x: number, y: number) => ({ x: box.x + (x / 760) * box.width, y: box.y + (y / 640) * box.height });
+    const start = point(50, 50);
+    const end = point(95, 85);
+    const before = await canvas.screenshot();
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 4 });
+    await page.mouse.up();
+    await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
+    await expect(page.locator('#inspector h3')).toHaveText('Bone: head');
+    await expect(field(page, 'x')).toHaveValue('0');
+    await expect(field(page, 'y')).toHaveValue('-106');
+    await expect(page.locator('#dirty-status')).toHaveText('No changes');
+    await expect(page.locator('#undo')).toBeDisabled();
+    // Hit testing and joint editing follow the character to its new position.
+    await page.locator('#edit-mode').selectOption('joint');
+    await page.mouse.click(start.x, start.y);
+    await expect(page.locator('#session-status')).toContainText('Selected: none');
+    const head = point(380 + 45, 313 + 35);
+    await page.mouse.move(head.x, head.y);
+    await page.mouse.down();
+    await page.mouse.move(head.x + 20, head.y + 10, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.locator('#inspector h3')).toHaveText('Bone: head');
+    await expect(field(page, 'x')).not.toHaveValue('0');
+    await page.locator('#undo').click();
+    await expect(field(page, 'x')).toHaveValue('0');
+    await expect(field(page, 'y')).toHaveValue('-106');
+    await expect(page.locator('#undo')).toBeDisabled();
+  });
+}
+
 for (const interruption of ['blur', 'hidden'] as const) {
   test(`a canvas drag interrupted by ${interruption} commits once and accepts the next drag`, async ({ page }) => {
     const box = await page.locator('#editor-stage canvas').boundingBox();

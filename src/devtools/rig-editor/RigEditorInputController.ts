@@ -13,13 +13,14 @@ export class RigEditorInputController {
   private activePointerId: number | undefined;
   private downX = 0;
   private downY = 0;
+  private characterDrag: { start: Point; value: Point } | undefined;
   private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
   private enabled = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly puppet: Puppet,
-    private readonly editor: Pick<RigEditor, 'state' | 'editBone' | 'undo' | 'redo' | 'refresh'>,
+    private readonly editor: Pick<RigEditor, 'state' | 'editBone' | 'undo' | 'redo' | 'refresh' | 'moveCharacter'>,
     private readonly overlay: RigEditorOverlay,
     private readonly onChange: () => void,
     private readonly redraw: () => void,
@@ -64,6 +65,7 @@ export class RigEditorInputController {
     this.panning = false;
     this.activePointerId = undefined;
     this.drag = undefined;
+    this.characterDrag = undefined;
     this.moved = false;
     this.state.endOperation();
   }
@@ -85,6 +87,11 @@ export class RigEditorInputController {
 
   private local(pointer: Phaser.Input.Pointer, parent: Phaser.GameObjects.Container): Point | undefined {
     return worldToLocal(this.world(pointer), parent.getWorldTransformMatrix());
+  }
+
+  private characterPoint(pointer: Phaser.Input.Pointer): Point | undefined {
+    const parent = this.puppet.container.parentContainer;
+    return parent ? this.local(pointer, parent) : this.world(pointer);
   }
 
   private imageContains(pointer: Phaser.Input.Pointer, image: Phaser.GameObjects.Image | undefined): boolean {
@@ -159,13 +166,22 @@ export class RigEditorInputController {
     this.downX = pointer.x;
     this.downY = pointer.y;
     this.drag = undefined;
+    this.characterDrag = undefined;
     if (this.panning || !pointer.leftButtonDown()) return;
     const selected = this.state.selection;
     const picked = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false);
     const target = picked ?? selected;
+    const image = target
+      ? target.type === 'bone'
+        ? this.puppet.getBone(target.id).sprite
+        : this.puppet.getSlotImage(target.id)
+      : undefined;
+    if (!picked && !(this.state.editMode === 'sprite' && this.imageContains(pointer, image))) {
+      const start = this.characterPoint(pointer);
+      if (start) this.characterDrag = { start, value: { x: this.puppet.container.x, y: this.puppet.container.y } };
+      return;
+    }
     if (!target) return;
-    const image = target.type === 'bone' ? this.puppet.getBone(target.id).sprite : this.puppet.getSlotImage(target.id);
-    if (!picked && !(this.state.editMode === 'sprite' && this.imageContains(pointer, image))) return;
     if (picked) this.state.selection = picked;
     const parent =
       target.type === 'slot'
@@ -204,6 +220,14 @@ export class RigEditorInputController {
   private pointerMove(pointer: Phaser.Input.Pointer): void {
     if (pointer.id !== this.activePointerId || !pointer.isDown) return;
     if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
+    if (this.characterDrag) {
+      if (!this.moved) return;
+      const local = this.characterPoint(pointer);
+      if (!local) return;
+      const { start, value } = this.characterDrag;
+      this.editor.moveCharacter(value.x + local.x - start.x, value.y + local.y - start.y);
+      return;
+    }
     if (!this.panning) {
       if (!this.drag) return;
       const { type, id, start, value } = this.drag;

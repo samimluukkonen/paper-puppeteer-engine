@@ -145,6 +145,22 @@ export class RigEditor {
     return this.puppet.getAttachment(id);
   }
 
+  /** Reposition the preview and its pinned IK targets without authoring rig transforms. */
+  moveCharacter(x: number, y: number): void {
+    const container = this.puppet.container;
+    const before = container.getWorldTransformMatrix();
+    const oldX = before.tx;
+    const oldY = before.ty;
+    container.setPosition(x, y);
+    const after = container.getWorldTransformMatrix();
+    for (const constraint of this.registeredIK.values()) {
+      const target = constraint.target;
+      if (target) constraint.setTarget(target.x + after.tx - oldX, target.y + after.ty - oldY);
+    }
+    this.overlay?.invalidate();
+    this.update();
+  }
+
   editBone(id: string, field: BoneField, value: number | undefined, notify = true): void {
     this.state.editBone(id, field, value);
     this.refresh(notify);

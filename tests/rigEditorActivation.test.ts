@@ -32,6 +32,17 @@ test('editor activation reuses IK constraints and balances overlay and listener 
   const bones = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
   const puppet = {
     rig,
+    container: {
+      x: 380,
+      y: 435,
+      getWorldTransformMatrix() {
+        return { tx: this.x, ty: this.y };
+      },
+      setPosition(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+      },
+    },
     ikConstraints: new Map<string, TwoBoneIKConstraint>(),
     bones,
     addIK: vi.fn(Puppet.prototype.addIK),
@@ -79,6 +90,13 @@ test('editor activation reuses IK constraints and balances overlay and listener 
   assert.deepEqual(events.off.mock.calls, events.on.mock.calls);
   assert.deepEqual(browser.removeEventListener.mock.calls, browser.addEventListener.mock.calls);
   assert.equal(destroyOverlay.mock.calls.length, 4);
+
+  const exported = editor.exportJson(false);
+  editor.moveCharacter(420, 455);
+  assert.deepEqual(constraint.target, { x: 52, y: 54 }, 'pinned targets follow the character translation');
+  assert.equal(editor.exportJson(false), exported);
+  assert.isFalse(editor.state.dirty);
+  assert.equal(editor.state.historyLength, 0);
 });
 
 test.each([false, true])('activation restores edited state and IK preview (%s) without changing history', (preview) => {

@@ -38,7 +38,7 @@ test('blur stops panning without adding history or closing an unrelated inspecto
   const controller = new RigEditorInputController(
     { input, cameras: { main: camera } } as unknown as Phaser.Scene,
     {} as Puppet,
-    { state, editBone: vi.fn(), undo: vi.fn(), redo: vi.fn(), refresh: vi.fn() },
+    { state, editBone: vi.fn(), undo: vi.fn(), redo: vi.fn(), refresh: vi.fn(), moveCharacter: vi.fn() },
     {} as RigEditorOverlay,
     vi.fn(),
     redraw,
@@ -75,6 +75,71 @@ test('blur stops panning without adding history or closing an unrelated inspecto
 const dragCases = (['pointerup', 'pointerupoutside', 'disable', 'blur', 'hidden', 'pagehide'] as const).flatMap(
   (finish) => (['bone', 'slot', 'sprite', 'attachment'] as const).map((type) => ({ type, finish })),
 );
+
+test.each([
+  { mode: 'joint' as const, zoom: 0.5 },
+  { mode: 'sprite' as const, zoom: 2 },
+])('background drag moves only the preview in $mode mode at zoom $zoom', ({ mode, zoom }) => {
+  const browser = new EventTarget();
+  vi.stubGlobal('window', browser);
+  const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root' }] }));
+  state.selectBone('root');
+  state.editMode = mode;
+  state.gridSnap = 10;
+  const input = { on: vi.fn(), off: vi.fn() };
+  const container = { x: 380, y: 435, parentContainer: null };
+  const camera = {
+    scrollX: 30,
+    scrollY: 50,
+    zoom,
+    getWorldPoint: (x: number, y: number) => ({ x: x / zoom + 30, y: y / zoom + 50 }),
+  };
+  const moveCharacter = vi.fn((x: number, y: number) => Object.assign(container, { x, y }));
+  const controller = new RigEditorInputController(
+    { input, cameras: { main: camera } } as unknown as Phaser.Scene,
+    { container, getBone: () => ({}) } as unknown as Puppet,
+    { state, editBone: vi.fn(), undo: vi.fn(), redo: vi.fn(), refresh: vi.fn(), moveCharacter },
+    { pick: () => null } as unknown as RigEditorOverlay,
+    vi.fn(),
+    vi.fn(),
+  );
+  controller.enable();
+  const emit = (event: string, x: number, y: number, id = 1) => {
+    const [, handler, context] = input.on.mock.calls.find(([name]) => name === event)!;
+    handler.call(context, { id, x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });
+  };
+  const exported = state.exportJson(false);
+  emit('pointerdown', 10, 10);
+  emit('pointermove', 12, 12);
+  assert.equal(moveCharacter.mock.calls.length, 0, 'click jitter must not move the character');
+  emit('pointermove', 37, 29);
+  assert.equal(container.x, 380 + 27 / zoom);
+  assert.equal(container.y, 435 + 19 / zoom);
+  emit('pointerup', 37, 29, 2);
+  emit('pointermove', 100, 100, 2);
+  assert.equal(moveCharacter.mock.calls.length, 1, 'another pointer cannot take over');
+  emit('pointerupoutside', 37, 29);
+  emit('pointermove', 50, 50);
+  assert.equal(moveCharacter.mock.calls.length, 1, 'release outside stops the drag');
+  assert.deepEqual(state.selection, { type: 'bone', id: 'root' });
+  assert.equal(camera.scrollX, 30);
+  assert.equal(camera.scrollY, 50);
+  assert.equal(state.exportJson(false), exported);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
+  emit('pointerdown', 10, 10);
+  emit('pointermove', 20, 20);
+  browser.dispatchEvent(new Event('blur'));
+  emit('pointermove', 30, 30);
+  assert.equal(moveCharacter.mock.calls.length, 2, 'blur stops the drag');
+  emit('pointerdown', 10, 10);
+  emit('pointerup', 10, 10);
+  assert.isNull(state.selection, 'a background click still clears selection');
+  emit('pointerdown', 10, 10);
+  emit('pointermove', 20, 20);
+  assert.equal(moveCharacter.mock.calls.length, 3, 'background dragging also works without a selection');
+  controller.disable();
+});
 
 test.each(dragCases)(
   '$type drag synchronizes once per move and validates the final grouped edit after $finish',
