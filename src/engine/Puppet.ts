@@ -5,6 +5,7 @@ import {
   AnimationPlayer,
   type FiredAnimationEvent,
   type PlayAnimationOptions,
+  type SampleAnimationOptions,
 } from './AnimationPlayer.js';
 import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
@@ -306,6 +307,15 @@ export class Puppet {
 
   restart(): this {
     this.animationPlayer.restart(this.prepareAnimationPose, this.synchronizeAnimationPose);
+    return this;
+  }
+
+  /** Preview the base clip at milliseconds without moving clocks or firing events.
+   * Restore temporary pose/IK changes before sampling, then synchronize presets, IK, and rendering.
+   */
+  sampleAnimation(time: number, options: SampleAnimationOptions = {}): this {
+    this.animationPlayer.sample(time, options, this.prepareAnimationPose);
+    this.syncPose();
     return this;
   }
 

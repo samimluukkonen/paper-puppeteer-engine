@@ -55,7 +55,82 @@ const rejectedCommands: [string, (puppet: Puppet) => unknown][] = [
   ['clear base', (puppet) => puppet.clearLayer('base')],
   ['clear empty layer', (puppet) => puppet.clearLayer('')],
   ['unknown rotated bone', (puppet) => puppet.setBoneRotation('missing', 1)],
+  ['nonfinite sample time', (puppet) => puppet.sampleAnimation(NaN)],
 ];
+
+test('sampleAnimation synchronizes sampled poses, presets, IK, and artwork without advancing playback', () => {
+  const { puppet, constraint } = fixture();
+  puppet.addAnimation({
+    name: 'move',
+    duration: 1000,
+    loop: false,
+    playback: { mode: 'stepped', fps: 10 },
+    tracks: {
+      upper: [
+        { time: 0, x: 0, rotation: 0.1 },
+        { time: 1000, x: 100, rotation: 0.9 },
+      ],
+    },
+    events: [{ time: 100, name: 'marker' }],
+  });
+  puppet.play('move', { speed: 0.5 });
+  puppet.update(100);
+  puppet.addPose({ version: 1, name: 'preset', bones: { upper: { x: 20 } } }).applyPose('preset', { mix: 0.5 });
+  constraint.setTarget(60, 70);
+  puppet.syncPose();
+  const event = vi.fn();
+  const completion = vi.fn();
+  puppet.onAnimationEvent(event);
+  puppet.onAnimationComplete(completion);
+  const clock = puppet.animationPlayer.elapsedTime;
+  const assertPreview = (x: number) => {
+    const upper = puppet.getBone('upper');
+    assert.equal(upper.pose.x, x);
+    assert.equal(upper.container.x, x);
+    assert.equal(constraint.status, 'solved');
+    const slot = puppet.getSlotImage('item')!.getWorldTransformMatrix();
+    const hand = puppet.getBone('hand').container.getWorldTransformMatrix().transformPoint(3, 4);
+    assert.closeTo(slot.tx, hand.x, 1e-9);
+    assert.closeTo(slot.ty, hand.y, 1e-9);
+    assert.equal(puppet.animationPlayer.elapsedTime, clock);
+    assert.isTrue(puppet.isPlaying);
+    assert.equal(event.mock.calls.length, 0);
+    assert.equal(completion.mock.calls.length, 0);
+  };
+  assert.strictEqual(puppet.sampleAnimation(50), puppet);
+  assertPreview(12.5);
+  puppet.sampleAnimation(150, { mode: 'playback' });
+  assertPreview(15);
+  puppet.sampleAnimation(50, { mode: 'raw' });
+  assertPreview(12.5);
+  puppet.clearPose();
+  constraint.enabled = false;
+  puppet.sampleAnimation(-100);
+  assert.equal(puppet.getBone('upper').pose.x, 0);
+  puppet.sampleAnimation(2000, { mode: 'playback' });
+  assert.equal(puppet.getBone('upper').pose.x, 100);
+  assert.closeTo(puppet.getBone('upper').container.rotation, 0.9, 1e-12);
+  assert.equal(puppet.animationPlayer.elapsedTime, clock);
+  assert.equal(event.mock.calls.length, 0);
+  assert.equal(completion.mock.calls.length, 0);
+  puppet.destroy();
+  assert.throws(() => puppet.sampleAnimation(0), /disposed/);
+});
+
+test('sampleAnimation preserves paused and stopped playback and safely handles an unselected clip', () => {
+  const { puppet } = fixture();
+  puppet.setBoneRotation('upper', 0.7);
+  puppet.sampleAnimation(500);
+  assert.closeTo(puppet.getBone('upper').container.rotation, 0.7, 1e-12);
+  puppet.addAnimation({ name: 'held', duration: 1000, loop: true, tracks: { upper: [{ time: 0, x: 10 }] } });
+  puppet.play('held').pauseAnimation().stop();
+  puppet.sampleAnimation(500);
+  assert.isTrue(puppet.animationPlayer.isPaused);
+  assert.isFalse(puppet.isPlaying);
+  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.getBone('upper').container.x, 10);
+  puppet.destroy();
+});
 
 test.each(rejectedCommands)('rejected %s preserves the preset, IK, playback, and rendering', (_name, command) => {
   const { puppet, constraint } = fixture();

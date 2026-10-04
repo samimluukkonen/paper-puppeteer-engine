@@ -348,11 +348,12 @@ export class AnimationPlayer {
   /** Sample only the base clip, clamping time without moving clocks or firing events.
    * Reset properties owned by fades/layers to bind values; retain untracked manual edits.
    */
-  sample(time: number, options: SampleAnimationOptions = {}): void {
+  sample(time: number, options: SampleAnimationOptions = {}, preparePose?: () => void): void {
     this.assertActive();
     assertFinite(time, 'Sample time');
     const state = this.layers.get('base')?.state;
     if (!state) return;
+    preparePose?.();
     this.poseEvaluator.sample(state, time, options.mode === 'playback', this.layers, this.playback);
   }
 

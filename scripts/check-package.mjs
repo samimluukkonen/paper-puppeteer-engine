@@ -136,6 +136,7 @@ export { Puppet } from 'paper-puppeteer-engine';
 export function sync(puppet: Puppet, options: SyncPoseOptions): void {
   puppet.syncPose(options);
   puppet.syncIK(options);
+  puppet.sampleAnimation(500, { mode: 'playback' }).sampleAnimation(250);
 }
 `,
   );
