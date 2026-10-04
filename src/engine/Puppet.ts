@@ -7,6 +7,7 @@ import {
   type PlayAnimationOptions,
   type SampleAnimationOptions,
 } from './AnimationPlayer.js';
+import { worldToLocal } from './affineMath.js';
 import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
@@ -65,11 +66,8 @@ export class Puppet {
   private readonly ikContext: IKTransformContext = {
     worldToParent: (id, target) => {
       const parent = this.getBone(id).container.parentContainer!;
-      const matrix = parent.getWorldTransformMatrix();
-      const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
-      if (!Number.isFinite(determinant) || determinant === 0) return undefined;
-      const point = matrix.applyInverse(target.x, target.y);
-      return Number.isFinite(point.x) && Number.isFinite(point.y) ? point : undefined;
+      // IK accepts nonsingular ancestors; editor gestures use the helper's default tolerance.
+      return worldToLocal(target, parent.getWorldTransformMatrix(), 0);
     },
   };
   private readonly poses = new Map<string, PoseDefinition>();

@@ -499,6 +499,45 @@ test('dynamic priorities retain registration order for ties', () => {
   assert.deepEqual(order, ['first', 'second']);
 });
 
+test.each([1e-200, 1e200])(
+  'IK handles nonsingular ancestor scale %s without determinant underflow or overflow',
+  (scale) => {
+    for (const reflected of [false, true]) {
+      const { puppet, constraint } = fixture();
+      const scaleX = reflected ? -scale : scale;
+      puppet.container.setScale(scaleX, scale);
+      constraint.mix = 1;
+      constraint.setTarget(60 * scaleX, 70 * scale);
+      puppet.syncPose();
+      assert.equal(constraint.status, 'solved');
+      const hand = puppet.getBone('hand').container.getWorldTransformMatrix();
+      assert.approximately(hand.tx / scaleX, 60, 1e-8);
+      assert.approximately(hand.ty / scale, 70, 1e-8);
+      puppet.destroy();
+    }
+  },
+);
+
+test('IK retains support for nonsingular ancestors below the editor gesture tolerance', () => {
+  const actual = fixture();
+  const expected = fixture();
+  expected.constraint.mix = 1;
+  expected.constraint.setTarget(60, 70);
+  expected.puppet.syncPose();
+  actual.puppet.container.setScale(1, 1e-14);
+  actual.puppet.getBone('root').pose.rotation = Math.PI / 4;
+  actual.puppet.syncPose();
+  const parent = actual.puppet.getBone('root').container.getWorldTransformMatrix();
+  actual.constraint.mix = 1;
+  actual.constraint.setTarget(parent.transformPoint(60, 70));
+  actual.puppet.syncPose();
+  assert.equal(actual.constraint.status, 'solved');
+  for (const id of ['upper', 'lower'])
+    assert.approximately(actual.puppet.getBone(id).pose.rotation, expected.puppet.getBone(id).pose.rotation, 1e-8);
+  actual.puppet.destroy();
+  expected.puppet.destroy();
+});
+
 test('overlapping chains restore one authored baseline across repeated partial solves', () => {
   const { puppet, constraint } = fixture();
   constraint.setTarget(60, 70);
