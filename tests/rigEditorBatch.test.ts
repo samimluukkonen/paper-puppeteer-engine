@@ -89,9 +89,9 @@ test.each(dragCases)(
     vi.spyOn(RigEditorOverlay.prototype, 'pick').mockReturnValue(type === 'attachment' ? null : selection);
     editor.enable();
     puppet.syncPose.mockClear();
-    const emit = (event: string, x: number, y: number) => {
+    const emit = (event: string, x: number, y: number, id = 1) => {
       const [, handler, context] = input.on.mock.calls.find(([name]) => name === event)!;
-      handler.call(context, { x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });
+      handler.call(context, { id, x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });
     };
     const validate = vi.spyOn(externalData, 'validateRigDefinition');
     const parse = vi.spyOn(rigDefinitionSchema, 'parse');
@@ -104,6 +104,11 @@ test.each(dragCases)(
     ]) {
       emit('pointermove', x!, y!);
     }
+    // Another touch must neither take over the gesture nor commit its history.
+    emit('pointerdown', 200, 200, 2);
+    emit('pointermove', 300, 300, 2);
+    emit('pointerup', 300, 300, 2);
+    emit('pointerupoutside', 300, 300, 2);
     assert.equal(validate.mock.calls.length, 0, 'full validation waits until the drag finishes');
     assert.isTrue(editor.state.validationPending);
     assert.equal(puppet.syncPose.mock.calls.length, 2);

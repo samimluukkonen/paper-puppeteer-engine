@@ -9,7 +9,7 @@ import type { RigEditorOverlay } from './RigEditorOverlay.js';
 export class RigEditorInputController {
   private panning = false;
   private moved = false;
-  private pointerActive = false;
+  private activePointerId: number | undefined;
   private downX = 0;
   private downY = 0;
   private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
@@ -43,7 +43,7 @@ export class RigEditorInputController {
     if (!this.enabled) return;
     this.enabled = false;
     this.panning = false;
-    this.pointerActive = false;
+    this.activePointerId = undefined;
     this.drag = undefined;
     this.state.endOperation();
     this.scene.input.off('pointerdown', this.pointerDown, this);
@@ -133,7 +133,8 @@ export class RigEditorInputController {
   };
 
   private pointerDown(pointer: Phaser.Input.Pointer): void {
-    this.pointerActive = true;
+    if (this.activePointerId !== undefined) return;
+    this.activePointerId = pointer.id;
     this.panning = pointer.middleButtonDown();
     this.moved = false;
     this.downX = pointer.x;
@@ -182,7 +183,7 @@ export class RigEditorInputController {
   }
 
   private pointerMove(pointer: Phaser.Input.Pointer): void {
-    if (!pointer.isDown) return;
+    if (pointer.id !== this.activePointerId || !pointer.isDown) return;
     if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
     if (!this.panning) {
       if (!this.drag) return;
@@ -215,8 +216,8 @@ export class RigEditorInputController {
 
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
-    if (!this.pointerActive) return;
-    this.pointerActive = false;
+    if (pointer.id !== this.activePointerId) return;
+    this.activePointerId = undefined;
     if (!this.panning && !this.moved && !this.drag) {
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();
