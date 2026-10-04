@@ -8,7 +8,7 @@ The ruler adapts to duration and available width, with major labels, minor ticks
 
 ## Data and preview ownership
 
-`AnimationEditorState` is independent of Phaser and the DOM. It owns a frozen source snapshot per animation and a separately cloned working animation in the existing versioned file format. Caller-owned character animations remain untouched. Editor-only selection, time, validation issues, and history stay outside the serialized data. `subscribe()` connects external state changes to the preview and UI.
+`AnimationEditorState` is independent of Phaser and the DOM. It owns a frozen source snapshot and saved baseline per animation and a separately cloned working animation in the existing versioned file format. `markSaved()` retains the selected animation's working data across selection changes while keeping its original source untouched. Explicitly discarding changes restores the last saved baseline on the next selection. Caller-owned character animations remain untouched. Editor-only selection, time, validation issues, and history stay outside the serialized data. `subscribe()` connects external state changes to the preview and UI.
 
 `currentTime` is the sole editor clock, in continuous seconds. `duration` reads the working animation's explicit `duration` in milliseconds and converts it to seconds; keys and events do not redefine the endpoint. Zero-duration clips are invalid in the existing runtime schema and display its validation errors. Empty/partial tracks and event-only clips retain their explicit positive duration. No character, no animations, or no selection uses a disabled zero-length timeline.
 

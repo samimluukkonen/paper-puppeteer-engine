@@ -91,6 +91,57 @@ test('authored replacements validate atomically, use shared history, and protect
   assert.isFalse(state.dirty);
 });
 
+test('saved edits survive switching and deselection with independent animation baselines', () => {
+  const input = clip();
+  const state = new AnimationEditorState(rig, [input, clip({ name: 'other' })]);
+  state.selectAnimation('move');
+  const source = state.sourceAnimation;
+  state.replaceWorkingAnimation(file(clip({ duration: 3000 })));
+  state.markSaved();
+  const savedMove = state.workingAnimation;
+  state.selectAnimation('other');
+  state.replaceWorkingAnimation(file(clip({ name: 'other', duration: 4000 })));
+  state.markSaved();
+  state.selectAnimation(null);
+  state.markSaved();
+
+  state.selectAnimation('move');
+  assert.equal(state.duration, 3);
+  assert.deepEqual(state.workingAnimation, savedMove);
+  assert.notStrictEqual(state.workingAnimation, savedMove);
+  assert.strictEqual(state.sourceAnimation, source);
+  assert.equal(state.sourceAnimation!.duration, 2000);
+  assert.equal(input.duration, 2000);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
+  state.selectAnimation('other');
+  assert.equal(state.duration, 4);
+  assert.isFalse(state.dirty);
+});
+
+test('discard restores the last saved animation and failed selection preserves unsaved edits', () => {
+  const state = new AnimationEditorState(rig, [clip(), clip({ name: 'other' })]);
+  state.selectAnimation('move');
+  state.replaceWorkingAnimation(file(clip({ duration: 3000 })));
+  state.markSaved();
+  state.replaceWorkingAnimation(file(clip({ duration: 4000 })));
+  assert.isFalse(state.selectAnimation('missing', { discardChanges: true }));
+  assert.equal(state.duration, 4);
+  assert.isTrue(state.dirty);
+  assert.isFalse(state.selectAnimation('other'));
+  assert.isTrue(state.selectAnimation('other', { discardChanges: true }));
+  state.selectAnimation('move');
+  assert.equal(state.duration, 3);
+  assert.isFalse(state.dirty);
+  assert.isFalse(state.canUndo);
+  assert.isFalse(state.canRedo);
+
+  state.replaceWorkingAnimation(file(clip({ duration: 5000 })));
+  state.selectAnimation('move', { discardChanges: true });
+  assert.equal(state.duration, 3);
+  assert.isFalse(state.dirty);
+});
+
 test.each([
   { duration: 0 },
   { duration: -1 },

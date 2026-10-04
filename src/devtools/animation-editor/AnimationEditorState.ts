@@ -14,7 +14,11 @@ import { animationDurationSeconds, clampTime } from './timeline.js';
 export type ReadonlyAnimation = ReadonlyEditorData<AnimationClip> & {
   readonly version: typeof ANIMATION_FORMAT_VERSION;
 };
-type AnimationEntry = { source: ReadonlyAnimation | null; issues: readonly ValidationIssue[] };
+type AnimationEntry = {
+  source: ReadonlyAnimation | null;
+  saved: ReadonlyAnimation | null;
+  issues: readonly ValidationIssue[];
+};
 
 /** Owns animation data and navigation independently of the DOM and Phaser.
  * Authored replacements use the rig editor's snapshot history. Navigation never enters history.
@@ -36,7 +40,7 @@ export class AnimationEditorState {
   ) {
     for (const animation of animations) {
       const file = this.inspect({ ...animation, version: ANIMATION_FORMAT_VERSION });
-      this.animations.set(animation.name, { source: file, issues: this.issues });
+      this.animations.set(animation.name, { source: file, saved: file, issues: this.issues });
     }
     this.issues = [];
   }
@@ -121,7 +125,7 @@ export class AnimationEditorState {
       return false;
     }
     this.source = entry?.source ?? null;
-    this.working = this.source ? freezeData(structuredClone(this.source)) : null;
+    this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
     this.selectedId = id;
     this.time = 0;
     this.issues = [];
@@ -155,6 +159,8 @@ export class AnimationEditorState {
   }
 
   markSaved(): void {
+    const entry = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
+    if (entry) entry.saved = this.working;
     this.saved = this.snapshot;
     this.notify();
   }
