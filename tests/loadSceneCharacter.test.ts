@@ -132,6 +132,46 @@ test('shutdown while images load settles promptly and removes loader listeners',
   load.emit('complete');
 });
 
+test('a metadata failure aborts sibling requests and preserves the original error', async () => {
+  const { metadata, start, load, events, assertClean } = fixture();
+  metadata.mockRestore();
+  const aborted = vi.fn();
+  let siblingSignal: AbortSignal | undefined;
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith('character.json'))
+      return Response.json({
+        version: 1,
+        id: 'test',
+        rig: 'rig.json',
+        defaultSkin: 'default',
+        skins: { default: 'skin.json' },
+        animations: [],
+        textures: {},
+      });
+    if (url.endsWith('rig.json')) return new Response(null, { status: 404 });
+    siblingSignal = init!.signal!;
+    return new Promise<Response>((_resolve, reject) => {
+      siblingSignal!.addEventListener(
+        'abort',
+        () => {
+          aborted();
+          reject(siblingSignal!.reason);
+        },
+        { once: true },
+      );
+    });
+  });
+
+  await rejects(start(), /Could not load character JSON "https:\/\/example.test\/rig.json" \(404\)/);
+  assert.isTrue(siblingSignal?.aborted);
+  assert.equal(aborted.mock.calls.length, 1);
+  assert.equal(load.start.mock.calls.length, 0);
+  assertClean();
+  events.emit('shutdown');
+  assert.equal(aborted.mock.calls.length, 1);
+});
+
 test.each(['metadata', 'image queue', 'loader start'])(
   'a failure during %s releases scene listeners',
   async (stage) => {

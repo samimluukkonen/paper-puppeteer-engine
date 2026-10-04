@@ -26,6 +26,8 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
     };
     const fail = (error: unknown): void => {
       if (settled) return;
+      // Promise.all rejects before sibling metadata requests finish; cancel them before removing shutdown cleanup.
+      controller.abort();
       cleanup();
       reject(error);
     };
