@@ -74,6 +74,24 @@ test('affine coordinate conversion handles translated, rotated and scaled parent
   assert.equal(worldToLocal(world, { ...parent, a: 0, b: 0, c: 0, d: 0 }), undefined);
 });
 
+test.each([1e-200, 1e-7, 1e200])('coordinate inversion preserves invertible transforms at scale %s', (scale) => {
+  const matrix = { a: 0, b: scale, c: -2 * scale, d: 0, tx: 0, ty: 0 };
+  const local = { x: 7, y: -4 };
+  const result = worldToLocal(localToWorld(local, matrix), matrix)!;
+  assert.closeTo(result.x, local.x, 1e-12);
+  assert.closeTo(result.y, local.y, 1e-12);
+});
+
+test('coordinate inversion handles unequal axis scales and rejects unreliable or nonfinite results', () => {
+  const matrix = { a: 1e-7, b: 0, c: 0, d: 1e7, tx: 0, ty: 0 };
+  const local = { x: 7, y: -4 };
+  assert.deepEqual(worldToLocal(localToWorld(local, matrix), matrix), local);
+  assert.isUndefined(worldToLocal({ x: 1, y: 1 }, { ...matrix, a: 1, b: 1, c: 1, d: 1 + Number.EPSILON }));
+  assert.isUndefined(worldToLocal({ x: 1e308, y: 0 }, { ...matrix, a: 1e-4, d: 1e-4 }));
+  assert.isUndefined(worldToLocal({ x: Infinity, y: 0 }, matrix));
+  assert.isUndefined(worldToLocal(local, { ...matrix, tx: NaN }));
+});
+
 test('editing joint, sprite, length and slot changes only the working rig', () => {
   const source = new Rig({
     root: 'root',
