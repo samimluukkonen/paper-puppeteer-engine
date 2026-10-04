@@ -48,6 +48,7 @@ scene.load.start();
 | --- | --- |
 | [Demo controls](docs/demo.md) | Keyboard controls, playback examples, facing, skins, and pose authoring |
 | [Rig editor](docs/rig-editor.md) | Editing, snapping, undo/redo, validation, imports, exports, and embedding |
+| [Animation editor](docs/animation-editor.md) | Working copies, animation selection, timeline scrubbing, and runtime pose preview |
 | [Character assets and rigs](docs/characters.md) | Manifests, JSON validation, slots, skins, artwork, and rig definitions |
 | [Animation and poses](docs/animation.md) | Keyframes, static poses, playback, crossfades, events, layers, and manual updates |
 | [IK and object attachments](docs/ik.md) | Two-bone solving, transforms, foot planting, katana grips, and attached props |
@@ -68,7 +69,7 @@ For browser checks, install Chromium with `npx playwright install chromium`, the
 ## Current limitations
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
-- One clip per layer with simple masked overlays; no animation graph, blend tree, visual animation editor, or automatic state machine.
+- One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine. The visual animation editor supports selection and scrubbing; keyframe authoring is deferred.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot planting is manual; the walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
@@ -82,4 +83,4 @@ For browser checks, install Chromium with `npx playwright install chromium`, the
 - Visual animation editor with a timeline and keyframe authoring.
 - Character editing tools and richer asset pipeline integration.
 
-The next planned milestone is the Visual Animation Editor Foundation: an independent animation working copy, animation selection, timeline scrubbing, and puppet preview driven by the existing runtime evaluator. The visual rig editor is available now; keyframe editing and animation export will follow the animation editor foundation.
+The Visual Animation Editor Foundation is available at `/animation-editor/`: independent animation working copies, selection, timeline scrubbing, and puppet preview driven by the existing runtime evaluator. The Rig Editor remains at `/rig-editor/`. Keyframe editing, playback controls, and animation export will follow in v0.5.2.2+.

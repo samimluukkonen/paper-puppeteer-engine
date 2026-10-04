@@ -124,6 +124,13 @@ src/devtools/rig-editor/
   RigEditor.ts         Editor activation and working-rig preview synchronization
   RigEditorInputController.ts  Dragging, keyboard commands, and input listener lifecycle
   RigEditorState.ts    Working rig, validation, bounded history, and serialization
+src/devtools/animation-editor/
+  main.ts              Animation editor page and Phaser bootstrap
+  AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
+  AnimationEditorState.ts  Owned animation data, selection, continuous time, validation and authored history
+  AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
+  TimelineController.ts   Responsive ruler, pointer capture, keyboard navigation and status display
+  timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
 src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
