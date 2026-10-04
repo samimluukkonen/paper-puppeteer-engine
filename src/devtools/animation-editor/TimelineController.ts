@@ -2,6 +2,14 @@ import { isEditorTypingTarget } from '../shared/editorShortcuts.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
 
+function setText(element: HTMLElement, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+function setAttribute(element: HTMLElement, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
 /** DOM adapter only: width/pointer capture belong here, while time and animation data belong to state. */
 export class TimelineController {
   private state = new AnimationEditorState();
@@ -17,7 +25,9 @@ export class TimelineController {
   private readonly status: HTMLElement;
   private readonly reset: HTMLButtonElement;
   private readonly playPause: HTMLButtonElement;
+  private readonly dirty: HTMLElement;
   private pointer: number | undefined;
+  private width = 0;
   private rulerKey = '';
   private externalError = '';
 
@@ -31,6 +41,7 @@ export class TimelineController {
     this.status = this.element('#animation-status');
     this.reset = this.element<HTMLButtonElement>('#reset-time');
     this.playPause = this.element<HTMLButtonElement>('#play-pause');
+    this.dirty = this.element('#animation-dirty');
     const options = { signal: this.abort.signal };
     this.selection.addEventListener(
       'change',
@@ -126,7 +137,11 @@ export class TimelineController {
       },
       options,
     );
-    this.resize = new ResizeObserver(() => this.render());
+    this.width = this.timeline.getBoundingClientRect().width;
+    this.resize = new ResizeObserver(() => {
+      this.width = this.timeline.getBoundingClientRect().width;
+      this.render();
+    });
     this.resize.observe(this.timeline);
     this.bind(this.state);
   }
@@ -169,7 +184,7 @@ export class TimelineController {
   private render(): void {
     const state = this.state;
     const animation = state.workingAnimation;
-    const width = this.timeline.getBoundingClientRect().width;
+    const width = this.width;
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
       this.rulerKey = rulerKey;
@@ -188,35 +203,44 @@ export class TimelineController {
       );
     }
     this.playhead.style.left = `${timeToTimelineX(state.currentTime, state.duration, width)}px`;
-    this.timeline.setAttribute('aria-valuemax', String(state.duration));
-    this.timeline.setAttribute('aria-valuenow', String(state.currentTime));
-    this.timeline.setAttribute(
+    setAttribute(this.timeline, 'aria-valuemax', String(state.duration));
+    setAttribute(this.timeline, 'aria-valuenow', String(state.currentTime));
+    setAttribute(
+      this.timeline,
       'aria-valuetext',
       `${state.currentTime.toFixed(3)} of ${state.duration.toFixed(3)} seconds`,
     );
-    this.timeline.setAttribute('aria-disabled', String(!animation));
-    this.selection.value = state.selectedAnimationId ?? '';
-    this.selection.disabled = !state.animationIds.length;
-    this.reset.disabled = !animation;
-    this.playPause.disabled = !animation || !(state.duration > 0);
-    this.playPause.textContent = state.isPlaying ? 'Pause' : 'Play';
-    this.timeDisplay.textContent = `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`;
+    setAttribute(this.timeline, 'aria-disabled', String(!animation));
+    const selectedId = state.selectedAnimationId ?? '';
+    if (this.selection.value !== selectedId) this.selection.value = selectedId;
+    const selectionDisabled = !state.animationIds.length;
+    if (this.selection.disabled !== selectionDisabled) this.selection.disabled = selectionDisabled;
+    if (this.reset.disabled !== !animation) this.reset.disabled = !animation;
+    const playDisabled = !animation || !(state.duration > 0);
+    if (this.playPause.disabled !== playDisabled) this.playPause.disabled = playDisabled;
+    setText(this.playPause, state.isPlaying ? 'Pause' : 'Play');
+    setText(this.timeDisplay, `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`);
     const playback = animation?.playback;
-    this.metadata.textContent = animation
-      ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: once · ${state.isPlaying ? 'Playing' : 'Paused'}`
-      : 'Select an animation to preview its pose.';
-    this.element('#animation-dirty').textContent = state.dirty ? 'Unsaved changes' : 'No unsaved changes';
-    this.status.textContent =
+    setText(
+      this.metadata,
+      animation
+        ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: once · ${state.isPlaying ? 'Playing' : 'Paused'}`
+        : 'Select an animation to preview its pose.',
+    );
+    setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
+    setText(
+      this.status,
       this.externalError ||
-      (state.validationIssues.length
-        ? state.validationIssues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n')
-        : animation
-          ? 'Validation: OK'
-          : !state.rig
-            ? 'Load a character to begin.'
-            : !state.animationIds.length
-              ? 'This character has no animations.'
-              : 'No animation selected.');
+        (state.validationIssues.length
+          ? state.validationIssues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n')
+          : animation
+            ? 'Validation: OK'
+            : !state.rig
+              ? 'Load a character to begin.'
+              : !state.animationIds.length
+                ? 'This character has no animations.'
+                : 'No animation selected.'),
+    );
   }
 
   dispose(): void {

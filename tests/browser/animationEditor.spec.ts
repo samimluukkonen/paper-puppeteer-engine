@@ -245,3 +245,51 @@ test('Space toggles playback once and leaves typing targets alone', async ({ pag
   await timeline.press('Space');
   await expect(timeline).toHaveAttribute('aria-valuenow', '0');
 });
+
+test('playback advances without measuring layout or rewriting unchanged timeline controls', async ({ page }) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ json: { ...(await response.json()), duration: 60_000 } });
+  });
+  await openEditor(page);
+  await page.locator('#play-pause').click();
+  await expect(page.locator('#play-pause')).toHaveText('Pause');
+  const work = await page.evaluate(async () => {
+    const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await frame();
+    await frame();
+    const timeline = document.querySelector<HTMLElement>('#timeline')!;
+    const bounds = timeline.getBoundingClientRect;
+    let measurements = 0;
+    let timeUpdates = 0;
+    let unchangedWrites = 0;
+    timeline.getBoundingClientRect = function () {
+      measurements += 1;
+      return bounds.call(this);
+    };
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.target === timeline && mutation.attributeName === 'aria-valuenow') timeUpdates += 1;
+        else unchangedWrites += 1;
+      }
+    });
+    observer.observe(timeline, {
+      attributes: true,
+      attributeFilter: ['aria-valuenow', 'aria-valuemax', 'aria-disabled'],
+    });
+    for (const selector of ['#animation-metadata', '#animation-status', '#animation-dirty', '#play-pause'])
+      observer.observe(document.querySelector(selector)!, { childList: true, characterData: true, subtree: true });
+    try {
+      for (let count = 0; count < 10; count += 1) await frame();
+      return { measurements, timeUpdates, unchangedWrites };
+    } finally {
+      timeline.getBoundingClientRect = bounds;
+      observer.disconnect();
+    }
+  });
+  expect(work.timeUpdates).toBeGreaterThan(0);
+  expect(work.measurements).toBe(0);
+  expect(work.unchangedWrites).toBe(0);
+  await page.locator('#play-pause').click();
+  await expect(page.locator('#play-pause')).toHaveText('Play');
+});
