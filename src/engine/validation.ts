@@ -49,13 +49,15 @@ export function checkRigReferences(definition: RigDefinition, report: ReportVali
   }
   const visiting = new Set<string>();
   const visited = new Set<string>();
-  const visit = (id: string): void => {
-    if (visited.has(id) || visiting.has(id)) return;
-    visiting.add(id);
-    const index = ids.get(id);
-    const parent = index === undefined ? undefined : bones[index]?.parent;
-    if (parent !== undefined && ids.has(parent)) {
-      if (visiting.has(parent))
+  for (const start of ids.keys()) {
+    const path: string[] = [];
+    let id: string | undefined = start;
+    while (id !== undefined && ids.has(id) && !visited.has(id)) {
+      visiting.add(id);
+      path.push(id);
+      const index: number = ids.get(id)!;
+      const parent: string | undefined = bones[index]?.parent;
+      if (parent !== undefined && visiting.has(parent)) {
         report(
           {
             severity: 'error',
@@ -64,12 +66,15 @@ export function checkRigReferences(definition: RigDefinition, report: ReportVali
           },
           `Rig contains a cycle at "${id}".`,
         );
-      else visit(parent);
+        break;
+      }
+      id = parent;
     }
-    visiting.delete(id);
-    visited.add(id);
-  };
-  for (const id of ids.keys()) visit(id);
+    for (const id of path) {
+      visiting.delete(id);
+      visited.add(id);
+    }
+  }
   const slotIds = new Set<string>();
   for (const [index, slot] of (definition.slots ?? []).entries()) {
     if (slotIds.has(slot.id))

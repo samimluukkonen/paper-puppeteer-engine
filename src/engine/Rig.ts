@@ -44,18 +44,21 @@ export function computeRenderOrder(root: string, bones: readonly BoneDefinition[
     }
   }
   const renderOrder: string[] = [];
-  const visit = (id: string): void => {
+  const pending = [{ id: root, self: false }];
+  while (pending.length) {
+    const { id, self } = pending.pop()!;
+    if (self) {
+      renderOrder.push(id);
+      continue;
+    }
     const bone = definitions.get(id)!;
     const entries = [
       { id, depth: bone.sprite?.depth ?? 0, self: true },
       ...(children.get(id) ?? []).map((child) => ({ id: child.id, depth: child.depth ?? 0, self: false })),
     ].sort((left, right) => left.depth - right.depth);
-    for (const entry of entries) {
-      if (entry.self) renderOrder.push(entry.id);
-      else visit(entry.id);
-    }
-  };
-  visit(root);
+    // Reverse the stack insertion to retain stable sibling order and sprite depth placement.
+    for (let index = entries.length - 1; index >= 0; index -= 1) pending.push(entries[index]!);
+  }
   return renderOrder;
 }
 
@@ -117,14 +120,19 @@ export class Rig {
 
     const ordered: DeepReadonly<BoneDefinition>[] = [];
     const visited = new Set<string>();
-    const visit = (id: string): void => {
-      if (visited.has(id)) return;
-      const bone = this.getBone(id);
-      if (bone.parent !== undefined) visit(bone.parent);
-      visited.add(id);
-      ordered.push(bone);
-    };
-    for (const id of this.definitions.keys()) visit(id);
+    for (const id of this.definitions.keys()) {
+      const ancestors: DeepReadonly<BoneDefinition>[] = [];
+      let bone: DeepReadonly<BoneDefinition> | undefined = this.getBone(id);
+      while (bone && !visited.has(bone.id)) {
+        ancestors.push(bone);
+        bone = bone.parent === undefined ? undefined : this.getBone(bone.parent);
+      }
+      for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+        const bone = ancestors[index]!;
+        visited.add(bone.id);
+        ordered.push(bone);
+      }
+    }
     this.bones = Object.freeze(ordered);
     this.renderOrder = Object.freeze(computeRenderOrder(this.root, ordered));
     this.slots = Object.freeze((definition.slots ?? []).map((slot) => Object.freeze({ ...slot })));

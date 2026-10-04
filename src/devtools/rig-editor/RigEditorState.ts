@@ -464,11 +464,14 @@ export class RigEditorState {
 
   hierarchy(): readonly { id: string; depth: number }[] {
     const rows: { id: string; depth: number }[] = [];
-    const visit = (id: string, depth: number): void => {
-      rows.push({ id, depth });
-      for (const child of this.childrenOf(id)) visit(child, depth + 1);
-    };
-    visit(this.rig.root, 0);
+    const pending = [{ id: this.rig.root, depth: 0 }];
+    while (pending.length) {
+      const row = pending.pop()!;
+      rows.push(row);
+      const children = this.childrenOf(row.id);
+      for (let index = children.length - 1; index >= 0; index -= 1)
+        pending.push({ id: children[index]!, depth: row.depth + 1 });
+    }
     return rows;
   }
 }
