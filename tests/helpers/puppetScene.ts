@@ -26,6 +26,8 @@ class Container {
   height = 100;
   originX = 0.5;
   originY = 0.5;
+  isCropped = false;
+  crop: { x: number; y: number; width: number; height: number } | undefined;
   parentContainer: Container | null = null;
   readonly list: Container[] = [];
 
@@ -63,6 +65,11 @@ class Container {
   setOrigin(x: number, y: number) {
     this.originX = x;
     this.originY = y;
+    return this;
+  }
+  setCrop(x?: number, y = 0, width = 0, height = 0) {
+    this.isCropped = x !== undefined;
+    this.crop = x === undefined ? undefined : { x, y, width, height };
     return this;
   }
   sort(_property: string) {

@@ -44,14 +44,18 @@ export class DemoScene extends Phaser.Scene {
   private skin = 'default';
   private gripHand = false;
   private helmet = false;
-  private readonly prepareAnimationPose = (): void => this.puppet?.preparePose();
+  private sampleLayout = true;
+  private readonly prepareAnimationPose = (): void => this.presentation?.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.updatePresentation(true);
 
   private get poseMode(): boolean {
     return this.authoring?.active ?? false;
   }
 
-  constructor(private readonly onChange: (state: DemoState) => void) {
+  constructor(
+    private readonly onChange: (state: DemoState) => void,
+    private readonly characterUrl = 'characters/demo-puppet/character.json',
+  ) {
     super('DemoScene');
   }
 
@@ -68,8 +72,7 @@ export class DemoScene extends Phaser.Scene {
 
   private async loadCharacter(): Promise<void> {
     try {
-      const url = `${import.meta.env.BASE_URL}characters/demo-puppet/character.json`;
-      const definition = await loadSceneCharacter(this, url);
+      const definition = await loadSceneCharacter(this, this.characterUrl);
       if (definition && this.sys.isActive()) this.createPuppet(definition);
     } catch (error) {
       if (this.sys.isActive()) this.showLoadError(String(error));
@@ -81,6 +84,7 @@ export class DemoScene extends Phaser.Scene {
   }
 
   private createPuppet(definition: CharacterDefinition): void {
+    this.sampleLayout = definition.id === 'demo-puppet';
     this.handIK = false;
     this.footIK = false;
     this.upperBody = false;
@@ -98,13 +102,13 @@ export class DemoScene extends Phaser.Scene {
       scale: 1.08,
       autoUpdate: false,
     });
-    this.presentation = new DemoPresenter(this, this.puppet);
+    this.presentation = new DemoPresenter(this, this.puppet, this.sampleLayout);
     this.puppet.play('idle');
     this.puppet.onAnimationEvent((event) => {
       this.lastEvent = `${event.clip}: ${event.name}`;
       this.notify();
     });
-    this.authoring = new DemoPoseAuthoring(this, this.puppet);
+    this.authoring = new DemoPoseAuthoring(this, this.puppet, this.sampleLayout);
     this.updatePresentation();
     this.controls = new DemoInput(this, this.authoring, this.presentation);
     this.notify();
@@ -170,6 +174,7 @@ export class DemoScene extends Phaser.Scene {
 
   play(name: string): void {
     this.authoring?.exit();
+    this.presentation?.preparePose();
     this.puppet?.clearPose();
     this.puppet?.play(name);
     this.handIK = name === 'sword';
@@ -186,6 +191,7 @@ export class DemoScene extends Phaser.Scene {
       return;
     }
     this.presentation?.captureCrossfadeSource();
+    this.presentation?.preparePose();
     this.puppet?.play(name, { fadeDuration: 300 });
     this.handIK = false;
     this.updatePresentation();
@@ -222,6 +228,7 @@ export class DemoScene extends Phaser.Scene {
   toggleUpperBody(): void {
     if (!this.puppet) return;
     if (this.poseMode) this.play('idle');
+    this.presentation?.preparePose();
     this.upperBody = !this.upperBody;
     if (this.upperBody) {
       this.puppet.setLayerMask('upperBody', [
@@ -243,6 +250,7 @@ export class DemoScene extends Phaser.Scene {
   face(direction: Facing): void {
     if (this.poseMode && this.puppet) {
       this.authoring?.face(direction);
+      this.presentation?.sketchFacing?.syncVisuals();
       this.presentation?.katana.reattach();
       this.authoring?.refresh();
       this.notify();
@@ -254,6 +262,7 @@ export class DemoScene extends Phaser.Scene {
       this.puppet.getIK('leftArmIK').enabled = false;
       this.puppet.getIK('rightArmIK').enabled = false;
     }
+    this.presentation?.preparePose();
     this.puppet?.setFacing(direction);
     this.presentation?.katana.resetRearPalm(direction);
     this.presentation?.katana.reattach();
@@ -288,6 +297,7 @@ export class DemoScene extends Phaser.Scene {
       this.resetBind();
       return;
     }
+    this.presentation?.preparePose();
     this.puppet?.restart();
     this.updatePresentation();
     this.notify();
@@ -298,6 +308,7 @@ export class DemoScene extends Phaser.Scene {
       this.play('idle');
       return;
     }
+    this.presentation?.preparePose();
     if (this.puppet?.isPlaying) this.puppet.stop();
     else this.puppet?.restart();
     this.updatePresentation();
@@ -338,7 +349,8 @@ export class DemoScene extends Phaser.Scene {
 
   private syncVisualOverrides(): void {
     if (!this.puppet) return;
-    this.puppet.setAttachment('rightHandVisual', this.gripHand ? 'rightHandGrip' : 'rightHandDefault');
+    if (this.presentation?.sketchFacing) this.presentation.sketchFacing.setGripHand(this.gripHand);
+    else this.puppet.setAttachment('rightHandVisual', this.gripHand ? 'rightHandGrip' : 'rightHandDefault');
     if (this.helmet) this.puppet.applySkin('helmet-only');
     else this.puppet.clearAttachment('headwear');
     this.presentation?.katana.syncVisualOverride();

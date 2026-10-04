@@ -440,6 +440,20 @@ export class Puppet {
   }
 
   attach(boneId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
+    return this.attachAt(boneId, object, options);
+  }
+
+  /** Attach a prop at a slot's transform and global layer, independently of its sprite. */
+  attachToSlot(slotId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
+    return this.attachAt(this.rig.getSlot(slotId).bone, object, options, slotId);
+  }
+
+  private attachAt(
+    boneId: string,
+    object: Phaser.GameObjects.GameObject,
+    options: AttachmentOptions,
+    slotId?: string,
+  ): this {
     const bone = this.getBone(boneId);
     if (object.scene !== this.scene) throw new Error('Attachments must belong to the puppet scene.');
     for (
@@ -450,7 +464,7 @@ export class Puppet {
       if (ancestor === object) throw new Error('Cannot attach an ancestor of the target bone.');
     }
     for (const [label, value] of Object.entries(options)) assertFinite(value, `Attachment ${label}`);
-    const renderMount = this.renderer.getMount(boneId);
+    const renderMount = slotId ? this.renderer.getSlotMount(slotId) : this.renderer.getMount(boneId);
     for (
       let ancestor: Phaser.GameObjects.Container | null = renderMount;
       ancestor;

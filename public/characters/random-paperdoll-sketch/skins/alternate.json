@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "alternate",
+  "slots": {
+    "torsoVisual": "torsoDefault",
+    "headVisual": "headDefault",
+    "leftUpperArmVisual": "leftUpperArmDefault",
+    "leftForearmVisual": "leftForearmDefault",
+    "leftHandVisual": "leftHandDefault",
+    "rightUpperArmVisual": "rightUpperArmDefault",
+    "rightForearmVisual": "rightForearmDefault",
+    "rightHandVisual": "rightHandDefault",
+    "leftThighVisual": "leftThighDefault",
+    "leftLowerLegVisual": "leftLowerLegDefault",
+    "leftFootVisual": "leftFootDefault",
+    "rightThighVisual": "rightThighDefault",
+    "rightLowerLegVisual": "rightLowerLegDefault",
+    "rightFootVisual": "rightFootDefault",
+    "armorOverlay": "torsoArmored"
+  }
+}

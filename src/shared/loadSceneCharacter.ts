@@ -51,8 +51,9 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, onShutdown);
     const load = async (): Promise<void> => {
       // Scene.create() runs before Phaser marks the scene active; check after fetching instead.
+      // Authoring views reload frequently after replacing rig and animation files.
       definition = await CharacterLoader.load(url, (input, init) =>
-        fetch(input, { ...init, signal: controller.signal }),
+        fetch(input, { ...init, cache: 'no-store', signal: controller.signal }),
       );
       if (settled) return;
       if (!scene.sys.isActive()) {

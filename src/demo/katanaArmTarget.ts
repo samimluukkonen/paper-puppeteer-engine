@@ -4,6 +4,7 @@ export interface HeadBounds {
   left: number;
   right: number;
   top: number;
+  bottom: number;
 }
 
 export interface PalmPathState {
@@ -51,14 +52,15 @@ export function palmClearanceCorrection(
   edges: { left: number; right: number } | undefined,
   head: HeadBounds | undefined,
   margin: number,
+  bodyMargin = margin,
 ): IKTarget {
   const push =
     path.overHead || !edges
       ? 0
       : path.side === 'right'
-        ? Math.max(0, edges.right + margin - palm.x)
-        : Math.min(0, edges.left - margin - palm.x);
-  const overpass = path.overHead && head ? Math.min(0, headOverpassY(head, palm.x, margin) - palm.y) : 0;
+        ? Math.max(0, edges.right + bodyMargin - palm.x)
+        : Math.min(0, edges.left - bodyMargin - palm.x);
+  const overpass = path.overHead && head ? headOverpassY(head, palm.x, margin) - palm.y : Infinity;
   return {
     x: push > 0 ? Math.max(reach.x, push) : push < 0 ? Math.min(reach.x, push) : reach.x,
     y: Math.min(reach.y, overpass),
@@ -109,7 +111,7 @@ export function horizontalEdgesAtY(
   return Number.isFinite(left) ? { left, right } : undefined;
 }
 
-/** Take a bounded step toward a palm target, routing across the head's top corners. */
+/** Take a bounded step around the head, using its lower corners when returning to the torso. */
 export function stepPalmAroundHead(
   previous: IKTarget,
   desired: IKTarget,
@@ -120,11 +122,21 @@ export function stepPalmAroundHead(
   const left = head.left - margin;
   const right = head.right + margin;
   const top = head.top - margin;
+  const bottom = head.bottom + margin;
   const center = (head.left + head.right) / 2;
+  // Torso-height moves can pass below the head; only route upward when the path reaches it.
+  const belowHead = Math.min(previous.y, desired.y) > head.bottom;
   let waypoint = desired;
-  if (previous.x > center && previous.y > top + 1 && desired.x < right) {
+  if (!belowHead && desired.y > head.bottom) {
+    const edge = previous.x < center ? left : right;
+    const crossesHead = previous.x < center ? desired.x > left : desired.x < right;
+    if (crossesHead) {
+      const insideWidth = previous.x > left + 1 && previous.x < right - 1;
+      waypoint = { x: edge, y: insideWidth ? Math.max(top, previous.y) : bottom };
+    }
+  } else if (!belowHead && previous.x > center && previous.y > top + 1 && desired.x < right) {
     waypoint = { x: right, y: top };
-  } else if (previous.x < center && previous.y > top + 1 && desired.x > left) {
+  } else if (!belowHead && previous.x < center && previous.y > top + 1 && desired.x > left) {
     waypoint = { x: left, y: top };
   } else if (previous.y <= top + 1 && desired.y > top + 1 && desired.x <= left && previous.x > left + 1) {
     waypoint = { x: left, y: top };

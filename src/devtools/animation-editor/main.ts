@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { viewHeader } from '../../ui/viewShell.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import { TimelineController } from './TimelineController.js';
@@ -17,10 +18,12 @@ app.innerHTML = `
     </section>
   </main>`;
 
+const releaseCharacterSelection = bindCharacterSelection(app);
 const timeline = new TimelineController(app);
 const scene = new AnimationEditorScene(
   (state, id) => timeline.bind(state, id),
   (message) => timeline.showError(message),
+  { characterUrl: `../characters/${selectedCharacterId()}/character.json` },
 );
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -35,5 +38,6 @@ const game = new Phaser.Game({
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
     timeline.dispose();
+    releaseCharacterSelection();
     game.destroy(true);
   });

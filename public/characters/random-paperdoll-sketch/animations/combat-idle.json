@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "name": "sword",
+  "duration": 1800,
+  "loop": true,
+  "events": [
+    {
+      "time": 200,
+      "name": "weapon-ready"
+    }
+  ],
+  "tracks": {
+    "pelvis": [
+      {
+        "time": 0,
+        "y": 0
+      },
+      {
+        "time": 900,
+        "y": -2
+      },
+      {
+        "time": 1800,
+        "y": 0
+      }
+    ],
+    "torso": [
+      {
+        "time": 0,
+        "rotation": -0.08
+      }
+    ],
+    "head": [
+      {
+        "time": 0,
+        "rotation": -0.015
+      },
+      {
+        "time": 900,
+        "rotation": 0.015
+      },
+      {
+        "time": 1800,
+        "rotation": -0.015
+      }
+    ],
+    "leftUpperArm": [
+      {
+        "time": 0,
+        "rotation": 1.002022
+      }
+    ],
+    "rightUpperArm": [
+      {
+        "time": 0,
+        "rotation": -1.161084
+      }
+    ],
+    "leftForearm": [
+      {
+        "time": 0,
+        "rotation": -1.856226
+      }
+    ],
+    "rightForearm": [
+      {
+        "time": 0,
+        "rotation": 0.14293
+      }
+    ]
+  }
+}

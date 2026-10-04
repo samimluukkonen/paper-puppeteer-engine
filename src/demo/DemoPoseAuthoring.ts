@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import type { Facing, Puppet } from '../engine/index.js';
 import { downloadJson } from '../shared/downloadJson.js';
 import { demoAuthoringLayout } from './demoPresentation.js';
+import { swapSketchLimbs } from './SketchFacingLayout.js';
 
 /** Static pose editing and the scene-space authoring inspector. */
 export class DemoPoseAuthoring {
@@ -13,6 +14,7 @@ export class DemoPoseAuthoring {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly puppet: Puppet,
+    private readonly sampleLayout = true,
   ) {
     this.poseMarker = scene.add.graphics().setDepth(190);
     this.poseText = scene.add
@@ -43,6 +45,12 @@ export class DemoPoseAuthoring {
   }
 
   face(direction: Facing): void {
+    if (!this.sampleLayout) {
+      this.puppet.preparePose();
+      if (this.puppet.facingDirection !== direction) swapSketchLimbs(this.puppet);
+      this.puppet.setFacing(direction);
+      return;
+    }
     const previous = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
     const next = demoAuthoringLayout(this.puppet.rig, direction);
     this.puppet.preparePose();
@@ -88,12 +96,27 @@ export class DemoPoseAuthoring {
 
   applyCombatPose(): void {
     if (!this.active) return;
+    if (!this.sampleLayout) {
+      this.puppet.resetToBindPose().applyPose('combat-ready').commitPoseForEditing();
+      this.puppet.container.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 278);
+      if (this.puppet.facingDirection === 'left') swapSketchLimbs(this.puppet);
+      this.puppet.syncPose();
+      this.refresh();
+      return;
+    }
     this.resetAuthoringPose();
     this.puppet.applyPose('combat-ready').commitPoseForEditing();
     this.refresh();
   }
 
   private resetAuthoringPose(): void {
+    if (!this.sampleLayout) {
+      this.puppet.resetToBindPose();
+      this.puppet.container.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 278);
+      if (this.puppet.facingDirection === 'left') swapSketchLimbs(this.puppet);
+      this.puppet.syncPose();
+      return;
+    }
     const layout = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
     this.puppet.resetToBindPose().setRenderOrder(layout.order, layout.slotDepths);
     this.puppet.container.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 278);
@@ -104,7 +127,15 @@ export class DemoPoseAuthoring {
 
   exportCurrentPose(): void {
     if (!this.active) return;
-    const json = JSON.stringify(this.puppet.exportPose('exported-pose'), null, 2);
+    const canonical = !this.sampleLayout && this.puppet.facingDirection === 'left';
+    this.puppet.preparePose();
+    if (canonical) swapSketchLimbs(this.puppet);
+    const pose = this.puppet.exportPose('exported-pose');
+    if (canonical) {
+      swapSketchLimbs(this.puppet);
+      this.puppet.syncPose();
+    }
+    const json = JSON.stringify(pose, null, 2);
     console.log(`Exported pose JSON:\n${json}`);
     void navigator.clipboard?.writeText(json).catch(() => {});
     downloadJson(json, 'exported-pose.json');

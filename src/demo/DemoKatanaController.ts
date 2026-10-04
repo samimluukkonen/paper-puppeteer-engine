@@ -17,6 +17,8 @@ import {
 const palmGripOffset: IKTarget = { x: 0, y: 15 };
 const palmVisibilityMargin = 8;
 const maximumPalmStep = 8;
+// The slot texture's handle ends where its guard starts (texture coordinates).
+const slotHiltWidth = 39;
 
 /** Targets and adapters shared by the three correction phases of one solve. */
 interface GripSolve {
@@ -36,12 +38,18 @@ export class DemoKatanaController {
   private swordAngle = -0.65;
   private rearPalmPath: PalmPathState = { side: 'right', overHead: false };
   private previousRearPalm: IKTarget | undefined;
+  private readonly hiltSlot: string | undefined;
+  private hiltBehind = false;
 
   constructor(
     private readonly puppet: Puppet,
     private readonly katana: Katana,
+    private readonly swapHandsWithFacing = true,
+    private readonly gripOffset: IKTarget = palmGripOffset,
+    private readonly bodyClearanceMargin = palmVisibilityMargin,
   ) {
     katana.container.setVisible(false);
+    this.hiltSlot = puppet.rig.slots.find((slot) => slot.id === 'katanaHilt')?.id;
   }
 
   rotate(delta: number): void {
@@ -54,12 +62,18 @@ export class DemoKatanaController {
   }
 
   reattach(): void {
-    if (this.attached) this.attachKatana();
+    if (this.attached) {
+      this.attachKatana();
+      this.aimKatana(this.swordAngle);
+    }
+    if (this.slotKatana) this.aimSlotKatana(this.swordAngle);
+    this.syncHiltLayer();
   }
 
   syncVisualOverride(): void {
     if (this.slotKatana) this.puppet.setAttachment('rightHandItem', 'katana');
     else this.puppet.clearAttachment('rightHandItem');
+    this.syncHiltLayer();
   }
 
   resetPosition(): void {
@@ -74,26 +88,31 @@ export class DemoKatanaController {
     if (this.attached) this.aimKatana(this.swordAngle);
     if (this.slotKatana) this.aimSlotKatana(this.swordAngle);
     this.keepBothHandsOnKatana(handTarget, handIK, upperBody, syncOptions);
+    this.syncHiltLayer();
   }
 
   getSecondaryTarget(): IKTarget | undefined {
-    const facing = this.puppet.facingDirection;
-    const secondaryArm = this.puppet.getIK(facing === 'right' ? 'leftArmIK' : 'rightArmIK');
+    const primaryRight = this.primaryRight;
+    const secondaryArm = this.puppet.getIK(primaryRight ? 'leftArmIK' : 'rightArmIK');
     if (!secondaryArm.enabled) return undefined;
-    return this.katana.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary);
+    return this.katana.getGripWorldPosition(primaryRight ? katanaGrips.secondary : katanaGrips.primary);
+  }
+
+  private get primaryRight(): boolean {
+    return !this.swapHandsWithFacing || this.puppet.facingDirection === 'right';
   }
 
   configureArms(handTarget: IKTarget, handIK: boolean, upperBody: boolean): void {
     const rightArm = this.puppet.getIK('rightArmIK');
     const leftArm = this.puppet.getIK('leftArmIK');
-    const facing = this.puppet.facingDirection;
+    const primaryRight = this.primaryRight;
     leftArm.bendDirection = -1;
-    const primaryArm = facing === 'right' ? rightArm : leftArm;
-    const secondaryArm = facing === 'right' ? leftArm : rightArm;
+    const primaryArm = primaryRight ? rightArm : leftArm;
+    const secondaryArm = primaryRight ? leftArm : rightArm;
     primaryArm.priority = 0;
     secondaryArm.priority = 1;
     primaryArm.setEndOffset({ x: 0, y: 0 });
-    secondaryArm.setEndOffset(palmGripOffset);
+    secondaryArm.setEndOffset(this.gripOffset);
     primaryArm.enabled = handIK;
     primaryArm.setTarget(handTarget);
     secondaryArm.enabled =
@@ -101,7 +120,7 @@ export class DemoKatanaController {
     if (upperBody) primaryArm.enabled = true;
     secondaryArm.setTargetProvider(() => {
       this.aimKatana(this.swordAngle);
-      return this.katana.getGripWorldPosition(facing === 'right' ? katanaGrips.secondary : katanaGrips.primary);
+      return this.katana.getGripWorldPosition(primaryRight ? katanaGrips.secondary : katanaGrips.primary);
     });
   }
 
@@ -124,14 +143,45 @@ export class DemoKatanaController {
       if (useSlot) this.puppet.setAttachment('rightHandItem', 'katana');
       else this.puppet.clearAttachment('rightHandItem');
     }
+    this.syncHiltLayer();
+  }
+
+  private syncHiltLayer(): void {
+    if (!this.hiltSlot) return;
+    const behind = this.enabled && this.puppet.facingDirection === 'left';
+    const splitProp = behind && this.attached;
+    if (splitProp !== this.hiltBehind) {
+      if (splitProp) {
+        this.katana.container.remove(this.katana.hilt);
+        this.puppet.attachToSlot(this.hiltSlot, this.katana.hilt);
+      } else {
+        this.puppet.detach(this.katana.hilt);
+        this.katana.hilt.setPosition(0, 0).setRotation(0).setScale(1);
+        this.katana.container.add(this.katana.hilt).sort('depth');
+      }
+      this.hiltBehind = splitProp;
+    }
+    if (splitProp) {
+      // Both mounts follow the right palm; copy the blade's compensated local transform.
+      const blade = this.katana.container;
+      this.katana.hilt.setPosition(blade.x, blade.y).setRotation(blade.rotation).setScale(blade.scaleX, blade.scaleY);
+    }
+    const splitSlot = behind && this.slotKatana;
+    if (splitSlot) this.puppet.setAttachment(this.hiltSlot, 'katana');
+    else this.puppet.clearAttachment(this.hiltSlot);
+    const image = this.puppet.getSlotImage('rightHandItem');
+    if (splitSlot && image) {
+      image.setCrop(slotHiltWidth, 0, image.width - slotHiltWidth, image.height);
+      this.puppet.getSlotImage(this.hiltSlot)?.setCrop(0, 0, slotHiltWidth, image.height).setRotation(image.rotation);
+    } else image?.setCrop();
   }
 
   private attachKatana(): void {
-    const facing = this.puppet.facingDirection;
-    const grip = facing === 'right' ? katanaGrips.primary : katanaGrips.secondary;
-    this.puppet.attach(facing === 'right' ? 'rightHand' : 'leftHand', this.katana.container, {
-      x: palmGripOffset.x - grip.x,
-      y: palmGripOffset.y - grip.y,
+    const primaryRight = this.primaryRight;
+    const grip = primaryRight ? katanaGrips.primary : katanaGrips.secondary;
+    this.puppet.attach(primaryRight ? 'rightHand' : 'leftHand', this.katana.container, {
+      x: this.gripOffset.x - grip.x,
+      y: this.gripOffset.y - grip.y,
     });
   }
 
@@ -148,9 +198,9 @@ export class DemoKatanaController {
     const leftArm = this.puppet.getIK('leftArmIK');
     const rightArm = this.puppet.getIK('rightArmIK');
     const facing = this.puppet.facingDirection;
-    const primaryArm = facing === 'right' ? rightArm : leftArm;
-    const secondaryArm = facing === 'right' ? leftArm : rightArm;
-    const secondaryGrip = facing === 'right' ? katanaGrips.secondary : katanaGrips.primary;
+    const primaryArm = this.primaryRight ? rightArm : leftArm;
+    const secondaryArm = this.primaryRight ? leftArm : rightArm;
+    const secondaryGrip = this.primaryRight ? katanaGrips.secondary : katanaGrips.primary;
     const rearPalmBone = this.puppet.getBone(secondaryArm.endBone);
     const rearPalmOffset = secondaryArm.endOffset;
     const rearPalm = (): IKTarget =>
@@ -163,8 +213,7 @@ export class DemoKatanaController {
       rearPalm,
       syncOptions,
     };
-    // Follow the head's top while crossing between sides. A vertical path
-    // avoids the discontinuous left/right projection at the head's corners.
+    // Finite head bounds allow torso targets to return beneath the head.
     const head = this.puppet.getSlotImage('headVisual');
     // Corrections solve only arm/leg rotations. Body cutouts stay fixed within this pass;
     // rebuild lazily on the next frame so animation, facing, and skin changes remain visible.
@@ -177,19 +226,26 @@ export class DemoKatanaController {
         left: Math.min(...corners.map((point) => point.x)),
         right: Math.max(...corners.map((point) => point.x)),
         top: Math.min(...corners.map((point) => point.y)),
+        bottom: Math.max(...corners.map((point) => point.y)),
       };
-      this.rearPalmPath = updatePalmPath(
-        this.rearPalmPath,
-        rearPalm(),
-        headBounds,
-        facing === 'right' || secondaryArm.status === 'solved',
-        palmVisibilityMargin,
-      );
+      // Release the overhead lock when the cursor returns to the torso.
+      this.rearPalmPath =
+        handTarget.y > headBounds.bottom + palmVisibilityMargin
+          ? { ...this.rearPalmPath, overHead: false }
+          : updatePalmPath(
+              this.rearPalmPath,
+              rearPalm(),
+              headBounds,
+              facing === 'right' || secondaryArm.status === 'solved',
+              palmVisibilityMargin,
+            );
     }
     this.correctPalmClearance(solve, bodyCorners, headBounds);
     if (this.previousRearPalm && headBounds) {
       this.smoothPalmPath(solve, this.previousRearPalm, headBounds);
       this.recoverSecondaryReach(solve);
+      // Smoothing and reach recovery must not carry the gripping hand through the body.
+      this.correctPalmClearance(solve, bodyCorners, headBounds);
     }
     this.previousRearPalm = rearPalm();
   }
@@ -207,11 +263,14 @@ export class DemoKatanaController {
     headBounds: HeadBounds | undefined,
   ): void {
     for (let pass = 0; pass < 24; pass += 1) {
+      if (solve.primaryArm.status === 'clamped') {
+        // Recover the front wrist first, otherwise an unreachable mouse target can defeat body clearance.
+        const correction = this.armReachCorrection(solve.primaryArm, solve.target);
+        this.applyGripCorrection(solve, correction);
+      }
       const grip = this.katana.getGripWorldPosition(solve.secondaryGrip);
       const reachCorrection =
-        solve.secondaryArm.status === 'clamped'
-          ? this.secondaryReachCorrection(solve.secondaryArm, grip)
-          : { x: 0, y: 0 };
+        solve.secondaryArm.status === 'clamped' ? this.armReachCorrection(solve.secondaryArm, grip) : { x: 0, y: 0 };
       const palm = solve.rearPalm();
       const correction = palmClearanceCorrection(
         palm,
@@ -220,6 +279,7 @@ export class DemoKatanaController {
         this.rearPalmPath.overHead ? undefined : this.bodyEdgesAt(palm.y, bodyCorners),
         headBounds,
         palmVisibilityMargin,
+        this.bodyClearanceMargin,
       );
       if (Math.hypot(correction.x, correction.y) < 0.01) break;
       if (!this.applyGripCorrection(solve, correction)) break;
@@ -238,7 +298,7 @@ export class DemoKatanaController {
   private recoverSecondaryReach(solve: GripSolve): void {
     // The bounded path can leave the second arm's reach even when its endpoints are reachable.
     for (let pass = 0; pass < 12 && solve.secondaryArm.status === 'clamped'; pass += 1) {
-      const correction = this.secondaryReachCorrection(
+      const correction = this.armReachCorrection(
         solve.secondaryArm,
         this.katana.getGripWorldPosition(solve.secondaryGrip),
       );
@@ -247,7 +307,7 @@ export class DemoKatanaController {
     }
   }
 
-  private secondaryReachCorrection(arm: TwoBoneIKConstraint, grip: IKTarget): IKTarget {
+  private armReachCorrection(arm: TwoBoneIKConstraint, grip: IKTarget): IKTarget {
     const shoulder = this.puppet.getBone(arm.rootBone).getWorldPosition();
     const elbow = this.puppet.getBone(arm.middleBone).getWorldPosition();
     const palm = this.puppet
@@ -280,15 +340,34 @@ export class DemoKatanaController {
   ): { left: number; right: number } | undefined {
     let left: number | undefined;
     let right: number | undefined;
-    for (const id of ['head', 'torso', 'pelvis']) {
+    for (const id of [
+      'head',
+      'torso',
+      'pelvis',
+      'leftThigh',
+      'rightThigh',
+      'leftLowerLeg',
+      'rightLowerLeg',
+      'leftFoot',
+      'rightFoot',
+    ]) {
       if (!bodyCorners.has(id)) {
-        const sprite = this.puppet.getSlotImage(`${id}Visual`);
+        const slotId = `${id}Visual`;
+        const sprite = this.puppet.rig.slots.some((slot) => slot.id === slotId)
+          ? this.puppet.getSlotImage(slotId)
+          : undefined;
         bodyCorners.set(id, sprite ? this.cutoutCorners(sprite) : undefined);
       }
       const corners = bodyCorners.get(id);
       if (!corners) continue;
       const edges = horizontalEdgesAtY(corners, y);
       if (edges) {
+        if (id === 'head') {
+          // The tunable body overlap applies to torso/legs; the head keeps its full safety margin.
+          const extra = palmVisibilityMargin - this.bodyClearanceMargin;
+          edges.left -= extra;
+          edges.right += extra;
+        }
         left = Math.min(left ?? Infinity, edges.left);
         right = Math.max(right ?? -Infinity, edges.right);
       }
@@ -301,7 +380,7 @@ export class DemoKatanaController {
     const rotation = this.katanaRotationIn(this.katana.container.parentContainer, angle);
     if (rotation === undefined) return;
     this.katana.container.setRotation(rotation);
-    const grip = this.puppet.facingDirection === 'right' ? katanaGrips.primary : katanaGrips.secondary;
+    const grip = this.primaryRight ? katanaGrips.primary : katanaGrips.secondary;
     this.katana.container.setPosition(
       grip.x - (Math.cos(rotation) * grip.x - Math.sin(rotation) * grip.y),
       grip.y - (Math.sin(rotation) * grip.x + Math.cos(rotation) * grip.y),

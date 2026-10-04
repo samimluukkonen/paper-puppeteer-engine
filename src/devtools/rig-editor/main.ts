@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { demoIK } from '../../demo/demoIK.js';
+import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { createControlsController } from './ControlsController.js';
 import { mountEditorMarkup } from './editorMarkup.js';
 import { createHierarchyController } from './HierarchyController.js';
@@ -13,6 +14,7 @@ import './style.css';
 const app = document.querySelector<HTMLElement>('#editor-app');
 if (!app) throw new Error('Missing rig editor host.');
 mountEditorMarkup(app);
+const releaseCharacterSelection = bindCharacterSelection(app);
 
 const session = createSessionController(app, () => scene);
 const releaseNavigationGuard = protectUnsavedChanges(session.hasUnsavedChanges);
@@ -25,7 +27,10 @@ const render = (editor: RigEditor): void => {
   controls.render(editor);
   inspector.render(editor);
 };
-const scene = new RigEditorScene(render, inspector.showError, { ikChains: demoIK });
+const scene = new RigEditorScene(render, inspector.showError, {
+  characterUrl: `../characters/${selectedCharacterId()}/character.json`,
+  ikChains: demoIK,
+});
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'editor-stage',
@@ -39,6 +44,7 @@ const game = new Phaser.Game({
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
     releaseNavigationGuard();
+    releaseCharacterSelection();
     inspector.dispose();
     controls.dispose();
     hierarchy.dispose();

@@ -3,6 +3,7 @@ import type { DemoState } from './demo/DemoScene.js';
 import { DemoScene } from './demo/DemoScene.js';
 import { createDemoCommands } from './demo/demoCommands.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
+import { bindCharacterSelection, selectedCharacterId } from './ui/characterSelection.js';
 import { viewHeader } from './ui/viewShell.js';
 import './style.css';
 
@@ -98,6 +99,14 @@ app.innerHTML = `
   <footer><span>Paper Puppeteer Engine</span><span>Rigid cutouts / hierarchical transforms / endless possibilities</span></footer>
 `;
 
+const releaseCharacterSelection = bindCharacterSelection(app);
+const sketch = selectedCharacterId() === 'random-paperdoll-sketch';
+if (sketch) {
+  app.querySelector('.intro')!.textContent =
+    'Test the artist’s sketch with animation, planted feet, and a two-handed katana.';
+  app.querySelector<HTMLElement>('.limb-legend')!.hidden = true;
+}
+
 function updateControls(state: DemoState): void {
   const pressed: Record<string, boolean> = {
     idle: state.animation === 'idle',
@@ -129,7 +138,7 @@ function updateControls(state: DemoState): void {
   document.querySelector('.status-dot')?.classList.toggle('stopped', !state.playing);
 }
 
-const demo = new DemoScene(updateControls);
+const demo = new DemoScene(updateControls, `characters/${selectedCharacterId()}/character.json`);
 export const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'stage',
@@ -150,4 +159,8 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]
   });
 }
 
-if (import.meta.hot) import.meta.hot.dispose(() => game.destroy(true));
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    releaseCharacterSelection();
+    game.destroy(true);
+  });

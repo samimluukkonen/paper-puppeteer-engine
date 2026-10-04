@@ -84,7 +84,9 @@ In stance `3`, the front arm runs at priority 0 and follows the mouse target. It
 
 The demo uses bend direction `-1` for both elbows in the two-handed stance. Both hands follow their grip points without moving the shoulders.
 
-In the two-handed stance, the blade can turn through a horizontal overhead pose. In either facing direction, the rear palm stays outside the head, torso, and pelvis cutouts. It travels around the head's top corners in bounded steps, so moving the mouse or rotating the sword cannot make the hands snap across the face. The demo checks the cutout edges at the palm's height and adjusts the front arm's hand target when either input would carry the rear palm behind the body. Both shoulders stay fixed and both palms stay on the hilt.
+In the two-handed stance, the blade can turn through a horizontal overhead pose. In either facing direction, the rear palm stays outside the head, torso, pelvis, and both legs, including the feet. It travels around the head's corners in bounded steps and can return below the head to torso height. Crossing to the body's other side still requires passing above the head. The demo checks the cutout edges at the palm's height and adjusts the front arm's hand target when either input would carry the rear palm behind the body. Both arms' reach limits are respected, and clearance is checked again after smoothing and reach recovery. Both shoulders stay fixed and both palms stay on the hilt.
+
+The sketch swaps its actual limb chains when facing left while keeping the right hand on the primary grip in both directions. The left hand holds the secondary grip and obeys the same torso and leg restrictions in its two-handed sword stance and upper-body sword layer while walking. Its body clearance margin is −4 pixels, allowing a small overlap at the body edge while retaining the eight-pixel head clearance. When facing left, the hilt follows the right palm in the `katanaHilt` slot behind the right leg; the blade keeps its foreground layer. This applies to both the grip-aware prop and the one-handed slot sprite.
 
 ```ts
 // Assume katana is attached at its primary grip and both arm chains are registered.
@@ -108,3 +110,5 @@ puppet.detach(prop);
 ```
 
 Attached props inherit all ancestor transforms and facing, and draw in their bone's global slot. Attachment `depth` sorts relative to that bone's image and other props. `detach` returns `true` when it releases a registered prop back to the scene display list; the object survives with its original local transform. It does **not** preserve world coordinates automatically. Reattaching moves the object to the new mount. Attached objects are destroyed with the puppet; detach anything you want to keep before `puppet.destroy()`. The puppet removes its update hooks and debug objects on scene shutdown or destruction.
+
+Use `puppet.attachToSlot('weaponHilt', prop)` to inherit a rig slot's transform and global depth instead. The prop and the slot's sprite can coexist; clearing or changing the sprite preserves the prop. The same attachment offsets and lifecycle apply, with `depth` sorting within that slot. `setSlotDepth` can move the entire slot behind another body part without changing the prop's bone assignment.

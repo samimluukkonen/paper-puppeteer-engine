@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "id": "random-paperdoll-sketch",
+  "rig": "rig.json",
+  "defaultSkin": "default",
+  "skins": {
+    "default": "skins/default.json",
+    "alternate": "skins/alternate.json",
+    "helmet-only": "skins/helmet-only.json"
+  },
+  "animations": [
+    "animations/idle.json",
+    "animations/walk.json",
+    "animations/combat-idle.json",
+    "animations/guard-upper-body.json"
+  ],
+  "textures": {
+    "random-paperdoll-torso": "Torso.PNG",
+    "random-paperdoll-head": "Head.PNG",
+    "random-paperdoll-leftUpperArm": "upper arm back.PNG",
+    "random-paperdoll-leftForearm": "lower arm back.PNG",
+    "random-paperdoll-leftHand": "hand back.PNG",
+    "random-paperdoll-rightUpperArm": "upper arm front.PNG",
+    "random-paperdoll-rightForearm": "lower arm front.PNG",
+    "random-paperdoll-rightHand": "hand front.PNG",
+    "random-paperdoll-leftThigh": "Upper leg back.PNG",
+    "random-paperdoll-leftLowerLeg": "Lower leg back.PNG",
+    "random-paperdoll-leftFoot": "foot back.PNG",
+    "random-paperdoll-rightThigh": "Upper leg front.PNG",
+    "random-paperdoll-rightLowerLeg": "Lower leg front.PNG",
+    "random-paperdoll-rightFoot": "foot front.PNG",
+    "random-paperdoll-demo-armor": "../demo-puppet/images/paper-armor-torso.png",
+    "random-paperdoll-demo-grip": "../demo-puppet/images/paper-right-grip-hand.png",
+    "random-paperdoll-demo-kabuto": "../demo-puppet/images/paper-kabuto.png",
+    "random-paperdoll-demo-katana": "../demo-puppet/images/paper-slot-katana.png"
+  },
+  "poses": ["poses/combat-ready.json"]
+}

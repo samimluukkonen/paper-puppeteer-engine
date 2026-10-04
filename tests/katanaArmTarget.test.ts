@@ -24,7 +24,7 @@ test('grip corrections continue while either coordinate makes progress', () => {
 });
 
 test('palm path switches sides above the head and descends only outside its margin', () => {
-  const head = { left: 0, right: 60, top: 0 };
+  const head = { left: 0, right: 60, top: 0, bottom: 30 };
   const previous = { side: 'right' as const, overHead: false };
   const above = updatePalmPath(previous, { x: 20, y: -8 }, head, true, 8);
   assert.deepEqual(above, { side: 'left', overHead: true });
@@ -45,15 +45,43 @@ test.each(['left', 'right'] as const)('palm clearance keeps the stronger %s outw
   });
   assert.deepEqual(palmClearanceCorrection(palm, { x: 35 * sign, y: 4 }, path, edges, undefined, 8), {
     x: sign * 35,
-    y: 0,
+    y: 4,
   });
 });
 
 test('overhead clearance routes above the head without pushing toward a silhouette edge', () => {
   const path = { side: 'left' as const, overHead: true };
-  const head = { left: 0, right: 60, top: 0 };
+  const head = { left: 0, right: 60, top: 0, bottom: 30 };
   assert.deepEqual(palmClearanceCorrection({ x: 30, y: 4 }, { x: 2, y: -3 }, path, head, head, 8), { x: 2, y: -12 });
   assert.deepEqual(palmClearanceCorrection({ x: -9, y: 4 }, { x: 2, y: -3 }, path, head, head, 8), { x: 2, y: -3 });
+});
+
+test('zero body margin allows touching the boundary and retains full overhead clearance', () => {
+  const palm = { x: 60, y: 10 };
+  const head = { left: 0, right: 60, top: 0, bottom: 30 };
+  assert.deepEqual(
+    palmClearanceCorrection(palm, { x: 0, y: 0 }, { side: 'right', overHead: false }, head, head, 8, 0),
+    { x: 0, y: 0 },
+  );
+  assert.deepEqual(palmClearanceCorrection(palm, { x: 0, y: 0 }, { side: 'right', overHead: true }, head, head, 8, 0), {
+    x: 0,
+    y: -18,
+  });
+});
+
+test.each(['left', 'right'] as const)('negative body margin limits overlap to four pixels on the %s', (side) => {
+  const edges = { left: 0, right: 60 };
+  const boundary = side === 'right' ? 56 : 4;
+  const inward = side === 'right' ? -1 : 1;
+  const path = { side, overHead: false };
+  assert.deepEqual(palmClearanceCorrection({ x: boundary, y: 10 }, { x: 0, y: 0 }, path, edges, undefined, 8, -4), {
+    x: 0,
+    y: 0,
+  });
+  assert.deepEqual(
+    palmClearanceCorrection({ x: boundary + inward, y: 10 }, { x: 0, y: 0 }, path, edges, undefined, 8, -4),
+    { x: -inward, y: 0 },
+  );
 });
 
 test('an in-range secondary grip leaves the primary hand target alone', () => {
@@ -85,7 +113,7 @@ test('body silhouette edge follows the cutout at the palm height', () => {
 });
 
 test('a palm crossing the head climbs its near corner before moving across', () => {
-  const head = { left: 0, right: 60, top: 0 };
+  const head = { left: 0, right: 60, top: 0, bottom: 30 };
   const step = stepPalmAroundHead({ x: 68, y: 20 }, { x: 30, y: -8 }, head, 8, 8);
   assert.deepEqual(step, { x: 68, y: 12 });
   const across = stepPalmAroundHead({ x: 68, y: -8 }, { x: 30, y: -8 }, head, 8, 8);
@@ -94,4 +122,45 @@ test('a palm crossing the head climbs its near corner before moving across', () 
   assert.deepEqual(reverse, { x: -8, y: 12 });
   const descent = stepPalmAroundHead({ x: 30, y: -8 }, { x: -8, y: 20 }, head, 8, 8);
   assert.deepEqual(descent, { x: 22, y: -8 });
+});
+
+test.each(['left', 'right'] as const)(
+  'moving inward below the head from the %s keeps the hands at torso height',
+  (side) => {
+    const head = { left: 0, right: 60, top: 0, bottom: 30 };
+    const previous = { x: side === 'right' ? 68 : -8, y: 80 };
+    const step = stepPalmAroundHead(previous, { x: 30, y: 80 }, head, 8, 8);
+    assert.deepEqual(step, { x: side === 'right' ? 60 : 0, y: 80 });
+  },
+);
+
+test('secondary reach can lower the hands when no overhead clearance is needed', () => {
+  assert.deepEqual(
+    palmClearanceCorrection(
+      { x: 80, y: 80 },
+      { x: -2, y: 5 },
+      { side: 'right', overHead: false },
+      undefined,
+      undefined,
+      8,
+    ),
+    { x: -2, y: 5 },
+  );
+});
+
+test.each(['left', 'right'] as const)(
+  'a palm just below the head can move inward from the %s without another detour',
+  (side) => {
+    const head = { left: 0, right: 60, top: 0, bottom: 30 };
+    const x = side === 'right' ? 68 : -8;
+    const step = stepPalmAroundHead({ x, y: 34 }, { x: 30, y: 80 }, head, 8, 8);
+    assert.isAbove(step.y, 34);
+    assert.isAbove((step.x - x) * (side === 'right' ? -1 : 1), 0);
+  },
+);
+
+test.each(['left', 'right'] as const)('returning to the torso from the %s head edge takes the lower corner', (side) => {
+  const head = { left: 0, right: 60, top: 0, bottom: 30 };
+  const x = side === 'right' ? 68 : -8;
+  assert.deepEqual(stepPalmAroundHead({ x, y: 20 }, { x: 30, y: 80 }, head, 8, 8), { x, y: 28 });
 });

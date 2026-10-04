@@ -14,7 +14,11 @@ vi.mock('phaser', () => ({
 function fixture() {
   const scene = puppetScene();
   const puppet = new Puppet(scene, {
-    rig: { root: 'root', bones: [{ id: 'root' }, { id: 'hand', parent: 'root' }] },
+    rig: {
+      root: 'root',
+      bones: [{ id: 'root' }, { id: 'hand', parent: 'root' }],
+      slots: [{ id: 'propSlot', bone: 'hand', x: 4, y: 6, rotation: 0.2, depth: -20 }],
+    },
     autoUpdate: false,
   });
   const prop = scene.add.container(0, 0);
@@ -119,4 +123,50 @@ test('puppet teardown removes prop listeners before destroying rendering', () =>
   assert.equal(events.listenerCount('destroy'), 0);
   assert.doesNotThrow(() => prop.destroy());
   assert.doesNotThrow(() => puppet.destroy());
+});
+
+test('slot props inherit the slot transform and global depth, and retain attachment lifecycle', () => {
+  const { puppet, prop, mount, events } = fixture();
+  puppet.setFacing('left');
+  Object.assign(puppet.getBone('hand').pose, { x: 10, y: 20, rotation: 0.3, scaleX: 1.2, scaleY: 0.8 });
+  puppet.syncPose();
+  puppet.attachToSlot('propSlot', prop, { x: 2, y: 3 });
+  const slotPoint = {
+    x: 4 + 2 * Math.cos(0.2) - 3 * Math.sin(0.2),
+    y: 6 + 2 * Math.sin(0.2) + 3 * Math.cos(0.2),
+  };
+  const expected = puppet.getBone('hand').container.getWorldTransformMatrix().transformPoint(slotPoint.x, slotPoint.y);
+  const actual = prop.getWorldTransformMatrix().transformPoint(0, 0);
+  assert.approximately(actual.x, expected.x, 1e-8);
+  assert.approximately(actual.y, expected.y, 1e-8);
+  let branch = mount();
+  while (branch.parentContainer?.parentContainer !== puppet.container) branch = branch.parentContainer!;
+  assert.equal(branch.depth, -20);
+  puppet.setSlotDepth('propSlot', -25);
+  assert.equal(branch.depth, -25);
+  assert.equal(events.listenerCount('destroy'), 1);
+  const wrapper = mount();
+  puppet.attach('hand', prop);
+  assert.isTrue(wrapper.isDestroyed);
+  assert.equal(events.listenerCount('destroy'), 1);
+  puppet.attachToSlot('propSlot', prop);
+  const current = mount();
+  prop.destroy();
+  assert.isTrue(current.isDestroyed);
+  assert.isFalse(puppet.detach(prop));
+  puppet.destroy();
+});
+
+test('invalid slot props fail before allocating wrappers or changing an existing attachment', () => {
+  const { puppet, prop, mount } = fixture();
+  puppet.attach('hand', prop);
+  const current = mount();
+  const create = vi.spyOn(prop.scene!.add, 'container');
+  assert.throws(() => puppet.attachToSlot('unknown', prop), /Unknown slot/);
+  assert.throws(() => puppet.attachToSlot('propSlot', prop, { rotation: Number.NaN }), /finite/);
+  assert.throws(() => puppet.attachToSlot('propSlot', puppetScene().add.container()), /puppet scene/);
+  assert.equal(create.mock.calls.length, 0);
+  assert.equal(mount(), current);
+  create.mockRestore();
+  puppet.destroy();
 });

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "combat-ready",
+  "bones": {
+    "torso": {
+      "rotation": -0.08
+    },
+    "rightUpperArm": {
+      "rotation": 0.534851
+    },
+    "rightForearm": {
+      "rotation": -0.95707
+    },
+    "leftUpperArm": {
+      "rotation": -0.061778
+    },
+    "leftForearm": {
+      "rotation": -0.593806
+    }
+  }
+}

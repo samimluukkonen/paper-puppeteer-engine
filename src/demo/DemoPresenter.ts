@@ -11,6 +11,7 @@ import {
   demoSlotDepths,
 } from './demoPresentation.js';
 import { Katana } from './Katana.js';
+import { SketchFacingLayout } from './SketchFacingLayout.js';
 
 export interface DemoPresenterOptions {
   handIK: boolean;
@@ -50,6 +51,7 @@ export function createDemoBackdrop(scene: Phaser.Scene): void {
 export class DemoPresenter {
   readonly katana: DemoKatanaController;
   readonly feet: DemoFootPlanting;
+  readonly sketchFacing: SketchFacingLayout | undefined;
   handTarget: IKTarget;
   private readonly markers: Phaser.GameObjects.Graphics;
   private renderOrder: readonly string[] | undefined;
@@ -61,15 +63,31 @@ export class DemoPresenter {
   constructor(
     scene: Phaser.Scene,
     private readonly puppet: Puppet,
+    private readonly sampleLayout = true,
   ) {
-    this.katana = new DemoKatanaController(puppet, new Katana(scene));
-    this.feet = new DemoFootPlanting(scene, puppet);
+    this.katana = new DemoKatanaController(
+      puppet,
+      new Katana(scene),
+      sampleLayout,
+      { x: 0, y: sampleLayout ? 15 : 18 },
+      sampleLayout ? 8 : -4,
+    );
+    this.feet = new DemoFootPlanting(scene, puppet, sampleLayout);
+    this.sketchFacing = sampleLayout ? undefined : new SketchFacingLayout(puppet);
     this.handTarget = { x: scene.scale.width / 2 + 55, y: scene.scale.height - 320 };
     this.markers = scene.add.graphics().setDepth(100);
   }
 
   clearTargets(): void {
     this.markers.clear();
+    this.feet.resetFootRotation();
+    this.sketchFacing?.forgetPose();
+  }
+
+  /** Restore canonical limbs before sampling or snapshotting an animation. */
+  preparePose(): void {
+    this.puppet.preparePose();
+    this.sketchFacing?.restoreAuthoredPose();
   }
 
   /** Retain the presentation correction before playback snapshots an interrupted fade. */
@@ -81,8 +99,25 @@ export class DemoPresenter {
     this.katana.syncMode(options.upperBody);
     this.katana.resetPosition();
     // Reuse this frame's sample, or restore it for paused frames and control changes.
-    this.puppet.preparePose();
-    if (!poseEvaluated) this.puppet.animationPlayer.applyCurrentPose();
+    if (poseEvaluated) this.puppet.preparePose();
+    else {
+      this.preparePose();
+      this.puppet.animationPlayer.applyCurrentPose();
+    }
+    if (this.sampleLayout) this.applySampleLayout();
+    this.sketchFacing?.applyPose();
+    this.sketchFacing?.syncVisuals();
+    this.katana.configureArms(this.handTarget, options.handIK, options.upperBody);
+    const feet = this.feet.update(options.footIK);
+    this.katana.setInitialRotation();
+    this.puppet.syncPose({ updateDebug: false });
+    this.feet.syncFootRotation(feet.walkFeet);
+    this.katana.solveGrip(this.handTarget, options.handIK, options.upperBody, { updateDebug: false });
+    this.puppet.refreshDebugViews();
+    this.drawTargets(options, feet.targets, feet.walkFeet);
+  }
+
+  private applySampleLayout(): void {
     this.syncRenderOrder();
     const shoulders = demoShoulderPositions(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection);
     for (const [id, x] of Object.entries(shoulders)) this.puppet.getBone(id).pose.x = x;
@@ -116,13 +151,6 @@ export class DemoPresenter {
     this.puppet.setDebugLabelSide('leftLowerLeg', idle && this.puppet.facingDirection === 'left' ? 'right' : undefined);
     this.puppet.setDebugLabelSide('rightFoot', idle && this.puppet.facingDirection === 'left' ? 'left' : undefined);
     this.puppet.setDebugLabelSide('leftFoot', idle && this.puppet.facingDirection === 'right' ? 'right' : undefined);
-    this.katana.configureArms(this.handTarget, options.handIK, options.upperBody);
-    const feet = this.feet.update(options.footIK);
-    this.katana.setInitialRotation();
-    this.puppet.syncPose({ updateDebug: false });
-    this.katana.solveGrip(this.handTarget, options.handIK, options.upperBody, { updateDebug: false });
-    this.puppet.refreshDebugViews();
-    this.drawTargets(options, feet.targets, feet.walkFeet);
   }
 
   private syncRenderOrder(): void {

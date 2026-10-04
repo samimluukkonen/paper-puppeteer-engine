@@ -1,4 +1,5 @@
 import packageInfo from '../../package.json';
+import { characterChoices, selectedCharacterId } from './characterSelection.js';
 import puppetLogo from './images/puppet-running-header.png';
 import './viewShell.css';
 
@@ -13,6 +14,8 @@ export function viewHeader(view: keyof typeof views): string {
   const current = views[view];
   const root = view === 'demo' ? './' : '../';
   const status = view === 'rig' ? '<p id="dirty-status"></p>' : '';
+  const characterId = selectedCharacterId();
+  const characterQuery = characterId === 'demo-puppet' ? '' : `?character=${characterId}`;
   return `
     <header class="view-header">
       <div class="view-header-top">
@@ -24,12 +27,15 @@ export function viewHeader(view: keyof typeof views): string {
           <h1>${current.title}${view === 'rig' ? ' <span class="view-title-badge">Bind Pose</span>' : ''}</h1>
           <p${view === 'animation' ? ' id="character-status"' : ''}>${current.description}</p>
           ${status}
+          <label class="character-choice">Character <select id="character-selection">${characterChoices
+            .map(({ id, label }) => `<option value="${id}"${id === characterId ? ' selected' : ''}>${label}</option>`)
+            .join('')}</select></label>
         </div>
         <nav class="view-navigation" aria-label="Views">
           ${Object.entries(views)
             .map(
               ([id, item]) =>
-                `<a href="${root}${item.path}"${id === view ? ' aria-current="page"' : ''}>${item.title}</a>`,
+                `<a href="${root}${item.path}${characterQuery}"${id === view ? ' aria-current="page"' : ''}>${item.title}</a>`,
             )
             .join('')}
         </nav>
