@@ -1,11 +1,11 @@
 import type { AnimationClip, AnimationEvent, AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
 import { compileClip, copyAnimationEvent, ownCompiledClip } from './AnimationClip.js';
-import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer, evaluateClip } from './AnimationPose.js';
-import { quantizePlaybackTime } from './animationMath.js';
+import { type AnimationLayer, AnimationLayerEvaluator, type AnimationState } from './AnimationLayerEvaluator.js';
+import type { AnimationPose } from './AnimationPose.js';
 import { advanceAnimationTime, collectAnimationEvents, countAnimationEvents } from './animationTimeline.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
-import { assertFinite, type TransformProperty, transformProperties } from './types.js';
+import { assertFinite } from './types.js';
 
 export interface PlayAnimationOptions {
   fadeDuration?: number;
@@ -29,33 +29,6 @@ export interface AnimationCompletion {
   layer: string;
 }
 
-interface AnimationState {
-  clip: CompiledClip;
-  time: number;
-  speed: number;
-  playing: boolean;
-}
-
-interface AnimationTransition {
-  source: AnimationState | AnimationPose;
-  elapsed: number;
-  duration: number;
-}
-
-interface AnimationLayer {
-  state?: AnimationState;
-  transition: AnimationTransition | undefined;
-  mask?: ReadonlySet<string>;
-  weight: number;
-  stopped: boolean;
-}
-
-interface LayerBuffers {
-  target: ClipPoseBuffer;
-  source: ClipPoseBuffer;
-  blended: AnimationPose;
-}
-
 function validateSpeed(speed: number): void {
   assertFinite(speed, 'Animation speed');
   if (speed < 0) throw new Error('Animation speed cannot be negative.');
@@ -71,11 +44,7 @@ export class AnimationPlayer {
   ]);
   private readonly eventListeners = new Set<(event: FiredAnimationEvent) => void>();
   private readonly completionListeners = new Set<(event: AnimationCompletion) => void>();
-  private readonly workingPose: AnimationPose = new Map();
-  private readonly emptyPose: AnimationPose = new Map();
-  private readonly controlled = new Map<string, Set<TransformProperty>>();
-  private controlDirty = true;
-  private readonly layerBuffers = new WeakMap<AnimationLayer, LayerBuffers>();
+  private readonly poseEvaluator: AnimationLayerEvaluator;
   private playback: AnimationPlaybackMode = { mode: 'smooth' };
   private speed = 1;
   private paused = false;
@@ -95,11 +64,7 @@ export class AnimationPlayer {
       }
       this.clips.set(clip.name, ownCompiledClip(clip));
     }
-    for (const bone of rig.bones) {
-      if (!joints.has(bone.id)) throw new Error(`Missing joint "${bone.id}".`);
-      this.workingPose.set(bone.id, { ...joints.get(bone.id)!.bindPose });
-      this.controlled.set(bone.id, new Set());
-    }
+    this.poseEvaluator = new AnimationLayerEvaluator(rig, joints);
   }
 
   get currentAnimation(): string | undefined {
@@ -138,7 +103,7 @@ export class AnimationPlayer {
     return {
       from: transition.source instanceof Map ? 'previous pose' : transition.source.clip.name,
       to: layer.state.clip.name,
-      progress: this.transitionWeight(layer.state, transition),
+      progress: this.poseEvaluator.transitionWeight(layer.state, transition, this.playback),
     };
   }
 
@@ -179,15 +144,20 @@ export class AnimationPlayer {
     if (fade > 0) {
       if (layer.state)
         source = layer.transition
-          ? this.evaluateLayer(layer, this.underlyingPose(layerName), true)
+          ? this.poseEvaluator.evaluateLayer(
+              layer,
+              this.poseEvaluator.underlyingPose(layerName, this.layers, this.playback),
+              this.playback,
+              true,
+            )
           : { ...layer.state };
       else if (layerName !== 'base') source = new Map();
     }
-    if (layerName !== 'base' && !source) this.resetLayerProperties(layer);
+    if (layerName !== 'base' && !source) this.poseEvaluator.resetLayerProperties(layer);
     layer.state = { clip, time: 0, speed, playing: true };
     layer.transition = source ? { source, elapsed: 0, duration: fade } : undefined;
     layer.stopped = false;
-    this.controlDirty = true;
+    this.poseEvaluator.invalidate();
     if (layerName === 'base' && !source) this.resetPose();
     this.applyCurrentPose();
     synchronizePose?.();
@@ -239,9 +209,9 @@ export class AnimationPlayer {
     for (const id of bones) this.rig.getBone(id);
     preparePose?.();
     const layer = this.getOrCreateLayer(name);
-    this.resetLayerProperties(layer);
+    this.poseEvaluator.resetLayerProperties(layer);
     layer.mask = new Set(bones);
-    this.controlDirty = true;
+    this.poseEvaluator.invalidate();
     this.applyCurrentPose();
   }
 
@@ -253,9 +223,9 @@ export class AnimationPlayer {
     if (weight < 0 || weight > 1) throw new Error('Layer weight must be between 0 and 1.');
     preparePose?.();
     const layer = this.getOrCreateLayer(name);
-    if (weight === 0 && layer.weight > 0) this.resetLayerProperties(layer);
+    if (weight === 0 && layer.weight > 0) this.poseEvaluator.resetLayerProperties(layer);
     layer.weight = weight;
-    this.controlDirty = true;
+    this.poseEvaluator.invalidate();
     this.applyCurrentPose();
   }
 
@@ -265,9 +235,9 @@ export class AnimationPlayer {
     if (name === 'base') throw new Error('The base layer cannot be cleared.');
     preparePose?.();
     const layer = this.layers.get(name);
-    if (layer) this.resetLayerProperties(layer);
+    if (layer) this.poseEvaluator.resetLayerProperties(layer);
     this.layers.delete(name);
-    this.controlDirty = true;
+    this.poseEvaluator.invalidate();
     this.applyCurrentPose();
   }
 
@@ -276,7 +246,7 @@ export class AnimationPlayer {
     this.assertActive();
     this.layers.clear();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
-    this.controlDirty = true;
+    this.poseEvaluator.invalidate();
   }
 
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
@@ -350,7 +320,7 @@ export class AnimationPlayer {
       for (const layer of this.layers.values()) {
         if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
           layer.transition = undefined;
-          this.controlDirty = true;
+          this.poseEvaluator.invalidate();
         }
       }
     }
@@ -366,150 +336,13 @@ export class AnimationPlayer {
     assertFinite(time, 'Sample time');
     const state = this.layers.get('base')?.state;
     if (!state) return;
-    const clampedTime = Math.max(0, Math.min(time, state.clip.duration));
-    const pose = evaluateClip(
-      state.clip,
-      options.mode === 'playback' ? this.sampleTime(state.clip, clampedTime) : clampedTime,
-    );
-    this.updateControlledProperties();
-    for (const [id, properties] of this.controlled) {
-      const joint = this.joints.get(id)!;
-      for (const property of properties) joint.pose[property] = joint.bindPose[property];
-    }
-    for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
+    this.poseEvaluator.sample(state, time, options.mode === 'playback', this.layers, this.playback);
   }
 
   /** Reapply the held authored pose; useful before external per-frame adjustments. */
   applyCurrentPose(): void {
     this.assertActive();
-    const base = this.layers.get('base');
-    const pose = this.workingPose;
-    for (const [id, values] of pose) {
-      const bindPose = this.joints.get(id)!.bindPose;
-      for (const property of transformProperties) values[property] = bindPose[property];
-    }
-    if (base?.state) blendPoseInto(pose, this.emptyPose, this.evaluateLayer(base, pose), 1);
-    for (const [name, layer] of this.layers) {
-      if (name === 'base' || !layer.state || layer.weight === 0) continue;
-      blendPoseInto(pose, this.emptyPose, this.evaluateLayer(layer, pose), layer.weight, layer.mask);
-    }
-    this.updateControlledProperties();
-    const controlled = this.controlled;
-    for (const [id, values] of pose) {
-      const joint = this.joints.get(id)!;
-      for (const property of transformProperties) {
-        if (!controlled.get(id)?.has(property)) values[property] = joint.pose[property];
-      }
-    }
-    for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
-  }
-
-  private updateControlledProperties(): void {
-    if (!this.controlDirty) return;
-    for (const properties of this.controlled.values()) properties.clear();
-    for (const layer of this.layers.values()) this.markLayerControlled(this.controlled, layer);
-    this.controlDirty = false;
-  }
-
-  private markLayerControlled(controlled: Map<string, Set<TransformProperty>>, layer: AnimationLayer): void {
-    if (!layer.state || layer.weight === 0) return;
-    this.markControlled(controlled, layer.state.clip, layer.mask);
-    const source = layer.transition?.source;
-    if (source && !(source instanceof Map)) this.markControlled(controlled, source.clip, layer.mask);
-    else if (source instanceof Map) {
-      for (const [id, values] of source) {
-        if (layer.mask && !layer.mask.has(id)) continue;
-        const properties = controlled.get(id) ?? new Set<TransformProperty>();
-        for (const property of transformProperties) if (values[property] !== undefined) properties.add(property);
-        controlled.set(id, properties);
-      }
-    }
-  }
-
-  private markControlled(
-    controlled: Map<string, Set<TransformProperty>>,
-    clip: CompiledClip,
-    mask?: ReadonlySet<string>,
-  ): void {
-    for (const track of clip.tracks) {
-      if (mask && !mask.has(track.bone)) continue;
-      const properties = controlled.get(track.bone) ?? new Set<TransformProperty>();
-      for (const property of track.properties.keys()) properties.add(property);
-      controlled.set(track.bone, properties);
-    }
-  }
-
-  private resetLayerProperties(layer: AnimationLayer): void {
-    const controlled = new Map<string, Set<TransformProperty>>();
-    this.markLayerControlled(controlled, layer);
-    for (const [id, properties] of controlled) {
-      const joint = this.joints.get(id)!;
-      for (const property of properties) joint.pose[property] = joint.bindPose[property];
-    }
-  }
-
-  /** Reuse per-layer buffers; interrupted fades request an independent snapshot with sparse ownership. */
-  private evaluateLayer(layer: AnimationLayer, underlying: AnimationPose, snapshot = false): AnimationPose {
-    let buffers = this.layerBuffers.get(layer);
-    if (!buffers) {
-      buffers = { target: new ClipPoseBuffer(), source: new ClipPoseBuffer(), blended: new Map() };
-      this.layerBuffers.set(layer, buffers);
-    }
-    const state = layer.state!;
-    const target = buffers.target.evaluate(state.clip, this.sampleTime(state.clip, state.time));
-    const transition = layer.transition;
-    if (!transition) return snapshot ? new Map([...target].map(([id, values]) => [id, { ...values }])) : target;
-    const source =
-      transition.source instanceof Map
-        ? transition.source
-        : buffers.source.evaluate(
-            transition.source.clip,
-            this.sampleTime(transition.source.clip, transition.source.time),
-          );
-    for (const [id, values] of underlying) {
-      const output = buffers.blended.get(id) ?? {};
-      Object.assign(output, values);
-      buffers.blended.set(id, output);
-    }
-    blendPoseInto(buffers.blended, source, target, this.transitionWeight(state, transition));
-    if (!snapshot) return buffers.blended;
-    // Copy only properties owned by the fade, excluding underlying fallback properties.
-    const pose: AnimationPose = new Map();
-    for (const [id, values] of source) pose.set(id, { ...values });
-    for (const [id, values] of target) pose.set(id, { ...pose.get(id), ...values });
-    for (const [id, values] of pose) {
-      for (const property of transformProperties) {
-        if (values[property] !== undefined) values[property] = buffers.blended.get(id)![property]!;
-      }
-    }
-    return pose;
-  }
-
-  private transitionWeight(state: AnimationState, transition: AnimationTransition): number {
-    const mode = state.clip.playback ?? this.playback;
-    const blendTime =
-      transition.elapsed < transition.duration ? quantizePlaybackTime(transition.elapsed, mode) : transition.elapsed;
-    return Math.min(1, blendTime / transition.duration);
-  }
-
-  private bindPose(): AnimationPose {
-    return new Map(this.rig.bones.map((bone) => [bone.id, { ...this.joints.get(bone.id)!.bindPose }]));
-  }
-
-  private underlyingPose(layerName: string): AnimationPose {
-    let pose = this.bindPose();
-    for (const [name, layer] of this.layers) {
-      if (name === layerName) break;
-      if (layer.state && layer.weight > 0)
-        pose = blendPose(pose, new Map(), this.evaluateLayer(layer, pose), layer.weight, layer.mask);
-    }
-    return pose;
-  }
-
-  private sampleTime(clip: CompiledClip, time: number): number {
-    const mode = clip.playback ?? this.playback;
-    if (!clip.loop && time === clip.duration) return time;
-    return quantizePlaybackTime(time, mode);
+    this.poseEvaluator.applyCurrentPose(this.layers, this.playback);
   }
 
   private advance(
@@ -577,9 +410,7 @@ export class AnimationPlayer {
     this.completionListeners.clear();
     this.clips.clear();
     this.layers.clear();
-    this.workingPose.clear();
-    this.emptyPose.clear();
-    this.controlled.clear();
+    this.poseEvaluator.dispose();
     this.joints = new Map();
     this.playback = { mode: 'smooth' };
     this.speed = 1;

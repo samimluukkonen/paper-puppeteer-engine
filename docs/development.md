@@ -86,6 +86,7 @@ src/engine/
   Bone.ts              Joint backed by a Phaser container and optional image
   AnimationClip.ts      Keyframe types, validation and property-track compilation
   AnimationPlayer.ts    Layer clocks, transitions, events and completion
+  AnimationLayerEvaluator.ts  Layer sampling, blending, pose buffers and controlled properties
   AnimationPose.ts      Pure clip evaluation and pose blending
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
   PuppetPoseController.ts  Pose overrides, restoration, IK ordering and projection passes
