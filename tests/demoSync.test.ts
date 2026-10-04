@@ -99,7 +99,10 @@ test.each([
   baseline.puppet.syncIK = () => immediateSync();
   const sync = vi.spyOn(optimized.puppet, 'syncPose');
   const corrections = vi.spyOn(optimized.puppet, 'syncIK');
-  const views = [PuppetDebug, IKDebug, SlotDebug].map((view) => vi.spyOn(view.prototype, 'update'));
+  const views = [PuppetDebug, IKDebug, SlotDebug].map((view) =>
+    vi.spyOn(view.prototype, 'update').mockImplementation(() => {}),
+  );
+  optimized.puppet.setDebug(true).setIKDebug(true).setSlotDebug(true);
   for (let frame = 0; frame < 60; frame += 1) {
     const phase = (frame / 60) * Math.PI * 2;
     const target = { x: 380 + (facing === 'right' ? 1 : -1) * Math.sin(phase) * 250, y: 280 + Math.cos(phase) * 180 };

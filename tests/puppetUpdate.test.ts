@@ -452,7 +452,11 @@ test.each([false, true])('later providers see synchronized projections with defe
   });
   const sync = vi.spyOn(PuppetRenderer.prototype, 'sync');
   const partial = vi.spyOn(PuppetRenderer.prototype, 'syncBone');
-  const debug = [PuppetDebug, IKDebug, SlotDebug].map((view) => vi.spyOn(view.prototype, 'update'));
+  const debug = [PuppetDebug, IKDebug, SlotDebug].map((view) =>
+    vi.spyOn(view.prototype, 'update').mockImplementation(() => {}),
+  );
+  puppet.setDebug(true).setIKDebug(true).setSlotDebug(true);
+  for (const update of debug) update.mockClear();
   for (let frame = 0; frame < 5; frame += 1) {
     if (deferred) puppet.syncPose({ updateDebug: false });
     else puppet.update(16);

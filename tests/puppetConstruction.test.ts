@@ -1,8 +1,12 @@
 import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import * as animationClip from '../src/engine/AnimationClip.js';
+import { IKDebug } from '../src/engine/ik/IKDebug.js';
 import { Puppet, type PuppetOptions } from '../src/engine/Puppet.js';
+import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { Rig } from '../src/engine/Rig.js';
+import { SlotDebug } from '../src/engine/SlotDebug.js';
+import type { Facing } from '../src/engine/types.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -20,6 +24,71 @@ const rig = new Rig({
 const animation = { name: 'idle', duration: 100, loop: true, tracks: {} };
 const pose = { version: 1 as const, name: 'rest', bones: {} };
 const ik = { name: 'armIK', rootBone: 'root', middleBone: 'arm', endBone: 'hand' };
+
+test.each(['debug', 'ikDebug', 'slotDebug'] as const)('the %s constructor option creates only its overlay', (flag) => {
+  const scene = puppetScene();
+  const graphics = vi.spyOn(scene.add, 'graphics');
+  const depths: number[] = [];
+  for (const view of [PuppetDebug, IKDebug, SlotDebug])
+    vi.spyOn(view.prototype, 'update').mockImplementation(function (this: PuppetDebug | IKDebug | SlotDebug) {
+      depths.push(this.container.depth);
+    });
+  const puppet = new Puppet(scene, { rig, [flag]: true, autoUpdate: false, depth: 10 });
+  assert.equal(graphics.mock.calls.length, 1);
+  assert.equal(puppet.isDebug, flag === 'debug');
+  assert.equal(puppet.isIKDebug, flag === 'ikDebug');
+  assert.equal(puppet.isSlotDebug, flag === 'slotDebug');
+  assert.deepEqual(depths, [flag === 'debug' ? 11 : flag === 'ikDebug' ? 12 : 13]);
+  puppet.destroy();
+});
+
+test('debug overlays allocate only on first enable, retain label settings, and cannot outlive the puppet', () => {
+  const scene = puppetScene();
+  const text = vi.spyOn(scene.add, 'text');
+  const graphics = vi.spyOn(scene.add, 'graphics');
+  for (const view of [PuppetDebug, IKDebug, SlotDebug]) vi.spyOn(view.prototype, 'update').mockImplementation(() => {});
+  const labelSide = vi.spyOn(PuppetDebug.prototype, 'setLabelSide');
+  const destroy = [PuppetDebug, IKDebug, SlotDebug].map((view) => vi.spyOn(view.prototype, 'destroy'));
+  const puppet = new Puppet(scene, {
+    rig: { root: rig.root, bones: rig.bones, slots: [{ id: 'item', bone: 'hand' }] },
+    autoUpdate: false,
+    depth: 10,
+  });
+  puppet.setDebugLabelSide('hand', 'left').setDebugLabelSide('arm', 'right').setDebugLabelSide('arm');
+  assert.throws(() => puppet.setDebugLabelSide('missing'), /Unknown bone/);
+  assert.throws(() => puppet.setDebugLabelSide('hand', 'up' as Facing), /Invalid label side/);
+  puppet.setDebug(false).setIKDebug(false).setSlotDebug(false);
+  puppet.update(16);
+  puppet.refreshDebugViews();
+  assert.equal(text.mock.calls.length, 0);
+  assert.equal(graphics.mock.calls.length, 0);
+  assert.isFalse(puppet.isDebug);
+  assert.isFalse(puppet.isIKDebug);
+  assert.isFalse(puppet.isSlotDebug);
+
+  puppet.setDebug(true);
+  assert.equal(text.mock.calls.length, rig.bones.length);
+  assert.deepEqual(labelSide.mock.calls, [['hand', 'left']]);
+  puppet.setSlotDebug(true).setIKDebug(true);
+  assert.equal(text.mock.calls.length, rig.bones.length + 1);
+  assert.equal(graphics.mock.calls.length, 3);
+  assert.isTrue(puppet.isDebug);
+  assert.isTrue(puppet.isIKDebug);
+  assert.isTrue(puppet.isSlotDebug);
+  puppet.setDebug(false).setIKDebug(false).setSlotDebug(false);
+  assert.isFalse(puppet.isDebug);
+  assert.isFalse(puppet.isIKDebug);
+  assert.isFalse(puppet.isSlotDebug);
+  puppet.setDebug(true).setIKDebug(true).setSlotDebug(true);
+  assert.equal(text.mock.calls.length, rig.bones.length + 1);
+  assert.equal(graphics.mock.calls.length, 3);
+  puppet.destroy();
+  puppet.destroy();
+  for (const release of destroy) assert.equal(release.mock.calls.length, 1);
+  puppet.setDebug(true).setIKDebug(true).setSlotDebug(true);
+  assert.equal(text.mock.calls.length, rig.bones.length + 1);
+  assert.equal(graphics.mock.calls.length, 3);
+});
 
 test.each(['bone', 'attachment'])('%s assets validate textures and frames before allocating objects', (owner) => {
   for (const frame of ['missing', 0]) {

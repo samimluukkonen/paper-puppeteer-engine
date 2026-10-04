@@ -52,10 +52,11 @@ export class Puppet {
   readonly animationPlayer: AnimationPlayer;
   private readonly bones = new Map<string, Bone>();
   private readonly attachments = new Map<Phaser.GameObjects.GameObject, Phaser.GameObjects.Container>();
-  private readonly debugView: PuppetDebug;
+  private debugView: PuppetDebug | undefined;
+  private readonly debugLabelSides = new Map<string, Facing>();
   private readonly renderer: PuppetRenderer;
   private readonly slotState: SlotState;
-  private readonly slotDebugView: SlotDebug;
+  private slotDebugView: SlotDebug | undefined;
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
@@ -72,7 +73,7 @@ export class Puppet {
     },
   };
   private readonly poses = new Map<string, PoseDefinition>();
-  private readonly ikDebugView: IKDebug;
+  private ikDebugView: IKDebug | undefined;
   private facing: Facing;
   private destroyed = false;
 
@@ -136,11 +137,8 @@ export class Puppet {
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
     this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones);
-    this.slotDebugView = new SlotDebug(scene, this.rig, this.renderer, this.slotState);
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones, compiledAnimations);
-    this.debugView = new PuppetDebug(scene, this.bones);
     this.renderSlots();
-    this.ikDebugView = new IKDebug(scene, this.bones);
     this.poseController = new PuppetPoseController(
       this.bones,
       this.ikConstraints,
@@ -165,13 +163,13 @@ export class Puppet {
     return this.animationPlayer.isPlaying;
   }
   get isDebug(): boolean {
-    return this.debugView.container.visible;
+    return this.debugView?.container.visible ?? false;
   }
   get isIKDebug(): boolean {
-    return this.ikDebugView.container.visible;
+    return this.ikDebugView?.container.visible ?? false;
   }
   get isSlotDebug(): boolean {
-    return this.slotDebugView.container.visible;
+    return this.slotDebugView?.container.visible ?? false;
   }
   get facingDirection(): Facing {
     return this.facing;
@@ -425,7 +423,10 @@ export class Puppet {
   }
 
   setSlotDebug(enabled: boolean): this {
-    this.slotDebugView.setVisible(enabled);
+    if (this.destroyed) return this;
+    if (enabled) this.slotDebugView ??= new SlotDebug(this.scene, this.rig, this.renderer, this.slotState);
+    this.slotDebugView?.container.setDepth(this.container.depth + 3);
+    this.slotDebugView?.setVisible(enabled);
     return this;
   }
 
@@ -437,7 +438,7 @@ export class Puppet {
       if (id) this.renderedSlotAttachments.set(slot.id, id);
       else this.renderedSlotAttachments.delete(slot.id);
     }
-    this.slotDebugView.update();
+    this.slotDebugView?.update();
   }
 
   attach(boneId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
@@ -492,7 +493,13 @@ export class Puppet {
   }
 
   setDebug(enabled: boolean): this {
-    this.debugView.setVisible(enabled);
+    if (this.destroyed) return this;
+    if (enabled && !this.debugView) {
+      this.debugView = new PuppetDebug(this.scene, this.bones);
+      for (const [id, side] of this.debugLabelSides) this.debugView.setLabelSide(id, side);
+    }
+    this.debugView?.container.setDepth(this.container.depth + 1);
+    this.debugView?.setVisible(enabled);
     return this;
   }
 
@@ -523,14 +530,23 @@ export class Puppet {
   }
 
   setIKDebug(enabled: boolean): this {
-    this.ikDebugView.container.setVisible(enabled);
-    this.ikDebugView.update(this.poseController.getOrderedConstraints());
+    if (this.destroyed) return this;
+    if (enabled) this.ikDebugView ??= new IKDebug(this.scene, this.bones);
+    if (this.ikDebugView) {
+      this.ikDebugView.container.setDepth(this.container.depth + 2).setVisible(enabled);
+      this.ikDebugView.update(this.poseController.getOrderedConstraints());
+    }
     return this;
   }
 
   /** Choose a screen side for a pivot label; omit side to restore automatic placement. */
   setDebugLabelSide(boneId: string, side?: Facing): this {
-    this.debugView.setLabelSide(boneId, side);
+    this.getBone(boneId);
+    if (side !== undefined && side !== 'left' && side !== 'right')
+      throw new Error(`Invalid label side: ${String(side)}.`);
+    if (side === undefined) this.debugLabelSides.delete(boneId);
+    else this.debugLabelSides.set(boneId, side);
+    this.debugView?.setLabelSide(boneId, side);
     return this;
   }
 
@@ -547,9 +563,13 @@ export class Puppet {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.container.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
-    this.debugView.destroy();
-    this.ikDebugView.destroy();
-    this.slotDebugView.destroy();
+    this.debugView?.destroy();
+    this.ikDebugView?.destroy();
+    this.slotDebugView?.destroy();
+    this.debugView = undefined;
+    this.ikDebugView = undefined;
+    this.slotDebugView = undefined;
+    this.debugLabelSides.clear();
     for (const object of this.attachments.keys())
       object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     this.renderer.destroy();
@@ -590,11 +610,11 @@ export class Puppet {
   }
 
   private updateDebugViews(constraints: readonly TwoBoneIKConstraint[]): void {
-    this.debugView.container.setDepth(this.container.depth + 1);
-    this.debugView.update();
-    this.ikDebugView.container.setDepth(this.container.depth + 2);
-    this.ikDebugView.update(constraints);
-    this.slotDebugView.container.setDepth(this.container.depth + 3);
-    this.slotDebugView.update();
+    this.debugView?.container.setDepth(this.container.depth + 1);
+    this.debugView?.update();
+    this.ikDebugView?.container.setDepth(this.container.depth + 2);
+    this.ikDebugView?.update(constraints);
+    this.slotDebugView?.container.setDepth(this.container.depth + 3);
+    this.slotDebugView?.update();
   }
 }
