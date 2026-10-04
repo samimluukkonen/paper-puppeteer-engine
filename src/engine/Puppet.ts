@@ -221,11 +221,9 @@ export class Puppet {
     return this;
   }
 
-  /** Excludes IK by restoring its temporary changes before taking a snapshot. */
+  /** Snapshot authored transforms without changing the held pose, rendering, or IK state. */
   exportPose(name: string, options?: { epsilon?: number; onlyChanged?: boolean }): PoseDefinition {
-    const pose = this.poseController.exportPose(name, options);
-    this.syncPose();
-    return pose;
+    return this.poseController.exportPose(name, options);
   }
 
   /** Data only: normalized rig values, including pivots, slots and sprite offsets. */

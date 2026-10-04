@@ -12,6 +12,15 @@ export class IKPoseState {
   private readonly captured = new Set<Joint>();
   private count = 0;
 
+  /** Read the authored rotation without consuming the restoration state or changing a joint. */
+  authoredRotation(joint: Joint): number {
+    for (let index = 0; index < this.count; index += 1) {
+      const state = this.rotations[index]!;
+      if (state.joint === joint) return joint.pose.rotation === state.solved ? state.base : joint.pose.rotation;
+    }
+    return joint.pose.rotation;
+  }
+
   restore(onRestore?: (joint: Joint) => void): void {
     for (let index = 0; index < this.count; index += 1) {
       const state = this.rotations[index]!;

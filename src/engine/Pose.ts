@@ -70,7 +70,7 @@ export function applyPoseToJoints(
 /** Serialize authored local transforms, omitting differences no greater than epsilon. */
 export function serializePose(
   name: string,
-  joints: ReadonlyMap<string, Joint>,
+  joints: ReadonlyMap<string, Pick<Joint, 'pose' | 'bindPose'>>,
   options: { epsilon?: number; onlyChanged?: boolean } = {},
 ): PoseDefinition {
   identifierSchema.parse(name);

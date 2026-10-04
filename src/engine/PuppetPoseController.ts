@@ -51,8 +51,16 @@ export class PuppetPoseController {
   }
 
   exportPose(name: string, options?: { epsilon?: number; onlyChanged?: boolean }): PoseDefinition {
-    this.ikPose.restore();
-    return serializePose(name, this.bones, options);
+    const authored = new Map(
+      [...this.bones].map(([id, bone]) => [
+        id,
+        {
+          bindPose: bone.bindPose,
+          pose: { ...bone.pose, rotation: this.ikPose.authoredRotation(bone) },
+        },
+      ]),
+    );
+    return serializePose(name, authored, options);
   }
 
   preparePose(): void {

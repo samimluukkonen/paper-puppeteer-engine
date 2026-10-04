@@ -56,7 +56,52 @@ const rejectedCommands: [string, (puppet: Puppet) => unknown][] = [
   ['clear empty layer', (puppet) => puppet.clearLayer('')],
   ['unknown rotated bone', (puppet) => puppet.setBoneRotation('missing', 1)],
   ['nonfinite sample time', (puppet) => puppet.sampleAnimation(NaN)],
+  ['empty pose export name', (puppet) => puppet.exportPose('')],
+  ['reserved pose export name', (puppet) => puppet.exportPose('__proto__')],
+  ['negative pose export epsilon', (puppet) => puppet.exportPose('saved', { epsilon: -1 })],
+  ['nonfinite pose export epsilon', (puppet) => puppet.exportPose('saved', { epsilon: NaN })],
 ];
+
+test('pose exports exclude IK without rerunning providers or consuming restoration state', () => {
+  const { puppet, constraint } = fixture();
+  puppet.addPose({ version: 1, name: 'preset', bones: { upper: { rotation: 0.7, x: 5 } } }).applyPose('preset');
+  const provider = vi.fn(() => ({ x: 60, y: 70 }));
+  constraint.setTargetProvider(provider);
+  puppet.syncPose();
+  provider.mockClear();
+  const upper = puppet.getBone('upper');
+  const held = { ...upper.pose };
+  const lowerHeld = { ...puppet.getBone('lower').pose };
+  const renderedRotation = upper.container.rotation;
+  const matrix = puppet.getSlotImage('item')!.getWorldTransformMatrix();
+  const exported = puppet.exportPose('saved', { onlyChanged: false });
+  assert.equal(exported.bones.upper!.rotation, 0.7);
+  assert.equal(exported.bones.upper!.x, 5);
+  assert.equal(exported.bones.lower!.rotation, 0.2);
+  assert.deepEqual(upper.pose, held);
+  const after = puppet.getSlotImage('item')!.getWorldTransformMatrix();
+  assert.equal(after.tx, matrix.tx);
+  assert.equal(after.ty, matrix.ty);
+  assert.equal(provider.mock.calls.length, 0);
+
+  // Direct edits take precedence over the previous IK output, just as they do during restoration.
+  upper.pose.rotation = 0.9;
+  assert.equal(puppet.exportPose('edited').bones.upper!.rotation, 0.9);
+  const other = puppet.getBone('otherUpper');
+  other.pose.x = NaN;
+  assert.throws(() => puppet.exportPose('invalid'), /must be finite/);
+  assert.equal(upper.pose.rotation, 0.9);
+  assert.equal(upper.container.rotation, renderedRotation);
+  assert.deepEqual(puppet.getBone('lower').pose, lowerHeld);
+  assert.equal(provider.mock.calls.length, 0);
+  other.pose.x = 10;
+  puppet.clearPose();
+  constraint.enabled = false;
+  puppet.syncPose();
+  assert.equal(upper.pose.rotation, 0.1);
+  assert.equal(puppet.getBone('lower').pose.rotation, 0.2);
+  puppet.destroy();
+});
 
 test('sampleAnimation synchronizes sampled poses, presets, IK, and artwork without advancing playback', () => {
   const { puppet, constraint } = fixture();
