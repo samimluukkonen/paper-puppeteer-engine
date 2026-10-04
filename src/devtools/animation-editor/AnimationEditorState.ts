@@ -32,6 +32,7 @@ export class AnimationEditorState {
   private time = 0;
   private saved = '';
   private issues: readonly ValidationIssue[] = [];
+  private readonly snapshots = new WeakMap<ReadonlyAnimation, string>();
   private history = this.createHistory();
 
   constructor(
@@ -85,7 +86,18 @@ export class AnimationEditorState {
     return this.history.length;
   }
   private get snapshot(): string {
-    return this.working ? JSON.stringify(this.working) : '';
+    return this.snapshotFor(this.working);
+  }
+
+  /** Immutable animation identities let status and history reuse serialization across scrubs and undo. */
+  private snapshotFor(animation: ReadonlyAnimation | null): string {
+    if (!animation) return '';
+    let snapshot = this.snapshots.get(animation);
+    if (snapshot === undefined) {
+      snapshot = JSON.stringify(animation);
+      this.snapshots.set(animation, snapshot);
+    }
+    return snapshot;
   }
 
   subscribe(listener: () => void): () => void {
@@ -172,7 +184,7 @@ export class AnimationEditorState {
         this.working = entry;
         this.time = clampTime(this.time, this.duration);
       },
-      (left, right) => JSON.stringify(left) === JSON.stringify(right),
+      (left, right) => this.snapshotFor(left) === this.snapshotFor(right),
     );
   }
 

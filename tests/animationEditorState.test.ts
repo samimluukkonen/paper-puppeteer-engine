@@ -1,4 +1,4 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -206,4 +206,35 @@ test('subscriptions reflect external state changes and unsubscribe cleanly', () 
   release();
   state.setCurrentTime(0.5);
   assert.equal(count, 2);
+});
+
+test('scrubbing and status updates reuse snapshots while authored edits and undo keep dirty state accurate', () => {
+  const state = new AnimationEditorState(rig, [clip()]);
+  state.selectAnimation('move');
+  const release = state.subscribe(() => {
+    assert.isFalse(state.dirty);
+  });
+  const stringify = vi.spyOn(JSON, 'stringify');
+  try {
+    for (let index = 0; index < 100; index += 1) {
+      state.setCurrentTime(index / 100);
+      assert.isFalse(state.dirty);
+    }
+    assert.equal(stringify.mock.calls.length, 0);
+    release();
+
+    state.replaceWorkingAnimation(file(clip({ duration: 3000 })));
+    assert.isTrue(state.dirty);
+    state.markSaved();
+    assert.isFalse(state.dirty);
+    const serialized = stringify.mock.calls.length;
+    assert.isTrue(state.undo());
+    assert.isTrue(state.dirty);
+    assert.isTrue(state.redo());
+    assert.isFalse(state.dirty);
+    assert.equal(stringify.mock.calls.length, serialized);
+  } finally {
+    release();
+    stringify.mockRestore();
+  }
 });
