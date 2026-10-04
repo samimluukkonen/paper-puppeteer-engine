@@ -68,6 +68,9 @@ for (const facing of ['left', 'right'] as const) {
           assert.isBelow(leftElbowShift, 15);
           assert.isBelow(rightElbowShift, -3);
           assert.isAbove(rightElbowShift, -15);
+        } else if (clip.name === 'idle') {
+          assert.equal(presented.leftUpperArm, -sampled.leftUpperArm);
+          assert.equal(presented.rightUpperArm, -sampled.rightUpperArm);
         } else assert.deepEqual(presented, sampled);
       }
     }
@@ -183,13 +186,13 @@ test('default rig drawing order respects sibling depth and image placement', () 
   assert.isAbove(order.indexOf('rightUpperArm'), order.indexOf('torso'));
 });
 
-test('idle swaps hip positions facing right and restores them facing left', () => {
+test('idle uses authored hip positions facing right and swaps them facing left', () => {
   const right = demoHipPositions(rig, 'right');
-  assert.strictEqual(right.leftThigh, rig.getBone('rightThigh').x);
-  assert.strictEqual(right.rightThigh, rig.getBone('leftThigh').x);
+  assert.strictEqual(right.leftThigh, rig.getBone('leftThigh').x);
+  assert.strictEqual(right.rightThigh, rig.getBone('rightThigh').x);
   const left = demoHipPositions(rig, 'left');
-  assert.strictEqual(left.leftThigh, rig.getBone('leftThigh').x);
-  assert.strictEqual(left.rightThigh, rig.getBone('rightThigh').x);
+  assert.strictEqual(left.leftThigh, rig.getBone('rightThigh').x);
+  assert.strictEqual(left.rightThigh, rig.getBone('leftThigh').x);
   const legs = ['leftThigh', 'leftLowerLeg', 'leftFoot', 'rightThigh', 'rightLowerLeg', 'rightFoot'];
   assert.deepEqual(
     demoRenderOrder(rig, 'idle', 'right').filter((id) => legs.includes(id)),
@@ -212,8 +215,8 @@ test('idle facing left draws the entire left leg in front of the right leg and p
   const hips = demoHipPositions(rig, 'left');
   assert.isBelow(order.indexOf('leftThigh'), order.indexOf('leftLowerLeg'));
   assert.isBelow(order.indexOf('leftLowerLeg'), order.indexOf('leftFoot'));
-  assert.strictEqual(hips.leftThigh, rig.getBone('leftThigh').x);
-  assert.strictEqual(hips.rightThigh, rig.getBone('rightThigh').x);
+  assert.strictEqual(hips.leftThigh, rig.getBone('rightThigh').x);
+  assert.strictEqual(hips.rightThigh, rig.getBone('leftThigh').x);
 });
 
 test('idle facing right draws the entire right leg in front of the pelvis', () => {

@@ -54,7 +54,7 @@ export class DemoPoseAuthoring {
       const bone = this.puppet.getBone(id);
       bone.pose.rotation += rotation - previous.rotations[id as keyof typeof previous.rotations];
     }
-    this.puppet.setRenderOrder(next.order).setFacing(direction);
+    this.puppet.setRenderOrder(next.order, next.slotDepths).setFacing(direction);
   }
 
   selectBone(direction: number): void {
@@ -95,7 +95,7 @@ export class DemoPoseAuthoring {
 
   private resetAuthoringPose(): void {
     const layout = demoAuthoringLayout(this.puppet.rig, this.puppet.facingDirection);
-    this.puppet.resetToBindPose().setRenderOrder(layout.order);
+    this.puppet.resetToBindPose().setRenderOrder(layout.order, layout.slotDepths);
     this.puppet.container.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 278);
     for (const [id, x] of Object.entries(layout.positions)) this.puppet.getBone(id).pose.x = x;
     for (const [id, rotation] of Object.entries(layout.rotations)) this.puppet.getBone(id).pose.rotation = rotation;

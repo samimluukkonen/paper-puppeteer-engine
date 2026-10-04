@@ -8,7 +8,7 @@ const limbs = new Set([...leftArm, ...rightArm, ...leftLeg, ...rightLeg]);
 type ArmRotations = Readonly<Record<'leftUpperArm' | 'rightUpperArm', number>>;
 
 export function demoArmRotations(animation: string | undefined, facing: Facing, rotations: ArmRotations): ArmRotations {
-  const direction = animation === 'idle' && facing === 'right' ? -1 : 1;
+  const direction = animation === 'idle' && facing === 'left' ? -1 : 1;
   return {
     leftUpperArm: direction * rotations.leftUpperArm,
     rightUpperArm: direction * rotations.rightUpperArm,
@@ -33,7 +33,7 @@ export function demoShoulderPositions(
   animation: string | undefined,
   facing: Facing,
 ): Readonly<Record<'leftUpperArm' | 'rightUpperArm', number>> {
-  const swap = (animation === 'walk' || animation === 'idle' || animation === 'sword') && facing === 'right' ? -1 : 1;
+  const swap = (animation === 'walk' || animation === 'idle' || animation === 'sword') && facing === 'left' ? -1 : 1;
   return {
     leftUpperArm: swap * (rig.getBone('leftUpperArm').x ?? 0),
     rightUpperArm: swap * (rig.getBone('rightUpperArm').x ?? 0),
@@ -43,7 +43,20 @@ export function demoShoulderPositions(
 export function demoHipPositions(rig: Rig, facing: Facing): Readonly<Record<'leftThigh' | 'rightThigh', number>> {
   const left = rig.getBone('leftThigh').x ?? 0;
   const right = rig.getBone('rightThigh').x ?? 0;
-  return facing === 'right' ? { leftThigh: right, rightThigh: left } : { leftThigh: left, rightThigh: right };
+  return facing === 'left' ? { leftThigh: right, rightThigh: left } : { leftThigh: left, rightThigh: right };
+}
+
+/** The sample's far-arm slots have global depths so editors share the demo's layering. */
+export function demoSlotDepths(
+  rig: Rig,
+  order: readonly string[],
+  facing: Facing,
+): ReadonlyMap<string, number | undefined> {
+  return new Map(
+    rig.slots
+      .filter((slot) => leftArm.includes(slot.bone))
+      .map((slot) => [slot.id, facing === 'left' ? order.indexOf(slot.bone) * 10 + 1 : undefined]),
+  );
 }
 
 /** Stable, facing-aware starting layout for the demo's static pose inspector. */
@@ -52,11 +65,14 @@ export function demoAuthoringLayout(
   facing: Facing,
 ): {
   order: readonly string[];
+  slotDepths: ReadonlyMap<string, number | undefined>;
   positions: Readonly<Record<'leftUpperArm' | 'rightUpperArm' | 'leftThigh' | 'rightThigh', number>>;
   rotations: ArmRotations;
 } {
+  const order = demoRenderOrder(rig, 'idle', facing);
   return {
-    order: demoRenderOrder(rig, 'idle', facing),
+    order,
+    slotDepths: demoSlotDepths(rig, order, facing),
     positions: {
       ...demoShoulderPositions(rig, 'idle', facing),
       ...demoHipPositions(rig, facing),

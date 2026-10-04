@@ -3,7 +3,13 @@ import type { Facing, IKTarget, Puppet } from '../engine/index.js';
 import { DemoFootPlanting } from './DemoFootPlanting.js';
 import { DemoKatanaController } from './DemoKatanaController.js';
 import type { WalkFootIK } from './demoFootTargets.js';
-import { demoArmRotations, demoHipPositions, demoRenderOrder, demoShoulderPositions } from './demoPresentation.js';
+import {
+  demoArmRotations,
+  demoHipPositions,
+  demoRenderOrder,
+  demoShoulderPositions,
+  demoSlotDepths,
+} from './demoPresentation.js';
 import { Katana } from './Katana.js';
 
 export interface DemoPresenterOptions {
@@ -89,8 +95,8 @@ export class DemoPresenter {
       transition?.from === 'previous pose' ? this.armFadeSource : transition?.from === 'idle' ? -1 : 1;
     const toDirection = this.puppet.currentAnimation === 'idle' ? -1 : 1;
     this.armDirection = transition ? fromDirection + (toDirection - fromDirection) * transition.progress : toDirection;
-    const toSign = this.puppet.facingDirection === 'right' ? toDirection : 1;
-    const sign = this.puppet.facingDirection === 'right' ? this.armDirection : 1;
+    const toSign = this.puppet.facingDirection === 'left' ? toDirection : 1;
+    const sign = this.puppet.facingDirection === 'left' ? this.armDirection : 1;
     for (const [id, rotation] of Object.entries(arms)) {
       this.puppet.getBone(id).pose.rotation = transition ? (rotation * sign) / toSign : rotation;
     }
@@ -122,6 +128,7 @@ export class DemoPresenter {
   private syncRenderOrder(): void {
     const animation = this.puppet.currentAnimation;
     const facing = this.puppet.facingDirection;
+    const facingChanged = this.orderFacing !== facing;
     if (!this.renderOrder || this.orderAnimation !== animation || this.orderFacing !== facing) {
       this.renderOrder = demoRenderOrder(this.puppet.rig, animation, facing);
       this.orderAnimation = animation;
@@ -129,8 +136,12 @@ export class DemoPresenter {
     }
     // Authoring controls can change the puppet order between presentation frames.
     const current = this.puppet.getRenderOrder();
-    if (current.length !== this.renderOrder.length || current.some((id, index) => id !== this.renderOrder![index]))
-      this.puppet.setRenderOrder(this.renderOrder);
+    if (
+      facingChanged ||
+      current.length !== this.renderOrder.length ||
+      current.some((id, index) => id !== this.renderOrder![index])
+    )
+      this.puppet.setRenderOrder(this.renderOrder, demoSlotDepths(this.puppet.rig, this.renderOrder, facing));
   }
 
   private drawTargets(

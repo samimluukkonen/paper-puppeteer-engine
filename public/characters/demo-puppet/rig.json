@@ -25,9 +25,9 @@
     {
       "id": "leftUpperArm",
       "parent": "torso",
-      "x": -38,
+      "x": 38,
       "y": -86,
-      "rotation": 0.12,
+      "rotation": -0.12,
       "depth": -1
     },
     {
@@ -46,16 +46,16 @@
     {
       "id": "rightUpperArm",
       "parent": "torso",
-      "x": 38,
+      "x": -38,
       "y": -86,
-      "rotation": -0.12,
+      "rotation": 0.12,
       "depth": 3
     },
     {
       "id": "rightForearm",
       "parent": "rightUpperArm",
       "y": 60,
-      "rotation": 0.12,
+      "rotation": -0.12,
       "depth": 1
     },
     {
@@ -67,7 +67,7 @@
     {
       "id": "leftThigh",
       "parent": "pelvis",
-      "x": -20,
+      "x": 20,
       "y": 12,
       "rotation": -0.04,
       "depth": -2
@@ -89,10 +89,10 @@
     {
       "id": "rightThigh",
       "parent": "pelvis",
-      "x": 20,
+      "x": -20,
       "y": 12,
       "rotation": -0.04,
-      "depth": -1
+      "depth": 1
     },
     {
       "id": "rightLowerLeg",
@@ -124,15 +124,18 @@
     },
     {
       "id": "leftUpperArmVisual",
-      "bone": "leftUpperArm"
+      "bone": "leftUpperArm",
+      "depth": -30
     },
     {
       "id": "leftForearmVisual",
-      "bone": "leftForearm"
+      "bone": "leftForearm",
+      "depth": -20
     },
     {
       "id": "leftHandVisual",
-      "bone": "leftHand"
+      "bone": "leftHand",
+      "depth": -10
     },
     {
       "id": "rightUpperArmVisual",
