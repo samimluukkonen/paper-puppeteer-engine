@@ -14,36 +14,7 @@ select,
 input {
   font: inherit;
 }
-.editor-header {
-  max-width: 1500px;
-  margin: auto;
-  padding: 20px 28px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #cfcec0;
-}
-.editor-header a {
-  color: #746752;
-  font-size: 12px;
-  text-decoration: none;
-}
-.editor-header h1 {
-  margin: 8px 0 2px;
-  font:
-    36px Georgia,
-    serif;
-}
-.editor-header p,
-.editor-header > span {
-  margin: 0;
-  color: #798376;
-  font-size: 11px;
-}
 .editor-layout {
-  max-width: 1500px;
-  margin: auto;
-  padding: 24px 28px;
   display: grid;
   grid-template-columns: minmax(200px, 250px) minmax(0, 1fr) minmax(210px, 260px);
   gap: 18px;
@@ -279,15 +250,6 @@ input {
   white-space: nowrap;
   font: inherit;
 }
-.editor-header h1 span {
-  font:
-    12px "Avenir Next",
-    sans-serif;
-  color: #ad6547;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  vertical-align: middle;
-}
 @media (max-width: 1050px) {
   .editor-layout {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -299,15 +261,11 @@ input {
 @media (max-width: 660px) {
   .editor-layout {
     grid-template-columns: 1fr;
-    padding: 15px;
   }
   .editor-center {
     grid-row: 1;
   }
   .inspector {
     grid-column: auto;
-  }
-  .editor-header {
-    padding: 16px;
   }
 }

@@ -1,0 +1,127 @@
+.view-shell {
+  --view-gutter: 28px;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 var(--view-gutter);
+}
+.view-content {
+  padding: 24px 0;
+}
+.view-header {
+  padding: 20px 0;
+  border-bottom: 1px solid #cfcec0;
+}
+.view-header-top,
+.view-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.view-header-main {
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.view-version {
+  color: #6d786a;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.view-header a {
+  color: #746752;
+  text-decoration: none;
+}
+.view-header a:hover {
+  color: #34473e;
+  text-decoration: underline;
+}
+.view-header a:focus-visible {
+  outline: 2px solid #a2674f;
+  outline-offset: 3px;
+}
+.view-header .wordmark {
+  color: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.view-header .wordmark:hover {
+  text-decoration: none;
+}
+.wordmark .mark {
+  display: block;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+.wordmark-sub {
+  font-weight: 400;
+  color: #899083;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.view-heading h1 {
+  margin: 0 0 4px;
+  font:
+    36px Georgia,
+    serif;
+  letter-spacing: normal;
+}
+.view-title-badge {
+  display: inline-block;
+  vertical-align: middle;
+  color: #ad6547;
+  font:
+    12px "Avenir Next",
+    "Segoe UI",
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.view-heading p {
+  margin: 0;
+  color: #6d786a;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.view-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+.view-navigation a {
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+.view-navigation a[aria-current="page"] {
+  color: #f3efe2;
+  background: #39574b;
+}
+@media (max-width: 660px) {
+  .view-shell {
+    --view-gutter: 16px;
+  }
+  .view-header,
+  .view-content {
+    padding: 16px 0;
+  }
+  .view-heading h1 {
+    font-size: 30px;
+  }
+  .view-navigation {
+    width: 100%;
+  }
+  .view-header .wordmark {
+    font-size: 10px;
+    letter-spacing: 1px;
+    gap: 4px;
+  }
+  .wordmark-sub {
+    display: none;
+  }
+}

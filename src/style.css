@@ -17,48 +17,6 @@ a {
 button {
   font: inherit;
 }
-#app {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 56px;
-}
-.masthead {
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #cfcec0;
-  gap: 16px;
-}
-.wordmark {
-  color: inherit;
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.mark {
-  color: #ae664b;
-  font-size: 36px;
-  font-weight: 400;
-}
-.wordmark-sub {
-  font-weight: 400;
-  color: #899083;
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-.version {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  font-size: 11px;
-  color: #778173;
-}
-.version-dot,
 .status-dot {
   height: 6px;
   width: 6px;
@@ -69,7 +27,6 @@ button {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
   gap: 58px;
-  padding: 46px 0 38px;
   align-items: start;
 }
 .controls {
@@ -82,7 +39,9 @@ button {
   color: #a2674f;
   margin: 0 0 19px;
 }
-h1 {
+.demo-headline {
+  display: block;
+  color: inherit;
   font-family: "Baskerville", Georgia, serif;
   font-weight: 400;
   font-size: 49px;
@@ -319,40 +278,18 @@ footer {
   }
 }
 @media (max-width: 900px) {
-  #app {
-    padding: 0 28px;
-  }
   .workbench {
     grid-template-columns: 235px minmax(0, 1fr);
     gap: 28px;
   }
-  h1 {
+  .demo-headline {
     font-size: 42px;
-  }
-  .wordmark-sub {
-    display: none;
   }
 }
 @media (max-width: 650px) {
-  #app {
-    padding: 0 20px;
-  }
-  .masthead {
-    height: 76px;
-  }
-  .wordmark {
-    font-size: 10px;
-    letter-spacing: 1px;
-    gap: 7px;
-  }
-  .version {
-    font-size: 9px;
-    gap: 6px;
-  }
   .workbench {
     grid-template-columns: 1fr;
     gap: 8px;
-    padding-top: 20px;
   }
   .stage-wrap {
     grid-row: 1;
@@ -360,7 +297,7 @@ footer {
   .controls {
     padding: 20px 0;
   }
-  h1 {
+  .demo-headline {
     font-size: 40px;
   }
   .intro {

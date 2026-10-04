@@ -16,31 +16,7 @@ select {
 a {
   color: #746752;
 }
-.animation-header {
-  max-width: 1200px;
-  margin: auto;
-  padding: 20px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #cfcec0;
-}
-.animation-header h1 {
-  margin: 10px 0;
-  font:
-    36px Georgia,
-    serif;
-}
-.animation-header p,
-.animation-header > span {
-  margin: 0;
-  color: #6d786a;
-  font-size: 13px;
-}
 .animation-layout {
-  max-width: 1200px;
-  margin: auto;
-  padding: 24px 28px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   gap: 18px;
@@ -171,10 +147,6 @@ a {
 @media (max-width: 720px) {
   .animation-layout {
     grid-template-columns: minmax(0, 1fr);
-    padding: 18px 12px;
-  }
-  .animation-header {
-    padding: 18px 12px;
   }
   .animation-session {
     grid-row: 2;

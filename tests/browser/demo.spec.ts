@@ -29,7 +29,7 @@ test('demo loads artwork and responds to playback, facing, skin and IK controls'
 test('demo and editor navigation preserves the deployment path and loads fresh scenes', async ({ page, baseURL }) => {
   await page.goto('./');
   await expect(page.locator('#status-text')).toContainText('Current: idle');
-  await page.getByRole('link', { name: 'Open Rig Editor' }).click();
+  await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
   await expect(page).toHaveURL(new URL('rig-editor/', baseURL!).href);
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   const x = page.locator('#inspector input[data-field="x"]');

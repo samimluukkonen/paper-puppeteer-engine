@@ -10,7 +10,7 @@ async function openEditor(page: Page): Promise<void> {
 
 test('editor routes and the demo remain linked under the deployment base', async ({ page, baseURL }) => {
   await page.goto('./');
-  await page.getByRole('link', { name: 'Open Animation Editor' }).click();
+  await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await expect(page).toHaveURL(new URL('animation-editor/', baseURL!).href);
   await expect(page.locator('#character-status')).toHaveText('Character: demo-puppet');
   await expect(page.locator('#animation-selection')).toHaveValue('idle');

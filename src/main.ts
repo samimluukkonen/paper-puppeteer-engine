@@ -1,23 +1,21 @@
 import Phaser from 'phaser';
-import packageInfo from '../package.json';
 import type { DemoState } from './demo/DemoScene.js';
 import { DemoScene } from './demo/DemoScene.js';
 import { createDemoCommands } from './demo/demoCommands.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
+import { viewHeader } from './ui/viewShell.js';
 import './style.css';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('Missing demo host.');
+app.classList.add('view-shell');
 
 app.innerHTML = `
-  <header class="masthead">
-    <a class="wordmark" href="./"><span class="mark" aria-hidden="true">✳</span> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
-    <span class="version"><a href="./rig-editor/">Open Rig Editor</a> · <a href="./animation-editor/">Open Animation Editor</a> <span class="version-dot"></span> v${packageInfo.version}</span>
-  </header>
-  <section class="workbench">
+  ${viewHeader('demo')}
+  <main class="workbench view-content" aria-label="Paper puppet animation demo">
     <aside class="controls" aria-label="Animation controls">
       <p class="eyebrow">A LITTLE THEATRE OF TRANSFORMS</p>
-      <h1>Paper pieces.<br>Living joints.</h1>
+      <h2 class="demo-headline">Paper pieces.<br>Living joints.</h2>
       <p class="intro">Move a hand target, plant the feet, and turn a katana held with two hands.</p>
       <div class="control-section">
         <h2>01 <span>Animation</span></h2>
@@ -96,7 +94,7 @@ app.innerHTML = `
       </aside>
       <div class="stage-caption"><span>THE PUPPET LAB</span><span>Mouse to aim · Q / E to turn</span></div>
     </div>
-  </section>
+  </main>
   <footer><span>Paper Puppeteer Engine</span><span>Rigid cutouts / hierarchical transforms / endless possibilities</span></footer>
 `;
 
