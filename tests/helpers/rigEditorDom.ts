@@ -13,7 +13,7 @@ export class EditorElement {
   dataset: Record<string, string> = {};
   files: { name: string; text: () => Promise<string> }[] = [];
   children: EditorElement[] = [];
-  classList = { toggle: vi.fn() };
+  classList = { add: vi.fn(), toggle: vi.fn() };
   setAttribute = vi.fn();
   setCustomValidity = vi.fn();
   reportValidity = vi.fn();
