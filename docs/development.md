@@ -105,6 +105,7 @@ src/engine/
 src/demo/
   DemoScene.ts         Character loading, playback controls and UI state
   DemoInput.ts         Pointer/keyboard bindings and shutdown cleanup
+  demoCommands.ts      Shared button commands and pose-aware keyboard shortcuts
   DemoPoseAuthoring.ts  Static pose editing, inspector and export
   DemoPresenter.ts     Sampled pose layout, IK coordination and target markers
   DemoFootPlanting.ts  Ground targets, body sway and walk contact constraints

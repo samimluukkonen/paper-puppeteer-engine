@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import packageInfo from '../package.json';
 import type { DemoState } from './demo/DemoScene.js';
 import { DemoScene } from './demo/DemoScene.js';
+import { createDemoCommands } from './demo/demoCommands.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
 import './style.css';
 
@@ -143,42 +144,11 @@ export const game = new Phaser.Game({
   scene: [demo],
 });
 
-const actions: Record<string, () => void> = {
-  idle: () => demo.play('idle'),
-  walk: () => demo.play('walk'),
-  sword: () => demo.play('sword'),
-  fadeIdle: () => demo.crossfade('idle'),
-  fadeWalk: () => demo.crossfade('walk'),
-  stepped: () => demo.toggleStepped(),
-  fps8: () => demo.setSteppedFPS(8),
-  fps10: () => demo.setSteppedFPS(10),
-  pause: () => demo.togglePause(),
-  slower: () => demo.adjustSpeed(-0.25),
-  faster: () => demo.adjustSpeed(0.25),
-  upperBody: () => demo.toggleUpperBody(),
-  left: () => demo.face('left'),
-  right: () => demo.face('right'),
-  debug: () => demo.toggleDebug(),
-  prop: () => demo.toggleProp(),
-  handIK: () => demo.toggleHandIK(),
-  footIK: () => demo.toggleFootIK(),
-  ikDebug: () => demo.toggleIKDebug(),
-  defaultSkin: () => demo.setSkin('default'),
-  armoredSkin: () => demo.setSkin('alternate'),
-  gripHand: () => demo.toggleGripHand(),
-  helmet: () => demo.toggleHelmet(),
-  slotDebug: () => demo.toggleSlotDebug(),
-  rotateLeft: () => demo.rotateKatana(-0.15),
-  rotateRight: () => demo.rotateKatana(0.15),
-  poseMode: () => demo.togglePoseMode(),
-  combatPose: () => demo.applyCombatPose(),
-  bindPose: () => demo.resetBind(),
-  exportPose: () => demo.exportCurrentPose(),
-};
+const actions = createDemoCommands(demo);
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
   button.addEventListener('click', () => {
     const action = button.dataset.action;
-    if (action) actions[action]?.();
+    if (action) actions[action]?.run();
   });
 }
 

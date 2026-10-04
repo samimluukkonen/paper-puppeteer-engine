@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import type { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import type { DemoPresenter } from './DemoPresenter.js';
 import type { DemoScene } from './DemoScene.js';
+import { createDemoCommands } from './demoCommands.js';
 
 /** Scene input bindings and held weapon-rotation keys. */
 export class DemoInput {
@@ -21,37 +22,8 @@ export class DemoInput {
         keyboard.on(event, handler);
         this.cleanup.push(() => keyboard.off(event, handler));
       };
-      on('keydown-ONE', () => scene.play('idle'));
-      on('keydown-TWO', () => scene.play('walk'));
-      on('keydown-THREE', () => scene.play('sword'));
-      on('keydown-FOUR', () => scene.crossfade('idle'));
-      on('keydown-FIVE', () => scene.crossfade('walk'));
-      on('keydown-S', () => scene.toggleStepped());
-      on('keydown-EIGHT', () => scene.setSteppedFPS(8));
-      on('keydown-ZERO', () => scene.setSteppedFPS(10));
-      on('keydown-L', () => scene.toggleUpperBody());
-      on('keydown-P', () => scene.togglePause());
-      on('keydown-OPEN_BRACKET', () => (authoring.active ? scene.selectBone(-1) : scene.adjustSpeed(-0.25)));
-      on('keydown-CLOSED_BRACKET', () => (authoring.active ? scene.selectBone(1) : scene.adjustSpeed(0.25)));
-      on('keydown-A', () => scene.face('left'));
-      on('keydown-D', () => scene.face('right'));
-      on('keydown-B', () => scene.toggleDebug());
-      on('keydown-I', () => scene.toggleIKDebug());
-      on('keydown-F', () => scene.toggleFootIK());
-      on('keydown-H', () => scene.toggleHandIK());
-      on('keydown-T', () => scene.toggleProp());
-      on('keydown-K', () => scene.setSkin('default'));
-      on('keydown-M', () => scene.setSkin('alternate'));
-      on('keydown-G', () => scene.toggleGripHand());
-      on('keydown-N', () => scene.toggleHelmet());
-      on('keydown-V', () => scene.toggleSlotDebug());
-      on('keydown-SPACE', () => scene.togglePlayback());
-      on('keydown-R', () => (authoring.active ? scene.resetBind() : scene.restart()));
-      on('keydown-O', () => scene.togglePoseMode());
-      on('keydown-C', () => scene.applyCombatPose());
-      on('keydown-X', () => scene.exportCurrentPose());
-      on('keydown-J', () => scene.exportRig());
-      on('keydown-U', () => scene.resetSelectedBone());
+      for (const command of Object.values(createDemoCommands(scene)))
+        if (command.key) on(`keydown-${command.key}`, () => command.runFromKeyboard(authoring.active));
       const onKeyDown = (event: KeyboardEvent): void => {
         if (!authoring.active || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         event.preventDefault();

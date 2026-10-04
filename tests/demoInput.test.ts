@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { DemoInput } from '../src/demo/DemoInput.js';
 import type { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
 import type { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import type { DemoScene } from '../src/demo/DemoScene.js';
+import { createDemoCommands } from '../src/demo/demoCommands.js';
 
 function emitter() {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -106,4 +108,34 @@ test('pointer input works when keyboard support is disabled', () => {
   scene.input.emit('pointermove', { worldX: 10, worldY: 20 });
   assert.deepEqual(presentation.handTarget, { x: 10, y: 20 });
   assert.strictEqual(input.katanaTurn(500), 0);
+});
+
+test('buttons retain their actions when keyboard shortcuts switch to pose editing', () => {
+  const { scene, authoring, keyboard, bind } = fixture();
+  const commands = createDemoCommands(scene as unknown as DemoScene);
+  bind();
+  authoring.active = true;
+  commands.slower!.run();
+  commands.faster!.run();
+  commands.restart!.run();
+  assert.deepEqual(scene.adjustSpeed.mock.calls, [[-0.25], [0.25]]);
+  assert.equal(scene.restart.mock.calls.length, 1);
+  assert.equal(scene.selectBone.mock.calls.length, 0);
+  keyboard.emit('keydown-OPEN_BRACKET');
+  keyboard.emit('keydown-CLOSED_BRACKET');
+  keyboard.emit('keydown-R');
+  assert.deepEqual(scene.selectBone.mock.calls, [[-1], [1]]);
+  assert.equal(scene.adjustSpeed.mock.calls.length, 2);
+  assert.equal(scene.resetBind.mock.calls.length, 1);
+});
+
+test('every demo button resolves a command and keyboard shortcuts have one binding each', () => {
+  const { scene } = fixture();
+  const commands = createDemoCommands(scene as unknown as DemoScene);
+  const markup = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const buttons = [...markup.matchAll(/<button[^>]*data-action="([^"]+)"/g)];
+  assert.isAbove(buttons.length, 0);
+  for (const [, action] of buttons) assert.isFunction(commands[action!]!.run, `Missing command for ${action}`);
+  const keys = Object.values(commands).flatMap((command) => (command.key ? [command.key] : []));
+  assert.equal(new Set(keys).size, keys.length);
 });
