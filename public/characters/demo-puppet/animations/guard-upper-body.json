@@ -13,25 +13,25 @@
     "leftUpperArm": [
       {
         "time": 0,
-        "rotation": -0.8
+        "rotation": 0.81380094
       }
     ],
     "leftForearm": [
       {
         "time": 0,
-        "rotation": 1.2
+        "rotation": -1.71241989
       }
     ],
     "rightUpperArm": [
       {
         "time": 0,
-        "rotation": -0.7
+        "rotation": -0.99593504
       }
     ],
     "rightForearm": [
       {
         "time": 0,
-        "rotation": -1.1
+        "rotation": 0
       }
     ]
   }

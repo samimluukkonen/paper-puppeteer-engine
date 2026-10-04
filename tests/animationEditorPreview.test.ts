@@ -1,4 +1,5 @@
 import { assert, test, vi } from 'vitest';
+import { katanaGrips } from '../src/demo/Katana.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import type { AnimationClip, AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
@@ -80,6 +81,47 @@ test('sample idle, walk and sparse tracks match runtime, selection clears previo
   preview.dispose();
   puppet.destroy();
   runtime.destroy();
+});
+
+test.each(['sword', 'guardUpperBody'])('%s previews a complete two-handed grip without IK', (name) => {
+  const state = new AnimationEditorState(demoRig, demoAnimations);
+  const puppet = new Puppet(puppetScene(), { rig: demoRig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  // Select after walking to exercise reset of the previous pose as well as nonsequential scrubbing.
+  state.selectAnimation('walk');
+  state.setCurrentTime(0.75);
+  state.selectAnimation(name);
+  const swordAngle = -0.65;
+  const gripSpacing = katanaGrips.primary.x - katanaGrips.secondary.x;
+  const assertGrip = () => {
+    const palm = (side: 'left' | 'right') =>
+      puppet.getBone(`${side}Hand`).container.getWorldTransformMatrix().transformPoint(0, 15);
+    const primary = palm('right');
+    const secondary = palm('left');
+    // Baked Phaser transforms and the runtime solver use floating-point tolerances.
+    assert.approximately(secondary.x, primary.x - gripSpacing * Math.cos(swordAngle), 1e-3);
+    assert.approximately(secondary.y, primary.y - gripSpacing * Math.sin(swordAngle), 1e-3);
+    const torso = puppet.getBone('torso').container.getWorldTransformMatrix();
+    for (const point of [primary, secondary]) {
+      const local = torso.applyInverse(point.x, point.y);
+      assert.isAbove(local.x, puppet.getBone('leftUpperArm').pose.x, 'palms stay in front of the body');
+      assert.isAbove(local.y, puppet.getBone('head').pose.y, 'palms stay below the head');
+      assert.isBelow(local.y, 0, 'palms stay above the waist');
+    }
+  };
+  for (const time of [0, 0.9, 0.25, 1.8]) {
+    state.setCurrentTime(time);
+    assertGrip();
+  }
+  state.restart();
+  state.play();
+  for (let frame = 0; frame < 108; frame += 1) {
+    state.advancePlayback(1 / 60);
+    assertGrip();
+  }
+  assert.isFalse(state.dirty);
+  preview.dispose();
+  puppet.destroy();
 });
 
 test('authored replacements recompile preview and invalid replacements retain its last pose', () => {
