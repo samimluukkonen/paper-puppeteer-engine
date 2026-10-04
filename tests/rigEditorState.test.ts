@@ -120,6 +120,9 @@ test('status and history reuse validation and serialization until the rig change
     assert.isTrue(state.dirty);
     state.validationIssues();
     assert.equal(validation.mock.calls.length, 2);
+    assert.equal(stringify.mock.calls.length, 0);
+    const exported = state.workingSnapshot;
+    assert.equal(state.workingSnapshot, exported);
     assert.equal(stringify.mock.calls.length, 1);
 
     state.undo();
@@ -134,6 +137,50 @@ test('status and history reuse validation and serialization until the rig change
     validation.mockRestore();
     stringify.mockRestore();
   }
+});
+
+test('undo and redo share immutable entries without serializing or parsing the rig', () => {
+  const state = new RigEditorState(source);
+  const original = state.workingCopy;
+  const stringify = vi.spyOn(JSON, 'stringify');
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    state.markSaved();
+    state.editBone('root', 'x', 12);
+    const edited = state.workingCopy;
+    assert.strictEqual(edited.bones[2], original.bones[2]);
+    assert.isTrue(state.undo());
+    assert.strictEqual(state.workingCopy, original);
+    assert.isTrue(state.redo());
+    assert.strictEqual(state.workingCopy, edited);
+    state.editSprite('arm', 'x', 18);
+    assert.equal(edited.bones[2]!.sprite!.x, 3);
+    state.undo();
+    assert.strictEqual(state.workingCopy, edited);
+    state.resetRig();
+    assert.strictEqual(state.workingCopy, original);
+    assert.isFalse(state.dirty);
+    assert.equal(stringify.mock.calls.length, 0);
+    assert.equal(parse.mock.calls.length, 0);
+  } finally {
+    stringify.mockRestore();
+    parse.mockRestore();
+  }
+});
+
+test('no-op groups preserve redo and clean status when optional fields change insertion order', () => {
+  const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root', x: 1, y: 2 }] }));
+  state.editBone('root', 'y', 3);
+  state.undo();
+  state.beginOperation();
+  state.editBone('root', 'x', undefined);
+  state.editBone('root', 'x', 1);
+  state.endOperation();
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
+  assert.isTrue(state.canRedo);
+  state.redo();
+  assert.equal(state.getBone('root').y, 3);
 });
 
 test('cached status follows grouped edits, resets, and asynchronous save baselines', () => {

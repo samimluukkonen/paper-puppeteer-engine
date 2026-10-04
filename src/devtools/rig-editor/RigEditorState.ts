@@ -14,7 +14,7 @@ import type {
   TransformProperty,
 } from '../../engine/types.js';
 
-import { freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
+import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { serializeRigData } from './rigSerialization.js';
 
@@ -32,7 +32,7 @@ export interface RigEditorStateOptions {
   historyLimit?: number;
 }
 
-type HistoryEntry = { rig: string; directions: [string, { x: number; y: number }][] };
+type HistoryEntry = ReadonlyEditorData<{ rig: RigDefinition; directions: [string, { x: number; y: number }][] }>;
 
 export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
@@ -82,8 +82,9 @@ export class RigEditorState {
   rotationSnap: RotationSnap = 0;
   readonly name: string | undefined;
   private readonly includeSkins: boolean;
-  private readonly initialCopy: RigDefinition;
-  private saved: string;
+  private readonly initialCopy: ReadonlyRigData<RigDefinition>;
+  private saved: ReadonlyRigData<RigDefinition>;
+  private cachedDirty: boolean | undefined;
   private cachedSnapshot: string | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
   private validationDirty = true;
@@ -98,7 +99,7 @@ export class RigEditorState {
     this.history = new SnapshotHistory(
       () => this.historyEntry(),
       (entry) => this.restoreHistory(entry),
-      (left, right) => left.rig === right.rig,
+      (left, right) => equalEditorData(left.rig, right.rig),
       options.historyLimit ?? 100,
     );
     this.source = source;
@@ -114,9 +115,9 @@ export class RigEditorState {
     this.freezeEntries();
     this.rig = source;
     this.rebuildIndexes();
-    this.initialCopy = structuredClone(this.workingCopy);
-    this.saved = snapshot(this.workingCopy);
-    this.cachedSnapshot = this.saved;
+    this.initialCopy = this.workingCopy;
+    this.saved = this.initialCopy;
+    this.cachedDirty = false;
     for (const bone of this.rig.bones) {
       if (bone.parent === undefined) continue;
       const children = this.children.get(bone.parent) ?? [];
@@ -127,7 +128,8 @@ export class RigEditorState {
   }
 
   get dirty(): boolean {
-    return this.workingSnapshot !== this.saved;
+    this.cachedDirty ??= !equalEditorData(this.workingCopy, this.saved);
+    return this.cachedDirty;
   }
 
   /** Immutable data view; edits replace only changed entries and preserve older views. */
@@ -156,6 +158,7 @@ export class RigEditorState {
   private invalidate(): void {
     this.cachedWorkingCopy = undefined;
     this.cachedSnapshot = undefined;
+    this.cachedDirty = undefined;
     this.validationDirty = true;
   }
 
@@ -195,28 +198,29 @@ export class RigEditorState {
   }
 
   private historyEntry(): HistoryEntry {
-    return { rig: this.workingSnapshot, directions: [...this.childDirections] };
+    return freezeData({ rig: this.workingCopy, directions: [...this.childDirections] });
   }
 
   private change(edit: () => void): void {
     this.history.change(() => {
-      try {
-        edit();
-      } finally {
-        this.invalidate();
-      }
+      this.invalidate();
+      edit();
     });
     if (!this.history.inOperation) this.updateWarnings();
   }
 
-  private restore(json: string): void {
-    const copy = JSON.parse(json) as WorkingRig;
-    Object.assign(this.data, copy);
+  private restore(copy: ReadonlyRigData<RigDefinition>): void {
+    Object.assign(this.data, {
+      ...copy,
+      bones: [...copy.bones],
+      ...(copy.slots === undefined ? {} : { slots: [...copy.slots] }),
+      ...(copy.attachments === undefined ? {} : { attachments: [...copy.attachments] }),
+      ...(copy.skins === undefined ? {} : { skins: [...copy.skins] }),
+    });
     for (const key of ['slots', 'attachments', 'skins'] as const) if (copy[key] === undefined) delete this.data[key];
-    this.freezeEntries();
     this.invalidate();
+    this.cachedWorkingCopy = copy;
     this.rebuildIndexes();
-    this.cachedSnapshot = json;
   }
 
   private restoreHistory(entry: HistoryEntry): void {
@@ -259,17 +263,15 @@ export class RigEditorState {
             this.replaceBone(child);
           }
         }
-        this.data.bones[index] = freezeData(structuredClone(original));
+        this.data.bones[index] = original;
       } else {
         const index = this.slotIndices.get(selected.id)!;
-        this.data.slots![index] = freezeData(structuredClone(this.initialCopy.slots![index]!));
+        this.data.slots![index] = this.initialCopy.slots![index]!;
         // The inspector's artwork fields belong to the active slot attachment.
         if (attachmentId) {
           const attachmentIndex = this.attachmentIndices.get(attachmentId);
           if (attachmentIndex !== undefined)
-            this.data.attachments![attachmentIndex] = freezeData(
-              structuredClone(this.initialCopy.attachments![attachmentIndex]!),
-            );
+            this.data.attachments![attachmentIndex] = this.initialCopy.attachments![attachmentIndex]!;
         }
       }
     });
@@ -278,7 +280,7 @@ export class RigEditorState {
 
   resetRig(): void {
     this.change(() => {
-      this.restore(snapshot(this.initialCopy));
+      this.restore(this.initialCopy);
       this.childDirections.clear();
     });
   }
@@ -318,8 +320,13 @@ export class RigEditorState {
     };
   }
 
-  markSaved(savedSnapshot = this.workingSnapshot): void {
-    this.saved = savedSnapshot;
+  markSaved(savedSnapshot?: string): void {
+    // A delayed export can save an older working copy after subsequent edits.
+    this.saved =
+      savedSnapshot === undefined || savedSnapshot === this.workingSnapshot
+        ? this.workingCopy
+        : freezeData(JSON.parse(savedSnapshot) as RigDefinition);
+    this.cachedDirty = undefined;
   }
 
   exportRig(saveBaseline = true): RigJsonDefinition {
