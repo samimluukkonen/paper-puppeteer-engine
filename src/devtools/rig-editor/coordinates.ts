@@ -19,7 +19,8 @@ export function localToWorld(point: Point, matrix: Affine): Point {
 }
 
 export function worldToLocal(point: Point, matrix: Affine): Point | undefined {
-  if (![point.x, point.y, ...Object.values(matrix)].every(Number.isFinite)) return undefined;
+  if (![point.x, point.y, matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty].every(Number.isFinite))
+    return undefined;
   // Normalize each axis before checking invertibility. The determinant's
   // magnitude should depend on the angle between axes, not their authored scale.
   const scaleX = Math.max(Math.abs(matrix.a), Math.abs(matrix.b));

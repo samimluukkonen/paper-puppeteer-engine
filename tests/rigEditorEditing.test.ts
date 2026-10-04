@@ -86,6 +86,9 @@ test('coordinate inversion handles unequal axis scales and rejects unreliable or
   const matrix = { a: 1e-7, b: 0, c: 0, d: 1e7, tx: 0, ty: 0 };
   const local = { x: 7, y: -4 };
   assert.deepEqual(worldToLocal(localToWorld(local, matrix), matrix), local);
+  // Renderer matrices may carry typed-array storage alongside their affine components.
+  const rendererMatrix = { ...matrix, storage: new Float32Array(6) };
+  assert.deepEqual(worldToLocal(localToWorld(local, rendererMatrix), rendererMatrix), local);
   assert.isUndefined(worldToLocal({ x: 1, y: 1 }, { ...matrix, a: 1, b: 1, c: 1, d: 1 + Number.EPSILON }));
   assert.isUndefined(worldToLocal({ x: 1e308, y: 0 }, { ...matrix, a: 1e-4, d: 1e-4 }));
   assert.isUndefined(worldToLocal({ x: Infinity, y: 0 }, matrix));
