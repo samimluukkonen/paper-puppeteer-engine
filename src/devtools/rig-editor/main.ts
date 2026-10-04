@@ -1,6 +1,6 @@
-import Phaser from 'phaser';
 import { demoIK } from '../../demo/demoIK.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
+import { createEditorGame } from '../shared/editorGame.js';
 import { createControlsController } from './ControlsController.js';
 import { mountEditorMarkup } from './editorMarkup.js';
 import { createHierarchyController } from './HierarchyController.js';
@@ -31,16 +31,7 @@ const scene = new RigEditorScene(render, inspector.showError, {
   characterUrl: `../characters/${selectedCharacterId()}/character.json`,
   ikChains: demoIK,
 });
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'editor-stage',
-  width: 760,
-  height: 640,
-  transparent: true,
-  render: { antialias: true, maxTextures: 1 },
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [scene],
-});
+const game = createEditorGame('editor-stage', scene);
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
     releaseNavigationGuard();

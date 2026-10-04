@@ -133,6 +133,7 @@ src/devtools/animation-editor/
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
 src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
+  editorGame.ts        Shared Phaser rendering and scaling defaults for editor previews
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
   editorData.ts        Readonly data and editor number rounding
 src/shared/

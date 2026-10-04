@@ -1,6 +1,6 @@
-import Phaser from 'phaser';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { viewHeader } from '../../ui/viewShell.js';
+import { createEditorGame } from '../shared/editorGame.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import { TimelineController } from './TimelineController.js';
 import './style.css';
@@ -25,16 +25,7 @@ const scene = new AnimationEditorScene(
   (message) => timeline.showError(message),
   { characterUrl: `../characters/${selectedCharacterId()}/character.json` },
 );
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'animation-stage',
-  width: 760,
-  height: 640,
-  transparent: true,
-  render: { antialias: true, maxTextures: 1 },
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [scene],
-});
+const game = createEditorGame('animation-stage', scene);
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
     timeline.dispose();
