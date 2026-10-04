@@ -91,6 +91,41 @@ test('authored replacements validate atomically, use shared history, and protect
   assert.isFalse(state.dirty);
 });
 
+test.each(['other', 'renamed'])('replacement name %s cannot change selection or overwrite saved entries', (name) => {
+  const state = new AnimationEditorState(rig, [clip(), clip({ name: 'other' })]);
+  state.selectAnimation('move');
+  state.replaceWorkingAnimation(file(clip({ duration: 3000 })));
+  state.undo();
+  state.setCurrentTime(0.5);
+  state.play();
+  const working = state.workingAnimation;
+  const source = state.sourceAnimation;
+  const listener = vi.fn();
+  const release = state.subscribe(listener);
+
+  assert.isFalse(state.replaceWorkingAnimation(file(clip({ name, duration: 4000 }))));
+  assert.strictEqual(state.workingAnimation, working);
+  assert.strictEqual(state.sourceAnimation, source);
+  assert.equal(state.selectedAnimationId, 'move');
+  assert.deepEqual(state.animationIds, ['move', 'other']);
+  assert.equal(state.currentTime, 0.5);
+  assert.isTrue(state.isPlaying);
+  assert.isFalse(state.dirty);
+  assert.isFalse(state.canUndo);
+  assert.isTrue(state.canRedo);
+  assert.equal(state.validationIssues[0]?.path, 'name');
+  assert.equal(listener.mock.calls.length, 1);
+  release();
+
+  state.markSaved();
+  state.selectAnimation('other');
+  assert.equal(state.workingAnimation!.name, 'other');
+  assert.equal(state.duration, 2);
+  state.selectAnimation('move');
+  assert.equal(state.workingAnimation!.name, 'move');
+  assert.equal(state.duration, 2);
+});
+
 test('saved edits survive switching and deselection with independent animation baselines', () => {
   const input = clip();
   const state = new AnimationEditorState(rig, [input, clip({ name: 'other' })]);

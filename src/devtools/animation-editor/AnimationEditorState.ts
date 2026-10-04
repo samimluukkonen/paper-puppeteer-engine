@@ -196,6 +196,17 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
+    if (next.name !== this.selectedId) {
+      this.issues = [
+        {
+          severity: 'error',
+          path: 'name',
+          message: `Animation name must remain "${this.selectedId}"; renaming is not supported.`,
+        },
+      ];
+      this.notify();
+      return false;
+    }
     this.history.change(() => {
       this.working = next;
     });
