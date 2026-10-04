@@ -37,9 +37,15 @@ export function createHierarchyController(hierarchy: HTMLElement) {
       hierarchy.append(button);
       hierarchyButtons.set(`${type}:${id}`, button);
     };
+    const slotsByBone = new Map<string, string[]>();
+    for (const slot of state.rig.slots) {
+      const slots = slotsByBone.get(slot.bone) ?? [];
+      slots.push(slot.id);
+      slotsByBone.set(slot.bone, slots);
+    }
     for (const { id, depth } of state.hierarchy()) {
       appendEntry('bone', id, depth);
-      for (const slot of state.rig.slots.filter((item) => item.bone === id)) appendEntry('slot', slot.id, depth);
+      for (const slot of slotsByBone.get(id) ?? []) appendEntry('slot', slot, depth);
     }
   }
 
