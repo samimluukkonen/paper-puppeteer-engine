@@ -260,6 +260,65 @@ test('the public core API compiles and evaluates an authored clip without runtim
   assert.equal(rig.getBone('root').x, 3);
 });
 
+test('player sampling reuses pose storage across seeks and rebuilds it when the clip changes', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 3, y: 4 }] });
+  const joint = new Joint('root', rig.getBone('root'));
+  const player = new AnimationPlayer(rig, new Map([['root', joint]]));
+  player.addAnimation({
+    name: 'horizontal',
+    duration: 1000,
+    loop: false,
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 1000, x: 100 },
+      ],
+    },
+  });
+  player.addAnimation({
+    name: 'vertical',
+    duration: 1000,
+    loop: false,
+    tracks: {
+      root: [
+        { time: 0, y: 0 },
+        { time: 1000, y: 200 },
+      ],
+    },
+  });
+  player.play('horizontal');
+  const evaluate = vi.spyOn(ClipPoseBuffer.prototype, 'evaluate');
+  try {
+    let heldPose: ReturnType<ClipPoseBuffer['evaluate']> | undefined;
+    let heldValues: unknown;
+    for (const time of [750, 250, 1000, 0, 500]) {
+      evaluate.mockClear();
+      player.sample(time);
+      const pose = evaluate.mock.results[0]!.value as ReturnType<ClipPoseBuffer['evaluate']>;
+      if (heldPose) {
+        assert.strictEqual(pose, heldPose);
+        assert.strictEqual(pose.get('root'), heldValues);
+      }
+      heldPose = pose;
+      heldValues = pose.get('root');
+      assert.equal(joint.pose.x, time / 10);
+      assert.equal(joint.pose.y, 4);
+      assert.equal(player.elapsedTime, 0);
+    }
+    player.play('vertical');
+    evaluate.mockClear();
+    player.sample(250);
+    const verticalPose = evaluate.mock.results[0]!.value;
+    assert.notStrictEqual(verticalPose, heldPose);
+    assert.deepEqual(verticalPose.get('root'), { y: 50 });
+    assert.equal(joint.pose.x, 3);
+    assert.equal(joint.pose.y, 50);
+  } finally {
+    evaluate.mockRestore();
+    player.dispose();
+  }
+});
+
 test('dense tracks interpolate the correct interval when seeking in both directions', () => {
   const keys = Array.from({ length: 512 }, (_, index) => ({ time: index * 17, value: index ** 2 }));
   for (const index of [510, 1, 256, 42, 0, 509]) {

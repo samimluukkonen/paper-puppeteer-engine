@@ -1,5 +1,5 @@
 import type { AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
-import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer, evaluateClip } from './AnimationPose.js';
+import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer } from './AnimationPose.js';
 import { quantizePlaybackTime } from './animationMath.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
@@ -39,6 +39,7 @@ export class AnimationLayerEvaluator {
   private readonly controlled = new Map<string, Set<TransformProperty>>();
   private controlDirty = true;
   private readonly layerBuffers = new WeakMap<AnimationLayer, LayerBuffers>();
+  private sampleBuffer: ClipPoseBuffer | undefined;
 
   constructor(
     private readonly rig: Rig,
@@ -63,7 +64,8 @@ export class AnimationLayerEvaluator {
     playback: AnimationPlaybackMode,
   ): void {
     const clampedTime = Math.max(0, Math.min(time, state.clip.duration));
-    const pose = evaluateClip(
+    this.sampleBuffer ??= new ClipPoseBuffer();
+    const pose = this.sampleBuffer.evaluate(
       state.clip,
       usePlayback ? this.sampleTime(state.clip, clampedTime, playback) : clampedTime,
     );
@@ -217,6 +219,7 @@ export class AnimationLayerEvaluator {
   }
 
   dispose(): void {
+    this.sampleBuffer = undefined;
     this.workingPose.clear();
     this.emptyPose.clear();
     this.controlled.clear();
