@@ -6,7 +6,7 @@ import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { SlotDebug } from '../src/engine/SlotDebug.js';
 import type { Facing } from '../src/engine/types.js';
-import { demoRig, guardUpperBody, sword } from './helpers/demoCharacter.js';
+import { demoRig, guardUpperBody, idle, sword, walk } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -30,7 +30,7 @@ function fixture(facing: Facing) {
   const puppet = new Puppet(scene, {
     rig: demoRig,
     skin: 'default',
-    animations: [sword, guardUpperBody],
+    animations: [sword, guardUpperBody, idle, walk],
     ik: demoIK,
     x: 380,
     y: 362,
@@ -40,6 +40,42 @@ function fixture(facing: Facing) {
   puppet.setFacing(facing).play('sword');
   return { puppet, presenter: new DemoPresenter(scene, puppet) };
 }
+
+test.each(['left', 'right'] as const)('interrupted crossfades preserve the visible arm pose facing %s', (facing) => {
+  const { puppet, presenter } = fixture(facing);
+  presenter.katana.enabled = false;
+  const options = { handIK: false, footIK: false, upperBody: false };
+  puppet.play('idle');
+  presenter.update(options);
+  const fade = (name: string): void => {
+    presenter.captureCrossfadeSource();
+    puppet.play(name, { fadeDuration: 300 });
+    presenter.update(options);
+  };
+  fade('walk');
+  for (const name of ['idle', 'walk', 'idle']) {
+    puppet.animationPlayer.update(
+      150,
+      () => puppet.preparePose(),
+      () => presenter.update(options, true),
+    );
+    const before = ['leftUpperArm', 'rightUpperArm'].map((id) => puppet.getBone(id).pose.rotation);
+    fade(name);
+    for (const [index, id] of ['leftUpperArm', 'rightUpperArm'].entries())
+      assert.approximately(puppet.getBone(id).pose.rotation, before[index]!, 1e-12);
+    presenter.update(options);
+    for (const [index, id] of ['leftUpperArm', 'rightUpperArm'].entries())
+      assert.approximately(puppet.getBone(id).pose.rotation, before[index]!, 1e-12);
+  }
+  puppet.animationPlayer.update(
+    300,
+    () => puppet.preparePose(),
+    () => presenter.update(options, true),
+  );
+  const completed = puppet.getBone('leftUpperArm').pose.rotation;
+  presenter.update(options);
+  assert.approximately(puppet.getBone('leftUpperArm').pose.rotation, completed, 1e-12);
+});
 
 test.each([
   ['left', false],

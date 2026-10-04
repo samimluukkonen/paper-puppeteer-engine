@@ -49,6 +49,8 @@ export class DemoPresenter {
   private renderOrder: readonly string[] | undefined;
   private orderAnimation: string | undefined;
   private orderFacing: Facing | undefined;
+  private armDirection = 1;
+  private armFadeSource = 1;
 
   constructor(
     scene: Phaser.Scene,
@@ -62,6 +64,11 @@ export class DemoPresenter {
 
   clearTargets(): void {
     this.markers.clear();
+  }
+
+  /** Retain the presentation correction before playback snapshots an interrupted fade. */
+  captureCrossfadeSource(): void {
+    this.armFadeSource = this.armDirection;
   }
 
   update(options: DemoPresenterOptions, poseEvaluated = false): void {
@@ -78,9 +85,12 @@ export class DemoPresenter {
       rightUpperArm: this.puppet.getBone('rightUpperArm').pose.rotation,
     });
     const transition = this.puppet.animationPlayer.transition;
-    const fromSign = transition?.from === 'idle' && this.puppet.facingDirection === 'right' ? -1 : 1;
-    const toSign = this.puppet.currentAnimation === 'idle' && this.puppet.facingDirection === 'right' ? -1 : 1;
-    const sign = transition ? fromSign + (toSign - fromSign) * transition.progress : toSign;
+    const fromDirection =
+      transition?.from === 'previous pose' ? this.armFadeSource : transition?.from === 'idle' ? -1 : 1;
+    const toDirection = this.puppet.currentAnimation === 'idle' ? -1 : 1;
+    this.armDirection = transition ? fromDirection + (toDirection - fromDirection) * transition.progress : toDirection;
+    const toSign = this.puppet.facingDirection === 'right' ? toDirection : 1;
+    const sign = this.puppet.facingDirection === 'right' ? this.armDirection : 1;
     for (const [id, rotation] of Object.entries(arms)) {
       this.puppet.getBone(id).pose.rotation = transition ? (rotation * sign) / toSign : rotation;
     }

@@ -185,6 +185,7 @@ export class DemoScene extends Phaser.Scene {
       this.play(name);
       return;
     }
+    this.presentation?.captureCrossfadeSource();
     this.puppet?.play(name, { fadeDuration: 300 });
     this.handIK = false;
     this.updatePresentation();
