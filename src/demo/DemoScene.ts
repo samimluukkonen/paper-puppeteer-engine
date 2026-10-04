@@ -45,6 +45,7 @@ export class DemoScene extends Phaser.Scene {
   private gripHand = false;
   private helmet = false;
   private sampleLayout = true;
+  private commandDepth = 0;
   private readonly prepareAnimationPose = (): void => this.presentation?.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.updatePresentation(true);
 
@@ -174,15 +175,14 @@ export class DemoScene extends Phaser.Scene {
 
   play(name: string): void {
     this.authoring?.exit();
-    this.presentation?.preparePose();
-    this.puppet?.clearPose();
-    this.puppet?.play(name);
-    this.handIK = name === 'sword';
-    if (name === 'sword') {
-      this.presentation?.katana.resetRearPalm(this.puppet?.facingDirection ?? 'right');
-    }
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(
+      (puppet) => {
+        puppet.clearPose().play(name);
+        this.handIK = name === 'sword';
+        if (this.handIK) this.presentation?.katana.resetRearPalm(puppet.facingDirection);
+      },
+      { preparePose: true },
+    );
   }
 
   crossfade(name: 'idle' | 'walk'): void {
@@ -191,26 +191,27 @@ export class DemoScene extends Phaser.Scene {
       return;
     }
     this.presentation?.captureCrossfadeSource();
-    this.presentation?.preparePose();
-    this.puppet?.play(name, { fadeDuration: 300 });
-    this.handIK = false;
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(
+      (puppet) => {
+        puppet.play(name, { fadeDuration: 300 });
+        this.handIK = false;
+      },
+      { preparePose: true },
+    );
   }
 
   toggleStepped(): void {
-    if (!this.puppet) return;
-    const stepped = this.puppet.animationPlayer.playbackMode.mode === 'stepped';
-    this.puppet.setAnimationPlaybackMode(stepped ? { mode: 'smooth' } : { mode: 'stepped', fps: this.steppedFPS });
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand((puppet) => {
+      const stepped = puppet.animationPlayer.playbackMode.mode === 'stepped';
+      puppet.setAnimationPlaybackMode(stepped ? { mode: 'smooth' } : { mode: 'stepped', fps: this.steppedFPS });
+    });
   }
 
   setSteppedFPS(fps: number): void {
-    this.steppedFPS = fps;
-    this.puppet?.setAnimationFPS(fps);
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand((puppet) => {
+      puppet.setAnimationFPS(fps);
+      this.steppedFPS = fps;
+    });
   }
 
   togglePause(): void {
@@ -226,25 +227,26 @@ export class DemoScene extends Phaser.Scene {
   }
 
   toggleUpperBody(): void {
-    if (!this.puppet) return;
     if (this.poseMode) this.play('idle');
-    this.presentation?.preparePose();
-    this.upperBody = !this.upperBody;
-    if (this.upperBody) {
-      this.puppet.setLayerMask('upperBody', [
-        'torso',
-        'head',
-        'leftUpperArm',
-        'leftForearm',
-        'leftHand',
-        'rightUpperArm',
-        'rightForearm',
-        'rightHand',
-      ]);
-      this.puppet.play('guardUpperBody', { layer: 'upperBody', fadeDuration: 250 });
-    } else this.puppet.clearLayer('upperBody');
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(
+      (puppet) => {
+        this.upperBody = !this.upperBody;
+        if (this.upperBody) {
+          puppet.setLayerMask('upperBody', [
+            'torso',
+            'head',
+            'leftUpperArm',
+            'leftForearm',
+            'leftHand',
+            'rightUpperArm',
+            'rightForearm',
+            'rightHand',
+          ]);
+          puppet.play('guardUpperBody', { layer: 'upperBody', fadeDuration: 250 });
+        } else puppet.clearLayer('upperBody');
+      },
+      { preparePose: true },
+    );
   }
 
   face(direction: Facing): void {
@@ -256,18 +258,17 @@ export class DemoScene extends Phaser.Scene {
       this.notify();
       return;
     }
-    // setFacing synchronizes the rig; wait until the weapon mount has changed
-    // before asking the rear hand to evaluate its grip in the new direction.
-    if (this.puppet) {
-      this.puppet.getIK('leftArmIK').enabled = false;
-      this.puppet.getIK('rightArmIK').enabled = false;
-    }
-    this.presentation?.preparePose();
-    this.puppet?.setFacing(direction);
-    this.presentation?.katana.resetRearPalm(direction);
-    this.presentation?.katana.reattach();
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(
+      (puppet) => {
+        // Wait until the weapon mount has changed before evaluating the rear-hand grip.
+        puppet.getIK('leftArmIK').enabled = false;
+        puppet.getIK('rightArmIK').enabled = false;
+        puppet.setFacing(direction);
+        this.presentation?.katana.resetRearPalm(direction);
+        this.presentation?.katana.reattach();
+      },
+      { preparePose: true },
+    );
   }
   toggleDebug(): void {
     if (this.puppet) this.puppet.setDebug(!this.puppet.isDebug);
@@ -279,15 +280,15 @@ export class DemoScene extends Phaser.Scene {
   }
   toggleHandIK(): void {
     if (this.poseMode) return;
-    this.handIK = !this.handIK;
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(() => {
+      this.handIK = !this.handIK;
+    });
   }
   toggleFootIK(): void {
     if (this.poseMode) return;
-    this.footIK = !this.footIK;
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(() => {
+      this.footIK = !this.footIK;
+    });
   }
   rotateKatana(delta: number): void {
     this.presentation?.katana.rotate(delta);
@@ -297,10 +298,7 @@ export class DemoScene extends Phaser.Scene {
       this.resetBind();
       return;
     }
-    this.presentation?.preparePose();
-    this.puppet?.restart();
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand((puppet) => puppet.restart(), { preparePose: true });
   }
 
   togglePlayback(): void {
@@ -308,18 +306,21 @@ export class DemoScene extends Phaser.Scene {
       this.play('idle');
       return;
     }
-    this.presentation?.preparePose();
-    if (this.puppet?.isPlaying) this.puppet.stop();
-    else this.puppet?.restart();
-    this.updatePresentation();
-    this.notify();
+    this.runPresentationCommand(
+      (puppet) => {
+        if (puppet.isPlaying) puppet.stop();
+        else puppet.restart();
+      },
+      { preparePose: true },
+    );
   }
 
   toggleProp(): void {
     if (!this.presentation) return;
-    this.presentation.katana.enabled = !this.presentation.katana.enabled;
-    this.updatePresentation();
-    this.notify();
+    const katana = this.presentation.katana;
+    this.runPresentationCommand(() => {
+      katana.enabled = !katana.enabled;
+    });
   }
 
   setSkin(name: 'default' | 'alternate'): void {
@@ -357,7 +358,7 @@ export class DemoScene extends Phaser.Scene {
   }
 
   private notify(): void {
-    if (!this.puppet) return;
+    if (!this.puppet || this.commandDepth > 0) return;
     this.onChange({
       animation: this.puppet.currentAnimation ?? 'none',
       facing: this.puppet.facingDirection,
@@ -383,6 +384,23 @@ export class DemoScene extends Phaser.Scene {
       slotDebug: this.puppet.isSlotDebug,
       poseMode: this.poseMode,
     });
+  }
+
+  /** Commands finish with presentation before UI observers read the new state. */
+  private runPresentationCommand(change: (puppet: Puppet) => void, options: { preparePose?: boolean } = {}): void {
+    const puppet = this.puppet;
+    if (!puppet) return;
+    ++this.commandDepth;
+    try {
+      if (options.preparePose) this.presentation?.preparePose();
+      change(puppet);
+    } finally {
+      --this.commandDepth;
+    }
+    if (this.commandDepth === 0) {
+      this.updatePresentation();
+      this.notify();
+    }
   }
 
   private updatePresentation(poseEvaluated = false): void {
