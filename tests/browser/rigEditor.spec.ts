@@ -96,6 +96,46 @@ test('a canvas drag released outside commits one undo and stops moving', async (
   ).toBe(true);
 });
 
+for (const interruption of ['blur', 'hidden'] as const) {
+  test(`a canvas drag interrupted by ${interruption} commits once and accepts the next drag`, async ({ page }) => {
+    const box = await page.locator('#editor-stage canvas').boundingBox();
+    if (!box) throw new Error('Missing editor canvas');
+    const start = { x: box.x + (380 / 760) * box.width, y: box.y + (313 / 640) * box.height };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 20, start.y + 10, { steps: 4 });
+    await expect(page.locator('#validation')).toContainText('pending');
+    const editedX = await field(page, 'x').inputValue();
+    const editedY = await field(page, 'y').inputValue();
+    await page.evaluate((reason) => {
+      if (reason === 'hidden') {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        Reflect.deleteProperty(document, 'visibilityState');
+      } else window.dispatchEvent(new Event('blur'));
+    }, interruption);
+    await expect(page.locator('#validation')).toHaveText('Validation: OK');
+    await expect(page.locator('#undo')).toBeEnabled();
+    await page.mouse.move(start.x + 50, start.y + 30, { steps: 4 });
+    await page.mouse.up();
+    await expect(field(page, 'x')).toHaveValue(editedX);
+    await expect(field(page, 'y')).toHaveValue(editedY);
+    // The second gesture begins at the first gesture's new head position.
+    await page.mouse.move(start.x + 20, start.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 40, start.y + 20, { steps: 4 });
+    await page.mouse.up();
+    await expect(field(page, 'x')).not.toHaveValue(editedX);
+    await page.locator('#undo').click();
+    await expect(field(page, 'x')).toHaveValue(editedX);
+    await expect(field(page, 'y')).toHaveValue(editedY);
+    await page.locator('#undo').click();
+    await expect(field(page, 'x')).toHaveValue('0');
+    await expect(field(page, 'y')).toHaveValue('-106');
+    await expect(page.locator('#undo')).toBeDisabled();
+  });
+}
+
 test('hierarchy selection retains button focus and rebuilds for a different imported rig', async ({ page }) => {
   const head = page.getByRole('treeitem', { name: 'head', exact: true });
   const slot = page.getByRole('treeitem', { name: '◇ headVisual', exact: true });

@@ -37,22 +37,46 @@ export class RigEditorInputController {
     this.scene.input.on('pointerupoutside', this.pointerUp, this);
     this.scene.input.on('wheel', this.wheel, this);
     window.addEventListener('keydown', this.keyDown);
+    window.addEventListener('blur', this.interruptGesture);
+    window.addEventListener('pagehide', this.interruptGesture);
+    // Capture document visibility changes, including when they do not bubble.
+    window.addEventListener('visibilitychange', this.visibilityChanged, true);
   }
 
   disable(): void {
     if (!this.enabled) return;
     this.enabled = false;
-    this.panning = false;
-    this.activePointerId = undefined;
-    this.drag = undefined;
-    this.state.endOperation();
+    this.endGesture();
     this.scene.input.off('pointerdown', this.pointerDown, this);
     this.scene.input.off('pointermove', this.pointerMove, this);
     this.scene.input.off('pointerup', this.pointerUp, this);
     this.scene.input.off('pointerupoutside', this.pointerUp, this);
     this.scene.input.off('wheel', this.wheel, this);
     window.removeEventListener('keydown', this.keyDown);
+    window.removeEventListener('blur', this.interruptGesture);
+    window.removeEventListener('pagehide', this.interruptGesture);
+    window.removeEventListener('visibilitychange', this.visibilityChanged, true);
   }
+
+  /** Commit authored changes once and release pointer ownership after any gesture ending. */
+  private endGesture(): void {
+    this.panning = false;
+    this.activePointerId = undefined;
+    this.drag = undefined;
+    this.moved = false;
+    this.state.endOperation();
+  }
+
+  private interruptGesture = (): void => {
+    if (this.activePointerId === undefined) return;
+    this.endGesture();
+    this.onChange();
+    this.redraw();
+  };
+
+  private visibilityChanged = (): void => {
+    if (document.visibilityState === 'hidden') this.interruptGesture();
+  };
 
   private world(pointer: Phaser.Input.Pointer): Point {
     return this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -217,15 +241,12 @@ export class RigEditorInputController {
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
     if (pointer.id !== this.activePointerId) return;
-    this.activePointerId = undefined;
     if (!this.panning && !this.moved && !this.drag) {
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();
       this.redraw();
     }
-    this.panning = false;
-    this.drag = undefined;
-    this.state.endOperation();
+    this.endGesture();
     this.onChange();
   }
 

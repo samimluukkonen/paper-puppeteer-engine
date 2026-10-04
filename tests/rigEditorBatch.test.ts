@@ -1,7 +1,9 @@
 import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
+import { RigEditorInputController } from '../src/devtools/rig-editor/RigEditorInputController.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
+import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import * as externalData from '../src/engine/externalData.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -23,14 +25,64 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const dragCases = (['pointerup', 'pointerupoutside', 'disable'] as const).flatMap((finish) =>
-  (['bone', 'slot', 'sprite', 'attachment'] as const).map((type) => ({ type, finish })),
+test('blur stops panning without adding history or closing an unrelated inspector edit', () => {
+  const browser = new EventTarget();
+  vi.stubGlobal('window', browser);
+  const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root' }] }));
+  state.selectBone('root');
+  state.beginOperation();
+  state.editBone('root', 'x', 2);
+  const input = { on: vi.fn(), off: vi.fn() };
+  const camera = { scrollX: 0, scrollY: 0, zoom: 1 };
+  const redraw = vi.fn();
+  const controller = new RigEditorInputController(
+    { input, cameras: { main: camera } } as unknown as Phaser.Scene,
+    {} as Puppet,
+    { state, editBone: vi.fn(), undo: vi.fn(), redo: vi.fn(), refresh: vi.fn() },
+    {} as RigEditorOverlay,
+    vi.fn(),
+    redraw,
+  );
+  controller.enable();
+  browser.dispatchEvent(new Event('blur'));
+  assert.isTrue(state.validationPending);
+  state.endOperation();
+  const emit = (event: string, id = 1) => {
+    const [, handler, context] = input.on.mock.calls.find(([name]) => name === event)!;
+    handler.call(context, {
+      id,
+      x: 10,
+      y: 10,
+      prevPosition: { x: 0, y: 0 },
+      isDown: true,
+      middleButtonDown: () => true,
+    });
+  };
+  emit('pointerdown');
+  emit('pointermove');
+  assert.equal(camera.scrollX, -10);
+  browser.dispatchEvent(new Event('blur'));
+  emit('pointermove');
+  assert.equal(camera.scrollX, -10);
+  emit('pointerdown', 2);
+  emit('pointermove', 2);
+  assert.equal(camera.scrollX, -20);
+  assert.equal(state.historyLength, 1);
+  assert.deepEqual(state.selection, { type: 'bone', id: 'root' });
+  controller.disable();
+});
+
+const dragCases = (['pointerup', 'pointerupoutside', 'disable', 'blur', 'hidden', 'pagehide'] as const).flatMap(
+  (finish) => (['bone', 'slot', 'sprite', 'attachment'] as const).map((type) => ({ type, finish })),
 );
 
 test.each(dragCases)(
   '$type drag synchronizes once per move and validates the final grouped edit after $finish',
   ({ type, finish }) => {
-    vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const browser = new EventTarget();
+    vi.stubGlobal('window', browser);
+    const document = { visibilityState: 'visible' };
+    vi.stubGlobal('document', document);
     const rig = new Rig({
       root: 'root',
       bones: [{ id: 'root', sprite: { texture: 'part' } }],
@@ -115,10 +167,17 @@ test.each(dragCases)(
     assert.equal(parse.mock.calls.length, 0, 'refresh does not rebuild and parse a rig');
     assert.equal(onChange.mock.calls.length, 2);
     assert.isFalse(editor.state.canUndo);
+    browser.dispatchEvent(new Event('visibilitychange'));
+    assert.isTrue(editor.state.validationPending, 'becoming visible must not interrupt editing');
     if (finish === 'disable') {
       editor.disable();
       editor.disable();
       editor.enable();
+    } else if (finish === 'blur' || finish === 'pagehide' || finish === 'hidden') {
+      if (finish === 'hidden') document.visibilityState = 'hidden';
+      browser.dispatchEvent(new Event(finish === 'hidden' ? 'visibilitychange' : finish));
+      browser.dispatchEvent(new Event('blur'));
+      browser.dispatchEvent(new Event('pagehide'));
     } else {
       emit(finish, 22, 28);
       emit('pointerup', 22, 28);
@@ -144,6 +203,16 @@ test.each(dragCases)(
     editor.redo();
     assert.equal(current().x, 20);
     assert.equal(current().y, 30);
+    emit('pointerdown', 0, 0, 2);
+    emit('pointermove', 10, 10, 2);
+    emit('pointerup', 10, 10, 2);
+    assert.equal(current().x, 30, 'a new pointer can start another gesture after interruption');
+    assert.equal(current().y, 40);
+    assert.equal(editor.state.historyLength, 2);
     editor.disable();
+    const notifications = onChange.mock.calls.length;
+    browser.dispatchEvent(new Event('blur'));
+    browser.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(onChange.mock.calls.length, notifications, 'disabled input ignores interruption events');
   },
 );

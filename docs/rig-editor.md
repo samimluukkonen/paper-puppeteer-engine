@@ -24,6 +24,8 @@ Undo history retains the most recent 100 operations by default, dropping the old
 
 Field values are checked immediately while editing. Full rig validation runs when a drag or numeric field session finishes; the panel shows Pending during edits. Validate and export always check the current rig, including unfinished edits.
 
+Releasing a drag outside the canvas, switching windows or tabs, or leaving the page ends the gesture. Authored changes commit as one undo entry and are validated; camera panning stops without changing rig history. Returning to the editor allows a fresh drag immediately.
+
 For embedded editors, `workingCopy`, `getBone()`, `getSlot()`, and `getAttachment()` return frozen readonly data. Use the state's `editBoneFields()`, `editSlotFields()`, and `editSpriteFields()` methods to preserve validation, dirty tracking, and undo history. Retained views keep their previous values after edits; request a fresh view to read the current data, or use `structuredClone(state.workingCopy)` for an independent mutable copy.
 
 `RigEditorScene` accepts a third options argument with `characterUrl` and optional `ikChains`. URLs resolve relative to the editor document. Preview chains default to an empty list, so other rigs can load without the demo's bone names; configured chains must be valid direct two-bone chains. The shipped editor passes the demo chains explicitly and continues to load the sample character. Scene options are copied when constructed.
