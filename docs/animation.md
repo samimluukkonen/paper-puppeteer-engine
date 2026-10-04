@@ -51,7 +51,7 @@ const wave: AnimationClip = {
 
 puppet.addAnimation(wave).play('wave');
 puppet.stop();    // Freeze the current pose.
-puppet.restart(); // Restart the selected clip at time zero.
+puppet.restart(); // Restart all selected layers at time zero, preserving their playback settings.
 puppet.setFacing('left');
 puppet.setFacing('right');
 ```
@@ -59,6 +59,8 @@ puppet.setFacing('right');
 Key times and durations are **milliseconds**. Values are **absolute local transforms**, not deltas from the bind pose. All five transform properties support interpolation, independently across sparse keys. Rotations take the shortest angular path in radians. Each property's first/last value is held outside its key range; a single key holds a constant value. Key times must increase strictly and stay within the duration. Missing properties/bones use the bind pose on the base layer and the underlying pose on an overlay. Playing the same name restarts it unless `restart: false` is passed. Duplicate clip names and unknown bones/animations throw descriptive errors.
 
 Looping wraps the clock at the duration; use matching start/end poses for a seamless cycle. Nonlooping clips stop at their exact final pose. Shortest-path rotation interpolation is intended for joint poses, not authored full-turn spins.
+
+`stop()` freezes every layer. `restart()` resets every selected layer to time zero and clears its fade, retaining clip speeds, masks, weights, the global speed, playback mode, and pause state. Time-zero events fire after all restarted layers have been synchronized. To restart only one layer, call `play(name, { layer, speed })` with its desired settings.
 
 ## Playback, events and layers
 

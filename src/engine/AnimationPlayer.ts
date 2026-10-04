@@ -171,11 +171,28 @@ export class AnimationPlayer {
       layer.stopped = true;
     }
   }
+  /** Restart every selected layer together, preserving speeds, masks, weights, and pause state. */
   restart(preparePose?: () => void, synchronizePose?: () => void): void {
     this.assertActive();
-    const name = this.currentAnimation;
-    if (name) this.play(name, {}, preparePose, synchronizePose);
-    else synchronizePose?.();
+    if (![...this.layers.values()].some((layer) => layer.state)) {
+      synchronizePose?.();
+      return;
+    }
+    preparePose?.();
+    this.resetPose();
+    const events: FiredAnimationEvent[] = [];
+    for (const [name, layer] of this.layers) {
+      if (!layer.state) continue;
+      layer.state = { ...layer.state, time: 0, playing: true };
+      layer.transition = undefined;
+      layer.stopped = false;
+      for (const marker of layer.state.clip.events)
+        if (marker.time === 0) events.push({ ...marker, clip: layer.state.clip.name, layer: name });
+    }
+    this.poseEvaluator.invalidate();
+    this.applyCurrentPose();
+    synchronizePose?.();
+    this.dispatchNotifications(events, []);
   }
   pause(): void {
     this.assertActive();

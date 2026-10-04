@@ -27,6 +27,104 @@ function fixture() {
   return { player, joints };
 }
 
+test('restart resets all selected layers and retains their speeds, weights, and masks', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'move',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      arm: [
+        { time: 0, x: 10 },
+        { time: 1000, x: 110 },
+      ],
+    },
+  });
+  player.addAnimation({
+    name: 'lift',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      arm: [
+        { time: 0, y: 0 },
+        { time: 1000, y: 100 },
+      ],
+      leg: [{ time: 0, y: 100 }],
+    },
+  });
+  player.play('move', { speed: 0.5 });
+  player.setLayerMask('upper', ['arm']);
+  player.setLayerWeight('upper', 0.5);
+  player.play('lift', { layer: 'upper', speed: 2, fadeDuration: 1000 });
+  player.setSpeed(0.5);
+  player.setPlaybackMode({ mode: 'stepped', fps: 20 });
+  player.update(200);
+  player.stop();
+  player.pause();
+  player.restart();
+  assert.equal(player.elapsedTime, 0);
+  assert.equal(player.currentAnimationSpeed, 0.5);
+  assert.equal(player.playbackSpeed, 0.5);
+  assert.deepEqual(player.playbackMode, { mode: 'stepped', fps: 20 });
+  assert.isUndefined(player.transition);
+  assert.isTrue(player.isPaused);
+  assert.isTrue(player.isPlaying);
+  assert.equal(player.getLayerWeight('upper'), 0.5);
+  assert.equal(joints.get('arm')!.pose.x, 10);
+  assert.equal(joints.get('arm')!.pose.y, 0);
+  player.resume();
+  player.update(200);
+  assert.equal(player.elapsedTime, 50);
+  assert.equal(joints.get('arm')!.pose.x, 15);
+  assert.equal(joints.get('arm')!.pose.y, 10);
+  assert.equal(joints.get('leg')!.pose.y, 10);
+});
+
+test('restart synchronizes all layer start poses once before delivering time-zero events', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'once',
+    duration: 100,
+    loop: false,
+    tracks: { arm: [{ time: 0, x: 30 }] },
+    events: [{ time: 0, name: 'start' }],
+  });
+  player.play('once');
+  player.play('once', { layer: 'upper' });
+  player.update(100);
+  const order: string[] = [];
+  player.onAnimationEvent((event) => order.push(event.layer));
+  player.restart(
+    () => order.push('prepare'),
+    () => {
+      assert.equal(player.elapsedTime, 0);
+      assert.equal(joints.get('arm')!.pose.x, 30);
+      order.push('sync');
+    },
+  );
+  assert.deepEqual(order, ['prepare', 'sync', 'base', 'upper']);
+  const completions: string[] = [];
+  player.onAnimationComplete((event) => completions.push(event.layer));
+  player.update(100);
+  assert.deepEqual(completions, ['base', 'upper']);
+});
+
+test('restart also restarts overlay-only playback and safely synchronizes an empty player', () => {
+  const { player } = fixture();
+  const prepare = vi.fn();
+  const sync = vi.fn();
+  player.restart(prepare, sync);
+  assert.equal(prepare.mock.calls.length, 0);
+  assert.equal(sync.mock.calls.length, 1);
+  player.play('a', { layer: 'upper', speed: 0.5 });
+  player.update(100);
+  player.stop();
+  player.restart(prepare, sync);
+  assert.equal(prepare.mock.calls.length, 1);
+  assert.equal(sync.mock.calls.length, 2);
+  assert.isTrue(player.update(100));
+});
+
 test.each([0, 50])('JSON event payloads at %s are isolated from source data, listeners and later loops', (time) => {
   const { player } = fixture();
   const data = { nested: { values: [1] } };
