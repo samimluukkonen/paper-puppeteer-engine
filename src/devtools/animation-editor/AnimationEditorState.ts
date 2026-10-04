@@ -30,6 +30,7 @@ export class AnimationEditorState {
   private working: ReadonlyAnimation | null = null;
   private selectedId: string | null = null;
   private time = 0;
+  private playing = false;
   private saved = '';
   private issues: readonly ValidationIssue[] = [];
   private readonly snapshots = new WeakMap<ReadonlyAnimation, string>();
@@ -65,7 +66,7 @@ export class AnimationEditorState {
     return animationDurationSeconds(this.working);
   }
   get isPlaying(): boolean {
-    return false;
+    return this.playing;
   }
   get loop(): boolean {
     return this.working?.loop ?? false;
@@ -140,6 +141,7 @@ export class AnimationEditorState {
     this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
     this.selectedId = id;
     this.time = 0;
+    this.playing = false;
     this.issues = [];
     this.saved = this.snapshot;
     this.history = this.createHistory();
@@ -149,9 +151,41 @@ export class AnimationEditorState {
 
   setCurrentTime(time: number): void {
     const next = clampTime(time, this.duration);
-    if (next === this.time) return;
+    const playing = this.playing && next < this.duration;
+    if (next === this.time && playing === this.playing) return;
     this.time = next;
+    this.playing = playing;
     this.notify();
+  }
+
+  /** Resume the sole editor clock; a completed clip starts again at zero. */
+  play(): void {
+    if (this.playing || !this.working || !(this.duration > 0)) return;
+    if (this.time >= this.duration) this.time = 0;
+    this.playing = true;
+    this.notify();
+  }
+
+  pause(): void {
+    if (!this.playing) return;
+    this.playing = false;
+    this.notify();
+  }
+
+  togglePlayback(): void {
+    if (this.playing) this.pause();
+    else this.play();
+  }
+
+  /** Rewind immediately, preserving whether playback is active. */
+  restart(): void {
+    this.setCurrentTime(0);
+  }
+
+  /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
+  advancePlayback(deltaSeconds: number): void {
+    if (!this.playing || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
+    this.setCurrentTime(this.time + deltaSeconds);
   }
 
   /** Future authoring boundary: validate atomically, own a fresh JSON copy, and record one authored edit. */
@@ -166,6 +200,7 @@ export class AnimationEditorState {
       this.working = next;
     });
     this.time = clampTime(this.time, this.duration);
+    if (this.time >= this.duration) this.playing = false;
     this.notify();
     return true;
   }
@@ -183,6 +218,7 @@ export class AnimationEditorState {
       (entry) => {
         this.working = entry;
         this.time = clampTime(this.time, this.duration);
+        if (this.time >= this.duration) this.playing = false;
       },
       (left, right) => this.snapshotFor(left) === this.snapshotFor(right),
     );

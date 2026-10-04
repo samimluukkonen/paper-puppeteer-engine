@@ -132,3 +132,116 @@ test('stepped animation metadata and held preview frames use the existing runtim
   await expect(timeline).toHaveAttribute('aria-valuenow', '0.02');
   expect((await canvas.screenshot()).equals(frame)).toBe(true);
 });
+
+test('play, pause, resume, restart, and completion synchronize the preview and timeline', async ({ page }) => {
+  // Different endpoint poses make holding the final frame observable, including for authored loop=true.
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    const animation = await response.json();
+    await route.fulfill({
+      json: {
+        ...animation,
+        duration: 2050,
+        loop: true,
+        playback: { mode: 'stepped', fps: 10 },
+        events: [],
+        tracks: {
+          root: [
+            { time: 0, x: 0 },
+            { time: 2050, x: 100 },
+          ],
+        },
+      },
+    });
+  });
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  const playPause = page.locator('#play-pause');
+  const restart = page.getByRole('button', { name: 'Restart', exact: true });
+  const canvas = page.locator('#animation-stage canvas');
+  const time = async () => Number(await timeline.getAttribute('aria-valuenow'));
+  const initial = await canvas.screenshot();
+  await playPause.click();
+  await expect(playPause).toHaveText('Pause');
+  await expect.poll(time).toBeGreaterThan(0.2);
+  await playPause.click();
+  await expect(playPause).toHaveText('Play');
+  const pausedTime = await time();
+  const pausedPose = await canvas.screenshot();
+  expect(pausedPose.equals(initial)).toBe(false);
+  await expect(page.locator('#current-time')).toHaveText(`${pausedTime.toFixed(3)} / 2.050 s`);
+  const bounds = await timeline.boundingBox();
+  const playhead = await page.locator('#timeline-playhead').boundingBox();
+  expect(playhead!.x).toBeCloseTo(bounds!.x + (pausedTime / 2.05) * bounds!.width, 0);
+  await page.waitForTimeout(150);
+  expect(await time()).toBe(pausedTime);
+  expect((await canvas.screenshot()).equals(pausedPose)).toBe(true);
+  await playPause.click();
+  await expect.poll(time).toBeGreaterThan(pausedTime);
+  await restart.click();
+  await expect(playPause).toHaveText('Pause');
+  await expect.poll(time).toBeLessThan(pausedTime);
+  await playPause.click();
+  await restart.click();
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(playPause).toHaveText('Play');
+  expect((await canvas.screenshot()).equals(initial)).toBe(true);
+  await timeline.press('End');
+  const finalPose = await canvas.screenshot();
+  expect(finalPose.equals(initial)).toBe(false);
+  await timeline.press('ArrowLeft');
+  await playPause.click();
+  await expect(playPause).toHaveText('Play');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '2.05');
+  await page.waitForTimeout(150);
+  expect((await canvas.screenshot()).equals(finalPose)).toBe(true);
+  await playPause.click();
+  await expect(playPause).toHaveText('Pause');
+  await expect.poll(time).toBeLessThan(1);
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.locator('#animation-selection').selectOption('walk');
+  await expect(playPause).toHaveText('Play');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await page.screenshot({ path: test.info().outputPath('animation-playback-controls.png'), fullPage: true });
+});
+
+test('Space toggles playback once and leaves typing targets alone', async ({ page }) => {
+  await openEditor(page);
+  const playPause = page.locator('#play-pause');
+  const timeline = page.locator('#timeline');
+  await timeline.focus();
+  await page.keyboard.down('Space');
+  await expect(playPause).toHaveText('Pause');
+  await page.keyboard.down('Space');
+  await expect(playPause).toHaveText('Pause');
+  await page.keyboard.up('Space');
+  await page.keyboard.press('Space');
+  await expect(playPause).toHaveText('Play');
+  // Space on a focused button must not also generate a native click that toggles a second time.
+  await playPause.focus();
+  await page.keyboard.press('Space');
+  await expect(playPause).toHaveText('Pause');
+  await page.keyboard.press('Space');
+  await expect(playPause).toHaveText('Play');
+  await page.locator('#animation-selection').focus();
+  await page.locator('#animation-selection').dispatchEvent('keydown', { code: 'Space', key: ' ', bubbles: true });
+  await expect(playPause).toHaveText('Play');
+  await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.id = 'typing-targets';
+    host.innerHTML = '<input><textarea></textarea><div contenteditable="true"><span>Editable</span></div>';
+    document.body.append(host);
+  });
+  for (const selector of ['input', 'textarea', '[contenteditable] span']) {
+    const target = page.locator(`#typing-targets ${selector}`);
+    await target.click();
+    await page.keyboard.press('Space');
+    await expect(playPause).toHaveText('Play');
+  }
+  await page.locator('#typing-targets').evaluate((element) => element.remove());
+  await page.locator('#animation-selection').selectOption('');
+  await expect(playPause).toBeDisabled();
+  await expect(page.locator('#reset-time')).toBeDisabled();
+  await timeline.press('Space');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+});

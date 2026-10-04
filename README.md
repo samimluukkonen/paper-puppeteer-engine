@@ -83,4 +83,4 @@ For browser checks, install Chromium with `npx playwright install chromium`, the
 - Visual animation editor with a timeline and keyframe authoring.
 - Character editing tools and richer asset pipeline integration.
 
-The Visual Animation Editor Foundation is available at `/animation-editor/`: independent animation working copies, selection, timeline scrubbing, and puppet preview driven by the existing runtime evaluator. The Rig Editor remains at `/rig-editor/`. Keyframe editing, playback controls, and animation export will follow in v0.5.2.2+.
+The Visual Animation Editor is available at `/animation-editor/`: independent animation working copies, selection, timeline scrubbing, Play/Pause (Space), Restart, and puppet preview driven by the existing runtime evaluator. Playback advances with elapsed time and holds the final pose without looping or dirtying animation data. The Rig Editor remains at `/rig-editor/`. Looping, speed controls, keyframe editing, and animation export remain deferred.

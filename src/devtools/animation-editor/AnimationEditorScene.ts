@@ -12,6 +12,7 @@ export interface AnimationEditorSceneOptions {
 export class AnimationEditorScene extends Phaser.Scene {
   private puppet: Puppet | undefined;
   private preview: AnimationEditorPreview | undefined;
+  private state: AnimationEditorState | undefined;
   private loadSession = 0;
 
   constructor(
@@ -26,12 +27,18 @@ export class AnimationEditorScene extends Phaser.Scene {
     const session = ++this.loadSession;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       ++this.loadSession;
+      this.state?.pause();
+      this.state = undefined;
       this.preview?.dispose();
       this.preview = undefined;
       this.puppet?.destroy();
       this.puppet = undefined;
     });
     void this.loadCharacter(session);
+  }
+
+  update(_time: number, delta: number): void {
+    this.state?.advancePlayback(delta / 1000);
   }
 
   private async loadCharacter(session: number): Promise<void> {
@@ -56,12 +63,15 @@ export class AnimationEditorScene extends Phaser.Scene {
       preview = new AnimationEditorPreview(state, puppet);
       this.puppet = puppet;
       this.preview = preview;
+      this.state = state;
       this.onReady(state, definition.id);
     } catch (error) {
       preview?.dispose();
       puppet?.destroy();
       this.preview = undefined;
       this.puppet = undefined;
+      this.state?.pause();
+      this.state = undefined;
       if (session === this.loadSession && this.sys.isActive()) this.onError(String(error));
     }
   }

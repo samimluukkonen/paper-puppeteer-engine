@@ -99,3 +99,53 @@ test('authored replacements recompile preview and invalid replacements retain it
   preview.dispose();
   puppet.destroy();
 });
+
+test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
+  'playback uses the evaluator for $mode and holds the exact final pose of an authored looping clip',
+  (playback) => {
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const clip: AnimationClip = {
+      name: 'move',
+      duration: 1050,
+      loop: true,
+      playback,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 1050, x: 105 },
+        ],
+      },
+    };
+    const state = new AnimationEditorState(rig, [clip]);
+    state.selectAnimation('move');
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const preview = new AnimationEditorPreview(state, puppet);
+    state.play();
+    state.advancePlayback(0.25);
+    assert.approximately(puppet.getBone('root').pose.x, playback.mode === 'stepped' ? 20 : 25, 1e-12);
+    state.pause();
+    const held = puppet.getBone('root').pose.x;
+    state.advancePlayback(1);
+    assert.equal(puppet.getBone('root').pose.x, held);
+    state.restart();
+    assert.equal(puppet.getBone('root').pose.x, 0);
+    state.play();
+    state.advancePlayback(2);
+    assert.equal(state.currentTime, 1.05);
+    assert.equal(puppet.getBone('root').pose.x, 105);
+    assert.equal(puppet.getBone('root').container.x, 105);
+    state.advancePlayback(2);
+    assert.equal(puppet.getBone('root').pose.x, 105);
+    state.play();
+    assert.equal(puppet.getBone('root').pose.x, 0);
+    state.advancePlayback(0.25);
+    state.restart();
+    assert.isTrue(state.isPlaying);
+    assert.equal(puppet.getBone('root').pose.x, 0);
+    assert.isTrue(clip.loop);
+    assert.isTrue(state.workingAnimation!.loop);
+    assert.isFalse(state.dirty);
+    preview.dispose();
+    puppet.destroy();
+  },
+);

@@ -1,3 +1,4 @@
+import { isEditorTypingTarget } from '../shared/editorShortcuts.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
 
@@ -15,6 +16,7 @@ export class TimelineController {
   private readonly metadata: HTMLElement;
   private readonly status: HTMLElement;
   private readonly reset: HTMLButtonElement;
+  private readonly playPause: HTMLButtonElement;
   private pointer: number | undefined;
   private rulerKey = '';
   private externalError = '';
@@ -28,6 +30,7 @@ export class TimelineController {
     this.metadata = this.element('#animation-metadata');
     this.status = this.element('#animation-status');
     this.reset = this.element<HTMLButtonElement>('#reset-time');
+    this.playPause = this.element<HTMLButtonElement>('#play-pause');
     const options = { signal: this.abort.signal };
     this.selection.addEventListener(
       'change',
@@ -37,7 +40,27 @@ export class TimelineController {
       },
       options,
     );
-    this.reset.addEventListener('click', () => this.state.setCurrentTime(0), options);
+    this.reset.addEventListener('click', () => this.state.restart(), options);
+    this.playPause.addEventListener('click', () => this.state.togglePlayback(), options);
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        if (
+          event.code !== 'Space' ||
+          event.defaultPrevented ||
+          event.isComposing ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          isEditorTypingTarget(event.target) ||
+          !this.state.workingAnimation
+        )
+          return;
+        event.preventDefault();
+        if (!event.repeat) this.state.togglePlayback();
+      },
+      options,
+    );
     this.timeline.addEventListener(
       'pointerdown',
       (event) => {
@@ -117,6 +140,7 @@ export class TimelineController {
   bind(state: AnimationEditorState, characterId?: string): void {
     this.endScrub();
     this.unsubscribe?.();
+    this.state.pause();
     this.state = state;
     this.externalError = '';
     const empty = new Option('No animation selected', '');
@@ -174,10 +198,12 @@ export class TimelineController {
     this.selection.value = state.selectedAnimationId ?? '';
     this.selection.disabled = !state.animationIds.length;
     this.reset.disabled = !animation;
+    this.playPause.disabled = !animation || !(state.duration > 0);
+    this.playPause.textContent = state.isPlaying ? 'Pause' : 'Play';
     this.timeDisplay.textContent = `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`;
     const playback = animation?.playback;
     this.metadata.textContent = animation
-      ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Loop: ${state.loop ? 'on' : 'off'} · Stopped`
+      ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: once · ${state.isPlaying ? 'Playing' : 'Paused'}`
       : 'Select an animation to preview its pose.';
     this.element('#animation-dirty').textContent = state.dirty ? 'Unsaved changes' : 'No unsaved changes';
     this.status.textContent =
@@ -198,5 +224,6 @@ export class TimelineController {
     this.abort.abort();
     this.resize.disconnect();
     this.unsubscribe?.();
+    this.state.pause();
   }
 }
