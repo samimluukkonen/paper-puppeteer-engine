@@ -43,13 +43,82 @@ function matchingRow(keys: readonly Keyframe[], time: number, property?: Transfo
   return match;
 }
 
+interface IndexedKeyframe extends PropertyKeyframe {
+  order: number;
+}
+
+const keyframeIndexes = new WeakMap<AnimationData, Map<string, Map<TransformProperty, IndexedKeyframe[]>>>();
+
+function lowerBound(keys: readonly IndexedKeyframe[], time: number): number {
+  let low = 0;
+  let high = keys.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (keys[middle]!.time < time) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
+/** Immutable editor snapshots share sorted property indexes; caller-owned mutable data stays uncached. */
+function indexedKeyframe(
+  animation: AnimationData,
+  boneId: string,
+  property: TransformProperty,
+  time: number,
+): IndexedKeyframe | undefined | false {
+  let tracks = keyframeIndexes.get(animation);
+  if (!tracks) {
+    if (!isFullyFrozen(animation)) return false;
+    tracks = new Map();
+    keyframeIndexes.set(animation, tracks);
+  }
+  let properties = tracks.get(boneId);
+  if (!properties) {
+    properties = new Map();
+    const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+    for (const [order, row] of rows.entries()) {
+      for (const entry of transformProperties) {
+        const value = row[entry];
+        if (value === undefined || !Number.isFinite(row.time)) continue;
+        let keys = properties.get(entry);
+        if (!keys) {
+          keys = [];
+          properties.set(entry, keys);
+        }
+        keys.push({ time: row.time, value, order });
+      }
+    }
+    for (const keys of properties.values()) keys.sort((a, b) => a.time - b.time || a.order - b.order);
+    tracks.set(boneId, properties);
+  }
+  const keys = properties.get(property) ?? [];
+  const index = lowerBound(keys, time);
+  // A predecessor may be the last of several duplicate times. Preserve the original first-row tie rule.
+  const before = index > 0 ? keys[lowerBound(keys, keys[index - 1]!.time)] : undefined;
+  const after = keys[index];
+  let match: IndexedKeyframe | undefined;
+  for (const key of [before, after]) {
+    if (!key || !keyframeTimesMatch(key.time, time)) continue;
+    if (
+      !match ||
+      Math.abs(key.time - time) < Math.abs(match.time - time) ||
+      (Math.abs(key.time - time) === Math.abs(match.time - time) && key.order < match.order)
+    )
+      match = key;
+  }
+  return match;
+}
+
 export function findBonePropertyKeyframe(
   animation: AnimationData,
   boneId: string,
   property: TransformProperty,
   timeMs: number,
 ): PropertyKeyframe | undefined {
-  if (!transformProperties.includes(property)) return undefined;
+  if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
+  const indexed = indexedKeyframe(animation, boneId, property, timeMs);
+  if (indexed !== false) return indexed ? { time: indexed.time, value: indexed.value } : undefined;
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const key = keys[matchingRow(keys, timeMs, property)];
   const value = key?.[property];
@@ -183,10 +252,18 @@ const valueSamplers = new WeakMap<AnimationData, WeakMap<Rig, AnimationValueSamp
 /** Readonly types or a shallow freeze alone do not prevent edits to nested caller data. */
 function isFullyFrozen(animation: AnimationData): boolean {
   const pending: object[] = [animation];
+  const seen = new Set<object>();
   while (pending.length) {
     const value = pending.pop()!;
+    if (seen.has(value)) continue;
+    seen.add(value);
     if (!Object.isFrozen(value)) return false;
-    for (const child of Object.values(value)) if (child !== null && typeof child === 'object') pending.push(child);
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+      // Frozen getters can still expose changing values; do not invoke them while checking ownership.
+      if (!Object.hasOwn(descriptor, 'value')) return false;
+      const child: unknown = descriptor.value;
+      if (child !== null && typeof child === 'object') pending.push(child);
+    }
   }
   return true;
 }

@@ -36,6 +36,76 @@ const clip = (patch: Partial<AnimationClip> = {}): AnimationClip & { version: 1 
   ...patch,
 });
 
+test('frozen property indexes avoid rescanning dense tracks and preserve sparse, duplicate, and unsorted matches', () => {
+  const rows = Object.freeze(
+    Array.from({ length: 4000 }, (_, index) =>
+      Object.freeze({ time: 4000 - index, x: index, ...(index % 2 ? { y: index } : {}) }),
+    ),
+  );
+  let reads = 0;
+  const tracked = new Proxy(rows, {
+    get(target, property, receiver) {
+      if (typeof property === 'string' && /^\d+$/.test(property)) reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const animation = Object.freeze({
+    ...clip({ duration: 4000 }),
+    events: Object.freeze([]),
+    tracks: Object.freeze({ root: tracked }),
+  });
+  assert.deepEqual(findBonePropertyKeyframe(animation, 'root', 'x', 2), { time: 2, value: 3998 });
+  reads = 0;
+  for (const time of [4000, 1, 1000, 2500, 2, 2000]) {
+    assert.deepEqual(findBonePropertyKeyframe(animation, 'root', 'x', time), { time, value: 4000 - time });
+    assert.equal(hasKeyframeAtTime(animation, 'root', 'y', time), (4000 - time) % 2 === 1);
+    assert.isUndefined(findBonePropertyKeyframe(animation, 'root', 'rotation', time));
+  }
+  assert.equal(reads, 0);
+  const close = freezeData(
+    clip({
+      tracks: {
+        root: [
+          { time: 0.0000015, x: 2 },
+          { time: 0, x: 1 },
+          { time: 0, x: 3 },
+        ],
+      },
+    }),
+  );
+  assert.deepEqual(findBonePropertyKeyframe(close, 'root', 'x', 0.00000075), { time: 0.0000015, value: 2 });
+  assert.deepEqual(findBonePropertyKeyframe(close, 'root', 'x', 0.0000001), { time: 0, value: 1 });
+  assert.deepEqual(findBonePropertyKeyframe(close, 'root', 'x', -KEYFRAME_TIME_TOLERANCE_MS), { time: 0, value: 1 });
+});
+
+test('mutable, shallow frozen, and accessor inputs keep keyframe queries fresh', () => {
+  for (const shallow of [false, true]) {
+    const animation = clip({ tracks: { root: [{ time: 0, x: 1 }] } });
+    if (shallow) Object.freeze(animation);
+    assert.deepEqual(findBonePropertyKeyframe(animation, 'root', 'x', 0), { time: 0, value: 1 });
+    animation.tracks.root![0]!.time = 2;
+    animation.tracks.root![0]!.x = 3;
+    assert.isUndefined(findBonePropertyKeyframe(animation, 'root', 'x', 0));
+    assert.deepEqual(findBonePropertyKeyframe(animation, 'root', 'x', 2), { time: 2, value: 3 });
+  }
+  let time = 0;
+  const row = Object.freeze({
+    get time() {
+      return time;
+    },
+    x: 1,
+  });
+  const animation = Object.freeze({ ...clip({ events: [] }), tracks: Object.freeze({ root: Object.freeze([row]) }) });
+  assert.isTrue(hasKeyframeAtTime(animation, 'root', 'x', 0));
+  time = 2;
+  assert.isFalse(hasKeyframeAtTime(animation, 'root', 'x', 0));
+  assert.isTrue(hasKeyframeAtTime(animation, 'root', 'x', 2));
+  const snapshot = freezeData(clip({ tracks: { root: [{ time: 0, x: 1 }] } }));
+  const edited = freezeData(setBonePropertyKeyframe(snapshot, rig, 'root', 'x', 0, 4));
+  assert.deepEqual(findBonePropertyKeyframe(snapshot, 'root', 'x', 0), { time: 0, value: 1 });
+  assert.deepEqual(findBonePropertyKeyframe(edited, 'root', 'x', 0), { time: 0, value: 4 });
+});
+
 test.each(transformProperties)(
   'create/update/delete %s preserves the external format and caller/source ownership',
   (property) => {
