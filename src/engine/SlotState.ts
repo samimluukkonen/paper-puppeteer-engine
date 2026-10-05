@@ -18,15 +18,18 @@ export class SlotState {
     return this.assigned.get(slot);
   }
 
-  setAttachment(slot: string, attachment: string): void {
+  /** Validate even unchanged assignments, and report whether the selection changed. */
+  setAttachment(slot: string, attachment: string): boolean {
     this.requireSlot(slot);
     if (!this.attachments.has(attachment)) throw new Error(`Unknown attachment "${attachment}".`);
+    if (this.assigned.get(slot) === attachment) return false;
     this.assigned.set(slot, attachment);
+    return true;
   }
 
-  clearAttachment(slot: string): void {
+  clearAttachment(slot: string): boolean {
     this.requireSlot(slot);
-    this.assigned.delete(slot);
+    return this.assigned.delete(slot);
   }
 
   /** Replace the complete selection. Slots absent from the skin become empty. */

@@ -7,6 +7,7 @@ import { Puppet, type PuppetOptions } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { Rig } from '../src/engine/Rig.js';
 import { SlotDebug } from '../src/engine/SlotDebug.js';
+import { SlotState } from '../src/engine/SlotState.js';
 import type { Facing } from '../src/engine/types.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
@@ -25,6 +26,47 @@ const rig = new Rig({
 const animation = { name: 'idle', duration: 100, loop: true, tracks: {} };
 const pose = { version: 1 as const, name: 'rest', bones: {} };
 const ik = { name: 'armIK', rootBone: 'root', middleBone: 'arm', endBone: 'hand' };
+
+test('unchanged slot selections skip artwork work and debug redraws; a changed slot renders independently', () => {
+  const scene = puppetScene();
+  const update = vi.spyOn(SlotDebug.prototype, 'update').mockImplementation(() => {});
+  const puppet = new Puppet(scene, {
+    rig: {
+      root: 'root',
+      bones: [{ id: 'root' }],
+      slots: [
+        { id: 'hand', bone: 'root' },
+        { id: 'empty', bone: 'root' },
+      ],
+      attachments: [
+        { id: 'open', texture: 'open' },
+        { id: 'grip', texture: 'grip' },
+      ],
+      skins: [{ version: 1, name: 'default', slots: { hand: 'open' } }],
+    },
+    skin: 'default',
+    slotDebug: true,
+    autoUpdate: false,
+  });
+  const image = vi.spyOn(scene.add, 'image');
+  const read = vi.spyOn(SlotState.prototype, 'getAttachment');
+  update.mockClear();
+  puppet.setAttachment('hand', 'open').clearAttachment('empty');
+  assert.equal(read.mock.calls.length, 0, 'unchanged assignments do not scan any slots');
+  puppet.setSkin('default').applySkin('default');
+  assert.equal(image.mock.calls.length, 0);
+  assert.equal(update.mock.calls.length, 0);
+  read.mockClear();
+  puppet.setAttachment('hand', 'grip');
+  assert.equal(read.mock.calls.length, 1, 'a changed assignment visits only its slot');
+  assert.equal(image.mock.calls.length, 1);
+  assert.equal(update.mock.calls.length, 1);
+  puppet.clearAttachment('hand');
+  assert.equal(update.mock.calls.length, 2);
+  assert.throws(() => puppet.clearAttachment('missing'), /Unknown slot/);
+  assert.throws(() => puppet.setAttachment('hand', 'missing'), /Unknown attachment/);
+  puppet.destroy();
+});
 
 test.each(['debug', 'ikDebug', 'slotDebug'] as const)('the %s constructor option creates only its overlay', (flag) => {
   const scene = puppetScene();

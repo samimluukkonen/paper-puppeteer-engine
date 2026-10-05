@@ -10,6 +10,7 @@ import { horizontalEdgesAtY } from '../src/demo/katanaArmTarget.js';
 import { SketchFacingLayout } from '../src/demo/SketchFacingLayout.js';
 import { CharacterDefinition, type CharacterManifest } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';
+import { SlotDebug } from '../src/engine/SlotDebug.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -58,6 +59,23 @@ function fixture() {
   const puppet = new Puppet(scene, { definition, ik: demoIK, x: 380, y: 362, scale: 1.08, autoUpdate: false });
   return { scene, puppet };
 }
+
+test('unchanged sketch frames refresh the slot overlay only from the final pose', () => {
+  const { scene, puppet } = fixture();
+  const update = vi.spyOn(SlotDebug.prototype, 'update').mockImplementation(() => {});
+  try {
+    puppet.play('idle').setSlotDebug(true);
+    const presenter = new DemoPresenter(scene, puppet, sketchProfile);
+    const options = { handIK: false, footIK: false, upperBody: false };
+    presenter.update(options);
+    update.mockClear();
+    presenter.update(options);
+    assert.equal(update.mock.calls.length, 1);
+  } finally {
+    update.mockRestore();
+    puppet.destroy();
+  }
+});
 
 test('left-facing sketch layers only the katana hilt behind the right leg in both weapon modes', () => {
   const { scene, puppet } = fixture();

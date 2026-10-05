@@ -400,14 +400,12 @@ export class Puppet {
   }
 
   setAttachment(slot: string, attachment: string): this {
-    this.slotState.setAttachment(slot, attachment);
-    this.renderSlots();
+    if (this.slotState.setAttachment(slot, attachment) && this.renderSlot(slot)) this.slotDebugView?.update();
     return this;
   }
 
   clearAttachment(slot: string): this {
-    this.slotState.clearAttachment(slot);
-    this.renderSlots();
+    if (this.slotState.clearAttachment(slot) && this.renderSlot(slot)) this.slotDebugView?.update();
     return this;
   }
 
@@ -432,14 +430,20 @@ export class Puppet {
   }
 
   private renderSlots(): void {
+    let changed = false;
     for (const slot of this.rig.slots) {
-      const id = this.slotState.getAttachment(slot.id);
-      if (this.renderedSlotAttachments.get(slot.id) === id) continue;
-      this.renderer.setSlotAttachment(slot.id, id ? this.rig.getAttachment(id) : undefined);
-      if (id) this.renderedSlotAttachments.set(slot.id, id);
-      else this.renderedSlotAttachments.delete(slot.id);
+      if (this.renderSlot(slot.id)) changed = true;
     }
-    this.slotDebugView?.update();
+    if (changed) this.slotDebugView?.update();
+  }
+
+  private renderSlot(slot: string): boolean {
+    const id = this.slotState.getAttachment(slot);
+    if (this.renderedSlotAttachments.get(slot) === id) return false;
+    this.renderer.setSlotAttachment(slot, id ? this.rig.getAttachment(id) : undefined);
+    if (id) this.renderedSlotAttachments.set(slot, id);
+    else this.renderedSlotAttachments.delete(slot);
+    return true;
   }
 
   attach(boneId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
