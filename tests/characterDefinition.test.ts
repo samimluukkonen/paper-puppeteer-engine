@@ -320,6 +320,25 @@ test('character validation checks pose files against the loaded rig', () => {
   assert.ok(validateCharacterDefinition(data).some((entry) => /Unsupported pose format version/.test(entry.message)));
 });
 
+test('character validation preserves pose leaf diagnostics rather than combining formatted errors', () => {
+  const data = bundle();
+  const path = manifest.poses![0]!;
+  data.poses[path] = { version: 1, name: 'bad', bones: { ghost: { x: 1 }, other: { y: 2 } } };
+  assert.deepEqual(validateCharacterDefinition(data), [
+    { severity: 'error', path: 'poses[0].bones.ghost', message: 'Unknown bone "ghost".' },
+    { severity: 'error', path: 'poses[0].bones.other', message: 'Unknown bone "other".' },
+  ]);
+  data.poses[path] = { version: 1, name: 'bad', bones: { torso: { x: 'invalid', rotation: 'invalid' } } };
+  assert.deepEqual(
+    validateCharacterDefinition(data)
+      .map(({ path }) => path)
+      .sort(),
+    ['poses[0].bones.torso.rotation', 'poses[0].bones.torso.x'],
+  );
+  data.poses[path] = { version: 1, name: 'bad', bones: { torso: { extra: 1 } } };
+  assert.equal(validateCharacterDefinition(data)[0]!.path, 'poses[0].bones.torso.extra');
+});
+
 test('loader fetches JSON relative to the manifest and leaves image loading to the host', async () => {
   const requested: string[] = [];
   const fetcher = (async (url: string | URL | Request) => {

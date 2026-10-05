@@ -66,6 +66,7 @@ export {
   parsePoseDefinition,
   poseDefinitionSchema,
   serializePose,
+  validatePoseDefinition,
 } from './Pose.js';
 export { Rig } from './Rig.js';
 export type { DeepReadonly } from './readonlyData.js';

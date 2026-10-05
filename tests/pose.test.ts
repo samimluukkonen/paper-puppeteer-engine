@@ -1,6 +1,13 @@
 import { assert, test } from 'vitest';
+import { UnsupportedFormatVersionError } from '../src/engine/externalData.js';
 import { Joint } from '../src/engine/Joint.js';
-import { applyPoseToJoints, PoseValidationError, parsePoseDefinition, serializePose } from '../src/engine/Pose.js';
+import {
+  applyPoseToJoints,
+  PoseValidationError,
+  parsePoseDefinition,
+  serializePose,
+  validatePoseDefinition,
+} from '../src/engine/Pose.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({
@@ -66,6 +73,37 @@ test('parse valid sparse pose and reject unknown bones, versions and scalar valu
   assert.throws(() => parsePoseDefinition({ ...source, bones: { arm: { rotation: NaN } } }, rig), /rotation/);
   assert.throws(() => parsePoseDefinition({ ...source, bones: { arm: { rotation: '1' } } }, rig), /rotation/);
   assert.throws(() => parsePoseDefinition({ ...source, bones: { arm: { rotation: undefined } } }, rig), /JSON value/);
+});
+
+test('pose validation retains individual field and reference paths without throwing', () => {
+  assert.deepEqual(validatePoseDefinition(source, rig), []);
+  const references = validatePoseDefinition({ ...source, bones: { ghost: { x: 1 }, other: { y: 2 } } }, rig);
+  assert.deepEqual(
+    references.map(({ severity, path }) => ({ severity, path })),
+    [
+      { severity: 'error', path: 'bones.ghost' },
+      { severity: 'error', path: 'bones.other' },
+    ],
+  );
+  const fields = validatePoseDefinition({ ...source, bones: { arm: { x: 'invalid', rotation: 'invalid' } } }, rig);
+  assert.deepEqual(fields.map(({ path }) => path).sort(), ['bones.arm.rotation', 'bones.arm.x']);
+  assert.deepEqual(
+    validatePoseDefinition({ ...source, bones: { arm: { extra: 1 } } }, rig).map(({ path }) => path),
+    ['bones.arm.extra'],
+  );
+  const { version: _version, ...missingVersion } = source;
+  assert.deepEqual(
+    validatePoseDefinition(missingVersion, rig).map(({ path }) => path),
+    ['version'],
+  );
+  const unsupported = { ...source, version: 2 };
+  assert.equal(validatePoseDefinition(unsupported, rig).length, 1);
+  assert.throws(() => parsePoseDefinition(unsupported, rig), UnsupportedFormatVersionError);
+  const cyclic: Record<string, unknown> = { ...source };
+  cyclic.extra = cyclic;
+  assert.ok(
+    validatePoseDefinition(cyclic, rig).some(({ path, message }) => path === 'extra' && /Cyclic/.test(message)),
+  );
 });
 
 test('partial poses preserve underlying values and mix endpoints', () => {

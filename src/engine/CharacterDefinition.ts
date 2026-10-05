@@ -9,7 +9,7 @@ import {
 } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { mergeSkins } from './mergeSkins.js';
-import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
+import { inspectPoseDefinition, type PoseDefinition } from './Pose.js';
 import { Rig } from './Rig.js';
 import { type DeepReadonly, freezeData } from './readonlyData.js';
 import { characterManifestSchema, skinFileSchema } from './schemas.js';
@@ -130,13 +130,13 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       continue;
     }
     if (!rig) continue;
-    try {
-      const pose = parsePoseDefinition(value, rig);
-      result.poses.push(pose);
-      if (poseNames.has(pose.name)) issues.push(issue(`poses[${index}].name`, `Duplicate pose name "${pose.name}".`));
-      poseNames.add(pose.name);
-    } catch (error) {
-      issues.push(issue(`poses[${index}]`, error instanceof Error ? error.message : String(error)));
+    const pose = inspectPoseDefinition(value, rig);
+    issues.push(...prefixed(pose.issues, `poses[${index}]`));
+    if (pose.data) {
+      result.poses.push(pose.data);
+      if (poseNames.has(pose.data.name))
+        issues.push(issue(`poses[${index}].name`, `Duplicate pose name "${pose.data.name}".`));
+      poseNames.add(pose.data.name);
     }
   }
   return result;

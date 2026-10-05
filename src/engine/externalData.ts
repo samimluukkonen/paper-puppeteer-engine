@@ -78,15 +78,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function shapeIssues(error: { issues: readonly { path: PropertyKey[]; message: string }[] }): ValidationIssue[] {
-  return error.issues.map((issue) => ({
-    severity: 'error',
-    path: issue.path.reduce<string>((path, key) => childPath(path, key as string | number), ''),
-    message: issue.message,
-  }));
+/** @internal Convert schema diagnostics to the shared field-path format. */
+export function shapeIssues(error: {
+  issues: readonly { path: PropertyKey[]; message: string; code?: string; keys?: readonly string[] }[];
+}): ValidationIssue[] {
+  return error.issues.flatMap((issue): ValidationIssue[] => {
+    const path = issue.path.reduce<string>((base, key) => childPath(base, key as string | number), '');
+    return issue.code === 'unrecognized_keys' && issue.keys
+      ? issue.keys.map((key) => ({ severity: 'error', path: childPath(path, key), message: `Unknown field "${key}".` }))
+      : [{ severity: 'error', path, message: issue.message }];
+  });
 }
 
-function inspectVersion(input: unknown, expected: number, format: 'rig' | 'animation' | 'skin') {
+/** @internal Inspect only owned JSON version metadata, without invoking accessors. */
+export function inspectVersion(input: unknown, expected: number, format: 'rig' | 'animation' | 'skin' | 'pose') {
   const descriptor = isRecord(input) ? Object.getOwnPropertyDescriptor(input, 'version') : undefined;
   if (!descriptor)
     return {
@@ -128,7 +133,8 @@ function inspectFileShape<Definition>(
   return runtime.data;
 }
 
-interface ValidationResult<T> {
+/** @internal Shared inspection result; parsers retain typed version errors. */
+export interface ValidationResult<T> {
   issues: ValidationIssue[];
   data?: T;
   versionError?: UnsupportedFormatVersionError | undefined;

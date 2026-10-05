@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { lerpProperty } from './AnimationPose.js';
-import { UnsupportedFormatVersionError } from './externalData.js';
+import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import type { Joint } from './Joint.js';
 import { checkJson } from './jsonData.js';
 import type { Rig } from './Rig.js';
@@ -19,31 +19,36 @@ export class PoseValidationError extends Error {
   }
 }
 
-/** A pose is sparse and uses absolute local joint values, in radians for rotation. */
-export function parsePoseDefinition(input: unknown, rig: Rig): PoseDefinition {
-  const jsonIssues: ValidationIssue[] = [];
-  checkJson(input, '', jsonIssues);
-  if (jsonIssues.length)
-    throw new PoseValidationError(jsonIssues.map(({ path, message }) => ({ path: path ?? '', message })));
-  const version =
-    typeof input === 'object' && input !== null ? Object.getOwnPropertyDescriptor(input, 'version') : undefined;
-  if (version && version.value !== POSE_FORMAT_VERSION) {
-    throw new UnsupportedFormatVersionError('pose', version.value, POSE_FORMAT_VERSION);
-  }
+/** @internal Retain validated poses and individual diagnostics for character assembly. */
+export function inspectPoseDefinition(input: unknown, rig: Rig): ValidationResult<PoseDefinition> {
+  const issues: ValidationIssue[] = [];
+  checkJson(input, '', issues);
+  if (issues.length) return { issues };
+  const { issues: versionIssues, versionError } = inspectVersion(input, POSE_FORMAT_VERSION, 'pose');
+  issues.push(...versionIssues);
   const parsed = poseDefinitionSchema.safeParse(input);
   if (!parsed.success) {
-    throw new PoseValidationError(
-      parsed.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message,
-      })),
-    );
+    issues.push(...shapeIssues(parsed.error).filter((issue) => issue.path !== 'version' || !versionIssues.length));
+    return { issues, versionError };
   }
-  const issues = Object.keys(parsed.data.bones)
-    .filter((id) => !rig.hasBone(id))
-    .map((id) => ({ path: `bones.${id}`, message: `Unknown bone "${id}".` }));
-  if (issues.length) throw new PoseValidationError(issues);
-  return parsed.data;
+  for (const id of Object.keys(parsed.data.bones))
+    if (!rig.hasBone(id)) issues.push({ severity: 'error', path: `bones.${id}`, message: `Unknown bone "${id}".` });
+  return issues.length ? { issues, versionError } : { issues, data: parsed.data };
+}
+
+/** Reports JSON, version, field and rig-reference diagnostics without throwing. */
+export function validatePoseDefinition(input: unknown, rig: Rig): ValidationIssue[] {
+  return inspectPoseDefinition(input, rig).issues;
+}
+
+/** A pose is sparse and uses absolute local joint values, in radians for rotation. */
+export function parsePoseDefinition(input: unknown, rig: Rig): PoseDefinition {
+  const { issues, data, versionError } = inspectPoseDefinition(input, rig);
+  if (!data) {
+    if (versionError) throw versionError;
+    throw new PoseValidationError(issues.map(({ path, message }) => ({ path: path ?? '', message })));
+  }
+  return data;
 }
 
 export function applyPoseToJoints(

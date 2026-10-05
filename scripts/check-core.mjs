@@ -8,6 +8,7 @@ import {
   Joint,
   Rig,
   solveTwoBoneIK,
+  validatePoseDefinition,
   validateRigDefinition,
 } from 'paper-puppeteer-engine/core';
 import { z } from 'zod';
@@ -21,6 +22,11 @@ const character = await CharacterLoader.load(
   async (url) => new Response(await readFile(new URL(url), 'utf8')),
 );
 const rig = character.rig;
+assert.deepEqual(validatePoseDefinition({ version: 1, name: 'rest', bones: { [rig.root]: { x: 1 } } }, rig), []);
+assert.equal(
+  validatePoseDefinition({ version: 1, name: 'bad', bones: { missing: { x: 1 } } }, rig)[0].path,
+  'bones.missing',
+);
 assert.deepEqual(validateRigDefinition({ version: 1, root: rig.root, bones: rig.bones }), []);
 assert.ok(validateRigDefinition({ version: 1, root: 'missing', bones: rig.bones }).length > 0);
 const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
