@@ -109,9 +109,9 @@ if (sketch) {
 
 function updateControls(state: DemoState): void {
   const pressed: Record<string, boolean> = {
-    idle: state.animation === 'idle',
-    walk: state.animation === 'walk',
-    sword: state.animation === 'sword',
+    idle: state.animationRole === 'idle',
+    walk: state.animationRole === 'walk',
+    sword: state.animationRole === 'sword',
     left: state.facing === 'left',
     right: state.facing === 'right',
     debug: state.debug,

@@ -23,6 +23,9 @@ test('shared presentation settings are immutable and own their IK definitions', 
     assert.isTrue(Object.isFrozen(profile));
     assert.isTrue(Object.isFrozen(profile.katana.gripOffset));
     assert.isTrue(Object.isFrozen(profile.feet.sway));
+    assert.isTrue(Object.isFrozen(profile.clips));
+    assert.isTrue(Object.isFrozen(profile.upperBody.mask));
+    assert.isTrue(Object.isFrozen(profile.appearance));
     assert.isTrue(Object.isFrozen(profile.ikChains));
     assert.notStrictEqual(profile.ikChains, demoIK);
     for (const [index, chain] of profile.ikChains.entries()) {

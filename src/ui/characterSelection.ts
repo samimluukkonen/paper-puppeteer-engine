@@ -1,10 +1,10 @@
-import { demoCharacterProfiles } from '../demo/demoCharacterProfiles.js';
+import { characterCatalog, defaultCharacterId } from '../shared/characterCatalog.js';
 
-export const characterChoices = demoCharacterProfiles.map(({ id, label }) => ({ id, label }));
+export const characterChoices = characterCatalog;
 
 export function selectedCharacterId(): string {
   const id = new URLSearchParams(globalThis.location?.search ?? '').get('character');
-  return characterChoices.find((character) => character.id === id)?.id ?? 'demo-puppet';
+  return characterChoices.find((character) => character.id === id)?.id ?? defaultCharacterId;
 }
 
 /** Navigate through the normal page lifecycle, including the rig editor's unsaved-change guard. */
@@ -15,7 +15,7 @@ export function bindCharacterSelection(app: HTMLElement): () => void {
     'change',
     () => {
       const url = new URL(window.location.href);
-      if (select.value === 'demo-puppet') url.searchParams.delete('character');
+      if (select.value === defaultCharacterId) url.searchParams.delete('character');
       else url.searchParams.set('character', select.value);
       // Restore the displayed selection if navigation is canceled because of unsaved edits.
       select.value = selectedCharacterId();

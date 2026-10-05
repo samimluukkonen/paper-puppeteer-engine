@@ -85,7 +85,7 @@ export class DemoFootPlanting {
 
   update(enabled: boolean): DemoFootPlantingFrame {
     this.resetFootRotation();
-    const plantWalkFeet = enabled && this.puppet.currentAnimation === 'walk';
+    const plantWalkFeet = enabled && this.puppet.currentAnimation === this.profile.clips.walk;
     // Give the sketch's extended stance some knee bend so floor contacts stay within IK reach.
     const stanceOffset = plantWalkFeet ? this.profile.feet.stanceOffset : 0;
     const player = this.puppet.animationPlayer;

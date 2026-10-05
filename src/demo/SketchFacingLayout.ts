@@ -1,4 +1,5 @@
 import type { Facing, JointTransform, Puppet } from '../engine/index.js';
+import { type DemoCharacterProfile, sketchProfile } from './demoCharacterProfiles.js';
 
 const parts = ['UpperArm', 'Forearm', 'Hand', 'Thigh', 'LowerLeg', 'Foot'] as const;
 
@@ -19,7 +20,10 @@ export class SketchFacingLayout {
   private visualFacing: Facing | undefined;
   private gripHand = false;
 
-  constructor(private readonly puppet: Puppet) {}
+  constructor(
+    private readonly puppet: Puppet,
+    private readonly profile: DemoCharacterProfile = sketchProfile,
+  ) {}
 
   restoreAuthoredPose(): void {
     for (const [id, pose] of this.authored) Object.assign(this.puppet.getBone(id).pose, pose);
@@ -55,7 +59,9 @@ export class SketchFacingLayout {
         const slot = `${side}${part}Visual`;
         this.puppet.setAttachment(
           slot,
-          side === 'right' && part === 'Hand' && this.gripHand ? 'rightHandGrip' : `${source}${part}Default`,
+          slot === this.profile.appearance.gripHandSlot && this.gripHand
+            ? this.profile.appearance.gripHandAttachment
+            : `${source}${part}Default`,
         );
         if (facing === 'left') this.puppet.setSlotDepth(slot, this.puppet.rig.getSlot(`${source}${part}Visual`).depth!);
         else this.puppet.clearSlotDepth(slot);

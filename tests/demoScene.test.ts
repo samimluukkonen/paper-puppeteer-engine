@@ -2,8 +2,11 @@ import { EventEmitter } from 'node:events';
 import { afterEach, assert, test, vi } from 'vitest';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { DemoScene, type DemoState } from '../src/demo/DemoScene.js';
+import { type DemoCharacterProfile, demoPuppetProfile, resolveDemoClip } from '../src/demo/demoCharacterProfiles.js';
 import { demoIK } from '../src/demo/demoIK.js';
+import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Puppet } from '../src/engine/Puppet.js';
+import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
 import { demoAnimations, demoRig } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
@@ -31,7 +34,12 @@ vi.mock('../src/shared/loadSceneCharacter.js', () => ({ loadSceneCharacter: vi.f
 
 afterEach(() => vi.restoreAllMocks());
 
-function commandFixture() {
+function commandFixture(
+  profile: DemoCharacterProfile = demoPuppetProfile,
+  rig = demoRig,
+  animations: readonly AnimationClip[] = demoAnimations,
+  skin = 'default',
+) {
   const notifications: DemoState[] = [];
   const scene = new DemoScene((state) => {
     for (const { id } of scene.puppet!.rig.bones) {
@@ -44,9 +52,9 @@ function commandFixture() {
   });
   const display = demoPuppetScene();
   const puppet = new Puppet(display, {
-    rig: demoRig,
-    skin: 'default',
-    animations: demoAnimations,
+    rig,
+    skin,
+    animations,
     ik: demoIK,
     x: 380,
     y: 362,
@@ -54,10 +62,90 @@ function commandFixture() {
     autoUpdate: false,
   });
   scene.puppet = puppet;
-  const presenter = new DemoPresenter(display, puppet);
+  const presenter = new DemoPresenter(display, puppet, profile);
+  Reflect.set(scene, 'profile', profile);
+  Reflect.set(scene, 'defaultSkin', skin);
   Reflect.set(scene, 'presentation', presenter);
   return { scene, puppet, presenter, notifications };
 }
+
+test('character profiles drive clip roles, walk and sword IK, layer masks and appearance', () => {
+  const profile: DemoCharacterProfile = {
+    ...demoPuppetProfile,
+    layout: 'authored',
+    clips: { idle: 'rest', walk: 'stride', sword: 'attack' },
+    upperBody: { clip: 'head-overlay', mask: ['head'] },
+    appearance: {
+      ...demoPuppetProfile.appearance,
+      alternateSkin: 'other-art',
+      headwearSkin: 'hat-art',
+      gripHandSlot: 'leftHandVisual',
+      openHandAttachment: 'leftHandDefault',
+    },
+  };
+  const rig = new Rig(
+    demoRig,
+    demoRig.skins.map((skin) => ({
+      ...skin,
+      name: skin.name === 'default' ? 'base-art' : skin.name === 'alternate' ? 'other-art' : 'hat-art',
+    })),
+  );
+  const animations: AnimationClip[] = [
+    ...demoAnimations.map((clip) => ({ ...clip, name: resolveDemoClip(profile, clip.name) })),
+    {
+      name: 'head-overlay',
+      duration: 1000,
+      loop: true,
+      tracks: {
+        head: [{ time: 0, rotation: 0.4 }],
+        [rig.root]: [{ time: 0, x: 123 }],
+      },
+    },
+  ];
+  const { scene, puppet, presenter, notifications } = commandFixture(profile, rig, animations, 'base-art');
+  try {
+    scene.play('idle');
+    assert.equal(puppet.currentAnimation, 'rest');
+    assert.equal(notifications.at(-1)!.animationRole, 'idle');
+    scene.crossfade('walk');
+    assert.equal(puppet.currentAnimation, 'stride');
+    assert.equal(notifications.at(-1)!.animationRole, 'walk');
+    scene.toggleFootIK();
+    assert.isTrue(puppet.getIK(profile.legIK.left).enabled);
+    assert.isDefined(presenter.feet.update(true).walkFeet);
+    scene.play('sword');
+    assert.equal(puppet.currentAnimation, 'attack');
+    assert.isTrue(notifications.at(-1)!.handIK);
+    assert.isTrue(puppet.getIK(profile.armIK.left).enabled);
+    scene.play('idle');
+    scene.toggleUpperBody();
+    scene.update(0, 300);
+    assert.equal(puppet.animationPlayer.getLayerAnimation('upperBody'), 'head-overlay');
+    assert.approximately(puppet.getBone('head').pose.rotation, 0.4, 1e-12);
+    assert.equal(puppet.getBone(rig.root).pose.x, rig.getBone(rig.root).x ?? 0);
+    scene.setSkin('alternate');
+    assert.equal(
+      puppet.getAttachment('torsoVisual'),
+      rig.skins.find((skin) => skin.name === 'other-art')!.slots.torsoVisual,
+    );
+    scene.setSkin('default');
+    assert.equal(
+      puppet.getAttachment('torsoVisual'),
+      rig.skins.find((skin) => skin.name === 'base-art')!.slots.torsoVisual,
+    );
+    assert.equal(notifications.at(-1)!.skin, 'default');
+    scene.toggleGripHand();
+    assert.equal(puppet.getAttachment('leftHandVisual'), profile.appearance.gripHandAttachment);
+    scene.toggleGripHand();
+    assert.equal(puppet.getAttachment('leftHandVisual'), 'leftHandDefault');
+    scene.toggleHelmet();
+    assert.isDefined(puppet.getAttachment(profile.appearance.headwearSlot));
+    scene.toggleHelmet();
+    assert.isUndefined(puppet.getAttachment(profile.appearance.headwearSlot));
+  } finally {
+    puppet.destroy();
+  }
+});
 
 test('demo commands present once before reporting playback, facing, layers and IK state', () => {
   const { scene, puppet, presenter, notifications } = commandFixture();
@@ -88,6 +176,45 @@ test('demo commands present once before reporting playback, facing, layers and I
     }
   } finally {
     puppet.destroy();
+  }
+});
+
+test('renamed clips preserve sample facing corrections through interrupted crossfades', () => {
+  const profile: DemoCharacterProfile = {
+    ...demoPuppetProfile,
+    clips: { idle: 'rest', walk: 'stride', sword: 'attack' },
+  };
+  const original = commandFixture();
+  const renamed = commandFixture(
+    profile,
+    demoRig,
+    demoAnimations.map((clip) => ({
+      ...clip,
+      name: resolveDemoClip(profile, clip.name),
+    })),
+  );
+  const commands: ((scene: DemoScene) => void)[] = [
+    (scene) => scene.play('idle'),
+    (scene) => scene.face('left'),
+    (scene) => scene.update(0, 80),
+    (scene) => scene.crossfade('walk'),
+    (scene) => scene.update(0, 100),
+    (scene) => scene.crossfade('idle'),
+    (scene) => scene.update(0, 100),
+    (scene) => scene.play('sword'),
+  ];
+  try {
+    for (const command of commands) {
+      command(original.scene);
+      command(renamed.scene);
+      assert.deepEqual(renamed.puppet.getRenderOrder(), original.puppet.getRenderOrder());
+      for (const { id } of demoRig.bones) {
+        assert.deepEqual(renamed.puppet.getBone(id).pose, original.puppet.getBone(id).pose, id);
+      }
+    }
+  } finally {
+    original.puppet.destroy();
+    renamed.puppet.destroy();
   }
 });
 

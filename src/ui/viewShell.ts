@@ -1,4 +1,5 @@
 import packageInfo from '../../package.json';
+import { defaultCharacterId } from '../shared/characterCatalog.js';
 import { characterChoices, selectedCharacterId } from './characterSelection.js';
 import puppetLogo from './images/puppet-running-header.png';
 import './viewShell.css';
@@ -15,7 +16,7 @@ export function viewHeader(view: keyof typeof views): string {
   const root = view === 'demo' ? './' : '../';
   const status = view === 'rig' ? '<p id="dirty-status"></p>' : '';
   const characterId = selectedCharacterId();
-  const characterQuery = characterId === 'demo-puppet' ? '' : `?character=${characterId}`;
+  const characterQuery = characterId === defaultCharacterId ? '' : `?character=${characterId}`;
   return `
     <header class="view-header">
       <div class="view-header-top">

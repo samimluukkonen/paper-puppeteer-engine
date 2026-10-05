@@ -98,7 +98,7 @@ export class DemoPoseAuthoring {
   applyCombatPose(): void {
     if (!this.active) return;
     if (this.profile.layout === 'authored') {
-      this.puppet.resetToBindPose().applyPose('combat-ready').commitPoseForEditing();
+      this.puppet.resetToBindPose().applyPose(this.profile.combatPose).commitPoseForEditing();
       this.puppet.container.setPosition(
         this.scene.scale.width / 2,
         this.scene.scale.height - this.profile.placement.yOffset,
@@ -109,7 +109,7 @@ export class DemoPoseAuthoring {
       return;
     }
     this.resetAuthoringPose();
-    this.puppet.applyPose('combat-ready').commitPoseForEditing();
+    this.puppet.applyPose(this.profile.combatPose).commitPoseForEditing();
     this.refresh();
   }
 

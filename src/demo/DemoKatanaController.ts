@@ -108,7 +108,9 @@ export class DemoKatanaController {
     primaryArm.enabled = handIK;
     primaryArm.setTarget(handTarget);
     secondaryArm.enabled =
-      (handIK || upperBody) && this.attached && (this.puppet.currentAnimation === 'sword' || upperBody);
+      (handIK || upperBody) &&
+      this.attached &&
+      (this.puppet.currentAnimation === this.profile.clips.sword || upperBody);
     if (upperBody) primaryArm.enabled = true;
     secondaryArm.setTargetProvider(() => {
       this.aimKatana(this.swordAngle);
@@ -118,7 +120,7 @@ export class DemoKatanaController {
 
   /** One visible katana: the sprite follows the hand except when grip-aware IK needs the prop. */
   syncMode(upperBody: boolean): void {
-    const needsGripPoints = this.enabled && (this.puppet.currentAnimation === 'sword' || upperBody);
+    const needsGripPoints = this.enabled && (this.puppet.currentAnimation === this.profile.clips.sword || upperBody);
     if (this.attached !== needsGripPoints) {
       if (needsGripPoints) {
         this.katana.container.setVisible(true);
@@ -187,7 +189,11 @@ export class DemoKatanaController {
     upperBody: boolean,
     syncOptions: SyncPoseOptions,
   ): void {
-    if (!this.attached || (!handIK && !upperBody) || (this.puppet.currentAnimation !== 'sword' && !upperBody)) {
+    if (
+      !this.attached ||
+      (!handIK && !upperBody) ||
+      (this.puppet.currentAnimation !== this.profile.clips.sword && !upperBody)
+    ) {
       this.previousRearPalm = undefined;
       return;
     }

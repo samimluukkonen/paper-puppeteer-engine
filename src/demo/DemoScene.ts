@@ -5,10 +5,18 @@ import { loadSceneCharacter } from '../shared/loadSceneCharacter.js';
 import { DemoInput } from './DemoInput.js';
 import { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import { createDemoBackdrop, DemoPresenter } from './DemoPresenter.js';
-import { type DemoCharacterProfile, demoPuppetProfile, getDemoCharacterProfile } from './demoCharacterProfiles.js';
+import {
+  type DemoAnimationRole,
+  type DemoCharacterProfile,
+  demoPuppetProfile,
+  getDemoAnimationRole,
+  getDemoCharacterProfile,
+  resolveDemoClip,
+} from './demoCharacterProfiles.js';
 
 export interface DemoState {
   animation: string;
+  animationRole: DemoAnimationRole | undefined;
   facing: Facing;
   debug: boolean;
   playing: boolean;
@@ -41,7 +49,8 @@ export class DemoScene extends Phaser.Scene {
   private steppedFPS = 10;
   private upperBody = false;
   private lastEvent = 'none';
-  private skin = 'default';
+  private skin: 'default' | 'alternate' = 'default';
+  private defaultSkin = 'default';
   private gripHand = false;
   private helmet = false;
   private profile: DemoCharacterProfile = demoPuppetProfile;
@@ -90,7 +99,8 @@ export class DemoScene extends Phaser.Scene {
     this.footIK = false;
     this.upperBody = false;
     this.lastEvent = 'none';
-    this.skin = definition.defaultSkin;
+    this.defaultSkin = definition.defaultSkin;
+    this.skin = 'default';
     this.gripHand = false;
     this.helmet = false;
     createDemoBackdrop(this, definition.rig.bones.length, this.profile);
@@ -104,7 +114,7 @@ export class DemoScene extends Phaser.Scene {
       autoUpdate: false,
     });
     this.presentation = new DemoPresenter(this, this.puppet, this.profile);
-    this.puppet.play('idle');
+    this.puppet.play(this.profile.clips.idle);
     this.puppet.onAnimationEvent((event) => {
       this.lastEvent = `${event.clip}: ${event.name}`;
       this.notify();
@@ -177,8 +187,9 @@ export class DemoScene extends Phaser.Scene {
     this.authoring?.exit();
     this.runPresentationCommand(
       (puppet) => {
-        puppet.clearPose().play(name);
-        this.handIK = name === 'sword';
+        const clip = resolveDemoClip(this.profile, name);
+        puppet.clearPose().play(clip);
+        this.handIK = clip === this.profile.clips.sword;
         if (this.handIK) this.presentation?.katana.resetRearPalm(puppet.facingDirection);
       },
       { preparePose: true },
@@ -193,7 +204,7 @@ export class DemoScene extends Phaser.Scene {
     this.presentation?.captureCrossfadeSource();
     this.runPresentationCommand(
       (puppet) => {
-        puppet.play(name, { fadeDuration: 300 });
+        puppet.play(this.profile.clips[name], { fadeDuration: 300 });
         this.handIK = false;
       },
       { preparePose: true },
@@ -232,17 +243,8 @@ export class DemoScene extends Phaser.Scene {
       (puppet) => {
         this.upperBody = !this.upperBody;
         if (this.upperBody) {
-          puppet.setLayerMask('upperBody', [
-            'torso',
-            'head',
-            'leftUpperArm',
-            'leftForearm',
-            'leftHand',
-            'rightUpperArm',
-            'rightForearm',
-            'rightHand',
-          ]);
-          puppet.play('guardUpperBody', { layer: 'upperBody', fadeDuration: 250 });
+          puppet.setLayerMask('upperBody', this.profile.upperBody.mask);
+          puppet.play(this.profile.upperBody.clip, { layer: 'upperBody', fadeDuration: 250 });
         } else puppet.clearLayer('upperBody');
       },
       { preparePose: true },
@@ -325,8 +327,8 @@ export class DemoScene extends Phaser.Scene {
 
   setSkin(name: 'default' | 'alternate'): void {
     if (!this.puppet) return;
+    this.puppet.setSkin(name === 'default' ? this.defaultSkin : this.profile.appearance.alternateSkin);
     this.skin = name;
-    this.puppet.setSkin(name);
     this.syncVisualOverrides();
     this.notify();
   }
@@ -351,9 +353,15 @@ export class DemoScene extends Phaser.Scene {
   private syncVisualOverrides(): void {
     if (!this.puppet) return;
     if (this.presentation?.sketchFacing) this.presentation.sketchFacing.setGripHand(this.gripHand);
-    else this.puppet.setAttachment('rightHandVisual', this.gripHand ? 'rightHandGrip' : 'rightHandDefault');
-    if (this.helmet) this.puppet.applySkin('helmet-only');
-    else this.puppet.clearAttachment('headwear');
+    else {
+      const appearance = this.profile.appearance;
+      this.puppet.setAttachment(
+        appearance.gripHandSlot,
+        this.gripHand ? appearance.gripHandAttachment : appearance.openHandAttachment,
+      );
+    }
+    if (this.helmet) this.puppet.applySkin(this.profile.appearance.headwearSkin);
+    else this.puppet.clearAttachment(this.profile.appearance.headwearSlot);
     this.presentation?.katana.syncVisualOverride();
   }
 
@@ -361,6 +369,7 @@ export class DemoScene extends Phaser.Scene {
     if (!this.puppet || this.commandDepth > 0) return;
     this.onChange({
       animation: this.puppet.currentAnimation ?? 'none',
+      animationRole: getDemoAnimationRole(this.profile, this.puppet.currentAnimation),
       facing: this.puppet.facingDirection,
       debug: this.puppet.isDebug,
       playing: this.puppet.isPlaying,

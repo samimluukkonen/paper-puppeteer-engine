@@ -1,6 +1,9 @@
 import type { IKTarget, TwoBoneIKDefinition } from '../engine/core.js';
 import { type DeepReadonly, freezeData } from '../engine/readonlyData.js';
+import { demoPuppetCharacter, sketchCharacter } from '../shared/characterCatalog.js';
 import { demoIK } from './demoIK.js';
+
+export type DemoAnimationRole = 'idle' | 'walk' | 'sword';
 
 /** Presentation choices for a demo character; rig and animation data remain engine-owned. */
 export type DemoCharacterProfile = DeepReadonly<{
@@ -8,6 +11,17 @@ export type DemoCharacterProfile = DeepReadonly<{
   label: string;
   layout: 'sample' | 'authored';
   swapLimbsWithFacing: boolean;
+  clips: Record<DemoAnimationRole, string>;
+  upperBody: { clip: string; mask: readonly string[] };
+  combatPose: string;
+  appearance: {
+    alternateSkin: string;
+    gripHandSlot: string;
+    openHandAttachment: string;
+    gripHandAttachment: string;
+    headwearSlot: string;
+    headwearSkin: string;
+  };
   placement: { scale: number; yOffset: number };
   ikChains: readonly TwoBoneIKDefinition[];
   armIK: Record<'left' | 'right', string>;
@@ -45,6 +59,20 @@ export type DemoCharacterProfile = DeepReadonly<{
 }>;
 
 const common = {
+  clips: { idle: 'idle', walk: 'walk', sword: 'sword' },
+  upperBody: {
+    clip: 'guardUpperBody',
+    mask: ['torso', 'head', 'leftUpperArm', 'leftForearm', 'leftHand', 'rightUpperArm', 'rightForearm', 'rightHand'],
+  },
+  combatPose: 'combat-ready',
+  appearance: {
+    alternateSkin: 'alternate',
+    gripHandSlot: 'rightHandVisual',
+    openHandAttachment: 'rightHandDefault',
+    gripHandAttachment: 'rightHandGrip',
+    headwearSlot: 'headwear',
+    headwearSkin: 'helmet-only',
+  },
   placement: { scale: 1.08, yOffset: 278 },
   ikChains: structuredClone(demoIK),
   armIK: { left: 'leftArmIK', right: 'rightArmIK' },
@@ -81,8 +109,7 @@ const common = {
 
 export const demoPuppetProfile: DemoCharacterProfile = freezeData({
   ...common,
-  id: 'demo-puppet',
-  label: 'Demo puppet',
+  ...demoPuppetCharacter,
   layout: 'sample',
   swapLimbsWithFacing: false,
   katana: {
@@ -101,8 +128,7 @@ export const demoPuppetProfile: DemoCharacterProfile = freezeData({
 
 export const sketchProfile: DemoCharacterProfile = freezeData({
   ...common,
-  id: 'random-paperdoll-sketch',
-  label: 'Random paperdoll sketch',
+  ...sketchCharacter,
   layout: 'authored',
   swapLimbsWithFacing: true,
   katana: {
@@ -120,6 +146,22 @@ export const sketchProfile: DemoCharacterProfile = freezeData({
 });
 
 export const demoCharacterProfiles: readonly DemoCharacterProfile[] = Object.freeze([demoPuppetProfile, sketchProfile]);
+
+/** Translate an engine clip name into the action displayed by the demo controls. */
+export function getDemoAnimationRole(
+  profile: DemoCharacterProfile,
+  clip: string | undefined,
+): DemoAnimationRole | undefined {
+  for (const role of ['idle', 'walk', 'sword'] as const) {
+    if (profile.clips[role] === clip) return role;
+  }
+  return undefined;
+}
+
+/** Demo actions use roles; explicitly registered clip names remain playable too. */
+export function resolveDemoClip(profile: DemoCharacterProfile, name: string): string {
+  return Object.hasOwn(profile.clips, name) ? profile.clips[name as DemoAnimationRole] : name;
+}
 
 export function getDemoCharacterProfile(id: string): DemoCharacterProfile {
   const profile = demoCharacterProfiles.find((entry) => entry.id === id);

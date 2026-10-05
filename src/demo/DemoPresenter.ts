@@ -2,7 +2,7 @@ import type Phaser from 'phaser';
 import type { Facing, IKTarget, Puppet } from '../engine/index.js';
 import { DemoFootPlanting } from './DemoFootPlanting.js';
 import { DemoKatanaController } from './DemoKatanaController.js';
-import { type DemoCharacterProfile, demoPuppetProfile } from './demoCharacterProfiles.js';
+import { type DemoCharacterProfile, demoPuppetProfile, getDemoAnimationRole } from './demoCharacterProfiles.js';
 import type { WalkFootIK } from './demoFootTargets.js';
 import {
   demoArmRotations,
@@ -70,7 +70,7 @@ export class DemoPresenter {
   ) {
     this.katana = new DemoKatanaController(puppet, new Katana(scene), profile);
     this.feet = new DemoFootPlanting(scene, puppet, profile);
-    this.sketchFacing = profile.swapLimbsWithFacing ? new SketchFacingLayout(puppet) : undefined;
+    this.sketchFacing = profile.swapLimbsWithFacing ? new SketchFacingLayout(puppet, profile) : undefined;
     this.handTarget = { x: scene.scale.width / 2 + 55, y: scene.scale.height - 320 };
     this.markers = scene.add.graphics().setDepth(100);
   }
@@ -116,31 +116,32 @@ export class DemoPresenter {
 
   private applySampleLayout(): void {
     this.syncRenderOrder();
-    const shoulders = demoShoulderPositions(this.puppet.rig, this.puppet.currentAnimation, this.puppet.facingDirection);
+    const animation = getDemoAnimationRole(this.profile, this.puppet.currentAnimation);
+    const shoulders = demoShoulderPositions(this.puppet.rig, animation, this.puppet.facingDirection);
     for (const [id, x] of Object.entries(shoulders)) this.puppet.getBone(id).pose.x = x;
-    const arms = demoArmRotations(this.puppet.currentAnimation, this.puppet.facingDirection, {
+    const arms = demoArmRotations(animation, this.puppet.facingDirection, {
       leftUpperArm: this.puppet.getBone('leftUpperArm').pose.rotation,
       rightUpperArm: this.puppet.getBone('rightUpperArm').pose.rotation,
     });
     const transition = this.puppet.animationPlayer.transition;
     const fromDirection =
-      transition?.from === 'previous pose' ? this.armFadeSource : transition?.from === 'idle' ? -1 : 1;
-    const toDirection = this.puppet.currentAnimation === 'idle' ? -1 : 1;
+      transition?.from === 'previous pose'
+        ? this.armFadeSource
+        : getDemoAnimationRole(this.profile, transition?.from) === 'idle'
+          ? -1
+          : 1;
+    const toDirection = animation === 'idle' ? -1 : 1;
     this.armDirection = transition ? fromDirection + (toDirection - fromDirection) * transition.progress : toDirection;
     const toSign = this.puppet.facingDirection === 'left' ? toDirection : 1;
     const sign = this.puppet.facingDirection === 'left' ? this.armDirection : 1;
     for (const [id, rotation] of Object.entries(arms)) {
       this.puppet.getBone(id).pose.rotation = transition ? (rotation * sign) / toSign : rotation;
     }
-    if (
-      this.puppet.currentAnimation === 'idle' ||
-      this.puppet.currentAnimation === 'walk' ||
-      this.puppet.currentAnimation === 'sword'
-    ) {
+    if (animation === 'idle' || animation === 'walk' || animation === 'sword') {
       const hips = demoHipPositions(this.puppet.rig, this.puppet.facingDirection);
       for (const [id, x] of Object.entries(hips)) this.puppet.getBone(id).pose.x = x;
     }
-    const idle = this.puppet.currentAnimation === 'idle' || this.puppet.currentAnimation === 'sword';
+    const idle = animation === 'idle' || animation === 'sword';
     this.puppet.setDebugLabelSide(
       'rightLowerLeg',
       idle && this.puppet.facingDirection === 'right' ? 'left' : undefined,
@@ -155,7 +156,7 @@ export class DemoPresenter {
     const facing = this.puppet.facingDirection;
     const facingChanged = this.orderFacing !== facing;
     if (!this.renderOrder || this.orderAnimation !== animation || this.orderFacing !== facing) {
-      this.renderOrder = demoRenderOrder(this.puppet.rig, animation, facing);
+      this.renderOrder = demoRenderOrder(this.puppet.rig, getDemoAnimationRole(this.profile, animation), facing);
       this.orderAnimation = animation;
       this.orderFacing = facing;
     }
