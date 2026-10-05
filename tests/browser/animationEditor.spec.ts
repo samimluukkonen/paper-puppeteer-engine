@@ -89,6 +89,8 @@ test('no animations and no selection show safe empty timelines', async ({ page }
   await page.locator('#animation-selection').selectOption('');
   await expect(page.locator('#animation-status')).toHaveText('No animation selected.');
   await expect(page.locator('#current-time')).toHaveText('0.000 / 0.000 s');
+  for (const selector of ['#playback-speed', '#animation-mode', '#animation-fps', '#animation-undo', '#animation-redo'])
+    await expect(page.locator(selector)).toBeDisabled();
   await page.route('**/characters/demo-puppet/character.json', async (route) => {
     const response = await route.fetch();
     const manifest = await response.json();
@@ -99,6 +101,126 @@ test('no animations and no selection show safe empty timelines', async ({ page }
   await expect(page.locator('#animation-stage canvas')).toBeVisible();
   await expect(page.locator('#animation-selection')).toBeDisabled();
   await expect(page.locator('#timeline')).toHaveAttribute('aria-disabled', 'true');
+});
+
+test('preview speeds scale browser playback while remaining transient across selection', async ({ page }) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ json: { ...(await response.json()), duration: 60_000 } });
+  });
+  await openEditor(page);
+  await expect(page.locator('#playback-speed')).toHaveValue('1');
+  for (const speed of [0.5, 1, 2]) {
+    await page.locator('#playback-speed').selectOption(String(speed));
+    await page.locator('#play-pause').click();
+    const measured = await page.locator('#timeline').evaluate(async (element) => {
+      const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await frame();
+      const start = performance.now();
+      const initial = Number(element.getAttribute('aria-valuenow'));
+      while (performance.now() - start < 350) await frame();
+      return (Number(element.getAttribute('aria-valuenow')) - initial) / ((performance.now() - start) / 1000);
+    });
+    expect(measured).toBeGreaterThan(speed * 0.75);
+    expect(measured).toBeLessThan(speed * 1.25);
+    await page.locator('#play-pause').click();
+    await expect(page.locator('#animation-metadata')).toContainText(`Speed: ${speed}×`);
+    await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+    await expect(page.locator('#animation-undo')).toBeDisabled();
+  }
+  await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#playback-speed')).toHaveValue('2');
+  await expect(page.locator('#play-pause')).toHaveText('Play');
+});
+
+test('authored mode and FPS update the paused pose immediately and undo restores settings', async ({ page }) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      json: {
+        ...(await response.json()),
+        duration: 2000,
+        events: [],
+        tracks: {
+          root: [
+            { time: 0, x: 0 },
+            { time: 2000, x: 200 },
+          ],
+        },
+      },
+    });
+  });
+  await openEditor(page);
+  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect(page.locator('#animation-fps')).toBeDisabled();
+  await page.locator('#animation-mode').selectOption('stepped');
+  await expect(page.locator('#animation-fps')).toHaveValue('10');
+  const timeline = page.locator('#timeline');
+  for (let step = 0; step < 15; step += 1) await timeline.press('ArrowRight');
+  const canvas = page.locator('#animation-stage canvas');
+  const steppedPose = await canvas.screenshot();
+  await page.locator('#animation-fps').fill('20');
+  await page.locator('#animation-fps').press('Tab');
+  await expect(page.locator('#animation-metadata')).toContainText('Mode: stepped · FPS: 20');
+  await expect(page.locator('#current-time')).toHaveText('0.150 / 2.000 s');
+  expect((await canvas.screenshot()).equals(steppedPose)).toBe(false);
+  await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#animation-selection')).toHaveValue('idle');
+  await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
+  await page.locator('#animation-undo').click();
+  await expect(page.locator('#animation-fps')).toHaveValue('10');
+  expect((await canvas.screenshot()).equals(steppedPose)).toBe(true);
+  await page.locator('#animation-redo').click();
+  await expect(page.locator('#animation-fps')).toHaveValue('20');
+  await page.locator('#animation-mode').selectOption('smooth');
+  await expect(page.locator('#animation-fps')).toBeDisabled();
+  const smoothPose = await canvas.screenshot();
+  await timeline.press('ArrowRight');
+  expect((await canvas.screenshot()).equals(smoothPose)).toBe(false);
+  await page.locator('#animation-undo').click();
+  await page.locator('#animation-undo').click();
+  await page.locator('#animation-undo').click();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#animation-selection')).toHaveValue('walk');
+  await page.screenshot({ path: test.info().outputPath('animation-settings-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 620, height: 1100 });
+  await page.screenshot({ path: test.info().outputPath('animation-settings-narrow.png'), fullPage: true });
+});
+
+test('invalid FPS restores the authored value and typing while playing retains the uncommitted edit', async ({
+  page,
+}) => {
+  await openEditor(page);
+  await page.locator('#animation-mode').selectOption('stepped');
+  const fps = page.locator('#animation-fps');
+  for (const invalid of ['-1', '0', '241', '']) {
+    await fps.fill(invalid);
+    await fps.press('Tab');
+    await expect(page.locator('#animation-status')).toContainText(
+      'Animation FPS must be a finite number from 1 to 240',
+    );
+    await expect(fps).toHaveValue('10');
+    await expect(page.locator('#animation-metadata')).toContainText('FPS: 10');
+  }
+  await page.locator('#preview-loop').click();
+  await page.locator('#play-pause').click();
+  await fps.fill('12.5');
+  await page.waitForTimeout(200);
+  await expect(fps).toHaveValue('12.5');
+  await expect(page.locator('#animation-metadata')).toContainText('FPS: 10');
+  await fps.dispatchEvent('keydown', { key: ' ', code: 'Space', bubbles: true });
+  await expect(page.locator('#play-pause')).toHaveText('Pause');
+  await fps.press('Tab');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await expect(page.locator('#animation-metadata')).toContainText('FPS: 12.5');
+  await expect(page.locator('#play-pause')).toHaveText('Pause');
+  await page.locator('#playback-speed').focus();
+  await page.locator('#playback-speed').dispatchEvent('keydown', { key: ' ', code: 'Space', bubbles: true });
+  await expect(page.locator('#play-pause')).toHaveText('Pause');
+  await page.locator('#play-pause').click();
 });
 
 test('invalid zero-duration data reports shared validation errors and survives resize', async ({ page }) => {

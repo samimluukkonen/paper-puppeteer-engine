@@ -10,7 +10,8 @@ body {
   margin: 0;
 }
 button,
-select {
+select,
+input {
   font: inherit;
 }
 a {
@@ -41,6 +42,20 @@ a {
 .animation-session select {
   max-width: 100%;
 }
+.animation-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+.animation-settings input {
+  width: 100%;
+  min-width: 0;
+}
+.animation-history {
+  display: flex;
+  gap: 8px;
+}
 .animation-session h2,
 .timeline-panel h2 {
   font-size: 13px;
@@ -67,6 +82,11 @@ a {
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
+}
+.timeline-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 #current-time {
   font-variant-numeric: tabular-nums;

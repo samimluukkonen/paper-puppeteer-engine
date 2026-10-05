@@ -27,10 +27,16 @@ export class TimelineController {
   private readonly playPause: HTMLButtonElement;
   private readonly loop: HTMLButtonElement;
   private readonly dirty: HTMLElement;
+  private readonly speed: HTMLSelectElement;
+  private readonly mode: HTMLSelectElement;
+  private readonly fps: HTMLInputElement;
+  private readonly undo: HTMLButtonElement;
+  private readonly redo: HTMLButtonElement;
   private pointer: number | undefined;
   private width = 0;
   private rulerKey = '';
   private externalError = '';
+  private authoredFPS = '';
 
   constructor(private readonly app: HTMLElement) {
     this.timeline = this.element('#timeline');
@@ -44,6 +50,11 @@ export class TimelineController {
     this.playPause = this.element<HTMLButtonElement>('#play-pause');
     this.loop = this.element<HTMLButtonElement>('#preview-loop');
     this.dirty = this.element('#animation-dirty');
+    this.speed = this.element<HTMLSelectElement>('#playback-speed');
+    this.mode = this.element<HTMLSelectElement>('#animation-mode');
+    this.fps = this.element<HTMLInputElement>('#animation-fps');
+    this.undo = this.element<HTMLButtonElement>('#animation-undo');
+    this.redo = this.element<HTMLButtonElement>('#animation-redo');
     const options = { signal: this.abort.signal };
     this.selection.addEventListener(
       'change',
@@ -56,6 +67,26 @@ export class TimelineController {
     this.reset.addEventListener('click', () => this.state.restart(), options);
     this.playPause.addEventListener('click', () => this.state.togglePlayback(), options);
     this.loop.addEventListener('click', () => this.state.setPreviewLoop(!this.state.previewLoop), options);
+    this.speed.addEventListener('change', () => this.state.setPlaybackSpeed(Number(this.speed.value)), options);
+    this.mode.addEventListener(
+      'change',
+      () => {
+        const mode = this.mode.value;
+        if (mode === 'smooth' || mode === 'stepped') this.state.setAuthoredPlaybackMode(mode);
+      },
+      options,
+    );
+    this.fps.addEventListener(
+      'change',
+      () => {
+        this.state.setAuthoredFPS(this.fps.valueAsNumber);
+        // Rejected input restores the held authored value; the status retains the validation error.
+        this.fps.value = this.authoredFPS;
+      },
+      options,
+    );
+    this.undo.addEventListener('click', () => this.state.undo(), options);
+    this.redo.addEventListener('click', () => this.state.redo(), options);
     window.addEventListener(
       'keydown',
       (event) => {
@@ -230,10 +261,25 @@ export class TimelineController {
     setAttribute(this.loop, 'aria-pressed', String(state.previewLoop));
     setText(this.timeDisplay, `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`);
     const playback = animation?.playback;
+    const speed = String(state.playbackSpeed);
+    if (this.speed.value !== speed) this.speed.value = speed;
+    if (this.speed.disabled !== !animation) this.speed.disabled = !animation;
+    const mode = playback?.mode ?? 'smooth';
+    if (this.mode.value !== mode) this.mode.value = mode;
+    if (this.mode.disabled !== !animation) this.mode.disabled = !animation;
+    const fps = playback?.mode === 'stepped' ? String(playback.fps) : '';
+    // Leave an uncommitted numeric edit alone while playback notifications refresh the other controls.
+    if ((fps !== this.authoredFPS || document.activeElement !== this.fps) && this.fps.value !== fps)
+      this.fps.value = fps;
+    this.authoredFPS = fps;
+    const fpsDisabled = !animation || mode !== 'stepped';
+    if (this.fps.disabled !== fpsDisabled) this.fps.disabled = fpsDisabled;
+    if (this.undo.disabled !== !state.canUndo) this.undo.disabled = !state.canUndo;
+    if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
     setText(
       this.metadata,
       animation
-        ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.previewLoop ? 'loop' : 'once'} · ${state.isScrubbing ? 'Scrubbing' : state.isPlaying ? 'Playing' : 'Paused'}`
+        ? `Mode: ${mode} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.previewLoop ? 'loop' : 'once'} · Speed: ${speed}× · ${state.isScrubbing ? 'Scrubbing' : state.isPlaying ? 'Playing' : 'Paused'}`
         : 'Select an animation to preview its pose.',
     );
     setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');

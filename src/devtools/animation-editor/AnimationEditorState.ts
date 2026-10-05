@@ -1,4 +1,4 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
+import type { AnimationClip, AnimationPlaybackMode } from '../../engine/AnimationClip.js';
 import {
   ANIMATION_FORMAT_VERSION,
   inspectAnimationDefinition,
@@ -9,6 +9,11 @@ import { animationFileSchema } from '../../engine/schemas.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { animationDurationSeconds, clampTime } from './timeline.js';
+
+export const PREVIEW_PLAYBACK_SPEEDS = [0.25, 0.5, 1, 1.5, 2] as const;
+export const AUTHORED_FPS_MIN = 1;
+export const AUTHORED_FPS_MAX = 240;
+export const DEFAULT_AUTHORED_FPS = 10;
 
 /** Same external file fields; event data remains unknown to callers and is validated as JSON before ownership. */
 export type ReadonlyAnimation = ReadonlyEditorData<AnimationClip> & {
@@ -32,6 +37,7 @@ export class AnimationEditorState {
   private time = 0;
   private playing = false;
   private previewLoopEnabled = false;
+  private speed = 1;
   private scrubbing = false;
   private saved: ReadonlyAnimation | null = null;
   private cachedDirty: boolean | undefined;
@@ -72,6 +78,9 @@ export class AnimationEditorState {
   }
   get previewLoop(): boolean {
     return this.previewLoopEnabled;
+  }
+  get playbackSpeed(): number {
+    return this.speed;
   }
   get isScrubbing(): boolean {
     return this.scrubbing;
@@ -116,11 +125,11 @@ export class AnimationEditorState {
     return freezeData(animationFileSchema.parse({ ...result.data, version: ANIMATION_FORMAT_VERSION }));
   }
 
-  /** Failed selections preserve the current working copy. Future authoring can explicitly discard changes. */
+  /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
     if (this.dirty && !options.discardChanges) {
       this.issues = [
-        { severity: 'error', message: 'Unsaved animation changes; save or explicitly discard before selecting.' },
+        { severity: 'error', message: 'Unsaved animation changes; undo edits or explicitly discard before selecting.' },
       ];
       this.notify();
       return false;
@@ -165,6 +174,42 @@ export class AnimationEditorState {
     this.previewLoopEnabled = loop;
     this.updateTime(this.time);
     this.notify();
+  }
+
+  /** A preview preference, never serialized or recorded in authored history. */
+  setPlaybackSpeed(speed: number): boolean {
+    if (!PREVIEW_PLAYBACK_SPEEDS.some((value) => value === speed)) return false;
+    if (speed !== this.speed) {
+      this.speed = speed;
+      this.notify();
+    }
+    return true;
+  }
+
+  /** FPS only exists on stepped clips in the runtime format; keys and events retain millisecond times. */
+  setAuthoredFPS(fps: number): boolean {
+    if (this.working?.playback?.mode !== 'stepped') return false;
+    if (!Number.isFinite(fps) || fps < AUTHORED_FPS_MIN || fps > AUTHORED_FPS_MAX) {
+      this.issues = [
+        {
+          severity: 'error',
+          path: 'playback.fps',
+          message: `Animation FPS must be a finite number from ${AUTHORED_FPS_MIN} to ${AUTHORED_FPS_MAX}.`,
+        },
+      ];
+      this.notify();
+      return false;
+    }
+    return this.replaceWorkingAnimation({ ...this.working, playback: { mode: 'stepped', fps } });
+  }
+
+  setAuthoredPlaybackMode(mode: AnimationPlaybackMode['mode']): boolean {
+    if (!this.working || (mode !== 'smooth' && mode !== 'stepped')) return false;
+    if (mode === (this.working.playback?.mode ?? 'smooth')) return true;
+    return this.replaceWorkingAnimation({
+      ...this.working,
+      playback: mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS },
+    });
   }
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
@@ -213,13 +258,15 @@ export class AnimationEditorState {
       this.setCurrentTime(0);
       return;
     }
-    // Reduce large deltas before addition so they cannot overflow or swallow the held time.
-    this.setCurrentTime(
-      this.previewLoop ? (this.time + (deltaSeconds % duration)) % duration : this.time + deltaSeconds,
-    );
+    const distance = deltaSeconds * this.speed;
+    // Reduce before addition; if scaling overflows, reduce real time by one preview loop first.
+    const loopDistance = Number.isFinite(distance)
+      ? distance % duration
+      : (deltaSeconds % (duration / this.speed)) * this.speed;
+    this.setCurrentTime(this.previewLoop ? (this.time + loopDistance) % duration : this.time + distance);
   }
 
-  /** Future authoring boundary: validate atomically, own a fresh JSON copy, and record one authored edit. */
+  /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */
   replaceWorkingAnimation(input: unknown): boolean {
     if (!this.working) return false;
     const next = this.inspect(input);

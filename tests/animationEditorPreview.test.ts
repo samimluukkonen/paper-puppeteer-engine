@@ -159,6 +159,7 @@ test('status changes skip sampling and rendering while time and authored changes
   const sync = vi.spyOn(puppet, 'syncPose');
   try {
     state.setPreviewLoop(true);
+    state.setPlaybackSpeed(0.5);
     state.play();
     state.pause();
     state.beginScrub();
@@ -240,6 +241,97 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
     puppet.destroy();
   },
 );
+
+test.each([false, true])('authored FPS/mode immediately resample the held time with playing=%s', (playing) => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip: AnimationClip = {
+    name: 'move',
+    duration: 1000,
+    loop: false,
+    playback: { mode: 'stepped', fps: 10 },
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 1000, x: 100 },
+      ],
+    },
+  };
+  const before = JSON.stringify(clip);
+  const state = new AnimationEditorState(rig, [clip]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  state.setCurrentTime(0.25712345);
+  if (playing) state.play();
+  assert.equal(puppet.getBone('root').pose.x, 20);
+  state.setAuthoredFPS(20);
+  assert.equal(puppet.getBone('root').pose.x, 25);
+  assert.equal(puppet.getBone('root').container.x, 25);
+  assert.equal(state.currentTime, 0.25712345);
+  assert.equal(state.isPlaying, playing);
+  assert.isTrue(state.dirty);
+  assert.equal(JSON.stringify(clip), before);
+  state.setAuthoredPlaybackMode('smooth');
+  assert.approximately(puppet.getBone('root').pose.x, 25.712345, 1e-12);
+  state.setCurrentTime(0.26712345);
+  assert.approximately(puppet.getBone('root').pose.x, 26.712345, 1e-12);
+  state.undo();
+  assert.equal(puppet.getBone('root').pose.x, 25);
+  state.undo();
+  assert.equal(puppet.getBone('root').pose.x, 20);
+  assert.isFalse(state.dirty);
+  state.redo();
+  assert.equal(puppet.getBone('root').pose.x, 25);
+  const held = state.workingAnimation;
+  state.setAuthoredFPS(NaN);
+  assert.strictEqual(state.workingAnimation, held);
+  assert.equal(puppet.getBone('root').pose.x, 25);
+  preview.dispose();
+  puppet.destroy();
+});
+
+test.each([0.5, 1, 2])('%s× keeps a continuous 120 Hz clock while only stepped poses hold', (speed) => {
+  for (const mode of ['smooth', 'stepped'] as const) {
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const clip: AnimationClip = {
+      name: 'move',
+      duration: 2000,
+      loop: false,
+      playback: mode === 'smooth' ? { mode } : { mode, fps: 10 },
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 2000, x: 200 },
+        ],
+      },
+    };
+    const state = new AnimationEditorState(rig, [clip]);
+    state.selectAnimation('move');
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const runtime = new Puppet(puppetScene(), { rig, animations: [clip], autoUpdate: false });
+    runtime.play('move').pauseAnimation();
+    const preview = new AnimationEditorPreview(state, puppet);
+    const poses = new Set<number>();
+    state.setPlaybackSpeed(speed);
+    state.play();
+    let previous = state.currentTime;
+    for (let frame = 0; frame < 60; frame += 1) {
+      state.advancePlayback(1 / 120);
+      assert.isAbove(state.currentTime, previous);
+      previous = state.currentTime;
+      runtime.sampleAnimation(state.currentTime * 1000, { mode: 'playback' });
+      assert.deepEqual(puppet.getBone('root').pose, runtime.getBone('root').pose);
+      poses.add(puppet.getBone('root').pose.x);
+    }
+    assert.approximately(state.currentTime, 0.5 * speed, 1e-12);
+    if (mode === 'smooth') assert.equal(poses.size, 60);
+    else assert.isBelow(poses.size, 20);
+    assert.isFalse(state.dirty);
+    preview.dispose();
+    runtime.destroy();
+    puppet.destroy();
+  }
+});
 
 test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
   '$mode loop and playing scrubs evaluate poses without runtime advancement or events',

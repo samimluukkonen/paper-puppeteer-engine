@@ -128,7 +128,7 @@ src/devtools/rig-editor/
 src/devtools/animation-editor/
   main.ts              Animation editor page and Phaser bootstrap
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
-  AnimationEditorState.ts  Owned animation data, selection, continuous time, validation and authored history
+  AnimationEditorState.ts  Owned animation data, continuous clock, preview speed/loop, authored FPS/mode and history
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
   TimelineController.ts   Responsive ruler, pointer capture, keyboard navigation and status display
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
@@ -179,7 +179,7 @@ npm install /absolute/path/to/paper-puppeteer-engine
 import { Puppet, type RigDefinition, type AnimationClip } from 'paper-puppeteer-engine';
 ```
 
-`npm pack` validates the package version with `npm run check:version`, then rebuilds the library through the `prepack` hook before creating a tarball. Package versions use SemVer; milestone 0.5.2.2.2 is represented as `0.5.2-2.2`. Run `npm run test:package` to install that tarball into a temporary consumer and verify Node `/core` imports, public TypeScript APIs, and browser bundling. The check reuses installed dependencies offline and removes its temporary files afterward. CI runs it after the build. Core declarations receive a full type check; browser consumer types use the repository's `skipLibCheck` setting for Phaser declarations.
+`npm pack` validates the package version with `npm run check:version`, then rebuilds the library through the `prepack` hook before creating a tarball. Package versions use SemVer; milestone 0.5.2.2.3 is represented as `0.5.2-2.3`. Run `npm run test:package` to install that tarball into a temporary consumer and verify Node `/core` imports, public TypeScript APIs, and browser bundling. The check reuses installed dependencies offline and removes its temporary files afterward. CI runs it after the build. Core declarations receive a full type check; browser consumer types use the repository's `skipLibCheck` setting for Phaser declarations.
 
 The library includes TypeScript declarations and source maps. Zod is externalized and supplied through the package dependency, so consumers share its validation runtime and error classes. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
 
