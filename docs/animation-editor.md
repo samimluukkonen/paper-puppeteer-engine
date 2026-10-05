@@ -75,7 +75,7 @@ Deleting removes only the requested property. Rows with no remaining transform v
 
 Pure queries are `findBonePropertyKeyframe(animation, boneId, property, timeMs)` (a detached `{ time, value }` or `undefined`), `hasKeyframeAtTime(...)`, and `getKeyedPropertiesAtTime(animation, boneId, timeMs)` (in runtime property order). Missing keys and nonfinite query times produce an empty result.
 
-`getEvaluatedBonePropertyValue(animation, rig, boneId, property, timeMs)` uses renderer-independent `Joint` instances and the existing `AnimationPlayer`, compiling an event-free, nonlooping preview clip. It samples playback mode without advancing a clock or retaining an evaluated pose as authored data. Smooth interpolation and shortest-path rotation come from the runtime; stepped clips hold at authored FPS boundaries and retain the exact endpoint. Before the first property key and after its last, the runtime holds the nearest value. A wholly unkeyed property falls back to the rig bind pose. The result represents the animation's local transform before optional presets, IK, and facing. Invalid evaluation targets throw. This one-shot helper creates an isolated sampler per call.
+`getEvaluatedBonePropertyValue(animation, rig, boneId, property, timeMs)` uses the runtime pose buffer and playback quantization, compiling an event-free, nonlooping preview clip. `getEvaluatedBoneTransform(animation, rig, boneId, timeMs)` reads all five local properties together. Fully frozen animation snapshots cache compilation per rig and reuse pose evaluation within the same sampled frame; mutable or shallow-frozen caller data is validated and compiled afresh. Returned transforms are detached copies. Sampling never advances a clock or stores an evaluated pose as authored data. Smooth interpolation and shortest-path rotation come from the runtime; stepped clips hold at authored FPS boundaries and retain the exact endpoint. Before the first property key and after its last, the runtime holds the nearest value. A wholly unkeyed property falls back to the rig bind pose. Results represent the animation's local transform before optional presets, IK, and facing. Invalid evaluation targets throw.
 
 State methods use **seconds**, defaulting to `currentTime`:
 
@@ -86,6 +86,7 @@ state.findBonePropertyKeyframe(boneId, property, timeSeconds?)
 state.hasKeyframeAtTime(boneId, property, timeSeconds?)
 state.getKeyedPropertiesAtTime(boneId, timeSeconds?)
 state.getEvaluatedBonePropertyValue(boneId, property, timeSeconds?)
+state.getEvaluatedBoneTransform(boneId, timeSeconds?)
 ```
 
 The returned keyframe's `time` remains milliseconds. Mutation methods return success, including no-ops; invalid edits return `false` with validation issues and leave the working snapshot/history unchanged. Without selection, mutations return `false`, key/value lookups return `undefined`, and keyed-state queries return `false`/`[]`. Evaluation errors on a selected animation throw without changing session diagnostics.

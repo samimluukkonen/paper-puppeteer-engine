@@ -3,6 +3,7 @@ import { AnimationEditorState } from '../src/devtools/animation-editor/Animation
 import {
   findBonePropertyKeyframe,
   getEvaluatedBonePropertyValue,
+  getEvaluatedBoneTransform,
   getKeyedPropertiesAtTime,
   hasKeyframeAtTime,
   KEYFRAME_TIME_TOLERANCE_MS,
@@ -11,8 +12,9 @@ import {
   setBonePropertyKeyframe,
 } from '../src/devtools/animation-editor/keyframes.js';
 import { freezeData } from '../src/devtools/shared/editorData.js';
+import * as animationClip from '../src/engine/AnimationClip.js';
 import { type AnimationClip, compileClip } from '../src/engine/AnimationClip.js';
-import { evaluateClip } from '../src/engine/AnimationPose.js';
+import { ClipPoseBuffer, evaluateClip } from '../src/engine/AnimationPose.js';
 import { validateAnimationDefinition } from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
 import { type TransformProperty, transformProperties } from '../src/engine/types.js';
@@ -332,8 +334,99 @@ test('keyframe state APIs handle unloaded and unselected sessions', () => {
     assert.isFalse(state.removeBonePropertyKeyframe('root', 'x'));
     assert.isUndefined(state.findBonePropertyKeyframe('root', 'x'));
     assert.isUndefined(state.getEvaluatedBonePropertyValue('root', 'x'));
+    assert.isUndefined(state.getEvaluatedBoneTransform('root'));
     assert.isFalse(state.hasKeyframeAtTime('root', 'x'));
     assert.deepEqual(state.getKeyedPropertiesAtTime('root'), []);
     assert.isFalse(state.dirty);
+  }
+});
+
+test('frozen value queries share compilation and stepped-frame evaluation without exposing cached poses', () => {
+  const animation = freezeData(
+    clip({
+      playback: { mode: 'stepped', fps: 10 },
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 2000, x: 200 },
+        ],
+      },
+    }),
+  );
+  const compile = vi.spyOn(animationClip, 'compileClip');
+  const evaluate = vi.spyOn(ClipPoseBuffer.prototype, 'evaluate');
+  try {
+    const transform = getEvaluatedBoneTransform(animation, rig, 'root', 742);
+    assert.deepEqual(transform, { x: 70, y: 0, rotation: 0, scaleX: 1, scaleY: 2 });
+    for (const property of transformProperties)
+      assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'root', property, 749), transform[property]);
+    assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'child', 'y', 749), 12);
+    transform.x = -100;
+    assert.equal(getEvaluatedBoneTransform(animation, rig, 'root', 749).x, 70);
+    assert.equal(compile.mock.calls.length, 1);
+    assert.equal(evaluate.mock.calls.length, 1);
+    assert.deepEqual(compile.mock.calls[0]![0].events, []);
+    assert.isFalse(compile.mock.calls[0]![0].loop);
+
+    assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'root', 'x', 850), 80);
+    assert.equal(evaluate.mock.calls.length, 2);
+    assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'root', 'x', 749), 70);
+    assert.equal(evaluate.mock.calls.length, 3);
+    assert.equal(compile.mock.calls.length, 1);
+  } finally {
+    compile.mockRestore();
+    evaluate.mockRestore();
+  }
+});
+
+test.each([false, true])('mutable nested data stays fresh with shallow-frozen root=%s', (shallowFreeze) => {
+  const animation = clip({ tracks: { root: [{ time: 0, x: 10 }] } });
+  if (shallowFreeze) Object.freeze(animation);
+  assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'root', 'x', 0), 10);
+  animation.tracks.root![0]!.x = 20;
+  assert.equal(getEvaluatedBoneTransform(animation, rig, 'root', 0).x, 20);
+  (animation.events![0]!.data as { nested: unknown[] }).nested.push(() => 1);
+  assert.throws(() => getEvaluatedBonePropertyValue(animation, rig, 'root', 'x', 0), /JSON/);
+});
+
+test('cached queries remain independent across rigs, edits, selection, and undo/redo', () => {
+  const input = clip({ tracks: { root: [{ time: 0, x: 10 }] } });
+  const state = new AnimationEditorState(rig, [input, clip({ name: 'other', tracks: {} })]);
+  state.selectAnimation('move');
+  const listener = vi.fn();
+  state.subscribe(listener);
+  const compile = vi.spyOn(animationClip, 'compileClip');
+  try {
+    assert.equal(state.getEvaluatedBoneTransform('root')!.x, 10);
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 10);
+    assert.equal(compile.mock.calls.length, 1);
+    assert.equal(listener.mock.calls.length, 0);
+    const otherRig = new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root', scaleY: 3 },
+        { id: 'child', parent: 'root' },
+      ],
+    });
+    assert.equal(getEvaluatedBoneTransform(state.workingAnimation!, otherRig, 'root', 0).scaleY, 3);
+    assert.equal(state.getEvaluatedBoneTransform('root')!.scaleY, 2);
+    assert.equal(compile.mock.calls.length, 2);
+
+    state.setBonePropertyKeyframe('root', 'x', 20);
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 20);
+    assert.equal(compile.mock.calls.length, 3);
+    state.undo();
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 10);
+    state.redo();
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 20);
+    assert.equal(compile.mock.calls.length, 3);
+    state.undo();
+    state.selectAnimation('other');
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 4);
+    state.selectAnimation(null);
+    assert.isUndefined(state.getEvaluatedBoneTransform('root'));
+    assert.equal(input.tracks.root![0]!.x, 10);
+  } finally {
+    compile.mockRestore();
   }
 });

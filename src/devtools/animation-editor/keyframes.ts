@@ -1,11 +1,23 @@
-import { type AnimationClip, compileClip, type Keyframe, type PropertyKeyframe } from '../../engine/AnimationClip.js';
-import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
+import {
+  type AnimationClip,
+  type CompiledClip,
+  compileClip,
+  type Keyframe,
+  type PropertyKeyframe,
+} from '../../engine/AnimationClip.js';
+import { ClipPoseBuffer } from '../../engine/AnimationPose.js';
+import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/externalData.js';
-import { Joint } from '../../engine/Joint.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import { identifierSchema } from '../../engine/schemas.js';
-import { assertFinite, type TransformProperty, transformProperties } from '../../engine/types.js';
+import {
+  assertFinite,
+  createTransform,
+  type JointTransform,
+  type TransformProperty,
+  transformProperties,
+} from '../../engine/types.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;
 
@@ -65,12 +77,13 @@ function assertTarget(
   animation: AnimationData,
   rig: Rig,
   boneId: string,
-  property: TransformProperty,
+  property: TransformProperty | undefined,
   timeMs: number,
 ): number {
   identifierSchema.parse(boneId);
   rig.getBone(boneId);
-  if (!transformProperties.includes(property)) throw new Error(`Unknown transform property "${property}".`);
+  if (property !== undefined && !transformProperties.includes(property))
+    throw new Error(`Unknown transform property "${property}".`);
   assertFinite(timeMs, 'Keyframe time');
   if (
     (timeMs < 0 && !keyframeTimesMatch(timeMs, 0)) ||
@@ -138,9 +151,74 @@ export function removeBonePropertyKeyframe<Animation extends AnimationData>(
   return next;
 }
 
-/** Sample an absolute local value using the same event-free, nonlooping player as the preview.
- * Unkeyed properties fall back to the rig bind pose. No evaluated pose is retained or authored.
- */
+/** Reuses the runtime pose buffer and playback quantization without clocks, events, or IK. */
+class AnimationValueSampler {
+  private readonly clip: CompiledClip;
+  private readonly buffer = new ClipPoseBuffer();
+  private sampledTime: number | undefined;
+  private pose: ReturnType<ClipPoseBuffer['evaluate']> | undefined;
+
+  constructor(
+    animation: AnimationData,
+    private readonly rig: Rig,
+  ) {
+    const parsed = parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...animation }, rig);
+    this.clip = compileClip({ ...parsed, loop: false, events: [] }, rig);
+  }
+
+  sample(boneId: string, timeMs: number): JointTransform {
+    const time =
+      timeMs === this.clip.duration ? timeMs : quantizePlaybackTime(timeMs, this.clip.playback ?? { mode: 'smooth' });
+    // Repeated property queries at the same playback frame share one pose evaluation.
+    if (time !== this.sampledTime) {
+      this.pose = this.buffer.evaluate(this.clip, time);
+      this.sampledTime = time;
+    }
+    return { ...createTransform(this.rig.getBone(boneId)), ...this.pose?.get(boneId) };
+  }
+}
+
+const valueSamplers = new WeakMap<AnimationData, WeakMap<Rig, AnimationValueSampler>>();
+
+/** Readonly types or a shallow freeze alone do not prevent edits to nested caller data. */
+function isFullyFrozen(animation: AnimationData): boolean {
+  const pending: object[] = [animation];
+  while (pending.length) {
+    const value = pending.pop()!;
+    if (!Object.isFrozen(value)) return false;
+    for (const child of Object.values(value)) if (child !== null && typeof child === 'object') pending.push(child);
+  }
+  return true;
+}
+
+function valueSampler(animation: AnimationData, rig: Rig): AnimationValueSampler {
+  const cached = valueSamplers.get(animation)?.get(rig);
+  if (cached) return cached;
+  // Validate before inspecting nested data for cache eligibility. Mutable inputs remain fresh on every call.
+  const sampler = new AnimationValueSampler(animation, rig);
+  if (isFullyFrozen(animation)) {
+    let rigs = valueSamplers.get(animation);
+    if (!rigs) {
+      rigs = new WeakMap();
+      valueSamplers.set(animation, rigs);
+    }
+    rigs.set(rig, sampler);
+  }
+  return sampler;
+}
+
+/** Sample all absolute local properties together; returned values cannot mutate the cached pose. */
+export function getEvaluatedBoneTransform(
+  animation: AnimationData,
+  rig: Rig,
+  boneId: string,
+  timeMs: number,
+): JointTransform {
+  timeMs = assertTarget(animation, rig, boneId, undefined, timeMs);
+  return valueSampler(animation, rig).sample(boneId, timeMs);
+}
+
+/** Unkeyed properties use the rig bind pose. Fully frozen snapshots share compilation and evaluation. */
 export function getEvaluatedBonePropertyValue(
   animation: AnimationData,
   rig: Rig,
@@ -149,15 +227,5 @@ export function getEvaluatedBonePropertyValue(
   timeMs: number,
 ): number {
   timeMs = assertTarget(animation, rig, boneId, property, timeMs);
-  validate(animation, rig);
-  const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
-  const player = new AnimationPlayer(rig, joints, [compileClip({ ...animation, loop: false, events: [] }, rig)]);
-  try {
-    player.play(animation.name);
-    player.pause();
-    player.sample(timeMs, { mode: 'playback' });
-    return joints.get(boneId)!.pose[property];
-  } finally {
-    player.dispose();
-  }
+  return valueSampler(animation, rig).sample(boneId, timeMs)[property];
 }

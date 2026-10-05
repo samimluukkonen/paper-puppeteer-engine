@@ -7,12 +7,13 @@ import {
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { animationFileSchema } from '../../engine/schemas.js';
-import type { TransformProperty } from '../../engine/types.js';
+import type { JointTransform, TransformProperty } from '../../engine/types.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import {
   findBonePropertyKeyframe,
   getEvaluatedBonePropertyValue,
+  getEvaluatedBoneTransform,
   getKeyedPropertiesAtTime,
   hasKeyframeAtTime,
   removeBonePropertyKeyframe,
@@ -283,6 +284,12 @@ export class AnimationEditorState {
   ): number | undefined {
     return this.working && this.rig
       ? getEvaluatedBonePropertyValue(this.working, this.rig, boneId, property, timeSeconds * 1000)
+      : undefined;
+  }
+
+  getEvaluatedBoneTransform(boneId: string, timeSeconds = this.time): JointTransform | undefined {
+    return this.working && this.rig
+      ? getEvaluatedBoneTransform(this.working, this.rig, boneId, timeSeconds * 1000)
       : undefined;
   }
 
