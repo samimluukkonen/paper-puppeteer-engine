@@ -96,8 +96,8 @@ test('shutdown aborts metadata and prevents a late result from affecting a resta
   const fetcher = vi.fn().mockResolvedValue(new Response('{}'));
   vi.stubGlobal('fetch', fetcher);
   let release!: (value: CharacterDefinition) => void;
-  metadata.mockImplementationOnce(async (url, fetch) => {
-    await fetch!(url);
+  metadata.mockImplementationOnce(async (url, fetch, options) => {
+    await fetch!(url, { signal: options!.signal! });
     return new Promise((resolve) => {
       release = resolve;
     });

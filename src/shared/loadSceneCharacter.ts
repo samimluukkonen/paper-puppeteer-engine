@@ -26,7 +26,6 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
     };
     const fail = (error: unknown): void => {
       if (settled) return;
-      // Promise.all rejects before sibling metadata requests finish; cancel them before removing shutdown cleanup.
       controller.abort();
       cleanup();
       reject(error);
@@ -54,9 +53,9 @@ export function loadSceneCharacter(scene: Phaser.Scene, url: string): Promise<Ch
     const load = async (): Promise<void> => {
       // Scene.create() runs before Phaser marks the scene active; check after fetching instead.
       // Authoring views reload frequently after replacing rig and animation files.
-      definition = await CharacterLoader.load(url, (input, init) =>
-        fetch(input, { ...init, cache: 'no-store', signal: controller.signal }),
-      );
+      definition = await CharacterLoader.load(url, (input, init) => fetch(input, { ...init, cache: 'no-store' }), {
+        signal: controller.signal,
+      });
       if (settled) return;
       if (!scene.sys.isActive()) {
         succeed();

@@ -26,6 +26,7 @@ export {
   characterManifestSchema,
   validateCharacterDefinition,
 } from './CharacterDefinition.js';
+export type { CharacterLoadOptions } from './CharacterLoader.js';
 export { CharacterLoader } from './CharacterLoader.js';
 export type {
   AnimationJsonDefinition,

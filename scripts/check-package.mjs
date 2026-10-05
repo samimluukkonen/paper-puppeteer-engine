@@ -55,8 +55,12 @@ try {
   await writeFile(
     join(consumer, 'core.ts'),
     `
-import { AnimationPlayer, Joint, Rig, compileClip, evaluateClip } from 'paper-puppeteer-engine/core';
-import type { AnimationClip, CharacterDefinition, CompiledClip, DeepReadonly, RigJsonDefinition } from 'paper-puppeteer-engine/core';
+import { AnimationPlayer, CharacterLoader, Joint, Rig, compileClip, evaluateClip } from 'paper-puppeteer-engine/core';
+import type { AnimationClip, CharacterDefinition, CharacterLoadOptions, CompiledClip, DeepReadonly, RigJsonDefinition } from 'paper-puppeteer-engine/core';
+
+export function loadCharacter(url: string, options: CharacterLoadOptions): Promise<CharacterDefinition> {
+  return CharacterLoader.load(url, undefined, options);
+}
 
 export function sample(): number | undefined {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });

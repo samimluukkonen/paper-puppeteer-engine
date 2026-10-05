@@ -36,6 +36,12 @@ scene.load.once(Phaser.Loader.Events.COMPLETE, () => {
 scene.load.start();
 ```
 
+Metadata loads accept an optional third argument, `CharacterLoadOptions`. Use
+`CharacterLoader.load(url, fetch, { signal: controller.signal })` with an `AbortController` to cancel
+the manifest and its related files. A failed metadata request also cancels sibling requests and
+preserves the original error. Custom fetch implementations remain supported as the second argument;
+they must honor `RequestInit.signal` to cancel pending I/O.
+
 For Phaser `preload`, custom pipelines, generated content, or tests, pass already parsed values to `CharacterDefinition.fromData({ manifest, rig, skins, animations, poses }, optionalManifestUrl)`. The `skins`, `animations`, and `poses` objects are indexed by the paths in the manifest. `queueCharacterTextures` skips texture keys already loaded in the scene, so an app can preload an atlas itself. `definition.textureUrl(key)` resolves a key to a URL when given a manifest URL; without one it returns the authored path. `new Puppet(scene, { rig, animations, poses, skin })` and TypeScript-authored rigs and clips continue to work.
 
 Character assembly preserves skins embedded in the rig. A standalone skin declared in the manifest replaces an embedded skin with the same name; embedded skins with other names remain available at runtime. `definition.standaloneSkins` exposes immutable manifest-owned skins separately from `definition.rig.skins`, which contains the merged runtime selection. The original rig file retains its authored skin definitions for editor reloads and exports, and editor previews use the same precedence as runtime.
