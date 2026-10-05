@@ -31,6 +31,8 @@ export class AnimationEditorState {
   private selectedId: string | null = null;
   private time = 0;
   private playing = false;
+  private previewLoopEnabled = false;
+  private scrubbing = false;
   private saved = '';
   private issues: readonly ValidationIssue[] = [];
   private readonly snapshots = new WeakMap<ReadonlyAnimation, string>();
@@ -67,6 +69,12 @@ export class AnimationEditorState {
   }
   get isPlaying(): boolean {
     return this.playing;
+  }
+  get previewLoop(): boolean {
+    return this.previewLoopEnabled;
+  }
+  get isScrubbing(): boolean {
+    return this.scrubbing;
   }
   get loop(): boolean {
     return this.working?.loop ?? false;
@@ -142,6 +150,7 @@ export class AnimationEditorState {
     this.selectedId = id;
     this.time = 0;
     this.playing = false;
+    this.scrubbing = false;
     this.issues = [];
     this.saved = this.snapshot;
     this.history = this.createHistory();
@@ -151,10 +160,32 @@ export class AnimationEditorState {
 
   setCurrentTime(time: number): void {
     const next = clampTime(time, this.duration);
-    const playing = this.playing && next < this.duration;
+    const playing = this.playing && this.duration > 0 && (this.scrubbing || this.previewLoop || next < this.duration);
     if (next === this.time && playing === this.playing) return;
     this.time = next;
     this.playing = playing;
+    this.notify();
+  }
+
+  /** Preview preferences stay outside authored data and history. */
+  setPreviewLoop(loop: boolean): void {
+    if (loop === this.previewLoopEnabled) return;
+    this.previewLoopEnabled = loop;
+    if (!loop && !this.scrubbing && this.time >= this.duration) this.playing = false;
+    this.notify();
+  }
+
+  /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
+  beginScrub(): void {
+    if (this.scrubbing || !this.working) return;
+    this.scrubbing = true;
+    this.notify();
+  }
+
+  endScrub(): void {
+    if (!this.scrubbing) return;
+    this.scrubbing = false;
+    if (!(this.duration > 0) || (!this.previewLoop && this.time >= this.duration)) this.playing = false;
     this.notify();
   }
 
@@ -184,8 +215,16 @@ export class AnimationEditorState {
 
   /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
   advancePlayback(deltaSeconds: number): void {
-    if (!this.playing || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
-    this.setCurrentTime(this.time + deltaSeconds);
+    if (!this.playing || this.scrubbing || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
+    const duration = this.duration;
+    if (!(duration > 0)) {
+      this.setCurrentTime(0);
+      return;
+    }
+    // Reduce large deltas before addition so they cannot overflow or swallow the held time.
+    this.setCurrentTime(
+      this.previewLoop ? (this.time + (deltaSeconds % duration)) % duration : this.time + deltaSeconds,
+    );
   }
 
   /** Future authoring boundary: validate atomically, own a fresh JSON copy, and record one authored edit. */

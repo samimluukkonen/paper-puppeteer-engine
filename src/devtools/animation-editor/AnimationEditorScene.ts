@@ -28,6 +28,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       ++this.loadSession;
       this.state?.pause();
+      this.state?.endScrub();
       this.state = undefined;
       this.preview?.dispose();
       this.preview = undefined;

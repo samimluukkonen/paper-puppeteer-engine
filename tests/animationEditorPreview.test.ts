@@ -191,3 +191,60 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
     puppet.destroy();
   },
 );
+
+test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
+  '$mode loop and playing scrubs evaluate poses without runtime advancement or events',
+  (playback) => {
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const clip: AnimationClip = {
+      name: 'move',
+      duration: 2000,
+      loop: false,
+      playback,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 2000, x: 200 },
+        ],
+      },
+      events: [
+        { time: 0, name: 'start' },
+        { time: 1000, name: 'middle' },
+      ],
+    };
+    const state = new AnimationEditorState(rig, [clip, { ...clip, name: 'other', tracks: {} }]);
+    state.selectAnimation('move');
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const preview = new AnimationEditorPreview(state, puppet);
+    const event = vi.fn();
+    const runtime = Reflect.get(preview, 'player') as import('../src/engine/AnimationPlayer.js').AnimationPlayer;
+    runtime.onAnimationEvent(event);
+    const update = vi.spyOn(runtime, 'update');
+    state.setPreviewLoop(true);
+    state.play();
+    state.advancePlayback(2.5);
+    assert.equal(puppet.getBone('root').pose.x, 50);
+    state.beginScrub();
+    for (const time of [1.5, 0.5, 2, 0]) {
+      state.setCurrentTime(time);
+      assert.equal(puppet.getBone('root').pose.x, time * 100);
+      state.advancePlayback(50);
+      assert.equal(puppet.getBone('root').pose.x, time * 100);
+    }
+    state.endScrub();
+    state.advancePlayback(10.5);
+    assert.equal(puppet.getBone('root').pose.x, 50);
+    assert.equal(puppet.getBone('root').container.x, 50);
+    assert.equal(event.mock.calls.length, 0);
+    assert.equal(update.mock.calls.length, 0);
+    assert.isFalse(state.dirty);
+    state.selectAnimation('other');
+    assert.isFalse(state.isPlaying);
+    assert.equal(state.currentTime, 0);
+    assert.equal(puppet.getBone('root').pose.x, 0);
+    state.advancePlayback(1);
+    assert.equal(puppet.getBone('root').pose.x, 0);
+    preview.dispose();
+    puppet.destroy();
+  },
+);

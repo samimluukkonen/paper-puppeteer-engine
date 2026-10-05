@@ -293,3 +293,150 @@ test('playback advances without measuring layout or rewriting unchanged timeline
   await page.locator('#play-pause').click();
   await expect(page.locator('#play-pause')).toHaveText('Play');
 });
+
+test('loop preview repeats, remains a preference across selection, and stops at the endpoint when disabled', async ({
+  page,
+}) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      json: {
+        ...(await response.json()),
+        duration: 400,
+        loop: false,
+        events: [],
+        tracks: {
+          root: [
+            { time: 0, x: 0 },
+            { time: 400, x: 40 },
+          ],
+        },
+      },
+    });
+  });
+  await openEditor(page);
+  const loop = page.getByRole('button', { name: 'Loop preview', exact: true });
+  const playPause = page.locator('#play-pause');
+  const timeline = page.locator('#timeline');
+  await expect(loop).toHaveAttribute('aria-pressed', 'false');
+  await loop.click();
+  await expect(loop).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#animation-metadata')).toContainText('Authored loop: off · Playback: loop');
+  await playPause.click();
+  const wraps = await timeline.evaluate(async (element) => {
+    let previous = Number(element.getAttribute('aria-valuenow'));
+    let count = 0;
+    return await new Promise<number>((resolve) => {
+      const finish = () => {
+        observer.disconnect();
+        clearTimeout(timeout);
+        resolve(count);
+      };
+      const observer = new MutationObserver(() => {
+        const current = Number(element.getAttribute('aria-valuenow'));
+        if (current < previous) count += 1;
+        previous = current;
+        if (count >= 3) finish();
+      });
+      const timeout = setTimeout(finish, 5000);
+      observer.observe(element, { attributes: true, attributeFilter: ['aria-valuenow'] });
+    });
+  });
+  expect(wraps).toBe(3);
+  await expect(playPause).toHaveText('Pause');
+  await loop.click();
+  await expect(playPause).toHaveText('Play');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0.4');
+  await loop.click();
+  await playPause.click();
+  await page.locator('#animation-selection').selectOption('walk');
+  await expect(playPause).toHaveText('Play');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(loop).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.screenshot({ path: test.info().outputPath('animation-loop-preview.png'), fullPage: true });
+});
+
+test('playing drag owns time and pose until release; paused drag remains paused', async ({ page }) => {
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  const playPause = page.locator('#play-pause');
+  const canvas = page.locator('#animation-stage canvas');
+  const loop = page.locator('#preview-loop');
+  const time = async () => Number(await timeline.getAttribute('aria-valuenow'));
+  const box = await timeline.boundingBox();
+  if (!box) throw new Error('Missing timeline bounds.');
+  await loop.click();
+  await playPause.click();
+  await page.mouse.move(box.x + box.width * 0.25, box.y + 50);
+  await page.mouse.down();
+  await expect(page.locator('#animation-metadata')).toContainText('Scrubbing');
+  const held = await time();
+  const pose = await canvas.screenshot();
+  await page.waitForTimeout(200);
+  expect(await time()).toBe(held);
+  expect((await canvas.screenshot()).equals(pose)).toBe(true);
+  await page.mouse.move(box.x + box.width * 0.6, box.y + 50, { steps: 5 });
+  const moved = await time();
+  expect(moved).toBeCloseTo(1.8 * 0.6, 2);
+  expect((await canvas.screenshot()).equals(pose)).toBe(false);
+  await page.waitForTimeout(150);
+  expect(await time()).toBe(moved);
+  await page.mouse.up();
+  await expect(playPause).toHaveText('Pause');
+  await expect.poll(time).toBeGreaterThan(moved);
+  await playPause.click();
+  await page.mouse.move(box.x + box.width * 0.3, box.y + 50);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width + 15, box.y + 70);
+  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await expect(playPause).toHaveText('Play');
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
+
+test('selection during a playing drag releases the old pointer without resuming the new animation', async ({
+  page,
+}) => {
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  const box = await timeline.boundingBox();
+  if (!box) throw new Error('Missing timeline bounds.');
+  await page.locator('#play-pause').click();
+  await page.mouse.move(box.x + box.width * 0.4, box.y + 50);
+  await page.mouse.down();
+  await expect(page.locator('#animation-metadata')).toContainText('Scrubbing');
+  await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#play-pause')).toHaveText('Play');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await page.mouse.move(box.x + box.width * 0.7, box.y + 50);
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#animation-metadata')).not.toContainText('Scrubbing');
+});
+
+for (const ending of ['pointercancel', 'lostpointercapture', 'blur'] as const) {
+  test(`${ending} ends a playing drag and restores advancement`, async ({ page }) => {
+    await openEditor(page);
+    const timeline = page.locator('#timeline');
+    await page.locator('#preview-loop').click();
+    await page.locator('#play-pause').click();
+    const box = await timeline.boundingBox();
+    if (!box) throw new Error('Missing timeline bounds.');
+    await page.mouse.move(box.x + box.width * 0.3, box.y + 50);
+    await page.mouse.down();
+    const held = Number(await timeline.getAttribute('aria-valuenow'));
+    await timeline.evaluate((element, eventName) => {
+      if (eventName === 'blur') window.dispatchEvent(new Event('blur'));
+      else element.dispatchEvent(new PointerEvent(eventName, { pointerId: 1, bubbles: true }));
+    }, ending);
+    await expect(page.locator('#animation-metadata')).not.toContainText('Scrubbing');
+    await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).toBeGreaterThan(held);
+    await page.mouse.up();
+    await expect(page.locator('#play-pause')).toHaveText('Pause');
+    await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  });
+}

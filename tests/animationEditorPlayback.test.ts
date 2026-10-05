@@ -172,3 +172,149 @@ test('shortening duration and history restoration clamp and stop playback', () =
   assert.equal(state.currentTime, 1);
   assert.isFalse(state.isPlaying);
 });
+
+test.each([
+  { start: 1.75, delta: 0.25, expected: 0 },
+  { start: 1.9, delta: 0.3, expected: 0.2 },
+  { start: 1.9, delta: 10.3, expected: 0.2 },
+  { start: 0.25, delta: 2_000_000.5, expected: 0.75 },
+  { start: 0.25, delta: Number.MAX_VALUE, expected: 0.25 },
+])('preview loop preserves overshoot for $start + $delta', ({ start, delta, expected }) => {
+  const state = session();
+  state.setPreviewLoop(true);
+  state.setCurrentTime(start);
+  state.play();
+  state.advancePlayback(delta);
+  assert.approximately(state.currentTime, expected, 1e-10);
+  assert.isTrue(Number.isFinite(state.currentTime));
+  assert.isTrue(state.isPlaying);
+});
+
+test('repeated loops preserve elapsed time rather than losing overshoot', () => {
+  const state = session();
+  state.setPreviewLoop(true);
+  state.play();
+  for (let frame = 0; frame < 1000; frame += 1) state.advancePlayback(0.03);
+  assert.approximately(state.currentTime, 0, 1e-10);
+  assert.isTrue(state.isPlaying);
+  state.setPreviewLoop(false);
+  state.advancePlayback(10);
+  assert.equal(state.currentTime, 2);
+  assert.isFalse(state.isPlaying);
+});
+
+test.each([false, true])('scrubbing suspends advancement and restores playing=%s', (playing) => {
+  const state = session();
+  state.setCurrentTime(0.4);
+  if (playing) state.play();
+  state.beginScrub();
+  state.beginScrub(); // A duplicate pointer-down must not overwrite playback intent.
+  assert.isTrue(state.isScrubbing);
+  state.advancePlayback(10);
+  assert.equal(state.currentTime, 0.4);
+  state.setCurrentTime(1.3);
+  state.advancePlayback(100);
+  assert.equal(state.currentTime, 1.3);
+  state.endScrub();
+  state.endScrub();
+  assert.isFalse(state.isScrubbing);
+  assert.equal(state.isPlaying, playing);
+  state.advancePlayback(0.2);
+  assert.approximately(state.currentTime, playing ? 1.5 : 1.3, 1e-12);
+});
+
+test.each([false, true])('release at the endpoint stops once or resumes loop=%s', (loop) => {
+  const state = session();
+  state.setPreviewLoop(loop);
+  state.play();
+  state.beginScrub();
+  state.setCurrentTime(2);
+  assert.isTrue(state.isPlaying);
+  state.advancePlayback(0.5);
+  assert.equal(state.currentTime, 2);
+  state.endScrub();
+  assert.equal(state.isPlaying, loop);
+  state.advancePlayback(0.5);
+  assert.equal(state.currentTime, loop ? 0.5 : 2);
+});
+
+test('explicit pause during a playing scrub cancels automatic resume', () => {
+  const state = session();
+  state.play();
+  state.beginScrub();
+  state.pause();
+  state.setCurrentTime(0.5);
+  state.endScrub();
+  state.advancePlayback(1);
+  assert.equal(state.currentTime, 0.5);
+  assert.isFalse(state.isPlaying);
+});
+
+test('switching during a playing scrub clears drag and playback while preserving the loop preference', () => {
+  const state = new AnimationEditorState(rig, [clip, { ...clip, name: 'other', duration: 3000 }]);
+  state.selectAnimation('move');
+  state.setPreviewLoop(true);
+  state.play();
+  state.beginScrub();
+  state.setCurrentTime(1.3);
+  assert.isFalse(state.selectAnimation('missing'));
+  assert.isTrue(state.isScrubbing);
+  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.selectAnimation('other'));
+  assert.equal(state.duration, 3);
+  assert.equal(state.currentTime, 0);
+  assert.equal(state.workingAnimation!.name, 'other');
+  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.isScrubbing);
+  assert.isTrue(state.previewLoop);
+  state.endScrub();
+  state.advancePlayback(1);
+  assert.equal(state.currentTime, 0);
+});
+
+test.each([false, true])('looping and scrubbing preserve snapshots, history and dirty=%s', (dirty) => {
+  const input = JSON.stringify(clip);
+  const state = session();
+  if (dirty) state.replaceWorkingAnimation({ ...clip, version: 1, duration: 3000 });
+  const source = state.sourceAnimation;
+  const working = state.workingAnimation;
+  const snapshot = JSON.stringify(working);
+  const history = state.historyLength;
+  for (const action of [
+    () => state.setPreviewLoop(true),
+    () => state.play(),
+    () => state.advancePlayback(100.3),
+    () => state.beginScrub(),
+    () => state.setCurrentTime(0.7),
+    () => state.advancePlayback(Number.MAX_VALUE),
+    () => state.endScrub(),
+    () => state.advancePlayback(100.3),
+    () => state.setPreviewLoop(false),
+    () => state.pause(),
+    () => state.beginScrub(),
+    () => state.setCurrentTime(1),
+    () => state.endScrub(),
+  ]) {
+    action();
+    assert.equal(state.dirty, dirty);
+    assert.equal(state.historyLength, history);
+    assert.strictEqual(state.sourceAnimation, source);
+    assert.strictEqual(state.workingAnimation, working);
+    assert.equal(JSON.stringify(working), snapshot);
+    assert.equal(JSON.stringify(clip), input);
+  }
+});
+
+test('loop and scrub commands on a zero-length session keep time finite and playback stopped', () => {
+  const state = new AnimationEditorState(rig, [{ ...clip, duration: 0, tracks: {}, events: [] }]);
+  assert.isFalse(state.selectAnimation('move'));
+  state.setPreviewLoop(true);
+  state.beginScrub();
+  state.setCurrentTime(Infinity);
+  state.play();
+  state.advancePlayback(Number.MAX_VALUE);
+  state.endScrub();
+  assert.equal(state.currentTime, 0);
+  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.isScrubbing);
+});

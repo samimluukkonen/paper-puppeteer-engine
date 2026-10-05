@@ -25,7 +25,7 @@ export class AnimationEditorPreview {
         ? new AnimationPlayer(
             this.puppet.rig,
             new Map(this.puppet.rig.bones.map((bone) => [bone.id, this.puppet.getBone(bone.id)])),
-            // Editor playback is non-looping, including the evaluator's exact stepped endpoint.
+            // The editor clock owns wrapping; sampling must retain the exact stepped endpoint for scrubs.
             [compileClip({ ...animation, loop: false }, this.puppet.rig)],
           )
         : undefined;

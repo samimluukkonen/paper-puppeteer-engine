@@ -38,7 +38,11 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
   assert.equal(state.currentTime, 0.25);
   scene.update(99999, 125);
   assert.equal(state.currentTime, 0.375);
+  state.beginScrub();
   scene.events.emit('shutdown');
+  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.isScrubbing);
+  state.endScrub();
   assert.isFalse(state.isPlaying);
   assert.isUndefined(Reflect.get(scene, 'state'));
   assert.equal(dispose.mock.calls.length, 1);

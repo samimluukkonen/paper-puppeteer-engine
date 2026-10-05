@@ -75,6 +75,10 @@ a {
 .timeline-inset {
   margin: 0 24px;
 }
+#preview-loop[aria-pressed="true"] {
+  color: #f8f5ec;
+  background: #39574b;
+}
 #timeline {
   position: relative;
   height: 110px;

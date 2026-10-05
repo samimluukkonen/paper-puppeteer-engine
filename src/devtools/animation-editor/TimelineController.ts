@@ -25,6 +25,7 @@ export class TimelineController {
   private readonly status: HTMLElement;
   private readonly reset: HTMLButtonElement;
   private readonly playPause: HTMLButtonElement;
+  private readonly loop: HTMLButtonElement;
   private readonly dirty: HTMLElement;
   private pointer: number | undefined;
   private width = 0;
@@ -41,6 +42,7 @@ export class TimelineController {
     this.status = this.element('#animation-status');
     this.reset = this.element<HTMLButtonElement>('#reset-time');
     this.playPause = this.element<HTMLButtonElement>('#play-pause');
+    this.loop = this.element<HTMLButtonElement>('#preview-loop');
     this.dirty = this.element('#animation-dirty');
     const options = { signal: this.abort.signal };
     this.selection.addEventListener(
@@ -53,6 +55,7 @@ export class TimelineController {
     );
     this.reset.addEventListener('click', () => this.state.restart(), options);
     this.playPause.addEventListener('click', () => this.state.togglePlayback(), options);
+    this.loop.addEventListener('click', () => this.state.setPreviewLoop(!this.state.previewLoop), options);
     window.addEventListener(
       'keydown',
       (event) => {
@@ -80,6 +83,7 @@ export class TimelineController {
         this.timeline.focus();
         this.pointer = event.pointerId;
         this.timeline.setPointerCapture(event.pointerId);
+        this.state.beginScrub();
         this.scrub(event.clientX);
       },
       options,
@@ -153,9 +157,9 @@ export class TimelineController {
   }
 
   bind(state: AnimationEditorState, characterId?: string): void {
+    this.state.pause();
     this.endScrub();
     this.unsubscribe?.();
-    this.state.pause();
     this.state = state;
     this.externalError = '';
     const empty = new Option('No animation selected', '');
@@ -179,10 +183,12 @@ export class TimelineController {
     const pointer = this.pointer;
     this.pointer = undefined;
     if (pointer !== undefined && this.timeline.hasPointerCapture(pointer)) this.timeline.releasePointerCapture(pointer);
+    this.state.endScrub();
   }
 
   private render(): void {
     const state = this.state;
+    if (this.pointer !== undefined && !state.isScrubbing) this.endScrub();
     const animation = state.workingAnimation;
     const width = this.width;
     const rulerKey = `${state.duration}:${width}`;
@@ -219,12 +225,14 @@ export class TimelineController {
     const playDisabled = !animation || !(state.duration > 0);
     if (this.playPause.disabled !== playDisabled) this.playPause.disabled = playDisabled;
     setText(this.playPause, state.isPlaying ? 'Pause' : 'Play');
+    if (this.loop.disabled !== !animation) this.loop.disabled = !animation;
+    setAttribute(this.loop, 'aria-pressed', String(state.previewLoop));
     setText(this.timeDisplay, `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`);
     const playback = animation?.playback;
     setText(
       this.metadata,
       animation
-        ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: once · ${state.isPlaying ? 'Playing' : 'Paused'}`
+        ? `Mode: ${playback?.mode ?? 'smooth'} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.previewLoop ? 'loop' : 'once'} · ${state.isScrubbing ? 'Scrubbing' : state.isPlaying ? 'Playing' : 'Paused'}`
         : 'Select an animation to preview its pose.',
     );
     setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
@@ -244,10 +252,10 @@ export class TimelineController {
   }
 
   dispose(): void {
+    this.state.pause();
     this.endScrub();
     this.abort.abort();
     this.resize.disconnect();
     this.unsubscribe?.();
-    this.state.pause();
   }
 }
