@@ -246,6 +246,25 @@ test('Space toggles playback once and leaves typing targets alone', async ({ pag
   await expect(timeline).toHaveAttribute('aria-valuenow', '0');
 });
 
+test('Space activates focused Restart and Loop preview buttons without toggling playback', async ({ page }) => {
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  const playPause = page.locator('#play-pause');
+  await timeline.press('End');
+  await page.locator('#reset-time').focus();
+  await page.keyboard.press('Space');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(playPause).toHaveText('Play');
+  const loop = page.locator('#preview-loop');
+  await loop.focus();
+  await page.keyboard.press('Space');
+  await expect(loop).toHaveAttribute('aria-pressed', 'true');
+  await expect(playPause).toHaveText('Play');
+  await page.keyboard.press('Space');
+  await expect(loop).toHaveAttribute('aria-pressed', 'false');
+  await expect(playPause).toHaveText('Play');
+});
+
 test('playback advances without measuring layout or rewriting unchanged timeline controls', async ({ page }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
