@@ -107,6 +107,7 @@ export class RigEditorInputController {
   }
 
   private keyDown = (event: KeyboardEvent): void => {
+    if (event.defaultPrevented || event.isComposing) return;
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
       if (isTypingTarget(event.target)) return;
       event.preventDefault();
