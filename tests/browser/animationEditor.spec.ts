@@ -137,25 +137,24 @@ test('no animations and no selection show safe empty timelines', async ({ page }
 });
 
 test('preview speeds scale browser playback while remaining transient across selection', async ({ page }) => {
+  await page.clock.install({ time: new Date('2030-01-01T00:00:00Z') });
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
     await route.fulfill({ json: { ...(await response.json()), duration: 60_000 } });
   });
   await openEditor(page);
+  await page.clock.pauseAt(new Date('2030-01-01T01:00:00Z'));
+  // Feed regular frames through Phaser's delta history before measuring playback.
+  await page.clock.runFor(1000);
   await expect(page.locator('#playback-speed')).toHaveValue('1');
   for (const speed of [0.5, 1, 2]) {
     await page.locator('#playback-speed').selectOption(String(speed));
     await page.locator('#play-pause').click();
-    const measured = await page.locator('#timeline').evaluate(async (element) => {
-      const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      await frame();
-      const start = performance.now();
-      const initial = Number(element.getAttribute('aria-valuenow'));
-      while (performance.now() - start < 350) await frame();
-      return (Number(element.getAttribute('aria-valuenow')) - initial) / ((performance.now() - start) / 1000);
-    });
-    expect(measured).toBeGreaterThan(speed * 0.75);
-    expect(measured).toBeLessThan(speed * 1.25);
+    const timeline = page.locator('#timeline');
+    const initial = Number(await timeline.getAttribute('aria-valuenow'));
+    await page.clock.runFor(1000);
+    const advancement = Number(await timeline.getAttribute('aria-valuenow')) - initial;
+    expect(advancement).toBeCloseTo(speed, 1);
     await page.locator('#play-pause').click();
     await expect(page.locator('#animation-metadata')).toContainText(`Speed: ${speed}×`);
     await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
