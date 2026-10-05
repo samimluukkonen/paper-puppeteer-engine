@@ -389,3 +389,172 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
     puppet.destroy();
   },
 );
+
+test.each([0.5, 1])('preview preserves optional IK, presets and facing through recompilation (mix=%s)', (mix) => {
+  const rig = new Rig({
+    root: 'root',
+    bones: [
+      { id: 'root' },
+      { id: 'upper', parent: 'root', y: 10 },
+      { id: 'lower', parent: 'upper', y: 60 },
+      { id: 'hand', parent: 'lower', y: 50 },
+    ],
+  });
+  const clip: AnimationClip = {
+    name: 'move',
+    duration: 1000,
+    loop: false,
+    playback: { mode: 'smooth' },
+    tracks: {
+      upper: [
+        { time: 0, rotation: 0.1 },
+        { time: 1000, rotation: 0.9 },
+      ],
+    },
+  };
+  const before = JSON.stringify(clip);
+  const state = new AnimationEditorState(rig, [clip, { ...clip, name: 'sparse', tracks: {} }]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const runtime = new Puppet(puppetScene(), { rig, animations: [clip], autoUpdate: false });
+  const configure = (host: Puppet) => {
+    host.addPose({ version: 1, name: 'preset', bones: { upper: { x: 20 } } }).applyPose('preset', { mix: 0.5 });
+    const constraint = host.addIK({ name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand', mix });
+    constraint.setTargetProvider(() => {
+      // Providers run after pose processing and skeleton projection, in the mirrored world space.
+      assert.equal(host.getBone('upper').container.x, 10);
+      return { x: host.facingDirection === 'left' ? -60 : 60, y: 70 };
+    });
+    return constraint;
+  };
+  const constraint = configure(puppet);
+  configure(runtime);
+  runtime.play('move').pauseAnimation();
+  const preview = new AnimationEditorPreview(state, puppet);
+  for (const facing of ['right', 'left', 'right'] as const) {
+    puppet.setFacing(facing);
+    runtime.setFacing(facing);
+    state.restart();
+    state.play();
+    for (const delta of [0.1, 0.2, 0.4]) {
+      state.advancePlayback(delta);
+      runtime.sampleAnimation(state.currentTime * 1000, { mode: 'playback' });
+      assert.isTrue(constraint.enabled);
+      assert.equal(constraint.status, 'solved');
+      for (const bone of rig.bones) {
+        assert.deepEqual(puppet.getBone(bone.id).pose, runtime.getBone(bone.id).pose);
+        const actual = puppet.getBone(bone.id).container.getWorldTransformMatrix().transformPoint(0, 0);
+        const expected = runtime.getBone(bone.id).container.getWorldTransformMatrix().transformPoint(0, 0);
+        assert.approximately(actual.x, expected.x, 1e-9);
+        assert.approximately(actual.y, expected.y, 1e-9);
+      }
+    }
+    state.pause();
+    const pose = { ...puppet.getBone('upper').pose };
+    puppet.syncPose();
+    assert.deepEqual(puppet.getBone('upper').pose, pose, 'partial IK/preset mix must not accumulate');
+  }
+  state.setAuthoredPlaybackMode('stepped');
+  state.setAuthoredFPS(20);
+  state.undo();
+  state.undo();
+  assert.isTrue(constraint.enabled);
+  assert.equal(constraint.status, 'solved');
+  state.selectAnimation('sparse');
+  assert.isTrue(constraint.enabled);
+  assert.equal(constraint.status, 'solved');
+  assert.equal(puppet.getBone('upper').pose.x, 10, 'preset survives sparse selection');
+  constraint.enabled = false;
+  state.selectAnimation('move');
+  assert.isFalse(constraint.enabled, 'selection preserves disabled constraints too');
+  assert.equal(puppet.getBone('upper').pose.rotation, 0.1);
+  state.selectAnimation(null);
+  assert.isFalse(constraint.enabled);
+  assert.equal(puppet.getBone('upper').pose.rotation, 0);
+  assert.equal(puppet.getBone('upper').pose.x, 10);
+  assert.equal(JSON.stringify(clip), before);
+  assert.deepEqual(state.sourceAnimation, null);
+  assert.isFalse(state.dirty);
+  preview.dispose();
+  puppet.destroy();
+  runtime.destroy();
+});
+
+test('pose-only preview suppresses start, middle and end events across restart, loops and recompilation', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip: AnimationClip = {
+    name: 'move',
+    duration: 1000,
+    loop: true,
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 1000, x: 100 },
+      ],
+    },
+    events: [
+      { time: 0, name: 'start', data: { gameplay: true } },
+      { time: 500, name: 'middle' },
+      { time: 1000, name: 'end' },
+    ],
+  };
+  const before = JSON.stringify(clip);
+  const state = new AnimationEditorState(rig, [clip]);
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const event = vi.fn();
+  const complete = vi.fn();
+  const originalPlay = AnimationPlayer.prototype.play;
+  // Attach before initialization to catch time-zero events as well as later pose sampling.
+  const play = vi.spyOn(AnimationPlayer.prototype, 'play').mockImplementation(function (
+    this: AnimationPlayer,
+    ...args
+  ) {
+    this.onAnimationEvent(event);
+    this.onAnimationComplete(complete);
+    originalPlay.apply(this, args);
+  });
+  const update = vi.spyOn(AnimationPlayer.prototype, 'update');
+  const preview = new AnimationEditorPreview(state, puppet);
+  try {
+    state.selectAnimation('move');
+    state.play();
+    state.advancePlayback(2);
+    state.restart();
+    state.setPreviewLoop(true);
+    state.play();
+    state.advancePlayback(100.5);
+    state.beginScrub();
+    for (const time of [1, 0, 0.5, 0, 1]) state.setCurrentTime(time);
+    state.endScrub();
+    state.restart();
+    state.setAuthoredPlaybackMode('stepped');
+    state.setAuthoredFPS(20);
+    state.undo();
+    state.redo();
+    state.undo();
+    state.undo();
+    state.selectAnimation('move');
+    state.selectAnimation(null);
+    assert.equal(event.mock.calls.length, 0);
+    assert.equal(complete.mock.calls.length, 0);
+    assert.equal(update.mock.calls.length, 0);
+    assert.isAbove(play.mock.calls.length, 4, 'exercise initialization and multiple recompilations');
+    assert.equal(JSON.stringify(clip), before);
+    assert.isFalse(state.dirty);
+  } finally {
+    play.mockRestore();
+    update.mockRestore();
+    preview.dispose();
+    puppet.destroy();
+  }
+  // Runtime event dispatch remains intact for the same caller-owned clip.
+  const runtime = new Puppet(puppetScene(), { rig, animations: [clip], autoUpdate: false });
+  runtime.onAnimationEvent(event);
+  runtime.play('move');
+  runtime.update(1000);
+  assert.deepEqual(
+    event.mock.calls.map(([marker]) => marker.name),
+    ['start', 'middle', 'start', 'end'],
+  );
+  runtime.destroy();
+});

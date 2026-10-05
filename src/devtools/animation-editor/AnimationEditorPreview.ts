@@ -12,7 +12,7 @@ export class AnimationEditorPreview {
 
   constructor(
     private readonly state: AnimationEditorState,
-    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'resetToBindPose'>,
+    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose'>,
   ) {
     this.refresh();
     this.unsubscribe = state.subscribe(() => this.refresh());
@@ -29,16 +29,19 @@ export class AnimationEditorPreview {
             this.puppet.rig,
             new Map(this.puppet.rig.bones.map((bone) => [bone.id, this.puppet.getBone(bone.id)])),
             // The editor clock owns wrapping; sampling must retain the exact stepped endpoint for scrubs.
-            [compileClip({ ...animation, loop: false }, this.puppet.rig)],
+            // Preview is pose-only, including initialization/recompilation at time-zero event markers.
+            [compileClip({ ...animation, loop: false, events: [] }, this.puppet.rig)],
           )
         : undefined;
       this.player?.dispose();
-      this.puppet.resetToBindPose();
+      // Reset sparse animation properties without clearing pose presets or disabling optional IK.
+      this.puppet.preparePose();
+      for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
       this.player = next;
       this.animation = animation;
-      if (animation) {
-        next!.play(animation.name);
-        next!.pause();
+      if (next && animation) {
+        next.play(animation.name);
+        next.pause();
       }
     }
     this.player?.sample(time * 1000, { mode: 'playback' }, () => this.puppet.preparePose());

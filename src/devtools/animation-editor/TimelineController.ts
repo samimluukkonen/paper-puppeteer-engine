@@ -91,19 +91,22 @@ export class TimelineController {
       'keydown',
       (event) => {
         if (
-          event.code !== 'Space' ||
+          (event.code !== 'Space' && event.key !== 'Home') ||
           event.defaultPrevented ||
           event.isComposing ||
           event.altKey ||
           event.ctrlKey ||
           event.metaKey ||
           isTypingTarget(event.target) ||
-          (event.target instanceof Element && event.target.closest('button, a[href]')) ||
+          (event.code === 'Space' && event.target instanceof Element && event.target.closest('button, a[href]')) ||
           !this.state.workingAnimation
         )
           return;
         event.preventDefault();
-        if (!event.repeat) this.state.togglePlayback();
+        if (!event.repeat) {
+          if (event.key === 'Home') this.state.restart();
+          else this.state.togglePlayback();
+        }
       },
       options,
     );
@@ -155,18 +158,25 @@ export class TimelineController {
     this.timeline.addEventListener(
       'keydown',
       (event) => {
-        if (!this.state.workingAnimation) return;
+        if (
+          !this.state.workingAnimation ||
+          event.defaultPrevented ||
+          event.isComposing ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          isTypingTarget(event.target)
+        )
+          return;
         const step = event.shiftKey ? 0.1 : 0.01;
         const time =
-          event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? this.state.duration
-              : event.key === 'ArrowLeft'
-                ? this.state.currentTime - step
-                : event.key === 'ArrowRight'
-                  ? this.state.currentTime + step
-                  : undefined;
+          event.key === 'End'
+            ? this.state.duration
+            : event.key === 'ArrowLeft'
+              ? this.state.currentTime - step
+              : event.key === 'ArrowRight'
+                ? this.state.currentTime + step
+                : undefined;
         if (time === undefined) return;
         event.preventDefault();
         this.state.setCurrentTime(time);

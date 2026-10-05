@@ -1,6 +1,6 @@
 /** Editor coordinates use continuous seconds; external clips and the runtime use milliseconds. */
 export function animationDurationSeconds(animation: { readonly duration: number } | null): number {
-  return animation ? Math.max(0, animation.duration / 1000) : 0;
+  return animation && Number.isFinite(animation.duration) ? Math.max(0, animation.duration / 1000) : 0;
 }
 
 export function clampTime(time: number, duration: number): number {

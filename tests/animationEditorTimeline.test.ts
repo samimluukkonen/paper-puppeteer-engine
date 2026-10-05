@@ -75,3 +75,10 @@ test('ruler includes major labels, minor subdivisions and a single exact end mar
   assert.lengthOf(generateRulerTicks(0, 800), 1);
   assert.lengthOf(generateRulerTicks(2, 0), 1);
 });
+
+test.each([NaN, Infinity, -Infinity, -1])(
+  'invalid explicit duration %s becomes an empty finite timeline',
+  (duration) => {
+    assert.equal(animationDurationSeconds({ duration }), 0);
+  },
+);

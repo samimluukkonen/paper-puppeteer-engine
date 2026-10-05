@@ -359,3 +359,67 @@ test('loop and scrub commands on a zero-length session keep time finite and play
   assert.isFalse(state.isPlaying);
   assert.isFalse(state.isScrubbing);
 });
+
+test.each([0.000001, 3_600_000, Number.MAX_VALUE])(
+  'short/long duration %s stays finite across playback edges',
+  (duration) => {
+    const state = new AnimationEditorState(rig, [{ ...clip, duration, tracks: {}, events: [] }]);
+    assert.isTrue(state.selectAnimation('move'));
+    for (const loop of [false, true]) {
+      state.setPreviewLoop(loop);
+      for (const speed of [0.25, 1, 2]) {
+        state.setPlaybackSpeed(speed);
+        state.restart();
+        state.play();
+        state.advancePlayback(state.duration / (4 * speed));
+        assert.approximately(state.currentTime / state.duration, 0.25, 1e-12);
+        state.beginScrub();
+        state.setCurrentTime(Infinity);
+        state.advancePlayback(Number.MAX_VALUE);
+        assert.equal(state.currentTime, state.duration);
+        state.endScrub();
+        assert.equal(state.isPlaying, loop);
+        state.advancePlayback(Number.MAX_VALUE);
+        assert.isTrue(Number.isFinite(state.currentTime));
+        assert.isTrue(state.currentTime >= 0 && state.currentTime <= state.duration);
+        assert.equal(state.isPlaying, loop);
+        state.pause();
+      }
+    }
+    assert.isFalse(state.dirty);
+    assert.equal(state.historyLength, 0);
+  },
+);
+
+test('repeated commands and animation switches leave one coherent transient session', () => {
+  const state = new AnimationEditorState(rig, [clip, { ...clip, name: 'other' }]);
+  const before = JSON.stringify(clip);
+  for (let iteration = 0; iteration < 100; iteration += 1) {
+    assert.isTrue(state.selectAnimation(iteration % 2 ? 'move' : 'other'));
+    assert.equal(state.currentTime, 0);
+    assert.isFalse(state.isPlaying);
+    state.play();
+    state.play();
+    state.setPreviewLoop(true);
+    state.setPreviewLoop(true);
+    state.advancePlayback(20.25);
+    assert.equal(state.currentTime, 0.25);
+    state.pause();
+    state.pause();
+    state.togglePlayback();
+    state.restart();
+    assert.equal(state.currentTime, 0);
+    assert.isTrue(state.isPlaying);
+    state.beginScrub();
+    state.setCurrentTime(state.duration);
+    state.setPreviewLoop(false);
+    state.setPreviewLoop(false);
+    assert.isTrue(state.isPlaying);
+    state.endScrub();
+    assert.isFalse(state.isPlaying);
+    assert.equal(state.currentTime, state.duration);
+    assert.isFalse(state.dirty);
+    assert.equal(state.historyLength, 0);
+  }
+  assert.equal(JSON.stringify(clip), before);
+});

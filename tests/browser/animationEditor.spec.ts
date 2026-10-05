@@ -613,3 +613,107 @@ for (const ending of ['pointercancel', 'lostpointercapture', 'blur'] as const) {
     await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   });
 }
+
+test('Home rewinds from outside the timeline, preserves playback, and ignores typing and modified keys', async ({
+  page,
+}) => {
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  const playPause = page.locator('#play-pause');
+  await timeline.press('End');
+  await page.locator('#preview-loop').focus();
+  await page.keyboard.press('Home');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(playPause).toHaveText('Play');
+  await timeline.press('Shift+ArrowRight');
+  for (const key of ['Control+Home', 'Alt+Home', 'Meta+Home', 'Control+ArrowRight', 'Alt+End']) {
+    // Dispatch avoids triggering browser navigation shortcuts while exercising editor guards.
+    await timeline.dispatchEvent('keydown', {
+      key: key.split('+')[1],
+      code: key.split('+')[1],
+      ctrlKey: key.startsWith('Control'),
+      altKey: key.startsWith('Alt'),
+      metaKey: key.startsWith('Meta'),
+      bubbles: true,
+    });
+    await expect(timeline).toHaveAttribute('aria-valuenow', '0.1');
+  }
+  await timeline.dispatchEvent('keydown', { key: 'Home', code: 'Home', isComposing: true, bubbles: true });
+  await timeline.dispatchEvent('keydown', { key: 'ArrowRight', isComposing: true, bubbles: true });
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0.1');
+  await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.id = 'home-typing';
+    host.innerHTML =
+      '<input type="number"><textarea></textarea><div contenteditable="true"><span>Editable</span></div>';
+    document.body.append(host);
+  });
+  for (const target of [
+    '#animation-selection',
+    '#playback-speed',
+    '#home-typing input',
+    '#home-typing textarea',
+    '#home-typing span',
+  ]) {
+    await page.locator(target).dispatchEvent('keydown', { key: 'Home', code: 'Home', bubbles: true });
+    await expect(timeline).toHaveAttribute('aria-valuenow', '0.1');
+  }
+  await page.locator('#home-typing').evaluate((element) => element.remove());
+  await timeline.press('End');
+  await timeline.press('ArrowLeft');
+  await page.locator('#preview-loop').click();
+  await playPause.click();
+  await playPause.focus();
+  await page.keyboard.press('Home');
+  await expect(playPause).toHaveText('Pause');
+  await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).toBeLessThan(0.5);
+  await playPause.click();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.locator('#animation-selection').selectOption('');
+  await timeline.press('Home');
+  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(playPause).toBeDisabled();
+});
+
+test('repeated animation switches reset playback and time while retaining transient preferences', async ({ page }) => {
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  const playPause = page.locator('#play-pause');
+  await page.locator('#preview-loop').click();
+  await page.locator('#playback-speed').selectOption('2');
+  for (const animation of ['walk', 'idle', '', 'walk', 'idle', '', 'idle']) {
+    if (!(await playPause.isDisabled())) await playPause.click();
+    await page.locator('#animation-selection').selectOption(animation);
+    await expect(playPause).toHaveText('Play');
+    await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+    await expect(page.locator('#preview-loop')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#playback-speed')).toHaveValue('2');
+    await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  }
+});
+
+test('hiding the page releases a playing scrub and resumes after visibility returns', async ({ page }) => {
+  await openEditor(page);
+  const timeline = page.locator('#timeline');
+  await page.locator('#preview-loop').click();
+  await page.locator('#play-pause').click();
+  const box = await timeline.boundingBox();
+  if (!box) throw new Error('Missing timeline bounds.');
+  await page.mouse.move(box.x + box.width * 0.2, box.y + 50);
+  await page.mouse.down();
+  const held = Number(await timeline.getAttribute('aria-valuenow'));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.locator('#animation-metadata')).not.toContainText('Scrubbing');
+  await page.mouse.up();
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document, 'hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.locator('#play-pause')).toHaveText('Pause');
+  await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).toBeGreaterThan(held);
+  await page.locator('#play-pause').click();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
