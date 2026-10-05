@@ -28,6 +28,39 @@ test('editor routes and the demo remain linked under the deployment base', async
   await expect(page.locator('#status-text')).toContainText('Current: idle');
 });
 
+test('unsaved animation settings protect navigation, refresh, and character selection until undone', async ({
+  page,
+}) => {
+  await openEditor(page);
+  await page.locator('#animation-mode').selectOption('stepped');
+  await page.locator('#animation-fps').fill('12');
+  await page.locator('#animation-fps').press('Tab');
+  await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  const dismissNavigation = async (): Promise<void> => {
+    const dialog = await page.waitForEvent('dialog');
+    expect(dialog.type()).toBe('beforeunload');
+    await dialog.dismiss();
+  };
+  await Promise.all([dismissNavigation(), page.getByRole('link', { name: 'Rig Editor', exact: true }).click()]);
+  await Promise.all([
+    dismissNavigation(),
+    page.evaluate(() => {
+      setTimeout(() => window.location.reload(), 0);
+    }),
+  ]);
+  await Promise.all([
+    dismissNavigation(),
+    page.locator('#character-selection').selectOption('random-paperdoll-sketch'),
+  ]);
+  await expect(page.locator('#character-selection')).toHaveValue('demo-puppet');
+  await expect(page.locator('#animation-fps')).toHaveValue('12');
+  await page.locator('#animation-undo').click();
+  await page.locator('#animation-undo').click();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.locator('#character-selection').selectOption('random-paperdoll-sketch');
+  await expect(page.locator('#character-status')).toHaveText('Character: random-paperdoll-sketch');
+});
+
 test('ruler, current time, selection and scrubbed artwork update without dirtying', async ({ page }) => {
   await openEditor(page);
   await page.screenshot({ path: test.info().outputPath('animation-editor-desktop.png'), fullPage: true });

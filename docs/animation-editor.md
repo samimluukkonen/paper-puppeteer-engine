@@ -16,6 +16,8 @@ The ruler adapts to duration and available width, with major labels, minor ticks
 
 **Undo** and **Redo** restore authored settings through the existing snapshot history and refresh the preview. Settings changes mark the working animation dirty when it differs from the saved baseline. The original source remains immutable. Animation switching preserves a dirty working copy and reports the issue; undo edits back to the baseline before switching. Saving/exporting animation data remains deferred.
 
+Mode/FPS edits also protect page navigation, refresh, closing, and character selection with the browser's unsaved-change confirmation. Undo the edits before leaving to avoid discarding them. Preview navigation and playback preferences do not trigger this confirmation.
+
 ## Data and preview ownership
 
 `AnimationEditorState` is independent of Phaser and the DOM. It owns a frozen source snapshot and saved baseline per animation and a separately cloned working animation in the existing versioned file format. `markSaved()` retains the selected animation's working data across selection changes while keeping its original source untouched. Explicitly discarding changes restores the last saved baseline on the next selection. Caller-owned character animations remain untouched. Editor-only selection, time, playback, speed, preview loop preference, scrubbing, validation issues, and history stay outside the serialized data. Authored FPS/mode use the existing `playback` union; no schema or engine changes are needed. `subscribe()` connects external state changes to the preview and UI.

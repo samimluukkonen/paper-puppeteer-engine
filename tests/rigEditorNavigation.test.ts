@@ -1,5 +1,5 @@
 import { afterEach, assert, test, vi } from 'vitest';
-import { protectUnsavedChanges } from '../src/devtools/rig-editor/protectUnsavedChanges.js';
+import { protectUnsavedChanges } from '../src/devtools/shared/protectUnsavedChanges.js';
 
 afterEach(() => vi.unstubAllGlobals());
 

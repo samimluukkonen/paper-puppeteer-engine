@@ -182,6 +182,10 @@ export class TimelineController {
     this.bind(this.state);
   }
 
+  get hasUnsavedChanges(): boolean {
+    return this.state.dirty;
+  }
+
   private element<T extends HTMLElement = HTMLElement>(selector: string): T {
     const element = this.app.querySelector<T>(selector);
     if (!element) throw new Error(`Missing animation editor element ${selector}.`);

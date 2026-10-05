@@ -1,6 +1,7 @@
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { viewHeader } from '../../ui/viewShell.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { TimelineController } from './TimelineController.js';
@@ -24,6 +25,7 @@ app.innerHTML = `
 
 const releaseCharacterSelection = bindCharacterSelection(app);
 const timeline = new TimelineController(app);
+const releaseNavigationGuard = protectUnsavedChanges(() => timeline.hasUnsavedChanges);
 const scene = new AnimationEditorScene(
   (state, id) => timeline.bind(state, id),
   (message) => timeline.showError(message),
@@ -32,6 +34,7 @@ const scene = new AnimationEditorScene(
 const game = createEditorGame('animation-stage', scene);
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
+    releaseNavigationGuard();
     timeline.dispose();
     releaseCharacterSelection();
     game.destroy(true);

@@ -1,11 +1,11 @@
 import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { createControlsController } from './ControlsController.js';
 import { mountEditorMarkup } from './editorMarkup.js';
 import { createHierarchyController } from './HierarchyController.js';
 import { createInspectorController } from './InspectorController.js';
-import { protectUnsavedChanges } from './protectUnsavedChanges.js';
 import type { RigEditor } from './RigEditor.js';
 import { RigEditorScene } from './RigEditorScene.js';
 import { createSessionController } from './SessionController.js';
