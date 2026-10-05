@@ -5,6 +5,7 @@ import { DemoScene, type DemoState } from '../src/demo/DemoScene.js';
 import { type DemoCharacterProfile, demoPuppetProfile, resolveDemoClip } from '../src/demo/demoCharacterProfiles.js';
 import { demoIK } from '../src/demo/demoIK.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
+import type { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
@@ -293,4 +294,60 @@ test('a character load failure after shutdown does not create scene objects', as
   reject(new Error('Late failure'));
   await Promise.resolve();
   assert.equal(text.mock.calls.length, 0);
+});
+
+test.each([
+  ['result', 'before'],
+  ['result', 'after'],
+  ['error', 'before'],
+  ['error', 'after'],
+] as const)('an old load %s settled %s restart cannot affect the replacement scene', async (outcome, timing) => {
+  let resolveOld!: (definition: CharacterDefinition) => void;
+  let rejectOld!: (error: Error) => void;
+  let resolveCurrent!: (definition: CharacterDefinition) => void;
+  vi.mocked(loadSceneCharacter)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          resolveOld = resolve;
+          rejectOld = reject;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCurrent = resolve;
+        }),
+    );
+  const scene = new DemoScene(vi.fn());
+  const install = vi.fn();
+  Reflect.set(scene, 'createPuppet', install);
+  const text = vi.spyOn(scene.add, 'text');
+  const settleOld = () => {
+    if (outcome === 'result') resolveOld({ id: 'old' } as CharacterDefinition);
+    else rejectOld(new Error('Old failure'));
+  };
+  scene.create();
+  if (timing === 'before') settleOld();
+  scene.events.emit('shutdown');
+  scene.create();
+  if (timing === 'after') settleOld();
+  await Promise.resolve();
+  assert.equal(install.mock.calls.length, 0);
+  assert.equal(text.mock.calls.length, 0);
+
+  const current = { id: 'current' } as CharacterDefinition;
+  resolveCurrent(current);
+  await Promise.resolve();
+  assert.deepEqual(install.mock.calls, [[current]]);
+});
+
+test('current character load failures still display the error in the active demo', async () => {
+  vi.mocked(loadSceneCharacter).mockRejectedValueOnce(new Error('Current failure'));
+  const scene = new DemoScene(vi.fn());
+  const text = vi.spyOn(scene.add, 'text');
+  scene.create();
+  await Promise.resolve();
+  assert.equal(text.mock.calls.length, 1);
+  assert.include(text.mock.calls[0]![2], 'Current failure');
 });

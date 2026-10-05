@@ -55,6 +55,7 @@ export class DemoScene extends Phaser.Scene {
   private helmet = false;
   private profile: DemoCharacterProfile = demoPuppetProfile;
   private commandDepth = 0;
+  private loadSession = 0;
   private readonly prepareAnimationPose = (): void => this.presentation?.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.updatePresentation(true);
 
@@ -70,22 +71,24 @@ export class DemoScene extends Phaser.Scene {
   }
 
   create(): void {
+    const session = ++this.loadSession;
     // Phaser reuses this scene instance across restarts, but destroys its objects.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      ++this.loadSession;
       this.puppet = undefined;
       this.presentation = undefined;
       this.authoring = undefined;
       this.controls = undefined;
     });
-    void this.loadCharacter();
+    void this.loadCharacter(session);
   }
 
-  private async loadCharacter(): Promise<void> {
+  private async loadCharacter(session: number): Promise<void> {
     try {
       const definition = await loadSceneCharacter(this, this.characterUrl);
-      if (definition && this.sys.isActive()) this.createPuppet(definition);
+      if (definition && session === this.loadSession && this.sys.isActive()) this.createPuppet(definition);
     } catch (error) {
-      if (this.sys.isActive()) this.showLoadError(String(error));
+      if (session === this.loadSession && this.sys.isActive()) this.showLoadError(String(error));
     }
   }
 
