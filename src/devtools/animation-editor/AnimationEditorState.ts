@@ -146,19 +146,24 @@ export class AnimationEditorState {
   }
 
   setCurrentTime(time: number): void {
+    if (this.updateTime(time)) this.notify();
+  }
+
+  /** Clamp navigation and authored edits using the same loop and scrub playback intent. */
+  private updateTime(time: number): boolean {
     const next = clampTime(time, this.duration);
     const playing = this.playing && this.duration > 0 && (this.scrubbing || this.previewLoop || next < this.duration);
-    if (next === this.time && playing === this.playing) return;
+    if (next === this.time && playing === this.playing) return false;
     this.time = next;
     this.playing = playing;
-    this.notify();
+    return true;
   }
 
   /** Preview preferences stay outside authored data and history. */
   setPreviewLoop(loop: boolean): void {
     if (loop === this.previewLoopEnabled) return;
     this.previewLoopEnabled = loop;
-    if (!loop && !this.scrubbing && this.time >= this.duration) this.playing = false;
+    this.updateTime(this.time);
     this.notify();
   }
 
@@ -172,7 +177,7 @@ export class AnimationEditorState {
   endScrub(): void {
     if (!this.scrubbing) return;
     this.scrubbing = false;
-    if (!(this.duration > 0) || (!this.previewLoop && this.time >= this.duration)) this.playing = false;
+    this.updateTime(this.time);
     this.notify();
   }
 
@@ -239,8 +244,7 @@ export class AnimationEditorState {
         this.cachedDirty = undefined;
       });
     }
-    this.time = clampTime(this.time, this.duration);
-    if (this.time >= this.duration) this.playing = false;
+    this.updateTime(this.time);
     this.notify();
     return true;
   }
@@ -259,8 +263,7 @@ export class AnimationEditorState {
       (entry) => {
         this.working = entry;
         this.cachedDirty = undefined;
-        this.time = clampTime(this.time, this.duration);
-        if (this.time >= this.duration) this.playing = false;
+        this.updateTime(this.time);
       },
       equalEditorData,
     );

@@ -173,6 +173,47 @@ test('shortening duration and history restoration clamp and stop playback', () =
   assert.isFalse(state.isPlaying);
 });
 
+const endpointCases = [false, true].flatMap((loop) => [false, true].map((scrubbing) => ({ loop, scrubbing })));
+
+test.each(endpointCases)(
+  'authored edits and undo/redo retain endpoint playback intent with loop=$loop, scrubbing=$scrubbing',
+  ({ loop, scrubbing }) => {
+    for (const operation of ['edit', 'undo', 'redo'] as const) {
+      const state = session();
+      const short = { ...clip, version: 1, duration: 1000, tracks: {}, events: [] };
+      if (operation === 'undo') state.replaceWorkingAnimation({ ...short, duration: 3000 });
+      if (operation === 'redo') {
+        state.replaceWorkingAnimation(short);
+        state.undo();
+      }
+      state.setPreviewLoop(loop);
+      state.play();
+      if (scrubbing) state.beginScrub();
+      state.setCurrentTime(operation === 'undo' ? 2.5 : 1.5);
+      if (operation === 'edit') state.replaceWorkingAnimation(short);
+      else state[operation]();
+      assert.equal(state.currentTime, state.duration);
+      assert.equal(state.isPlaying, loop || scrubbing, operation);
+      state.endScrub();
+      assert.equal(state.isPlaying, loop, operation);
+      state.advancePlayback(0.1);
+      assert.approximately(state.currentTime, loop ? 0.1 : state.duration, 1e-12);
+    }
+  },
+);
+
+test('equivalent replacement at a looping endpoint preserves playback and history', () => {
+  const state = session();
+  state.setPreviewLoop(true);
+  state.play();
+  state.setCurrentTime(state.duration);
+  state.replaceWorkingAnimation(structuredClone(state.workingAnimation));
+  assert.isTrue(state.isPlaying);
+  assert.equal(state.historyLength, 0);
+  state.advancePlayback(0.1);
+  assert.approximately(state.currentTime, 0.1, 1e-12);
+});
+
 test.each([
   { start: 1.75, delta: 0.25, expected: 0 },
   { start: 1.9, delta: 0.3, expected: 0.2 },
