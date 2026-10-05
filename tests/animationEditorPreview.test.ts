@@ -611,3 +611,94 @@ test('pose-only preview suppresses start, middle and end events across restart, 
   );
   runtime.destroy();
 });
+
+test.each(['right', 'left'] as const)(
+  'temporary local values and keys remain pre-IK and canonical when facing %s',
+  (facing) => {
+    const rig = new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root', x: 100, rotation: 0.3, scaleX: 1.1 },
+        { id: 'upper', parent: 'root', x: 10, y: 20, rotation: 0.2 },
+        { id: 'lower', parent: 'upper', y: 60 },
+        { id: 'hand', parent: 'lower', y: 50 },
+      ],
+    });
+    const clip: AnimationClip = { name: 'move', duration: 2000, loop: false, tracks: {} };
+    const state = new AnimationEditorState(rig, [clip]);
+    state.selectAnimation('move');
+    state.setCurrentTime(0.5);
+    state.selectBone('lower');
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false, facing });
+    const constraint = puppet.addIK({ name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand' });
+    constraint.setTarget({ x: facing === 'right' ? 150 : -150, y: 90 });
+    const preview = new AnimationEditorPreview(state, puppet);
+    const before = JSON.stringify(clip);
+    const bind = { ...puppet.getBone('lower').bindPose };
+    state.setTemporaryBoneProperty('rotation', 0.7);
+    state.setTemporaryBoneProperty('x', 9);
+    assert.equal(state.selectedBoneTransform!.rotation, 0.7);
+    assert.equal(state.selectedBoneTransform!.x, 9);
+    assert.notEqual(puppet.getBone('lower').pose.rotation, 0.7, 'IK corrects the rendered rotation');
+    assert.equal(puppet.getBone('lower').pose.x, 9);
+    assert.equal(constraint.status, 'solved');
+    assert.isFalse(state.dirty);
+    state.commitBoneProperty('rotation');
+    assert.deepEqual(state.findBonePropertyKeyframe('lower', 'rotation'), { time: 500, value: 0.7 });
+    assert.deepEqual(state.getKeyedPropertiesAtTime('lower'), ['rotation']);
+    assert.approximately(state.selectedBoneTransform!.rotation, 0.7, 1e-12);
+    // Cancel also restores a draft property that the player does not own.
+    state.cancelTransformEdit();
+    assert.equal(puppet.getBone('lower').pose.x, 0);
+    constraint.enabled = false;
+    puppet.syncPose();
+    assert.approximately(puppet.getBone('lower').pose.rotation, 0.7, 1e-12);
+    state.setTemporaryBoneProperty('y', 75);
+    state.commitBoneProperty('y');
+    assert.equal(puppet.getBone('lower').pose.y, 75);
+    assert.equal(puppet.getBone('lower').container.y, 75);
+    assert.deepEqual(puppet.getBone('lower').bindPose, bind);
+    state.setCurrentTime(1.2);
+    state.setCurrentTime(0.5);
+    assert.approximately(puppet.getBone('lower').pose.rotation, 0.7, 1e-12);
+    state.deleteBonePropertyKey('rotation');
+    assert.equal(state.selectedBoneTransform!.rotation, 0);
+    assert.equal(puppet.getBone('lower').pose.rotation, 0);
+    assert.deepEqual(state.getKeyedPropertiesAtTime('lower'), ['y']);
+    assert.equal(JSON.stringify(clip), before);
+    assert.deepEqual(state.sourceAnimation!.tracks, {});
+    preview.dispose();
+    puppet.destroy();
+  },
+);
+
+test('draft cancellation, selection, navigation and Play restore untracked preview properties immediately', () => {
+  const rig = new Rig({
+    root: 'root',
+    bones: [
+      { id: 'root', x: 4 },
+      { id: 'child', parent: 'root', y: 20 },
+    ],
+  });
+  const state = new AnimationEditorState(rig, [{ name: 'move', duration: 2000, loop: false, tracks: {} }]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  state.selectBone('root');
+  state.setTemporaryBoneProperty('x', 10);
+  assert.equal(puppet.getBone('root').pose.x, 10);
+  state.cancelTransformEdit();
+  assert.equal(puppet.getBone('root').pose.x, 4);
+  state.setTemporaryBoneProperty('x', 10);
+  state.selectBone('child');
+  assert.equal(puppet.getBone('root').pose.x, 4);
+  state.setTemporaryBoneProperty('y', 50);
+  state.setCurrentTime(0.5);
+  assert.equal(puppet.getBone('child').pose.y, 20);
+  state.setTemporaryBoneProperty('y', 50);
+  state.play();
+  assert.equal(puppet.getBone('child').pose.y, 20);
+  assert.isFalse(state.dirty);
+  preview.dispose();
+  puppet.destroy();
+});

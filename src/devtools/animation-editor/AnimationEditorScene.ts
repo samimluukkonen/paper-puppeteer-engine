@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
+import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
+import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
@@ -7,6 +9,7 @@ import { AnimationEditorState } from './AnimationEditorState.js';
 export interface AnimationEditorSceneOptions {
   /** Resolved relative to the editor document, including when served under a base path. */
   readonly characterUrl?: string;
+  readonly ikChains?: readonly TwoBoneIKDefinition[];
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
@@ -14,6 +17,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   private preview: AnimationEditorPreview | undefined;
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
+  private selectionOverlay: Phaser.GameObjects.Graphics | undefined;
 
   constructor(
     private readonly onReady: (state: AnimationEditorState, characterId: string) => void,
@@ -30,6 +34,9 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state?.pause();
       this.state?.endScrub();
       this.state = undefined;
+      this.input?.off('pointerdown', this.selectPreviewBone, this);
+      this.selectionOverlay?.destroy();
+      this.selectionOverlay = undefined;
       this.preview?.dispose();
       this.preview = undefined;
       this.puppet?.destroy();
@@ -40,6 +47,52 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.state?.advancePlayback(delta / 1000);
+    const overlay = this.selectionOverlay;
+    overlay?.clear();
+    if (overlay && this.puppet && this.state?.selectedBoneId) {
+      const point = this.puppet.getBone(this.state.selectedBoneId).getWorldPosition();
+      overlay.lineStyle(3, 0xb7543a).strokeCircle(point.x, point.y, 10);
+    }
+  }
+
+  private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
+    if (!this.puppet || !this.state || pointer.button !== 0) return;
+    let nearest: string | undefined;
+    let distance = 12;
+    for (const bone of this.puppet.rig.bones) {
+      const point = this.puppet.getBone(bone.id).getWorldPosition();
+      const next = Math.hypot(point.x - pointer.worldX, point.y - pointer.worldY);
+      if (next < distance) {
+        distance = next;
+        nearest = bone.id;
+      }
+    }
+    if (nearest) this.state.selectBone(nearest);
+  }
+
+  setFacing(facing: Facing): void {
+    this.puppet?.setFacing(facing);
+  }
+
+  setBonesVisible(visible: boolean): void {
+    this.puppet?.setDebug(visible);
+  }
+
+  /** Pin current end joints in canonical puppet space; mirroring only changes their world projection. */
+  setIKPreview(enabled: boolean): void {
+    const puppet = this.puppet;
+    if (!puppet) return;
+    puppet.preparePose();
+    for (const chain of this.options.ikChains ?? []) {
+      const constraint = puppet.getIK(chain.name);
+      if (enabled) {
+        const point = puppet.getBone(chain.endBone).getWorldPosition();
+        const local = puppet.container.getWorldTransformMatrix().applyInverse(point.x, point.y);
+        constraint.setTargetProvider(() => puppet.container.getWorldTransformMatrix().transformPoint(local.x, local.y));
+      }
+      constraint.enabled = enabled;
+    }
+    puppet.syncPose();
   }
 
   private async loadCharacter(session: number): Promise<void> {
@@ -60,13 +113,20 @@ export class AnimationEditorScene extends Phaser.Scene {
         x: 380,
         y: 435,
         autoUpdate: false,
+        debug: true,
+        ik: (this.options.ikChains ?? []).map((chain) => ({ ...chain, enabled: false })),
       });
       preview = new AnimationEditorPreview(state, puppet);
       this.puppet = puppet;
       this.preview = preview;
       this.state = state;
+      this.selectionOverlay = this.add.graphics();
+      this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
     } catch (error) {
+      this.input?.off('pointerdown', this.selectPreviewBone, this);
+      this.selectionOverlay?.destroy();
+      this.selectionOverlay = undefined;
       preview?.dispose();
       puppet?.destroy();
       this.preview = undefined;

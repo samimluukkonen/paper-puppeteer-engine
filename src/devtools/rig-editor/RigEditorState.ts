@@ -13,7 +13,7 @@ import type {
   SpriteAttachmentDefinition,
   TransformProperty,
 } from '../../engine/types.js';
-
+import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { serializeRigData } from './rigSerialization.js';
@@ -470,15 +470,6 @@ export class RigEditorState {
   }
 
   hierarchy(): readonly { id: string; depth: number }[] {
-    const rows: { id: string; depth: number }[] = [];
-    const pending = [{ id: this.rig.root, depth: 0 }];
-    while (pending.length) {
-      const row = pending.pop()!;
-      rows.push(row);
-      const children = this.childrenOf(row.id);
-      for (let index = children.length - 1; index >= 0; index -= 1)
-        pending.push({ id: children[index]!, depth: row.depth + 1 });
-    }
-    return rows;
+    return boneHierarchy(this.rig);
   }
 }

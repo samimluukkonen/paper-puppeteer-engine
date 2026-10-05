@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.3.1
+# Visual Animation Editor — v0.5.2.3.2
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -14,9 +14,21 @@ The ruler adapts to duration and available width, with major labels, minor ticks
 
 **Mode** edits the animation's existing `playback` property in the working copy. Smooth interpolation stays continuous. Stepped mode holds poses at authored FPS boundaries while the playhead stays continuous and Phaser continues rendering at its normal rate. Switching to stepped mode starts at 10 FPS; switching to smooth removes the FPS field as required by the schema. **FPS** is enabled only for stepped clips and accepts finite values from 1 to 240, including fractional rates. Existing clips with valid runtime FPS outside those editor bounds still load and preview unchanged. Invalid or empty edits show a validation error and restore the held value. Mode/FPS edits update the paused or playing preview immediately without retiming keys or events (the format stores their times in milliseconds).
 
-**Undo** and **Redo** restore authored settings through the existing snapshot history and refresh the preview. Settings changes mark the working animation dirty when it differs from the saved baseline. The original source remains immutable. Animation switching preserves a dirty working copy and reports the issue; undo edits back to the baseline before switching. Saving/exporting animation data remains deferred.
+**Undo** and **Redo** restore authored settings and keys through the existing snapshot history and refresh the preview. Settings changes mark the working animation dirty when it differs from the saved baseline. The original source remains immutable. Animation switching preserves a dirty working copy and reports the issue; undo edits back to the baseline before switching. Saving/exporting animation data remains deferred.
 
-Mode/FPS edits also protect page navigation, refresh, closing, and character selection with the browser's unsaved-change confirmation. Undo the edits before leaving to avoid discarding them. Preview navigation and playback preferences do not trigger this confirmation.
+Mode/FPS and committed key edits also protect page navigation, refresh, closing, and character selection with the browser's unsaved-change confirmation. Undo the edits before leaving to avoid discarding them. Preview navigation and playback preferences do not trigger this confirmation.
+
+## Visual bone keyframing
+
+Select a bone from the **Bones** hierarchy or click its joint marker in the preview. The selected joint has an orange ring. **Show bones** controls the existing skeleton visualization; the hierarchy stays available when overlapping joints are hard to pick. Selection does not edit the animation or rig.
+
+Scrub to a time, then inspect X, Y, Rotation, Scale X, and Scale Y. These are absolute bone-local authored animation values from the existing evaluator, before IK. Rotation is displayed and entered in degrees, then converted to radians for the animation format. Unkeyed properties fall back to the rig bind values; smooth and stepped evaluation match the existing preview. The numeric display uses six decimal places at most; **Set Key** without typing uses the full evaluated value, without rounding it to the display precision.
+
+For example, at **0.5 s**, select `rightForearm`, enter **35** in Rotation, and press that row's **Set Key**. Typing previews a temporary editor-only transform, highlighted in yellow, and pauses playback at the held time. No key, history entry, or dirty change exists until Set Key. Set Key creates a sparse rotation key at 500 ms, or updates the existing rotation key within the core's floating-point time tolerance. Other properties are not implicitly keyed. You can also press Set Key directly to author the currently evaluated value. Each row shows **● keyed** or **○ no key**, using the existing keyed-state query API.
+
+**Delete Key** removes only that property's key at the playhead, discards its draft, and immediately re-evaluates interpolation or bind fallback. Other properties and other times remain intact. A property commit clears only that property's draft; other pending fields remain temporary until individually keyed or cancelled. Empty/nonfinite input cannot be committed. **Cancel edits** or **Escape** restores all evaluated values and does not resume playback. Changing time, bone, or animation, pressing Play, changing authored settings, and undo/redo discard pending drafts. Preview preferences do not clear drafts. Undo/redo applies to authored keys through the existing snapshot history; navigation and drafts do not enter history. Creating/updating/deleting changed data marks the working animation dirty; no-op edits remain clean, and deleting newly created keys can restore the baseline.
+
+**Facing** mirrors only the outer puppet container. **IK preview (fixed targets)** pins the configured demo chains' current end joints in canonical puppet coordinates; targets project with facing and remain fixed while scrubbing/playing. The render pose can differ from the pre-IK inspector while IK is enabled. Neither preview preference edits authored values or dirty state, and Set Key never reads rendered joints, screen/world coordinates, or IK output. The Rig Editor's bind pose remains unchanged. Numeric editing is the authoring interface for this milestone; transform drag handles remain deferred.
 
 ## Data and preview ownership
 
@@ -26,7 +38,7 @@ Mode/FPS edits also protect page navigation, refresh, closing, and character sel
 
 `TimelineController` owns pointer capture and measured DOM width, generates the ruler through pure helpers, and translates pixels into calls to `setCurrentTime()`. It calls `beginScrub()` on pointer-down and `endScrub()` on release or interruption, and releases a captured pointer when selection clears the scrub state. It has no independent animation clock. Ruler, playhead, and the empty track region are separate so later versions can add bone/property/event rows without replacing time navigation.
 
-`AnimationEditorPreview` compiles only when the working animation identity changes and owns an existing `AnimationPlayer` over the puppet's joints. The compiled preview uses `loop: false` and an empty event list without changing source or working data, so the evaluator also samples the exact final pose for stepped clips whose endpoint falls between frames. It converts seconds to milliseconds and calls `sample(..., { mode: 'playback' })`, then `Puppet.syncPose()` projects the pose through the runtime rendering pipeline. This reuses interpolation, shortest-path rotations, and stepped sampling; timeline code never interpolates bones. Selection resets joints to bind pose, including when switching to sparse clips, while preserving optional IK configuration and pose presets. The page itself configures no IK constraints or facing controls, so authored poses are directly visible. Embedded previews with enabled IK or mirroring retain the runtime order: evaluator, pose presets, constraints/IK, and rendering. Facing mirrors the outer puppet container without editing local animation transforms. Scrubbing and editor playback neither advance runtime playback clocks nor dispatch animation events; stripping markers also suppresses time-zero events on initialization, selection, authored settings edits, and undo/redo. Runtime gameplay events remain unchanged.
+`AnimationEditorPreview` compiles only when the working animation identity changes and owns an existing `AnimationPlayer` over the puppet's joints. The compiled preview uses `loop: false` and an empty event list without changing source or working data, so the evaluator also samples the exact final pose for stepped clips whose endpoint falls between frames. It converts seconds to milliseconds and calls `sample(..., { mode: 'playback' })`, then `Puppet.syncPose()` projects the pose through the runtime rendering pipeline. This reuses interpolation, shortest-path rotations, and stepped sampling; timeline code never interpolates bones. Each changed pose sample resets joints to bind pose before evaluation, preventing untracked temporary values from leaking after cancellation or navigation. Temporary local properties apply after evaluation and before pose presets/IK, while preserving optional IK configuration and pose presets. The page configures optional demo IK chains, disabled by default, and a facing preference; these affect only rendering. Embedded previews with enabled IK or mirroring retain the runtime order: evaluator, pose presets, constraints/IK, and rendering. Facing mirrors the outer puppet container without editing local animation transforms. Scrubbing and editor playback neither advance runtime playback clocks nor dispatch animation events; stripping markers also suppresses time-zero events on initialization, selection, authored settings edits, and undo/redo. Runtime gameplay events remain unchanged.
 
 `replaceWorkingAnimation()` validates external authored changes with the existing JSON/schema/reference checks and owns a fresh frozen copy. Internal FPS/mode setters validate their scalar changes; keyframe setters use the validating mutation helpers. These internal edits retain unchanged frozen tracks, rows, events, and playback settings instead of copying the whole clip again. All edits record one replacement through the shared `SnapshotHistory`, preserving those shared branches through undo/redo. Invalid replacements preserve the held working copy and pose. Replacements must retain the selected animation’s name; renaming is deferred. Dirty state compares the working snapshot with a saved baseline, following the Rig Editor pattern. `markSaved()` is internal save plumbing, while `undo()` and `redo()` are exposed for authored edits. `selectAnimation()` refuses dirty replacement unless explicitly called with `{ discardChanges: true }`. Scrubbing and selection never record history.
 
@@ -47,6 +59,11 @@ For a custom character, pass `{ characterUrl: '../characters/hero/character.json
 - `setAuthoredFPS(number)`, `setAuthoredPlaybackMode('smooth' | 'stepped')`: validated authored edits; return success, use working-copy history, and leave key/event times untouched.
 - `PREVIEW_PLAYBACK_SPEEDS`, `AUTHORED_FPS_MIN`, `AUTHORED_FPS_MAX`, `DEFAULT_AUTHORED_FPS`: shared editor control values.
 - `replaceWorkingAnimation(input)`, `markSaved()`, `undo()`, `redo()`: internal authored-change foundation.
+- `selectedBoneId`, `boneTransformDraft`, `hasTemporaryTransform`, `selectedBoneTransform`: editor-only bone selection, immutable sparse drafts, and evaluated local values with prospective overrides.
+- `selectBone(id | null)`, `beginTransformEdit()`, `setTemporaryBoneProperty(property, localValue)`, `commitBoneProperty(property)`, `deleteBonePropertyKey(property)`, `cancelTransformEdit()`: visual authoring commands; the UI handles degrees/radians conversion. Key mutations retain the existing core/state APIs.
+- `BoneInspectorController(app)` / `bind(state)` / `dispose()`: stable hierarchy and numeric property controls.
+- `AnimationEditorScene.setFacing(facing)`, `setBonesVisible(boolean)`, `setIKPreview(boolean)`, and optional `AnimationEditorSceneOptions.ikChains`: preview-only projection/configuration.
+- `boneHierarchy(rig)`: shared pure hierarchy traversal used by both editors.
 - `AnimationEditorPreview(state, puppet)` / `dispose()`: existing evaluator-to-puppet adapter.
 - `TimelineController(app)` / `bind(state, characterId?)` / `showError(message)` / `dispose()`: DOM adapter.
 - `animationDurationSeconds`, `clampTime`, `timeToTimelineX`, `timelineXToTime`, `generateRulerTicks`, `RulerTick`: pure timeline logic.
@@ -56,7 +73,7 @@ These APIs live under `src/devtools/animation-editor/`; the production package e
 
 ## Keyframe authoring core
 
-v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. No visual keyframe controls are exposed yet. Package version: `0.5.2-3.1`.
+v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. v0.5.2.3.2 connects these existing APIs to the visual inspector without changing their signatures. Package version: `0.5.2-3.2`.
 
 The existing file format remains authoritative: `tracks[boneId]` holds a strictly time-sorted array of sparse `{ time, x?, y?, rotation?, scaleX?, scaleY? }` rows. Time is milliseconds, rotation is radians, and values are absolute local transforms. Each property has its own independent samples even when several properties share a row. Setting rotation never authors position or scale implicitly.
 
@@ -100,6 +117,10 @@ const value = state.getEvaluatedBonePropertyValue('head', 'rotation');
 if (value !== undefined) state.setBonePropertyKeyframe('head', 'rotation', value);
 ```
 
+## Authoring verification
+
+The controller/state and preview tests cover selection without mutation, property create/update/delete, sparse tracks, draft/dirty/history behavior, cancellation on navigation, source and bind-pose isolation, nested local transforms, and pre-IK/canonical-facing values. The browser authoring scenarios use `demo-puppet`, select torso/upper arm/forearm/hand, author a rotation at 0.5 s, scrub away/back, update it, author local X/Y, delete only rotation, interpolate/play several keys, pause on field focus, cancel drafts, reject blank fields, and key with IK and mirrored preview enabled. They also capture desktop/mobile screenshots. Run `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationBoneAuthoring.spec.ts` to use installed Chrome.
+
 ## Verification checklist
 
 - [ ] Open the demo, Rig Editor, and Animation Editor independently; navigate between them under the local and deployed base paths.
@@ -131,6 +152,8 @@ The v0.5.2.2.4 stabilization pass adds global Home navigation, modifier/IME shor
 
 Verification details, architecture audit, changed files, and remaining manual checks are recorded in [Playback verification](animation-editor-playback-verification.md).
 
+The v0.5.2.3.2 implementation report, changed files, API additions, and verification results are recorded in [Bone authoring verification](animation-editor-authoring-verification.md).
+
 ## Deferred features
 
-Visual transform editing, bone/property/event tracks, keyframe diamonds, selection, dragging/movement, copy/paste, multi-key selection, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK authoring/baking remain deferred to v0.5.2.3.2+. Keyframe create/update/delete and keyed-state queries are available through the data APIs above.
+Bone/property/event timeline tracks, keyframe diamonds, key selection/dragging/movement, transform drag handles, copy/paste, multi-key selection, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.3.3+. Property create/update/delete is now available through the inspector as well as the data APIs above.

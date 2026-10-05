@@ -19,7 +19,7 @@ a {
 }
 .animation-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 460px;
   gap: 18px;
 }
 .animation-preview,
@@ -31,6 +31,8 @@ a {
   border-radius: 6px;
 }
 .animation-session {
+  grid-column: 1 / -1;
+  grid-row: 3;
   padding: 20px;
   font-size: 13px;
   line-height: 1.6;
@@ -73,7 +75,8 @@ a {
   display: block;
 }
 .timeline-panel {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  grid-row: 2;
   padding: 18px 0;
 }
 .timeline-toolbar {
@@ -168,11 +171,95 @@ a {
   border-right: 6px solid transparent;
   border-top: 8px solid #b7543a;
 }
-@media (max-width: 720px) {
+.animation-preview-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px;
+  font-size: 13px;
+}
+.animation-authoring {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  padding: 20px;
+  background: #f8f5ec;
+  border: 1px solid #d6d7c8;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.animation-authoring > div + div {
+  margin-top: 20px;
+}
+.animation-authoring h2 {
+  font-size: 14px;
+  margin-top: 0;
+}
+#animation-bones {
+  max-height: 190px;
+  overflow-y: auto;
+}
+#animation-bones .tree-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+#animation-bones .tree-entry[aria-pressed="true"] {
+  background: #dce7d7;
+  color: #243e31;
+  font-weight: 600;
+}
+#animation-bone-fields {
+  border: 0;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.animation-property {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 65px 75px 85px;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.animation-property label {
+  display: grid;
+  gap: 4px;
+}
+.animation-property input {
+  width: 100%;
+  min-width: 0;
+}
+.animation-property input[data-temporary="true"] {
+  background: #fff2ce;
+}
+.key-indicator {
+  font-size: 12px;
+  align-self: center;
+}
+.key-indicator[data-keyed="true"] {
+  color: #39574b;
+  font-weight: 600;
+}
+@media (max-width: 1000px) {
   .animation-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .animation-session {
+  .animation-authoring {
+    grid-column: 1;
     grid-row: 2;
+  }
+  .timeline-panel {
+    grid-row: 3;
+  }
+  .animation-session {
+    grid-row: 4;
+  }
+}
+@media (max-width: 480px) {
+  .animation-property {
+    grid-template-columns: minmax(100px, 1fr) 65px;
   }
 }

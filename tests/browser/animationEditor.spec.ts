@@ -190,26 +190,32 @@ test('authored mode and FPS update the paused pose immediately and undo restores
   const timeline = page.locator('#timeline');
   for (let step = 0; step < 15; step += 1) await timeline.press('ArrowRight');
   const canvas = page.locator('#animation-stage canvas');
-  const steppedPose = await canvas.screenshot();
+  const capturePose = async (): Promise<Buffer> => {
+    // Settings are below the preview. Keep the canvas at the same viewport position
+    // so scrolling to Undo does not change subpixel screenshot rasterization.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    return canvas.screenshot();
+  };
+  const steppedPose = await capturePose();
   await page.locator('#animation-fps').fill('20');
   await page.locator('#animation-fps').press('Tab');
   await expect(page.locator('#animation-metadata')).toContainText('Mode: stepped · FPS: 20');
   await expect(page.locator('#current-time')).toHaveText('0.150 / 2.000 s');
-  expect((await canvas.screenshot()).equals(steppedPose)).toBe(false);
+  expect((await capturePose()).equals(steppedPose)).toBe(false);
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-selection').selectOption('walk');
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
   await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
   await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-fps')).toHaveValue('10');
-  expect((await canvas.screenshot()).equals(steppedPose)).toBe(true);
+  expect((await capturePose()).equals(steppedPose)).toBe(true);
   await page.locator('#animation-redo').click();
   await expect(page.locator('#animation-fps')).toHaveValue('20');
   await page.locator('#animation-mode').selectOption('smooth');
   await expect(page.locator('#animation-fps')).toBeDisabled();
-  const smoothPose = await canvas.screenshot();
+  const smoothPose = await capturePose();
   await timeline.press('ArrowRight');
-  expect((await canvas.screenshot()).equals(smoothPose)).toBe(false);
+  expect((await capturePose()).equals(smoothPose)).toBe(false);
   await page.locator('#animation-undo').click();
   await page.locator('#animation-undo').click();
   await page.locator('#animation-undo').click();

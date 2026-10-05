@@ -1,6 +1,7 @@
 import { compileClip } from '../../engine/AnimationClip.js';
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { Puppet } from '../../engine/Puppet.js';
+import type { JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 
 /** Editor-owned runtime player samples the working copy; the puppet still owns rendering and IK. */
@@ -8,6 +9,7 @@ export class AnimationEditorPreview {
   private player: AnimationPlayer | undefined;
   private animation: ReadonlyAnimation | null | undefined;
   private sampledTime: number | undefined;
+  private draft: Readonly<Partial<JointTransform>> | undefined;
   private readonly unsubscribe: () => void;
 
   constructor(
@@ -21,7 +23,8 @@ export class AnimationEditorPreview {
   private refresh(): void {
     const animation = this.state.workingAnimation;
     const time = this.state.currentTime;
-    if (animation === this.animation && time === this.sampledTime) return;
+    const draft = this.state.boneTransformDraft;
+    if (animation === this.animation && time === this.sampledTime && draft === this.draft) return;
     if (animation !== this.animation) {
       // Compile before replacing the held preview. No data or interpolation lives in the timeline UI.
       const next = animation
@@ -44,9 +47,14 @@ export class AnimationEditorPreview {
         next.pause();
       }
     }
-    this.player?.sample(time * 1000, { mode: 'playback' }, () => this.puppet.preparePose());
+    // Restore even untracked temporary properties before sampling. Drafts belong before presets/IK/rendering.
+    this.puppet.preparePose();
+    for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
+    this.player?.sample(time * 1000, { mode: 'playback' });
+    if (this.state.selectedBoneId) Object.assign(this.puppet.getBone(this.state.selectedBoneId).pose, draft);
     this.puppet.syncPose();
     this.sampledTime = time;
+    this.draft = draft;
   }
 
   dispose(): void {

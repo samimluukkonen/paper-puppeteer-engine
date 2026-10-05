@@ -6,7 +6,7 @@ import {
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
-import type { JointTransform, TransformProperty } from '../../engine/types.js';
+import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import {
@@ -15,6 +15,7 @@ import {
   getEvaluatedBoneTransform,
   getKeyedPropertiesAtTime,
   hasKeyframeAtTime,
+  keyframeTimesMatch,
   removeBonePropertyKeyframe,
   setBonePropertyKeyframe,
 } from './keyframes.js';
@@ -53,6 +54,8 @@ export class AnimationEditorState {
   private cachedDirty: boolean | undefined;
   private issues: readonly ValidationIssue[] = [];
   private history = this.createHistory();
+  private selectedBone: string | null = null;
+  private temporaryTransform: Readonly<Partial<JointTransform>> = Object.freeze({});
 
   constructor(
     readonly rig?: Rig,
@@ -67,6 +70,60 @@ export class AnimationEditorState {
 
   get animationIds(): readonly string[] {
     return [...this.animations.keys()];
+  }
+  get selectedBoneId(): string | null {
+    return this.selectedBone;
+  }
+  /** Editor-only prospective local values, never serialized or recorded in history. */
+  get boneTransformDraft(): Readonly<Partial<JointTransform>> {
+    return this.temporaryTransform;
+  }
+  get hasTemporaryTransform(): boolean {
+    return Object.keys(this.temporaryTransform).length > 0;
+  }
+  get selectedBoneTransform(): JointTransform | undefined {
+    const evaluated = this.selectedBone ? this.getEvaluatedBoneTransform(this.selectedBone) : undefined;
+    return evaluated ? { ...evaluated, ...this.temporaryTransform } : undefined;
+  }
+  selectBone(id: string | null): boolean {
+    if (id !== null && !this.rig?.hasBone(id)) return false;
+    if (id !== this.selectedBone) {
+      this.selectedBone = id;
+      this.clearTransformDraft();
+      this.notify();
+    }
+    return true;
+  }
+  /** Focusing an authoring field pauses at the held time, even before the first input. */
+  beginTransformEdit(): void {
+    if (this.selectedBone && this.working) this.pause();
+  }
+  setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
+    if (!this.selectedBone || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
+      return false;
+    this.playing = false;
+    this.temporaryTransform = Object.freeze({ ...this.temporaryTransform, [property]: value });
+    this.notify();
+    return true;
+  }
+  commitBoneProperty(property: TransformProperty): boolean {
+    if (!this.selectedBone || !transformProperties.includes(property)) return false;
+    this.beginTransformEdit();
+    const value = this.selectedBoneTransform?.[property];
+    return value !== undefined && this.setBonePropertyKeyframe(this.selectedBone, property, value);
+  }
+  deleteBonePropertyKey(property: TransformProperty): boolean {
+    if (!this.selectedBone || !transformProperties.includes(property)) return false;
+    this.beginTransformEdit();
+    return this.removeBonePropertyKeyframe(this.selectedBone, property);
+  }
+  cancelTransformEdit(): void {
+    if (!this.hasTemporaryTransform) return;
+    this.clearTransformDraft();
+    this.notify();
+  }
+  private clearTransformDraft(): void {
+    if (this.hasTemporaryTransform) this.temporaryTransform = Object.freeze({});
   }
   get selectedAnimationId(): string | null {
     return this.selectedId;
@@ -153,6 +210,7 @@ export class AnimationEditorState {
     this.source = entry?.source ?? null;
     this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
     this.selectedId = id;
+    this.clearTransformDraft();
     this.time = 0;
     this.playing = false;
     this.scrubbing = false;
@@ -173,6 +231,7 @@ export class AnimationEditorState {
     const next = clampTime(time, this.duration);
     const playing = this.playing && this.duration > 0 && (this.scrubbing || this.previewLoop || next < this.duration);
     if (next === this.time && playing === this.playing) return false;
+    if (next !== this.time) this.clearTransformDraft();
     this.time = next;
     this.playing = playing;
     return true;
@@ -231,18 +290,29 @@ export class AnimationEditorState {
     value: number,
     timeSeconds = this.time,
   ): boolean {
-    return this.editKeyframe((animation, rig) =>
-      setBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000, value),
+    return this.editKeyframe(
+      (animation, rig) => setBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000, value),
+      boneId,
+      property,
+      timeSeconds,
     );
   }
 
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.time): boolean {
-    return this.editKeyframe((animation, rig) =>
-      removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000),
+    return this.editKeyframe(
+      (animation, rig) => removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000),
+      boneId,
+      property,
+      timeSeconds,
     );
   }
 
-  private editKeyframe(edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation): boolean {
+  private editKeyframe(
+    edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation,
+    boneId: string,
+    property: TransformProperty,
+    timeSeconds: number,
+  ): boolean {
     if (!this.working || !this.rig) return false;
     let next: ReadonlyAnimation;
     try {
@@ -257,7 +327,16 @@ export class AnimationEditorState {
       return false;
     }
     // The mutation helper validated the result and shares only this state's owned frozen branches.
-    return this.installWorkingAnimation(freezeData(next));
+    if (
+      boneId === this.selectedBone &&
+      keyframeTimesMatch(timeSeconds * 1000, this.time * 1000) &&
+      this.temporaryTransform[property] !== undefined
+    ) {
+      const draft = { ...this.temporaryTransform };
+      delete draft[property];
+      this.temporaryTransform = Object.freeze(draft);
+    }
+    return this.installWorkingAnimation(freezeData(next), true);
   }
 
   /** Queries never install animation snapshots or change validation, history, or dirty state.
@@ -312,6 +391,7 @@ export class AnimationEditorState {
   /** Resume the sole editor clock; a completed clip starts again at zero. */
   play(): void {
     if (this.playing || !this.working || !(this.duration > 0)) return;
+    this.clearTransformDraft();
     if (this.time >= this.duration) this.time = 0;
     this.playing = true;
     this.notify();
@@ -361,7 +441,7 @@ export class AnimationEditorState {
   }
 
   /** Internal edits have already validated their changes and retain immutable unchanged branches. */
-  private installWorkingAnimation(next: ReadonlyAnimation): boolean {
+  private installWorkingAnimation(next: ReadonlyAnimation, retainDraft = false): boolean {
     this.issues = [];
     if (next.name !== this.selectedId) {
       this.issues = [
@@ -374,6 +454,7 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
+    if (!retainDraft) this.clearTransformDraft();
     if (!equalEditorData(this.working, next)) {
       this.history.change(() => {
         this.working = next;
@@ -397,6 +478,7 @@ export class AnimationEditorState {
     return new SnapshotHistory(
       () => this.working,
       (entry) => {
+        this.clearTransformDraft();
         this.working = entry;
         this.cachedDirty = undefined;
         this.updateTime(this.time);
