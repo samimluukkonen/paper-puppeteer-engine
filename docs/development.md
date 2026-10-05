@@ -128,7 +128,8 @@ src/devtools/rig-editor/
 src/devtools/animation-editor/
   main.ts              Animation editor page and Phaser bootstrap
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
-  AnimationEditorState.ts  Owned animation data, continuous clock, preview speed/loop, authored FPS/mode and history
+  AnimationEditorState.ts  Owned animation data, transform drafts, authored FPS/mode and history
+  AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
   TimelineController.ts   Responsive ruler, pointer capture, keyboard navigation and status display
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
