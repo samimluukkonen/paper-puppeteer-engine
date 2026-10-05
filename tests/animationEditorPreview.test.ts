@@ -3,6 +3,7 @@ import { katanaGrips } from '../src/demo/Katana.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import type { AnimationClip, AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
+import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { transformProperties } from '../src/engine/types.js';
@@ -140,6 +141,54 @@ test('authored replacements recompile preview and invalid replacements retain it
   assert.equal(puppet.getBone('root').pose.x, 10);
   preview.dispose();
   puppet.destroy();
+});
+
+test('status changes skip sampling and rendering while time and authored changes update the preview', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const clip: AnimationClip = {
+    name: 'move',
+    duration: 1000,
+    loop: false,
+    tracks: { root: [{ time: 0, x: 10 }] },
+  };
+  const state = new AnimationEditorState(rig, [clip]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  const sample = vi.spyOn(AnimationPlayer.prototype, 'sample');
+  const sync = vi.spyOn(puppet, 'syncPose');
+  try {
+    state.setPreviewLoop(true);
+    state.play();
+    state.pause();
+    state.beginScrub();
+    state.endScrub();
+    state.markSaved();
+    state.replaceWorkingAnimation({ ...clip, version: 1, duration: 0 });
+    state.replaceWorkingAnimation({ ...clip, version: 1 });
+    assert.equal(sample.mock.calls.length, 0);
+    assert.equal(sync.mock.calls.length, 0);
+
+    state.setCurrentTime(0.5);
+    assert.equal(sample.mock.calls.length, 1);
+    assert.equal(sync.mock.calls.length, 1);
+    state.replaceWorkingAnimation({ ...clip, version: 1, tracks: { root: [{ time: 0, x: 20 }] } });
+    assert.equal(sample.mock.calls.length, 2);
+    assert.equal(puppet.getBone('root').container.x, 20);
+    state.undo();
+    assert.equal(puppet.getBone('root').container.x, 10);
+    state.selectAnimation(null);
+    assert.equal(puppet.getBone('root').container.x, 0);
+    const calls = sync.mock.calls.length;
+    state.setPreviewLoop(false);
+    state.markSaved();
+    assert.equal(sync.mock.calls.length, calls);
+  } finally {
+    sample.mockRestore();
+    sync.mockRestore();
+    preview.dispose();
+    puppet.destroy();
+  }
 });
 
 test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(

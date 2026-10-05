@@ -7,6 +7,7 @@ import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorS
 export class AnimationEditorPreview {
   private player: AnimationPlayer | undefined;
   private animation: ReadonlyAnimation | null | undefined;
+  private sampledTime: number | undefined;
   private readonly unsubscribe: () => void;
 
   constructor(
@@ -19,6 +20,8 @@ export class AnimationEditorPreview {
 
   private refresh(): void {
     const animation = this.state.workingAnimation;
+    const time = this.state.currentTime;
+    if (animation === this.animation && time === this.sampledTime) return;
     if (animation !== this.animation) {
       // Compile before replacing the held preview. No data or interpolation lives in the timeline UI.
       const next = animation
@@ -38,8 +41,9 @@ export class AnimationEditorPreview {
         next!.pause();
       }
     }
-    this.player?.sample(this.state.currentTime * 1000, { mode: 'playback' }, () => this.puppet.preparePose());
+    this.player?.sample(time * 1000, { mode: 'playback' }, () => this.puppet.preparePose());
     this.puppet.syncPose();
+    this.sampledTime = time;
   }
 
   dispose(): void {
