@@ -18,6 +18,9 @@ export class AnimationEditorScene extends Phaser.Scene {
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
   private selectionOverlay: Phaser.GameObjects.Graphics | undefined;
+  private facing: Facing = 'right';
+  private bonesVisible = true;
+  private ikPreviewEnabled = false;
 
   constructor(
     private readonly onReady: (state: AnimationEditorState, characterId: string) => void,
@@ -71,15 +74,18 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   setFacing(facing: Facing): void {
+    this.facing = facing;
     this.puppet?.setFacing(facing);
   }
 
   setBonesVisible(visible: boolean): void {
+    this.bonesVisible = visible;
     this.puppet?.setDebug(visible);
   }
 
   /** Pin current end joints in canonical puppet space; mirroring only changes their world projection. */
   setIKPreview(enabled: boolean): void {
+    this.ikPreviewEnabled = enabled;
     const puppet = this.puppet;
     if (!puppet) return;
     puppet.preparePose();
@@ -113,13 +119,15 @@ export class AnimationEditorScene extends Phaser.Scene {
         x: 380,
         y: 435,
         autoUpdate: false,
-        debug: true,
+        facing: this.facing,
+        debug: this.bonesVisible,
         ik: (this.options.ikChains ?? []).map((chain) => ({ ...chain, enabled: false })),
       });
       preview = new AnimationEditorPreview(state, puppet);
       this.puppet = puppet;
       this.preview = preview;
       this.state = state;
+      if (this.ikPreviewEnabled) this.setIKPreview(true);
       this.selectionOverlay = this.add.graphics();
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
