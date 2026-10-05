@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.2.4
+# Visual Animation Editor — v0.5.2.3.1
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -28,7 +28,7 @@ Mode/FPS edits also protect page navigation, refresh, closing, and character sel
 
 `AnimationEditorPreview` compiles only when the working animation identity changes and owns an existing `AnimationPlayer` over the puppet's joints. The compiled preview uses `loop: false` and an empty event list without changing source or working data, so the evaluator also samples the exact final pose for stepped clips whose endpoint falls between frames. It converts seconds to milliseconds and calls `sample(..., { mode: 'playback' })`, then `Puppet.syncPose()` projects the pose through the runtime rendering pipeline. This reuses interpolation, shortest-path rotations, and stepped sampling; timeline code never interpolates bones. Selection resets joints to bind pose, including when switching to sparse clips, while preserving optional IK configuration and pose presets. The page itself configures no IK constraints or facing controls, so authored poses are directly visible. Embedded previews with enabled IK or mirroring retain the runtime order: evaluator, pose presets, constraints/IK, and rendering. Facing mirrors the outer puppet container without editing local animation transforms. Scrubbing and editor playback neither advance runtime playback clocks nor dispatch animation events; stripping markers also suppresses time-zero events on initialization, selection, authored settings edits, and undo/redo. Runtime gameplay events remain unchanged.
 
-`replaceWorkingAnimation()` validates authored changes with the existing JSON/schema/reference checks, owns a fresh frozen copy, and records one replacement through the shared `SnapshotHistory`. FPS and mode setters use this boundary. Invalid replacements preserve the held working copy and pose. Replacements must retain the selected animation’s name; renaming is deferred. Dirty state compares the working snapshot with a saved baseline, following the Rig Editor pattern. `markSaved()` is internal save plumbing, while `undo()` and `redo()` are exposed for settings edits. `selectAnimation()` refuses dirty replacement unless explicitly called with `{ discardChanges: true }`. Scrubbing and selection never record history.
+`replaceWorkingAnimation()` validates authored changes with the existing JSON/schema/reference checks, owns a fresh frozen copy, and records one replacement through the shared `SnapshotHistory`. FPS, mode, and keyframe setters use this boundary. Invalid replacements preserve the held working copy and pose. Replacements must retain the selected animation’s name; renaming is deferred. Dirty state compares the working snapshot with a saved baseline, following the Rig Editor pattern. `markSaved()` is internal save plumbing, while `undo()` and `redo()` are exposed for authored edits. `selectAnimation()` refuses dirty replacement unless explicitly called with `{ discardChanges: true }`. Scrubbing and selection never record history.
 
 `previewLoop`, `playbackSpeed`, and `isScrubbing` are transient state views. `isPlaying` retains playback intent during a drag, so `advancePlayback()` skips while `isScrubbing` and resumes naturally after `endScrub()`; no separate saved playback flag is needed. Successful animation selection clears both playback and scrub state and resets time before notifying the preview. Failed selection preserves the held session. Binding a new session, disposal, and scene shutdown pause before ending a scrub, preventing accidental resume.
 
@@ -53,6 +53,51 @@ For a custom character, pass `{ characterUrl: '../characters/hero/character.json
 - `AnimationEditorSceneOptions`, `ReadonlyAnimation`: editor configuration and immutable data views.
 
 These APIs live under `src/devtools/animation-editor/`; the production package exports and external JSON schemas are unchanged.
+
+## Keyframe authoring core
+
+v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. No visual keyframe controls are exposed yet. Package version: `0.5.2-3.1`.
+
+The existing file format remains authoritative: `tracks[boneId]` holds a strictly time-sorted array of sparse `{ time, x?, y?, rotation?, scaleX?, scaleY? }` rows. Time is milliseconds, rotation is radians, and values are absolute local transforms. Each property has its own independent samples even when several properties share a row. Setting rotation never authors position or scale implicitly.
+
+Pure mutation signatures are:
+
+```ts
+setBonePropertyKeyframe(animation, rig, boneId, property, timeMs, value)
+removeBonePropertyKeyframe(animation, rig, boneId, property, timeMs)
+```
+
+Both return a replacement animation, preserve supplied version/metadata, and never mutate or freeze the input. Changed arrays/rows are copied; unrelated branches are shared and should be treated as read-only. No-op edits return the input identity. They guard rig references, supported properties, finite values, and duration bounds, and validate both input and result through the existing file validator. Invalid inputs throw. Existing invalid/unsorted timelines are rejected rather than silently repaired.
+
+Setting a property first looks for its nearest authored key within `KEYFRAME_TIME_TOLERANCE_MS = 1e-6` milliseconds (one nanosecond). It updates that value while retaining its stored time. If the property is absent, it merges into the nearest row in tolerance or inserts a new sorted row. Equal-distance matches favor the earlier stored row. Existing distinct close rows are retained; new edits do not add effectively duplicate times. The same `keyframeTimesMatch()` policy applies to lookup, deletion, and keyed-state queries. No FPS quantization or global rounding changes authored time. Endpoint arithmetic error within tolerance is clamped to zero/duration; times farther outside the duration are rejected.
+
+Deleting removes only the requested property. Rows with no remaining transform values are removed; tracks with no remaining rows are omitted. Other bones, properties, key times, events, and playback metadata remain intact.
+
+Pure queries are `findBonePropertyKeyframe(animation, boneId, property, timeMs)` (a detached `{ time, value }` or `undefined`), `hasKeyframeAtTime(...)`, and `getKeyedPropertiesAtTime(animation, boneId, timeMs)` (in runtime property order). Missing keys and nonfinite query times produce an empty result.
+
+`getEvaluatedBonePropertyValue(animation, rig, boneId, property, timeMs)` uses renderer-independent `Joint` instances and the existing `AnimationPlayer`, compiling an event-free, nonlooping preview clip. It samples playback mode without advancing a clock or retaining an evaluated pose as authored data. Smooth interpolation and shortest-path rotation come from the runtime; stepped clips hold at authored FPS boundaries and retain the exact endpoint. Before the first property key and after its last, the runtime holds the nearest value. A wholly unkeyed property falls back to the rig bind pose. The result represents the animation's local transform before optional presets, IK, and facing. Invalid evaluation targets throw. This one-shot helper creates an isolated sampler per call.
+
+State methods use **seconds**, defaulting to `currentTime`:
+
+```ts
+state.setBonePropertyKeyframe(boneId, property, value, timeSeconds?)
+state.removeBonePropertyKeyframe(boneId, property, timeSeconds?)
+state.findBonePropertyKeyframe(boneId, property, timeSeconds?)
+state.hasKeyframeAtTime(boneId, property, timeSeconds?)
+state.getKeyedPropertiesAtTime(boneId, timeSeconds?)
+state.getEvaluatedBonePropertyValue(boneId, property, timeSeconds?)
+```
+
+The returned keyframe's `time` remains milliseconds. Mutation methods return success, including no-ops; invalid edits return `false` with validation issues and leave the working snapshot/history unchanged. Without selection, mutations return `false`, key/value lookups return `undefined`, and keyed-state queries return `false`/`[]`. Evaluation errors on a selected animation throw without changing session diagnostics.
+
+Only `workingAnimation` is replaced. Actual data changes record one history entry, update the existing dirty comparison, and notify the existing preview subscription, which refreshes immediately while paused. No-ops preserve snapshot identity and redo history. Deleting newly created keys can return the animation to its clean baseline. Queries never notify or change history, validation issues, or dirty state. Edits preserve continuous time and playback intent; the clock architecture is unchanged.
+
+For example, explicitly key the value visible at a paused playhead:
+
+```ts
+const value = state.getEvaluatedBonePropertyValue('head', 'rotation');
+if (value !== undefined) state.setBonePropertyKeyframe('head', 'rotation', value);
+```
 
 ## Verification checklist
 
@@ -87,4 +132,4 @@ Verification details, architecture audit, changed files, and remaining manual ch
 
 ## Deferred features
 
-Editable bone/property/event tracks, keyframe markers and authoring, selection of keys, keyframe creation/deletion/movement/copy/paste, per-keyframe interpolation editing, event editing, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK authoring/baking remain deferred. The v0.5.2.2 playback hardening pass is complete; keyframe authoring starts in v0.5.2.3+.
+Visual transform editing, bone/property/event tracks, keyframe diamonds, selection, dragging/movement, copy/paste, multi-key selection, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK authoring/baking remain deferred to v0.5.2.3.2+. Keyframe create/update/delete and keyed-state queries are available through the data APIs above.

@@ -1,0 +1,339 @@
+import { assert, test, vi } from 'vitest';
+import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import {
+  findBonePropertyKeyframe,
+  getEvaluatedBonePropertyValue,
+  getKeyedPropertiesAtTime,
+  hasKeyframeAtTime,
+  KEYFRAME_TIME_TOLERANCE_MS,
+  keyframeTimesMatch,
+  removeBonePropertyKeyframe,
+  setBonePropertyKeyframe,
+} from '../src/devtools/animation-editor/keyframes.js';
+import { freezeData } from '../src/devtools/shared/editorData.js';
+import { type AnimationClip, compileClip } from '../src/engine/AnimationClip.js';
+import { evaluateClip } from '../src/engine/AnimationPose.js';
+import { validateAnimationDefinition } from '../src/engine/externalData.js';
+import { Rig } from '../src/engine/Rig.js';
+import { type TransformProperty, transformProperties } from '../src/engine/types.js';
+
+const rig = new Rig({
+  root: 'root',
+  bones: [
+    { id: 'root', x: 4, scaleY: 2 },
+    { id: 'child', parent: 'root', y: 12 },
+  ],
+});
+const clip = (patch: Partial<AnimationClip> = {}): AnimationClip & { version: 1 } => ({
+  version: 1,
+  name: 'move',
+  duration: 2000,
+  loop: false,
+  tracks: {},
+  events: [{ time: 0, name: 'start', data: { nested: [1, 2] } }],
+  ...patch,
+});
+
+test.each(transformProperties)(
+  'create/update/delete %s preserves the external format and caller/source ownership',
+  (property) => {
+    const source = freezeData(clip());
+    const original = JSON.stringify(source);
+    const working = structuredClone(source);
+    const created = setBonePropertyKeyframe(working, rig, 'root', property, 500, 3);
+    assert.deepEqual(created.tracks, { root: [{ time: 500, [property]: 3 }] });
+    assert.deepEqual(validateAnimationDefinition(created, rig), []);
+    assert.equal(JSON.stringify(working), original);
+    assert.isFalse(Object.isFrozen(working.events![0]!.data));
+    const updated = setBonePropertyKeyframe(created, rig, 'root', property, 500.0000001, 7);
+    assert.deepEqual(updated.tracks, { root: [{ time: 500, [property]: 7 }] });
+    assert.deepEqual(created.tracks, { root: [{ time: 500, [property]: 3 }] });
+    const deleted = removeBonePropertyKeyframe(updated, rig, 'root', property, 500.0000001);
+    assert.deepEqual(deleted.tracks, {});
+    assert.deepEqual(validateAnimationDefinition(deleted, rig), []);
+    assert.deepEqual(updated.tracks, { root: [{ time: 500, [property]: 7 }] });
+    assert.equal(JSON.stringify(source), original);
+    assert.equal(deleted.version, 1);
+    assert.deepEqual(deleted.events, source.events);
+  },
+);
+
+test('inserting in random order stays sorted, sparse, isolated, and continuous even for stepped clips', () => {
+  const source = clip({ tracks: { child: [{ time: 0, y: 12 }] }, playback: { mode: 'stepped', fps: 10 } });
+  let working = source;
+  for (const time of [1000, 250, 500, 742.123456])
+    working = setBonePropertyKeyframe(working, rig, 'root', 'rotation', time, time / 1000);
+  assert.deepEqual(working.tracks.root, [
+    { time: 250, rotation: 0.25 },
+    { time: 500, rotation: 0.5 },
+    { time: 742.123456, rotation: 742.123456 / 1000 },
+    { time: 1000, rotation: 1 },
+  ]);
+  assert.strictEqual(working.tracks.child, source.tracks.child);
+  assert.isFalse(Object.isFrozen(source.tracks.child));
+  assert.deepEqual(validateAnimationDefinition(working, rig), []);
+});
+
+test('merge at a shared row and delete only the requested property, row, or final bone track', () => {
+  const source = clip({
+    tracks: {
+      root: [
+        { time: 500, x: 4 },
+        { time: 1000, rotation: 1 },
+      ],
+      child: [{ time: 500, y: 12 }],
+    },
+  });
+  const created = setBonePropertyKeyframe(source, rig, 'root', 'rotation', 500.0000001, 2);
+  assert.deepEqual(created.tracks.root, [
+    { time: 500, x: 4, rotation: 2 },
+    { time: 1000, rotation: 1 },
+  ]);
+  assert.deepEqual(getKeyedPropertiesAtTime(created, 'root', 500), ['x', 'rotation']);
+  const removed = removeBonePropertyKeyframe(created, rig, 'root', 'rotation', 500);
+  assert.deepEqual(removed, source);
+  const removedRow = removeBonePropertyKeyframe(removed, rig, 'root', 'rotation', 1000);
+  assert.deepEqual(removedRow.tracks.root, [{ time: 500, x: 4 }]);
+  const removedBone = removeBonePropertyKeyframe(removedRow, rig, 'root', 'x', 500);
+  assert.deepEqual(removedBone.tracks, { child: [{ time: 500, y: 12 }] });
+  assert.deepEqual(removedBone.events, source.events);
+});
+
+test('one centralized tolerance prevents duplicate rows without quantizing distinct times', () => {
+  assert.isTrue(keyframeTimesMatch(500, 0.5000000001 * 1000));
+  assert.isTrue(keyframeTimesMatch(0, KEYFRAME_TIME_TOLERANCE_MS));
+  for (const time of [NaN, Infinity, -Infinity]) assert.isFalse(keyframeTimesMatch(time, time));
+  const created = setBonePropertyKeyframe(clip(), rig, 'root', 'rotation', 500, 1);
+  const updated = setBonePropertyKeyframe(created, rig, 'root', 'rotation', 0.5000000001 * 1000, 2);
+  assert.equal(updated.tracks.root!.length, 1);
+  assert.deepEqual(findBonePropertyKeyframe(updated, 'root', 'rotation', 500.0000001), { time: 500, value: 2 });
+  assert.isTrue(hasKeyframeAtTime(updated, 'root', 'rotation', 500.0000001));
+  assert.isFalse(hasKeyframeAtTime(updated, 'root', 'x', 500));
+  assert.isFalse(hasKeyframeAtTime(updated, 'child', 'rotation', 500));
+  assert.isFalse(hasKeyframeAtTime(updated, 'root', 'rotation', 500.00001));
+  assert.deepEqual(getKeyedPropertiesAtTime(updated, 'root', 500.0000001), ['rotation']);
+  assert.deepEqual(getKeyedPropertiesAtTime(updated, 'root', NaN), []);
+  const distinct = setBonePropertyKeyframe(updated, rig, 'root', 'rotation', 500.00001, 3);
+  assert.equal(distinct.tracks.root!.length, 2);
+});
+
+test('existing close rows match nearest property keys consistently, ties favor earlier time', () => {
+  const source = clip({
+    tracks: {
+      root: [
+        { time: 0, x: 1 },
+        { time: 0.0000015, rotation: 2 },
+      ],
+    },
+  });
+  const time = 0.00000075;
+  assert.deepEqual(getKeyedPropertiesAtTime(source, 'root', time), ['x', 'rotation']);
+  const updated = setBonePropertyKeyframe(source, rig, 'root', 'rotation', time, 3);
+  assert.deepEqual(updated.tracks.root, [
+    { time: 0, x: 1 },
+    { time: 0.0000015, rotation: 3 },
+  ]);
+  assert.deepEqual(removeBonePropertyKeyframe(updated, rig, 'root', 'rotation', time).tracks.root, [{ time: 0, x: 1 }]);
+  const merged = setBonePropertyKeyframe(source, rig, 'root', 'y', time, 4);
+  assert.deepEqual(merged.tracks.root, [
+    { time: 0, x: 1, y: 4 },
+    { time: 0.0000015, rotation: 2 },
+  ]);
+});
+
+test('no-op set/delete preserve animation identity', () => {
+  const source = clip({ tracks: { root: [{ time: 500, rotation: 1 }] } });
+  assert.strictEqual(setBonePropertyKeyframe(source, rig, 'root', 'rotation', 500.0000001, 1), source);
+  assert.strictEqual(removeBonePropertyKeyframe(source, rig, 'root', 'x', 500), source);
+  assert.strictEqual(removeBonePropertyKeyframe(source, rig, 'child', 'rotation', 500), source);
+});
+
+test.each([NaN, Infinity, -Infinity, -1, 2001])('invalid authored time %s fails without mutating input', (time) => {
+  const source = clip();
+  const original = JSON.stringify(source);
+  assert.throws(() => setBonePropertyKeyframe(source, rig, 'root', 'x', time, 1));
+  assert.throws(() => removeBonePropertyKeyframe(source, rig, 'root', 'x', time));
+  assert.equal(JSON.stringify(source), original);
+});
+
+test('endpoint floating error clamps within tolerance, otherwise mutation uses the shared validator', () => {
+  let working = setBonePropertyKeyframe(clip(), rig, 'root', 'x', -0.0000001, 1);
+  working = setBonePropertyKeyframe(working, rig, 'root', 'x', 2000.0000001, 2);
+  assert.deepEqual(working.tracks.root, [
+    { time: 0, x: 1 },
+    { time: 2000, x: 2 },
+  ]);
+  for (const value of [NaN, Infinity, -Infinity])
+    assert.throws(() => setBonePropertyKeyframe(working, rig, 'root', 'x', 500, value));
+  for (const bone of ['missing', '', '__proto__']) {
+    assert.throws(() => setBonePropertyKeyframe(working, rig, bone, 'x', 500, 1));
+    assert.throws(() => removeBonePropertyKeyframe(working, rig, bone, 'x', 500));
+  }
+  assert.throws(() => setBonePropertyKeyframe(working, rig, 'root', 'opacity' as TransformProperty, 500, 1));
+  assert.throws(() => setBonePropertyKeyframe({ ...working, version: 99 }, rig, 'root', 'x', 500, 1));
+  for (const invalid of [
+    clip({
+      tracks: {
+        root: [
+          { time: 500, x: 1 },
+          { time: 0, x: 2 },
+        ],
+      },
+    }),
+    clip({
+      tracks: {
+        root: [
+          { time: 0, x: 1 },
+          { time: 0, y: 2 },
+        ],
+      },
+    }),
+    clip({ tracks: { missing: [{ time: 0, x: 1 }] } }),
+    clip({ events: [{ time: 0, name: 'bad', data: () => 1 }] }),
+  ]) {
+    assert.throws(() => setBonePropertyKeyframe(invalid, rig, 'root', 'x', 500, 1));
+    assert.throws(() => removeBonePropertyKeyframe(invalid, rig, 'root', 'x', 500));
+  }
+});
+
+test('evaluation reuses sparse runtime interpolation, rotation path, holds, and bind fallback', () => {
+  const source = clip({
+    tracks: {
+      root: [
+        { time: 250, x: 10, rotation: 3.1 },
+        { time: 1000, x: 100, rotation: -3.1 },
+      ],
+    },
+  });
+  const original = JSON.stringify(source);
+  const compiled = compileClip(source, rig);
+  for (const time of [0, 250, 500, 1000, 2000]) {
+    for (const property of ['x', 'rotation'] as const)
+      assert.equal(
+        getEvaluatedBonePropertyValue(source, rig, 'root', property, time),
+        evaluateClip(compiled, time).get('root')![property],
+      );
+    assert.equal(getEvaluatedBonePropertyValue(source, rig, 'root', 'scaleY', time), 2);
+    assert.equal(getEvaluatedBonePropertyValue(source, rig, 'child', 'y', time), 12);
+  }
+  assert.equal(getEvaluatedBonePropertyValue(source, rig, 'root', 'x', 0), 10);
+  assert.equal(getEvaluatedBonePropertyValue(source, rig, 'root', 'x', 2000), 100);
+  assert.approximately(getEvaluatedBonePropertyValue(source, rig, 'root', 'rotation', 625), Math.PI, 1e-12);
+  assert.equal(JSON.stringify(source), original);
+});
+
+test('stepped value queries preserve preview endpoint semantics and explicit unsnapped authored times', () => {
+  const source = clip({
+    duration: 1050,
+    loop: true,
+    playback: { mode: 'stepped', fps: 10 },
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 1050, x: 105 },
+      ],
+    },
+  });
+  assert.equal(getEvaluatedBonePropertyValue(source, rig, 'root', 'x', 742.123456), 70);
+  assert.equal(getEvaluatedBonePropertyValue(source, rig, 'root', 'x', 1050), 105);
+  assert.equal(getEvaluatedBonePropertyValue(source, rig, 'root', 'scaleX', 742.123456), 1);
+});
+
+test('state authoring changes only working snapshots, uses history/dirty state, and queries never notify', () => {
+  const input = clip();
+  const original = JSON.stringify(input);
+  const state = new AnimationEditorState(rig, [input]);
+  state.selectAnimation('move');
+  state.setCurrentTime(0.5);
+  const source = state.sourceAnimation;
+  const sourceSnapshot = JSON.stringify(source);
+  const baseline = state.workingAnimation;
+  const listener = vi.fn();
+  state.subscribe(listener);
+  assert.isFalse(state.hasKeyframeAtTime('root', 'rotation'));
+  assert.isUndefined(state.findBonePropertyKeyframe('root', 'rotation'));
+  assert.deepEqual(state.getKeyedPropertiesAtTime('root'), []);
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 4);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
+  assert.equal(listener.mock.calls.length, 0);
+
+  assert.isTrue(state.setBonePropertyKeyframe('root', 'rotation', 1));
+  assert.isTrue(state.dirty);
+  assert.equal(state.historyLength, 1);
+  assert.deepEqual(state.workingAnimation!.tracks.root, [{ time: 500, rotation: 1 }]);
+  assert.equal(JSON.stringify(state.sourceAnimation), sourceSnapshot);
+  assert.deepEqual(state.findBonePropertyKeyframe('root', 'rotation'), { time: 500, value: 1 });
+  assert.isTrue(state.hasKeyframeAtTime('root', 'rotation', 0.5000000001));
+  assert.deepEqual(state.getKeyedPropertiesAtTime('root'), ['rotation']);
+  assert.isTrue(state.setBonePropertyKeyframe('root', 'rotation', 2, 0.5000000001));
+  assert.equal(state.historyLength, 2);
+  assert.isTrue(state.dirty);
+  assert.deepEqual(state.workingAnimation!.tracks.root, [{ time: 500, rotation: 2 }]);
+  assert.equal(JSON.stringify(state.sourceAnimation), sourceSnapshot);
+  state.markSaved();
+  assert.isFalse(state.dirty);
+  assert.isTrue(state.removeBonePropertyKeyframe('root', 'rotation'));
+  assert.isTrue(state.dirty);
+  assert.deepEqual(state.workingAnimation!.tracks, {});
+  assert.equal(JSON.stringify(state.sourceAnimation), sourceSnapshot);
+  assert.equal(state.historyLength, 3);
+  assert.isTrue(state.undo());
+  assert.isFalse(state.dirty);
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'rotation'), 2);
+  state.undo();
+  state.undo();
+  assert.strictEqual(state.workingAnimation, baseline);
+  assert.isTrue(state.redo());
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'rotation'), 1);
+  assert.strictEqual(state.sourceAnimation, source);
+  assert.equal(JSON.stringify(input), original);
+  assert.deepEqual(source, input);
+});
+
+test('state no-op and invalid edits preserve working data, playback, history, and redo', () => {
+  const state = new AnimationEditorState(rig, [clip({ tracks: { root: [{ time: 500, x: 4 }] } })]);
+  state.selectAnimation('move');
+  state.setCurrentTime(0.5);
+  state.play();
+  state.setBonePropertyKeyframe('root', 'x', 5);
+  state.undo();
+  const working = state.workingAnimation;
+  assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 4));
+  assert.isTrue(state.removeBonePropertyKeyframe('root', 'rotation'));
+  assert.isTrue(state.canRedo);
+  assert.isFalse(state.dirty);
+  for (const edit of [
+    () => state.setBonePropertyKeyframe('missing', 'x', 1),
+    () => state.setBonePropertyKeyframe('root', 'x', NaN),
+    () => state.setBonePropertyKeyframe('root', 'x', 1, 3),
+    () => state.removeBonePropertyKeyframe('root', 'x', Infinity),
+  ]) {
+    assert.isFalse(edit());
+    assert.isNotEmpty(state.validationIssues);
+    assert.strictEqual(state.workingAnimation, working);
+    assert.isFalse(state.dirty);
+    assert.isTrue(state.canRedo);
+    assert.isFalse(state.canUndo);
+    assert.isTrue(state.isPlaying);
+    assert.equal(state.currentTime, 0.5);
+  }
+  assert.isTrue(state.redo());
+  assert.isTrue(state.dirty);
+  assert.equal(state.currentTime, 0.5);
+  assert.isTrue(state.isPlaying);
+  state.advancePlayback(0.25);
+  assert.equal(state.currentTime, 0.75);
+});
+
+test('keyframe state APIs handle unloaded and unselected sessions', () => {
+  for (const state of [new AnimationEditorState(), new AnimationEditorState(rig, [clip()])]) {
+    assert.isFalse(state.setBonePropertyKeyframe('root', 'x', 1));
+    assert.isFalse(state.removeBonePropertyKeyframe('root', 'x'));
+    assert.isUndefined(state.findBonePropertyKeyframe('root', 'x'));
+    assert.isUndefined(state.getEvaluatedBonePropertyValue('root', 'x'));
+    assert.isFalse(state.hasKeyframeAtTime('root', 'x'));
+    assert.deepEqual(state.getKeyedPropertiesAtTime('root'), []);
+    assert.isFalse(state.dirty);
+  }
+});

@@ -69,7 +69,7 @@ For browser checks, install Chromium with `npx playwright install chromium`, the
 ## Current limitations
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
-- One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine. The visual animation editor supports selection and scrubbing; keyframe authoring is deferred.
+- One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine. The animation editor supports selection, playback, scrubbing, and pure keyframe authoring APIs; visual keyframe controls remain deferred.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot planting is manual; the walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.

@@ -1,13 +1,23 @@
-import type { AnimationClip, AnimationPlaybackMode } from '../../engine/AnimationClip.js';
+import type { AnimationClip, AnimationPlaybackMode, PropertyKeyframe } from '../../engine/AnimationClip.js';
 import {
   ANIMATION_FORMAT_VERSION,
+  AnimationValidationError,
   inspectAnimationDefinition,
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { animationFileSchema } from '../../engine/schemas.js';
+import type { TransformProperty } from '../../engine/types.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import {
+  findBonePropertyKeyframe,
+  getEvaluatedBonePropertyValue,
+  getKeyedPropertiesAtTime,
+  hasKeyframeAtTime,
+  removeBonePropertyKeyframe,
+  setBonePropertyKeyframe,
+} from './keyframes.js';
 import { animationDurationSeconds, clampTime } from './timeline.js';
 
 export const PREVIEW_PLAYBACK_SPEEDS = [0.25, 0.5, 1, 1.5, 2] as const;
@@ -210,6 +220,70 @@ export class AnimationEditorState {
       ...this.working,
       playback: mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS },
     });
+  }
+
+  /** State-facing authoring uses continuous seconds, defaulting to the sole editor clock. */
+  setBonePropertyKeyframe(
+    boneId: string,
+    property: TransformProperty,
+    value: number,
+    timeSeconds = this.time,
+  ): boolean {
+    return this.editKeyframe((animation, rig) =>
+      setBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000, value),
+    );
+  }
+
+  removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.time): boolean {
+    return this.editKeyframe((animation, rig) =>
+      removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000),
+    );
+  }
+
+  private editKeyframe(edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation): boolean {
+    if (!this.working || !this.rig) return false;
+    let next: ReadonlyAnimation;
+    try {
+      next = edit(this.working, this.rig);
+    } catch (error) {
+      this.issues = freezeData(
+        error instanceof AnimationValidationError
+          ? error.issues
+          : [{ severity: 'error' as const, message: error instanceof Error ? error.message : String(error) }],
+      );
+      this.notify();
+      return false;
+    }
+    return this.replaceWorkingAnimation(next);
+  }
+
+  /** Queries never install animation snapshots or change validation, history, or dirty state.
+   * Returned keyframe times are milliseconds, matching the external authored format.
+   */
+  findBonePropertyKeyframe(
+    boneId: string,
+    property: TransformProperty,
+    timeSeconds = this.time,
+  ): PropertyKeyframe | undefined {
+    return this.working ? findBonePropertyKeyframe(this.working, boneId, property, timeSeconds * 1000) : undefined;
+  }
+
+  hasKeyframeAtTime(boneId: string, property: TransformProperty, timeSeconds = this.time): boolean {
+    return this.working ? hasKeyframeAtTime(this.working, boneId, property, timeSeconds * 1000) : false;
+  }
+
+  getKeyedPropertiesAtTime(boneId: string, timeSeconds = this.time): TransformProperty[] {
+    return this.working ? getKeyedPropertiesAtTime(this.working, boneId, timeSeconds * 1000) : [];
+  }
+
+  getEvaluatedBonePropertyValue(
+    boneId: string,
+    property: TransformProperty,
+    timeSeconds = this.time,
+  ): number | undefined {
+    return this.working && this.rig
+      ? getEvaluatedBonePropertyValue(this.working, this.rig, boneId, property, timeSeconds * 1000)
+      : undefined;
   }
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */

@@ -18,6 +18,59 @@ vi.mock('phaser', () => ({
 }));
 
 test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
+  'authored keyframe edits and undo/redo immediately refresh $mode preview without advancing the clock',
+  (playback) => {
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 4 }] });
+    const clip: AnimationClip = {
+      name: 'move',
+      duration: 1050,
+      loop: true,
+      playback,
+      tracks: {},
+      events: [
+        { time: 0, name: 'start' },
+        { time: 500, name: 'middle' },
+      ],
+    };
+    const state = new AnimationEditorState(rig, [clip]);
+    state.selectAnimation('move');
+    state.setCurrentTime(0.5);
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const preview = new AnimationEditorPreview(state, puppet);
+    const assertValue = (value: number) => {
+      assert.equal(puppet.getBone('root').pose.x, value);
+      assert.equal(puppet.getBone('root').container.x, value);
+      assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), value);
+      assert.equal(state.currentTime, 0.5);
+    };
+    assertValue(4);
+    state.setBonePropertyKeyframe('root', 'x', 10);
+    assertValue(10);
+    assert.isFalse(state.isPlaying);
+    state.setBonePropertyKeyframe('root', 'x', 20);
+    assertValue(20);
+    state.removeBonePropertyKeyframe('root', 'x');
+    assertValue(4);
+    state.undo();
+    assertValue(20);
+    state.redo();
+    assertValue(4);
+
+    // Active edits remain safe and keep the existing playback intent and clock.
+    state.play();
+    state.setBonePropertyKeyframe('root', 'x', 30);
+    assertValue(30);
+    assert.isTrue(state.isPlaying);
+    state.advancePlayback(0.1);
+    assert.approximately(state.currentTime, 0.6, 1e-12);
+    assert.equal(puppet.getBone('root').pose.x, 30);
+    assert.deepEqual(state.sourceAnimation!.tracks, {});
+    preview.dispose();
+    puppet.destroy();
+  },
+);
+
+test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
   'preview matches runtime sampling for $mode and keeps precise timeline time',
   (playback) => {
     const rig = new Rig({ root: 'root', bones: [{ id: 'root', x: 4 }] });
