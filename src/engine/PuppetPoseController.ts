@@ -129,7 +129,7 @@ export class PuppetPoseController {
         const middleRotation = middle.pose.rotation;
         constraint.apply(this.ikContext);
         // Later providers may read attachments in any descendant render mount.
-        // Project only changed local transforms into all of their copies.
+        // Recompose render branches beneath each changed local transform.
         this.syncIKBone(root, rootRotation);
         this.syncIKBone(middle, middleRotation);
       }

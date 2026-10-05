@@ -10,7 +10,7 @@ import { rendererFixture } from './helpers/rendererFixture.js';
 
 vi.mock('phaser', () => ({ default: {} }));
 
-test('a deep slot rig allocates only the visible chain and creates reusable prop mounts on demand', () => {
+test('deep slot rigs allocate two affine factors per drawable and reuse lazy prop mounts', () => {
   const count = 128;
   const { renderer, allocations } = rendererFixture({
     root: 'bone0',
@@ -20,9 +20,9 @@ test('a deep slot rig allocates only the visible chain and creates reusable prop
     })),
     slots: [{ id: 'item', bone: `bone${count - 1}` }],
   });
-  assert.equal(allocations.projections, count, 'one ancestor chain for the slot');
+  assert.equal(allocations.projections, 2, 'two affine factors for the slot regardless of skeleton depth');
   const mount = renderer.getMount('bone63');
-  assert.equal(allocations.projections, count + 64, 'a prop mount adds only its own chain');
+  assert.equal(allocations.projections, 4, 'a prop mount adds two factors');
   const containers = allocations.containers;
   assert.strictEqual(renderer.getMount('bone63'), mount);
   assert.equal(allocations.containers, containers, 'reusing a prop mount creates no containers');
@@ -74,8 +74,8 @@ test('lazy prop mounts immediately preserve affine transforms, current depth, an
   const root = bones.get('root')!.container;
   root.setAlpha(0.2).setVisible(false);
   renderer.syncBone('root');
-  assert.equal(mount.parentContainer!.parentContainer!.alpha, 0.2);
-  assert.isFalse(mount.parentContainer!.parentContainer!.visible);
+  assert.equal(branch.alpha, 0.2);
+  assert.isFalse(branch.visible);
   renderer.setOrder(['root', 'upper', 'hand']);
   assert.equal(branch.depth, 20, 'later order changes update the existing prop branch');
 });
@@ -85,12 +85,99 @@ test('bones with authored sprites retain eagerly initialized mounts', () => {
     root: 'root',
     bones: [{ id: 'root', x: 12, sprite: { texture: 'part' } }],
   });
-  assert.equal(allocations.projections, 1);
+  assert.equal(allocations.projections, 2);
   const containers = allocations.containers;
   const mount = renderer.getMount('root');
   assert.strictEqual(bones.get('root')!.sprite!.parentContainer, mount);
-  assert.equal(mount.x, 12);
+  assert.equal(mount.getWorldTransformMatrix().tx, 12);
   assert.equal(allocations.containers, containers);
+});
+
+test('lazy mounts retain current unsynchronized ancestor edits through later partial updates', () => {
+  const { renderer, bones } = rendererFixture({
+    root: 'root',
+    bones: [
+      { id: 'root', x: 10, scaleX: 2, scaleY: 0.5 },
+      { id: 'hand', parent: 'root', y: 20 },
+    ],
+  });
+  bones.get('root')!.container.setRotation(0.8).setAlpha(0.4);
+  const hand = bones.get('hand')!.container;
+  const mount = renderer.getMount('hand');
+  assertSameMatrix(mount, hand);
+  hand.setRotation(-0.7);
+  renderer.syncBone('hand');
+  assertSameMatrix(mount, hand);
+  assert.equal(mount.parentContainer!.alpha, 0.4);
+});
+
+function assertSameMatrix(actual: Phaser.GameObjects.Container, expected: Phaser.GameObjects.Container): void {
+  const result = actual.getWorldTransformMatrix();
+  const source = expected.getWorldTransformMatrix();
+  for (const field of ['a', 'b', 'c', 'd', 'tx', 'ty'] as const)
+    assert.closeTo(result[field], source[field], Math.max(1, Math.abs(source[field])) * 1e-11, field);
+}
+
+test('dense deep rigs allocate linearly and preserve affine transforms through full and partial synchronization', () => {
+  const count = 128;
+  const { renderer, bones, allocations, parent } = rendererFixture({
+    root: 'bone0',
+    bones: Array.from({ length: count }, (_, index) => ({
+      id: `bone${index}`,
+      ...(index ? { parent: `bone${index - 1}` } : {}),
+      x: (index % 3) - 1,
+      y: index % 4,
+      rotation: Math.sin(index) * 0.2,
+      scaleX: index % 2 ? -1.03 : 0.97,
+      scaleY: index % 2 ? 0.98 : 1.02,
+      sprite: { texture: 'part' },
+    })),
+  });
+  assert.equal(allocations.projections, count * 2);
+  assert.equal(allocations.containers, count * 3 + 2);
+  parent.setScale(0, -2).setRotation(0.3).setPosition(20, 10);
+  for (const [id, bone] of bones) assertSameMatrix(renderer.getMount(id), bone.container);
+  parent.setScale(-2, 0.7);
+  const changed = bones.get('bone63')!;
+  changed.container.setRotation(0.8).setScale(0, -1.5);
+  renderer.syncBone(changed.id);
+  for (const [id, bone] of bones) assertSameMatrix(renderer.getMount(id), bone.container);
+  changed.container.setScale(-0.7, 1.5);
+  bones.get('bone0')!.container.setAlpha(0.5);
+  bones.get('bone64')!.container.setAlpha(0.4).setVisible(false);
+  renderer.sync();
+  for (const [id, bone] of bones) assertSameMatrix(renderer.getMount(id), bone.container);
+  const leafBranch = renderer.getMount('bone127').parentContainer!;
+  assert.closeTo(leafBranch.alpha, 0.2, 1e-15);
+  assert.isFalse(leafBranch.visible);
+  const containers = allocations.containers;
+  renderer.sync();
+  assert.equal(allocations.containers, containers);
+});
+
+test('partial synchronization leaves unrelated unpublished local edits unchanged', () => {
+  const { renderer, bones } = rendererFixture({
+    root: 'root',
+    bones: [
+      { id: 'root', rotation: 0.3, scaleX: 2, scaleY: 0.5 },
+      { id: 'left', parent: 'root', x: 10, sprite: { texture: 'part' } },
+      { id: 'right', parent: 'root', x: -10, sprite: { texture: 'part' } },
+    ],
+  });
+  const left = renderer.getMount('left');
+  const before = left.getWorldTransformMatrix();
+  bones.get('left')!.container.setPosition(200, 0);
+  bones.get('right')!.container.setRotation(0.7);
+  renderer.syncBone('right');
+  const after = left.getWorldTransformMatrix();
+  for (const field of ['a', 'b', 'c', 'd', 'tx', 'ty'] as const) assert.equal(after[field], before[field]);
+  assertSameMatrix(renderer.getMount('right'), bones.get('right')!.container);
+  bones.get('root')!.container.setRotation(0.8);
+  renderer.syncBone('root');
+  assertSameMatrix(renderer.getMount('right'), bones.get('right')!.container);
+  assert.notEqual(left.getWorldTransformMatrix().tx, bones.get('left')!.container.getWorldTransformMatrix().tx);
+  renderer.sync();
+  assertSameMatrix(left, bones.get('left')!.container);
 });
 
 function fixture(depth?: number) {
@@ -103,6 +190,8 @@ function fixture(depth?: number) {
       rotation: 0,
       scaleX: 1,
       scaleY: 1,
+      alpha: 1,
+      visible: true,
       setName(name: string) {
         containers.set(name, this as unknown as Phaser.GameObjects.Container);
         return this;

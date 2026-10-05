@@ -48,7 +48,7 @@ A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scen
 | 32 tracked bones, three layers with fades | 170.53 | 114.17 |
 | 36 bones, one active and 12 inactive IK constraints | 41.19 | 10.37 |
 
-Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into all of its render projections before later target providers run. Inactive constraints still update their status without adding projection passes.
+Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into its descendant render branches before later target providers run. Inactive constraints still update their status without adding projection passes.
 
 Profile renderer scaling separately from animation and IK:
 
@@ -58,14 +58,16 @@ VITE_PROFILE=1 npx vitest run tests/puppetRenderer.profile.test.ts --reporter=ve
 
 The profile compares 32- and 128-bone chains with a leaf slot, chains with artwork on every bone, and shallow rigs with a leaf slot. It reports actual container/transform-copy allocations and warmed CPU synchronization medians, excluding browser/GPU costs. Timings are diagnostic and have no test thresholds.
 
-Bones without authored sprites allocate an independent render branch only when `attach()` needs a prop mount. Slot branches and sprite branches still retain full ancestor chains, preserving affine transforms and shear. Lazy mounts initialize from the current pose and render order immediately, and participate in subsequent full and partial synchronization. A deep chain with one leaf slot now needs one transform copy per bone, instead of copies for every empty joint's ancestor chain:
+Bones without authored sprites allocate an independent render branch only when `attach()` needs a prop mount. Each sprite, slot, or prop branch uses two transform containers to represent its complete affine transform, including shear, reflection, and singular scales. The renderer composes skeleton matrices in parent order once per full synchronization. Partial IK synchronization recomposes only the changed bone's subtree, preserving unrelated unpublished edits and making descendant mounts current before later target providers run. Creating a lazy mount publishes current source transforms to the renderer before attaching the prop, so subsequent partial updates retain that same ancestor state. The mount uses the current draw order immediately.
 
-| Bones | Previous transform copies | Current transform copies | Previous containers | Current containers |
-| --- | ---: | ---: | ---: | ---: |
-| 32 | 560 | 32 | 628 | 68 |
-| 128 | 8,384 | 128 | 8,644 | 260 |
+| Workload | Bones | Previous transform copies | Current transform factors | Previous containers | Current containers |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Chain, leaf slot | 32 | 32 | 2 | 68 | 37 |
+| Chain, leaf slot | 128 | 128 | 2 | 260 | 133 |
+| Chain, all sprites | 32 | 528 | 64 | 594 | 98 |
+| Chain, all sprites | 128 | 8,256 | 256 | 8,514 | 386 |
 
-Container counts include the source skeleton and fixture root. Every additional prop mount allocates its ancestor chain once and reuses it thereafter. Chains with artwork on every bone still require quadratic transform-copy counts; use the dense-artwork profile to assess those rigs before changing their projection strategy.
+Container counts include the source skeleton and fixture root. Each additional prop mount allocates two transform containers once and reuses them thereafter. Dense artwork now requires linear storage and synchronization work. One local CPU profile measured the 128-bone dense chain at about 26 microseconds per synchronization, versus about 459 microseconds before this change; timings vary by machine. Sparse rigs still traverse their skeleton during full synchronization, so their CPU cost depends on bone count even with only one drawable.
 
 Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph.
 
@@ -91,7 +93,8 @@ src/engine/
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
   PuppetPoseController.ts  Pose overrides, restoration, IK ordering and projection passes
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay
-  PuppetRenderer.ts    Independent draw slots retaining ancestor transform chains
+  PuppetRenderer.ts    Independent draw slots with constant-size affine factors
+  affineProjection.ts  Two-factor affine decomposition preserving shear and singular scales
   SlotState.ts         Attachment selection and base/partial skin application
   SlotDebug.ts         Scene-space slot position and assignment overlay
   ik/
@@ -109,7 +112,8 @@ src/demo/
   DemoPoseAuthoring.ts  Static pose editing, inspector and export
   DemoPresenter.ts     Sampled pose layout, IK coordination and target markers
   DemoFootPlanting.ts  Ground targets, body sway and walk contact constraints
-  DemoKatanaController.ts  Weapon modes, arm targets and continuous rear-palm constraints
+  DemoKatanaController.ts  Weapon modes, arm targets, mounting and draw layers
+  DemoKatanaGripSolver.ts  Rear-palm clearance, path continuity and reach recovery
   demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
   demoCharacterProfiles.ts  Per-character placement, facing, grips, foot contacts and IK configuration
   demoIK.ts            Default arm/leg chains with explicit execution priorities
@@ -146,7 +150,7 @@ docs/                  Focused user and developer guides
 src/main.ts            Demo bootstrap and control panel
 ```
 
-The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with a copy of their ancestor transform chain. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. Debug overlays allocate their Phaser objects only when first enabled and reuse them across toggles; label-side settings made before enabling debug are retained. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
+The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with two factors representing their composed ancestor transform. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. Debug overlays allocate their Phaser objects only when first enabled and reuse them across toggles; label-side settings made before enabling debug are retained. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
 
 Demo character identities and picker labels live in `src/shared/characterCatalog.ts`; presentation is configured in `src/demo/demoCharacterProfiles.ts`. Each profile supplies clip names for the idle, walk, and sword actions, the upper-body clip and bone mask, combat pose name, appearance overrides, stage placement, IK definitions and names, layout/facing behavior, katana grip and clearance settings, and foot contact settings. The default skin comes from the character definition. The demo scene, presenter, pose authoring, and rig-editor IK preview consume those profiles. Register another catalog entry and profile alongside its character definition to add a demo character; sample layout and sketch limb swapping still expect their existing humanoid bone and limb attachment conventions.
 

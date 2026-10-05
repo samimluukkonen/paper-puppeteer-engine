@@ -14,7 +14,7 @@ export function rendererFixture(definition: RigDefinition) {
     const container = addContainer(x, y);
     const setName = container.setName.bind(container);
     container.setName = (name) => {
-      if (name.startsWith('pose-')) allocations.projections += 1;
+      if (name.startsWith('pose-') || name.startsWith('render-')) allocations.projections += 1;
       return setName(name);
     };
     return container;

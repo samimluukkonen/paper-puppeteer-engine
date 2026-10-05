@@ -1,28 +1,65 @@
 import type Phaser from 'phaser';
+import type { Affine } from './affineMath.js';
+import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
 import type { SpriteAttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
-
-interface TransformProjection {
-  source: Phaser.GameObjects.Container;
-  target: Phaser.GameObjects.Container;
-}
 
 interface RenderBranch {
   root: Phaser.GameObjects.Container;
   mount: Phaser.GameObjects.Container;
 }
 
-/** Independent draw slots retain complete ancestor transforms, including shear. */
+interface ProjectionNode {
+  source: Phaser.GameObjects.Container;
+  parent: ProjectionNode | undefined;
+  children: ProjectionNode[];
+  branches: RenderBranch[];
+  local: Affine;
+  world: Affine;
+  localAlpha: number;
+  localVisible: boolean;
+  alpha: number;
+  visible: boolean;
+}
+
+const identity = (): Affine => ({ a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 });
+
+function readLocal(source: Phaser.GameObjects.Container, matrix: Affine): void {
+  const cos = Math.cos(source.rotation);
+  const sin = Math.sin(source.rotation);
+  matrix.a = cos * source.scaleX;
+  matrix.b = sin * source.scaleX;
+  matrix.c = -sin * source.scaleY;
+  matrix.d = cos * source.scaleY;
+  matrix.tx = source.x;
+  matrix.ty = source.y;
+}
+
+function compose(local: Affine, parent: Affine | undefined, result: Affine): void {
+  if (!parent) {
+    Object.assign(result, local);
+    return;
+  }
+  result.a = parent.a * local.a + parent.c * local.b;
+  result.b = parent.b * local.a + parent.d * local.b;
+  result.c = parent.a * local.c + parent.c * local.d;
+  result.d = parent.b * local.c + parent.d * local.d;
+  result.tx = parent.a * local.tx + parent.c * local.ty + parent.tx;
+  result.ty = parent.b * local.tx + parent.d * local.ty + parent.ty;
+}
+
+/** Independent draw slots use two transform factors to retain arbitrary affine shear. */
 export class PuppetRenderer {
   private readonly container: Phaser.GameObjects.Container;
   private readonly branches = new Map<string, RenderBranch>();
   private readonly slotBranches = new Map<string, RenderBranch>();
   private readonly slotImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly slotDepthOverrides = new Map<string, number>();
-  private readonly projections: TransformProjection[] = [];
-  private readonly boneProjections = new Map<string, TransformProjection[]>();
+  private readonly nodes = new Map<string, ProjectionNode>();
+  private readonly pending: ProjectionNode[] = [];
+  private readonly factors: AffineFactors = { rotation: 0, scaleX: 1, scaleY: 1, innerRotation: 0, innerScale: 1 };
   private order: readonly string[] = Object.freeze([]);
 
   constructor(
@@ -33,6 +70,24 @@ export class PuppetRenderer {
   ) {
     this.container = scene.add.container(0, 0).setName('puppet-render');
     parent.add(this.container);
+    for (const definition of rig.bones) {
+      const node: ProjectionNode = {
+        source: bones.get(definition.id)!.container,
+        parent: definition.parent === undefined ? undefined : this.nodes.get(definition.parent),
+        children: [],
+        branches: [],
+        local: identity(),
+        world: identity(),
+        localAlpha: 1,
+        localVisible: true,
+        alpha: 1,
+        visible: true,
+      };
+      this.nodes.set(definition.id, node);
+      node.parent?.children.push(node);
+      this.readNode(node);
+      this.updateNode(node);
+    }
     for (const bone of bones.values()) {
       // Empty joints need no independent draw branch until a host attaches a prop.
       if (!bone.sprite) continue;
@@ -53,31 +108,15 @@ export class PuppetRenderer {
   }
 
   private makeBranch(name: string, bone: Bone): RenderBranch {
-    const ancestors: Bone[] = [];
-    let ancestor: Bone | undefined = bone;
-    while (ancestor) {
-      ancestors.push(ancestor);
-      ancestor = ancestor.parentId === undefined ? undefined : this.bones.get(ancestor.parentId);
-    }
     const root = this.scene.add.container(0, 0).setName(`render-${name}`);
+    const mount = this.scene.add.container(0, 0).setName(`pose-${bone.id}`);
     this.container.add(root);
-    let mount = root;
-    const newProjections: TransformProjection[] = [];
-    // Keeping the chain avoids decomposing a rotated, nonuniformly scaled matrix.
-    for (const source of ancestors.reverse()) {
-      const target = this.scene.add.container(0, 0).setName(`pose-${source.id}`);
-      mount.add(target);
-      const projection = { source: source.container, target };
-      this.projections.push(projection);
-      newProjections.push(projection);
-      const projections = this.boneProjections.get(source.id) ?? [];
-      projections.push(projection);
-      this.boneProjections.set(source.id, projections);
-      mount = target;
-    }
-    // A lazy attachment can be created between pose updates; initialize it immediately.
-    this.syncProjections(newProjections);
-    return { root, mount };
+    root.add(mount);
+    const branch = { root, mount };
+    const node = this.nodes.get(bone.id)!;
+    node.branches.push(branch);
+    this.project(branch, node.world, node.alpha, node.visible);
+    return branch;
   }
 
   getOrder(): readonly string[] {
@@ -114,6 +153,9 @@ export class PuppetRenderer {
     if (!branch) {
       const bone = this.bones.get(id);
       if (!bone) throw new Error(`Unknown bone "${id}".`);
+      // Publish current source transforms before adding a mount so later partial
+      // updates cannot restore an older ancestor cached before this attachment.
+      this.sync();
       branch = this.makeBranch(id, bone);
       branch.root.setDepth(this.order.indexOf(id) * 10);
       this.branches.set(id, branch);
@@ -181,25 +223,47 @@ export class PuppetRenderer {
   }
 
   sync(): void {
-    this.syncProjections(this.projections);
-  }
-
-  /** Update every copy of a changed local bone transform, including descendant slot branches. */
-  syncBone(id: string): void {
-    if (!this.rig.hasBone(id)) throw new Error(`Unknown bone "${id}".`);
-    const projections = this.boneProjections.get(id);
-    if (projections) this.syncProjections(projections);
-  }
-
-  private syncProjections(projections: readonly TransformProjection[]): void {
-    for (const { source, target } of projections) {
-      target
-        .setPosition(source.x, source.y)
-        .setRotation(source.rotation)
-        .setScale(source.scaleX, source.scaleY)
-        .setAlpha(source.alpha)
-        .setVisible(source.visible);
+    for (const node of this.nodes.values()) {
+      this.readNode(node);
+      this.updateNode(node);
     }
+  }
+
+  /** Recompose only the changed joint's descendants before later IK providers read mounts. */
+  syncBone(id: string): void {
+    const node = this.nodes.get(id);
+    if (!node) throw new Error(`Unknown bone "${id}".`);
+    this.readNode(node);
+    this.pending.push(node);
+    while (this.pending.length) {
+      const descendant = this.pending.pop()!;
+      this.updateNode(descendant);
+      for (const child of descendant.children) this.pending.push(child);
+    }
+  }
+
+  private readNode(node: ProjectionNode): void {
+    readLocal(node.source, node.local);
+    node.localAlpha = node.source.alpha;
+    node.localVisible = node.source.visible;
+  }
+
+  private updateNode(node: ProjectionNode): void {
+    compose(node.local, node.parent?.world, node.world);
+    node.alpha = node.localAlpha * (node.parent?.alpha ?? 1);
+    node.visible = node.localVisible && (node.parent?.visible ?? true);
+    for (const branch of node.branches) this.project(branch, node.world, node.alpha, node.visible);
+  }
+
+  private project(branch: RenderBranch, matrix: Affine, alpha: number, visible: boolean): void {
+    const factors = factorAffine(matrix, this.factors);
+    branch.root
+      .setPosition(matrix.tx, matrix.ty)
+      .setRotation(factors.rotation)
+      .setScale(factors.scaleX, factors.scaleY)
+      .setAlpha(alpha)
+      .setVisible(visible);
+    branch.mount.setRotation(factors.innerRotation).setScale(factors.innerScale);
   }
 
   destroy(): void {
@@ -208,7 +272,7 @@ export class PuppetRenderer {
     this.slotBranches.clear();
     this.slotImages.clear();
     this.slotDepthOverrides.clear();
-    this.projections.length = 0;
-    this.boneProjections.clear();
+    this.nodes.clear();
+    this.pending.length = 0;
   }
 }
