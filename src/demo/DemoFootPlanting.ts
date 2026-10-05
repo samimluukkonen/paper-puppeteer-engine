@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { IKTarget, Puppet } from '../engine/index.js';
+import { type DemoCharacterProfile, demoPuppetProfile } from './demoCharacterProfiles.js';
 import {
   demoWalkFootIK,
   type FootSoles,
@@ -9,7 +10,6 @@ import {
 } from './demoFootTargets.js';
 
 type Feet = Readonly<Record<'left' | 'right', IKTarget>>;
-const SKETCH_STANCE_OFFSET = 7;
 
 export interface DemoFootPlantingFrame {
   targets: Feet;
@@ -29,24 +29,25 @@ export class DemoFootPlanting {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly puppet: Puppet,
-    private readonly sampleLayout = true,
+    private readonly profile: DemoCharacterProfile = demoPuppetProfile,
   ) {
     const { width, height } = scene.scale;
     this.groundTargets = {
-      left: { x: width / 2 + 24, y: height - 130 },
-      right: { x: width / 2 - 24, y: height - 130 },
+      left: { x: width / 2 + profile.feet.groundXOffset, y: height - profile.feet.groundYOffset },
+      right: { x: width / 2 - profile.feet.groundXOffset, y: height - profile.feet.groundYOffset },
     };
-    if (!sampleLayout) {
+    if (profile.feet.mode === 'sole-contacts') {
       for (const side of ['left', 'right'] as const) {
-        const ankle = puppet.getBone(`${side}Foot`).getWorldPosition();
-        const image = puppet.getSlotImage(`${side}FootVisual`)!;
+        const leg = puppet.getIK(profile.legIK[side]);
+        const ankle = puppet.getBone(leg.endBone).getWorldPosition();
+        const image = puppet.getSlotImage(profile.feet.visualSlots[side])!;
         const matrix = image.getWorldTransformMatrix();
         const left = -image.originX * image.width;
         const top = -image.originY * image.height;
         const toe = matrix.transformPoint(left, top + image.height);
         const heel = matrix.transformPoint(left + image.width, top + image.height);
-        const hip = puppet.getBone(`${side}Thigh`).getWorldPosition();
-        const knee = puppet.getBone(`${side}LowerLeg`).getWorldPosition();
+        const hip = puppet.getBone(leg.rootBone).getWorldPosition();
+        const knee = puppet.getBone(leg.middleBone).getWorldPosition();
         Object.assign(this.soles[side], {
           toe: { x: toe.x - ankle.x, y: toe.y - ankle.y },
           heel: { x: heel.x - ankle.x, y: heel.y - ankle.y },
@@ -58,8 +59,8 @@ export class DemoFootPlanting {
         const heelOffset = this.soles[side].heel;
         const cos = Math.cos(SKETCH_HEEL_STRIKE_ANGLE);
         const sin = Math.sin(SKETCH_HEEL_STRIKE_ANGLE);
-        const contactY = height - 115 - (heelOffset.x * sin + heelOffset.y * cos);
-        const vertical = contactY - hip.y - SKETCH_STANCE_OFFSET;
+        const contactY = height - profile.feet.floorYOffset - (heelOffset.x * sin + heelOffset.y * cos);
+        const vertical = contactY - hip.y - profile.feet.stanceOffset;
         const heelPivotX = heelOffset.x - (heelOffset.x * cos - heelOffset.y * sin);
         this.forwardReaches[side] = Math.sqrt(Math.max(0, reachSquared - vertical * vertical)) - heelPivotX;
         const bottom = Math.max(
@@ -67,10 +68,10 @@ export class DemoFootPlanting {
             [top, top + image.height].map((y) => matrix.transformPoint(x, y).y),
           ),
         );
-        // The contact phase adds seven pixels; fit each sole to the actual stage floor.
+        // Subtract the contact offset so each sole reaches the actual stage floor.
         Object.assign(this.groundTargets[side], {
           x: hip.x,
-          y: height - 115 - (bottom - ankle.y) - 7,
+          y: height - profile.feet.floorYOffset - (bottom - ankle.y) - profile.feet.contactOffset,
         });
       }
     }
@@ -86,15 +87,19 @@ export class DemoFootPlanting {
     this.resetFootRotation();
     const plantWalkFeet = enabled && this.puppet.currentAnimation === 'walk';
     // Give the sketch's extended stance some knee bend so floor contacts stay within IK reach.
-    const stanceOffset = plantWalkFeet && !this.sampleLayout ? SKETCH_STANCE_OFFSET : 0;
+    const stanceOffset = plantWalkFeet ? this.profile.feet.stanceOffset : 0;
     const player = this.puppet.animationPlayer;
     const phase = player.duration > 0 ? player.elapsedTime / player.duration : 0;
     // Rise over each supporting leg, then settle for the next contact. Tie the bob to the stride.
-    const swayX = this.sampleLayout ? 7 * Math.sin(this.elapsed / 1000) : 0;
-    const swayY = this.sampleLayout ? 3 * Math.sin(this.elapsed / 700) : -2 * Math.sin(2 * Math.PI * phase) ** 2;
+    const sway = this.profile.feet.sway;
+    const swayX =
+      sway.xAmplitude * Math.sin(sway.mode === 'elapsed' ? this.elapsed / sway.xPeriodMs : 2 * Math.PI * phase);
+    const swayY =
+      sway.yAmplitude *
+      (sway.mode === 'elapsed' ? Math.sin(this.elapsed / sway.yPeriodMs) : Math.sin(2 * Math.PI * phase) ** 2);
     this.puppet.container.setPosition(
       this.scene.scale.width / 2 + (plantWalkFeet ? swayX : 0),
-      this.scene.scale.height - 278 + (plantWalkFeet ? swayY : 0) + stanceOffset,
+      this.scene.scale.height - this.profile.placement.yOffset + (plantWalkFeet ? swayY : 0) + stanceOffset,
     );
     const ground = {
       left: this.facingGround('left'),
@@ -102,7 +107,7 @@ export class DemoFootPlanting {
     };
     const canonicalFeet = !plantWalkFeet
       ? undefined
-      : !this.sampleLayout
+      : this.profile.feet.mode === 'sole-contacts'
         ? sketchWalkFootIK(
             this.puppet.animationPlayer.elapsedTime,
             this.puppet.animationPlayer.duration,
@@ -116,12 +121,12 @@ export class DemoFootPlanting {
             right: this.animatedAnkle('right'),
           });
     const walkFeet =
-      canonicalFeet && !this.sampleLayout && this.puppet.facingDirection === 'left'
+      canonicalFeet && this.profile.swapLimbsWithFacing && this.puppet.facingDirection === 'left'
         ? { left: canonicalFeet.right, right: canonicalFeet.left }
         : canonicalFeet;
     const footTargets = walkFeet ? { left: walkFeet.left.target, right: walkFeet.right.target } : this.groundTargets;
     for (const side of ['left', 'right'] as const) {
-      const leg = this.puppet.getIK(`${side}LegIK`);
+      const leg = this.puppet.getIK(this.profile.legIK[side]);
       leg.enabled = plantWalkFeet;
       leg.mix = walkFeet?.[side].mix ?? 1;
       leg.setTarget(footTargets[side]);
@@ -130,9 +135,9 @@ export class DemoFootPlanting {
   }
 
   resetFootRotation(): void {
-    if (this.sampleLayout) return;
+    if (this.profile.feet.mode !== 'sole-contacts') return;
     for (const side of ['left', 'right'] as const) {
-      const slot = `${side}FootVisual`;
+      const slot = this.profile.feet.visualSlots[side];
       this.puppet.setSlotTransform(slot, { rotation: this.puppet.rig.getSlot(slot).rotation ?? 0 }, false);
     }
   }
@@ -140,31 +145,32 @@ export class DemoFootPlanting {
   private facingGround(side: 'left' | 'right'): IKTarget {
     const ground = this.groundTargets[side];
     const center = this.scene.scale.width / 2;
-    const mirror = !this.sampleLayout && this.puppet.facingDirection === 'left';
-    return { x: mirror ? 2 * center - ground.x : ground.x, y: ground.y + 7 };
+    const mirror = this.profile.swapLimbsWithFacing && this.puppet.facingDirection === 'left';
+    return { x: mirror ? 2 * center - ground.x : ground.x, y: ground.y + this.profile.feet.contactOffset };
   }
 
   /** Compensate for the solved shin angle without changing the authored animation or ankle target. */
   syncFootRotation(walkFeet: DemoFootPlantingFrame['walkFeet']): void {
-    if (this.sampleLayout || !walkFeet) return;
+    if (this.profile.feet.mode !== 'sole-contacts' || !walkFeet) return;
     for (const side of ['left', 'right'] as const) {
       let angle = 0;
-      let id: string | undefined = `${side}Foot`;
+      let id: string | undefined = this.puppet.getIK(this.profile.legIK[side]).endBone;
       while (id) {
         angle += this.puppet.getBone(id).pose.rotation;
         id = this.puppet.rig.getBone(id).parent;
       }
-      const slot = `${side}FootVisual`;
+      const slot = this.profile.feet.visualSlots[side];
       this.puppet.setSlotTransform(slot, { rotation: (walkFeet[side].rotation ?? 0) - angle }, false);
     }
   }
 
   private animatedAnkle(side: 'left' | 'right'): IKTarget {
     const puppet = this.puppet;
-    const pelvis = puppet.getBone('pelvis').pose;
-    const thigh = puppet.getBone(`${side}Thigh`).pose;
-    const shin = puppet.getBone(`${side}LowerLeg`).pose;
-    const foot = puppet.getBone(`${side}Foot`).pose;
+    const leg = puppet.getIK(this.profile.legIK[side]);
+    const pelvis = puppet.getBone(this.profile.feet.pelvisBone).pose;
+    const thigh = puppet.getBone(leg.rootBone).pose;
+    const shin = puppet.getBone(leg.middleBone).pose;
+    const foot = puppet.getBone(leg.endBone).pose;
     // This demo rig has an unrotated pelvis and vertical, unscaled leg links.
     const x =
       pelvis.x + thigh.x - shin.y * Math.sin(thigh.rotation) - foot.y * Math.sin(thigh.rotation + shin.rotation);

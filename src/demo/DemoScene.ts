@@ -5,7 +5,7 @@ import { loadSceneCharacter } from '../shared/loadSceneCharacter.js';
 import { DemoInput } from './DemoInput.js';
 import { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import { createDemoBackdrop, DemoPresenter } from './DemoPresenter.js';
-import { demoIK } from './demoIK.js';
+import { type DemoCharacterProfile, demoPuppetProfile, getDemoCharacterProfile } from './demoCharacterProfiles.js';
 
 export interface DemoState {
   animation: string;
@@ -44,7 +44,7 @@ export class DemoScene extends Phaser.Scene {
   private skin = 'default';
   private gripHand = false;
   private helmet = false;
-  private sampleLayout = true;
+  private profile: DemoCharacterProfile = demoPuppetProfile;
   private commandDepth = 0;
   private readonly prepareAnimationPose = (): void => this.presentation?.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.updatePresentation(true);
@@ -85,31 +85,31 @@ export class DemoScene extends Phaser.Scene {
   }
 
   private createPuppet(definition: CharacterDefinition): void {
-    this.sampleLayout = definition.id === 'demo-puppet';
+    this.profile = getDemoCharacterProfile(definition.id);
     this.handIK = false;
     this.footIK = false;
     this.upperBody = false;
     this.lastEvent = 'none';
-    this.skin = 'default';
+    this.skin = definition.defaultSkin;
     this.gripHand = false;
     this.helmet = false;
-    createDemoBackdrop(this);
+    createDemoBackdrop(this, definition.rig.bones.length, this.profile);
     const { width, height } = this.scale;
     this.puppet = new Puppet(this, {
       definition,
       x: width / 2,
-      y: height - 278,
-      ik: demoIK,
-      scale: 1.08,
+      y: height - this.profile.placement.yOffset,
+      ik: this.profile.ikChains,
+      scale: this.profile.placement.scale,
       autoUpdate: false,
     });
-    this.presentation = new DemoPresenter(this, this.puppet, this.sampleLayout);
+    this.presentation = new DemoPresenter(this, this.puppet, this.profile);
     this.puppet.play('idle');
     this.puppet.onAnimationEvent((event) => {
       this.lastEvent = `${event.clip}: ${event.name}`;
       this.notify();
     });
-    this.authoring = new DemoPoseAuthoring(this, this.puppet, this.sampleLayout);
+    this.authoring = new DemoPoseAuthoring(this, this.puppet, this.profile);
     this.updatePresentation();
     this.controls = new DemoInput(this, this.authoring, this.presentation);
     this.notify();
@@ -261,8 +261,8 @@ export class DemoScene extends Phaser.Scene {
     this.runPresentationCommand(
       (puppet) => {
         // Wait until the weapon mount has changed before evaluating the rear-hand grip.
-        puppet.getIK('leftArmIK').enabled = false;
-        puppet.getIK('rightArmIK').enabled = false;
+        puppet.getIK(this.profile.armIK.left).enabled = false;
+        puppet.getIK(this.profile.armIK.right).enabled = false;
         puppet.setFacing(direction);
         this.presentation?.katana.resetRearPalm(direction);
         this.presentation?.katana.reattach();

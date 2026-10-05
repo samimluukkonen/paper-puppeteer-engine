@@ -3,6 +3,7 @@ import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { DemoKatanaController } from '../src/demo/DemoKatanaController.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
+import { sketchProfile } from '../src/demo/demoCharacterProfiles.js';
 import { demoIK } from '../src/demo/demoIK.js';
 import { Katana, katanaGrips } from '../src/demo/Katana.js';
 import { horizontalEdgesAtY } from '../src/demo/katanaArmTarget.js';
@@ -60,7 +61,7 @@ function fixture() {
 
 test('left-facing sketch layers only the katana hilt behind the right leg in both weapon modes', () => {
   const { scene, puppet } = fixture();
-  const presenter = new DemoPresenter(scene, puppet, false);
+  const presenter = new DemoPresenter(scene, puppet, sketchProfile);
   const weapon = Reflect.get(presenter.katana, 'katana') as Katana;
   const layer = (object: Phaser.GameObjects.Container | Phaser.GameObjects.Image): number => {
     let branch = object.parentContainer!;
@@ -129,7 +130,7 @@ test.each(['left', 'right'] as const)(
   'sketch planted walk extends for heel-first landing, rolls flat, and pushes off behind the body facing %s',
   (facing) => {
     const { scene, puppet } = fixture();
-    const presenter = new DemoPresenter(scene, puppet, false);
+    const presenter = new DemoPresenter(scene, puppet, sketchProfile);
     puppet.setFacing(facing).play('walk');
     const direction = facing === 'right' ? 1 : -1;
     for (let time = 0; time <= 20000; time += 25) {
@@ -204,7 +205,7 @@ test.each(['left', 'right'] as const)(
 
 test('sketch planted ankle corrections hold while paused and reset for pose editing or unplanted playback', () => {
   const { scene, puppet } = fixture();
-  const presenter = new DemoPresenter(scene, puppet, false);
+  const presenter = new DemoPresenter(scene, puppet, sketchProfile);
   puppet.play('walk');
   puppet.animationPlayer.update(750);
   const options = { handIK: false, footIK: true, upperBody: false };
@@ -224,7 +225,7 @@ test('sketch planted ankle corrections hold while paused and reset for pose edit
 test.each(['left', 'right'] as const)('sketch katana keeps both palms on their grips facing %s', (facing) => {
   const { scene, puppet } = fixture();
   const weapon = new Katana(scene);
-  const controller = new DemoKatanaController(puppet, weapon, false, { x: 0, y: 18 }, -4);
+  const controller = new DemoKatanaController(puppet, weapon, sketchProfile);
   const layout = new SketchFacingLayout(puppet);
   puppet.setFacing(facing).play('sword');
   const target = { x: 380 + (facing === 'right' ? 80 : -80), y: 315 };
@@ -257,7 +258,7 @@ test.each(['left', 'right'] as const)(
   'sketch katana stays at torso height when the cursor moves inward facing %s',
   (facing) => {
     const { scene, puppet } = fixture();
-    const presenter = new DemoPresenter(scene, puppet, false);
+    const presenter = new DemoPresenter(scene, puppet, sketchProfile);
     puppet.setFacing(facing).play('sword');
     presenter.katana.resetRearPalm(facing);
     const torso = puppet.getBone('torso').getWorldPosition();
@@ -308,7 +309,7 @@ test.each(['idle', 'walk', 'sword'] as const)(
   'sketch %s swaps actual limb chains and cutouts when facing left without drifting while paused',
   (animation) => {
     const { scene, puppet } = fixture();
-    const presenter = new DemoPresenter(scene, puppet, false);
+    const presenter = new DemoPresenter(scene, puppet, sketchProfile);
     puppet.play(animation);
     puppet.animationPlayer.update(250);
     const options = { handIK: false, footIK: false, upperBody: false };
@@ -379,7 +380,7 @@ test.each([
   ['right', true],
 ] as const)('sketch two-handed rear grip clears torso and legs facing %s, walking %s', (facing, walking) => {
   const { scene, puppet } = fixture();
-  const presenter = new DemoPresenter(scene, puppet, false);
+  const presenter = new DemoPresenter(scene, puppet, sketchProfile);
   puppet.setFacing(facing).play(walking ? 'walk' : 'sword');
   if (walking) {
     puppet.setLayerMask('upperBody', [

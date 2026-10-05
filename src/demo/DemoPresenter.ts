@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import type { Facing, IKTarget, Puppet } from '../engine/index.js';
 import { DemoFootPlanting } from './DemoFootPlanting.js';
 import { DemoKatanaController } from './DemoKatanaController.js';
+import { type DemoCharacterProfile, demoPuppetProfile } from './demoCharacterProfiles.js';
 import type { WalkFootIK } from './demoFootTargets.js';
 import {
   demoArmRotations,
@@ -19,11 +20,13 @@ export interface DemoPresenterOptions {
   upperBody: boolean;
 }
 
-export function createDemoBackdrop(scene: Phaser.Scene): void {
+export function createDemoBackdrop(scene: Phaser.Scene, boneCount: number, profile: DemoCharacterProfile): void {
   const { width, height } = scene.scale;
   const floor = scene.add.graphics();
-  floor.lineStyle(1, 0x9eaa97, 0.45).lineBetween(70, height - 115, width - 70, height - 115);
-  floor.fillStyle(0x515e4e, 0.08).fillEllipse(width / 2, height - 115, 170, 18);
+  floor
+    .lineStyle(1, 0x9eaa97, 0.45)
+    .lineBetween(70, height - profile.feet.floorYOffset, width - 70, height - profile.feet.floorYOffset);
+  floor.fillStyle(0x515e4e, 0.08).fillEllipse(width / 2, height - profile.feet.floorYOffset, 170, 18);
   scene.add.text(30, 28, 'FIG. 03 / ANIMATION PLAYBACK', {
     fontFamily: 'monospace',
     fontSize: '11px',
@@ -31,7 +34,7 @@ export function createDemoBackdrop(scene: Phaser.Scene): void {
     letterSpacing: 1,
   });
   scene.add
-    .text(width - 30, 28, '16 JOINTS · 4 IK CHAINS', {
+    .text(width - 30, 28, `${boneCount} JOINTS · ${profile.ikChains.length} IK CHAINS`, {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#7e8678',
@@ -63,17 +66,11 @@ export class DemoPresenter {
   constructor(
     scene: Phaser.Scene,
     private readonly puppet: Puppet,
-    private readonly sampleLayout = true,
+    private readonly profile: DemoCharacterProfile = demoPuppetProfile,
   ) {
-    this.katana = new DemoKatanaController(
-      puppet,
-      new Katana(scene),
-      sampleLayout,
-      { x: 0, y: sampleLayout ? 15 : 18 },
-      sampleLayout ? 8 : -4,
-    );
-    this.feet = new DemoFootPlanting(scene, puppet, sampleLayout);
-    this.sketchFacing = sampleLayout ? undefined : new SketchFacingLayout(puppet);
+    this.katana = new DemoKatanaController(puppet, new Katana(scene), profile);
+    this.feet = new DemoFootPlanting(scene, puppet, profile);
+    this.sketchFacing = profile.swapLimbsWithFacing ? new SketchFacingLayout(puppet) : undefined;
     this.handTarget = { x: scene.scale.width / 2 + 55, y: scene.scale.height - 320 };
     this.markers = scene.add.graphics().setDepth(100);
   }
@@ -104,7 +101,7 @@ export class DemoPresenter {
       this.preparePose();
       this.puppet.animationPlayer.applyCurrentPose();
     }
-    if (this.sampleLayout) this.applySampleLayout();
+    if (this.profile.layout === 'sample') this.applySampleLayout();
     this.sketchFacing?.applyPose();
     this.sketchFacing?.syncVisuals();
     this.katana.configureArms(this.handTarget, options.handIK, options.upperBody);

@@ -1,7 +1,6 @@
-export const characterChoices = [
-  { id: 'demo-puppet', label: 'Demo puppet' },
-  { id: 'random-paperdoll-sketch', label: 'Random paperdoll sketch' },
-] as const;
+import { demoCharacterProfiles } from '../demo/demoCharacterProfiles.js';
+
+export const characterChoices = demoCharacterProfiles.map(({ id, label }) => ({ id, label }));
 
 export function selectedCharacterId(): string {
   const id = new URLSearchParams(globalThis.location?.search ?? '').get('character');

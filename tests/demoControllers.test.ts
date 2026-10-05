@@ -2,7 +2,7 @@ import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
-import { demoIK } from '../src/demo/demoIK.js';
+import { type DemoCharacterProfile, demoPuppetProfile } from '../src/demo/demoCharacterProfiles.js';
 import { demoAuthoringLayout } from '../src/demo/demoPresentation.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
@@ -44,7 +44,7 @@ function container() {
   };
 }
 
-function fixture(walkClip = walk) {
+function fixture(walkClip = walk, profile: DemoCharacterProfile = demoPuppetProfile) {
   const display = {
     setDepth: vi.fn().mockReturnThis(),
     setVisible: vi.fn().mockReturnThis(),
@@ -77,7 +77,7 @@ function fixture(walkClip = walk) {
   player.addAnimation(idle);
   player.play('walk');
   const constraints = new Map(
-    demoIK.map((definition) => [definition.name, new TwoBoneIKConstraint(definition, rig, bones)]),
+    profile.ikChains.map((definition) => [definition.name, new TwoBoneIKConstraint(definition, rig, bones)]),
   );
   const slots = new Map<string, string>();
   let renderOrder = rig.renderOrder;
@@ -115,7 +115,7 @@ function fixture(walkClip = walk) {
     attach: vi.fn(),
     detach: vi.fn(),
   };
-  const presenter = new DemoPresenter(scene, puppet as unknown as Puppet);
+  const presenter = new DemoPresenter(scene, puppet as unknown as Puppet, profile);
   return { scene, puppet, presenter, bones, constraints, slots, display };
 }
 
@@ -345,4 +345,35 @@ test('foot planting sway stops while paused or stopped and idle recenters the pu
   assert.isUndefined(feet.update(true).walkFeet);
   assert.strictEqual(puppet.container.x, 380);
   assert.strictEqual(puppet.container.y, 362);
+});
+
+test('character profiles configure IK names, grip offsets, hand facing, and grounded placement independently', () => {
+  const profile: DemoCharacterProfile = {
+    ...demoPuppetProfile,
+    placement: { scale: 1.08, yOffset: 250 },
+    ikChains: demoPuppetProfile.ikChains.map((chain) => ({ ...chain, name: `custom-${chain.name}` })),
+    armIK: { left: 'custom-leftArmIK', right: 'custom-rightArmIK' },
+    legIK: { left: 'custom-leftLegIK', right: 'custom-rightLegIK' },
+    katana: { ...demoPuppetProfile.katana, swapHandsWithFacing: false, gripOffset: { x: 4, y: 22 } },
+    feet: { ...demoPuppetProfile.feet, groundXOffset: 31, groundYOffset: 100, stanceOffset: 5 },
+  };
+  const { scene, presenter, puppet, constraints } = fixture(walk, profile);
+  puppet.setFacing('left');
+  presenter.katana.syncMode(true);
+  presenter.katana.configureArms({ x: 400, y: 200 }, true, true);
+  const primary = constraints.get(profile.armIK.right)!;
+  const secondary = constraints.get(profile.armIK.left)!;
+  assert.deepEqual(primary.endOffset, { x: 0, y: 0 });
+  assert.deepEqual(secondary.endOffset, { x: 4, y: 22 });
+  assert.equal(primary.priority, 0);
+  assert.equal(secondary.priority, 1);
+  assert.equal(puppet.attach.mock.calls[0]?.[0], primary.endBone);
+  const resting = presenter.feet.update(false);
+  assert.deepEqual(resting.targets, { left: { x: 411, y: 540 }, right: { x: 349, y: 540 } });
+  assert.equal(puppet.container.y, 390);
+  presenter.feet.update(true);
+  assert.equal(puppet.container.y, 395);
+  for (const id of Object.values(profile.legIK)) assert.isTrue(constraints.get(id)!.enabled);
+  new DemoPoseAuthoring(scene, puppet as unknown as Puppet, profile).enter();
+  assert.equal(puppet.container.y, 390);
 });

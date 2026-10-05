@@ -1,4 +1,4 @@
-import { demoIK } from '../../demo/demoIK.js';
+import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { createControlsController } from './ControlsController.js';
@@ -29,7 +29,7 @@ const render = (editor: RigEditor): void => {
 };
 const scene = new RigEditorScene(render, inspector.showError, {
   characterUrl: `../characters/${selectedCharacterId()}/character.json`,
-  ikChains: demoIK,
+  ikChains: getDemoCharacterProfile(selectedCharacterId()).ikChains,
 });
 const game = createEditorGame('editor-stage', scene);
 if (import.meta.hot)
