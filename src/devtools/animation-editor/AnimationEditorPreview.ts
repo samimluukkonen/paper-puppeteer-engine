@@ -1,5 +1,6 @@
 import { compileClip } from '../../engine/AnimationClip.js';
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
+import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import type { JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
@@ -22,9 +23,18 @@ export class AnimationEditorPreview {
 
   private refresh(): void {
     const animation = this.state.workingAnimation;
-    const time = this.state.currentTime;
+    const time = animation
+      ? this.state.currentTime === this.state.duration
+        ? animation.duration
+        : Math.min(this.state.currentTime * 1000, animation.duration)
+      : 0;
+    // Keep the editor clock continuous while held playback frames reuse their projected pose.
+    const sampledTime =
+      animation && time !== animation.duration
+        ? quantizePlaybackTime(time, animation.playback ?? { mode: 'smooth' })
+        : time;
     const draft = this.state.boneTransformDraft;
-    if (animation === this.animation && time === this.sampledTime && draft === this.draft) return;
+    if (animation === this.animation && sampledTime === this.sampledTime && draft === this.draft) return;
     if (animation !== this.animation) {
       // Compile before replacing the held preview. No data or interpolation lives in the timeline UI.
       const next = animation
@@ -50,10 +60,10 @@ export class AnimationEditorPreview {
     // Restore even untracked temporary properties before sampling. Drafts belong before presets/IK/rendering.
     this.puppet.preparePose();
     for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
-    this.player?.sample(time * 1000, { mode: 'playback' });
+    this.player?.sample(time, { mode: 'playback' });
     if (this.state.selectedBoneId) Object.assign(this.puppet.getBone(this.state.selectedBoneId).pose, draft);
     this.puppet.syncPose();
-    this.sampledTime = time;
+    this.sampledTime = sampledTime;
     this.draft = draft;
   }
 

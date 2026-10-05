@@ -17,6 +17,51 @@ vi.mock('phaser', () => ({
   },
 }));
 
+test('held stepped frames skip projection while drafts, authored edits and endpoints invalidate it', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const state = new AnimationEditorState(rig, [
+    {
+      name: 'move',
+      duration: 1050,
+      loop: true,
+      playback: { mode: 'stepped', fps: 10 },
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 1050, x: 105 },
+        ],
+      },
+    },
+  ]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  const sync = vi.spyOn(puppet, 'syncPose');
+  state.play();
+  for (let frame = 0; frame < 60; frame++) state.advancePlayback(1 / 120);
+  assert.approximately(state.currentTime, 0.5, 1e-12);
+  assert.equal(sync.mock.calls.length, 5, 'only the five new playback frames synchronize');
+  state.pause();
+  state.selectBone('root');
+  state.setCurrentTime(0.501);
+  assert.equal(sync.mock.calls.length, 5);
+  state.setTemporaryBoneProperty('x', 77);
+  assert.equal(puppet.getBone('root').pose.x, 77);
+  state.cancelTransformEdit();
+  assert.equal(puppet.getBone('root').pose.x, 50);
+  state.setBonePropertyKeyframe('root', 'y', 12);
+  assert.equal(puppet.getBone('root').pose.y, 12);
+  state.setCurrentTime(1.049);
+  assert.equal(puppet.getBone('root').pose.x, 100);
+  state.setCurrentTime(1.05);
+  assert.equal(puppet.getBone('root').pose.x, 105, 'the exact endpoint bypasses quantization');
+  state.setCurrentTime(1.04);
+  assert.equal(puppet.getBone('root').pose.x, 100);
+  sync.mockRestore();
+  preview.dispose();
+  puppet.destroy();
+});
+
 test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
   'authored keyframe edits and undo/redo immediately refresh $mode preview without advancing the clock',
   (playback) => {
