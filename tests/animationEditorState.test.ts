@@ -1,5 +1,6 @@
 import { assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import * as editorData from '../src/devtools/shared/editorData.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Rig } from '../src/engine/Rig.js';
 import { demoAnimations, demoRig } from './helpers/demoCharacter.js';
@@ -243,33 +244,65 @@ test('subscriptions reflect external state changes and unsubscribe cleanly', () 
   assert.equal(count, 2);
 });
 
-test('scrubbing and status updates reuse snapshots while authored edits and undo keep dirty state accurate', () => {
+test('scrubbing and status updates reuse dirty comparisons while edits and undo remain accurate', () => {
   const state = new AnimationEditorState(rig, [clip()]);
   state.selectAnimation('move');
   const release = state.subscribe(() => {
     assert.isFalse(state.dirty);
   });
-  const stringify = vi.spyOn(JSON, 'stringify');
+  const equals = vi.spyOn(editorData, 'equalEditorData');
   try {
     for (let index = 0; index < 100; index += 1) {
       state.setCurrentTime(index / 100);
       assert.isFalse(state.dirty);
     }
-    assert.equal(stringify.mock.calls.length, 0);
+    assert.equal(equals.mock.calls.length, 0);
     release();
 
     state.replaceWorkingAnimation(file(clip({ duration: 3000 })));
     assert.isTrue(state.dirty);
     state.markSaved();
     assert.isFalse(state.dirty);
-    const serialized = stringify.mock.calls.length;
     assert.isTrue(state.undo());
     assert.isTrue(state.dirty);
     assert.isTrue(state.redo());
     assert.isFalse(state.dirty);
-    assert.equal(stringify.mock.calls.length, serialized);
+    const comparisons = equals.mock.calls.length;
+    for (let index = 0; index < 100; index += 1) assert.isFalse(state.dirty);
+    assert.equal(equals.mock.calls.length, comparisons);
   } finally {
     release();
-    stringify.mockRestore();
+    equals.mockRestore();
   }
+});
+
+test('reordered tracks and event object keys preserve identity, clean state, and redo history', () => {
+  const input = clip({
+    tracks: { root: [{ time: 0, x: 1 }], child: [{ time: 0, x: 2 }] },
+    events: [{ time: 0, name: 'start', data: { a: 1, b: 2 } }],
+  });
+  const state = new AnimationEditorState(rig, [input]);
+  state.selectAnimation('move');
+  const original = state.workingAnimation;
+  const reordered = file({
+    ...input,
+    tracks: { child: input.tracks.child!, root: input.tracks.root! },
+    events: [{ time: 0, name: 'start', data: { b: 2, a: 1 } }],
+  });
+  assert.isTrue(state.replaceWorkingAnimation(reordered));
+  assert.strictEqual(state.workingAnimation, original);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
+
+  state.replaceWorkingAnimation({ ...reordered, duration: 3000 });
+  state.undo();
+  state.replaceWorkingAnimation(reordered);
+  assert.strictEqual(state.workingAnimation, original);
+  assert.isTrue(state.canRedo);
+  state.redo();
+  state.markSaved();
+  state.replaceWorkingAnimation(file(input));
+  assert.isTrue(state.dirty);
+  state.replaceWorkingAnimation({ ...reordered, duration: 3000 });
+  assert.isFalse(state.dirty);
 });

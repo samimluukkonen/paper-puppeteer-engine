@@ -6,7 +6,7 @@ import {
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { animationFileSchema } from '../../engine/schemas.js';
-import { freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
+import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { animationDurationSeconds, clampTime } from './timeline.js';
 
@@ -33,9 +33,9 @@ export class AnimationEditorState {
   private playing = false;
   private previewLoopEnabled = false;
   private scrubbing = false;
-  private saved = '';
+  private saved: ReadonlyAnimation | null = null;
+  private cachedDirty: boolean | undefined;
   private issues: readonly ValidationIssue[] = [];
-  private readonly snapshots = new WeakMap<ReadonlyAnimation, string>();
   private history = this.createHistory();
 
   constructor(
@@ -80,7 +80,8 @@ export class AnimationEditorState {
     return this.working?.loop ?? false;
   }
   get dirty(): boolean {
-    return this.snapshot !== this.saved;
+    this.cachedDirty ??= !equalEditorData(this.working, this.saved);
+    return this.cachedDirty;
   }
   get validationIssues(): readonly ValidationIssue[] {
     return this.issues;
@@ -94,21 +95,6 @@ export class AnimationEditorState {
   get historyLength(): number {
     return this.history.length;
   }
-  private get snapshot(): string {
-    return this.snapshotFor(this.working);
-  }
-
-  /** Immutable animation identities let status and history reuse serialization across scrubs and undo. */
-  private snapshotFor(animation: ReadonlyAnimation | null): string {
-    if (!animation) return '';
-    let snapshot = this.snapshots.get(animation);
-    if (snapshot === undefined) {
-      snapshot = JSON.stringify(animation);
-      this.snapshots.set(animation, snapshot);
-    }
-    return snapshot;
-  }
-
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -152,7 +138,8 @@ export class AnimationEditorState {
     this.playing = false;
     this.scrubbing = false;
     this.issues = [];
-    this.saved = this.snapshot;
+    this.saved = this.working;
+    this.cachedDirty = false;
     this.history = this.createHistory();
     this.notify();
     return true;
@@ -246,9 +233,12 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
-    this.history.change(() => {
-      this.working = next;
-    });
+    if (!equalEditorData(this.working, next)) {
+      this.history.change(() => {
+        this.working = next;
+        this.cachedDirty = undefined;
+      });
+    }
     this.time = clampTime(this.time, this.duration);
     if (this.time >= this.duration) this.playing = false;
     this.notify();
@@ -258,7 +248,8 @@ export class AnimationEditorState {
   markSaved(): void {
     const entry = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
     if (entry) entry.saved = this.working;
-    this.saved = this.snapshot;
+    this.saved = this.working;
+    this.cachedDirty = false;
     this.notify();
   }
 
@@ -267,10 +258,11 @@ export class AnimationEditorState {
       () => this.working,
       (entry) => {
         this.working = entry;
+        this.cachedDirty = undefined;
         this.time = clampTime(this.time, this.duration);
         if (this.time >= this.duration) this.playing = false;
       },
-      (left, right) => this.snapshotFor(left) === this.snapshotFor(right),
+      equalEditorData,
     );
   }
 
