@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { AnimationClip } from './AnimationClip.js';
+import { type AnimationClip, type CompiledClip, compileClip } from './AnimationClip.js';
 import {
   inspectAnimationDefinition,
   inspectRigDefinition,
@@ -154,6 +154,9 @@ export class CharacterValidationError extends Error {
   }
 }
 
+// Definitions are frozen; keep lazy compiler data outside their authored JSON snapshot.
+const compiledAnimations = new WeakMap<CharacterDefinition, readonly CompiledClip[]>();
+
 /** Fully assembled immutable runtime data. Clone JSON data before authoring changes. */
 export class CharacterDefinition {
   private constructor(
@@ -169,6 +172,16 @@ export class CharacterDefinition {
     readonly rigFile?: DeepReadonly<RigJsonDefinition>,
     readonly rigPath?: string,
   ) {}
+
+  /** Immutable clips compiled once per character; players retain their own clocks and pose buffers. */
+  get compiledAnimations(): readonly CompiledClip[] {
+    let clips = compiledAnimations.get(this);
+    if (!clips) {
+      clips = Object.freeze(this.animations.map((clip) => compileClip(clip, this.rig)));
+      compiledAnimations.set(this, clips);
+    }
+    return clips;
+  }
 
   static fromData(data: CharacterData, baseUrl?: string): CharacterDefinition {
     const { issues, manifest, rig, animations, poses, skins } = inspectCharacterDefinition(data);

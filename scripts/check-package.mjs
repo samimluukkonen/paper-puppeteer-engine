@@ -73,6 +73,10 @@ export function sample(): number | undefined {
 }
 
 export function checkOwnership(character: CharacterDefinition, rig: DeepReadonly<RigJsonDefinition>): void {
+  // @ts-expect-error Shared compilation lists cannot be extended by a consumer.
+  character.compiledAnimations.push(character.compiledAnimations[0]!);
+  // @ts-expect-error Shared clip metadata cannot be changed by a consumer.
+  character.compiledAnimations[0]!.duration = 1;
   // @ts-expect-error Character definitions expose readonly animation fields.
   character.animations[0]!.duration = 1;
   // @ts-expect-error Readonly rig data includes nested bone transforms.

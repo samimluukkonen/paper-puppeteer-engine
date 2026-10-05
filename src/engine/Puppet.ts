@@ -101,13 +101,18 @@ export class Puppet {
     if ((options.scale ?? 1) <= 0) throw new Error('Puppet scale must be greater than zero.');
 
     // Reject authored data before any Phaser objects or scene listeners are created.
-    const animations = options.animations ?? options.definition?.animations ?? [];
-    const compiledAnimations: CompiledClip[] = [];
-    const animationNames = new Set<string>();
-    for (const clip of animations) {
-      if (animationNames.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
-      compiledAnimations.push(compileClip(clip, this.rig));
-      animationNames.add(clip.name);
+    let compiledAnimations: readonly CompiledClip[];
+    if (options.definition && options.animations === undefined) {
+      compiledAnimations = options.definition.compiledAnimations;
+    } else {
+      const clips: CompiledClip[] = [];
+      const animationNames = new Set<string>();
+      for (const clip of options.animations ?? []) {
+        if (animationNames.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
+        clips.push(compileClip(clip, this.rig));
+        animationNames.add(clip.name);
+      }
+      compiledAnimations = clips;
     }
     for (const pose of options.poses ?? options.definition?.poses ?? []) this.addPose(pose);
     this.slotState = new SlotState(this.rig);

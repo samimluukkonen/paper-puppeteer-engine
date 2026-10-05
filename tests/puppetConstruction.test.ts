@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import * as animationClip from '../src/engine/AnimationClip.js';
+import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { IKDebug } from '../src/engine/ik/IKDebug.js';
 import { Puppet, type PuppetOptions } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';
@@ -181,4 +182,89 @@ test('construction compiles each initial clip once before scene allocation and r
   puppet.play('later');
   assert.equal(puppet.currentAnimation, 'later');
   puppet.destroy();
+});
+
+test('puppets share a character compilation while retaining independent playback, events, and lifecycle', () => {
+  const compile = vi.spyOn(animationClip, 'compileClip');
+  const character = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'shared',
+      rig: 'rig.json',
+      defaultSkin: 'default',
+      skins: { default: 'skin.json' },
+      animations: ['move.json'],
+      textures: {},
+    },
+    rig: { version: 1, root: rig.root, bones: rig.bones },
+    skins: { 'skin.json': { version: 1, name: 'default', slots: {} } },
+    animations: {
+      'move.json': {
+        version: 1,
+        name: 'move',
+        duration: 100,
+        loop: false,
+        tracks: {
+          arm: [
+            { time: 0, x: 20 },
+            { time: 100, x: 40 },
+          ],
+        },
+        events: [{ time: 50, name: 'half', data: { value: 1 } }],
+      },
+    },
+  });
+  assert.equal(compile.mock.calls.length, 0, 'metadata assembly remains lazy');
+  const first = new Puppet(puppetScene(), { definition: character, autoUpdate: false });
+  const second = new Puppet(puppetScene(), { definition: character, autoUpdate: false });
+  assert.equal(compile.mock.calls.length, 1);
+  assert.strictEqual(character.compiledAnimations, character.compiledAnimations);
+  assert.isTrue(Object.isFrozen(character.compiledAnimations));
+  assert.isTrue(Object.isFrozen(character.compiledAnimations[0]!.events[0]!.data));
+  const firstEvents: unknown[] = [];
+  const secondEvents: unknown[] = [];
+  first.onAnimationEvent((event) => {
+    firstEvents.push(event);
+    (event.data as { value: number }).value = 99;
+  });
+  second.onAnimationEvent((event) => secondEvents.push(event.data));
+  first.play('move').update(50);
+  second.play('move').update(25);
+  assert.equal(first.getBone('arm').pose.x, 30);
+  assert.equal(second.getBone('arm').pose.x, 25);
+  assert.equal(second.animationPlayer.elapsedTime, 25);
+  assert.equal(firstEvents.length, 1);
+  assert.equal(secondEvents.length, 0);
+  first.destroy();
+  second.update(25);
+  assert.equal(second.getBone('arm').pose.x, 30);
+  assert.deepEqual(secondEvents, [{ value: 1 }]);
+  const override = new Puppet(puppetScene(), {
+    definition: character,
+    animations: [{ ...animation, name: 'custom' }],
+    autoUpdate: false,
+  });
+  assert.equal(compile.mock.calls.length, 2);
+  override.play('custom');
+  assert.throws(() => override.play('move'), /Unknown animation/);
+  const empty = new Puppet(puppetScene(), { definition: character, animations: [], autoUpdate: false });
+  assert.equal(compile.mock.calls.length, 2);
+  assert.throws(() => empty.play('move'), /Unknown animation/);
+  const independent = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'empty',
+      rig: 'rig.json',
+      defaultSkin: 'default',
+      skins: { default: 'skin.json' },
+      animations: [],
+      textures: {},
+    },
+    rig: { version: 1, root: rig.root, bones: rig.bones },
+    skins: { 'skin.json': { version: 1, name: 'default', slots: {} } },
+  });
+  assert.notStrictEqual(independent.compiledAnimations, character.compiledAnimations);
+  second.destroy();
+  override.destroy();
+  empty.destroy();
 });
