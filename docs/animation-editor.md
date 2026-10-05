@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.3.2
+# Visual Animation Editor — v0.5.2.3.3
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -14,7 +14,7 @@ The ruler adapts to duration and available width, with major labels, minor ticks
 
 **Mode** edits the animation's existing `playback` property in the working copy. Smooth interpolation stays continuous. Stepped mode holds poses at authored FPS boundaries while the playhead stays continuous and Phaser continues rendering at its normal rate. Switching to stepped mode starts at 10 FPS; switching to smooth removes the FPS field as required by the schema. **FPS** is enabled only for stepped clips and accepts finite values from 1 to 240, including fractional rates. Existing clips with valid runtime FPS outside those editor bounds still load and preview unchanged. Invalid or empty edits show a validation error and restore the held value. Mode/FPS edits update the paused or playing preview immediately without retiming keys or events (the format stores their times in milliseconds).
 
-**Undo** and **Redo** restore authored settings and keys through the existing snapshot history and refresh the preview. Settings changes mark the working animation dirty when it differs from the saved baseline. The original source remains immutable. Animation switching preserves a dirty working copy and reports the issue; undo edits back to the baseline before switching. Saving/exporting animation data remains deferred.
+**Undo** and **Redo** restore authored settings and keys through the existing snapshot history and refresh the preview. **Ctrl/Cmd+Z** undoes and **Ctrl/Cmd+Shift+Z** redoes outside typing controls, matching the Rig Editor. Input, select, textarea and content-editable regions keep their native undo behavior; consumed shortcuts, IME composition, Alt-modified combinations and held-key repeats do not replay authored history. Each Set Key/Delete Key click, Mode change, or committed FPS change records one logical edit. Intermediate numeric input events remain temporary. Unchanged/invalid edits preserve redo; a new authored change invalidates it. This editor owns its own bounded history of 100 snapshots, separate from the Rig Editor. Undoing back to the exact loaded/saved baseline restores clean state, including when history has branched. Redo restores dirty state when its data differs from that baseline. The original source remains immutable. Animation switching preserves a dirty working copy and reports the issue; undo edits back to the baseline before switching. Every successful selection starts a clean history baseline. Saving/exporting animation data remains deferred.
 
 Mode/FPS and committed key edits also protect page navigation, refresh, closing, and character selection with the browser's unsaved-change confirmation. Undo the edits before leaving to avoid discarding them. Preview navigation and playback preferences do not trigger this confirmation.
 
@@ -29,6 +29,8 @@ For example, at **0.5 s**, select `rightForearm`, enter **35** in Rotation, and 
 **Delete Key** removes only that property's key at the playhead, discards its draft, and immediately re-evaluates interpolation or bind fallback. Other properties and other times remain intact. A property commit clears only that property's draft; other pending fields remain temporary until individually keyed or cancelled. Empty/nonfinite input cannot be committed. **Cancel edits** or **Escape** restores all evaluated values and does not resume playback. Changing time, bone, or animation, pressing Play, changing authored settings, and undo/redo discard pending drafts. Preview preferences do not clear drafts. Undo/redo applies to authored keys through the existing snapshot history; navigation and drafts do not enter history. Creating/updating/deleting changed data marks the working animation dirty; no-op edits remain clean, and deleting newly created keys can restore the baseline.
 
 **Facing** mirrors only the outer puppet container. **IK preview (fixed targets)** pins the configured demo chains' current end joints in canonical puppet coordinates; targets project with facing and remain fixed while scrubbing/playing. The render pose can differ from the pre-IK inspector while IK is enabled. Neither preview preference edits authored values or dirty state, and Set Key never reads rendered joints, screen/world coordinates, or IK output. The Rig Editor's bind pose remains unchanged. Numeric editing is the authoring interface for this milestone; transform drag handles remain deferred.
+
+Explicit time navigation and starting a scrub cancel drafts even when the playhead stays at the same time or clamps to its current endpoint. Restart at zero also cancels drafts. Undo/Redo cancel drafts even when their history stack is empty; cancelled fields refresh immediately, including focused fields. Other preview preferences retain drafts. Uncommitted FPS text is replaced by the held authored value when the working snapshot changes, so it cannot carry into another animation or a restored history snapshot.
 
 ## Data and preview ownership
 
@@ -73,7 +75,7 @@ These APIs live under `src/devtools/animation-editor/`; the production package e
 
 ## Keyframe authoring core
 
-v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. v0.5.2.3.2 connects these existing APIs to the visual inspector without changing their signatures. Package version: `0.5.2-3.2`.
+v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. v0.5.2.3.2 connects these existing APIs to the visual inspector without changing their signatures. v0.5.2.3.3 hardens cancellation boundaries, integrates keyboard history and expands regression verification. Package version: `0.5.2-3.3`.
 
 The existing file format remains authoritative: `tracks[boneId]` holds a strictly time-sorted array of sparse `{ time, x?, y?, rotation?, scaleX?, scaleY? }` rows. Time is milliseconds, rotation is radians, and values are absolute local transforms. Each property has its own independent samples even when several properties share a row. Setting rotation never authors position or scale implicitly.
 
@@ -154,6 +156,8 @@ Verification details, architecture audit, changed files, and remaining manual ch
 
 The v0.5.2.3.2 implementation report, changed files, API additions, and verification results are recorded in [Bone authoring verification](animation-editor-authoring-verification.md).
 
+The v0.5.2.3.3 stabilization report and command results are recorded in [History and regression verification](animation-editor-history-verification.md).
+
 ## Deferred features
 
-Bone/property/event timeline tracks, keyframe diamonds, key selection/dragging/movement, transform drag handles, copy/paste, multi-key selection, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.3.3+. Property create/update/delete is now available through the inspector as well as the data APIs above.
+Bone/property/event timeline tracks, keyframe diamonds, key selection/dragging/movement, transform drag handles, copy/paste, multi-key selection, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.4+. Property create/update/delete is now available through the inspector as well as the data APIs above.

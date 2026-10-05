@@ -30,6 +30,7 @@ export class TimelineController {
   private rulerKey = '';
   private externalError = '';
   private authoredFPS = '';
+  private animation: AnimationEditorState['workingAnimation'] = null;
 
   constructor(private readonly app: HTMLElement) {
     this.timeline = this.element('#timeline');
@@ -83,16 +84,23 @@ export class TimelineController {
     window.addEventListener(
       'keydown',
       (event) => {
+        if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
+          return;
+        // Match the Rig Editor shortcuts while leaving native text-field undo intact.
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+          event.preventDefault();
+          if (!event.repeat) {
+            if (event.shiftKey) this.state.redo();
+            else this.state.undo();
+          }
+          return;
+        }
         if (
           (event.code !== 'Space' && event.key !== 'Home') ||
-          event.defaultPrevented ||
-          event.isComposing ||
           event.altKey ||
           event.ctrlKey ||
           event.metaKey ||
-          isTypingTarget(event.target) ||
-          (event.code === 'Space' && event.target instanceof Element && event.target.closest('button, a[href]')) ||
-          !this.state.workingAnimation
+          (event.code === 'Space' && event.target instanceof Element && event.target.closest('button, a[href]'))
         )
           return;
         event.preventDefault();
@@ -229,6 +237,8 @@ export class TimelineController {
     const state = this.state;
     if (this.pointer !== undefined && !state.isScrubbing) this.endScrub();
     const animation = state.workingAnimation;
+    const authoredChanged = animation !== this.animation;
+    this.animation = animation;
     const width = this.width;
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
@@ -276,7 +286,7 @@ export class TimelineController {
     if (this.mode.disabled !== !animation) this.mode.disabled = !animation;
     const fps = playback?.mode === 'stepped' ? String(playback.fps) : '';
     // Leave an uncommitted numeric edit alone while playback notifications refresh the other controls.
-    if ((fps !== this.authoredFPS || document.activeElement !== this.fps) && this.fps.value !== fps)
+    if ((authoredChanged || fps !== this.authoredFPS || document.activeElement !== this.fps) && this.fps.value !== fps)
       this.fps.value = fps;
     this.authoredFPS = fps;
     const fpsDisabled = !animation || mode !== 'stepped';

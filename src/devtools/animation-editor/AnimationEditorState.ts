@@ -119,8 +119,10 @@ export class AnimationEditorState {
     this.clearTransformDraft();
     this.notify();
   }
-  private clearTransformDraft(): void {
-    if (this.hasTemporaryTransform) this.temporaryTransform = Object.freeze({});
+  private clearTransformDraft(): boolean {
+    if (!this.hasTemporaryTransform) return false;
+    this.temporaryTransform = Object.freeze({});
+    return true;
   }
   get selectedAnimationId(): string | null {
     return this.selectedId;
@@ -218,7 +220,9 @@ export class AnimationEditorState {
   }
 
   setCurrentTime(time: number): void {
-    if (this.updateTime(time)) this.notify();
+    // Explicit navigation cancels drafts even when clamping leaves the playhead at the same endpoint.
+    const cancelled = this.clearTransformDraft();
+    if (this.updateTime(time) || cancelled) this.notify();
   }
 
   /** Clamp navigation and authored edits using the same loop and scrub playback intent. */
@@ -368,7 +372,9 @@ export class AnimationEditorState {
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
   beginScrub(): void {
-    if (this.working) this.notifyPlaybackChange(this.currentTime, this.playback.beginScrub());
+    if (!this.working) return;
+    const cancelled = this.clearTransformDraft();
+    if (this.playback.beginScrub() || cancelled) this.notify();
   }
 
   endScrub(): void {
@@ -466,11 +472,11 @@ export class AnimationEditorState {
     return this.restoreHistory(() => this.history.redo());
   }
   private restoreHistory(restore: () => boolean): boolean {
+    // Undo/redo is also a cancellation boundary when the requested history stack is empty.
+    const cancelled = this.clearTransformDraft();
     const changed = restore();
-    if (changed) {
-      this.issues = [];
-      this.notify();
-    }
+    if (changed) this.issues = [];
+    if (changed || cancelled) this.notify();
     return changed;
   }
 }

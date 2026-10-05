@@ -650,6 +650,22 @@ test.each(['right', 'left'] as const)(
     // Cancel also restores a draft property that the player does not own.
     state.cancelTransformEdit();
     assert.equal(puppet.getBone('lower').pose.x, 0);
+    const keyed = state.workingAnimation;
+    state.undo();
+    assert.deepEqual(state.workingAnimation!.tracks, {});
+    assert.isFalse(state.dirty);
+    assert.equal(state.selectedBoneTransform!.rotation, 0);
+    assert.equal(constraint.status, 'solved');
+    state.redo();
+    assert.strictEqual(state.workingAnimation, keyed);
+    assert.approximately(state.selectedBoneTransform!.rotation, 0.7, 1e-12);
+    assert.notEqual(puppet.getBone('lower').pose.rotation, 0.7, 'redo retains IK as a separate preview pass');
+    puppet.setFacing(facing === 'right' ? 'left' : 'right');
+    puppet.syncPose();
+    puppet.setFacing(facing);
+    puppet.syncPose();
+    assert.strictEqual(state.workingAnimation, keyed);
+    assert.deepEqual(state.findBonePropertyKeyframe('lower', 'rotation'), { time: 500, value: 0.7 });
     constraint.enabled = false;
     puppet.syncPose();
     assert.approximately(puppet.getBone('lower').pose.rotation, 0.7, 1e-12);

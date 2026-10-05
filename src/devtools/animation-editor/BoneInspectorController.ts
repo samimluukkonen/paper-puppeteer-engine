@@ -1,7 +1,8 @@
-import { type TransformProperty, transformProperties } from '../../engine/types.js';
+import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { setAttribute, setText } from '../shared/domUpdates.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { toDisplayTransformValue, toLocalTransformValue } from './transformValues.js';
 
 const labels: Record<TransformProperty, string> = {
   x: 'X',
@@ -10,11 +11,6 @@ const labels: Record<TransformProperty, string> = {
   scaleX: 'Scale X',
   scaleY: 'Scale Y',
 };
-const toDisplay = (property: TransformProperty, value: number): number =>
-  property === 'rotation' ? (value * 180) / Math.PI : value;
-const toLocal = (property: TransformProperty, value: number): number =>
-  property === 'rotation' ? (value * Math.PI) / 180 : value;
-
 /** Stable numeric controls; temporary edits and animation mutation are owned by state. */
 export class BoneInspectorController {
   private state: AnimationEditorState | undefined;
@@ -39,6 +35,8 @@ export class BoneInspectorController {
   private bone: string | null | undefined;
   private time: number | undefined;
   private animation: ReadonlyAnimation | null | undefined;
+  private draft: Readonly<Partial<JointTransform>> | undefined;
+  private scrubbing: boolean | undefined;
 
   constructor(app: HTMLElement) {
     const element = <T extends HTMLElement>(selector: string): T => {
@@ -79,7 +77,7 @@ export class BoneInspectorController {
         () => {
           const value = input.valueAsNumber;
           if (input.validity.valid && Number.isFinite(value))
-            this.state?.setTemporaryBoneProperty(property, toLocal(property, value));
+            this.state?.setTemporaryBoneProperty(property, toLocalTransformValue(property, value));
           this.render();
         },
         options,
@@ -158,7 +156,11 @@ export class BoneInspectorController {
       force ||
       this.bone !== state?.selectedBoneId ||
       this.time !== state?.currentTime ||
-      this.animation !== state?.workingAnimation;
+      this.animation !== state?.workingAnimation ||
+      this.scrubbing !== state?.isScrubbing;
+    const previousDraft = this.draft;
+    this.draft = state?.boneTransformDraft;
+    this.scrubbing = state?.isScrubbing;
     this.bone = state?.selectedBoneId;
     this.time = state?.currentTime;
     this.animation = state?.workingAnimation;
@@ -171,8 +173,11 @@ export class BoneInspectorController {
       this.selectedButton = selected;
     }
     for (const [property, { input, indicator, set, remove }] of this.rows) {
-      if (navigated || document.activeElement !== input) {
-        const value = transform ? String(Number(toDisplay(property, transform[property]).toFixed(6))) : '';
+      const cancelled = previousDraft?.[property] !== undefined && this.draft?.[property] === undefined;
+      if (navigated || cancelled || document.activeElement !== input) {
+        const value = transform
+          ? String(Number(toDisplayTransformValue(property, transform[property]).toFixed(6)))
+          : '';
         if (input.value !== value) input.value = value;
       }
       const keyed = !!this.bone && !!state?.hasKeyframeAtTime(this.bone, property);

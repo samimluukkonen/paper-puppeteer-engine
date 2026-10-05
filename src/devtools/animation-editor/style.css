@@ -42,14 +42,19 @@ a {
   gap: 8px;
 }
 .animation-session select {
+  width: 240px;
   max-width: 100%;
 }
 .animation-settings {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 160px) minmax(0, 90px);
   gap: 12px;
   margin-top: 16px;
 }
+.animation-settings label {
+  min-width: 0;
+}
+.animation-settings select,
 .animation-settings input {
   width: 100%;
   min-width: 0;
