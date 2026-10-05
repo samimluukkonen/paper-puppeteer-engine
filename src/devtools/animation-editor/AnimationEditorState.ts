@@ -6,7 +6,6 @@ import {
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
-import { animationFileSchema } from '../../engine/schemas.js';
 import type { JointTransform, TransformProperty } from '../../engine/types.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
@@ -133,7 +132,7 @@ export class AnimationEditorState {
     this.issues = freezeData(result.issues);
     if (!result.data) return null;
     // The shared validator checks JSON compatibility and rig references before any clone is installed.
-    return freezeData(animationFileSchema.parse({ ...result.data, version: ANIMATION_FORMAT_VERSION }));
+    return freezeData({ ...result.data, version: ANIMATION_FORMAT_VERSION });
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
@@ -211,16 +210,18 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
-    return this.replaceWorkingAnimation({ ...this.working, playback: { mode: 'stepped', fps } });
+    return this.installWorkingAnimation(freezeData({ ...this.working, playback: { mode: 'stepped', fps } }));
   }
 
   setAuthoredPlaybackMode(mode: AnimationPlaybackMode['mode']): boolean {
     if (!this.working || (mode !== 'smooth' && mode !== 'stepped')) return false;
     if (mode === (this.working.playback?.mode ?? 'smooth')) return true;
-    return this.replaceWorkingAnimation({
-      ...this.working,
-      playback: mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS },
-    });
+    return this.installWorkingAnimation(
+      freezeData({
+        ...this.working,
+        playback: mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS },
+      }),
+    );
   }
 
   /** State-facing authoring uses continuous seconds, defaulting to the sole editor clock. */
@@ -255,7 +256,8 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
-    return this.replaceWorkingAnimation(next);
+    // The mutation helper validated the result and shares only this state's owned frozen branches.
+    return this.installWorkingAnimation(freezeData(next));
   }
 
   /** Queries never install animation snapshots or change validation, history, or dirty state.
@@ -355,6 +357,12 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
+    return this.installWorkingAnimation(next);
+  }
+
+  /** Internal edits have already validated their changes and retain immutable unchanged branches. */
+  private installWorkingAnimation(next: ReadonlyAnimation): boolean {
+    this.issues = [];
     if (next.name !== this.selectedId) {
       this.issues = [
         {

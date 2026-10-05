@@ -430,3 +430,95 @@ test('cached queries remain independent across rigs, edits, selection, and undo/
     compile.mockRestore();
   }
 });
+
+test('keyframe edits and history retain unchanged frozen tracks, rows, events, and playback settings', () => {
+  const input = clip({
+    tracks: {
+      root: [
+        { time: 0, x: 1 },
+        { time: 500, x: 3 },
+      ],
+      child: [{ time: 0, y: 12 }],
+    },
+    playback: { mode: 'stepped', fps: 10 },
+  });
+  const inputSnapshot = JSON.stringify(input);
+  const state = new AnimationEditorState(rig, [input]);
+  state.selectAnimation('move');
+  const baseline = state.workingAnimation!;
+  assert.isTrue(state.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.5));
+  const created = state.workingAnimation!;
+  assert.notStrictEqual(created.tracks, baseline.tracks);
+  assert.notStrictEqual(created.tracks.root, baseline.tracks.root);
+  assert.strictEqual(created.tracks.root![0], baseline.tracks.root![0]);
+  assert.notStrictEqual(created.tracks.root![1], baseline.tracks.root![1]);
+  assert.strictEqual(created.tracks.child, baseline.tracks.child);
+  assert.strictEqual(created.events, baseline.events);
+  assert.strictEqual(created.playback, baseline.playback);
+  assert.isTrue(Object.isFrozen(created.tracks.root![1]));
+  assert.deepEqual(validateAnimationDefinition(created, rig), []);
+
+  state.setBonePropertyKeyframe('root', 'rotation', 1, 0.5);
+  const updated = state.workingAnimation!;
+  assert.strictEqual(updated.tracks.child, baseline.tracks.child);
+  assert.strictEqual(updated.tracks.root![0], baseline.tracks.root![0]);
+  state.removeBonePropertyKeyframe('root', 'rotation', 0.5);
+  const removed = state.workingAnimation!;
+  assert.deepEqual(removed, baseline);
+  assert.strictEqual(removed.tracks.child, baseline.tracks.child);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 3);
+  for (const snapshot of [updated, created, baseline]) {
+    assert.isTrue(state.undo());
+    assert.strictEqual(state.workingAnimation, snapshot);
+  }
+  for (const snapshot of [created, updated, removed]) {
+    assert.isTrue(state.redo());
+    assert.strictEqual(state.workingAnimation, snapshot);
+    assert.strictEqual(snapshot.tracks.child, baseline.tracks.child);
+  }
+  assert.equal(JSON.stringify(input), inputSnapshot);
+  assert.isFalse(Object.isFrozen(input.tracks.child));
+});
+
+test('mode and FPS edits reuse tracks/events, clear prior errors, and undo to the saved snapshot', () => {
+  const state = new AnimationEditorState(rig, [clip({ tracks: { root: [{ time: 0, x: 1 }] } })]);
+  state.selectAnimation('move');
+  const baseline = state.workingAnimation!;
+  state.setAuthoredPlaybackMode('stepped');
+  const stepped = state.workingAnimation!;
+  assert.strictEqual(stepped.tracks, baseline.tracks);
+  assert.strictEqual(stepped.events, baseline.events);
+  assert.isFalse(state.setAuthoredFPS(NaN));
+  assert.isNotEmpty(state.validationIssues);
+  assert.isTrue(state.setAuthoredFPS(20));
+  const faster = state.workingAnimation!;
+  assert.isEmpty(state.validationIssues);
+  assert.strictEqual(faster.tracks, baseline.tracks);
+  assert.strictEqual(faster.events, baseline.events);
+  assert.deepEqual(validateAnimationDefinition(faster, rig), []);
+  state.markSaved();
+  state.undo();
+  assert.strictEqual(state.workingAnimation, stepped);
+  assert.isTrue(state.dirty);
+  state.redo();
+  assert.strictEqual(state.workingAnimation, faster);
+  assert.isFalse(state.dirty);
+});
+
+test('external replacements still validate and own nested caller data independently', () => {
+  const state = new AnimationEditorState(rig, [clip()]);
+  state.selectAnimation('move');
+  const replacement = clip({ tracks: { root: [{ time: 0, x: 10 }] } });
+  assert.isTrue(state.replaceWorkingAnimation(replacement));
+  const working = state.workingAnimation!;
+  assert.notStrictEqual(working.tracks, replacement.tracks);
+  assert.notStrictEqual(working.events![0]!.data, replacement.events![0]!.data);
+  replacement.tracks.root![0]!.x = 20;
+  (replacement.events![0]!.data as { nested: number[] }).nested.push(3);
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 10);
+  assert.deepEqual(working.events![0]!.data, { nested: [1, 2] });
+  assert.isFalse(state.replaceWorkingAnimation({ ...replacement, version: 99 }));
+  assert.strictEqual(state.workingAnimation, working);
+  assert.isFalse(Object.isFrozen(replacement.tracks.root));
+});
