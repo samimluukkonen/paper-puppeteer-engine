@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { isTypingTarget } from '../shared/keyboardShortcuts.js';
 import type { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import type { DemoPresenter } from './DemoPresenter.js';
 import type { DemoScene } from './DemoScene.js';
@@ -18,13 +19,31 @@ export class DemoInput {
     this.cleanup.push(() => scene.input.off('pointermove', onPointerMove));
     const keyboard = scene.input.keyboard;
     if (keyboard) {
-      const on = (event: string, handler: () => void): void => {
-        keyboard.on(event, handler);
-        this.cleanup.push(() => keyboard.off(event, handler));
-      };
-      for (const command of Object.values(createDemoCommands(scene)))
-        if (command.key) on(`keydown-${command.key}`, () => command.runFromKeyboard(authoring.active));
+      const commands = new Map(
+        Object.values(createDemoCommands(scene)).flatMap((command) =>
+          command.code ? [[command.code, command] as const] : [],
+        ),
+      );
       const onKeyDown = (event: KeyboardEvent): void => {
+        if (
+          event.defaultPrevented ||
+          event.isComposing ||
+          event.ctrlKey ||
+          event.metaKey ||
+          isTypingTarget(event.target)
+        )
+          return;
+        const command = commands.get(event.code);
+        if (command) {
+          if (
+            event.altKey ||
+            (event.code === 'Space' && (event.target as Element | null)?.closest?.('button, a[href]'))
+          )
+            return;
+          event.preventDefault();
+          if (!event.repeat) command.runFromKeyboard(authoring.active);
+          return;
+        }
         if (!authoring.active || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         event.preventDefault();
         const step = event.shiftKey ? 0.1 : 0.01;
@@ -36,11 +55,11 @@ export class DemoInput {
           );
         } else scene.adjustSelected('y', (event.key === 'ArrowDown' ? 1 : -1) * (event.shiftKey ? 5 : 1));
       };
-      keyboard.on('keydown', onKeyDown);
-      this.cleanup.push(() => keyboard.off('keydown', onKeyDown));
-      keyboard.addCapture(['SPACE']);
-      this.rotateLeft = keyboard.addKey('Q');
-      this.rotateRight = keyboard.addKey('E');
+      // Handle DOM events before the browser's default action; Phaser dispatches its queue later.
+      window.addEventListener('keydown', onKeyDown);
+      this.cleanup.push(() => window.removeEventListener('keydown', onKeyDown));
+      this.rotateLeft = keyboard.addKey('Q', false);
+      this.rotateRight = keyboard.addKey('E', false);
     }
     scene.events.once('shutdown', () => {
       for (const cleanup of this.cleanup) cleanup();
@@ -49,7 +68,21 @@ export class DemoInput {
   }
 
   katanaTurn(delta: number): number {
-    const turn = Number(this.rotateRight?.isDown ?? false) - Number(this.rotateLeft?.isDown ?? false);
+    if (!this.rotateLeft?.isDown && !this.rotateRight?.isDown) return 0;
+    if (isTypingTarget(document.activeElement)) return 0;
+    const held = (key: Phaser.Input.Keyboard.Key | undefined): boolean => {
+      const event = key?.originalEvent;
+      return (
+        !!key?.isDown &&
+        !key.altKey &&
+        !key.ctrlKey &&
+        !key.metaKey &&
+        !event?.isComposing &&
+        !event?.defaultPrevented &&
+        !isTypingTarget(event?.target ?? null)
+      );
+    };
+    const turn = Number(held(this.rotateRight)) - Number(held(this.rotateLeft));
     return (turn * delta) / 1000;
   }
 }

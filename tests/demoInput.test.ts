@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type Phaser from 'phaser';
-import { assert, test, vi } from 'vitest';
+import { afterEach, assert, test, vi } from 'vitest';
 import { DemoInput } from '../src/demo/DemoInput.js';
 import type { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
 import type { DemoPresenter } from '../src/demo/DemoPresenter.js';
@@ -30,12 +30,24 @@ function emitter() {
   };
 }
 
+afterEach(() => vi.unstubAllGlobals());
+
 function fixture() {
-  const keys = { Q: { isDown: false }, E: { isDown: false } };
+  const target = new EventTarget();
+  const document = { activeElement: null as unknown };
+  vi.stubGlobal('window', target);
+  vi.stubGlobal('document', document);
+  const press = (code: string, properties: Record<string, unknown> = {}) => {
+    const event = new Event('keydown', { cancelable: true });
+    for (const [key, value] of Object.entries({ code, key: code, ...properties }))
+      Object.defineProperty(event, key, { value });
+    target.dispatchEvent(event);
+    return event;
+  };
+  const keys = { Q: { isDown: false, ctrlKey: false }, E: { isDown: false, ctrlKey: false } };
   const keyboard = {
     ...emitter(),
-    addCapture: vi.fn(),
-    addKey: (key: keyof typeof keys) => keys[key],
+    addKey: vi.fn((key: keyof typeof keys, _capture?: boolean) => keys[key]),
   };
   const scene = {
     input: { ...emitter(), keyboard: keyboard as typeof keyboard | undefined },
@@ -47,52 +59,102 @@ function fixture() {
     adjustSelected: vi.fn(),
     resetBind: vi.fn(),
     restart: vi.fn(),
+    face: vi.fn(),
+    togglePlayback: vi.fn(),
   };
   const authoring = { active: false };
   const presentation = { handTarget: { x: 0, y: 0 } };
   const bind = () =>
     new DemoInput(scene as unknown as DemoScene, authoring as DemoPoseAuthoring, presentation as DemoPresenter);
-  return { scene, authoring, presentation, keys, keyboard, bind };
+  return { scene, authoring, presentation, keys, keyboard, bind, press, document };
 }
 
 test('input uses world coordinates, changes bracket/R actions with pose mode, and reads held Q/E keys', () => {
-  const { scene, authoring, presentation, keys, keyboard, bind } = fixture();
+  const { scene, authoring, presentation, keys, bind, press } = fixture();
   const input = bind();
   scene.input.emit('pointermove', { worldX: 123, worldY: 456 } as Phaser.Input.Pointer);
   assert.deepEqual(presentation.handTarget, { x: 123, y: 456 });
-  keyboard.emit('keydown-ONE');
+  press('Digit1');
   assert.deepEqual(scene.play.mock.lastCall, ['idle']);
-  keyboard.emit('keydown-OPEN_BRACKET');
+  press('BracketLeft');
   assert.deepEqual(scene.adjustSpeed.mock.lastCall, [-0.25]);
-  keyboard.emit('keydown-R');
+  press('KeyR');
   assert.strictEqual(scene.restart.mock.calls.length, 1);
 
   authoring.active = true;
-  keyboard.emit('keydown-CLOSED_BRACKET');
+  press('BracketRight');
   assert.deepEqual(scene.selectBone.mock.lastCall, [1]);
-  keyboard.emit('keydown-R');
+  press('KeyR');
   assert.strictEqual(scene.resetBind.mock.calls.length, 1);
-  const event = { key: 'ArrowRight', shiftKey: true, altKey: true, preventDefault: vi.fn() };
-  keyboard.emit('keydown', event);
+  const event = press('ArrowRight', { shiftKey: true, altKey: true });
   assert.deepEqual(scene.adjustSelected.mock.lastCall, ['x', 5]);
-  assert.strictEqual(event.preventDefault.mock.calls.length, 1);
+  assert.isTrue(event.defaultPrevented);
   keys.Q.isDown = true;
   assert.strictEqual(input.katanaTurn(500), -0.5);
   keys.E.isDown = true;
   assert.strictEqual(input.katanaTurn(500), 0);
 });
 
+test('shortcuts preserve form input, modifiers, composition, repeated toggles, and native Space activation', () => {
+  const { scene, authoring, bind, press } = fixture();
+  bind();
+  for (const properties of [
+    { target: { tagName: 'SELECT' } },
+    { target: { tagName: 'INPUT' } },
+    { target: { isContentEditable: true } },
+    { ctrlKey: true },
+    { metaKey: true },
+    { altKey: true },
+    { isComposing: true },
+    { defaultPrevented: true },
+    { repeat: true },
+  ])
+    press('KeyA', properties);
+  assert.equal(scene.face.mock.calls.length, 0);
+  press('KeyA');
+  assert.deepEqual(scene.face.mock.lastCall, ['left']);
+  const nativeSpace = press('Space', { target: { closest: () => ({}) } });
+  assert.isFalse(nativeSpace.defaultPrevented);
+  assert.equal(scene.togglePlayback.mock.calls.length, 0);
+  assert.isTrue(press('Space').defaultPrevented);
+  assert.equal(scene.togglePlayback.mock.calls.length, 1);
+  authoring.active = true;
+  press('ArrowRight', { target: { tagName: 'SELECT' } });
+  press('ArrowRight', { ctrlKey: true });
+  assert.equal(scene.adjustSelected.mock.calls.length, 0);
+  press('ArrowRight', { altKey: true, shiftKey: true, repeat: true });
+  assert.deepEqual(scene.adjustSelected.mock.lastCall, ['x', 5]);
+});
+
+test('held rotation does not capture keys or rotate while typing or using browser modifiers', () => {
+  const { keys, keyboard, bind, document } = fixture();
+  const input = bind();
+  assert.deepEqual(keyboard.addKey.mock.calls, [
+    ['Q', false],
+    ['E', false],
+  ]);
+  keys.Q.isDown = true;
+  document.activeElement = { tagName: 'SELECT' };
+  assert.equal(input.katanaTurn(1000), 0);
+  document.activeElement = null;
+  keys.Q.ctrlKey = true;
+  assert.equal(input.katanaTurn(1000), 0);
+  keys.Q.ctrlKey = false;
+  assert.equal(input.katanaTurn(1000), -1);
+});
+
 test('shutdown removes demo listeners and rebinding triggers each control only once', () => {
-  const { scene, keyboard, bind } = fixture();
+  const { scene, keyboard, bind, press } = fixture();
   const unrelated = vi.fn();
   keyboard.on('keydown-ONE', unrelated);
   bind();
   scene.events.emit('shutdown');
-  keyboard.emit('keydown-ONE');
+  press('Digit1');
   assert.strictEqual(scene.play.mock.calls.length, 0);
+  keyboard.emit('keydown-ONE');
   assert.strictEqual(unrelated.mock.calls.length, 1);
   bind();
-  keyboard.emit('keydown-ONE');
+  press('Digit1');
   assert.strictEqual(scene.play.mock.calls.length, 1);
   scene.events.emit('shutdown');
   const onPointer = vi.fn();
@@ -111,7 +173,7 @@ test('pointer input works when keyboard support is disabled', () => {
 });
 
 test('buttons retain their actions when keyboard shortcuts switch to pose editing', () => {
-  const { scene, authoring, keyboard, bind } = fixture();
+  const { scene, authoring, bind, press } = fixture();
   const commands = createDemoCommands(scene as unknown as DemoScene);
   bind();
   authoring.active = true;
@@ -121,9 +183,9 @@ test('buttons retain their actions when keyboard shortcuts switch to pose editin
   assert.deepEqual(scene.adjustSpeed.mock.calls, [[-0.25], [0.25]]);
   assert.equal(scene.restart.mock.calls.length, 1);
   assert.equal(scene.selectBone.mock.calls.length, 0);
-  keyboard.emit('keydown-OPEN_BRACKET');
-  keyboard.emit('keydown-CLOSED_BRACKET');
-  keyboard.emit('keydown-R');
+  press('BracketLeft');
+  press('BracketRight');
+  press('KeyR');
   assert.deepEqual(scene.selectBone.mock.calls, [[-1], [1]]);
   assert.equal(scene.adjustSpeed.mock.calls.length, 2);
   assert.equal(scene.resetBind.mock.calls.length, 1);
@@ -136,6 +198,6 @@ test('every demo button resolves a command and keyboard shortcuts have one bindi
   const buttons = [...markup.matchAll(/<button[^>]*data-action="([^"]+)"/g)];
   assert.isAbove(buttons.length, 0);
   for (const [, action] of buttons) assert.isFunction(commands[action!]!.run, `Missing command for ${action}`);
-  const keys = Object.values(commands).flatMap((command) => (command.key ? [command.key] : []));
+  const keys = Object.values(commands).flatMap((command) => (command.code ? [command.code] : []));
   assert.equal(new Set(keys).size, keys.length);
 });

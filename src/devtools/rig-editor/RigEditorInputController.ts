@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import type { Puppet } from '../../engine/Puppet.js';
+import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
-import { isEditorTypingTarget } from '../shared/editorShortcuts.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigEditorOverlay } from './RigEditorOverlay.js';
@@ -108,13 +108,13 @@ export class RigEditorInputController {
 
   private keyDown = (event: KeyboardEvent): void => {
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
-      if (isEditorTypingTarget(event.target)) return;
+      if (isTypingTarget(event.target)) return;
       event.preventDefault();
       if (event.shiftKey) this.editor.redo();
       else this.editor.undo();
       return;
     }
-    if (event.altKey || event.ctrlKey || event.metaKey || isEditorTypingTarget(event.target)) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
     const selection = this.state.selection;
     if (selection?.type !== 'bone') return;
     const amount = event.shiftKey ? 10 : 1;

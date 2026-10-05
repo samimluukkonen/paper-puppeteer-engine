@@ -1,4 +1,4 @@
-import { isEditorTypingTarget } from '../shared/editorShortcuts.js';
+import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
 
@@ -97,7 +97,7 @@ export class TimelineController {
           event.altKey ||
           event.ctrlKey ||
           event.metaKey ||
-          isEditorTypingTarget(event.target) ||
+          isTypingTarget(event.target) ||
           (event.target instanceof Element && event.target.closest('button, a[href]')) ||
           !this.state.workingAnimation
         )

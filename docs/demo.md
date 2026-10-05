@@ -2,6 +2,8 @@
 
 [All guides](../README.md#guides)
 
+Shortcuts leave form controls and editable text alone. Ctrl/Cmd combinations and composition input retain browser behavior; Alt is reserved for pose translation. Space activates a focused button or link normally. Held Q/E rotation is suspended while editing a form control.
+
 | Key | Action |
 | --- | --- |
 | `1` | Play / restart idle |

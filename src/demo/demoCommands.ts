@@ -1,14 +1,14 @@
 import type { DemoScene } from './DemoScene.js';
 
 export interface DemoCommand {
-  readonly key?: string;
+  readonly code?: string;
   readonly run: () => void;
   readonly runFromKeyboard: (poseMode: boolean) => void;
 }
 
-function command(run: () => void, key?: string, runInPoseMode?: () => void): DemoCommand {
+function command(run: () => void, code?: string, runInPoseMode?: () => void): DemoCommand {
   return {
-    ...(key === undefined ? {} : { key }),
+    ...(code === undefined ? {} : { code }),
     run,
     runFromKeyboard: (poseMode) => (poseMode && runInPoseMode ? runInPoseMode : run)(),
   };
@@ -17,50 +17,50 @@ function command(run: () => void, key?: string, runInPoseMode?: () => void): Dem
 /** Scene-owned commands shared by DOM buttons and keyboard bindings. Held Q/E rotation stays in DemoInput. */
 export function createDemoCommands(scene: DemoScene): Readonly<Record<string, DemoCommand>> {
   return {
-    idle: command(() => scene.play('idle'), 'ONE'),
-    walk: command(() => scene.play('walk'), 'TWO'),
-    sword: command(() => scene.play('sword'), 'THREE'),
-    fadeIdle: command(() => scene.crossfade('idle'), 'FOUR'),
-    fadeWalk: command(() => scene.crossfade('walk'), 'FIVE'),
-    stepped: command(() => scene.toggleStepped(), 'S'),
-    fps8: command(() => scene.setSteppedFPS(8), 'EIGHT'),
-    fps10: command(() => scene.setSteppedFPS(10), 'ZERO'),
-    pause: command(() => scene.togglePause(), 'P'),
+    idle: command(() => scene.play('idle'), 'Digit1'),
+    walk: command(() => scene.play('walk'), 'Digit2'),
+    sword: command(() => scene.play('sword'), 'Digit3'),
+    fadeIdle: command(() => scene.crossfade('idle'), 'Digit4'),
+    fadeWalk: command(() => scene.crossfade('walk'), 'Digit5'),
+    stepped: command(() => scene.toggleStepped(), 'KeyS'),
+    fps8: command(() => scene.setSteppedFPS(8), 'Digit8'),
+    fps10: command(() => scene.setSteppedFPS(10), 'Digit0'),
+    pause: command(() => scene.togglePause(), 'KeyP'),
     slower: command(
       () => scene.adjustSpeed(-0.25),
-      'OPEN_BRACKET',
+      'BracketLeft',
       () => scene.selectBone(-1),
     ),
     faster: command(
       () => scene.adjustSpeed(0.25),
-      'CLOSED_BRACKET',
+      'BracketRight',
       () => scene.selectBone(1),
     ),
-    upperBody: command(() => scene.toggleUpperBody(), 'L'),
-    left: command(() => scene.face('left'), 'A'),
-    right: command(() => scene.face('right'), 'D'),
-    debug: command(() => scene.toggleDebug(), 'B'),
-    prop: command(() => scene.toggleProp(), 'T'),
-    handIK: command(() => scene.toggleHandIK(), 'H'),
-    footIK: command(() => scene.toggleFootIK(), 'F'),
-    ikDebug: command(() => scene.toggleIKDebug(), 'I'),
-    defaultSkin: command(() => scene.setSkin('default'), 'K'),
-    armoredSkin: command(() => scene.setSkin('alternate'), 'M'),
-    gripHand: command(() => scene.toggleGripHand(), 'G'),
-    helmet: command(() => scene.toggleHelmet(), 'N'),
-    slotDebug: command(() => scene.toggleSlotDebug(), 'V'),
+    upperBody: command(() => scene.toggleUpperBody(), 'KeyL'),
+    left: command(() => scene.face('left'), 'KeyA'),
+    right: command(() => scene.face('right'), 'KeyD'),
+    debug: command(() => scene.toggleDebug(), 'KeyB'),
+    prop: command(() => scene.toggleProp(), 'KeyT'),
+    handIK: command(() => scene.toggleHandIK(), 'KeyH'),
+    footIK: command(() => scene.toggleFootIK(), 'KeyF'),
+    ikDebug: command(() => scene.toggleIKDebug(), 'KeyI'),
+    defaultSkin: command(() => scene.setSkin('default'), 'KeyK'),
+    armoredSkin: command(() => scene.setSkin('alternate'), 'KeyM'),
+    gripHand: command(() => scene.toggleGripHand(), 'KeyG'),
+    helmet: command(() => scene.toggleHelmet(), 'KeyN'),
+    slotDebug: command(() => scene.toggleSlotDebug(), 'KeyV'),
     rotateLeft: command(() => scene.rotateKatana(-0.15)),
     rotateRight: command(() => scene.rotateKatana(0.15)),
-    poseMode: command(() => scene.togglePoseMode(), 'O'),
-    combatPose: command(() => scene.applyCombatPose(), 'C'),
+    poseMode: command(() => scene.togglePoseMode(), 'KeyO'),
+    combatPose: command(() => scene.applyCombatPose(), 'KeyC'),
     bindPose: command(() => scene.resetBind()),
-    exportPose: command(() => scene.exportCurrentPose(), 'X'),
-    exportRig: command(() => scene.exportRig(), 'J'),
-    resetBone: command(() => scene.resetSelectedBone(), 'U'),
-    playback: command(() => scene.togglePlayback(), 'SPACE'),
+    exportPose: command(() => scene.exportCurrentPose(), 'KeyX'),
+    exportRig: command(() => scene.exportRig(), 'KeyJ'),
+    resetBone: command(() => scene.resetSelectedBone(), 'KeyU'),
+    playback: command(() => scene.togglePlayback(), 'Space'),
     restart: command(
       () => scene.restart(),
-      'R',
+      'KeyR',
       () => scene.resetBind(),
     ),
   };

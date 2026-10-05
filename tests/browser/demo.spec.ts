@@ -26,6 +26,27 @@ test('demo loads artwork and responds to playback, facing, skin and IK controls'
   await expect(page.locator('[data-action="ikDebug"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('demo shortcuts respect form focus and native button activation', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('#status-text')).toContainText('Current: idle');
+  const left = page.locator('[data-action="left"]');
+  await page.locator('#character-selection').focus();
+  await page.keyboard.press('a');
+  await expect(left).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('[data-action="pause"]').focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator('#status-text')).toContainText('Paused: true');
+  await expect(page.locator('#status-text')).not.toContainText('(stopped)');
+  await page.locator('[data-action="pause"]').press('Space');
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await page.keyboard.press('Alt+a');
+  await expect(left).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('a');
+  await expect(left).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Space');
+  await expect(page.locator('#status-text')).toContainText('(stopped)');
+});
+
 test('demo and editor navigation preserves the deployment path and loads fresh scenes', async ({ page, baseURL }) => {
   await page.goto('./');
   await expect(page.locator('#status-text')).toContainText('Current: idle');
