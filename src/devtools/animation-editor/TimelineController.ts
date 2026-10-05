@@ -1,14 +1,7 @@
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { setAttribute, setText } from '../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
-
-function setText(element: HTMLElement, text: string): void {
-  if (element.textContent !== text) element.textContent = text;
-}
-
-function setAttribute(element: HTMLElement, name: string, value: string): void {
-  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
-}
 
 /** DOM adapter only: width/pointer capture belong here, while time and animation data belong to state. */
 export class TimelineController {

@@ -425,12 +425,13 @@ test('Space activates focused Restart and Loop preview buttons without toggling 
   await expect(playPause).toHaveText('Play');
 });
 
-test('playback advances without measuring layout or rewriting unchanged timeline controls', async ({ page }) => {
+test('playback advances without measuring layout or rewriting unchanged editor controls', async ({ page }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
     await route.fulfill({ json: { ...(await response.json()), duration: 60_000 } });
   });
   await openEditor(page);
+  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
   await page.locator('#play-pause').click();
   await expect(page.locator('#play-pause')).toHaveText('Pause');
   const work = await page.evaluate(async () => {
@@ -458,6 +459,18 @@ test('playback advances without measuring layout or rewriting unchanged timeline
     });
     for (const selector of ['#animation-metadata', '#animation-status', '#animation-dirty', '#play-pause'])
       observer.observe(document.querySelector(selector)!, { childList: true, characterData: true, subtree: true });
+    for (const selector of [
+      '#animation-bones',
+      '#animation-bone-title',
+      '#animation-bone-fields',
+      '#animation-cancel-transform',
+    ])
+      observer.observe(document.querySelector(selector)!, {
+        attributes: true,
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
     try {
       for (let count = 0; count < 10; count += 1) await frame();
       return { measurements, timeUpdates, unchangedWrites };

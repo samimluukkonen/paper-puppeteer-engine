@@ -1,5 +1,6 @@
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
+import { setAttribute, setText } from '../shared/domUpdates.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 
 const labels: Record<TransformProperty, string> = {
@@ -25,6 +26,7 @@ export class BoneInspectorController {
   private readonly fields: HTMLFieldSetElement;
   private readonly cancel: HTMLButtonElement;
   private readonly buttons = new Map<string, HTMLButtonElement>();
+  private selectedButton: HTMLButtonElement | undefined;
   private readonly rows = new Map<
     TransformProperty,
     {
@@ -132,6 +134,7 @@ export class BoneInspectorController {
     this.state = state;
     this.hierarchy.replaceChildren();
     this.buttons.clear();
+    this.selectedButton = undefined;
     if (state.rig)
       for (const { id, depth } of boneHierarchy(state.rig)) {
         const button = document.createElement('button');
@@ -159,22 +162,31 @@ export class BoneInspectorController {
     this.bone = state?.selectedBoneId;
     this.time = state?.currentTime;
     this.animation = state?.workingAnimation;
-    this.title.textContent = this.bone ? `Bone: ${this.bone}` : 'Select a bone';
-    this.fields.disabled = !transform;
-    for (const [id, button] of this.buttons) button.setAttribute('aria-pressed', String(id === this.bone));
-    for (const [property, { input, indicator, set, remove }] of this.rows) {
-      if (navigated || document.activeElement !== input)
-        input.value = transform ? String(Number(toDisplay(property, transform[property]).toFixed(6))) : '';
-      const keyed = !!this.bone && !!state?.hasKeyframeAtTime(this.bone, property);
-      indicator.textContent = keyed ? '● keyed' : '○ no key';
-      indicator.dataset.keyed = String(keyed);
-      input.dataset.temporary = String(state?.boneTransformDraft[property] !== undefined);
-      set.disabled = !transform || !input.validity.valid;
-      remove.disabled = !keyed;
+    setText(this.title, this.bone ? `Bone: ${this.bone}` : 'Select a bone');
+    if (this.fields.disabled !== !transform) this.fields.disabled = !transform;
+    const selected = this.bone ? this.buttons.get(this.bone) : undefined;
+    if (selected !== this.selectedButton) {
+      if (this.selectedButton) setAttribute(this.selectedButton, 'aria-pressed', 'false');
+      if (selected) setAttribute(selected, 'aria-pressed', 'true');
+      this.selectedButton = selected;
     }
-    this.cancel.disabled =
+    for (const [property, { input, indicator, set, remove }] of this.rows) {
+      if (navigated || document.activeElement !== input) {
+        const value = transform ? String(Number(toDisplay(property, transform[property]).toFixed(6))) : '';
+        if (input.value !== value) input.value = value;
+      }
+      const keyed = !!this.bone && !!state?.hasKeyframeAtTime(this.bone, property);
+      setText(indicator, keyed ? '● keyed' : '○ no key');
+      setAttribute(indicator, 'data-keyed', String(keyed));
+      setAttribute(input, 'data-temporary', String(state?.boneTransformDraft[property] !== undefined));
+      const setDisabled = !transform || !input.validity.valid;
+      if (set.disabled !== setDisabled) set.disabled = setDisabled;
+      if (remove.disabled !== !keyed) remove.disabled = !keyed;
+    }
+    const cancelDisabled =
       !transform ||
       (!state?.hasTemporaryTransform && ![...this.rows.values()].some(({ input }) => !input.validity.valid));
+    if (this.cancel.disabled !== cancelDisabled) this.cancel.disabled = cancelDisabled;
   }
 
   dispose(): void {
@@ -183,6 +195,7 @@ export class BoneInspectorController {
     this.hierarchyLifetime.abort();
     this.state = undefined;
     this.buttons.clear();
+    this.selectedButton = undefined;
     this.rows.clear();
   }
 }
