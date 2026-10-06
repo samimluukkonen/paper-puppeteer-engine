@@ -20,7 +20,7 @@ export function viewHeader(view: keyof typeof views): string {
   return `
     <header class="view-header">
       <div class="view-header-top">
-        <a class="wordmark" href="${root}" aria-label="Paper Puppeteer Engine"><img class="mark" src="${puppetLogo}" width="44" height="44" alt=""> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
+        <a class="wordmark" href="${root}${characterQuery}" aria-label="Paper Puppeteer Engine"><img class="mark" src="${puppetLogo}" width="44" height="44" alt=""> PAPER PUPPETEER <span class="wordmark-sub">ENGINE</span></a>
         <span class="view-version">v${packageInfo.version}</span>
       </div>
       <div class="view-header-main">

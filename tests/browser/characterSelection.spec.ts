@@ -2,6 +2,25 @@ import { expect } from '@playwright/test';
 import { parseRigDefinition } from '../../src/engine/externalData.js';
 import { test } from './fixtures.js';
 
+for (const route of ['', 'rig-editor/', 'animation-editor/']) {
+  test(`logo navigation preserves the selected character from ${route || 'demo'}`, async ({ page }) => {
+    await page.goto(`${route}?character=random-paperdoll-sketch`);
+    await expect(page.locator('#character-selection')).toHaveValue('random-paperdoll-sketch');
+    await page.getByRole('link', { name: 'Paper Puppeteer Engine', exact: true }).click();
+    await expect(page.locator('#status-text')).toContainText('Current: idle');
+    await expect(page.locator('#character-selection')).toHaveValue('random-paperdoll-sketch');
+    expect(new URL(page.url()).searchParams.get('character')).toBe('random-paperdoll-sketch');
+  });
+}
+
+test('logo navigation keeps the default character URL free of query parameters', async ({ page }) => {
+  await page.goto('animation-editor/');
+  await page.getByRole('link', { name: 'Paper Puppeteer Engine', exact: true }).click();
+  await expect(page.locator('#status-text')).toContainText('Current: idle');
+  await expect(page.locator('#character-selection')).toHaveValue('demo-puppet');
+  expect(new URL(page.url()).searchParams.has('character')).toBe(false);
+});
+
 test('sketch loads all parts, exports edits, and stays selected across views', async ({ page }) => {
   await page.goto('rig-editor/?character=random-paperdoll-sketch');
   await expect(page.locator('#session-status')).toContainText('Character: random-paperdoll-sketch');
