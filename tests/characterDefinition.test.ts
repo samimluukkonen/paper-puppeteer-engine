@@ -106,7 +106,8 @@ test('character texture and file lookups require own entries', () => {
   for (const collection of ['skins', 'animations', 'poses'] as const) {
     const inherited = bundle();
     const path = collection === 'skins' ? inherited.manifest.skins.default! : inherited.manifest[collection]![0]!;
-    inherited[collection] = Object.create({ [path]: inherited[collection][path] });
+    const inheritedFiles: unknown = Object.create({ [path]: inherited[collection][path] });
+    Reflect.set(inherited, collection, inheritedFiles);
     assert.ok(validateCharacterDefinition(inherited).some((issue) => /Missing .* file/.test(issue.message)));
   }
 });
@@ -333,8 +334,11 @@ test('character validation preserves pose leaf diagnostics rather than combining
   data.poses[path] = { version: 1, name: 'bad', bones: { torso: { x: 'invalid', rotation: 'invalid' } } };
   assert.deepEqual(
     validateCharacterDefinition(data)
-      .map(({ path }) => path)
-      .sort(),
+      .map(({ path }) => {
+        if (typeof path !== 'string') throw new Error('Validation issue must include a field path.');
+        return path;
+      })
+      .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
     ['poses[0].bones.torso.rotation', 'poses[0].bones.torso.x'],
   );
   data.poses[path] = { version: 1, name: 'bad', bones: { torso: { extra: 1 } } };

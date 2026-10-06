@@ -1,7 +1,9 @@
 import { afterEach, assert, test, vi } from 'vitest';
 import type { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
+import type { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { createSessionController } from '../src/devtools/rig-editor/SessionController.js';
+import { parseRigDefinition } from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
 
 afterEach(() => {
@@ -43,7 +45,7 @@ async function fixture() {
   const scene = {
     characterId: 'test-character',
     rigFilename: 'rig.json',
-    reloadRig: vi.fn(),
+    reloadRig: vi.fn<RigEditorScene['reloadRig']>(),
     reloadOriginal: vi.fn(),
   };
   vi.stubGlobal('window', { confirm: () => true });
@@ -64,7 +66,7 @@ test('clipboard completion saves the captured snapshot and leaves later edits di
   const { state, copy, writeText, resolve, feedback, querySelector } = await fixture();
   state.editBone('root', 'x', 1.123456789);
   copy();
-  assert.equal(JSON.parse(writeText.mock.calls[0]![0]).bones[0].x, 1.123457);
+  assert.equal(parseRigDefinition(JSON.parse(writeText.mock.calls[0]![0])).bones[0]!.x, 1.123457);
   state.editBone('root', 'x', 2);
   resolve();
   await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
@@ -148,7 +150,7 @@ test('a rejected copy preserves the last successfully exported rig and filename'
   await vi.waitFor(() => assert.include(feedback.textContent, 'Clipboard write failed'));
   querySelector('#reload-exported').click();
   const [rig, filename] = scene.reloadRig.mock.calls[0]!;
-  assert.equal((rig as { bones: { x: number }[] }).bones[0]!.x, 0);
+  assert.equal(rig.bones[0]!.x, 0);
   assert.equal(filename, 'rig.json');
 });
 
@@ -175,5 +177,5 @@ test('an older pending copy cannot replace a newer successful export', async () 
   await Promise.resolve();
   assert.isFalse(state.dirty);
   querySelector('#reload-exported').click();
-  assert.equal((scene.reloadRig.mock.calls[0]![0] as { bones: { x: number }[] }).bones[0]!.x, 2);
+  assert.equal(scene.reloadRig.mock.calls[0]![0].bones[0]!.x, 2);
 });

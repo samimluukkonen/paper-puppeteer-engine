@@ -9,6 +9,7 @@ import {
   validatePoseDefinition,
 } from '../src/engine/Pose.js';
 import { Rig } from '../src/engine/Rig.js';
+import type { JointTransform } from '../src/engine/types.js';
 
 const rig = new Rig({
   root: 'torso',
@@ -40,7 +41,7 @@ test('pose parsing rejects throwing accessors before reading versions or transfo
     },
   });
   assert.throws(() => parsePoseDefinition({ ...source, bones: { arm: transform } }, rig), PoseValidationError);
-  const inherited = Object.create({
+  const inherited: unknown = Object.create({
     get version() {
       throw new Error('inherited getter invoked');
     },
@@ -86,7 +87,15 @@ test('pose validation retains individual field and reference paths without throw
     ],
   );
   const fields = validatePoseDefinition({ ...source, bones: { arm: { x: 'invalid', rotation: 'invalid' } } }, rig);
-  assert.deepEqual(fields.map(({ path }) => path).sort(), ['bones.arm.rotation', 'bones.arm.x']);
+  assert.deepEqual(
+    fields
+      .map(({ path }) => {
+        if (typeof path !== 'string') throw new Error('Validation issue must include a field path.');
+        return path;
+      })
+      .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+    ['bones.arm.rotation', 'bones.arm.x'],
+  );
   assert.deepEqual(
     validatePoseDefinition({ ...source, bones: { arm: { extra: 1 } } }, rig).map(({ path }) => path),
     ['bones.arm.extra'],
@@ -129,11 +138,11 @@ test.each([1, -1])('static pose blending takes the shortest rotation across the 
   const to = -from;
   state.get('arm')!.pose.rotation = from;
   const pose = parsePoseDefinition({ ...source, bones: { arm: { rotation: to, x: 9 } } }, rig);
-  const underlying = new Map();
+  const underlying = new Map<string, Partial<JointTransform>>();
   applyPoseToJoints(pose, state, 0.5, underlying);
   assert.closeTo(state.get('arm')!.pose.rotation, direction * Math.PI, 1e-12);
   assert.equal(state.get('arm')!.pose.x, 7);
-  assert.equal(underlying.get('arm').rotation, from);
+  assert.equal(underlying.get('arm')!.rotation, from);
   state.get('arm')!.pose.rotation = from;
   applyPoseToJoints(pose, state, 0);
   assert.equal(state.get('arm')!.pose.rotation, from);

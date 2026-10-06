@@ -16,7 +16,7 @@ import {
 import type { RigDefinition } from '../src/engine/types.js';
 
 test('identifier dictionaries reject reserved keys before record parsing drops them', () => {
-  const dictionary = JSON.parse('{"__proto__":null}');
+  const dictionary: unknown = JSON.parse('{"__proto__":null}');
   for (const [schema, input] of [
     [skinDefinitionSchema, { version: 1, name: 'default', slots: dictionary }],
     [animationClipSchema, { name: 'idle', duration: 100, loop: true, tracks: dictionary }],

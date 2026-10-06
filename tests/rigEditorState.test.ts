@@ -249,7 +249,7 @@ test('explicit validation and export check the current data before a grouped edi
     assert.equal((validation.mock.calls.at(-1)![0] as externalData.RigJsonDefinition).slots![0]!.y, 12);
     state.editSlot('handVisual', 'y', 15);
     assert.isTrue(state.validationPending);
-    assert.equal(JSON.parse(state.exportJson(false)).slots[0].y, 15);
+    assert.equal(externalData.parseRigDefinition(JSON.parse(state.exportJson(false))).slots[0]!.y, 15);
     assert.isFalse(state.validationPending);
     assert.equal((validation.mock.calls.at(-1)![0] as externalData.RigJsonDefinition).slots![0]!.y, 15);
   } finally {

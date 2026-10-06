@@ -91,7 +91,7 @@ test('file validators reject root and nested accessors without invoking getters'
     },
   });
   assert.throws(() => parseRigDefinition({ ...rigFile, bones: [nested] }), RigValidationError);
-  const inherited = Object.create({
+  const inherited: unknown = Object.create({
     get version() {
       throw new Error('inherited getter invoked');
     },
