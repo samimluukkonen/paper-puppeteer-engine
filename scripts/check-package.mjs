@@ -6,13 +6,18 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
+import { readPackageManifest } from './packageManifest.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const installed = createRequire(new URL('../package.json', import.meta.url));
-const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const manifest = await readPackageManifest(new URL('../package.json', import.meta.url));
 const temporary = await mkdtemp(join(tmpdir(), 'paper-puppeteer-package-'));
 const consumer = join(temporary, 'consumer');
 const env = { ...process.env, npm_config_cache: join(temporary, 'npm-cache') };
+/**
+ * @param {string[]} args
+ * @param {string} [cwd]
+ */
 const npm = (args, cwd = root) => execFileSync('npm', args, { cwd, env, stdio: 'inherit' });
 
 try {
@@ -29,7 +34,7 @@ try {
   // Reuse installed dependencies so the consumer check is offline and tests the locked versions.
   for (const name of pending) {
     const path = installed.resolve(`${name}/package.json`);
-    const dependency = JSON.parse(await readFile(path, 'utf8'));
+    const dependency = await readPackageManifest(path);
     dependencies[name] = `file:${dirname(path)}`;
     for (const child of Object.keys(dependency.dependencies ?? {})) pending.add(child);
   }
@@ -111,21 +116,19 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
 }
 `,
   );
-  await writeFile(
-    join(consumer, 'tsconfig.json'),
-    JSON.stringify({
-      compilerOptions: {
-        target: 'ES2022',
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        strict: true,
-        noEmit: true,
-        skipLibCheck: false,
-        lib: ['ES2022', 'DOM'],
-      },
-      include: ['core.ts'],
-    }),
-  );
+  const config = {
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      strict: true,
+      noEmit: true,
+      skipLibCheck: false,
+      lib: ['ES2022', 'DOM'],
+    },
+    include: ['core.ts'],
+  };
+  await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify(config));
   const typecheck = () =>
     execFileSync(
       process.execPath,
@@ -149,7 +152,6 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
 `,
   );
   // Match the repository's skipLibCheck for the browser entry's third-party Phaser declarations.
-  const config = JSON.parse(await readFile(join(consumer, 'tsconfig.json'), 'utf8'));
   config.compilerOptions.skipLibCheck = true;
   config.include = ['browser.ts'];
   await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify(config));

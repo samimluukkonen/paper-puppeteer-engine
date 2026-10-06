@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readPackageManifest } from './packageManifest.mjs';
 
-const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const { version } = await readPackageManifest(new URL('../package.json', import.meta.url));
 // Numeric identifiers cannot have leading zeros; prerelease identifiers may also contain letters and hyphens.
 const numeric = '(?:0|[1-9][0-9]*)';
 const prerelease = `(?:${numeric}|[0-9]*[A-Za-z-][0-9A-Za-z-]*)`;
