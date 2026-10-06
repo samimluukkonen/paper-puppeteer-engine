@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import {
+import { z } from 'zod';
+
+// Lint runs before declarations are built; use source types while loading the package at runtime.
+const coreSpecifier = 'paper-puppeteer-engine/core';
+const {
   AnimationPlayer,
   CharacterLoader,
   compileClip,
@@ -10,8 +14,7 @@ import {
   solveTwoBoneIK,
   validatePoseDefinition,
   validateRigDefinition,
-} from 'paper-puppeteer-engine/core';
-import { z } from 'zod';
+} = /** @type {typeof import('../src/engine/core.ts')} */ (await import(coreSpecifier));
 
 // Exercise the built subpath in plain Node, with no browser globals or Phaser mock.
 assert.equal(typeof globalThis.window, 'undefined');
