@@ -36,6 +36,7 @@ export class TimelineController {
     this.resize = new ResizeObserver(() => {
       this.width = this.timeline.getBoundingClientRect().width;
       this.input.previewKeyDrag();
+      this.input.previewMarquee();
       this.render();
     });
     this.resize.observe(this.timeline);
@@ -53,6 +54,7 @@ export class TimelineController {
   }
 
   bind(state: AnimationEditorState, characterId?: string): void {
+    this.input.endMarquee(false);
     this.input.endKeyDrag(false);
     this.state.pause();
     this.input.endScrub();
@@ -103,6 +105,7 @@ export class TimelineController {
   }
 
   dispose(): void {
+    this.input.endMarquee(false);
     this.input.endKeyDrag(false);
     this.state.pause();
     this.input.dispose();

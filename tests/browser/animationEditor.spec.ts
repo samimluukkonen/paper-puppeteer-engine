@@ -76,10 +76,10 @@ test('ruler, current time, selection and scrubbed artwork update without dirtyin
   const box = await timeline.boundingBox();
   if (!box) throw new Error('Missing timeline bounds.');
   for (const fraction of [0.01, 0.5, 0.99]) {
-    await page.mouse.click(box.x + box.width * fraction, box.y + 50);
+    await page.mouse.click(box.x + box.width * fraction, box.y + 18);
     expect(Number(await timeline.getAttribute('aria-valuenow'))).toBeCloseTo(duration * fraction, 2);
   }
-  await page.mouse.click(box.x + box.width * 0.25, box.y + 50);
+  await page.mouse.click(box.x + box.width * 0.25, box.y + 18);
   await expect.poll(async () => (await canvas.screenshot()).equals(start)).toBe(false);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.locator('#reset-time').click();
@@ -95,14 +95,14 @@ test('captured pointer scrubs outside both edges, release ends drag, keyboard an
   const timeline = page.getByRole('slider', { name: 'Animation time' });
   const box = await timeline.boundingBox();
   if (!box) throw new Error('Missing timeline bounds.');
-  await page.mouse.move(box.x + box.width / 2, box.y + 50);
+  await page.mouse.move(box.x + box.width / 2, box.y + 18);
   await page.mouse.down();
   await page.mouse.move(box.x - 15, box.y + 150, { steps: 4 });
   await expect(timeline).toHaveAttribute('aria-valuenow', '0');
   await page.mouse.move(box.x + box.width + 15, box.y + 150, { steps: 8 });
   await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
   await page.mouse.up();
-  await page.mouse.move(box.x + box.width / 2, box.y + 50);
+  await page.mouse.move(box.x + box.width / 2, box.y + 18);
   await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
   await timeline.press('Home');
   await timeline.press('ArrowRight');
@@ -531,7 +531,8 @@ test('loop preview repeats, remains a preference across selection, and stops at 
         previous = current;
         if (count >= 3) finish();
       });
-      const timeout = setTimeout(finish, 5000);
+      // Allow slow software-rendered Chrome runs enough frames to observe three wraps.
+      const timeout = setTimeout(finish, 15000);
       observer.observe(element, { attributes: true, attributeFilter: ['aria-valuenow'] });
     });
   });
@@ -561,7 +562,7 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   if (!box) throw new Error('Missing timeline bounds.');
   await loop.click();
   await playPause.click();
-  await page.mouse.move(box.x + box.width * 0.25, box.y + 50);
+  await page.mouse.move(box.x + box.width * 0.25, box.y + 18);
   await page.mouse.down();
   await expect(page.locator('#animation-metadata')).toContainText('Scrubbing');
   const held = await time();
@@ -569,7 +570,7 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   await page.waitForTimeout(200);
   expect(await time()).toBe(held);
   expect((await canvas.screenshot()).equals(pose)).toBe(true);
-  await page.mouse.move(box.x + box.width * 0.6, box.y + 50, { steps: 5 });
+  await page.mouse.move(box.x + box.width * 0.6, box.y + 18, { steps: 5 });
   const moved = await time();
   expect(moved).toBeCloseTo(1.8 * 0.6, 2);
   expect((await canvas.screenshot()).equals(pose)).toBe(false);
@@ -579,7 +580,7 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   await expect(playPause).toHaveText('Pause');
   await expect.poll(time).toBeGreaterThan(moved);
   await playPause.click();
-  await page.mouse.move(box.x + box.width * 0.3, box.y + 50);
+  await page.mouse.move(box.x + box.width * 0.3, box.y + 18);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width + 15, box.y + 70);
   await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
@@ -598,13 +599,13 @@ test('selection during a playing drag releases the old pointer without resuming 
   const box = await timeline.boundingBox();
   if (!box) throw new Error('Missing timeline bounds.');
   await page.locator('#play-pause').click();
-  await page.mouse.move(box.x + box.width * 0.4, box.y + 50);
+  await page.mouse.move(box.x + box.width * 0.4, box.y + 18);
   await page.mouse.down();
   await expect(page.locator('#animation-metadata')).toContainText('Scrubbing');
   await page.locator('#animation-selection').selectOption('walk');
   await expect(page.locator('#play-pause')).toHaveText('Play');
   await expect(timeline).toHaveAttribute('aria-valuenow', '0');
-  await page.mouse.move(box.x + box.width * 0.7, box.y + 50);
+  await page.mouse.move(box.x + box.width * 0.7, box.y + 18);
   await page.mouse.up();
   await page.waitForTimeout(150);
   await expect(timeline).toHaveAttribute('aria-valuenow', '0');
@@ -619,7 +620,7 @@ for (const ending of ['pointercancel', 'lostpointercapture', 'blur'] as const) {
     await page.locator('#play-pause').click();
     const box = await timeline.boundingBox();
     if (!box) throw new Error('Missing timeline bounds.');
-    await page.mouse.move(box.x + box.width * 0.3, box.y + 50);
+    await page.mouse.move(box.x + box.width * 0.3, box.y + 18);
     await page.mouse.down();
     const held = Number(await timeline.getAttribute('aria-valuenow'));
     await timeline.evaluate((element, eventName) => {
@@ -719,7 +720,7 @@ test('hiding the page releases a playing scrub and resumes after visibility retu
   await page.locator('#play-pause').click();
   const box = await timeline.boundingBox();
   if (!box) throw new Error('Missing timeline bounds.');
-  await page.mouse.move(box.x + box.width * 0.2, box.y + 50);
+  await page.mouse.move(box.x + box.width * 0.2, box.y + 18);
   await page.mouse.down();
   const held = Number(await timeline.getAttribute('aria-valuenow'));
   await page.evaluate(() => {

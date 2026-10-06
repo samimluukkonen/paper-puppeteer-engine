@@ -119,7 +119,7 @@ export class TimelineSessionController {
       },
       options,
     );
-    this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframe(), options);
+    this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframes(), options);
     this.previousKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(-1), options);
     this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
   }
@@ -184,7 +184,7 @@ export class TimelineSessionController {
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
     if (this.download.disabled !== !animation) this.download.disabled = !animation;
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
-    const deleteDisabled = !state.selectedKeyframe;
+    const deleteDisabled = state.selectedKeys.length === 0;
     const previousDisabled = !state.getAdjacentKeyframe(-1);
     const nextDisabled = !state.getAdjacentKeyframe(1);
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;

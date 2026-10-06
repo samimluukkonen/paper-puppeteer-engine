@@ -2,7 +2,8 @@ import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform, TransformProperty } from '../../engine/types.js';
-import { findAdjacentBonePropertyKeyframe, findBonePropertyKeyframe } from './keyframes.js';
+import { findAdjacentBonePropertyKeyframe } from './keyframes.js';
+import { reconcileKeyframeSelection, sameKey, type KeyframeSelectionState } from './keyframeSelection.js';
 import { buildTimelineTracks, type KeyframeSelection, type TimelineTrack } from './timelineTracks.js';
 
 type AnimationData = DeepReadonly<AnimationClip> | null;
@@ -11,7 +12,8 @@ type AnimationData = DeepReadonly<AnimationClip> | null;
 export class AnimationEditorSelection {
   private bone: string | null = null;
   private selectedProperty: TransformProperty | null = null;
-  private selectedKey: KeyframeSelection | null = null;
+  private keySelection: KeyframeSelectionState = Object.freeze({ selectedKeys: Object.freeze([]), primaryKey: null });
+  private rangeAnchor: KeyframeSelection | null = null;
   private temporary: Readonly<Partial<JointTransform>> = Object.freeze({});
   private readonly expandedBones = new Set<string>();
   private rows: readonly TimelineTrack[] | undefined;
@@ -26,7 +28,13 @@ export class AnimationEditorSelection {
     return this.selectedProperty;
   }
   get key(): KeyframeSelection | null {
-    return this.selectedKey;
+    return this.keySelection.primaryKey;
+  }
+  get keys(): readonly KeyframeSelection[] {
+    return this.keySelection.selectedKeys;
+  }
+  get anchor(): KeyframeSelection | null {
+    return this.rangeAnchor;
   }
   get draft(): Readonly<Partial<JointTransform>> {
     return this.temporary;
@@ -36,52 +44,92 @@ export class AnimationEditorSelection {
   }
 
   selectBone(id: string | null): boolean {
-    if (id === this.bone && this.selectedProperty === null && this.selectedKey === null) return false;
+    if (id === this.bone && this.selectedProperty === null && this.keys.length === 0) return false;
     this.bone = id;
     this.selectedProperty = null;
-    this.selectedKey = null;
+    this.clearKey();
     this.clearDraft();
     return true;
   }
 
   selectProperty(boneId: string, property: TransformProperty): boolean {
-    if (this.bone === boneId && this.selectedProperty === property && this.selectedKey === null) return false;
+    if (this.bone === boneId && this.selectedProperty === property && this.keys.length === 0) return false;
     this.bone = boneId;
     this.selectedProperty = property;
-    this.selectedKey = null;
+    this.clearKey();
     this.clearDraft();
     return true;
   }
 
   selectKey(selection: KeyframeSelection): void {
-    this.clearDraft();
-    this.bone = selection.boneId;
-    this.selectedProperty = selection.property;
-    this.selectedKey = Object.freeze({ ...selection });
-    this.setExpanded(selection.boneId, true);
+    this.setKeys([selection], selection);
+    this.rangeAnchor = this.key;
+  }
+
+  setKeys(keys: readonly KeyframeSelection[], primary: KeyframeSelection | null, clearDraft = true): void {
+    const selectedKeys: KeyframeSelection[] = [];
+    for (const key of keys) {
+      if (!selectedKeys.some((entry) => sameKey(entry, key)))
+        selectedKeys.push(
+          Object.isFrozen(key) && !('value' in key)
+            ? key
+            : Object.freeze({ boneId: key.boneId, property: key.property, time: key.time }),
+        );
+    }
+    const primaryKey = (primary && selectedKeys.find((key) => sameKey(key, primary))) || selectedKeys[0] || null;
+    this.keySelection = Object.freeze({ selectedKeys: Object.freeze(selectedKeys), primaryKey });
+    this.followPrimary(clearDraft);
+    if (!this.rangeAnchor || !selectedKeys.some((key) => sameKey(key, this.rangeAnchor!)))
+      this.rangeAnchor = primaryKey;
+  }
+
+  private followPrimary(clearDraft = true): void {
+    const primary = this.key;
+    if (!primary) return;
+    if (clearDraft || this.bone !== primary.boneId || this.selectedProperty !== primary.property) this.clearDraft();
+    this.bone = primary.boneId;
+    this.selectedProperty = primary.property;
+    this.setExpanded(primary.boneId, true);
   }
 
   clearKey(): boolean {
-    if (!this.selectedKey) return false;
-    this.selectedKey = null;
+    if (!this.keys.length) return false;
+    this.keySelection = Object.freeze({ selectedKeys: Object.freeze([]), primaryKey: null });
+    this.rangeAnchor = null;
     return true;
   }
 
   resetAnimation(): void {
     this.selectedProperty = null;
-    this.selectedKey = null;
+    this.clearKey();
     this.clearDraft();
   }
 
   validateKey(animation: AnimationData): void {
-    const selection = this.selectedKey;
-    if (!selection) return;
-    const key = animation
-      ? findBonePropertyKeyframe(animation, selection.boneId, selection.property, selection.time * 1000)
-      : undefined;
-    if (!key) this.selectedKey = null;
-    else if (key.time / 1000 !== selection.time)
-      this.selectedKey = Object.freeze({ ...selection, time: key.time / 1000 });
+    const next = reconcileKeyframeSelection(animation, this.keySelection);
+    if (next === this.keySelection) return;
+    this.keySelection = next;
+    this.followPrimary(false);
+    if (!this.rangeAnchor || !this.keys.some((key) => sameKey(key, this.rangeAnchor!))) this.rangeAnchor = this.key;
+  }
+
+  /** Authored deletion removes the exact resolved reference before tolerant reconciliation. */
+  removeKey(ref: KeyframeSelection): void {
+    if (!this.keys.some((key) => sameKey(key, ref))) return;
+    this.setKeys(
+      this.keys.filter((key) => !sameKey(key, ref)),
+      this.key,
+      false,
+    );
+  }
+
+  moveKey(from: KeyframeSelection, to: KeyframeSelection): void {
+    const anchorMoved = this.rangeAnchor && sameKey(this.rangeAnchor, from);
+    this.setKeys(
+      this.keys.map((key) => (sameKey(key, from) ? to : key)),
+      to,
+    );
+    if (anchorMoved) this.rangeAnchor = this.key;
   }
 
   adjacentKey(animation: AnimationData, timeSeconds: number, direction: -1 | 1): KeyframeSelection | undefined {

@@ -1,5 +1,6 @@
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
@@ -33,6 +34,7 @@ export class TimelineTracksController {
   private selectedBone: string | null | undefined;
   private selectedProperty: AnimationEditorState['selectedTimelineProperty'] | undefined;
   private selectedKey: KeyframeSelection | null | undefined;
+  private selectedKeys: readonly KeyframeSelection[] | undefined;
   private width = -1;
   private drag: AnimationEditorState['keyframeDrag'] | undefined;
 
@@ -132,7 +134,11 @@ export class TimelineTracksController {
               const button = marker;
               marker.addEventListener('pointerdown', (event) => this.onKeyPointerDown(event, keyframe, button));
               marker.addEventListener('click', (event) => {
-                if (event.detail === 0) this.state?.selectKeyframe(keyframe);
+                if (event.detail === 0)
+                  this.state?.selectKeyframe(keyframe, {
+                    additive: event.ctrlKey || event.metaKey,
+                    range: event.shiftKey,
+                  });
               });
               row.markers.set(keyframe.time, marker);
             }
@@ -177,12 +183,14 @@ export class TimelineTracksController {
       !changed &&
       this.selectedBone === state.selectedBoneId &&
       this.selectedProperty === state.selectedTimelineProperty &&
-      this.selectedKey === state.selectedKeyframe
+      this.selectedKey === state.primaryKey &&
+      this.selectedKeys === state.selectedKeys
     )
       return;
     this.selectedBone = state.selectedBoneId;
     this.selectedProperty = state.selectedTimelineProperty;
-    this.selectedKey = state.selectedKeyframe;
+    this.selectedKey = state.primaryKey;
+    this.selectedKeys = state.selectedKeys;
     for (const track of tracks) {
       const row = this.rows.get(trackKey(track))!;
       const selected =
@@ -191,11 +199,13 @@ export class TimelineTracksController {
       setAttribute(row.select, 'aria-pressed', String(selected));
       for (const [time, marker] of row.markers) {
         // Both times are canonical authored values resolved by the state's tolerant key lookup.
-        const keySelected =
-          track.kind === 'property' &&
-          this.selectedKey?.boneId === track.boneId &&
-          this.selectedKey.property === track.property &&
-          this.selectedKey.time === time;
+        const ref = track.kind === 'property' ? { boneId: track.boneId, property: track.property, time } : null;
+        const keySelected = ref !== null && this.selectedKeys.some((key) => sameKey(key, ref));
+        setAttribute(
+          marker,
+          'data-primary',
+          String(ref !== null && this.selectedKey !== null && sameKey(this.selectedKey, ref)),
+        );
         setAttribute(marker, 'aria-pressed', String(keySelected));
       }
     }

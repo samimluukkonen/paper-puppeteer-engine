@@ -21,6 +21,13 @@ import {
   removeBonePropertyKeyframe,
   setBonePropertyKeyframe,
 } from './keyframes.js';
+import {
+  keysInMarquee,
+  resolveKey,
+  sameKey,
+  type KeyframeMarquee,
+  type KeyframeSelectionModifiers,
+} from './keyframeSelection.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
@@ -68,6 +75,12 @@ export class AnimationEditorState {
     return this.selection.property;
   }
   get selectedKeyframe(): KeyframeSelection | null {
+    return this.selection.key;
+  }
+  get selectedKeys(): readonly KeyframeSelection[] {
+    return this.selection.keys;
+  }
+  get primaryKey(): KeyframeSelection | null {
     return this.selection.key;
   }
   get keyframeDrag(): KeyframeDrag | null {
@@ -136,7 +149,7 @@ export class AnimationEditorState {
           (next === animation ? key.time : time) * 1000,
         );
         if (moved) {
-          this.selection.selectKey({ ...key, time: moved.time / 1000 });
+          this.selection.moveKey(key, { ...key, time: moved.time / 1000 });
           this.updateTime(moved.time / 1000);
         }
         return next;
@@ -147,13 +160,13 @@ export class AnimationEditorState {
     );
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
-    if (!this.selection.key || this.drag) return false;
+    if (!this.selection.key || this.selectedKeys.length !== 1 || this.drag) return false;
     const step = this.snapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
     const time = this.selection.key.time + direction * step * (large ? 10 : 1);
     return this.moveSelectedKeyframe(snapKeyframeTime(time, this.duration, this.snapMode, this.keyframeFPS));
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
-  selectKeyframe(selection: KeyframeSelection): boolean {
+  selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
     const { boneId, property, time } = selection;
     if (!this.rig?.hasBone(boneId)) return false;
     const key = this.findBonePropertyKeyframe(boneId, property, time);
@@ -161,8 +174,33 @@ export class AnimationEditorState {
     this.cancelKeyframeDrag();
     this.playback.pause();
     this.playback.endScrub();
-    this.selection.selectKey({ boneId, property, time: key.time / 1000 });
-    this.updateTime(key.time / 1000);
+    const clicked = Object.freeze({ boneId, property, time: key.time / 1000 });
+    const anchor = this.selection.anchor;
+    if (modifiers.range && anchor) {
+      // Range stays anchored across repeated Shift-clicks. Cross-track Shift adds and makes the clicked key primary.
+      const track = this.timelineTracks.find(
+        (row) => row.kind === 'property' && row.boneId === boneId && row.property === property,
+      );
+      const range =
+        anchor.boneId === boneId && anchor.property === property && track?.kind === 'property'
+          ? track.keyframes.filter(
+              (entry) =>
+                entry.time >= Math.min(anchor.time, clicked.time) && entry.time <= Math.max(anchor.time, clicked.time),
+            )
+          : [...this.selectedKeys, clicked];
+      this.selection.setKeys(modifiers.additive ? [...this.selectedKeys, ...range] : range, clicked);
+      this.updateTime(clicked.time);
+    } else if (modifiers.additive) {
+      const exists = this.selectedKeys.some((entry) => sameKey(entry, clicked));
+      this.selection.setKeys(
+        exists ? this.selectedKeys.filter((entry) => !sameKey(entry, clicked)) : [...this.selectedKeys, clicked],
+        this.primaryKey,
+      );
+      // Add/toggle retains primary where possible; fallback primary never seeks.
+    } else {
+      this.selection.selectKey(clicked);
+      this.updateTime(clicked.time);
+    }
     this.notify();
     return true;
   }
@@ -170,14 +208,44 @@ export class AnimationEditorState {
     this.cancelKeyframeDrag();
     if (this.selection.clearKey()) this.notify();
   }
-  /** Delete the selected authored time even when the playhead has scrubbed elsewhere. */
-  deleteSelectedKeyframe(): boolean {
+  /** Resolve externally supplied references before installing transient box selection. */
+  selectKeyframes(keys: readonly KeyframeSelection[], additive = false): void {
     this.cancelKeyframeDrag();
-    const key = this.selection.key;
-    if (!key) return false;
     this.playback.pause();
-    this.clearTransformDraft();
-    return this.removeBonePropertyKeyframe(key.boneId, key.property, key.time);
+    this.playback.endScrub();
+    const resolved = keys.flatMap((key) => {
+      const ref = resolveKey(this.working, key);
+      return ref ? [ref] : [];
+    });
+    const previous = this.primaryKey;
+    this.selection.setKeys(additive ? [...this.selectedKeys, ...resolved] : resolved, previous);
+    if (!additive && this.primaryKey && (!previous || !sameKey(previous, this.primaryKey)))
+      this.updateTime(this.primaryKey.time);
+    this.notify();
+  }
+  selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
+    this.selectKeyframes(keysInMarquee(this.timelineTracks, box), additive);
+  }
+  /** All selected authored properties are removed before installing one validated history snapshot. */
+  deleteSelectedKeyframes(): boolean {
+    this.cancelKeyframeDrag();
+    if (!this.selectedKeys.length || !this.working || !this.rig) return false;
+    this.playback.pause();
+    let next = this.working;
+    try {
+      for (const key of this.selectedKeys)
+        next = removeBonePropertyKeyframe(next, this.rig, key.boneId, key.property, key.time * 1000);
+    } catch (error) {
+      this.document.reportError(error);
+      this.notify();
+      return false;
+    }
+    this.selection.clearKey();
+    return this.installWorkingAnimation(freezeData(next));
+  }
+  /** Compatibility alias: deletion now operates on the whole selection. */
+  deleteSelectedKeyframe(): boolean {
+    return this.deleteSelectedKeyframes();
   }
   /** Previous/next authored key on the selected property, relative to the current playhead. */
   getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
@@ -411,15 +479,8 @@ export class AnimationEditorState {
       (animation, rig) => {
         const key = findBonePropertyKeyframe(animation, boneId, property, timeSeconds * 1000);
         const next = removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000);
-        // Clear the key actually removed, even if a distinct nearby authored time is within tolerance.
-        if (
-          next !== animation &&
-          this.selection.key?.boneId === boneId &&
-          this.selection.key.property === property &&
-          key !== undefined &&
-          key.time / 1000 === this.selection.key.time
-        )
-          this.selection.clearKey();
+        // Remove exact authored identity before nearby keys can be resolved through tolerance.
+        if (next !== animation && key) this.selection.removeKey({ boneId, property, time: key.time / 1000 });
         return next;
       },
       boneId,

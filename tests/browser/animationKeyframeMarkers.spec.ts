@@ -87,9 +87,9 @@ test('scrubbing retains selection, playback leaves markers stationary, empty cli
   const bounds = await timeline.boundingBox();
   const row = await lane(page).boundingBox();
   if (!bounds || !row) throw new Error('Missing timeline bounds.');
-  await page.mouse.move(bounds.x + bounds.width * 0.55, row.y + 15);
+  await page.mouse.move(bounds.x + bounds.width * 0.55, bounds.y + 18);
   await page.mouse.down();
-  await page.mouse.move(bounds.x + bounds.width * 0.6, row.y + 15, { steps: 4 });
+  await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + 18, { steps: 4 });
   await page.mouse.up();
   await expect(key(page, 0.5)).toHaveAttribute('aria-pressed', 'true');
   expect(Number(await timeline.getAttribute('aria-valuenow'))).toBeCloseTo(1.2, 2);
