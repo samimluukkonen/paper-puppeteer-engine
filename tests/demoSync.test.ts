@@ -1,6 +1,6 @@
 import { afterEach, assert, test, vi } from 'vitest';
-import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { demoIK } from '../src/demo/demoIK.js';
+import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { IKDebug } from '../src/engine/ik/IKDebug.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';

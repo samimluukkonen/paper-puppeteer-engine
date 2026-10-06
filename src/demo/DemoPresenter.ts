@@ -1,9 +1,9 @@
 import type Phaser from 'phaser';
 import type { Facing, IKTarget, Puppet } from '../engine/index.js';
-import { DemoFootPlanting } from './DemoFootPlanting.js';
-import { DemoKatanaController } from './DemoKatanaController.js';
 import { type DemoCharacterProfile, demoPuppetProfile, getDemoAnimationRole } from './demoCharacterProfiles.js';
+import { DemoFootPlanting } from './DemoFootPlanting.js';
 import type { WalkFootIK } from './demoFootTargets.js';
+import { DemoKatanaController } from './DemoKatanaController.js';
 import {
   demoArmRotations,
   demoHipPositions,

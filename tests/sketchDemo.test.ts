@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
-import { DemoKatanaController } from '../src/demo/DemoKatanaController.js';
-import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { sketchProfile } from '../src/demo/demoCharacterProfiles.js';
 import { demoIK } from '../src/demo/demoIK.js';
+import { DemoKatanaController } from '../src/demo/DemoKatanaController.js';
+import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { Katana, katanaGrips } from '../src/demo/Katana.js';
 import { horizontalEdgesAtY } from '../src/demo/katanaArmTarget.js';
 import { SketchFacingLayout } from '../src/demo/SketchFacingLayout.js';
@@ -82,7 +82,7 @@ test('left-facing sketch layers only the katana hilt behind the right leg in bot
   const presenter = new DemoPresenter(scene, puppet, sketchProfile);
   const weapon = Reflect.get(presenter.katana, 'katana') as Katana;
   const layer = (object: Phaser.GameObjects.Container | Phaser.GameObjects.Image): number => {
-    let branch = object.parentContainer!;
+    let branch = object.parentContainer;
     while (branch.parentContainer?.parentContainer !== puppet.container) branch = branch.parentContainer!;
     return branch.depth;
   };
@@ -126,9 +126,9 @@ test('left-facing sketch layers only the katana hilt behind the right leg in bot
         if (facing === 'right') assert.isUndefined(hilt);
         else {
           assert.exists(hilt);
-          aligned(hilt!, blade);
+          aligned(hilt, blade);
           for (const part of ['Thigh', 'LowerLeg', 'Foot']) {
-            assert.isBelow(layer(hilt!), layer(puppet.getSlotImage(`right${part}Visual`)!));
+            assert.isBelow(layer(hilt), layer(puppet.getSlotImage(`right${part}Visual`)!));
           }
           assert.isAbove(layer(blade), layer(puppet.getSlotImage('rightThighVisual')!));
         }
@@ -229,15 +229,15 @@ test('sketch planted ankle corrections hold while paused and reset for pose edit
   const options = { handIK: false, footIK: true, upperBody: false };
   presenter.update(options);
   const image = puppet.getSlotImage('leftFootVisual')!;
-  const angle = image.parentContainer!.rotation;
+  const angle = image.parentContainer.rotation;
   puppet.animationPlayer.pause();
   presenter.update(options);
-  assert.approximately(image.parentContainer!.rotation, angle, 1e-8);
+  assert.approximately(image.parentContainer.rotation, angle, 1e-8);
   presenter.clearTargets();
-  assert.equal(image.parentContainer!.rotation, 0);
+  assert.equal(image.parentContainer.rotation, 0);
   presenter.update(options);
   presenter.update({ ...options, footIK: false });
-  assert.equal(image.parentContainer!.rotation, 0);
+  assert.equal(image.parentContainer.rotation, 0);
 });
 
 test.each(['left', 'right'] as const)('sketch katana keeps both palms on their grips facing %s', (facing) => {

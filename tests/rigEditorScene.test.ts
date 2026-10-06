@@ -11,8 +11,8 @@ import type { TwoBoneIKDefinition } from '../src/engine/ik/types.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
-import { SlotState } from '../src/engine/SlotState.js';
 import { rigDefinitionSchema } from '../src/engine/schemas.js';
+import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
@@ -280,6 +280,7 @@ test.each(['reloadRig', 'reloadOriginal'] as const)('%s cleans up a replacement 
   let replacementOverlay: RigEditorOverlay | undefined;
   const draw = vi.spyOn(RigEditorOverlay.prototype, 'draw');
   draw.mockImplementationOnce(function (this: RigEditorOverlay) {
+    // oxlint-disable-next-line typescript/no-this-alias -- Capture the receiver for lifecycle assertions after the callback.
     replacementOverlay = this;
     throw failure;
   });
@@ -323,7 +324,7 @@ async function panelFixture() {
   vi.resetModules();
   await import('../src/devtools/rig-editor/main.js');
   const scene = vi.mocked(Phaser.Game).mock.lastCall![0]!.scene as RigEditorScene[];
-  return { ...fixture(scene[0]!), element };
+  return { ...fixture(scene[0]), element };
 }
 
 async function editNumber(element: ReturnType<typeof stubRigEditorDom>, bone: string, field: string, values: number[]) {

@@ -187,7 +187,7 @@ export class RigEditorInputController {
     const parent =
       target.type === 'slot'
         ? this.puppet.getBone(this.state.getSlot(target.id).bone).container
-        : this.puppet.getBone(target.id).container.parentContainer!;
+        : this.puppet.getBone(target.id).container.parentContainer;
     const local = this.local(pointer, parent);
     if (!local) return;
     if (target.type === 'slot' && this.state.editMode === 'sprite' && !picked && this.imageContains(pointer, image)) {
@@ -238,8 +238,8 @@ export class RigEditorInputController {
           : type === 'sprite'
             ? this.puppet.getBone(id).container
             : type === 'attachment'
-              ? this.puppet.getSlotImage(this.state.selection!.id)!.parentContainer!
-              : this.puppet.getBone(id).container.parentContainer!;
+              ? this.puppet.getSlotImage(this.state.selection!.id)!.parentContainer
+              : this.puppet.getBone(id).container.parentContainer;
       const local = this.local(pointer, parent);
       if (!local) return;
       const x = this.state.snapTranslation(value.x + local.x - start.x);

@@ -1,7 +1,7 @@
 import { assert, test, vi } from 'vitest';
 import { sampleProperty } from '../src/engine/AnimationClip.js';
-import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
 import { shortestRotationDelta } from '../src/engine/animationMath.js';
+import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
 import {
   AnimationPlayer,
   type CompiledClip,

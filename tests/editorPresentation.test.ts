@@ -25,7 +25,7 @@ function artworkOrder(puppet: Puppet): string[] {
   return puppet.rig.slots
     .filter((slot) => puppet.getSlotImage(slot.id))
     .map((slot) => {
-      let branch = puppet.getSlotImage(slot.id)!.parentContainer!;
+      let branch = puppet.getSlotImage(slot.id)!.parentContainer;
       while (branch.parentContainer?.parentContainer !== puppet.container) branch = branch.parentContainer!;
       return { bone: slot.bone, depth: branch.depth };
     })

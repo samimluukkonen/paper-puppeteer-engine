@@ -22,7 +22,7 @@ export function gridLines(localToScreen: Affine, width: number, height: number, 
     snap <= 0 ||
     width <= 0 ||
     height <= 0 ||
-    ![snap, width, height, ...Object.values(localToScreen)].every(Number.isFinite)
+    ![snap, width, height, ...(Object.values(localToScreen) as unknown[])].every(Number.isFinite)
   )
     return [];
   const corners = [

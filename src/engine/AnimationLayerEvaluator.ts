@@ -1,6 +1,6 @@
 import type { AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
-import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer } from './AnimationPose.js';
 import { quantizePlaybackTime } from './animationMath.js';
+import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer } from './AnimationPose.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
 import { type TransformProperty, transformProperties } from './types.js';

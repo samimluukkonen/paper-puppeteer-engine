@@ -12,7 +12,15 @@ npm run build
 npm run preview
 ```
 
-`check` runs Biome's formatting, lint, and import checks; `npm run check:fix` applies safe fixes. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
+`check` runs Oxfmt formatting validation, Oxlint linting (including type-aware TypeScript rules), and TypeScript 7's authoritative `tsc --noEmit` check. `npm run check:fix` applies Oxlint's safe fixes, formats with Oxfmt, and checks types. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
+
+Use `npm run format` / `npm run format:check` for formatting, and `npm run lint` / `npm run lint:fix` for linting. Oxfmt's root `.oxfmtrc.json` keeps two-space indentation, single quotes in JavaScript/TypeScript, double quotes in CSS, semicolons, trailing commas, 120-column lines, and sorted imports. Side-effect imports retain their order; embedded code snippets and package fields are not reorganized. Oxfmt covers TypeScript, JavaScript, JSON/JSONC, CSS, HTML, Markdown, and YAML. Dependency/build/coverage/browser-test outputs, caches, temporary directories, and the npm lockfile are excluded. `plans/` holds historical and in-progress design notes and is excluded from formatting to avoid rewriting those records.
+
+Oxlint's root `.oxlintrc.json` uses JSON so it works across the project's supported Node versions. `options.typeAware: true` activates the installed `oxlint-tsgolint` backend with TypeScript 7; experimental compiler diagnostics (`typeCheck`) are deliberately omitted. Correctness rules are errors, with explicit checks for floating/misused promises, awaiting non-promises, array `for-in` loops, unnecessary assertions, unsafe arguments/assignments/calls/member access/returns, type-only imports, duplicate/self imports, and unsafe promise patterns. Non-null assertions remain allowed. React hooks and JSX accessibility checks apply to future `.tsx`/`.jsx` files; the current application uses Phaser and DOM controllers.
+
+Transitional warnings keep existing technical debt visible without requiring unrelated refactors: `typescript/unbound-method` flags Phaser callbacks with separately supplied receiver contexts and test spies. In `tests/**` and `scripts/**`, the five unsafe-value rules above, `no-base-to-string`, `restrict-template-expressions`, and `require-array-sort-compare` are warnings because mocks, deliberately invalid fixtures, and JavaScript JSON helpers use loose types. Those unsafe-value rules remain errors in application code. `eslint/preserve-caught-error` is also a warning. Narrow, explained inline exceptions preserve listener snapshots, aggregate-error contents, arbitrary validation diagnostics, and intentionally invalid test inputs. Suspicious rules are selected individually rather than enabling noisy assertion/style restrictions across the engine.
+
+Install the recommended `oxc.oxc-vscode` extension for format-on-save and explicit safe fixes on save. Existing character JSON schema associations are retained, and the editor inherits type-aware linting from the root config.
 
 Run the small browser smoke suite against the real rig editor, Phaser canvas, and shipped character assets:
 
@@ -29,12 +37,12 @@ The rig editor caches unchanged overlay geometry and labels, redrawing after edi
 
 One local run of the earlier full-sync correction path on Node 24.19.0 measured the following. Sync counts include warmup:
 
-| Katana workload | Left: µs/frame | Right: µs/frame | Left: mean/max syncs | Right: mean/max syncs |
-| --- | ---: | ---: | ---: | ---: |
-| Steady reachable grip | 93.04 | 64.51 | 1.00 / 1 | 1.00 / 1 |
-| Out-of-reach target sweep | 230.99 | 120.66 | 5.73 / 25 | 2.92 / 8 |
-| Head crossing sweep | 79.76 | 77.25 | 1.02 / 2 | 1.39 / 3 |
-| Upper-body grip | 82.71 | 74.18 | 1.00 / 1 | 1.00 / 1 |
+| Katana workload           | Left: µs/frame | Right: µs/frame | Left: mean/max syncs | Right: mean/max syncs |
+| ------------------------- | -------------: | --------------: | -------------------: | --------------------: |
+| Steady reachable grip     |          93.04 |           64.51 |             1.00 / 1 |              1.00 / 1 |
+| Out-of-reach target sweep |         230.99 |          120.66 |            5.73 / 25 |              2.92 / 8 |
+| Head crossing sweep       |          79.76 |           77.25 |             1.02 / 2 |              1.39 / 3 |
+| Upper-body grip           |          82.71 |           74.18 |             1.00 / 1 |              1.00 / 1 |
 
 The correction loops can dominate out-of-reach frames. The demo now performs one full `syncPose()` per frame, then uses `syncIK()` for target corrections, restoring and projecting only affected IK joints. It defers debug overlays until the final corrected pose and caches render order to skip depth updates/sorting when the order is already applied. The three correction loops remain bounded at 24, 6, and 12 passes, while full synchronizations remain at one. The current profile selects the default skin so body silhouette checks run against the visible cutouts. The profile reports both kinds of passes and debug refreshes. Each profiling case has a 30-second timeout to accommodate slower machines.
 
@@ -42,11 +50,11 @@ Grip correction also reuses transformed head, torso, pelvis, and leg corners wit
 
 A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
 
-| Scenario | Before | After |
-| --- | ---: | ---: |
-| 32 tracked bones, base animation | 56.61 | 40.65 |
-| 32 tracked bones, three layers with fades | 170.53 | 114.17 |
-| 36 bones, one active and 12 inactive IK constraints | 41.19 | 10.37 |
+| Scenario                                            | Before |  After |
+| --------------------------------------------------- | -----: | -----: |
+| 32 tracked bones, base animation                    |  56.61 |  40.65 |
+| 32 tracked bones, three layers with fades           | 170.53 | 114.17 |
+| 36 bones, one active and 12 inactive IK constraints |  41.19 |  10.37 |
 
 Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into its descendant render branches before later target providers run. Inactive constraints still update their status without adding projection passes.
 
@@ -60,16 +68,16 @@ The profile compares 32- and 128-bone chains with a leaf slot, chains with artwo
 
 Bones without authored sprites allocate an independent render branch only when `attach()` needs a prop mount. Each sprite, slot, or prop branch uses two transform containers to represent its complete affine transform, including shear, reflection, and singular scales. The renderer composes skeleton matrices in parent order once per full synchronization. Partial IK synchronization recomposes only the changed bone's subtree, preserving unrelated unpublished edits and making descendant mounts current before later target providers run. Creating a lazy mount publishes current source transforms to the renderer before attaching the prop, so subsequent partial updates retain that same ancestor state. The mount uses the current draw order immediately.
 
-| Workload | Bones | Previous transform copies | Current transform factors | Previous containers | Current containers |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Chain, leaf slot | 32 | 32 | 2 | 68 | 37 |
-| Chain, leaf slot | 128 | 128 | 2 | 260 | 133 |
-| Chain, all sprites | 32 | 528 | 64 | 594 | 98 |
-| Chain, all sprites | 128 | 8,256 | 256 | 8,514 | 386 |
+| Workload           | Bones | Previous transform copies | Current transform factors | Previous containers | Current containers |
+| ------------------ | ----: | ------------------------: | ------------------------: | ------------------: | -----------------: |
+| Chain, leaf slot   |    32 |                        32 |                         2 |                  68 |                 37 |
+| Chain, leaf slot   |   128 |                       128 |                         2 |                 260 |                133 |
+| Chain, all sprites |    32 |                       528 |                        64 |                 594 |                 98 |
+| Chain, all sprites |   128 |                     8,256 |                       256 |               8,514 |                386 |
 
 Container counts include the source skeleton and fixture root. Each additional prop mount allocates two transform containers once and reuses them thereafter. Dense artwork now requires linear storage and synchronization work. One local CPU profile measured the 128-bone dense chain at about 26 microseconds per synchronization, versus about 459 microseconds before this change; timings vary by machine. Sparse rigs still traverse their skeleton during full synchronization, so their CPU cost depends on bone count even with only one drawable.
 
-Direct dependencies use exact versions: Zod **4.6.5**, Biome **2.5.14**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph.
+Direct dependencies use exact versions: Zod **4.6.5**, Oxfmt **0.72.0**, Oxlint **1.87.0**, oxlint-tsgolint **7.0.2003**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph. The Oxc tools use the latest npm releases at migration time; TypeScript **7.0.2** remains the latest stable compiler.
 
 ## Architecture
 
@@ -162,11 +170,11 @@ VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose 
 
 The profiles cover 32 tracked bones with two properties per track, 128 or 512 keys, base playback, three layers with fades, and backward/forward scrubbing. Property sampling uses binary search without a mutable cursor. A local comparison of warmed CPU medians (microseconds per frame, excluding browser/GPU costs) measured:
 
-| 512-key workload | Linear scan | Binary search |
-| --- | ---: | ---: |
-| Base animation | 156.72 | 47.22 |
-| Three layers with fades | 656.91 | 155.48 |
-| Nonsequential scrubbing | 135.47 | 33.35 |
+| 512-key workload        | Linear scan | Binary search |
+| ----------------------- | ----------: | ------------: |
+| Base animation          |      156.72 |         47.22 |
+| Three layers with fades |      656.91 |        155.48 |
+| Nonsequential scrubbing |      135.47 |         33.35 |
 
 These are diagnostic measurements from one machine, not CI timing thresholds. The two-key control profiles remain available by omitting `-t dense`.
 

@@ -44,15 +44,15 @@ scene.load.start();
 
 ## Guides
 
-| Guide | Contents |
-| --- | --- |
-| [Demo controls](docs/demo.md) | Keyboard controls, playback examples, facing, skins, and pose authoring |
-| [Rig editor](docs/rig-editor.md) | Editing, snapping, undo/redo, validation, imports, exports, and embedding |
-| [Animation editor](docs/animation-editor.md) | Working copies, bone selection, explicit property keyframing, playback, and runtime pose preview |
-| [Character assets and rigs](docs/characters.md) | Manifests, JSON validation, slots, skins, artwork, and rig definitions |
-| [Animation and poses](docs/animation.md) | Keyframes, static poses, playback, crossfades, events, layers, and manual updates |
-| [IK and object attachments](docs/ik.md) | Two-bone solving, transforms, foot planting, katana grips, and attached props |
-| [Development and package usage](docs/development.md) | Checks, browser tests, profiling, architecture, packaging, and Node APIs |
+| Guide                                                | Contents                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [Demo controls](docs/demo.md)                        | Keyboard controls, playback examples, facing, skins, and pose authoring                          |
+| [Rig editor](docs/rig-editor.md)                     | Editing, snapping, undo/redo, validation, imports, exports, and embedding                        |
+| [Animation editor](docs/animation-editor.md)         | Working copies, bone selection, explicit property keyframing, playback, and runtime pose preview |
+| [Character assets and rigs](docs/characters.md)      | Manifests, JSON validation, slots, skins, artwork, and rig definitions                           |
+| [Animation and poses](docs/animation.md)             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                |
+| [IK and object attachments](docs/ik.md)              | Two-bone solving, transforms, foot planting, katana grips, and attached props                    |
+| [Development and package usage](docs/development.md) | Checks, browser tests, profiling, architecture, packaging, and Node APIs                         |
 
 ## Development checks
 
@@ -63,6 +63,8 @@ npm test
 npm run build
 npm run test:package
 ```
+
+`npm run check` validates Oxfmt formatting, Oxlint's type-aware lint rules, and TypeScript 7 types. Use `npm run check:fix` to apply safe lint fixes and formatting. VS Code recommends the official Oxc extension for formatting and fixes on save.
 
 For browser checks, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. The [development guide](docs/development.md#checks-and-profiling) describes the test suites and profiling commands.
 

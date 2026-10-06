@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "useTabs": false,
+  "tabWidth": 2,
+  "printWidth": 120,
+  "singleQuote": true,
+  "jsxSingleQuote": false,
+  "quoteProps": "as-needed",
+  "trailingComma": "all",
+  "semi": true,
+  "arrowParens": "always",
+  "bracketSameLine": false,
+  "bracketSpacing": true,
+  "proseWrap": "preserve",
+  "embeddedLanguageFormatting": "off",
+  "sortPackageJson": false,
+  "sortImports": {
+    "groups": ["builtin", "external", ["internal", "subpath"], ["parent", "sibling", "index"], "style", "unknown"],
+    "newlinesBetween": false,
+    "ignoreCase": true,
+    "sortSideEffects": false
+  },
+  "overrides": [
+    {
+      "files": ["**/*.css"],
+      "options": {
+        "singleQuote": false
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    ".cache/**",
+    ".tmp/**",
+    "tmp/**",
+    "plans/**",
+    "package-lock.json"
+  ]
+}

@@ -64,7 +64,7 @@ test('clipboard completion saves the captured snapshot and leaves later edits di
   const { state, copy, writeText, resolve, feedback, querySelector } = await fixture();
   state.editBone('root', 'x', 1.123456789);
   copy();
-  assert.equal(JSON.parse(writeText.mock.calls[0]![0]!).bones[0].x, 1.123457);
+  assert.equal(JSON.parse(writeText.mock.calls[0]![0]).bones[0].x, 1.123457);
   state.editBone('root', 'x', 2);
   resolve();
   await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));

@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, assert, test, vi } from 'vitest';
-import { DemoPresenter } from '../src/demo/DemoPresenter.js';
-import { DemoScene, type DemoState } from '../src/demo/DemoScene.js';
 import { type DemoCharacterProfile, demoPuppetProfile, resolveDemoClip } from '../src/demo/demoCharacterProfiles.js';
 import { demoIK } from '../src/demo/demoIK.js';
+import { DemoPresenter } from '../src/demo/DemoPresenter.js';
+import { DemoScene, type DemoState } from '../src/demo/DemoScene.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import type { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';

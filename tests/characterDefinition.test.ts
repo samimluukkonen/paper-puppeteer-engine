@@ -20,8 +20,8 @@ import {
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
-import { SlotState } from '../src/engine/SlotState.js';
 import { animationClipSchema, rigDefinitionSchema } from '../src/engine/schemas.js';
+import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
 
 const root = new URL('../public/characters/demo-puppet/', import.meta.url);
@@ -209,6 +209,7 @@ test.each([
   [
     'sparse index',
     (array: unknown[]) => {
+      // oxlint-disable-next-line typescript/no-array-delete -- This fixture deliberately creates an invalid sparse array.
       delete array[0];
     },
   ],

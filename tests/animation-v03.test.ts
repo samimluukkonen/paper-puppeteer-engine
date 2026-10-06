@@ -212,7 +212,7 @@ test('standalone hosts synchronize before notifications and receive all listener
     thrown = error;
   }
   assert.instanceOf(thrown, AggregateError);
-  assert.deepEqual((thrown as AggregateError).errors, [eventFailure, completionFailure]);
+  assert.deepEqual(thrown.errors, [eventFailure, completionFailure]);
   assert.deepEqual(order, ['prepare', 'synchronize', 'event', 'complete']);
   player.update(100);
   assert.deepEqual(order, ['prepare', 'synchronize', 'event', 'complete']);

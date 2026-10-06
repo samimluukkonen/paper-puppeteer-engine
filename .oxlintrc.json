@@ -1,0 +1,80 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "off"
+  },
+  "options": {
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    ".cache/**",
+    ".tmp/**",
+    "tmp/**"
+  ],
+  "rules": {
+    "typescript/no-non-null-assertion": "off",
+    "typescript/consistent-type-imports": ["error", { "disallowTypeAnnotations": false }],
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "import/no-duplicates": "error",
+    "import/no-self-import": "error",
+    "promise/no-return-in-finally": "error",
+    "promise/no-new-statics": "error",
+    "eslint/eqeqeq": "error",
+    "eslint/no-var": "error",
+    "eslint/prefer-const": "error",
+    "eslint/preserve-caught-error": "warn",
+    "typescript/unbound-method": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["tests/**", "scripts/**"],
+      "rules": {
+        "typescript/no-unsafe-argument": "warn",
+        "typescript/no-unsafe-assignment": "warn",
+        "typescript/no-unsafe-call": "warn",
+        "typescript/no-unsafe-member-access": "warn",
+        "typescript/no-unsafe-return": "warn",
+        "typescript/no-base-to-string": "warn",
+        "typescript/restrict-template-expressions": "warn",
+        "typescript/require-array-sort-compare": "warn"
+      }
+    },
+    {
+      "files": ["**/*.tsx", "**/*.jsx"],
+      "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "react", "jsx-a11y"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "warn",
+        "react/jsx-no-duplicate-props": "error",
+        "react/jsx-key": "error",
+        "jsx-a11y/alt-text": "error",
+        "jsx-a11y/anchor-has-content": "error",
+        "jsx-a11y/aria-props": "error",
+        "jsx-a11y/aria-proptypes": "error",
+        "jsx-a11y/aria-role": "error",
+        "jsx-a11y/role-has-required-aria-props": "error"
+      }
+    }
+  ]
+}

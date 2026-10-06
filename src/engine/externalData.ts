@@ -68,6 +68,7 @@ export class UnsupportedFormatVersionError extends Error {
     readonly supportedVersion: number,
   ) {
     super(
+      // oxlint-disable-next-line typescript/no-base-to-string -- Deliberately render every unknown version in validation diagnostics.
       `Unsupported ${format} format version ${typeof version === 'object' ? JSON.stringify(version) : String(version)}; supported version is ${supportedVersion}.`,
     );
     this.name = 'UnsupportedFormatVersionError';

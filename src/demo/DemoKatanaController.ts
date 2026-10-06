@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import type { Facing, IKTarget, Puppet, SyncPoseOptions } from '../engine/index.js';
-import { DemoKatanaGripSolver } from './DemoKatanaGripSolver.js';
 import { type DemoCharacterProfile, demoPuppetProfile } from './demoCharacterProfiles.js';
+import { DemoKatanaGripSolver } from './DemoKatanaGripSolver.js';
 import type { Katana } from './Katana.js';
 import { katanaGrips } from './Katana.js';
 

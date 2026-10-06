@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
-import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
+import { createDemoCommands } from '../src/demo/demoCommands.js';
 import { DemoInput } from '../src/demo/DemoInput.js';
 import type { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
 import type { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import type { DemoScene } from '../src/demo/DemoScene.js';
-import { createDemoCommands } from '../src/demo/demoCommands.js';
 
 function emitter() {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -72,7 +71,7 @@ function fixture() {
 test('input uses world coordinates, changes bracket/R actions with pose mode, and reads held Q/E keys', () => {
   const { scene, authoring, presentation, keys, bind, press } = fixture();
   const input = bind();
-  scene.input.emit('pointermove', { worldX: 123, worldY: 456 } as Phaser.Input.Pointer);
+  scene.input.emit('pointermove', { worldX: 123, worldY: 456 });
   assert.deepEqual(presentation.handTarget, { x: 123, y: 456 });
   press('Digit1');
   assert.deepEqual(scene.play.mock.lastCall, ['idle']);

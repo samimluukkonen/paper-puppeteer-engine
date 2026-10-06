@@ -139,33 +139,36 @@ export function createSessionController(
     getScene().reloadOriginal();
     feedback.textContent = 'Original rig reloaded.';
   });
+  const importRig = async (event: Event): Promise<void> => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    // Capture the file before clearing so selecting it again starts a new request.
+    input.value = '';
+    const sequence = ++importSequence;
+    const sessionEditor = editor;
+    const isCurrent = (): boolean =>
+      !lifetime.signal.aborted && sequence === importSequence && editor === sessionEditor;
+    try {
+      const text = await file.text();
+      if (!isCurrent()) return;
+      const json = JSON.parse(text) as RigJsonDefinition;
+      const issues = validateRigDefinition(json);
+      if (issues.some((issue) => issue.severity === 'error'))
+        throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));
+      if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and load this file?')) {
+        return;
+      }
+      getScene().reloadRig(json, file.name);
+      feedback.textContent = `${file.name} loaded and validated.`;
+    } catch (error) {
+      if (isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
+    }
+  };
   app.querySelector<HTMLInputElement>('#load-json')!.addEventListener(
     'change',
-    async (event) => {
-      const input = event.target as HTMLInputElement;
-      const file = input.files?.[0];
-      if (!file) return;
-      // Capture the file before clearing so selecting it again starts a new request.
-      input.value = '';
-      const sequence = ++importSequence;
-      const sessionEditor = editor;
-      const isCurrent = (): boolean =>
-        !lifetime.signal.aborted && sequence === importSequence && editor === sessionEditor;
-      try {
-        const text = await file.text();
-        if (!isCurrent()) return;
-        const json = JSON.parse(text) as RigJsonDefinition;
-        const issues = validateRigDefinition(json);
-        if (issues.some((issue) => issue.severity === 'error'))
-          throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));
-        if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and load this file?')) {
-          return;
-        }
-        getScene().reloadRig(json, file.name);
-        feedback.textContent = `${file.name} loaded and validated.`;
-      } catch (error) {
-        if (isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
-      }
+    (event) => {
+      void importRig(event);
     },
     { signal: lifetime.signal },
   );

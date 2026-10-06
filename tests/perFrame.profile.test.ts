@@ -1,7 +1,7 @@
 import { assert, test, vi } from 'vitest';
-import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { demoIK } from '../src/demo/demoIK.js';
 import { demoRenderOrder } from '../src/demo/demoPresentation.js';
+import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';

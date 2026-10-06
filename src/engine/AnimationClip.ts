@@ -1,7 +1,7 @@
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
 import { copyJsonData } from './jsonData.js';
-import type { Rig } from './Rig.js';
 import { freezeData, readonlyMap } from './readonlyData.js';
+import type { Rig } from './Rig.js';
 import { animationClipSchema, identifierSchema, keyframeSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { assertFinite, transformProperties } from './types.js';

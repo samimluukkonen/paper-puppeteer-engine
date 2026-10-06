@@ -1,8 +1,8 @@
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { setAttribute, setText } from '../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
-import { TimelineTracksController } from './TimelineTracksController.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
+import { TimelineTracksController } from './TimelineTracksController.js';
 
 /** DOM adapter only: width/pointer capture belong here, while time and animation data belong to state. */
 export class TimelineController {

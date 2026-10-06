@@ -55,6 +55,7 @@ export class SnapshotHistory<Entry> {
     try {
       this.restore(before);
     } catch (rollbackError) {
+      // oxlint-disable-next-line eslint/preserve-caught-error -- Both failures are already retained in AggregateError.errors.
       throw new AggregateError([error, rollbackError], 'History operation and rollback failed.');
     }
     throw error;

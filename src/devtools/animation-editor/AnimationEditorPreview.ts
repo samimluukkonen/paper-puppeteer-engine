@@ -1,6 +1,6 @@
 import { compileClip } from '../../engine/AnimationClip.js';
-import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
+import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import type { JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';

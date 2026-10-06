@@ -4,41 +4,41 @@
 
 Shortcuts leave form controls and editable text alone. Ctrl/Cmd combinations and composition input retain browser behavior; Alt is reserved for pose translation. Space activates a focused button or link normally. Held Q/E rotation is suspended while editing a form control.
 
-| Key | Action |
-| --- | --- |
-| `1` | Play / restart idle |
-| `2` | Play / restart walk |
-| `3` | Two-handed katana stance; enables hand IK |
-| `4` / `5` | Crossfade to idle / walk over 300 ms |
-| `S` | Toggle smooth / stepped playback |
-| `8` / `0` | Set stepped playback to 8 / 10 FPS |
-| `L` | Toggle the masked upper-body sword layer |
-| `P` | Pause / resume animation clocks |
-| `[` / `]` | Decrease / increase playback speed by 0.25× |
-| `A` / `D` | Face left / right |
-| `B` | Toggle joint pivots, hierarchy lines, and bone names |
-| `I` | Toggle IK targets, joints, chain lines, lengths, bend signs and names |
-| `H` | Toggle mouse-controlled right-hand IK |
-| `F` | Toggle fixed world-space foot targets and gentle body sway |
-| Mouse | Move the hand target while hand IK is enabled |
-| `Q` / `E` | Rotate the katana in either pose; the right-facing two-handed rear palm stays visible beside the body |
-| `T` | Hide / show the katana |
-| `K` / `M` | Select default / armored skin |
-| `G` | Swap open / gripping right hand |
-| `N` | Toggle the headwear skin override |
-| `V` | Toggle slot markers, names, parent bones, and attachment names |
-| `Space` | Stop at the current pose / restart |
-| `R` | Restart the current clip |
-| `O` | Enter / exit pose authoring mode |
-| `C` (pose mode) | Apply the sample combat-ready pose |
-| `R` (pose mode) | Reset to bind pose |
-| `[` / `]` (pose mode) | Select previous / next bone |
-| `←` / `→` (pose mode) | Rotate selected bone by 0.01 radians; `Shift` uses 0.1 |
-| `Alt` + `←` / `→` (pose mode) | Move selected bone's local x by 1; `Shift` uses 5 |
-| `↑` / `↓` (pose mode) | Move selected bone's local y by 1; `Shift` uses 5 |
-| `U` (pose mode) | Reset selected bone to its bind transform |
-| `X` (pose mode) | Print, copy, and download pose JSON |
-| `J` (pose mode) | Print normalized rig JSON to the console |
+| Key                           | Action                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `1`                           | Play / restart idle                                                                                   |
+| `2`                           | Play / restart walk                                                                                   |
+| `3`                           | Two-handed katana stance; enables hand IK                                                             |
+| `4` / `5`                     | Crossfade to idle / walk over 300 ms                                                                  |
+| `S`                           | Toggle smooth / stepped playback                                                                      |
+| `8` / `0`                     | Set stepped playback to 8 / 10 FPS                                                                    |
+| `L`                           | Toggle the masked upper-body sword layer                                                              |
+| `P`                           | Pause / resume animation clocks                                                                       |
+| `[` / `]`                     | Decrease / increase playback speed by 0.25×                                                           |
+| `A` / `D`                     | Face left / right                                                                                     |
+| `B`                           | Toggle joint pivots, hierarchy lines, and bone names                                                  |
+| `I`                           | Toggle IK targets, joints, chain lines, lengths, bend signs and names                                 |
+| `H`                           | Toggle mouse-controlled right-hand IK                                                                 |
+| `F`                           | Toggle fixed world-space foot targets and gentle body sway                                            |
+| Mouse                         | Move the hand target while hand IK is enabled                                                         |
+| `Q` / `E`                     | Rotate the katana in either pose; the right-facing two-handed rear palm stays visible beside the body |
+| `T`                           | Hide / show the katana                                                                                |
+| `K` / `M`                     | Select default / armored skin                                                                         |
+| `G`                           | Swap open / gripping right hand                                                                       |
+| `N`                           | Toggle the headwear skin override                                                                     |
+| `V`                           | Toggle slot markers, names, parent bones, and attachment names                                        |
+| `Space`                       | Stop at the current pose / restart                                                                    |
+| `R`                           | Restart the current clip                                                                              |
+| `O`                           | Enter / exit pose authoring mode                                                                      |
+| `C` (pose mode)               | Apply the sample combat-ready pose                                                                    |
+| `R` (pose mode)               | Reset to bind pose                                                                                    |
+| `[` / `]` (pose mode)         | Select previous / next bone                                                                           |
+| `←` / `→` (pose mode)         | Rotate selected bone by 0.01 radians; `Shift` uses 0.1                                                |
+| `Alt` + `←` / `→` (pose mode) | Move selected bone's local x by 1; `Shift` uses 5                                                     |
+| `↑` / `↓` (pose mode)         | Move selected bone's local y by 1; `Shift` uses 5                                                     |
+| `U` (pose mode)               | Reset selected bone to its bind transform                                                             |
+| `X` (pose mode)               | Print, copy, and download pose JSON                                                                   |
+| `J` (pose mode)               | Print normalized rig JSON to the console                                                              |
 
 To compare playback styles, press `2`, then `S` and `8`. The walk pose updates eight times per second while Phaser continues rendering and IK still solves every frame. Press `S` again for smooth motion. Press `4` and `5` to compare crossfades in both directions. Press `L` during walking to keep the legs walking under a sword-ready upper body. The status panel shows the current event, transition progress, playback speed and layer state.
 

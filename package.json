@@ -32,22 +32,28 @@
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/check-core.mjs",
     "prepack": "npm run check:version && npm run build:lib",
     "preview": "vite preview",
-    "schemas:generate": "node scripts/generate-schemas.mjs && biome format --write schemas",
-    "check": "biome check .",
+    "schemas:generate": "node scripts/generate-schemas.mjs && oxfmt schemas",
+    "check": "npm run format:check && npm run lint && npm run typecheck",
     "check:version": "node scripts/check-version.mjs",
-    "check:fix": "biome check --write .",
+    "check:fix": "npm run lint:fix && npm run format && npm run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "npm run build:demo && playwright test",
-    "test:package": "node scripts/check-package.mjs"
+    "test:package": "node scripts/check-package.mjs",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "peerDependencies": {
     "phaser": "4.2.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
     "@playwright/test": "1.63.0",
     "@types/node": "24.19.1",
+    "oxfmt": "0.72.0",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
     "phaser": "4.2.1",
     "typescript": "7.0.2",
     "vite": "8.3.1",

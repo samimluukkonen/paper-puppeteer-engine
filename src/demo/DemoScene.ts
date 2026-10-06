@@ -2,9 +2,6 @@ import Phaser from 'phaser';
 import type { CharacterDefinition, Facing } from '../engine/index.js';
 import { Puppet } from '../engine/index.js';
 import { loadSceneCharacter } from '../shared/loadSceneCharacter.js';
-import { DemoInput } from './DemoInput.js';
-import { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
-import { createDemoBackdrop, DemoPresenter } from './DemoPresenter.js';
 import {
   type DemoAnimationRole,
   type DemoCharacterProfile,
@@ -13,6 +10,9 @@ import {
   getDemoCharacterProfile,
   resolveDemoClip,
 } from './demoCharacterProfiles.js';
+import { DemoInput } from './DemoInput.js';
+import { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
+import { createDemoBackdrop, DemoPresenter } from './DemoPresenter.js';
 
 export interface DemoState {
   animation: string;

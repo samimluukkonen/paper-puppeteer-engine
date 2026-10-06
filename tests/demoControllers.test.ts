@@ -1,9 +1,9 @@
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
-import { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
-import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { type DemoCharacterProfile, demoPuppetProfile } from '../src/demo/demoCharacterProfiles.js';
+import { DemoPoseAuthoring } from '../src/demo/DemoPoseAuthoring.js';
 import { demoAuthoringLayout } from '../src/demo/demoPresentation.js';
+import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';

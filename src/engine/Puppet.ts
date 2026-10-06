@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { worldToLocal } from './affineMath.js';
 import { type AnimationClip, type AnimationPlaybackMode, type CompiledClip, compileClip } from './AnimationClip.js';
 import {
   type AnimationCompletion,
@@ -7,7 +8,6 @@ import {
   type PlayAnimationOptions,
   type SampleAnimationOptions,
 } from './AnimationPlayer.js';
-import { worldToLocal } from './affineMath.js';
 import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
@@ -17,7 +17,6 @@ import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/typ
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetPoseController, type SyncPoseOptions } from './PuppetPoseController.js';
-
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
 import { SlotDebug } from './SlotDebug.js';
@@ -65,7 +64,7 @@ export class Puppet {
   private readonly synchronizeAnimationPose = (): void => this.syncPose();
   private readonly ikContext: IKTransformContext = {
     worldToParent: (id, target) => {
-      const parent = this.getBone(id).container.parentContainer!;
+      const parent = this.getBone(id).container.parentContainer;
       // IK accepts nonsingular ancestors; editor gestures use the helper's default tolerance.
       return worldToLocal(target, parent.getWorldTransformMatrix(), 0);
     },
@@ -470,7 +469,8 @@ export class Puppet {
     ) {
       if (ancestor === object) throw new Error('Cannot attach an ancestor of the target bone.');
     }
-    for (const [label, value] of Object.entries(options)) assertFinite(value, `Attachment ${label}`);
+    for (const [label, value] of Object.entries(options) as [string, number][])
+      assertFinite(value, `Attachment ${label}`);
     const renderMount = slotId ? this.renderer.getSlotMount(slotId) : this.renderer.getMount(boneId);
     for (
       let ancestor: Phaser.GameObjects.Container | null = renderMount;

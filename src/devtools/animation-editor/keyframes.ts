@@ -5,11 +5,11 @@ import {
   type Keyframe,
   type PropertyKeyframe,
 } from '../../engine/AnimationClip.js';
-import { ClipPoseBuffer } from '../../engine/AnimationPose.js';
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
+import { ClipPoseBuffer } from '../../engine/AnimationPose.js';
 import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/externalData.js';
-import type { Rig } from '../../engine/Rig.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
+import type { Rig } from '../../engine/Rig.js';
 import { identifierSchema } from '../../engine/schemas.js';
 import {
   assertFinite,

@@ -108,7 +108,7 @@ test('lazy mounts retain current unsynchronized ancestor edits through later par
   hand.setRotation(-0.7);
   renderer.syncBone('hand');
   assertSameMatrix(mount, hand);
-  assert.equal(mount.parentContainer!.alpha, 0.4);
+  assert.equal(mount.parentContainer.alpha, 0.4);
 });
 
 function assertSameMatrix(actual: Phaser.GameObjects.Container, expected: Phaser.GameObjects.Container): void {
@@ -147,7 +147,7 @@ test('dense deep rigs allocate linearly and preserve affine transforms through f
   bones.get('bone64')!.container.setAlpha(0.4).setVisible(false);
   renderer.sync();
   for (const [id, bone] of bones) assertSameMatrix(renderer.getMount(id), bone.container);
-  const leafBranch = renderer.getMount('bone127').parentContainer!;
+  const leafBranch = renderer.getMount('bone127').parentContainer;
   assert.closeTo(leafBranch.alpha, 0.2, 1e-15);
   assert.isFalse(leafBranch.visible);
   const containers = allocations.containers;

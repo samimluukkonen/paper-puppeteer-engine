@@ -56,7 +56,7 @@ function fixture() {
 
 test('invalid attachments do not allocate lazy render branches or wrappers', () => {
   const { puppet, prop } = fixture();
-  const create = vi.spyOn(prop.scene!.add, 'container');
+  const create = vi.spyOn(prop.scene.add, 'container');
   const foreign = puppetScene().add.container(0, 0);
   assert.throws(() => puppet.attach('hand', prop, { x: Number.NaN }), /finite/);
   assert.throws(() => puppet.attach('hand', foreign), /puppet scene/);
@@ -161,7 +161,7 @@ test('invalid slot props fail before allocating wrappers or changing an existing
   const { puppet, prop, mount } = fixture();
   puppet.attach('hand', prop);
   const current = mount();
-  const create = vi.spyOn(prop.scene!.add, 'container');
+  const create = vi.spyOn(prop.scene.add, 'container');
   assert.throws(() => puppet.attachToSlot('unknown', prop), /Unknown slot/);
   assert.throws(() => puppet.attachToSlot('propSlot', prop, { rotation: Number.NaN }), /finite/);
   assert.throws(() => puppet.attachToSlot('propSlot', puppetScene().add.container()), /puppet scene/);

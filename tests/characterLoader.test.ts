@@ -76,7 +76,7 @@ test.each(['http', 'fetch', 'json'])(
     const error: unknown = await CharacterLoader.load(url, fetcher).catch((error: unknown) => error);
     assert.instanceOf(error, Error);
     if (failure === 'fetch') assert.strictEqual(error, reason);
-    else if (failure === 'http') assert.match((error as Error).message, /rig.json.*404/);
+    else if (failure === 'http') assert.match(error.message, /rig.json.*404/);
     else assert.instanceOf(error, SyntaxError);
     assert.equal(signals.length, 3);
     assert.isTrue(signals.every((signal) => signal.aborted && signal.reason === error));

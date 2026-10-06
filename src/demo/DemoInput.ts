@@ -1,9 +1,9 @@
 import type Phaser from 'phaser';
 import { isTypingTarget } from '../shared/keyboardShortcuts.js';
+import { createDemoCommands } from './demoCommands.js';
 import type { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import type { DemoPresenter } from './DemoPresenter.js';
 import type { DemoScene } from './DemoScene.js';
-import { createDemoCommands } from './demoCommands.js';
 
 /** Scene input bindings and held weapon-rotation keys. */
 export class DemoInput {

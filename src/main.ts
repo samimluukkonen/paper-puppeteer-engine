@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import type { DemoState } from './demo/DemoScene.js';
-import { DemoScene } from './demo/DemoScene.js';
 import { createDemoCommands } from './demo/demoCommands.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
+import type { DemoState } from './demo/DemoScene.js';
+import { DemoScene } from './demo/DemoScene.js';
 import { bindCharacterSelection, selectedCharacterId } from './ui/characterSelection.js';
 import { viewHeader } from './ui/viewShell.js';
 import './style.css';

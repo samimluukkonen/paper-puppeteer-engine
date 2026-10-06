@@ -1,6 +1,6 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
-import type { Rig } from '../../engine/Rig.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
+import type { Rig } from '../../engine/Rig.js';
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { getAuthoredBoneProperties } from './keyframes.js';

@@ -174,7 +174,7 @@ test('a failed rollback reports both the original edit error and the restoration
     caught = error;
   }
   assert.instanceOf(caught, AggregateError);
-  assert.deepEqual((caught as AggregateError).errors, [editError, rollbackError]);
+  assert.deepEqual(caught.errors, [editError, rollbackError]);
   assert.isFalse(history.inOperation);
   assert.equal(history.length, 0);
 });

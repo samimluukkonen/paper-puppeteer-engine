@@ -397,6 +397,8 @@ export class AnimationPlayer {
   ): void {
     const errors: unknown[] = [];
     for (const event of events) {
+      // Snapshot listeners so callbacks can subscribe/unsubscribe during dispatch.
+      // oxlint-disable-next-line unicorn/no-useless-spread
       for (const listener of [...this.eventListeners]) {
         if (this.disposed) break;
         try {
@@ -407,6 +409,7 @@ export class AnimationPlayer {
       }
     }
     for (const event of completions) {
+      // oxlint-disable-next-line unicorn/no-useless-spread -- Preserve the listener snapshot during callbacks.
       for (const listener of [...this.completionListeners]) {
         if (this.disposed) break;
         try {

@@ -10,8 +10,8 @@ import {
 import { checkJson } from './jsonData.js';
 import { mergeSkins } from './mergeSkins.js';
 import { inspectPoseDefinition, type PoseDefinition } from './Pose.js';
-import { Rig } from './Rig.js';
 import { type DeepReadonly, freezeData } from './readonlyData.js';
+import { Rig } from './Rig.js';
 import { characterManifestSchema, skinFileSchema } from './schemas.js';
 import type { SkinDefinition } from './types.js';
 
@@ -115,7 +115,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       issues.push(...prefixed(clip.issues, `animations[${index}]`));
       if (clip.data) result.animations.push(clip.data);
     }
-    const name =
+    const name: unknown =
       typeof value === 'object' && value !== null ? Object.getOwnPropertyDescriptor(value, 'name')?.value : undefined;
     if (typeof name === 'string') {
       if (names.has(name)) issues.push(issue(`animations[${index}].name`, `Duplicate animation name "${name}".`));

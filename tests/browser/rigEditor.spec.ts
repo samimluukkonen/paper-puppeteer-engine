@@ -255,12 +255,12 @@ for (const name of ['head', '◇ headVisual']) {
     await expect(scaleX).toBeFocused();
     await expect(degrees).toHaveText('28.6479°');
     expect(
-      await originalRotation!.evaluate(
+      await originalRotation.evaluate(
         (input) => input === document.querySelector('#inspector input[data-field="rotation"]'),
       ),
     ).toBe(true);
     expect(
-      await originalScaleX!.evaluate(
+      await originalScaleX.evaluate(
         (input) => input === document.querySelector('#inspector input[data-field="scaleX"]'),
       ),
     ).toBe(true);

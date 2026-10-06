@@ -20,7 +20,7 @@ test.each(cases)(
   'two transform factors reconstruct [%s, %s, %s, %s] including shear and singular scales',
   (a, b, c, d) => {
     const factors = factorAffine(
-      { a: a!, b: b!, c: c!, d: d!, tx: 0, ty: 0 },
+      { a: a, b: b, c: c, d: d, tx: 0, ty: 0 },
       {
         rotation: 0,
         scaleX: 0,
@@ -40,7 +40,7 @@ test.each(cases)(
       (-outerCos * factors.scaleX * innerSin - outerSin * factors.scaleY * innerCos) * factors.innerScale,
       (-outerSin * factors.scaleX * innerSin + outerCos * factors.scaleY * innerCos) * factors.innerScale,
     ];
-    const expected = [a!, b!, c!, d!];
+    const expected = [a, b, c, d];
     const magnitude = Math.max(...expected.map(Math.abs)) || 1;
     for (let index = 0; index < 4; index += 1)
       assert.closeTo(actual[index]! / magnitude, expected[index]! / magnitude, 1e-14);
