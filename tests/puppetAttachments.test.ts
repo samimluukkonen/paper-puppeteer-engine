@@ -25,7 +25,9 @@ function fixture() {
   const events = new EventEmitter();
   const callbacks = new Map<Parameters<typeof prop.once>[1], (...args: unknown[]) => void>();
   prop.once = (event, listener, context) => {
-    const callback = (...args: unknown[]): void => listener.apply(context, args);
+    const callback = (...args: unknown[]): void => {
+      listener.apply(context, args);
+    };
     callbacks.set(listener, callback);
     events.once(event, callback);
     return prop;

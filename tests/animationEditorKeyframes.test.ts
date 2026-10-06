@@ -44,7 +44,7 @@ test('frozen property indexes avoid rescanning dense tracks and preserve sparse,
   );
   let reads = 0;
   const tracked = new Proxy(rows, {
-    get(target, property, receiver) {
+    get(target, property, receiver): unknown {
       if (typeof property === 'string' && /^\d+$/.test(property)) reads += 1;
       return Reflect.get(target, property, receiver);
     },

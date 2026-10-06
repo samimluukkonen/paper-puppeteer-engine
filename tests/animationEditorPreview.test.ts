@@ -455,7 +455,7 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
     state.selectAnimation('move');
     const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
     const preview = new AnimationEditorPreview(state, puppet);
-    const event = vi.fn();
+    const event = vi.fn<Parameters<AnimationPlayer['onAnimationEvent']>[0]>();
     const runtime = Reflect.get(preview, 'player') as import('../src/engine/AnimationPlayer.js').AnimationPlayer;
     runtime.onAnimationEvent(event);
     const update = vi.spyOn(runtime, 'update');
@@ -599,7 +599,7 @@ test('pose-only preview suppresses start, middle and end events across restart, 
   const before = JSON.stringify(clip);
   const state = new AnimationEditorState(rig, [clip]);
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
-  const event = vi.fn();
+  const event = vi.fn<Parameters<AnimationPlayer['onAnimationEvent']>[0]>();
   const complete = vi.fn();
   // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
   const originalPlay = AnimationPlayer.prototype.play;

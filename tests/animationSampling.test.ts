@@ -294,7 +294,9 @@ test('player sampling reuses pose storage across seeks and rebuilds it when the 
     for (const time of [750, 250, 1000, 0, 500]) {
       evaluate.mockClear();
       player.sample(time);
-      const pose = evaluate.mock.results[0]!.value as ReturnType<ClipPoseBuffer['evaluate']>;
+      const result = evaluate.mock.results[0]!;
+      if (result.type !== 'return') throw new Error('Pose evaluation must return successfully.');
+      const pose = result.value;
       if (heldPose) {
         assert.strictEqual(pose, heldPose);
         assert.strictEqual(pose.get('root'), heldValues);
@@ -308,7 +310,9 @@ test('player sampling reuses pose storage across seeks and rebuilds it when the 
     player.play('vertical');
     evaluate.mockClear();
     player.sample(250);
-    const verticalPose = evaluate.mock.results[0]!.value;
+    const result = evaluate.mock.results[0]!;
+    if (result.type !== 'return') throw new Error('Pose evaluation must return successfully.');
+    const verticalPose = result.value;
     assert.notStrictEqual(verticalPose, heldPose);
     assert.deepEqual(verticalPose.get('root'), { y: 50 });
     assert.equal(joint.pose.x, 3);

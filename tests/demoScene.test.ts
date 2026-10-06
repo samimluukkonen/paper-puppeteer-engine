@@ -250,7 +250,9 @@ test('time-zero animation events cannot notify the UI before a command finishes 
     });
     puppet.onAnimationEvent((event) => {
       Reflect.set(scene, 'lastEvent', event.name);
-      Reflect.get(scene, 'notify').call(scene);
+      const notify: unknown = Reflect.get(scene, 'notify');
+      if (typeof notify !== 'function') throw new Error('Scene notification callback is missing.');
+      Reflect.apply(notify, scene, []);
     });
     scene.play('marked');
     assert.equal(notifications.length, 1);
