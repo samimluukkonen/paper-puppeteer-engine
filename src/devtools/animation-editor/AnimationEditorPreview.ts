@@ -1,9 +1,9 @@
-import { compileClip } from '../../engine/AnimationClip.js';
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import type { JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { getCompiledPreviewClip } from './previewClip.js';
 
 /** Editor-owned runtime player samples the working copy; the puppet still owns rendering and IK. */
 export class AnimationEditorPreview {
@@ -43,7 +43,7 @@ export class AnimationEditorPreview {
             new Map(this.puppet.rig.bones.map((bone) => [bone.id, this.puppet.getBone(bone.id)])),
             // The editor clock owns wrapping; sampling must retain the exact stepped endpoint for scrubs.
             // Preview is pose-only, including initialization/recompilation at time-zero event markers.
-            [compileClip({ ...animation, loop: false, events: [] }, this.puppet.rig)],
+            [getCompiledPreviewClip(animation, this.puppet.rig)],
           )
         : undefined;
       this.player?.dispose();

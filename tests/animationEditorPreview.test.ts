@@ -2,6 +2,7 @@ import { assert, test, vi } from 'vitest';
 import { katanaGrips } from '../src/demo/Katana.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import * as animationClip from '../src/engine/AnimationClip.js';
 import type { AnimationClip, AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -16,6 +17,49 @@ vi.mock('phaser', () => ({
     GameObjects: { Events: { DESTROY: 'destroy' } },
   },
 }));
+
+test('canvas and inspector share compilation while independently evaluating time and edits', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const state = new AnimationEditorState(rig, [
+    {
+      name: 'move',
+      duration: 1000,
+      loop: true,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 1000, x: 100 },
+        ],
+      },
+      events: [{ time: 0, name: 'start' }],
+    },
+  ]);
+  state.selectAnimation('move');
+  state.selectBone('root');
+  const compile = vi.spyOn(animationClip, 'compileClip');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  try {
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x', 0.5), 50);
+    assert.equal(puppet.getBone('root').pose.x, 0, 'inspector queries do not overwrite the canvas pose');
+    state.setCurrentTime(0.25);
+    assert.equal(puppet.getBone('root').pose.x, 25);
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x', 0.5), 50);
+    assert.equal(compile.mock.calls.length, 1);
+    state.setBonePropertyKeyframe('root', 'x', 30);
+    assert.equal(state.selectedBoneTransform?.x, 30);
+    assert.equal(puppet.getBone('root').pose.x, 30);
+    assert.equal(compile.mock.calls.length, 2, 'new authored snapshots compile once for both consumers');
+    state.undo();
+    assert.equal(state.selectedBoneTransform?.x, 25);
+    assert.equal(puppet.getBone('root').pose.x, 25);
+    assert.equal(compile.mock.calls.length, 2, 'undo reuses the immutable earlier compilation');
+  } finally {
+    compile.mockRestore();
+    preview.dispose();
+    puppet.destroy();
+  }
+});
 
 test('key selection and selected-key deletion update the existing preview, including undo/redo after scrubbing', () => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
