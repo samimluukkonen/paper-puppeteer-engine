@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { parseRigDefinition } from '../../src/engine/externalData.js';
 import { test } from './fixtures.js';
 
 test('sketch loads all parts, exports edits, and stays selected across views', async ({ page }) => {
@@ -6,10 +7,14 @@ test('sketch loads all parts, exports edits, and stays selected across views', a
   await expect(page.locator('#session-status')).toContainText('Character: random-paperdoll-sketch');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await expect(page.getByRole('treeitem')).toHaveCount(34);
-  const rig = await (await page.request.get('characters/random-paperdoll-sketch/rig.json')).json();
-  expect(rig.attachments.find((attachment: { id: string }) => attachment.id === 'headDefault').scaleX).toBe(-0.3);
+  const rig = parseRigDefinition(await (await page.request.get('characters/random-paperdoll-sketch/rig.json')).json());
+  expect(rig.attachments.find((attachment) => attachment.id === 'headDefault')!.scaleX).toBe(-0.3);
   for (const side of ['left', 'right']) {
-    const depth = (id: string): number => rig.slots.find((slot: { id: string }) => slot.id === id).depth;
+    const depth = (id: string): number => {
+      const slot = rig.slots.find((slot) => slot.id === id);
+      if (slot?.depth === undefined) throw new Error(`Missing authored depth for slot "${id}".`);
+      return slot.depth;
+    };
     expect(depth(`${side}HandVisual`)).toBeLessThan(depth(`${side}ForearmVisual`));
   }
   for (const [bone, side] of [

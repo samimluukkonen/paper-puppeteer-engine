@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { animationFileSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
@@ -163,7 +164,7 @@ test('unkeyed bones/properties remain available, key presence refreshes, and no 
 }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
-    await route.fulfill({ json: { ...(await response.json()), tracks: {}, events: [] } });
+    await route.fulfill({ json: { ...animationFileSchema.parse(await response.json()), tracks: {}, events: [] } });
   });
   await openEditor(page);
   const labels = page.locator('#timeline-track-labels');

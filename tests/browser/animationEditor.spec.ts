@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
@@ -126,7 +127,7 @@ test('no animations and no selection show safe empty timelines', async ({ page }
     await expect(page.locator(selector)).toBeDisabled();
   await page.route('**/characters/demo-puppet/character.json', async (route) => {
     const response = await route.fetch();
-    const manifest = await response.json();
+    const manifest = characterManifestSchema.parse(await response.json());
     await route.fulfill({ json: { ...manifest, animations: [] } });
   });
   await page.reload();
@@ -140,7 +141,7 @@ test('preview speeds scale browser playback while remaining transient across sel
   await page.clock.install({ time: new Date('2030-01-01T00:00:00Z') });
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
-    await route.fulfill({ json: { ...(await response.json()), duration: 60_000 } });
+    await route.fulfill({ json: { ...animationFileSchema.parse(await response.json()), duration: 60_000 } });
   });
   await openEditor(page);
   await page.clock.pauseAt(new Date('2030-01-01T01:00:00Z'));
@@ -170,7 +171,7 @@ test('authored mode and FPS update the paused pose immediately and undo restores
     const response = await route.fetch();
     await route.fulfill({
       json: {
-        ...(await response.json()),
+        ...animationFileSchema.parse(await response.json()),
         duration: 2000,
         events: [],
         tracks: {
@@ -264,7 +265,7 @@ test('invalid FPS restores the authored value and typing while playing retains t
 test('invalid zero-duration data reports shared validation errors and survives resize', async ({ page }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
-    const animation = await response.json();
+    const animation = animationFileSchema.parse(await response.json());
     await route.fulfill({ json: { ...animation, duration: 0 } });
   });
   await page.goto('animation-editor/');
@@ -278,7 +279,7 @@ test('invalid zero-duration data reports shared validation errors and survives r
 test('stepped animation metadata and held preview frames use the existing runtime mode', async ({ page }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
-    const animation = await response.json();
+    const animation = animationFileSchema.parse(await response.json());
     await route.fulfill({ json: { ...animation, playback: { mode: 'stepped', fps: 10 } } });
   });
   await openEditor(page);
@@ -297,7 +298,7 @@ test('play, pause, resume, restart, and completion synchronize the preview and t
   // Different endpoint poses make holding the final frame observable, including for authored loop=true.
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
-    const animation = await response.json();
+    const animation = animationFileSchema.parse(await response.json());
     await route.fulfill({
       json: {
         ...animation,
@@ -428,7 +429,7 @@ test('Space activates focused Restart and Loop preview buttons without toggling 
 test('playback advances without measuring layout or rewriting unchanged editor controls', async ({ page }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
-    await route.fulfill({ json: { ...(await response.json()), duration: 60_000 } });
+    await route.fulfill({ json: { ...animationFileSchema.parse(await response.json()), duration: 60_000 } });
   });
   await openEditor(page);
   await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
@@ -439,13 +440,13 @@ test('playback advances without measuring layout or rewriting unchanged editor c
     await frame();
     await frame();
     const timeline = document.querySelector<HTMLElement>('#timeline')!;
-    const bounds = timeline.getBoundingClientRect;
+    const bounds = timeline.getBoundingClientRect.bind(timeline);
     let measurements = 0;
     let timeUpdates = 0;
     let unchangedWrites = 0;
     timeline.getBoundingClientRect = function () {
       measurements += 1;
-      return bounds.call(this);
+      return bounds();
     };
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -493,7 +494,7 @@ test('loop preview repeats, remains a preference across selection, and stops at 
     const response = await route.fetch();
     await route.fulfill({
       json: {
-        ...(await response.json()),
+        ...animationFileSchema.parse(await response.json()),
         duration: 400,
         loop: false,
         events: [],
