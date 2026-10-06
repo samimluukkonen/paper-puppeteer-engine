@@ -195,7 +195,7 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       editor = current;
       renderInspector(current);
     },
-    showError(message: string): void {
+    showError(this: void, message: string): void {
       if (lifetime.signal.aborted) return;
       inspector.textContent = `Character load failed: ${message}`;
     },

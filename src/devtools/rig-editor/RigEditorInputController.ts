@@ -33,10 +33,15 @@ export class RigEditorInputController {
   enable(): void {
     if (this.enabled) return;
     this.enabled = true;
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.on('pointerdown', this.pointerDown, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.on('pointermove', this.pointerMove, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.on('pointerup', this.pointerUp, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.on('pointerupoutside', this.pointerUp, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.on('wheel', this.wheel, this);
     window.addEventListener('keydown', this.keyDown);
     window.addEventListener('blur', this.interruptGesture);
@@ -49,10 +54,15 @@ export class RigEditorInputController {
     if (!this.enabled) return;
     this.enabled = false;
     this.endGesture();
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.off('pointerdown', this.pointerDown, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.off('pointermove', this.pointerMove, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.off('pointerup', this.pointerUp, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.off('pointerupoutside', this.pointerUp, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.off('wheel', this.wheel, this);
     window.removeEventListener('keydown', this.keyDown);
     window.removeEventListener('blur', this.interruptGesture);

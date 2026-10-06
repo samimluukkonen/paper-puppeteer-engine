@@ -49,6 +49,7 @@ export class RigEditor {
       () => this.update(),
     );
     this.inputController.enable();
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
     // Activation must project retained edits before drawing or capturing IK targets.
     this.refresh(false);
@@ -68,6 +69,7 @@ export class RigEditor {
     if (!this.overlay) return;
     this.inputController?.disable();
     this.inputController = undefined;
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
     this.overlay.destroy();
     this.overlay = undefined;

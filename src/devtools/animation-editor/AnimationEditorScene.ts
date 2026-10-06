@@ -37,6 +37,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state?.pause();
       this.state?.endScrub();
       this.state = undefined;
+      // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
@@ -129,9 +130,11 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state = state;
       if (this.ikPreviewEnabled) this.setIKPreview(true);
       this.selectionOverlay = this.add.graphics();
+      // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
     } catch (error) {
+      // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;

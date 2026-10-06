@@ -153,8 +153,11 @@ export class Puppet {
     this.setDebug(options.debug ?? false);
     this.setIKDebug(options.ikDebug ?? false);
     this.setSlotDebug(options.slotDebug ?? false);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     if (options.autoUpdate !== false) scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.container.once(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
   }
 
@@ -488,6 +491,7 @@ export class Puppet {
     mount.add(object);
     renderMount.add(mount).sort('depth');
     this.attachments.set(object, mount);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     object.once(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     return this;
   }
@@ -504,6 +508,7 @@ export class Puppet {
   detach(object: Phaser.GameObjects.GameObject): boolean {
     const mount = this.attachments.get(object);
     if (!mount) return false;
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     mount.remove(object);
     mount.destroy();
@@ -579,8 +584,11 @@ export class Puppet {
     if (this.destroyed) return;
     this.destroyed = true;
     this.animationPlayer.dispose();
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
+    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.container.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
     this.debugView?.destroy();
     this.ikDebugView?.destroy();
@@ -590,6 +598,7 @@ export class Puppet {
     this.slotDebugView = undefined;
     this.debugLabelSides.clear();
     for (const object of this.attachments.keys())
+      // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
     this.renderer.destroy();
     if (!this.container.isDestroyed) this.container.destroy();
