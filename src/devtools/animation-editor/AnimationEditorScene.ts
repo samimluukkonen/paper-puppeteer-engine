@@ -21,13 +21,15 @@ export class AnimationEditorScene extends Phaser.Scene {
   private facing: Facing = 'right';
   private bonesVisible = true;
   private ikPreviewEnabled = false;
+  private readonly options: AnimationEditorSceneOptions;
 
   constructor(
     private readonly onReady: (state: AnimationEditorState, characterId: string) => void,
     private readonly onError: (message: string) => void,
-    private readonly options: AnimationEditorSceneOptions = {},
+    options: AnimationEditorSceneOptions = {},
   ) {
     super('AnimationEditorScene');
+    this.options = structuredClone(options);
   }
 
   create(): void {

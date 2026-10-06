@@ -110,3 +110,42 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
   scene.update(0, 500);
   assert.equal(state.currentTime, 0.375);
 });
+
+test('scene owns options before loading and retains its IK chains after caller mutations', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const chains = [
+    {
+      name: 'arm',
+      rootBone: 'rightUpperArm',
+      middleBone: 'rightForearm',
+      endBone: 'rightHand',
+      endOffset: { x: 1, y: 2 },
+    },
+  ];
+  const options = { characterUrl: '../original/character.json', ikChains: chains };
+  const scene = new AnimationEditorScene(ready, error, options);
+  options.characterUrl = '../replacement/character.json';
+  chains[0]!.endOffset.x = 99;
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    assert.deepEqual(error.mock.calls, []);
+    assert.equal(vi.mocked(loadSceneCharacter).mock.calls[0]![1], 'https://example.test/original/character.json');
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    assert.deepEqual(puppet.getIK('arm').endOffset, { x: 1, y: 2 });
+    chains[0]!.name = 'changed-by-caller';
+    chains.push({ ...chains[0]!, name: 'added-by-caller' });
+    scene.setIKPreview(true);
+    assert.isTrue(puppet.getIK('arm').enabled);
+    scene.setIKPreview(false);
+    assert.isFalse(puppet.getIK('arm').enabled);
+  } finally {
+    (Reflect.get(scene, 'preview') as { dispose(): void }).dispose();
+    (Reflect.get(scene, 'puppet') as Puppet).destroy();
+  }
+});
