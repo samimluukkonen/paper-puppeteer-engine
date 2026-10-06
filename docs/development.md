@@ -143,7 +143,9 @@ src/devtools/animation-editor/
   AnimationEditorState.ts  Owned animation data, transform drafts, authored FPS/mode and history
   AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
-  TimelineController.ts   Responsive ruler, pointer capture, keyboard navigation and status display
+  TimelineController.ts   Session coordination, responsive ruler, tracks and playhead
+  TimelineInputController.ts  Pointer capture, gestures, keyboard navigation and cancellation
+  TimelineSessionController.ts  Selection, settings, history, exports and status display
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
 src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping

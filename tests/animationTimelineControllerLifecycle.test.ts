@@ -1,0 +1,118 @@
+import { afterEach, assert, test, vi } from 'vitest';
+import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { TimelineInputController } from '../src/devtools/animation-editor/TimelineInputController.js';
+import { TimelineSessionController } from '../src/devtools/animation-editor/TimelineSessionController.js';
+import { Rig } from '../src/engine/Rig.js';
+import { stubRigEditorDom } from './helpers/rigEditorDom.js';
+
+afterEach(() => vi.unstubAllGlobals());
+
+function state() {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const state = new AnimationEditorState(rig, [
+    { name: 'move', duration: 1000, loop: false, tracks: { root: [{ time: 0, x: 1 }] } },
+  ]);
+  state.selectAnimation('move');
+  return state;
+}
+
+class TimelineElement extends EventTarget {
+  readonly captures = new Set<number>();
+  focus() {}
+  closest() {
+    return null;
+  }
+  getBoundingClientRect() {
+    return { left: 0, width: 100 };
+  }
+  setPointerCapture(id: number) {
+    this.captures.add(id);
+  }
+  hasPointerCapture(id: number) {
+    return this.captures.has(id);
+  }
+  releasePointerCapture(id: number) {
+    this.captures.delete(id);
+  }
+}
+
+function inputFixture(getState: () => AnimationEditorState) {
+  const browser = new EventTarget();
+  vi.stubGlobal('window', browser);
+  vi.stubGlobal('document', new EventTarget());
+  vi.stubGlobal('Element', TimelineElement);
+  const app = new EventTarget() as unknown as HTMLElement;
+  const timeline = new TimelineElement();
+  const create = () => new TimelineInputController(app, timeline as unknown as HTMLElement, getState);
+  return { browser, timeline, create };
+}
+const pointer = (type: string, clientX = 50) =>
+  Object.assign(new Event(type, { cancelable: true }), { button: 0, pointerId: 1, clientX });
+const space = () => Object.assign(new Event('keydown', { cancelable: true }), { key: ' ', code: 'Space' });
+
+test('input disposal ends scrubbing, releases capture, and permits remount without duplicate shortcuts', () => {
+  const previous = state();
+  let current = previous;
+  const { browser, timeline, create } = inputFixture(() => current);
+  const first = create();
+  timeline.dispatchEvent(pointer('pointerdown'));
+  assert.isTrue(previous.isScrubbing);
+  assert.equal(previous.currentTime, 0.5);
+  assert.isTrue(timeline.captures.has(1));
+  first.dispose();
+  first.dispose();
+  assert.isFalse(previous.isScrubbing);
+  assert.equal(timeline.captures.size, 0);
+  timeline.dispatchEvent(pointer('pointerdown', 75));
+  browser.dispatchEvent(space());
+  assert.equal(previous.currentTime, 0.5);
+  assert.isFalse(previous.isPlaying);
+  current = state();
+  const second = create();
+  browser.dispatchEvent(space());
+  assert.isTrue(current.isPlaying);
+  assert.isFalse(previous.isPlaying);
+  second.dispose();
+});
+
+test('input disposal cancels a key drag without committing it', () => {
+  const current = state();
+  const { timeline, create } = inputFixture(() => current);
+  const input = create();
+  input.beginKeyDrag(
+    pointer('pointerdown', 0) as unknown as PointerEvent,
+    { boneId: 'root', property: 'x', time: 0 },
+    timeline as unknown as HTMLButtonElement,
+  );
+  timeline.dispatchEvent(pointer('pointermove', 75));
+  assert.equal(current.keyframeDrag?.previewTime, 0.75);
+  input.dispose();
+  assert.isNull(current.keyframeDrag);
+  assert.equal(current.currentTime, 0);
+  assert.equal(current.historyLength, 0);
+  assert.isFalse(current.dirty);
+  assert.equal(timeline.captures.size, 0);
+});
+
+test('session actions follow replacements and disposed controls do not handle remounted events', async () => {
+  const query = stubRigEditorDom();
+  const app = query('#editor-app') as unknown as HTMLElement;
+  let current = state();
+  const previous = current;
+  const first = new TimelineSessionController(app, () => current, { endScrub() {} });
+  await query('#play-pause').click();
+  assert.isTrue(previous.isPlaying);
+  current = state();
+  await query('#play-pause').click();
+  assert.isTrue(current.isPlaying);
+  current.pause();
+  first.dispose();
+  first.dispose();
+  const second = new TimelineSessionController(app, () => current, { endScrub() {} });
+  await query('#play-pause').click();
+  assert.isTrue(current.isPlaying);
+  assert.isTrue(previous.isPlaying);
+  second.dispose();
+  await query('#play-pause').click();
+  assert.isTrue(current.isPlaying);
+});
