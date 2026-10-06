@@ -8,7 +8,7 @@ Pushes to `master` build and deploy the demo through [the Pages workflow](.githu
 
 ## Install and run
 
-Requires Node.js **20.19+ or 22.12+** (Node 24 recommended) and npm.
+Requires Node.js **24 or newer** and npm. Local development and CI use **24.19.0**, pinned in [.nvmrc](.nvmrc). Run `nvm use` if you use nvm.
 
 ```bash
 npm install

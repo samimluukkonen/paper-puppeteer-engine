@@ -4,6 +4,8 @@
 
 ## Checks and profiling
 
+Use Node.js **24 or newer**. [.nvmrc](../.nvmrc) pins **24.19.0** for `nvm use` and CI. The repository enables `engine-strict` so npm dependency installs reject unsupported Node versions.
+
 ```bash
 npm run typecheck
 npm test
