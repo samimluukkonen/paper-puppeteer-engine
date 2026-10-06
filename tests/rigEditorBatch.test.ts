@@ -219,7 +219,7 @@ test.each(dragCases)(
     editor.enable();
     puppet.syncPose.mockClear();
     const emit = (event: string, x: number, y: number, id = 1) => {
-      const [, handler, context] = input.on.mock.calls.find(([name]) => name === event)!;
+      const [, handler, context] = input.on.mock.calls.filter(([name]) => name === event).at(-1)!;
       handler.call(context, { id, x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });
     };
     const validate = vi.spyOn(externalData, 'validateRigDefinition');
@@ -282,8 +282,19 @@ test.each(dragCases)(
     assert.equal(current().y, 30);
     emit('pointerdown', 0, 0, 2);
     emit('pointermove', 10, 10, 2);
-    emit('pointerup', 10, 10, 2);
     assert.equal(current().x, 30, 'a new pointer can start another gesture after interruption');
+    assert.equal(current().y, 40);
+    editor.undo();
+    emit('pointermove', 100, 100, 2);
+    emit('pointerup', 100, 100, 2);
+    assert.equal(current().x, 20, 'undo ends an active drag before restoring history');
+    assert.equal(current().y, 30);
+    assert.isTrue(editor.state.canRedo, 'later pointer events preserve the redo branch');
+    emit('pointerdown', 0, 0, 3);
+    editor.redo();
+    emit('pointermove', 100, 100, 3);
+    emit('pointerup', 100, 100, 3);
+    assert.equal(current().x, 30, 'redo also ends an active gesture');
     assert.equal(current().y, 40);
     assert.equal(editor.state.historyLength, 2);
     editor.disable();

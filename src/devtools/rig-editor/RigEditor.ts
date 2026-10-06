@@ -179,9 +179,11 @@ export class RigEditor {
   }
 
   undo(): void {
+    this.inputController?.endGesture();
     if (this.state.undo()) this.refresh();
   }
   redo(): void {
+    this.inputController?.endGesture();
     if (this.state.redo()) this.refresh();
   }
   resetSelected(): void {

@@ -71,7 +71,7 @@ export class RigEditorInputController {
   }
 
   /** Commit authored changes once and release pointer ownership after any gesture ending. */
-  private endGesture(): void {
+  endGesture(): void {
     this.panning = false;
     this.activePointerId = undefined;
     this.drag = undefined;

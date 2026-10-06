@@ -96,6 +96,29 @@ test('a canvas drag released outside commits one undo and stops moving', async (
   ).toBe(true);
 });
 
+test('undo during a held canvas drag ends the gesture and preserves redo', async ({ page }) => {
+  const box = await page.locator('#editor-stage canvas').boundingBox();
+  if (!box) throw new Error('Missing editor canvas');
+  const start = { x: box.x + (380 / 760) * box.width, y: box.y + (313 / 640) * box.height };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 30, start.y + 20, { steps: 4 });
+  await expect(field(page, 'x')).not.toHaveValue('0');
+  const editedX = await field(page, 'x').inputValue();
+  const editedY = await field(page, 'y').inputValue();
+  await page.keyboard.press('Control+z');
+  await expect(field(page, 'x')).toHaveValue('0');
+  await expect(field(page, 'y')).toHaveValue('-106');
+  await page.mouse.move(start.x + 60, start.y + 40, { steps: 4 });
+  await page.mouse.up();
+  await expect(field(page, 'x')).toHaveValue('0');
+  await expect(field(page, 'y')).toHaveValue('-106');
+  await expect(page.locator('#redo')).toBeEnabled();
+  await page.keyboard.press('Control+Shift+z');
+  await expect(field(page, 'x')).toHaveValue(editedX);
+  await expect(field(page, 'y')).toHaveValue(editedY);
+});
+
 for (const mode of ['joint', 'sprite']) {
   test(`background dragging repositions the character without editing the rig in ${mode} mode`, async ({ page }) => {
     await page.getByRole('treeitem', { name: 'head', exact: true }).click();
