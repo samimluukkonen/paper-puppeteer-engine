@@ -1,6 +1,6 @@
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
 import { copyJsonData } from './jsonData.js';
-import { freezeData, readonlyMap } from './readonlyData.js';
+import { freezeData, isFullyFrozen, readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
 import { animationClipSchema, identifierSchema, keyframeSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
@@ -58,6 +58,23 @@ export interface CompiledClip {
 }
 
 const ownedClips = new WeakSet<CompiledClip>();
+const ownedTracks = new WeakSet<CompiledTrack>();
+const compiledProperties = new WeakMap<readonly Keyframe[], CompiledTrack['properties']>();
+
+function ownCompiledTrack(track: CompiledTrack): CompiledTrack {
+  if (ownedTracks.has(track)) return track;
+  const owned = Object.freeze({
+    bone: track.bone,
+    properties: readonlyMap(
+      [...track.properties].map(
+        ([property, keys]) =>
+          [property, Object.freeze(keys.map((key) => Object.freeze({ time: key.time, value: key.value })))] as const,
+      ),
+    ),
+  });
+  ownedTracks.add(owned);
+  return owned;
+}
 
 /** @internal Share compiler-owned immutable clips; snapshot externally assembled compiled data. */
 export function ownCompiledClip(clip: CompiledClip): CompiledClip {
@@ -93,22 +110,7 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
     name: clip.name,
     duration: clip.duration,
     loop: clip.loop,
-    tracks: Object.freeze(
-      clip.tracks.map((track) =>
-        Object.freeze({
-          bone: track.bone,
-          properties: readonlyMap(
-            [...track.properties].map(
-              ([property, keys]) =>
-                [
-                  property,
-                  Object.freeze(keys.map((key) => Object.freeze({ time: key.time, value: key.value }))),
-                ] as const,
-            ),
-          ),
-        }),
-      ),
-    ),
+    tracks: Object.freeze(clip.tracks.map(ownCompiledTrack)),
     events: Object.freeze(
       clip.events.map((event) => {
         const copy = copyAnimationEvent(event);
@@ -135,6 +137,13 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
   const events = [...(clip.events ?? [])].sort((a, b) => a.time - b.time);
   const tracks: CompiledTrack[] = [];
   for (const [bone, keys] of Object.entries(clip.tracks)) {
+    const cached = compiledProperties.get(keys);
+    if (cached) {
+      const track = Object.freeze({ bone, properties: cached });
+      ownedTracks.add(track);
+      tracks.push(track);
+      continue;
+    }
     const properties = new Map<TransformProperty, readonly PropertyKeyframe[]>();
     for (const property of transformProperties) {
       const samples: PropertyKeyframe[] = [];
@@ -144,7 +153,9 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
       }
       if (samples.length > 0) properties.set(property, samples);
     }
-    tracks.push({ bone, properties });
+    const track = ownCompiledTrack({ bone, properties });
+    if (isFullyFrozen(keys)) compiledProperties.set(keys, track.properties);
+    tracks.push(track);
   }
   return snapshotCompiledClip({
     name: clip.name,

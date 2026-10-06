@@ -1,5 +1,27 @@
 export type DeepReadonly<T> = T extends object ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> } : T;
 
+const fullyFrozen = new WeakSet<object>();
+
+/** Verify deep immutability once; unchanged frozen branches cannot become mutable later. */
+export function isFullyFrozen(data: object): boolean {
+  const pending = [data];
+  const seen = new Set<object>();
+  while (pending.length) {
+    const value = pending.pop()!;
+    if (fullyFrozen.has(value) || seen.has(value)) continue;
+    seen.add(value);
+    if (!Object.isFrozen(value)) return false;
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+      // Frozen getters may expose changing data; inspect descriptors without invoking them.
+      if (!Object.hasOwn(descriptor, 'value')) return false;
+      const child: unknown = descriptor.value;
+      if (child !== null && typeof child === 'object') pending.push(child);
+    }
+  }
+  for (const value of seen) fullyFrozen.add(value);
+  return true;
+}
+
 /** Freeze owned JSON data recursively; callers clone source data before passing it here. */
 export function freezeData<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
