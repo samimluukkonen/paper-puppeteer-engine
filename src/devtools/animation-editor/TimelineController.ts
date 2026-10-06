@@ -1,6 +1,7 @@
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { setAttribute, setText } from '../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
+import { TimelineTracksController } from './TimelineTracksController.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
 
 /** DOM adapter only: width/pointer capture belong here, while time and animation data belong to state. */
@@ -25,6 +26,7 @@ export class TimelineController {
   private readonly fps: HTMLInputElement;
   private readonly undo: HTMLButtonElement;
   private readonly redo: HTMLButtonElement;
+  private readonly tracks: TimelineTracksController;
   private pointer: number | undefined;
   private width = 0;
   private rulerKey = '';
@@ -49,6 +51,10 @@ export class TimelineController {
     this.fps = this.element<HTMLInputElement>('#animation-fps');
     this.undo = this.element<HTMLButtonElement>('#animation-undo');
     this.redo = this.element<HTMLButtonElement>('#animation-redo');
+    this.tracks = new TimelineTracksController(
+      this.element('#timeline-track-labels'),
+      this.element('#timeline-tracks'),
+    );
     const options = { signal: this.abort.signal };
     this.selection.addEventListener(
       'change',
@@ -116,7 +122,7 @@ export class TimelineController {
       (event) => {
         if (event.button !== 0 || this.pointer !== undefined || !this.state.workingAnimation) return;
         event.preventDefault();
-        this.timeline.focus();
+        this.timeline.focus({ preventScroll: true });
         this.pointer = event.pointerId;
         this.timeline.setPointerCapture(event.pointerId);
         this.state.beginScrub();
@@ -239,6 +245,7 @@ export class TimelineController {
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
+    this.tracks.render(state);
     const width = this.width;
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
@@ -321,5 +328,6 @@ export class TimelineController {
     this.abort.abort();
     this.resize.disconnect();
     this.unsubscribe?.();
+    this.tracks.dispose();
   }
 }

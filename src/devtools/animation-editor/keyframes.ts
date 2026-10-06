@@ -21,6 +21,12 @@ import {
 
 type AnimationData = DeepReadonly<AnimationClip>;
 
+/** Authored presence anywhere in a track, independent of the playhead and evaluated pose. */
+export function getAuthoredBoneProperties(animation: AnimationData, boneId: string): TransformProperty[] {
+  const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+  return transformProperties.filter((property) => keys.some((key) => key[property] !== undefined));
+}
+
 /** One nanosecond expressed in the external format's milliseconds; never an FPS snap. */
 export const KEYFRAME_TIME_TOLERANCE_MS = 1e-6;
 

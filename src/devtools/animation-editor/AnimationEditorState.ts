@@ -21,6 +21,7 @@ import {
   setBonePropertyKeyframe,
 } from './keyframes.js';
 import { animationDurationSeconds } from './timeline.js';
+import { buildTimelineTracks, type TimelineTrack } from './timelineTracks.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export const AUTHORED_FPS_MIN = 1;
@@ -52,6 +53,10 @@ export class AnimationEditorState {
   private issues: readonly ValidationIssue[] = [];
   private history = this.createHistory();
   private selectedBone: string | null = null;
+  private selectedProperty: TransformProperty | null = null;
+  private readonly expandedTimelineBones = new Set<string>();
+  private trackRows: readonly TimelineTrack[] | undefined;
+  private trackAnimation: ReadonlyAnimation | null | undefined;
   private temporaryTransform: Readonly<Partial<JointTransform>> = Object.freeze({});
 
   constructor(
@@ -71,6 +76,41 @@ export class AnimationEditorState {
   get selectedBoneId(): string | null {
     return this.selectedBone;
   }
+  get selectedTimelineProperty(): TransformProperty | null {
+    return this.selectedProperty;
+  }
+  /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
+  get timelineTracks(): readonly TimelineTrack[] {
+    if (!this.trackRows || this.trackAnimation !== this.working) {
+      this.trackRows = buildTimelineTracks(this.rig, this.working, this.expandedTimelineBones);
+      this.trackAnimation = this.working;
+    }
+    return this.trackRows;
+  }
+  isTimelineBoneExpanded(boneId: string): boolean {
+    return this.expandedTimelineBones.has(boneId);
+  }
+  setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
+    if (!this.rig?.hasBone(boneId)) return false;
+    if (this.expandedTimelineBones.has(boneId) !== expanded) {
+      if (expanded) this.expandedTimelineBones.add(boneId);
+      else this.expandedTimelineBones.delete(boneId);
+      this.trackRows = undefined;
+      this.notify();
+    }
+    return true;
+  }
+  /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
+  selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
+    if (!this.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
+    if (this.selectedBone !== boneId || this.selectedProperty !== property) {
+      this.selectedBone = boneId;
+      this.selectedProperty = property;
+      this.clearTransformDraft();
+      this.notify();
+    }
+    return true;
+  }
   /** Editor-only prospective local values, never serialized or recorded in history. */
   get boneTransformDraft(): Readonly<Partial<JointTransform>> {
     return this.temporaryTransform;
@@ -84,8 +124,9 @@ export class AnimationEditorState {
   }
   selectBone(id: string | null): boolean {
     if (id !== null && !this.rig?.hasBone(id)) return false;
-    if (id !== this.selectedBone) {
+    if (id !== this.selectedBone || this.selectedProperty !== null) {
       this.selectedBone = id;
+      this.selectedProperty = null;
       this.clearTransformDraft();
       this.notify();
     }
@@ -209,6 +250,7 @@ export class AnimationEditorState {
     this.source = entry?.source ?? null;
     this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
     this.selectedId = id;
+    this.selectedProperty = null;
     this.clearTransformDraft();
     this.playback.reset();
     this.issues = [];
