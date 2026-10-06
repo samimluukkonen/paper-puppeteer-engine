@@ -18,21 +18,22 @@ export const CharacterLoader = {
     signal?.addEventListener('abort', onAbort, { once: true });
     try {
       signal?.throwIfAborted();
-      const manifestUrl = new URL(url, globalThis.location?.href).href;
-      const read = async (path: string): Promise<unknown> => {
+      const requestedUrl = new URL(url, globalThis.location?.href).href;
+      const read = async (resourceUrl: string): Promise<{ data: unknown; url: string }> => {
         controller.signal.throwIfAborted();
-        const resourceUrl = new URL(path, manifestUrl).href;
         const response = await fetcher(resourceUrl, { signal: controller.signal });
         controller.signal.throwIfAborted();
         if (!response.ok) throw new Error(`Could not load character JSON "${resourceUrl}" (${response.status}).`);
         const data: unknown = await response.json();
         controller.signal.throwIfAborted();
-        return data;
+        return { data, url: response.url || resourceUrl };
       };
-      const manifestData = await read(manifestUrl);
+      const { data: manifestData, url: manifestUrl } = await read(requestedUrl);
       const manifest = characterManifestSchema.parse(manifestData);
       const paths = [manifest.rig, ...Object.values(manifest.skins), ...manifest.animations, ...(manifest.poses ?? [])];
-      const entries = await Promise.all([...new Set(paths)].map(async (path) => [path, await read(path)] as const));
+      const entries = await Promise.all(
+        [...new Set(paths)].map(async (path) => [path, (await read(new URL(path, manifestUrl).href)).data] as const),
+      );
       const files = Object.fromEntries(entries);
       const data: CharacterData = {
         manifest: manifestData,

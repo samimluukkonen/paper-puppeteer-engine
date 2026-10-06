@@ -26,6 +26,47 @@ function waitForAbort(signal: AbortSignal): Promise<Response> {
   });
 }
 
+test.each(['https://cdn.example.test/versions/hero/character.json', ''])(
+  'metadata and artwork resolve against the manifest response URL %s, with a custom-I/O fallback',
+  async (responseUrl) => {
+    const baseUrl = responseUrl || url;
+    const redirectedManifest = {
+      ...manifest,
+      animations: ['../shared/idle.json'],
+      poses: ['pose.json'],
+      textures: { body: '../art/body.png' },
+    };
+    const metadata = new Map([
+      [new URL('rig.json', baseUrl).href, files['rig.json']],
+      [new URL('skin.json', baseUrl).href, files['skin.json']],
+      [new URL('../shared/idle.json', baseUrl).href, files['idle.json']],
+      [new URL('pose.json', baseUrl).href, { version: 1, name: 'rest', bones: {} }],
+    ]);
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const resourceUrl = requestUrl(input);
+      if (resourceUrl === url) {
+        const response = Response.json(redirectedManifest);
+        Object.defineProperty(response, 'url', { value: responseUrl });
+        return response;
+      }
+      if (!metadata.has(resourceUrl)) return new Response(null, { status: 404 });
+      const response = Response.json(metadata.get(resourceUrl));
+      // Redirects of related files must not change the manifest's base URL.
+      Object.defineProperty(response, 'url', { value: 'https://storage.example.test/file.json' });
+      return response;
+    });
+    const character = await CharacterLoader.load(url, fetcher);
+    assert.deepEqual(
+      fetcher.mock.calls.map(([input]) => requestUrl(input)),
+      [url, ...metadata.keys()],
+    );
+    assert.equal(character.baseUrl, baseUrl);
+    assert.equal(character.textureUrl('body'), new URL('../art/body.png', baseUrl).href);
+    assert.equal(character.animations[0]?.name, 'idle');
+    assert.equal(character.poses[0]?.name, 'rest');
+  },
+);
+
 test('an already aborted load rejects with its reason without fetching', async () => {
   const controller = new AbortController();
   const reason = new Error('canceled');
