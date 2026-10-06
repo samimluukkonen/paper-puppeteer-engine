@@ -168,6 +168,8 @@ export class CharacterDefinition {
     readonly textures: Readonly<Record<string, string>>,
     /** Manifest-owned skins, retained separately from the authored rig for editor previews. */
     readonly standaloneSkins: DeepReadonly<readonly SkinDefinition[]>,
+    /** Clip name -> original manifest path, retained for authoring exports. */
+    readonly animationPaths: Readonly<Record<string, string>>,
     readonly baseUrl?: string,
     readonly rigFile?: DeepReadonly<RigJsonDefinition>,
     readonly rigPath?: string,
@@ -195,6 +197,7 @@ export class CharacterDefinition {
         manifest.defaultSkin,
         freezeData({ ...manifest.textures }),
         freezeData(skins),
+        freezeData(Object.fromEntries(animations.map((clip, index) => [clip.name, manifest.animations[index]!]))),
         baseUrl,
         freezeData(structuredClone(data.rig) as RigJsonDefinition),
         manifest.rig,

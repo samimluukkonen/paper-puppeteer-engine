@@ -53,6 +53,16 @@ const bundle = () => ({
   poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, read(path)])),
 });
 
+test('character definitions retain immutable source paths by animation name', () => {
+  const data = bundle();
+  const definition = CharacterDefinition.fromData(data);
+  assert.equal(definition.animationPaths.sword, 'animations/combat-idle.json');
+  assert.equal(definition.animationPaths.guardUpperBody, 'animations/guard-upper-body.json');
+  data.manifest.animations[2] = 'changed.json';
+  assert.equal(definition.animationPaths.sword, 'animations/combat-idle.json');
+  assert.isTrue(Object.isFrozen(definition.animationPaths));
+});
+
 test('character JSON data is deeply readonly, frozen, and independently owned', () => {
   const data = bundle();
   const definition = CharacterDefinition.fromData(data);

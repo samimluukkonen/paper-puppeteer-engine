@@ -10,6 +10,26 @@ async function editRoot(page: Page, value: string): Promise<void> {
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
 }
 
+for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
+  test(`${character} downloads use manifest filenames rather than clip names`, async ({ page }) => {
+    await page.goto(`animation-editor/?character=${character}`);
+    await expect(page.locator('#animation-selection')).toHaveValue('idle');
+    for (const [name, filename] of [
+      ['sword', 'combat-idle.json'],
+      ['guardUpperBody', 'guard-upper-body.json'],
+    ]) {
+      await page.locator('#animation-selection').selectOption(name!);
+      const waiting = page.waitForEvent('download');
+      await page.locator('#animation-download').click();
+      const download = await waiting;
+      expect(download.suggestedFilename()).toBe(filename);
+      const path = await download.path();
+      if (!path) throw new Error('Animation download has no local file.');
+      expect(animationFileSchema.parse(JSON.parse(await readFile(path, 'utf8'))).name).toBe(name);
+    }
+  });
+}
+
 test('download saves authored JSON and allows switching; discard restores the downloaded baseline', async ({
   page,
 }) => {

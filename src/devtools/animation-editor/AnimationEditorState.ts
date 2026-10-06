@@ -39,7 +39,13 @@ type AnimationEntry = {
   source: ReadonlyAnimation | null;
   saved: ReadonlyAnimation | null;
   issues: readonly ValidationIssue[];
+  path?: string;
 };
+
+export interface AnimationEditorStateOptions {
+  /** Original manifest paths by clip name; omitted entries export using the clip name. */
+  animationPaths?: Readonly<Record<string, string>>;
+}
 
 export interface KeyframeDrag {
   readonly key: KeyframeSelection;
@@ -67,11 +73,21 @@ export class AnimationEditorState {
   constructor(
     readonly rig?: Rig,
     animations: readonly AnimationClip[] = [],
+    options: AnimationEditorStateOptions = {},
   ) {
     this.selection = new AnimationEditorSelection(rig);
     for (const animation of animations) {
       const file = this.inspect({ ...animation, version: ANIMATION_FORMAT_VERSION });
-      this.animations.set(animation.name, { source: file, saved: file, issues: this.issues });
+      const path =
+        options.animationPaths && Object.hasOwn(options.animationPaths, animation.name)
+          ? options.animationPaths[animation.name]
+          : undefined;
+      this.animations.set(animation.name, {
+        source: file,
+        saved: file,
+        issues: this.issues,
+        ...(path === undefined ? {} : { path }),
+      });
     }
     this.issues = [];
   }
@@ -281,6 +297,20 @@ export class AnimationEditorState {
   }
   get selectedAnimationId(): string | null {
     return this.selectedId;
+  }
+  get selectedAnimationFilename(): string | undefined {
+    if (this.selectedId === null) return undefined;
+    const fallback = `${this.selectedId.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`;
+    const path = this.animations.get(this.selectedId)?.path;
+    if (!path) return fallback;
+    const basename = new URL(path, 'https://character.invalid/').pathname.split('/').at(-1);
+    if (!basename) return fallback;
+    // Preserve literal percent signs as well as paths with URL-encoded filenames.
+    try {
+      return decodeURIComponent(basename);
+    } catch {
+      return basename;
+    }
   }
   get sourceAnimation(): ReadonlyAnimation | null {
     return this.source;

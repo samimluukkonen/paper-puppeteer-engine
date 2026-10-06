@@ -22,6 +22,21 @@ const clip = (patch: Partial<AnimationClip> = {}): AnimationClip => ({
 });
 const file = (animation: AnimationClip) => ({ ...animation, version: 1 });
 
+test('export filenames preserve owned manifest paths and fall back to sanitized clip names', () => {
+  const paths = { move: 'animations/combat%20idle.json?revision=2#clip' };
+  const state = new AnimationEditorState(rig, [clip()], { animationPaths: paths });
+  assert.isUndefined(state.selectedAnimationFilename);
+  paths.move = 'replacement.json';
+  state.selectAnimation('move');
+  assert.equal(state.selectedAnimationFilename, 'combat idle.json');
+  state.setBonePropertyKeyframe('root', 'x', 9);
+  state.undo();
+  assert.equal(state.selectedAnimationFilename, 'combat idle.json');
+  const fallback = new AnimationEditorState(rig, [clip({ name: 'custom/move' })]);
+  fallback.selectAnimation('custom/move');
+  assert.equal(fallback.selectedAnimationFilename, 'custom_move.json');
+});
+
 test('animation export round-trips authored data without saving drafts or changing history and navigation', () => {
   const input = clip();
   const state = new AnimationEditorState(rig, [input]);

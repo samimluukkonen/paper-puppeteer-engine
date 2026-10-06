@@ -114,7 +114,9 @@ export class AnimationEditorScene extends Phaser.Scene {
       );
       const definition = await loadSceneCharacter(this, url.href);
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
-      const state = new AnimationEditorState(definition.rig, definition.animations);
+      const state = new AnimationEditorState(definition.rig, definition.animations, {
+        animationPaths: definition.animationPaths,
+      });
       state.selectAnimation(state.animationIds[0] ?? null);
       puppet = new Puppet(this, {
         rig: definition.rig,

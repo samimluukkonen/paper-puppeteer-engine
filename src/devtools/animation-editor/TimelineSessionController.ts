@@ -99,7 +99,7 @@ export class TimelineSessionController {
       () => {
         try {
           const json = this.state.exportJson();
-          const filename = `${this.state.selectedAnimationId!.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`;
+          const filename = this.state.selectedAnimationFilename!;
           downloadJson(json, filename);
           this.state.markSaved();
           setText(this.exportFeedback, `Animation JSON download started: ${filename}`);
