@@ -6,7 +6,6 @@ import {
 } from '../../engine/AnimationClip.js';
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { ClipPoseBuffer } from '../../engine/AnimationPose.js';
-import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/externalData.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { identifierSchema } from '../../engine/schemas.js';
@@ -19,6 +18,7 @@ import {
 } from '../../engine/types.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { getCompiledPreviewClip } from './previewClip.js';
+import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;
 
@@ -213,13 +213,8 @@ function assertTarget(
   return Math.max(0, Math.min(timeMs, animation.duration));
 }
 
-function validate(animation: AnimationData, rig: Rig): void {
-  // Use the file validator, including JSON event data and any supplied version.
-  parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...animation }, rig);
-}
-
 /** Persistent authored edit in milliseconds: update a property row or merge into/create a sparse row.
- * Inputs are never mutated or frozen. Unchanged branches are shared; state owns/freeze-copies the result.
+ * Inputs are never mutated or frozen. New branches inherit immutable source ownership; unchanged branches are shared.
  */
 export function setBonePropertyKeyframe<Animation extends AnimationData>(
   animation: Animation,
@@ -231,7 +226,7 @@ export function setBonePropertyKeyframe<Animation extends AnimationData>(
 ): Animation {
   timeMs = assertTarget(animation, rig, boneId, property, timeMs);
   assertFinite(value, `Keyframe ${boneId}.${property}`);
-  validate(animation, rig);
+  getValidatedEditorAnimation(animation, rig);
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const propertyIndex = matchingRow(keys, timeMs, property);
   const index = propertyIndex >= 0 ? propertyIndex : matchingRow(keys, timeMs);
@@ -241,8 +236,7 @@ export function setBonePropertyKeyframe<Animation extends AnimationData>(
   else nextKeys.push({ time: timeMs, [property]: value });
   nextKeys.sort((a, b) => a.time - b.time);
   const next = { ...animation, tracks: { ...animation.tracks, [boneId]: nextKeys } };
-  validate(next, rig);
-  return next;
+  return validateEditedAnimation(next, animation, rig);
 }
 
 /** Remove only this property; drop the row/track only when no authored transform values remain. */
@@ -254,7 +248,7 @@ export function removeBonePropertyKeyframe<Animation extends AnimationData>(
   timeMs: number,
 ): Animation {
   timeMs = assertTarget(animation, rig, boneId, property, timeMs);
-  validate(animation, rig);
+  getValidatedEditorAnimation(animation, rig);
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const index = matchingRow(keys, timeMs, property);
   if (index < 0) return animation;
@@ -267,8 +261,7 @@ export function removeBonePropertyKeyframe<Animation extends AnimationData>(
   if (nextKeys.length) tracks[boneId] = nextKeys;
   else delete tracks[boneId];
   const next = { ...animation, tracks };
-  validate(next, rig);
-  return next;
+  return validateEditedAnimation(next, animation, rig);
 }
 
 /** Move time only (milliseconds), replacing all destination matches on this property.
@@ -285,7 +278,7 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   fromTime = assertTarget(animation, rig, boneId, property, fromTime);
   assertFinite(toTime, 'Keyframe destination');
   toTime = Math.max(0, Math.min(toTime, animation.duration));
-  validate(animation, rig);
+  getValidatedEditorAnimation(animation, rig);
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const source = matchingRow(keys, fromTime, property);
   const destination = matchingRow(keys, toTime, property);
@@ -309,8 +302,7 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   else nextKeys.push({ time: destinationTime, [property]: value });
   nextKeys.sort((a, b) => a.time - b.time);
   const next = { ...animation, tracks: { ...animation.tracks, [boneId]: nextKeys } };
-  validate(next, rig);
-  return next;
+  return validateEditedAnimation(next, animation, rig);
 }
 
 /** Reuses the runtime pose buffer and playback quantization without clocks, events, or IK. */

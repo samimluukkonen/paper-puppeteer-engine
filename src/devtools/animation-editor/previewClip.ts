@@ -1,8 +1,7 @@
-import { type AnimationClip, type CompiledClip, compileClip } from '../../engine/AnimationClip.js';
-import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/externalData.js';
+import { type AnimationClip, type CompiledClip, compileValidatedClip } from '../../engine/AnimationClip.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
-import { isFullyFrozen } from '../shared/editorData.js';
+import { getValidatedEditorAnimation } from './validatedAnimation.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;
 const clips = new WeakMap<AnimationData, WeakMap<Rig, CompiledClip>>();
@@ -11,10 +10,10 @@ const clips = new WeakMap<AnimationData, WeakMap<Rig, CompiledClip>>();
 export function getCompiledPreviewClip(animation: AnimationData, rig: Rig): CompiledClip {
   const cached = clips.get(animation)?.get(rig);
   if (cached) return cached;
-  const parsed = parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...animation }, rig);
+  const parsed = getValidatedEditorAnimation(animation, rig);
   // The editor clock owns looping and endpoints; previews never dispatch gameplay events.
-  const clip = compileClip({ ...parsed, loop: false, events: [] }, rig);
-  if (isFullyFrozen(animation)) {
+  const clip = compileValidatedClip({ ...parsed, loop: false, events: [] });
+  if (parsed === animation) {
     let rigs = clips.get(animation);
     if (!rigs) {
       rigs = new WeakMap();

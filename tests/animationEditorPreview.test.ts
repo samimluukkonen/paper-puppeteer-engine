@@ -88,7 +88,7 @@ test('canvas and inspector share compilation while independently evaluating time
   ]);
   state.selectAnimation('move');
   state.selectBone('root');
-  const compile = vi.spyOn(animationClip, 'compileClip');
+  const compile = vi.spyOn(animationClip, 'compileValidatedClip');
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const preview = new AnimationEditorPreview(state, puppet);
   try {

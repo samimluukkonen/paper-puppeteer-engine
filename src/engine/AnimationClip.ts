@@ -127,6 +127,11 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
 export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
   clip = animationClipSchema.parse(clip);
   checkAnimationReferences(clip, rig, throwValidationIssue);
+  return compileValidatedClip(clip);
+}
+
+/** @internal Compile data that has already passed shape and rig-reference validation. */
+export function compileValidatedClip(clip: AnimationClip): CompiledClip {
   const events = [...(clip.events ?? [])].sort((a, b) => a.time - b.time);
   const tracks: CompiledTrack[] = [];
   for (const [bone, keys] of Object.entries(clip.tracks)) {

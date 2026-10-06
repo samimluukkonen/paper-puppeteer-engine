@@ -459,7 +459,7 @@ test('frozen value queries share compilation and stepped-frame evaluation withou
       },
     }),
   );
-  const compile = vi.spyOn(animationClip, 'compileClip');
+  const compile = vi.spyOn(animationClip, 'compileValidatedClip');
   const evaluate = vi.spyOn(ClipPoseBuffer.prototype, 'evaluate');
   try {
     const transform = getEvaluatedBoneTransform(animation, rig, 'root', 742);
@@ -501,7 +501,7 @@ test('cached queries remain independent across rigs, edits, selection, and undo/
   state.selectAnimation('move');
   const listener = vi.fn();
   state.subscribe(listener);
-  const compile = vi.spyOn(animationClip, 'compileClip');
+  const compile = vi.spyOn(animationClip, 'compileValidatedClip');
   try {
     assert.equal(state.getEvaluatedBoneTransform('root')!.x, 10);
     assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 10);
