@@ -17,7 +17,7 @@ function fixture(definition: RigDefinition) {
     getBone: (id: string) => joints.get(id)!,
     preparePose: vi.fn(),
     syncPose: vi.fn(),
-    setRenderOrder: vi.fn(),
+    setRenderOrder: vi.fn<Puppet['setRenderOrder']>(),
     setSlotTransform: vi.fn(),
     getSlotImage: vi.fn(),
     getAttachment: vi.fn(),

@@ -284,7 +284,7 @@ test.each(['reloadRig', 'reloadOriginal'] as const)('%s cleans up a replacement 
     replacementOverlay = this;
     throw failure;
   });
-  const off = vi.mocked(scene.input).off;
+  const input = vi.mocked(scene.input);
   assert.throws(() => {
     if (method === 'reloadRig') scene.reloadRig(file, 'replacement.json');
     else scene.reloadOriginal();
@@ -293,7 +293,7 @@ test.each(['reloadRig', 'reloadOriginal'] as const)('%s cleans up a replacement 
   assert.equal(vi.mocked(replacement).destroy.mock.calls.length, 1);
   assert.equal(vi.mocked(replacementOverlay!).destroy.mock.calls.length, 1);
   assert.deepEqual(
-    off.mock.calls.map(([event]) => event),
+    input.off.mock.calls.map(([event]) => event),
     ['pointerdown', 'pointermove', 'pointerup', 'pointerupoutside', 'wheel'],
   );
   assert.equal(vi.mocked(scene.events).off.mock.calls[0]?.[0], 'update');

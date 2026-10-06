@@ -10,6 +10,8 @@ import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { rigDefinitionSchema } from '../src/engine/schemas.js';
 
+type PointerListener = (this: unknown, pointer: unknown) => void;
+
 vi.mock('phaser', () => ({ default: { Scenes: { Events: { UPDATE: 'update' } } } }));
 vi.mock('../src/devtools/rig-editor/RigEditorOverlay.js', () => ({
   RigEditorOverlay: class {
@@ -32,7 +34,10 @@ test('blur stops panning without adding history or closing an unrelated inspecto
   state.selectBone('root');
   state.beginOperation();
   state.editBone('root', 'x', 2);
-  const input = { on: vi.fn(), off: vi.fn() };
+  const input = {
+    on: vi.fn<(event: string, listener: PointerListener, context: unknown) => void>(),
+    off: vi.fn(),
+  };
   const camera = { scrollX: 0, scrollY: 0, zoom: 1 };
   const redraw = vi.fn();
   const controller = new RigEditorInputController(
@@ -86,7 +91,10 @@ test.each([
   state.selectBone('root');
   state.editMode = mode;
   state.gridSnap = 10;
-  const input = { on: vi.fn(), off: vi.fn() };
+  const input = {
+    on: vi.fn<(event: string, listener: PointerListener, context: unknown) => void>(),
+    off: vi.fn(),
+  };
   const container = { x: 380, y: 435, parentContainer: null };
   const camera = {
     scrollX: 30,
@@ -186,7 +194,10 @@ test.each(dragCases)(
       clearSlotDepth: vi.fn(),
       renderer: { setSlotTransform: vi.fn() },
     };
-    const input = { on: vi.fn(), off: vi.fn() };
+    const input = {
+      on: vi.fn<(event: string, listener: PointerListener, context: unknown) => void>(),
+      off: vi.fn(),
+    };
     const scene = {
       input,
       events: { on: vi.fn(), off: vi.fn() },

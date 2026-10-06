@@ -93,7 +93,7 @@ test('preloaded character keys do not claim failures from new image requests', a
 
 test('shutdown aborts metadata and prevents a late result from affecting a restarted scene', async () => {
   const { load, events, metadata, start, assertClean } = fixture();
-  const fetcher = vi.fn().mockResolvedValue(new Response('{}'));
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'));
   vi.stubGlobal('fetch', fetcher);
   let release!: (value: CharacterDefinition) => void;
   metadata.mockImplementationOnce(async (url, fetch, options) => {
@@ -104,7 +104,7 @@ test('shutdown aborts metadata and prevents a late result from affecting a resta
   });
   const oldSession = start();
   await vi.waitFor(() => assert.isFunction(release));
-  const signal = fetcher.mock.lastCall![1].signal as AbortSignal;
+  const signal = fetcher.mock.lastCall![1]!.signal!;
   assert.isFalse(signal.aborted);
   events.emit('shutdown');
   assert.isUndefined(await oldSession);

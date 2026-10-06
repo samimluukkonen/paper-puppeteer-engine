@@ -16,7 +16,7 @@ function fixture() {
   state.editBone('root', 'x', 10);
   const editor = {
     state,
-    editBone: vi.fn((id, field, value) => state.editBone(id, field, value)),
+    editBone: vi.fn((...args: Parameters<RigEditorState['editBone']>) => state.editBone(...args)),
     undo: vi.fn(() => state.undo()),
     redo: vi.fn(() => state.redo()),
     refresh: vi.fn(),

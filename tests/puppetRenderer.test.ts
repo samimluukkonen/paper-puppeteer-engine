@@ -211,7 +211,7 @@ function fixture(depth?: number) {
         this.rotation = rotation;
         return this;
       }),
-      setScale: vi.fn(function (this: Phaser.GameObjects.Container, x: number, y = x) {
+      setScale: vi.fn(function (this: Phaser.GameObjects.Container, x: number, y: number = x) {
         this.scaleX = x;
         this.scaleY = y;
         return this;
@@ -349,12 +349,12 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     getAttachment: vi.fn(),
   } as unknown as Puppet;
   const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
-  const syncPose = vi.mocked(puppet).syncPose;
+  const mockedPuppet = vi.mocked(puppet);
   const defaults = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 };
   for (const field of ['x', 'y', 'rotation', 'scaleX', 'scaleY'] as const) {
-    syncPose.mockClear();
+    mockedPuppet.syncPose.mockClear();
     editor.editSlot('automatic', field, 8);
-    assert.equal(syncPose.mock.calls.length, 1, 'refresh synchronizes once for all three slots');
+    assert.equal(mockedPuppet.syncPose.mock.calls.length, 1, 'refresh synchronizes once for all three slots');
     assert.deepEqual(slotTransform(renderer, 'automatic'), { ...defaults, [field]: 8 });
     editor.undo();
     assert.deepEqual(slotTransform(renderer, 'automatic'), defaults);
@@ -399,8 +399,8 @@ test('render order batches explicit and restored slot depths with one sort', () 
   renderer.setSlotDepth('item', 50);
   renderer.setSlotDepth('fixed', -5);
   renderer.setSlotDepth('automatic', 25);
-  const sort = vi.mocked(containers.get('puppet-render')!).sort;
-  sort.mockClear();
+  const renderContainer = vi.mocked(containers.get('puppet-render')!);
+  renderContainer.sort.mockClear();
   const order = vi.spyOn(renderer, 'setOrder');
   assert.strictEqual(
     puppet.setRenderOrder(
@@ -413,14 +413,14 @@ test('render order batches explicit and restored slot depths with one sort', () 
     puppet,
   );
   assert.equal(order.mock.calls.length, 1);
-  assert.equal(sort.mock.calls.length, 1);
+  assert.equal(renderContainer.sort.mock.calls.length, 1);
   assert.equal(slotDepth('item'), 11);
   assert.equal(slotDepth('fixed'), 0);
   assert.equal(slotDepth('automatic'), 25, 'omitted overrides are preserved');
   assert.isUndefined(rig.slots[0]!.depth);
   assert.equal(rig.slots[1]!.depth, 40);
 
-  sort.mockClear();
+  renderContainer.sort.mockClear();
   assert.throws(() => puppet.setRenderOrder(rig.renderOrder, new Map([['fixed', Number.NaN]])), /finite/);
   assert.throws(
     () =>
@@ -434,7 +434,7 @@ test('render order batches explicit and restored slot depths with one sort', () 
     /Unknown slot/,
   );
   assert.throws(() => puppet.setRenderOrder(['root'], new Map([['fixed', 99]])), /every bone/);
-  assert.equal(sort.mock.calls.length, 0);
+  assert.equal(renderContainer.sort.mock.calls.length, 0);
   assert.deepEqual(renderer.getOrder(), ['hand', 'root']);
   assert.equal(slotDepth('fixed'), 0);
   renderer.setOrder(rig.renderOrder);
@@ -489,15 +489,15 @@ test.each([undefined, 0, -5, 40])(
       getAttachment: vi.fn(),
     } as unknown as Puppet;
     const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
-    const sort = vi.mocked(containers.get('puppet-render')!).sort;
-    sort.mockClear();
+    const renderContainer = vi.mocked(containers.get('puppet-render')!);
+    renderContainer.sort.mockClear();
     const order = vi.spyOn(renderer, 'setOrder');
     const assertDepth = (expected: number | undefined, automatic = 11) => {
       assert.equal(editor.exportRig(false).slots!.find((slot) => slot.id === 'automatic')!.depth, expected);
       assert.equal(slotDepth('automatic'), expected ?? automatic);
-      assert.equal(sort.mock.calls.length, 1, 'each editor refresh sorts once');
+      assert.equal(renderContainer.sort.mock.calls.length, 1, 'each editor refresh sorts once');
       assert.equal(order.mock.calls.length, 1, 'each editor refresh updates the render order once');
-      sort.mockClear();
+      renderContainer.sort.mockClear();
       order.mockClear();
     };
 
