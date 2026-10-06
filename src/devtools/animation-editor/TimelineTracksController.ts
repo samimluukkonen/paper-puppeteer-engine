@@ -1,4 +1,4 @@
-import { setAttribute } from '../shared/domUpdates.js';
+import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { timeToTimelineX } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';

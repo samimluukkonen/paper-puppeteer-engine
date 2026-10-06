@@ -1,4 +1,4 @@
-import { setAttribute } from '../shared/domUpdates.js';
+import { setAttribute } from '../../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { generateRulerTicks, timeToTimelineX } from './timeline.js';
 import { TimelineInputController } from './TimelineInputController.js';

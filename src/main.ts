@@ -3,6 +3,7 @@ import { createDemoCommands } from './demo/demoCommands.js';
 import { demoLimbColors } from './demo/demoLimbColors.js';
 import type { DemoState } from './demo/DemoScene.js';
 import { DemoScene } from './demo/DemoScene.js';
+import { setAttribute, setText } from './shared/domUpdates.js';
 import { bindCharacterSelection, selectedCharacterId } from './ui/characterSelection.js';
 import { viewHeader } from './ui/viewShell.js';
 import './style.css';
@@ -107,6 +108,11 @@ if (sketch) {
   app.querySelector<HTMLElement>('.limb-legend')!.hidden = true;
 }
 
+const controlButtons = [...app.querySelectorAll<HTMLButtonElement>('[data-action]')];
+const controls = new Map(controlButtons.map((button) => [button.dataset.action, button]));
+const status = app.querySelector<HTMLElement>('#status-text');
+const statusDot = app.querySelector<HTMLElement>('.status-dot');
+
 function updateControls(state: DemoState): void {
   const pressed: Record<string, boolean> = {
     idle: state.animationRole === 'idle',
@@ -130,12 +136,16 @@ function updateControls(state: DemoState): void {
     poseMode: state.poseMode,
   };
   for (const [action, value] of Object.entries(pressed)) {
-    document.querySelector(`[data-action="${action}"]`)?.setAttribute('aria-pressed', String(value));
+    const button = controls.get(action);
+    if (button) setAttribute(button, 'aria-pressed', String(value));
   }
-  const status = document.querySelector('#status-text');
   if (status)
-    status.textContent = `Current: ${state.animation}${state.playing ? '' : ' (stopped)'}\nPlayback: ${state.playback}${state.playback === 'stepped' ? ` ${state.fps} FPS` : ''} · ${state.speed.toFixed(2)}x\nPaused: ${state.paused} · Upper body: ${state.upperBody ? `on (${state.layerWeight.toFixed(1)})` : 'off'}\nTransition: ${state.transition}\nEvent: ${state.lastEvent}`;
-  document.querySelector('.status-dot')?.classList.toggle('stopped', !state.playing);
+    setText(
+      status,
+      `Current: ${state.animation}${state.playing ? '' : ' (stopped)'}\nPlayback: ${state.playback}${state.playback === 'stepped' ? ` ${state.fps} FPS` : ''} · ${state.speed.toFixed(2)}x\nPaused: ${state.paused} · Upper body: ${state.upperBody ? `on (${state.layerWeight.toFixed(1)})` : 'off'}\nTransition: ${state.transition}\nEvent: ${state.lastEvent}`,
+    );
+  const stopped = !state.playing;
+  if (statusDot && statusDot.classList.contains('stopped') !== stopped) statusDot.classList.toggle('stopped', stopped);
 }
 
 const demo = new DemoScene(updateControls, `characters/${selectedCharacterId()}/character.json`);
@@ -152,7 +162,7 @@ export const game = new Phaser.Game({
 });
 
 const actions = createDemoCommands(demo);
-for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
+for (const button of controlButtons) {
   button.addEventListener('click', () => {
     const action = button.dataset.action;
     if (action) actions[action]?.run();

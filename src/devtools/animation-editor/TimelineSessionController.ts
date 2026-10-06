@@ -1,5 +1,5 @@
+import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { downloadJson } from '../../shared/downloadJson.js';
-import { setAttribute, setText } from '../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { TimelineInputController } from './TimelineInputController.js';
 

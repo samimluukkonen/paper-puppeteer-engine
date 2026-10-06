@@ -154,6 +154,7 @@ src/devtools/shared/
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
   editorData.ts        Readonly data and editor number rounding
 src/shared/
+  domUpdates.ts        Conditional DOM writes for demo and editor playback notifications
   downloadJson.ts       Browser JSON download and temporary URL cleanup
   loadSceneCharacter.ts  Cancelable metadata and artwork loading for a scene session
 public/characters/demo-puppet/  Shipped rig, skins, animations, poses, and artwork

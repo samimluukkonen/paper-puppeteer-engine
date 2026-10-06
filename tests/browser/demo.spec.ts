@@ -1,6 +1,74 @@
 import { expect } from '@playwright/test';
 import { test } from './fixtures.js';
 
+test('crossfade updates reuse controls and leave unchanged DOM untouched', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('#status-text')).toContainText('Current: idle');
+  const work = await page.evaluate(async () => {
+    const app = document.querySelector<HTMLElement>('#app')!;
+    const status = app.querySelector<HTMLElement>('#status-text')!;
+    const statusDot = app.querySelector<HTMLElement>('.status-dot')!;
+    const fade = app.querySelector<HTMLButtonElement>('[data-action="fadeWalk"]')!;
+    const pause = app.querySelector<HTMLButtonElement>('[data-action="pause"]')!;
+    const slower = app.querySelector<HTMLButtonElement>('[data-action="slower"]')!;
+    // Leave enough transition time to observe several frames on slower renderers.
+    for (let count = 0; count < 3; count += 1) slower.click();
+    const buttons = app.querySelectorAll('[data-action]');
+    const queryDocument = document.querySelector.bind(document);
+    const queryApp = app.querySelector.bind(app);
+    let queries = 0;
+    let controlWrites = 0;
+    let statusWrites = 0;
+    document.querySelector = <E extends Element>(selector: string): E | null => {
+      queries += 1;
+      return queryDocument<E>(selector);
+    };
+    app.querySelector = <E extends Element>(selector: string): E | null => {
+      queries += 1;
+      return queryApp<E>(selector);
+    };
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.target === status) statusWrites += 1;
+        else controlWrites += 1;
+      }
+    });
+    observer.observe(status, { childList: true });
+    observer.observe(statusDot, { attributes: true, attributeFilter: ['class'] });
+    for (const button of buttons) observer.observe(button, { attributes: true, attributeFilter: ['aria-pressed'] });
+    const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    try {
+      fade.click();
+      // Freeze an active fade so every frame reports the same visible state.
+      pause.click();
+      await frame();
+      await frame();
+      const pausedStatus = status.textContent;
+      queries = controlWrites = statusWrites = 0;
+      for (let count = 0; count < 10; count += 1) await frame();
+      const paused = { queries, controlWrites, statusWrites };
+      pause.click();
+      await frame();
+      await frame();
+      queries = controlWrites = statusWrites = 0;
+      for (let count = 0; count < 5; count += 1) await frame();
+      return { paused, pausedStatus, active: { queries, controlWrites, statusWrites } };
+    } finally {
+      document.querySelector = queryDocument;
+      app.querySelector = queryApp;
+      observer.disconnect();
+    }
+  });
+  expect(work.pausedStatus).toContain('Paused: true');
+  expect(work.pausedStatus).toMatch(/Transition: idle → walk \d+%/);
+  expect(work.paused).toEqual({ queries: 0, controlWrites: 0, statusWrites: 0 });
+  expect(work.active.queries).toBe(0);
+  expect(work.active.controlWrites).toBe(0);
+  expect(work.active.statusWrites).toBeGreaterThan(0);
+  await expect(page.locator('#status-text')).toContainText('Transition: none');
+  await expect(page.locator('[data-action="walk"]')).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('demo loads artwork and responds to playback, facing, skin and IK controls', async ({ page }) => {
   await page.goto('./');
   const status = page.locator('#status-text');

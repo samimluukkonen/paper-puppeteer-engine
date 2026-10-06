@@ -1,4 +1,4 @@
-/** Keep stable editor controls untouched during playback notifications. */
+/** Keep stable controls untouched during playback notifications. */
 export function setText(element: HTMLElement, text: string): void {
   if (element.textContent !== text) element.textContent = text;
 }

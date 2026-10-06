@@ -1,6 +1,6 @@
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
+import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
-import { setAttribute, setText } from '../shared/domUpdates.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { toDisplayTransformValue, toLocalTransformValue } from './transformValues.js';
 
