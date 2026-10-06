@@ -1,15 +1,13 @@
 import type { AnimationClip, AnimationPlaybackMode, PropertyKeyframe } from '../../engine/AnimationClip.js';
-import {
-  ANIMATION_FORMAT_VERSION,
-  AnimationValidationError,
-  inspectAnimationDefinition,
-  parseAnimationClip,
-  type ValidationIssue,
-} from '../../engine/externalData.js';
+import type { ValidationIssue } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
-import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
-import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { freezeData } from '../shared/editorData.js';
+import {
+  AnimationEditorDocument,
+  type AnimationEditorStateOptions,
+  type ReadonlyAnimation,
+} from './AnimationEditorDocument.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import {
@@ -31,41 +29,18 @@ export const AUTHORED_FPS_MIN = 1;
 export const AUTHORED_FPS_MAX = 240;
 export const DEFAULT_AUTHORED_FPS = DEFAULT_KEYFRAME_FPS;
 
-/** Same external file fields; event data remains unknown to callers and is validated as JSON before ownership. */
-export type ReadonlyAnimation = ReadonlyEditorData<AnimationClip> & {
-  readonly version: typeof ANIMATION_FORMAT_VERSION;
-};
-type AnimationEntry = {
-  source: ReadonlyAnimation | null;
-  saved: ReadonlyAnimation | null;
-  issues: readonly ValidationIssue[];
-  path?: string;
-};
-
-export interface AnimationEditorStateOptions {
-  /** Original manifest paths by clip name; omitted entries export using the clip name. */
-  animationPaths?: Readonly<Record<string, string>>;
-}
+export type { AnimationEditorStateOptions, ReadonlyAnimation } from './AnimationEditorDocument.js';
 
 export interface KeyframeDrag {
   readonly key: KeyframeSelection;
   readonly previewTime: number;
 }
 
-/** Owns animation data and navigation independently of the DOM and Phaser.
- * Authored replacements use the rig editor's snapshot history. Navigation never enters history.
- */
+/** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
-  private readonly animations = new Map<string, AnimationEntry>();
+  private readonly document: AnimationEditorDocument;
   private readonly listeners = new Set<() => void>();
-  private source: ReadonlyAnimation | null = null;
-  private working: ReadonlyAnimation | null = null;
-  private selectedId: string | null = null;
   private readonly playback = new AnimationEditorPlayback(() => this.duration);
-  private saved: ReadonlyAnimation | null = null;
-  private cachedDirty: boolean | undefined;
-  private issues: readonly ValidationIssue[] = [];
-  private history = this.createHistory();
   private readonly selection: AnimationEditorSelection;
   private drag: KeyframeDrag | null = null;
   private snapMode: KeyframeSnapMode = 'none';
@@ -75,25 +50,16 @@ export class AnimationEditorState {
     animations: readonly AnimationClip[] = [],
     options: AnimationEditorStateOptions = {},
   ) {
+    this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
-    for (const animation of animations) {
-      const file = this.inspect({ ...animation, version: ANIMATION_FORMAT_VERSION });
-      const path =
-        options.animationPaths && Object.hasOwn(options.animationPaths, animation.name)
-          ? options.animationPaths[animation.name]
-          : undefined;
-      this.animations.set(animation.name, {
-        source: file,
-        saved: file,
-        issues: this.issues,
-        ...(path === undefined ? {} : { path }),
-      });
-    }
-    this.issues = [];
+  }
+
+  private get working(): ReadonlyAnimation | null {
+    return this.document.workingAnimation;
   }
 
   get animationIds(): readonly string[] {
-    return [...this.animations.keys()];
+    return this.document.animationIds;
   }
   get selectedBoneId(): string | null {
     return this.selection.boneId;
@@ -296,24 +262,13 @@ export class AnimationEditorState {
     return this.selection.clearDraft();
   }
   get selectedAnimationId(): string | null {
-    return this.selectedId;
+    return this.document.selectedAnimationId;
   }
   get selectedAnimationFilename(): string | undefined {
-    if (this.selectedId === null) return undefined;
-    const fallback = `${this.selectedId.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`;
-    const path = this.animations.get(this.selectedId)?.path;
-    if (!path) return fallback;
-    const basename = new URL(path, 'https://character.invalid/').pathname.split('/').at(-1);
-    if (!basename) return fallback;
-    // Preserve literal percent signs as well as paths with URL-encoded filenames.
-    try {
-      return decodeURIComponent(basename);
-    } catch {
-      return basename;
-    }
+    return this.document.selectedAnimationFilename;
   }
   get sourceAnimation(): ReadonlyAnimation | null {
-    return this.source;
+    return this.document.sourceAnimation;
   }
   get workingAnimation(): ReadonlyAnimation | null {
     return this.working;
@@ -340,20 +295,19 @@ export class AnimationEditorState {
     return this.working?.loop ?? false;
   }
   get dirty(): boolean {
-    this.cachedDirty ??= !equalEditorData(this.working, this.saved);
-    return this.cachedDirty;
+    return this.document.dirty;
   }
   get validationIssues(): readonly ValidationIssue[] {
-    return this.issues;
+    return this.document.validationIssues;
   }
   get canUndo(): boolean {
-    return this.history.canUndo;
+    return this.document.canUndo;
   }
   get canRedo(): boolean {
-    return this.history.canRedo;
+    return this.document.canRedo;
   }
   get historyLength(): number {
-    return this.history.length;
+    return this.document.historyLength;
   }
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -364,45 +318,16 @@ export class AnimationEditorState {
     for (const listener of this.listeners) listener();
   }
 
-  private inspect(input: unknown): ReadonlyAnimation | null {
-    if (!this.rig) {
-      this.issues = [{ severity: 'error', message: 'Load a character before selecting an animation.' }];
-      return null;
-    }
-    const result = inspectAnimationDefinition(input, this.rig);
-    this.issues = freezeData(result.issues);
-    if (!result.data) return null;
-    // The shared validator checks JSON compatibility and rig references before any clone is installed.
-    return freezeData({ ...result.data, version: ANIMATION_FORMAT_VERSION });
-  }
-
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
     this.cancelKeyframeDrag();
-    if (this.dirty && !options.discardChanges) {
-      this.issues = [
-        { severity: 'error', message: 'Unsaved animation changes; download, discard, or undo edits before selecting.' },
-      ];
-      this.notify();
-      return false;
+    const selected = this.document.selectAnimation(id, options);
+    if (selected) {
+      this.selection.resetAnimation();
+      this.playback.reset();
     }
-    const entry = id === null ? undefined : this.animations.get(id);
-    if (id !== null && !entry?.source) {
-      this.issues = entry?.issues ?? [{ severity: 'error', message: `Animation "${id}" is missing.` }];
-      this.notify();
-      return false;
-    }
-    this.source = entry?.source ?? null;
-    this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
-    this.selectedId = id;
-    this.selection.resetAnimation();
-    this.playback.reset();
-    this.issues = [];
-    this.saved = this.working;
-    this.cachedDirty = false;
-    this.history = this.createHistory();
     this.notify();
-    return true;
+    return selected;
   }
 
   setCurrentTime(time: number): void {
@@ -442,13 +367,13 @@ export class AnimationEditorState {
   setAuthoredFPS(fps: number): boolean {
     if (this.working?.playback?.mode !== 'stepped') return false;
     if (!Number.isFinite(fps) || fps < AUTHORED_FPS_MIN || fps > AUTHORED_FPS_MAX) {
-      this.issues = [
+      this.document.reportIssues([
         {
           severity: 'error',
           path: 'playback.fps',
           message: `Animation FPS must be a finite number from ${AUTHORED_FPS_MIN} to ${AUTHORED_FPS_MAX}.`,
         },
-      ];
+      ]);
       this.notify();
       return false;
     }
@@ -514,11 +439,7 @@ export class AnimationEditorState {
     try {
       next = edit(this.working, this.rig);
     } catch (error) {
-      this.issues = freezeData(
-        error instanceof AnimationValidationError
-          ? error.issues
-          : [{ severity: 'error' as const, message: error instanceof Error ? error.message : String(error) }],
-      );
+      this.document.reportError(error);
       this.notify();
       return false;
     }
@@ -610,7 +531,7 @@ export class AnimationEditorState {
   /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */
   replaceWorkingAnimation(input: unknown): boolean {
     if (!this.working) return false;
-    const next = this.inspect(input);
+    const next = this.document.inspect(input);
     if (!next) {
       this.notify();
       return false;
@@ -621,25 +542,11 @@ export class AnimationEditorState {
   /** Internal edits have already validated their changes and retain immutable unchanged branches. */
   private installWorkingAnimation(next: ReadonlyAnimation, retainDraft = false): boolean {
     this.cancelKeyframeDrag();
-    this.issues = [];
-    if (next.name !== this.selectedId) {
-      this.issues = [
-        {
-          severity: 'error',
-          path: 'name',
-          message: `Animation name must remain "${this.selectedId}"; renaming is not supported.`,
-        },
-      ];
+    if (!this.document.install(next)) {
       this.notify();
       return false;
     }
     if (!retainDraft) this.clearTransformDraft();
-    if (!equalEditorData(this.working, next)) {
-      this.history.change(() => {
-        this.working = next;
-        this.cachedDirty = undefined;
-      });
-    }
     this.updateTime(this.currentTime);
     this.validateKeyframeSelection();
     this.notify();
@@ -648,46 +555,29 @@ export class AnimationEditorState {
 
   /** Export committed authored data only; drafts, selection, history and preview preferences stay local. */
   exportJson(): string {
-    if (!this.working || !this.rig) throw new Error('No animation is selected.');
-    const animation = parseAnimationClip(this.working, this.rig);
-    return `${JSON.stringify({ version: ANIMATION_FORMAT_VERSION, ...animation }, null, 2)}\n`;
+    return this.document.exportJson();
   }
 
   markSaved(): void {
-    const entry = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
-    if (entry) entry.saved = this.working;
-    this.saved = this.working;
-    this.cachedDirty = false;
-    this.issues = [];
+    this.document.markSaved();
     this.notify();
   }
 
-  private createHistory(): SnapshotHistory<ReadonlyAnimation | null> {
-    return new SnapshotHistory(
-      () => this.working,
-      (entry) => {
-        this.clearTransformDraft();
-        this.working = entry;
-        this.cachedDirty = undefined;
-        this.updateTime(this.currentTime);
-        this.validateKeyframeSelection();
-      },
-      equalEditorData,
-    );
-  }
-
   undo(): boolean {
-    return this.restoreHistory(() => this.history.undo());
+    return this.restoreHistory(() => this.document.undo());
   }
   redo(): boolean {
-    return this.restoreHistory(() => this.history.redo());
+    return this.restoreHistory(() => this.document.redo());
   }
   private restoreHistory(restore: () => boolean): boolean {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.
     const cancelledDrag = this.cancelKeyframeDrag();
     const cancelled = this.clearTransformDraft() || cancelledDrag;
     const changed = restore();
-    if (changed) this.issues = [];
+    if (changed) {
+      this.updateTime(this.currentTime);
+      this.validateKeyframeSelection();
+    }
     if (changed || cancelled) this.notify();
     return changed;
   }
