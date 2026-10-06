@@ -67,12 +67,7 @@ function lowerBound(keys: readonly IndexedKeyframe[], time: number): number {
 }
 
 /** Immutable editor snapshots share sorted property indexes; caller-owned mutable data stays uncached. */
-function indexedKeyframe(
-  animation: AnimationData,
-  boneId: string,
-  property: TransformProperty,
-  time: number,
-): IndexedKeyframe | undefined | false {
+function propertyIndexes(animation: AnimationData, boneId: string): Map<TransformProperty, IndexedKeyframe[]> | false {
   let tracks = keyframeIndexes.get(animation);
   if (!tracks) {
     if (!isFullyFrozen(animation)) return false;
@@ -98,6 +93,17 @@ function indexedKeyframe(
     for (const keys of properties.values()) keys.sort((a, b) => a.time - b.time || a.order - b.order);
     tracks.set(boneId, properties);
   }
+  return properties;
+}
+
+function indexedKeyframe(
+  animation: AnimationData,
+  boneId: string,
+  property: TransformProperty,
+  time: number,
+): IndexedKeyframe | undefined | false {
+  const properties = propertyIndexes(animation, boneId);
+  if (properties === false) return false;
   const keys = properties.get(property) ?? [];
   const index = lowerBound(keys, time);
   // A predecessor may be the last of several duplicate times. Preserve the original first-row tie rule.
@@ -138,6 +144,44 @@ export function hasKeyframeAtTime(
   timeMs: number,
 ): boolean {
   return findBonePropertyKeyframe(animation, boneId, property, timeMs) !== undefined;
+}
+
+/** Find a strictly previous/next property key, skipping every time within the shared tolerance. */
+export function findAdjacentBonePropertyKeyframe(
+  animation: AnimationData,
+  boneId: string,
+  property: TransformProperty,
+  timeMs: number,
+  direction: -1 | 1,
+): PropertyKeyframe | undefined {
+  if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
+  const properties = propertyIndexes(animation, boneId);
+  if (properties !== false) {
+    const keys = properties.get(property) ?? [];
+    let low = 0;
+    let high = keys.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      const time = keys[middle]!.time;
+      const before =
+        direction === 1
+          ? time <= timeMs || keyframeTimesMatch(time, timeMs)
+          : time < timeMs && !keyframeTimesMatch(time, timeMs);
+      if (before) low = middle + 1;
+      else high = middle;
+    }
+    const key = keys[direction === 1 ? low : low - 1];
+    return key ? { time: key.time, value: key.value } : undefined;
+  }
+  // Mutable authored tracks stay fresh and retain their stored order without copying arrays.
+  const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+  for (let index = direction === 1 ? 0 : rows.length - 1; index >= 0 && index < rows.length; index += direction) {
+    const row = rows[index]!;
+    const value = row[property];
+    if (value !== undefined && direction * (row.time - timeMs) > 0 && !keyframeTimesMatch(row.time, timeMs))
+      return { time: row.time, value };
+  }
+  return undefined;
 }
 
 export function getKeyedPropertiesAtTime(

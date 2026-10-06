@@ -11,6 +11,7 @@ import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import {
+  findAdjacentBonePropertyKeyframe,
   findBonePropertyKeyframe,
   getEvaluatedBonePropertyValue,
   getEvaluatedBoneTransform,
@@ -120,14 +121,8 @@ export class AnimationEditorState {
   getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
     const boneId = this.selectedBone;
     const property = this.selectedProperty;
-    if (!this.working || !boneId || !property || !Object.hasOwn(this.working.tracks, boneId)) return undefined;
-    const keys = this.working.tracks[boneId]!;
-    const ordered = direction === 1 ? keys : [...keys].reverse();
-    const timeMs = this.currentTime * 1000;
-    const key = ordered.find(
-      (row) =>
-        row[property] !== undefined && !keyframeTimesMatch(row.time, timeMs) && direction * (row.time - timeMs) > 0,
-    );
+    if (!this.working || !boneId || !property) return undefined;
+    const key = findAdjacentBonePropertyKeyframe(this.working, boneId, property, this.currentTime * 1000, direction);
     return key ? Object.freeze({ boneId, property, time: key.time / 1000 }) : undefined;
   }
   selectAdjacentKeyframe(direction: -1 | 1): boolean {

@@ -1,6 +1,7 @@
 import { assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import {
+  findAdjacentBonePropertyKeyframe,
   findBonePropertyKeyframe,
   getEvaluatedBonePropertyValue,
   getEvaluatedBoneTransform,
@@ -62,6 +63,14 @@ test('frozen property indexes avoid rescanning dense tracks and preserve sparse,
     assert.isUndefined(findBonePropertyKeyframe(animation, 'root', 'rotation', time));
   }
   assert.equal(reads, 0);
+  for (const time of [1, 1000, 2500, 3999]) {
+    assert.equal(
+      findAdjacentBonePropertyKeyframe(animation, 'root', 'x', time, -1)?.time,
+      time > 1 ? time - 1 : undefined,
+    );
+    assert.equal(findAdjacentBonePropertyKeyframe(animation, 'root', 'x', time, 1)?.time, time + 1);
+  }
+  assert.equal(reads, 0, 'adjacent queries share the property index instead of visiting authored rows');
   const close = freezeData(
     clip({
       tracks: {
@@ -77,6 +86,33 @@ test('frozen property indexes avoid rescanning dense tracks and preserve sparse,
   assert.deepEqual(findBonePropertyKeyframe(close, 'root', 'x', 0.0000001), { time: 0, value: 1 });
   assert.deepEqual(findBonePropertyKeyframe(close, 'root', 'x', -KEYFRAME_TIME_TOLERANCE_MS), { time: 0, value: 1 });
 });
+
+test.each([false, true])(
+  'adjacent property navigation skips close times and keeps mutable inputs fresh, frozen=%s',
+  (frozen) => {
+    const source = clip({
+      tracks: {
+        root: [
+          { time: 0, x: 1 },
+          { time: 1, x: 2 },
+          { time: 1 + KEYFRAME_TIME_TOLERANCE_MS / 2, x: 3 },
+          { time: 2, y: 4 },
+          { time: 3, x: 5 },
+        ],
+      },
+    });
+    const animation = frozen ? freezeData(source) : source;
+    assert.deepEqual(findAdjacentBonePropertyKeyframe(animation, 'root', 'x', 1, -1), { time: 0, value: 1 });
+    assert.deepEqual(findAdjacentBonePropertyKeyframe(animation, 'root', 'x', 1, 1), { time: 3, value: 5 });
+    assert.isUndefined(findAdjacentBonePropertyKeyframe(animation, 'root', 'x', 0, -1));
+    assert.isUndefined(findAdjacentBonePropertyKeyframe(animation, 'root', 'x', 3, 1));
+    assert.isUndefined(findAdjacentBonePropertyKeyframe(animation, 'root', 'rotation', 1, 1));
+    if (!frozen) {
+      source.tracks.root![4]!.time = 4;
+      assert.equal(findAdjacentBonePropertyKeyframe(animation, 'root', 'x', 1, 1)?.time, 4);
+    }
+  },
+);
 
 test('mutable, shallow frozen, and accessor inputs keep keyframe queries fresh', () => {
   for (const shallow of [false, true]) {
