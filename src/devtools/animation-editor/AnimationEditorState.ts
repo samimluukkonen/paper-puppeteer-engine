@@ -3,6 +3,7 @@ import {
   ANIMATION_FORMAT_VERSION,
   AnimationValidationError,
   inspectAnimationDefinition,
+  parseAnimationClip,
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -251,7 +252,7 @@ export class AnimationEditorState {
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
     if (this.dirty && !options.discardChanges) {
       this.issues = [
-        { severity: 'error', message: 'Unsaved animation changes; undo edits or explicitly discard before selecting.' },
+        { severity: 'error', message: 'Unsaved animation changes; download, discard, or undo edits before selecting.' },
       ];
       this.notify();
       return false;
@@ -512,11 +513,19 @@ export class AnimationEditorState {
     return true;
   }
 
+  /** Export committed authored data only; drafts, selection, history and preview preferences stay local. */
+  exportJson(): string {
+    if (!this.working || !this.rig) throw new Error('No animation is selected.');
+    const animation = parseAnimationClip(this.working, this.rig);
+    return `${JSON.stringify({ version: ANIMATION_FORMAT_VERSION, ...animation }, null, 2)}\n`;
+  }
+
   markSaved(): void {
     const entry = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
     if (entry) entry.saved = this.working;
     this.saved = this.working;
     this.cachedDirty = false;
+    this.issues = [];
     this.notify();
   }
 

@@ -61,6 +61,7 @@ a {
 }
 .animation-history {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .animation-session h2,

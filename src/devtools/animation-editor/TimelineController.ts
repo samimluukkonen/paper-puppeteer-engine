@@ -1,3 +1,4 @@
+import { downloadJson } from '../../shared/downloadJson.js';
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { setAttribute, setText } from '../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
@@ -26,6 +27,9 @@ export class TimelineController {
   private readonly fps: HTMLInputElement;
   private readonly undo: HTMLButtonElement;
   private readonly redo: HTMLButtonElement;
+  private readonly download: HTMLButtonElement;
+  private readonly discard: HTMLButtonElement;
+  private readonly exportFeedback: HTMLElement;
   private readonly deleteKey: HTMLButtonElement;
   private readonly previousKey: HTMLButtonElement;
   private readonly nextKey: HTMLButtonElement;
@@ -56,6 +60,9 @@ export class TimelineController {
     this.fps = this.element<HTMLInputElement>('#animation-fps');
     this.undo = this.element<HTMLButtonElement>('#animation-undo');
     this.redo = this.element<HTMLButtonElement>('#animation-redo');
+    this.download = this.element<HTMLButtonElement>('#animation-download');
+    this.discard = this.element<HTMLButtonElement>('#animation-discard');
+    this.exportFeedback = this.element('#animation-export-feedback');
     this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
     this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
     this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
@@ -68,7 +75,7 @@ export class TimelineController {
       'change',
       () => {
         this.endScrub();
-        this.state.selectAnimation(this.selection.value || null);
+        if (this.state.selectAnimation(this.selection.value || null)) setText(this.exportFeedback, '');
       },
       options,
     );
@@ -95,6 +102,31 @@ export class TimelineController {
     );
     this.undo.addEventListener('click', () => this.state.undo(), options);
     this.redo.addEventListener('click', () => this.state.redo(), options);
+    this.download.addEventListener(
+      'click',
+      () => {
+        try {
+          const json = this.state.exportJson();
+          const filename = `${this.state.selectedAnimationId!.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`;
+          downloadJson(json, filename);
+          this.state.markSaved();
+          setText(this.exportFeedback, `Animation JSON download started: ${filename}`);
+        } catch (error) {
+          setText(this.exportFeedback, `Could not download animation: ${String(error)}`);
+        }
+      },
+      options,
+    );
+    this.discard.addEventListener(
+      'click',
+      () => {
+        if (!this.state.dirty || !window.confirm('Discard unsaved animation changes?')) return;
+        this.endScrub();
+        if (this.state.selectAnimation(this.state.selectedAnimationId, { discardChanges: true }))
+          setText(this.exportFeedback, 'Changes discarded. The last saved animation was restored.');
+      },
+      options,
+    );
     this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframe(), options);
     this.previousKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(-1), options);
     this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
@@ -244,6 +276,7 @@ export class TimelineController {
     this.unsubscribe?.();
     this.state = state;
     this.externalError = '';
+    setText(this.exportFeedback, '');
     const empty = new Option('No animation selected', '');
     this.selection.replaceChildren(empty, ...state.animationIds.map((id) => new Option(id, id)));
     this.element('#character-status').textContent = characterId ? `Character: ${characterId}` : 'No character loaded.';
@@ -329,6 +362,8 @@ export class TimelineController {
     if (this.fps.disabled !== fpsDisabled) this.fps.disabled = fpsDisabled;
     if (this.undo.disabled !== !state.canUndo) this.undo.disabled = !state.canUndo;
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
+    if (this.download.disabled !== !animation) this.download.disabled = !animation;
+    if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = !state.selectedKeyframe;
     const previousDisabled = !state.getAdjacentKeyframe(-1);
     const nextDisabled = !state.getAdjacentKeyframe(1);

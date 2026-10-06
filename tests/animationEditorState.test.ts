@@ -2,6 +2,7 @@ import { assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import * as editorData from '../src/devtools/shared/editorData.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
+import { parseAnimationClip } from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
 import { demoAnimations, demoRig } from './helpers/demoCharacter.js';
 
@@ -20,6 +21,33 @@ const clip = (patch: Partial<AnimationClip> = {}): AnimationClip => ({
   ...patch,
 });
 const file = (animation: AnimationClip) => ({ ...animation, version: 1 });
+
+test('animation export round-trips authored data without saving drafts or changing history and navigation', () => {
+  const input = clip();
+  const state = new AnimationEditorState(rig, [input]);
+  assert.throws(() => state.exportJson(), /No animation/);
+  state.selectAnimation('move');
+  state.selectBone('root');
+  state.setCurrentTime(0.5);
+  state.setBonePropertyKeyframe('root', 'y', 17);
+  state.setTemporaryBoneProperty('x', 99);
+  state.setPreviewLoop(true);
+  state.setPlaybackSpeed(2);
+  const working = state.workingAnimation;
+  const history = state.historyLength;
+  const notification = vi.fn();
+  const unsubscribe = state.subscribe(notification);
+  const json = state.exportJson();
+  assert.deepEqual(JSON.parse(json), working);
+  assert.deepEqual(parseAnimationClip(JSON.parse(json), rig), { ...input, tracks: working!.tracks });
+  assert.equal(state.currentTime, 0.5);
+  assert.equal(state.boneTransformDraft.x, 99);
+  assert.equal(state.historyLength, history);
+  assert.isTrue(state.dirty, 'serialization alone never marks a document saved');
+  assert.equal(notification.mock.calls.length, 0);
+  assert.deepEqual(state.sourceAnimation, file(input));
+  unsubscribe();
+});
 
 test('sources, working copies, and nested event payloads have independent ownership', () => {
   const input = clip();
