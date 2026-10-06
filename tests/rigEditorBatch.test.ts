@@ -180,6 +180,7 @@ test.each(dragCases)(
       preparePose: vi.fn(),
       syncPose: vi.fn(),
       setRenderOrder: vi.fn(),
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setSlotTransform: Puppet.prototype.setSlotTransform,
       setSlotDepth: vi.fn(),
       clearSlotDepth: vi.fn(),

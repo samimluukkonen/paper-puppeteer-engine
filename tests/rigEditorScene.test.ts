@@ -196,7 +196,7 @@ function fixture(sceneOverride?: RigEditorScene) {
     assert.isTrue(editor.state.dirty);
     assert.isTrue(editor.state.canUndo);
     assert.equal(disable.mock.calls.length, 0);
-    assert.equal(vi.mocked(puppet.destroy).mock.calls.length, 0);
+    assert.equal(vi.mocked(puppet).destroy.mock.calls.length, 0);
     assert.equal(onReady.mock.calls.length, 0);
   };
   return { scene, file, editor, puppet, onReady, disable, assertPreserved };
@@ -284,37 +284,38 @@ test.each(['reloadRig', 'reloadOriginal'] as const)('%s cleans up a replacement 
     replacementOverlay = this;
     throw failure;
   });
-  const off = vi.mocked(scene.input.off);
+  const off = vi.mocked(scene.input).off;
   assert.throws(() => {
     if (method === 'reloadRig') scene.reloadRig(file, 'replacement.json');
     else scene.reloadOriginal();
   }, /Overlay draw failed/);
   const replacement = vi.mocked(Puppet).mock.results[1]!.value as Puppet;
-  assert.equal(vi.mocked(replacement.destroy).mock.calls.length, 1);
-  assert.equal(vi.mocked(replacementOverlay!.destroy).mock.calls.length, 1);
+  assert.equal(vi.mocked(replacement).destroy.mock.calls.length, 1);
+  assert.equal(vi.mocked(replacementOverlay!).destroy.mock.calls.length, 1);
   assert.deepEqual(
     off.mock.calls.map(([event]) => event),
     ['pointerdown', 'pointermove', 'pointerup', 'pointerupoutside', 'wheel'],
   );
-  assert.equal(vi.mocked(scene.events.off).mock.calls[0]?.[0], 'update');
+  assert.equal(vi.mocked(scene.events).off.mock.calls[0]?.[0], 'update');
   assert.equal(vi.mocked(window.removeEventListener).mock.calls[0]?.[0], 'keydown');
   assertPreserved();
 });
 
 test('replaces the session only after the new editor enables successfully', () => {
   const { scene, file, editor, puppet, onReady, disable } = fixture();
+  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
   const enable = RigEditor.prototype.enable;
   vi.spyOn(RigEditor.prototype, 'enable').mockImplementationOnce(function (this: RigEditor) {
     assert.strictEqual(scene.editor, editor);
     assert.equal(disable.mock.calls.length, 0);
-    assert.equal(vi.mocked(puppet.destroy).mock.calls.length, 0);
+    assert.equal(vi.mocked(puppet).destroy.mock.calls.length, 0);
     enable.call(this);
   });
   scene.reloadRig(file, 'replacement.json');
   assert.notStrictEqual(scene.editor, editor);
   assert.equal(scene.rigFilename, 'replacement.json');
   assert.equal(disable.mock.calls.length, 1);
-  assert.equal(vi.mocked(puppet.destroy).mock.calls.length, 1);
+  assert.equal(vi.mocked(puppet).destroy.mock.calls.length, 1);
   assert.deepEqual(onReady.mock.calls, [[scene.editor]]);
 });
 
@@ -408,7 +409,7 @@ test('an inspector depth edit updates draw order and undo restores the rig and p
   await editNumber(element, bone, 'depth', [-5, -8]);
   const editedOrder = new Rig(editor.state.workingCopy).renderOrder;
   assert.notDeepEqual(editedOrder, order);
-  assert.deepEqual(vi.mocked(puppet.setRenderOrder).mock.lastCall![0], editedOrder);
+  assert.deepEqual(vi.mocked(puppet).setRenderOrder.mock.lastCall![0], editedOrder);
   assert.equal(editor.state.getBone(bone).depth, -8);
   assert.equal(editor.state.historyLength, 1);
   assert.equal(element('#dirty-status').textContent, 'Unsaved changes *');
@@ -416,7 +417,7 @@ test('an inspector depth edit updates draw order and undo restores the rig and p
 
   await element('#undo').click();
   assert.equal(editor.exportJson(false), before);
-  assert.deepEqual(vi.mocked(puppet.setRenderOrder).mock.lastCall![0], order);
+  assert.deepEqual(vi.mocked(puppet).setRenderOrder.mock.lastCall![0], order);
   assert.equal(element('#dirty-status').textContent, 'No changes');
   assert.isTrue(element('#undo').disabled);
   assert.isFalse(element('#redo').disabled);
@@ -424,7 +425,7 @@ test('an inspector depth edit updates draw order and undo restores the rig and p
 
   await element('#redo').click();
   assert.equal(editor.state.getBone(bone).depth, -8);
-  assert.deepEqual(vi.mocked(puppet.setRenderOrder).mock.lastCall![0], editedOrder);
+  assert.deepEqual(vi.mocked(puppet).setRenderOrder.mock.lastCall![0], editedOrder);
 });
 
 test.each(['malformed JSON', 'invalid rig', 'incompatible preview', 'enable failure'])(
@@ -456,7 +457,7 @@ test.each(['malformed JSON', 'invalid rig', 'incompatible preview', 'enable fail
     assert.equal(scene.rigFilename, 'working.json');
     assert.equal(editor.exportJson(false), before);
     assert.equal(disable.mock.calls.length, 0);
-    assert.equal(vi.mocked(puppet.destroy).mock.calls.length, 0);
+    assert.equal(vi.mocked(puppet).destroy.mock.calls.length, 0);
 
     await editNumber(element, 'root', 'x', [22]);
     assert.equal(editor.state.getBone('root').x, 22);

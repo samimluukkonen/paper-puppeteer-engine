@@ -601,6 +601,7 @@ test('pose-only preview suppresses start, middle and end events across restart, 
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const event = vi.fn();
   const complete = vi.fn();
+  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
   const originalPlay = AnimationPlayer.prototype.play;
   // Attach before initialization to catch time-zero events as well as later pose sampling.
   const play = vi.spyOn(AnimationPlayer.prototype, 'play').mockImplementation(function (

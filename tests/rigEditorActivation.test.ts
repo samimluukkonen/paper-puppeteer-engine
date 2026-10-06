@@ -45,7 +45,9 @@ test('editor activation reuses IK constraints and balances overlay and listener 
     },
     ikConstraints: new Map<string, TwoBoneIKConstraint>(),
     bones,
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     addIK: vi.fn(Puppet.prototype.addIK),
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     getIK: Puppet.prototype.getIK,
     getBone: (id: string) => bones.get(id)!,
     preparePose: vi.fn(),
@@ -115,7 +117,9 @@ test.each([false, true])('activation restores edited state and IK preview (%s) w
     rig,
     bones,
     ikConstraints: new Map<string, TwoBoneIKConstraint>(),
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     addIK: Puppet.prototype.addIK,
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     getIK: Puppet.prototype.getIK,
     getBone: (id: string) => bones.get(id)!,
     resetToBindPose() {

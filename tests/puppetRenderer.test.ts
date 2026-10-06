@@ -275,6 +275,7 @@ test('render order reads reuse an immutable snapshot while previous orders remai
 test('invalid slot patches leave every transform unchanged and do not synchronize', () => {
   const { renderer } = fixture();
   const syncPose = vi.fn();
+  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
   const puppet = { renderer, syncPose, setSlotTransform: Puppet.prototype.setSlotTransform } as unknown as Puppet;
   const initial = slotTransform(renderer, 'item');
   for (const property of ['x', 'y', 'rotation', 'scaleX', 'scaleY']) {
@@ -313,6 +314,7 @@ test('successive partial slot transforms preserve runtime values and allow compl
 test('slot transforms synchronize immediately by default and can defer synchronization for a batch', () => {
   const { renderer } = fixture();
   const syncPose = vi.fn();
+  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
   const puppet = { renderer, syncPose, setSlotTransform: Puppet.prototype.setSlotTransform } as unknown as Puppet;
   assert.strictEqual(puppet.setSlotTransform('item', { x: 8 }), puppet);
   assert.equal(syncPose.mock.calls.length, 1);
@@ -335,15 +337,19 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     getBone: (id: string) => joints.get(id)!,
     preparePose: vi.fn(),
     syncPose: vi.fn(),
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setRenderOrder: Puppet.prototype.setRenderOrder,
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setSlotTransform: Puppet.prototype.setSlotTransform,
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setSlotDepth: Puppet.prototype.setSlotDepth,
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     clearSlotDepth: Puppet.prototype.clearSlotDepth,
     getSlotImage: vi.fn(),
     getAttachment: vi.fn(),
   } as unknown as Puppet;
   const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
-  const syncPose = vi.mocked(puppet.syncPose);
+  const syncPose = vi.mocked(puppet).syncPose;
   const defaults = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 };
   for (const field of ['x', 'y', 'rotation', 'scaleX', 'scaleY'] as const) {
     syncPose.mockClear();
@@ -388,11 +394,12 @@ test.each([50, 0, -5])('render order changes preserve runtime slot depth %s', (d
 
 test('render order batches explicit and restored slot depths with one sort', () => {
   const { renderer, rig, slotDepth, containers } = fixture();
+  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
   const puppet = { renderer, setRenderOrder: Puppet.prototype.setRenderOrder } as unknown as Puppet;
   renderer.setSlotDepth('item', 50);
   renderer.setSlotDepth('fixed', -5);
   renderer.setSlotDepth('automatic', 25);
-  const sort = vi.mocked(containers.get('puppet-render')!.sort);
+  const sort = vi.mocked(containers.get('puppet-render')!).sort;
   sort.mockClear();
   const order = vi.spyOn(renderer, 'setOrder');
   assert.strictEqual(
@@ -470,15 +477,19 @@ test.each([undefined, 0, -5, 40])(
       getBone: (id: string) => joints.get(id)!,
       preparePose: vi.fn(),
       syncPose: vi.fn(),
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setRenderOrder: Puppet.prototype.setRenderOrder,
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setSlotTransform: Puppet.prototype.setSlotTransform,
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setSlotDepth: Puppet.prototype.setSlotDepth,
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       clearSlotDepth: Puppet.prototype.clearSlotDepth,
       getSlotImage: vi.fn(),
       getAttachment: vi.fn(),
     } as unknown as Puppet;
     const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
-    const sort = vi.mocked(containers.get('puppet-render')!.sort);
+    const sort = vi.mocked(containers.get('puppet-render')!).sort;
     sort.mockClear();
     const order = vi.spyOn(renderer, 'setOrder');
     const assertDepth = (expected: number | undefined, automatic = 11) => {
