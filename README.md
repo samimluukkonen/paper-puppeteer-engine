@@ -44,15 +44,15 @@ scene.load.start();
 
 ## Guides
 
-| Guide                                                | Contents                                                                                         |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [Demo controls](docs/demo.md)                        | Keyboard controls, playback examples, facing, skins, and pose authoring                          |
-| [Rig editor](docs/rig-editor.md)                     | Editing, snapping, undo/redo, validation, imports, exports, and embedding                        |
-| [Animation editor](docs/animation-editor.md)         | Working copies, bone selection, explicit property keyframing, playback, and runtime pose preview |
-| [Character assets and rigs](docs/characters.md)      | Manifests, JSON validation, slots, skins, artwork, and rig definitions                           |
-| [Animation and poses](docs/animation.md)             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                |
-| [IK and object attachments](docs/ik.md)              | Two-bone solving, transforms, foot planting, katana grips, and attached props                    |
-| [Development and package usage](docs/development.md) | Checks, browser tests, profiling, architecture, packaging, and Node APIs                         |
+| Guide                                                | Contents                                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [Demo controls](docs/demo.md)                        | Keyboard controls, playback examples, facing, skins, and pose authoring                                 |
+| [Rig editor](docs/rig-editor.md)                     | Editing, snapping, undo/redo, validation, imports, exports, and embedding                               |
+| [Animation editor](docs/animation-editor.md)         | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview |
+| [Character assets and rigs](docs/characters.md)      | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
+| [Animation and poses](docs/animation.md)             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
+| [IK and object attachments](docs/ik.md)              | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |
+| [Development and package usage](docs/development.md) | Checks, browser tests, profiling, architecture, packaging, and Node APIs                                |
 
 ## Development checks
 
@@ -71,7 +71,7 @@ For browser checks, install Chromium with `npx playwright install chromium`, the
 ## Current limitations
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
-- One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine. The animation editor supports bone/property tracks, keyframe markers, single-key selection, deletion, navigation, and explicit property keyframing; keyframe dragging remains deferred.
+- One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine. The animation editor supports bone/property tracks, keyframe markers, single-key selection, deletion, navigation, explicit property keyframing, keyframe dragging, frame snapping, and keyboard nudging. Transform drag handles and multiple-key selection remain deferred.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot planting is manual; the walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
 - Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
@@ -82,7 +82,7 @@ For browser checks, install Chromium with `npx playwright install chromium`, the
 
 - Joint angle limits and optional end-effector rotation alignment.
 - More advanced animation state orchestration and editor tooling.
-- Keyframe dragging, timeline snapping, and richer animation authoring tools.
+- Transform drag handles, multiple-key selection, and richer animation authoring tools.
 - Character editing tools and richer asset pipeline integration.
 
-The Visual Animation Editor is available at `/animation-editor/`: independent animation working copies, selection, timeline scrubbing, Play/Pause (Space), Restart (Home), Loop preview, playback speeds from 0.25× to 2×, and puppet preview driven by the existing runtime evaluator. Preview navigation never dirties animation data. Authored smooth/stepped mode and stepped FPS edit only the working copy with undo/redo; render FPS remains independent. The Rig Editor remains at `/rig-editor/`. Bone selection and the transform inspector support temporary local previews, explicit property Set Key/Delete Key, keyed indicators, and undo/redo (Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z outside typing controls). Each committed property edit is one history action; undoing back to the saved baseline restores clean state. Download animation JSON to preserve committed edits and establish a saved baseline, or discard/undo edits before switching animations. Committed keys affect only the working animation; facing and optional IK remain preview preferences. Expandable bone/property tracks show keyframe markers with single-key selection, selected deletion, and Previous/Next Key navigation. Keyframe dragging and transform drag handles remain deferred.
+The Visual Animation Editor is available at `/animation-editor/`: independent animation working copies, selection, timeline scrubbing, Play/Pause (Space), Restart (Home), Loop preview, playback speeds from 0.25× to 2×, and puppet preview driven by the existing runtime evaluator. Preview navigation never dirties animation data. Authored smooth/stepped mode and stepped FPS edit only the working copy with undo/redo; render FPS remains independent. The Rig Editor remains at `/rig-editor/`. Bone selection and the transform inspector support temporary local previews, explicit property Set Key/Delete Key, keyed indicators, and undo/redo (Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z outside typing controls). Each committed property edit is one history action; undoing back to the saved baseline restores clean state. Download animation JSON to preserve committed edits and establish a saved baseline, or discard/undo edits before switching animations. Committed keys affect only the working animation; facing and optional IK remain preview preferences. Expandable bone/property tracks show keyframe markers with single-key selection, selected deletion, and Previous/Next Key navigation. Drag keys to move their times, use Frame snapping for frame-aligned placement, or nudge selected keys with the arrow keys. Shift bypasses snapping during a drag; Escape cancels it. Moving onto another key replaces that key on the same property, with undo/redo preserving both states. Transform drag handles and multiple-key selection remain deferred.
