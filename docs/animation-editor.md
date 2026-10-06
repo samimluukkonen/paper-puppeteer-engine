@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.4.1
+# Visual Animation Editor — v0.5.2.4.2
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -38,9 +38,19 @@ Every rig bone has a row in the same parent-first depth-first order as the Bones
 
 Click a bone label to select the same bone in the hierarchy, inspector, and puppet preview. Click a property label to select its bone plus a transient property track. Picking a bone from any surface clears property selection, including when picking the same bone. Successful animation selection clears the property selection and keeps expansion for this rig session. Collapse preserves a hidden property selection. Track selection cancels transform drafts when the selection changes, preserves time and playback intent, and never edits animation data or history. Expansion and scrolling also stay transient.
 
-Labels and time lanes share one grid and vertical scroll container, with matching fixed row heights. The existing ruler, time conversions, pointer capture, keyboard scrubbing and single playhead operate on the entire time column. Clicking or dragging a time lane scrubs; label buttons select or expand without scrubbing. Each property lane is a positioned, full-width container ready for future markers. The current milestone renders no keyframe diamonds.
+Labels and time lanes share one grid and vertical scroll container, with matching fixed row heights. The existing ruler, time conversions, pointer capture, keyboard scrubbing and single playhead operate on the entire time column. Clicking or dragging an empty time lane scrubs; label buttons select or expand without scrubbing. Each property lane hosts authored keyframe diamonds using the same time coordinates as the ruler and playhead.
 
 With no animation selected, the rig's rows and properties remain available, key indicators are empty, and time controls are disabled at zero. Empty authored tracks still show all rig bones. Invalid animation/zero-duration data continues through existing validation, preserving an existing valid session where applicable.
+
+## Keyframe markers and selection
+
+Every authored property sample has a diamond on its expanded property lane. Sparse rows create markers only for their authored properties; evaluated poses, bind values and animation events never create markers. `PropertyTimelineTrack.keyframes` is an immutable array of `TimelineKeyframe` records (`boneId`, `property`, `time` in seconds, and `value`). It belongs to the cached row model, rebuilt from `workingAnimation` on authored changes or expansion. Markers and surviving DOM buttons remain stationary during playback; width changes reposition them with `timeToTimelineX()`.
+
+Click a marker, or focus it and press Enter/Space, to pause playback, cancel drafts, select its bone/property and seek the sole editor clock to its exact authored time. The playhead, preview and existing inspector update together. A selected diamond has a contrasting color and `aria-pressed="true"`. Selection uses a frozen editor-only `KeyframeSelection` (`boneId`, `property`, `time` in seconds); lookup resolves through the existing millisecond key-time tolerance and stores the canonical authored time. It never dirties, serializes or enters authored history. Selecting another marker replaces it; bone/property navigation and successful animation switching clear it. Collapse retains selection. Dragging or keyboard time navigation retains selection without forcing the playhead back; clicking an empty time area clears it while retaining bone/property selection.
+
+**Delete Selected Key**, Delete, or Backspace removes the selected property at its selected time, even after scrubbing away. Deletion pauses and cancels drafts but preserves the playhead time. The existing mutation API records one snapshot history operation, preserves unrelated keys and source data, refreshes preview/markers/indicators and clears selection. Shortcuts ignore typing controls, content-editable regions, composition and modified commands; ordinary Backspace is prevented outside typing controls. Inspector mutations and Undo/Redo refresh the same working snapshot. Selection is validated before notifications; removed keys clear it, and Undo restores their markers without restoring transient selection. Tolerated time changes on replacement canonicalize selection without seeking.
+
+**Previous Key** and **Next Key** navigate only the selected bone/property relative to current time, ignoring the held key within the shared tolerance. A destination selects and seeks exactly as a marker click does; unavailable directions are disabled. Key dragging, moving and multiple selection remain deferred.
 
 ## Data and preview ownership
 
@@ -73,10 +83,12 @@ For a custom character, pass `{ characterUrl: '../characters/hero/character.json
 - `replaceWorkingAnimation(input)`, `markSaved()`, `undo()`, `redo()`: internal authored-change foundation.
 - `selectedBoneId`, `boneTransformDraft`, `hasTemporaryTransform`, `selectedBoneTransform`: editor-only bone selection, immutable sparse drafts, and evaluated local values with prospective overrides.
 - `selectedTimelineProperty`, `selectTimelineProperty(boneId, property)`: transient property view and atomic bone/property selection using the existing bone owner.
+- `selectedKeyframe`, `selectKeyframe(selection)`, `clearKeyframeSelection()`, `deleteSelectedKeyframe()`: single-key selection, coordinated seek and undoable deletion at the selected authored time.
+- `getAdjacentKeyframe(-1 | 1)`, `selectAdjacentKeyframe(-1 | 1)`: previous/next key query and navigation on the selected property.
 - `timelineTracks`, `isTimelineBoneExpanded(boneId)`, `setTimelineBoneExpanded(boneId, expanded)`: immutable visible rows and transient expansion queries/commands; invalid bones are rejected.
-- `TimelineTrack`, `BoneTimelineTrack`, `PropertyTimelineTrack`, `buildTimelineTracks(rig, animation, expandedBones)`: pure hierarchy/property row model with depth and authored-key presence.
+- `TimelineTrack`, `BoneTimelineTrack`, `PropertyTimelineTrack`, `TimelineKeyframe`, `KeyframeSelection`, `buildTimelineTracks(rig, animation, expandedBones)`: pure hierarchy/property row model with depth, authored-key presence and immutable property markers.
 - `getAuthoredBoneProperties(animation, boneId)`: supported properties with authored samples anywhere in the track, independent of current time.
-- `TimelineTracksController(labels, lanes)` / `render(state)` / `dispose()`: stable labels and matching time lanes.
+- `TimelineTracksController(labels, lanes)` / `render(state, width)` / `dispose()`: stable labels, time lanes and key buttons positioned with shared timeline coordinates.
 - `selectBone(id | null)`, `beginTransformEdit()`, `setTemporaryBoneProperty(property, localValue)`, `commitBoneProperty(property)`, `deleteBonePropertyKey(property)`, `cancelTransformEdit()`: visual authoring commands; the UI handles degrees/radians conversion. Key mutations retain the existing core/state APIs.
 - `BoneInspectorController(app)` / `bind(state)` / `dispose()`: stable hierarchy and numeric property controls.
 - `AnimationEditorScene.setFacing(facing)`, `setBonesVisible(boolean)`, `setIKPreview(boolean)`, and optional `AnimationEditorSceneOptions.ikChains`: preview-only projection/configuration.
@@ -90,7 +102,7 @@ These APIs live under `src/devtools/animation-editor/`; the production package e
 
 ## Keyframe authoring core
 
-v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. v0.5.2.3.2 connects these existing APIs to the visual inspector without changing their signatures. v0.5.2.3.3 hardens cancellation boundaries, integrates keyboard history and expands regression verification. v0.5.2.4.1 adds bone/property timeline tracks and transient track navigation. Package version: `0.5.2-4.1`.
+v0.5.2.3.1 adds pure data operations in `keyframes.ts` and commands/queries on `AnimationEditorState`. v0.5.2.3.2 connects these existing APIs to the visual inspector without changing their signatures. v0.5.2.3.3 hardens cancellation boundaries, integrates keyboard history and expands regression verification. v0.5.2.4.1 adds bone/property timeline tracks and transient track navigation. v0.5.2.4.2 adds authored markers, single-key selection, selected deletion and previous/next navigation. Package version: `0.5.2-4.2`.
 
 The existing file format remains authoritative: `tracks[boneId]` holds a strictly time-sorted array of sparse `{ time, x?, y?, rotation?, scaleX?, scaleY? }` rows. Time is milliseconds, rotation is radians, and values are absolute local transforms. Each property has its own independent samples even when several properties share a row. Setting rotation never authors position or scale implicitly.
 
@@ -175,6 +187,8 @@ The v0.5.2.3.3 stabilization report and command results are recorded in [History
 
 The v0.5.2.4.1 implementation, track architecture, APIs and verification results are recorded in [Timeline track verification](animation-editor-tracks-verification.md).
 
+The v0.5.2.4.2 marker/selection architecture, deletion behavior, APIs and verification results are recorded in [Keyframe marker verification](animation-editor-keyframe-markers-verification.md).
+
 ## Deferred features
 
-Keyframe diamonds, key selection/dragging/movement, event tracks, transform drag handles, copy/paste, multi-key selection, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.4.2+. Property create/update/delete remains available through the inspector and data APIs above.
+Key dragging/movement, event tracks, transform drag handles, copy/paste, duplication, box/multi-key selection, keyframe groups, auto-key, per-keyframe interpolation UI, event authoring, snapping, animation export/save/import UI, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.4.3+. Property create/update/delete remains available through the inspector and data APIs above.

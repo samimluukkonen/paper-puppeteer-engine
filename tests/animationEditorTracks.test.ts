@@ -72,6 +72,10 @@ test('expansion inserts every supported property in stable runtime order, withou
         depth: bone.depth + 1,
         property,
         hasKeys: boneId === 'zArm' && ['rotation', 'scaleX'].includes(property),
+        keyframes:
+          boneId === 'zArm' && ['rotation', 'scaleX'].includes(property)
+            ? [{ boneId, property, time: 1.5, value: property === 'rotation' ? 0 : 1 }]
+            : [],
       })),
     );
   }

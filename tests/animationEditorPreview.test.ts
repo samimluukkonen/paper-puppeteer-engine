@@ -17,6 +17,43 @@ vi.mock('phaser', () => ({
   },
 }));
 
+test('key selection and selected-key deletion update the existing preview, including undo/redo after scrubbing', () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const state = new AnimationEditorState(rig, [
+    {
+      name: 'move',
+      duration: 2000,
+      loop: false,
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 500, x: 40 },
+          { time: 2000, x: 20 },
+        ],
+      },
+    },
+  ]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  state.play();
+  state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
+  assert.equal(puppet.getBone('root').pose.x, 40);
+  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.dirty);
+  state.setCurrentTime(1);
+  assert.approximately(puppet.getBone('root').pose.x, 100 / 3, 1e-10);
+  state.deleteSelectedKeyframe();
+  assert.equal(puppet.getBone('root').pose.x, 10);
+  assert.equal(state.currentTime, 1);
+  state.undo();
+  assert.approximately(puppet.getBone('root').pose.x, 100 / 3, 1e-10);
+  state.redo();
+  assert.equal(puppet.getBone('root').pose.x, 10);
+  preview.dispose();
+  puppet.destroy();
+});
+
 test('held stepped frames skip projection while drafts, authored edits and endpoints invalidate it', () => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
   const state = new AnimationEditorState(rig, [

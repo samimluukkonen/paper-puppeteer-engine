@@ -21,7 +21,7 @@ import {
   setBonePropertyKeyframe,
 } from './keyframes.js';
 import { animationDurationSeconds } from './timeline.js';
-import { buildTimelineTracks, type TimelineTrack } from './timelineTracks.js';
+import { buildTimelineTracks, type KeyframeSelection, type TimelineTrack } from './timelineTracks.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export const AUTHORED_FPS_MIN = 1;
@@ -54,6 +54,7 @@ export class AnimationEditorState {
   private history = this.createHistory();
   private selectedBone: string | null = null;
   private selectedProperty: TransformProperty | null = null;
+  private selectedKey: KeyframeSelection | null = null;
   private readonly expandedTimelineBones = new Set<string>();
   private trackRows: readonly TimelineTrack[] | undefined;
   private trackAnimation: ReadonlyAnimation | null | undefined;
@@ -79,6 +80,69 @@ export class AnimationEditorState {
   get selectedTimelineProperty(): TransformProperty | null {
     return this.selectedProperty;
   }
+  get selectedKeyframe(): KeyframeSelection | null {
+    return this.selectedKey;
+  }
+  /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
+  selectKeyframe(selection: KeyframeSelection): boolean {
+    const { boneId, property, time } = selection;
+    if (!this.rig?.hasBone(boneId)) return false;
+    const key = this.findBonePropertyKeyframe(boneId, property, time);
+    if (!key) return false;
+    this.playback.pause();
+    this.playback.endScrub();
+    this.clearTransformDraft();
+    this.selectedBone = boneId;
+    this.selectedProperty = property;
+    this.selectedKey = Object.freeze({ boneId, property, time: key.time / 1000 });
+    if (!this.expandedTimelineBones.has(boneId)) {
+      this.expandedTimelineBones.add(boneId);
+      this.trackRows = undefined;
+    }
+    this.updateTime(this.selectedKey.time);
+    this.notify();
+    return true;
+  }
+  clearKeyframeSelection(): void {
+    if (!this.selectedKey) return;
+    this.selectedKey = null;
+    this.notify();
+  }
+  /** Delete the selected authored time even when the playhead has scrubbed elsewhere. */
+  deleteSelectedKeyframe(): boolean {
+    const key = this.selectedKey;
+    if (!key) return false;
+    this.playback.pause();
+    this.clearTransformDraft();
+    return this.removeBonePropertyKeyframe(key.boneId, key.property, key.time);
+  }
+  /** Previous/next authored key on the selected property, relative to the current playhead. */
+  getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
+    const boneId = this.selectedBone;
+    const property = this.selectedProperty;
+    if (!this.working || !boneId || !property || !Object.hasOwn(this.working.tracks, boneId)) return undefined;
+    const keys = this.working.tracks[boneId]!;
+    const ordered = direction === 1 ? keys : [...keys].reverse();
+    const timeMs = this.currentTime * 1000;
+    const key = ordered.find(
+      (row) =>
+        row[property] !== undefined && !keyframeTimesMatch(row.time, timeMs) && direction * (row.time - timeMs) > 0,
+    );
+    return key ? Object.freeze({ boneId, property, time: key.time / 1000 }) : undefined;
+  }
+  selectAdjacentKeyframe(direction: -1 | 1): boolean {
+    const key = this.getAdjacentKeyframe(direction);
+    return key ? this.selectKeyframe(key) : false;
+  }
+  /** Authored snapshots are authoritative; history never restores transient selection. */
+  private validateKeyframeSelection(): void {
+    const selection = this.selectedKey;
+    if (!selection) return;
+    const key = this.findBonePropertyKeyframe(selection.boneId, selection.property, selection.time);
+    if (!key) this.selectedKey = null;
+    else if (key.time / 1000 !== selection.time)
+      this.selectedKey = Object.freeze({ ...selection, time: key.time / 1000 });
+  }
   /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
   get timelineTracks(): readonly TimelineTrack[] {
     if (!this.trackRows || this.trackAnimation !== this.working) {
@@ -103,9 +167,10 @@ export class AnimationEditorState {
   /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
     if (!this.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
-    if (this.selectedBone !== boneId || this.selectedProperty !== property) {
+    if (this.selectedBone !== boneId || this.selectedProperty !== property || this.selectedKey !== null) {
       this.selectedBone = boneId;
       this.selectedProperty = property;
+      this.selectedKey = null;
       this.clearTransformDraft();
       this.notify();
     }
@@ -124,9 +189,10 @@ export class AnimationEditorState {
   }
   selectBone(id: string | null): boolean {
     if (id !== null && !this.rig?.hasBone(id)) return false;
-    if (id !== this.selectedBone || this.selectedProperty !== null) {
+    if (id !== this.selectedBone || this.selectedProperty !== null || this.selectedKey !== null) {
       this.selectedBone = id;
       this.selectedProperty = null;
+      this.selectedKey = null;
       this.clearTransformDraft();
       this.notify();
     }
@@ -251,6 +317,7 @@ export class AnimationEditorState {
     this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
     this.selectedId = id;
     this.selectedProperty = null;
+    this.selectedKey = null;
     this.clearTransformDraft();
     this.playback.reset();
     this.issues = [];
@@ -338,7 +405,20 @@ export class AnimationEditorState {
 
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
     return this.editKeyframe(
-      (animation, rig) => removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000),
+      (animation, rig) => {
+        const key = findBonePropertyKeyframe(animation, boneId, property, timeSeconds * 1000);
+        const next = removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000);
+        // Clear the key actually removed, even if a distinct nearby authored time is within tolerance.
+        if (
+          next !== animation &&
+          this.selectedKey?.boneId === boneId &&
+          this.selectedKey.property === property &&
+          key !== undefined &&
+          key.time / 1000 === this.selectedKey.time
+        )
+          this.selectedKey = null;
+        return next;
+      },
       boneId,
       property,
       timeSeconds,
@@ -482,6 +562,7 @@ export class AnimationEditorState {
       });
     }
     this.updateTime(this.currentTime);
+    this.validateKeyframeSelection();
     this.notify();
     return true;
   }
@@ -502,6 +583,7 @@ export class AnimationEditorState {
         this.working = entry;
         this.cachedDirty = undefined;
         this.updateTime(this.currentTime);
+        this.validateKeyframeSelection();
       },
       equalEditorData,
     );

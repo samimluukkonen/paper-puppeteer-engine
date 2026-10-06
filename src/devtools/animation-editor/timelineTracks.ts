@@ -11,6 +11,17 @@ interface TimelineTrackBase {
   readonly hasKeys: boolean;
 }
 
+/** Transient editor identity. Time is continuous seconds, as in the editor clock. */
+export interface KeyframeSelection {
+  readonly boneId: string;
+  readonly property: TransformProperty;
+  readonly time: number;
+}
+
+export interface TimelineKeyframe extends KeyframeSelection {
+  readonly value: number;
+}
+
 export interface BoneTimelineTrack extends TimelineTrackBase {
   readonly kind: 'bone';
   readonly expanded: boolean;
@@ -19,6 +30,7 @@ export interface BoneTimelineTrack extends TimelineTrackBase {
 export interface PropertyTimelineTrack extends TimelineTrackBase {
   readonly kind: 'property';
   readonly property: TransformProperty;
+  readonly keyframes: readonly TimelineKeyframe[];
 }
 
 export type TimelineTrack = BoneTimelineTrack | PropertyTimelineTrack;
@@ -38,7 +50,13 @@ export function buildTimelineTracks(
       const expanded = expandedBones.has(boneId);
       rows.push(Object.freeze({ kind: 'bone', boneId, depth, expanded, hasKeys: authored.length > 0 }));
       if (expanded)
-        for (const property of transformProperties)
+        for (const property of transformProperties) {
+          const keys = animation && Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+          const keyframes = keys.flatMap((key) =>
+            key[property] === undefined
+              ? []
+              : [Object.freeze({ boneId, property, time: key.time / 1000, value: key[property] })],
+          );
           rows.push(
             Object.freeze({
               kind: 'property',
@@ -46,8 +64,10 @@ export function buildTimelineTracks(
               property,
               depth: depth + 1,
               hasKeys: authored.includes(property),
+              keyframes: Object.freeze(keyframes),
             }),
           );
+        }
     }
   return Object.freeze(rows);
 }

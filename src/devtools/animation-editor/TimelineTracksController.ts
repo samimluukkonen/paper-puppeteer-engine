@@ -1,14 +1,16 @@
 import { setAttribute } from '../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
-import type { TimelineTrack } from './timelineTracks.js';
+import { timeToTimelineX } from './timeline.js';
+import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
 interface TrackElements {
   readonly label: HTMLElement;
   readonly select: HTMLButtonElement;
   readonly expand: HTMLButtonElement | undefined;
   readonly indicator: HTMLElement;
-  /** Full-width time lane, ready to host markers using the timeline's shared coordinates. */
+  /** Full-width time lane; marker centers share ruler/playhead coordinates. */
   readonly lane: HTMLElement;
+  readonly markers: Map<number, HTMLButtonElement>;
 }
 
 function trackKey(track: TimelineTrack): string {
@@ -30,6 +32,8 @@ export class TimelineTracksController {
   private readonly rows = new Map<string, TrackElements>();
   private selectedBone: string | null | undefined;
   private selectedProperty: AnimationEditorState['selectedTimelineProperty'] | undefined;
+  private selectedKey: KeyframeSelection | null | undefined;
+  private width = -1;
 
   constructor(
     private readonly labels: HTMLElement,
@@ -73,10 +77,10 @@ export class TimelineTracksController {
     const indicator = document.createElement('span');
     indicator.className = 'timeline-key-presence';
     label.append(select, indicator);
-    return { label, select, expand, indicator, lane };
+    return { label, select, expand, indicator, lane, markers: new Map() };
   }
 
-  render(state: AnimationEditorState): void {
+  render(state: AnimationEditorState, width: number): void {
     this.state = state;
     const tracks = state.timelineTracks;
     const changed = tracks !== this.tracks;
@@ -107,6 +111,35 @@ export class TimelineTracksController {
             `${track.expanded ? 'Collapse' : 'Expand'} ${track.boneId} properties`,
           );
         }
+        if (track.kind === 'property') {
+          const times = new Set(track.keyframes.map((key) => key.time));
+          for (const [time, marker] of row.markers) {
+            if (times.has(time)) continue;
+            if (document.activeElement === marker) this.lanes.parentElement?.focus({ preventScroll: true });
+            marker.remove();
+            row.markers.delete(time);
+          }
+          for (const keyframe of track.keyframes) {
+            let marker = row.markers.get(keyframe.time);
+            if (!marker) {
+              marker = document.createElement('button');
+              marker.type = 'button';
+              marker.className = 'timeline-keyframe';
+              marker.dataset.time = String(keyframe.time);
+              // Markers own clicks; they must not begin a scrub or resume playback on release.
+              marker.addEventListener('pointerdown', (event) => event.stopPropagation());
+              marker.addEventListener('click', () => this.state?.selectKeyframe(keyframe));
+              row.markers.set(keyframe.time, marker);
+            }
+            const description = `Select ${keyframe.boneId} ${keyframe.property} key at ${keyframe.time} s`;
+            setAttribute(marker, 'aria-label', description);
+            marker.title = `${description} (value ${keyframe.value})`;
+          }
+          reconcileRows(
+            row.lane,
+            track.keyframes.map((keyframe) => row.markers.get(keyframe.time)!),
+          );
+        }
         labels.push(row.label);
         lanes.push(row.lane);
       }
@@ -119,20 +152,37 @@ export class TimelineTracksController {
         this.labels.append(empty);
       }
     }
+    if (changed || width !== this.width) {
+      this.width = width;
+      for (const row of this.rows.values())
+        for (const [time, marker] of row.markers)
+          marker.style.left = `${timeToTimelineX(time, state.duration, width)}px`;
+    }
     if (
       !changed &&
       this.selectedBone === state.selectedBoneId &&
-      this.selectedProperty === state.selectedTimelineProperty
+      this.selectedProperty === state.selectedTimelineProperty &&
+      this.selectedKey === state.selectedKeyframe
     )
       return;
     this.selectedBone = state.selectedBoneId;
     this.selectedProperty = state.selectedTimelineProperty;
+    this.selectedKey = state.selectedKeyframe;
     for (const track of tracks) {
       const row = this.rows.get(trackKey(track))!;
       const selected =
         track.boneId === this.selectedBone && (track.kind === 'bone' || track.property === this.selectedProperty);
       for (const element of [row.label, row.lane]) setAttribute(element, 'data-selected', String(selected));
       setAttribute(row.select, 'aria-pressed', String(selected));
+      for (const [time, marker] of row.markers) {
+        // Both times are canonical authored values resolved by the state's tolerant key lookup.
+        const keySelected =
+          track.kind === 'property' &&
+          this.selectedKey?.boneId === track.boneId &&
+          this.selectedKey.property === track.property &&
+          this.selectedKey.time === time;
+        setAttribute(marker, 'aria-pressed', String(keySelected));
+      }
     }
   }
 

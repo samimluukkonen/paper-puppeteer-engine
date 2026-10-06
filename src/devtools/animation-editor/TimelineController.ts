@@ -26,8 +26,13 @@ export class TimelineController {
   private readonly fps: HTMLInputElement;
   private readonly undo: HTMLButtonElement;
   private readonly redo: HTMLButtonElement;
+  private readonly deleteKey: HTMLButtonElement;
+  private readonly previousKey: HTMLButtonElement;
+  private readonly nextKey: HTMLButtonElement;
   private readonly tracks: TimelineTracksController;
   private pointer: number | undefined;
+  private pointerStartX = 0;
+  private pointerMoved = false;
   private width = 0;
   private rulerKey = '';
   private externalError = '';
@@ -51,6 +56,9 @@ export class TimelineController {
     this.fps = this.element<HTMLInputElement>('#animation-fps');
     this.undo = this.element<HTMLButtonElement>('#animation-undo');
     this.redo = this.element<HTMLButtonElement>('#animation-redo');
+    this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
+    this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
+    this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
     this.tracks = new TimelineTracksController(
       this.element('#timeline-track-labels'),
       this.element('#timeline-tracks'),
@@ -87,6 +95,9 @@ export class TimelineController {
     );
     this.undo.addEventListener('click', () => this.state.undo(), options);
     this.redo.addEventListener('click', () => this.state.redo(), options);
+    this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframe(), options);
+    this.previousKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(-1), options);
+    this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
     window.addEventListener(
       'keydown',
       (event) => {
@@ -99,6 +110,17 @@ export class TimelineController {
             if (event.shiftKey) this.state.redo();
             else this.state.undo();
           }
+          return;
+        }
+        if (
+          (event.key === 'Delete' || event.key === 'Backspace') &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey
+        ) {
+          // Prevent native Backspace navigation even when there is no selected key.
+          event.preventDefault();
+          if (!event.repeat) this.state.deleteSelectedKeyframe();
           return;
         }
         if (
@@ -124,6 +146,8 @@ export class TimelineController {
         event.preventDefault();
         this.timeline.focus({ preventScroll: true });
         this.pointer = event.pointerId;
+        this.pointerStartX = event.clientX;
+        this.pointerMoved = false;
         this.timeline.setPointerCapture(event.pointerId);
         this.state.beginScrub();
         this.scrub(event.clientX);
@@ -133,7 +157,10 @@ export class TimelineController {
     this.timeline.addEventListener(
       'pointermove',
       (event) => {
-        if (event.pointerId === this.pointer) this.scrub(event.clientX);
+        if (event.pointerId === this.pointer) {
+          if (Math.abs(event.clientX - this.pointerStartX) > 3) this.pointerMoved = true;
+          this.scrub(event.clientX);
+        }
       },
       options,
     );
@@ -142,6 +169,8 @@ export class TimelineController {
       (event) => {
         if (event.pointerId !== this.pointer) return;
         this.scrub(event.clientX);
+        if (!this.pointerMoved && Math.abs(event.clientX - this.pointerStartX) <= 3)
+          this.state.clearKeyframeSelection();
         this.endScrub();
       },
       options,
@@ -245,8 +274,8 @@ export class TimelineController {
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
-    this.tracks.render(state);
     const width = this.width;
+    this.tracks.render(state, width);
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
       this.rulerKey = rulerKey;
@@ -300,6 +329,12 @@ export class TimelineController {
     if (this.fps.disabled !== fpsDisabled) this.fps.disabled = fpsDisabled;
     if (this.undo.disabled !== !state.canUndo) this.undo.disabled = !state.canUndo;
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
+    const deleteDisabled = !state.selectedKeyframe;
+    const previousDisabled = !state.getAdjacentKeyframe(-1);
+    const nextDisabled = !state.getAdjacentKeyframe(1);
+    if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
+    if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
+    if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
     setText(
       this.metadata,
       animation
