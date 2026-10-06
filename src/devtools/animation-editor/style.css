@@ -178,6 +178,39 @@ a {
   margin: 0 24px 12px;
   font-size: 12px;
 }
+.timeline-instructions {
+  margin: 0 24px 12px;
+  font-size: 12px;
+}
+.timeline-instructions summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.timeline-instructions summary:focus-visible {
+  outline: 2px solid #39574b;
+  outline-offset: 2px;
+}
+.timeline-instructions[open] summary {
+  margin-bottom: 8px;
+}
+.timeline-instructions table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.timeline-instructions th,
+.timeline-instructions td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #d6d7c8;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.timeline-instructions th:first-child {
+  width: 35%;
+}
+.timeline-instructions thead {
+  background: #e9edde;
+}
 .timeline-keyframe {
   position: absolute;
   top: 50%;
@@ -187,7 +220,8 @@ a {
   border: 0;
   background: transparent;
   transform: translate(-50%, -50%);
-  cursor: pointer;
+  cursor: ew-resize;
+  touch-action: none;
   z-index: 2;
 }
 .timeline-keyframe::before {
@@ -204,6 +238,12 @@ a {
   background: #b7543a;
   border-color: #75341f;
   box-shadow: 0 0 0 2px #fff2ce;
+}
+.timeline-keyframe[data-dragging="true"] {
+  z-index: 3;
+}
+.timeline-keyframe[data-dragging="true"]::before {
+  box-shadow: 0 0 0 3px #fff2ce;
 }
 .timeline-keyframe:focus-visible {
   outline: 2px solid #39574b;

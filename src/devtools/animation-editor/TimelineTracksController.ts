@@ -34,10 +34,12 @@ export class TimelineTracksController {
   private selectedProperty: AnimationEditorState['selectedTimelineProperty'] | undefined;
   private selectedKey: KeyframeSelection | null | undefined;
   private width = -1;
+  private drag: AnimationEditorState['keyframeDrag'] | undefined;
 
   constructor(
     private readonly labels: HTMLElement,
     private readonly lanes: HTMLElement,
+    private readonly onKeyPointerDown: (event: PointerEvent, key: KeyframeSelection, marker: HTMLButtonElement) => void,
   ) {}
 
   private createRow(track: TimelineTrack): TrackElements {
@@ -127,8 +129,11 @@ export class TimelineTracksController {
               marker.className = 'timeline-keyframe';
               marker.dataset.time = String(keyframe.time);
               // Markers own clicks; they must not begin a scrub or resume playback on release.
-              marker.addEventListener('pointerdown', (event) => event.stopPropagation());
-              marker.addEventListener('click', () => this.state?.selectKeyframe(keyframe));
+              const button = marker;
+              marker.addEventListener('pointerdown', (event) => this.onKeyPointerDown(event, keyframe, button));
+              marker.addEventListener('click', (event) => {
+                if (event.detail === 0) this.state?.selectKeyframe(keyframe);
+              });
               row.markers.set(keyframe.time, marker);
             }
             const description = `Select ${keyframe.boneId} ${keyframe.property} key at ${keyframe.time} s`;
@@ -152,11 +157,21 @@ export class TimelineTracksController {
         this.labels.append(empty);
       }
     }
-    if (changed || width !== this.width) {
+    if (changed || width !== this.width || this.drag !== state.keyframeDrag) {
       this.width = width;
-      for (const row of this.rows.values())
-        for (const [time, marker] of row.markers)
-          marker.style.left = `${timeToTimelineX(time, state.duration, width)}px`;
+      this.drag = state.keyframeDrag;
+      for (const track of tracks) {
+        const row = this.rows.get(trackKey(track))!;
+        for (const [time, marker] of row.markers) {
+          const dragging =
+            track.kind === 'property' &&
+            this.drag?.key.boneId === track.boneId &&
+            this.drag.key.property === track.property &&
+            this.drag.key.time === time;
+          marker.style.left = `${timeToTimelineX(dragging ? this.drag!.previewTime : time, state.duration, width)}px`;
+          setAttribute(marker, 'data-dragging', String(dragging));
+        }
+      }
     }
     if (
       !changed &&

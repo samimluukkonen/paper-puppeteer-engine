@@ -16,6 +16,18 @@ export function timelineXToTime(x: number, duration: number, width: number): num
   return width > 0 && Number.isFinite(width) ? clampTime((x / width) * duration, duration) : 0;
 }
 
+export type KeyframeSnapMode = 'none' | 'frame';
+export const DEFAULT_KEYFRAME_FPS = 10;
+
+/** Editor-only nearest-frame snapping in seconds, clamped again for off-frame endpoints. */
+export function snapKeyframeTime(time: number, duration: number, mode: KeyframeSnapMode, fps?: number): number {
+  const clamped = clampTime(time, duration);
+  if (mode === 'none' || clamped === 0 || clamped === duration) return clamped;
+  const rate = fps !== undefined && Number.isFinite(fps) && fps > 0 ? fps : DEFAULT_KEYFRAME_FPS;
+  const frame = clamped * rate;
+  return Number.isFinite(frame) ? clampTime(Math.round(frame) / rate, duration) : clamped;
+}
+
 export interface RulerTick {
   readonly time: number;
   readonly major: boolean;

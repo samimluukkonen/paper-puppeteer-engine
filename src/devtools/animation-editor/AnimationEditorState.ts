@@ -19,16 +19,17 @@ import {
   getKeyedPropertiesAtTime,
   hasKeyframeAtTime,
   keyframeTimesMatch,
+  moveBonePropertyKeyframe,
   removeBonePropertyKeyframe,
   setBonePropertyKeyframe,
 } from './keyframes.js';
-import { animationDurationSeconds } from './timeline.js';
+import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export const AUTHORED_FPS_MIN = 1;
 export const AUTHORED_FPS_MAX = 240;
-export const DEFAULT_AUTHORED_FPS = 10;
+export const DEFAULT_AUTHORED_FPS = DEFAULT_KEYFRAME_FPS;
 
 /** Same external file fields; event data remains unknown to callers and is validated as JSON before ownership. */
 export type ReadonlyAnimation = ReadonlyEditorData<AnimationClip> & {
@@ -39,6 +40,11 @@ type AnimationEntry = {
   saved: ReadonlyAnimation | null;
   issues: readonly ValidationIssue[];
 };
+
+export interface KeyframeDrag {
+  readonly key: KeyframeSelection;
+  readonly previewTime: number;
+}
 
 /** Owns animation data and navigation independently of the DOM and Phaser.
  * Authored replacements use the rig editor's snapshot history. Navigation never enters history.
@@ -55,6 +61,8 @@ export class AnimationEditorState {
   private issues: readonly ValidationIssue[] = [];
   private history = this.createHistory();
   private readonly selection: AnimationEditorSelection;
+  private drag: KeyframeDrag | null = null;
+  private snapMode: KeyframeSnapMode = 'none';
 
   constructor(
     readonly rig?: Rig,
@@ -80,12 +88,95 @@ export class AnimationEditorState {
   get selectedKeyframe(): KeyframeSelection | null {
     return this.selection.key;
   }
+  get keyframeDrag(): KeyframeDrag | null {
+    return this.drag;
+  }
+  get keyframeSnapMode(): KeyframeSnapMode {
+    return this.snapMode;
+  }
+  get keyframeFPS(): number {
+    const playback = this.working?.playback;
+    return playback?.mode === 'stepped' ? playback.fps : DEFAULT_KEYFRAME_FPS;
+  }
+  setKeyframeSnapMode(mode: KeyframeSnapMode): void {
+    if ((mode !== 'none' && mode !== 'frame') || mode === this.snapMode) return;
+    this.snapMode = mode;
+    this.notify();
+  }
+  beginKeyframeDrag(key: KeyframeSelection): boolean {
+    this.cancelKeyframeDrag();
+    if (!this.selectKeyframe(key)) return false;
+    this.drag = Object.freeze({ key: this.selection.key!, previewTime: this.currentTime });
+    this.notify();
+    return true;
+  }
+  previewKeyframeDrag(time: number, disableSnapping = false): boolean {
+    if (!this.drag || !Number.isFinite(time)) return false;
+    const previewTime = snapKeyframeTime(
+      time,
+      this.duration,
+      disableSnapping ? 'none' : this.snapMode,
+      this.keyframeFPS,
+    );
+    this.drag = Object.freeze({ key: this.drag.key, previewTime });
+    this.updateTime(previewTime);
+    this.notify();
+    return true;
+  }
+  commitKeyframeDrag(): boolean {
+    const drag = this.drag;
+    if (!drag) return false;
+    this.drag = null;
+    return this.moveSelectedKeyframe(drag.previewTime);
+  }
+  cancelKeyframeDrag(): boolean {
+    if (!this.drag) return false;
+    const time = this.drag.key.time;
+    this.drag = null;
+    this.updateTime(time);
+    this.notify();
+    return true;
+  }
+  /** Explicit time moves are continuous seconds; only drag/nudge apply editor snapping. */
+  moveSelectedKeyframe(time: number): boolean {
+    const key = this.selection.key;
+    if (!key || !Number.isFinite(time)) return false;
+    time = Math.max(0, Math.min(time, this.duration));
+    this.cancelKeyframeDrag();
+    this.playback.pause();
+    return this.editKeyframe(
+      (animation, rig) => {
+        const next = moveBonePropertyKeyframe(animation, rig, key.boneId, key.property, key.time * 1000, time * 1000);
+        const moved = findBonePropertyKeyframe(
+          next,
+          key.boneId,
+          key.property,
+          (next === animation ? key.time : time) * 1000,
+        );
+        if (moved) {
+          this.selection.selectKey({ ...key, time: moved.time / 1000 });
+          this.updateTime(moved.time / 1000);
+        }
+        return next;
+      },
+      key.boneId,
+      key.property,
+      key.time,
+    );
+  }
+  nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
+    if (!this.selection.key || this.drag) return false;
+    const step = this.snapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
+    const time = this.selection.key.time + direction * step * (large ? 10 : 1);
+    return this.moveSelectedKeyframe(snapKeyframeTime(time, this.duration, this.snapMode, this.keyframeFPS));
+  }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection): boolean {
     const { boneId, property, time } = selection;
     if (!this.rig?.hasBone(boneId)) return false;
     const key = this.findBonePropertyKeyframe(boneId, property, time);
     if (!key) return false;
+    this.cancelKeyframeDrag();
     this.playback.pause();
     this.playback.endScrub();
     this.selection.selectKey({ boneId, property, time: key.time / 1000 });
@@ -94,10 +185,12 @@ export class AnimationEditorState {
     return true;
   }
   clearKeyframeSelection(): void {
+    this.cancelKeyframeDrag();
     if (this.selection.clearKey()) this.notify();
   }
   /** Delete the selected authored time even when the playhead has scrubbed elsewhere. */
   deleteSelectedKeyframe(): boolean {
+    this.cancelKeyframeDrag();
     const key = this.selection.key;
     if (!key) return false;
     this.playback.pause();
@@ -125,12 +218,14 @@ export class AnimationEditorState {
   }
   setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
     if (!this.rig?.hasBone(boneId)) return false;
+    this.cancelKeyframeDrag();
     if (this.selection.setExpanded(boneId, expanded)) this.notify();
     return true;
   }
   /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
     if (!this.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
+    this.cancelKeyframeDrag();
     if (this.selection.selectProperty(boneId, property)) this.notify();
     return true;
   }
@@ -147,16 +242,19 @@ export class AnimationEditorState {
   }
   selectBone(id: string | null): boolean {
     if (id !== null && !this.rig?.hasBone(id)) return false;
+    this.cancelKeyframeDrag();
     if (this.selection.selectBone(id)) this.notify();
     return true;
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
+    this.cancelKeyframeDrag();
     if (this.selection.boneId && this.working) this.pause();
   }
   setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
     if (!this.selection.boneId || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
       return false;
+    this.cancelKeyframeDrag();
     this.playback.pause();
     this.selection.setDraft(property, value);
     this.notify();
@@ -250,6 +348,7 @@ export class AnimationEditorState {
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
+    this.cancelKeyframeDrag();
     if (this.dirty && !options.discardChanges) {
       this.issues = [
         { severity: 'error', message: 'Unsaved animation changes; download, discard, or undo edits before selecting.' },
@@ -277,6 +376,7 @@ export class AnimationEditorState {
   }
 
   setCurrentTime(time: number): void {
+    this.cancelKeyframeDrag();
     // Explicit navigation cancels drafts even when clamping leaves the playhead at the same endpoint.
     const cancelled = this.clearTransformDraft();
     if (this.updateTime(time) || cancelled) this.notify();
@@ -440,6 +540,7 @@ export class AnimationEditorState {
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
   beginScrub(): void {
+    this.cancelKeyframeDrag();
     if (!this.working) return;
     const cancelled = this.clearTransformDraft();
     if (this.playback.beginScrub() || cancelled) this.notify();
@@ -451,6 +552,7 @@ export class AnimationEditorState {
 
   /** Resume the sole editor clock; a completed clip starts again at zero. */
   play(): void {
+    if (this.drag) return;
     if (!this.playback.play()) return;
     this.clearTransformDraft();
     this.notify();
@@ -488,6 +590,7 @@ export class AnimationEditorState {
 
   /** Internal edits have already validated their changes and retain immutable unchanged branches. */
   private installWorkingAnimation(next: ReadonlyAnimation, retainDraft = false): boolean {
+    this.cancelKeyframeDrag();
     this.issues = [];
     if (next.name !== this.selectedId) {
       this.issues = [
@@ -551,7 +654,8 @@ export class AnimationEditorState {
   }
   private restoreHistory(restore: () => boolean): boolean {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.
-    const cancelled = this.clearTransformDraft();
+    const cancelledDrag = this.cancelKeyframeDrag();
+    const cancelled = this.clearTransformDraft() || cancelledDrag;
     const changed = restore();
     if (changed) this.issues = [];
     if (changed || cancelled) this.notify();

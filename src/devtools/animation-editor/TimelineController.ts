@@ -3,6 +3,7 @@ import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { setAttribute, setText } from '../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { generateRulerTicks, timelineXToTime, timeToTimelineX } from './timeline.js';
+import type { KeyframeSelection } from './timelineTracks.js';
 import { TimelineTracksController } from './TimelineTracksController.js';
 
 /** DOM adapter only: width/pointer capture belong here, while time and animation data belong to state. */
@@ -33,8 +34,12 @@ export class TimelineController {
   private readonly deleteKey: HTMLButtonElement;
   private readonly previousKey: HTMLButtonElement;
   private readonly nextKey: HTMLButtonElement;
+  private readonly snap: HTMLSelectElement;
   private readonly tracks: TimelineTracksController;
   private pointer: number | undefined;
+  private keyPointer:
+    | { id: number; startX: number; clientX: number; offset: number; moved: boolean; shift: boolean }
+    | undefined;
   private pointerStartX = 0;
   private pointerMoved = false;
   private width = 0;
@@ -66,11 +71,20 @@ export class TimelineController {
     this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
     this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
     this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
+    this.snap = this.element<HTMLSelectElement>('#timeline-snap');
     this.tracks = new TimelineTracksController(
       this.element('#timeline-track-labels'),
       this.element('#timeline-tracks'),
+      (event, key, marker) => this.beginKeyDrag(event, key, marker),
     );
     const options = { signal: this.abort.signal };
+    this.snap.addEventListener(
+      'change',
+      () => {
+        if (this.snap.value === 'none' || this.snap.value === 'frame') this.state.setKeyframeSnapMode(this.snap.value);
+      },
+      options,
+    );
     this.selection.addEventListener(
       'change',
       () => {
@@ -135,6 +149,11 @@ export class TimelineController {
       (event) => {
         if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
           return;
+        if (event.key === 'Escape' && this.state.keyframeDrag) {
+          event.preventDefault();
+          this.endKeyDrag(false);
+          return;
+        }
         // Match the Rig Editor shortcuts while leaving native text-field undo intact.
         if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
           event.preventDefault();
@@ -142,6 +161,17 @@ export class TimelineController {
             if (event.shiftKey) this.state.redo();
             else this.state.undo();
           }
+          return;
+        }
+        if (
+          (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+          this.state.selectedKeyframe &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey
+        ) {
+          event.preventDefault();
+          this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
           return;
         }
         if (
@@ -174,7 +204,7 @@ export class TimelineController {
     this.timeline.addEventListener(
       'pointerdown',
       (event) => {
-        if (event.button !== 0 || this.pointer !== undefined || !this.state.workingAnimation) return;
+        if (event.button !== 0 || this.pointer !== undefined || this.keyPointer || !this.state.workingAnimation) return;
         event.preventDefault();
         this.timeline.focus({ preventScroll: true });
         this.pointer = event.pointerId;
@@ -189,6 +219,13 @@ export class TimelineController {
     this.timeline.addEventListener(
       'pointermove',
       (event) => {
+        if (event.pointerId === this.keyPointer?.id) {
+          this.keyPointer.clientX = event.clientX;
+          this.keyPointer.shift = event.shiftKey;
+          if (Math.abs(event.clientX - this.keyPointer.startX) > 3) this.keyPointer.moved = true;
+          if (this.keyPointer.moved) this.previewKeyDrag();
+          return;
+        }
         if (event.pointerId === this.pointer) {
           if (Math.abs(event.clientX - this.pointerStartX) > 3) this.pointerMoved = true;
           this.scrub(event.clientX);
@@ -199,6 +236,14 @@ export class TimelineController {
     this.timeline.addEventListener(
       'pointerup',
       (event) => {
+        if (event.pointerId === this.keyPointer?.id) {
+          this.keyPointer.clientX = event.clientX;
+          this.keyPointer.shift = event.shiftKey;
+          if (Math.abs(event.clientX - this.keyPointer.startX) > 3) this.keyPointer.moved = true;
+          if (this.keyPointer.moved) this.previewKeyDrag();
+          this.endKeyDrag(this.keyPointer?.moved ?? false);
+          return;
+        }
         if (event.pointerId !== this.pointer) return;
         this.scrub(event.clientX);
         if (!this.pointerMoved && Math.abs(event.clientX - this.pointerStartX) <= 3)
@@ -211,15 +256,27 @@ export class TimelineController {
       this.timeline.addEventListener(
         name,
         (event) => {
+          if (event.pointerId === this.keyPointer?.id) this.endKeyDrag(false);
           if (event.pointerId === this.pointer) this.endScrub();
         },
         options,
       );
-    window.addEventListener('blur', () => this.endScrub(), options);
+    window.addEventListener(
+      'blur',
+      () => {
+        this.endKeyDrag(false);
+        this.endScrub();
+      },
+      options,
+    );
+    this.app.addEventListener('scroll', () => this.previewKeyDrag(), { ...options, capture: true });
     document.addEventListener(
       'visibilitychange',
       () => {
-        if (document.hidden) this.endScrub();
+        if (document.hidden) {
+          this.endKeyDrag(false);
+          this.endScrub();
+        }
       },
       options,
     );
@@ -236,6 +293,12 @@ export class TimelineController {
           isTypingTarget(event.target)
         )
           return;
+        // Handle selected-key arrows before this bubbling event reaches the global shortcuts.
+        if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && this.state.selectedKeyframe) {
+          event.preventDefault();
+          this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+          return;
+        }
         const step = event.shiftKey ? 0.1 : 0.01;
         const time =
           event.key === 'End'
@@ -254,6 +317,7 @@ export class TimelineController {
     this.width = this.timeline.getBoundingClientRect().width;
     this.resize = new ResizeObserver(() => {
       this.width = this.timeline.getBoundingClientRect().width;
+      this.previewKeyDrag();
       this.render();
     });
     this.resize.observe(this.timeline);
@@ -271,6 +335,7 @@ export class TimelineController {
   }
 
   bind(state: AnimationEditorState, characterId?: string): void {
+    this.endKeyDrag(false);
     this.state.pause();
     this.endScrub();
     this.unsubscribe?.();
@@ -294,6 +359,42 @@ export class TimelineController {
     this.state.setCurrentTime(timelineXToTime(clientX - bounds.left, this.state.duration, bounds.width));
   }
 
+  private beginKeyDrag(event: PointerEvent, key: KeyframeSelection, marker: HTMLButtonElement): void {
+    event.stopPropagation();
+    if (event.button !== 0 || this.pointer !== undefined || this.keyPointer) return;
+    event.preventDefault();
+    if (!this.state.beginKeyframeDrag(key)) return;
+    marker.focus({ preventScroll: true });
+    const bounds = this.timeline.getBoundingClientRect();
+    this.keyPointer = {
+      id: event.pointerId,
+      startX: event.clientX,
+      clientX: event.clientX,
+      offset: event.clientX - bounds.left - timeToTimelineX(key.time, this.state.duration, bounds.width),
+      moved: false,
+      shift: event.shiftKey,
+    };
+    this.timeline.setPointerCapture(event.pointerId);
+  }
+
+  private previewKeyDrag(): void {
+    const pointer = this.keyPointer;
+    if (!pointer?.moved) return;
+    const bounds = this.timeline.getBoundingClientRect();
+    this.state.previewKeyframeDrag(
+      timelineXToTime(pointer.clientX - bounds.left - pointer.offset, this.state.duration, bounds.width),
+      pointer.shift,
+    );
+  }
+
+  private endKeyDrag(commit: boolean): void {
+    const pointer = this.keyPointer;
+    this.keyPointer = undefined;
+    if (pointer && this.timeline.hasPointerCapture(pointer.id)) this.timeline.releasePointerCapture(pointer.id);
+    if (commit) this.state.commitKeyframeDrag();
+    else this.state.cancelKeyframeDrag();
+  }
+
   private endScrub(): void {
     const pointer = this.pointer;
     this.pointer = undefined;
@@ -303,12 +404,15 @@ export class TimelineController {
 
   private render(): void {
     const state = this.state;
+    if (this.keyPointer && !state.keyframeDrag) this.endKeyDrag(false);
     if (this.pointer !== undefined && !state.isScrubbing) this.endScrub();
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
     const width = this.width;
     this.tracks.render(state, width);
+    if (this.snap.value !== state.keyframeSnapMode) this.snap.value = state.keyframeSnapMode;
+    this.snap.disabled = !animation;
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
       this.rulerKey = rulerKey;
@@ -393,6 +497,7 @@ export class TimelineController {
   }
 
   dispose(): void {
+    this.endKeyDrag(false);
     this.state.pause();
     this.endScrub();
     this.abort.abort();

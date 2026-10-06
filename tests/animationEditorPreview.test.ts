@@ -18,6 +18,58 @@ vi.mock('phaser', () => ({
   },
 }));
 
+test.each(['smooth', 'stepped'] as const)(
+  'key movement refreshes %s preview/evaluator without baking facing',
+  (mode) => {
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const input: AnimationClip = {
+      name: 'move',
+      duration: 1000,
+      loop: true,
+      playback: mode === 'stepped' ? { mode, fps: 10 } : { mode },
+      tracks: {
+        root: [
+          { time: 0, x: 0 },
+          { time: 500, x: 40 },
+          { time: 1000, x: 20 },
+        ],
+      },
+    };
+    const state = new AnimationEditorState(rig, [input]);
+    state.selectAnimation('move');
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false, facing: 'left' });
+    const preview = new AnimationEditorPreview(state, puppet);
+    const before = JSON.stringify(input);
+    try {
+      state.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0.5 });
+      state.previewKeyframeDrag(0.8);
+      assert.equal(puppet.getBone('root').pose.x, 28, 'provisional seek evaluates unchanged authored keys');
+      state.commitKeyframeDrag();
+      assert.equal(puppet.getBone('root').pose.x, 40);
+      assert.equal(state.selectedBoneTransform?.x, 40);
+      state.undo();
+      assert.equal(puppet.getBone('root').pose.x, 28);
+      state.redo();
+      assert.equal(puppet.getBone('root').pose.x, 40);
+      state.setPreviewLoop(true);
+      state.setPlaybackSpeed(2);
+      state.play();
+      state.advancePlayback(0.3);
+      assert.approximately(state.currentTime, 0.4, 1e-12);
+      assert.approximately(puppet.getBone('root').pose.x, 20, 1e-12);
+      assert.equal(JSON.stringify(input), before);
+      assert.deepEqual(state.workingAnimation?.tracks.root, [
+        { time: 0, x: 0 },
+        { time: 800, x: 40 },
+        { time: 1000, x: 20 },
+      ]);
+    } finally {
+      preview.dispose();
+      puppet.destroy();
+    }
+  },
+);
+
 test('canvas and inspector share compilation while independently evaluating time and edits', () => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
   const state = new AnimationEditorState(rig, [

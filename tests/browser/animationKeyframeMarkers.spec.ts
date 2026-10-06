@@ -124,9 +124,9 @@ test('selected deletion uses one history operation after scrubbing and typing/co
   await expect(key(page, 0.5)).toHaveCount(1);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   const timeline = page.locator('#timeline');
-  await timeline.press('ArrowRight');
+  await timeline.press('End');
   const time = Number(await timeline.getAttribute('aria-valuenow'));
-  expect(time).toBeCloseTo(0.51);
+  expect(time).toBe(2);
   await timeline.press('Control+Delete');
   await timeline.dispatchEvent('keydown', { key: 'Delete', isComposing: true });
   await expect(key(page, 0.5)).toHaveCount(1);

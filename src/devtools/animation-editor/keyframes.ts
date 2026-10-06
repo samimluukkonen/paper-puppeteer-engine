@@ -271,6 +271,48 @@ export function removeBonePropertyKeyframe<Animation extends AnimationData>(
   return next;
 }
 
+/** Move time only (milliseconds), replacing all destination matches on this property.
+ * Sparse-row siblings retain their original times. Interpolation is clip-level and stays unchanged.
+ */
+export function moveBonePropertyKeyframe<Animation extends AnimationData>(
+  animation: Animation,
+  rig: Rig,
+  boneId: string,
+  property: TransformProperty,
+  fromTime: number,
+  toTime: number,
+): Animation {
+  fromTime = assertTarget(animation, rig, boneId, property, fromTime);
+  assertFinite(toTime, 'Keyframe destination');
+  toTime = Math.max(0, Math.min(toTime, animation.duration));
+  validate(animation, rig);
+  const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+  const source = matchingRow(keys, fromTime, property);
+  const destination = matchingRow(keys, toTime, property);
+  if (source < 0 || destination === source) return animation;
+  const value = keys[source]![property]!;
+  // Retain the existing canonical row time on collision, like the setter's tolerance policy.
+  const destinationTime = destination >= 0 ? keys[destination]!.time : toTime;
+  const nextKeys: Keyframe[] = [];
+  for (const [index, key] of keys.entries()) {
+    if (index !== source && !(key[property] !== undefined && keyframeTimesMatch(key.time, destinationTime))) {
+      nextKeys.push(key);
+      continue;
+    }
+    const row = { ...key };
+    delete row[property];
+    if (transformProperties.some((entry) => row[entry] !== undefined)) nextKeys.push(row);
+  }
+  // Only merge at the exact destination: nearby sibling properties must not shift this key's time.
+  const row = nextKeys.findIndex((key) => key.time === destinationTime);
+  if (row >= 0) nextKeys[row] = { ...nextKeys[row]!, [property]: value };
+  else nextKeys.push({ time: destinationTime, [property]: value });
+  nextKeys.sort((a, b) => a.time - b.time);
+  const next = { ...animation, tracks: { ...animation.tracks, [boneId]: nextKeys } };
+  validate(next, rig);
+  return next;
+}
+
 /** Reuses the runtime pose buffer and playback quantization without clocks, events, or IK. */
 class AnimationValueSampler {
   private readonly clip: CompiledClip;
