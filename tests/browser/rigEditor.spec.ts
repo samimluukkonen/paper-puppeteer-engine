@@ -212,6 +212,32 @@ test('hierarchy selection retains button focus and rebuilds for a different impo
   await expect(hierarchy.locator('[aria-selected="true"]')).toHaveText('◇ importedVisual');
 });
 
+test('hierarchy keyboard navigation selects entries without authoring joint changes', async ({ page }) => {
+  const hierarchy = page.locator('#hierarchy');
+  const head = page.getByRole('treeitem', { name: 'head', exact: true });
+  const headSlot = page.getByRole('treeitem', { name: '◇ headVisual', exact: true });
+  await head.click();
+  const before = await field(page, 'y').inputValue();
+  await head.press('ArrowDown');
+  await expect(headSlot).toBeFocused();
+  await expect(headSlot).toHaveAttribute('aria-selected', 'true');
+  await headSlot.press('ArrowUp');
+  await expect(head).toBeFocused();
+  await expect(field(page, 'y')).toHaveValue(before);
+  await expect(page.locator('#dirty-status')).toHaveText('No changes');
+  await expect(page.locator('#undo')).toBeDisabled();
+  await head.press('ArrowRight');
+  await expect(headSlot).toBeFocused();
+  await headSlot.press('ArrowLeft');
+  await expect(head).toBeFocused();
+  await head.press('Home');
+  await expect(hierarchy.getByRole('treeitem').first()).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(hierarchy.getByRole('treeitem').last()).toBeFocused();
+  await expect(hierarchy.locator('[tabindex="0"]')).toHaveCount(1);
+  await expect(page.locator('#dirty-status')).toHaveText('No changes');
+});
+
 test('inspector typing keeps focus and Tab groups each field into one undo', async ({ page }) => {
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   const x = field(page, 'x');
