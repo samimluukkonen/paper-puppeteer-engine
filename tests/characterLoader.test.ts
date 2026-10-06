@@ -1,5 +1,6 @@
 import { assert, test, vi } from 'vitest';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
+import { requestUrl } from './helpers/requestUrl.js';
 
 const url = 'https://example.test/character.json';
 const manifest = {
@@ -45,7 +46,7 @@ test.each(['manifest', 'related files'])(
     const fetcher: typeof fetch = async (input, init) => {
       const signal = init!.signal!;
       signals.push(signal);
-      if (stage === 'related files' && String(input) === url) return Response.json(manifest);
+      if (stage === 'related files' && requestUrl(input) === url) return Response.json(manifest);
       return waitForAbort(signal);
     };
     const reason = new Error('session closed');
@@ -64,10 +65,10 @@ test.each(['http', 'fetch', 'json'])(
     const signals: AbortSignal[] = [];
     const reason = new Error('connection failed');
     const fetcher: typeof fetch = async (input, init) => {
-      if (String(input) === url) return Response.json(manifest);
+      if (requestUrl(input) === url) return Response.json(manifest);
       const signal = init!.signal!;
       signals.push(signal);
-      if (String(input).endsWith('rig.json')) {
+      if (requestUrl(input).endsWith('rig.json')) {
         if (failure === 'fetch') throw reason;
         return failure === 'http' ? new Response(null, { status: 404 }) : new Response('{invalid');
       }
@@ -108,7 +109,7 @@ test('successful custom loads share a request signal and detach caller cancellat
   const signals: AbortSignal[] = [];
   const fetcher: typeof fetch = async (input, init) => {
     signals.push(init!.signal!);
-    return Response.json(files[new URL(String(input)).pathname.slice(1)]);
+    return Response.json(files[new URL(requestUrl(input)).pathname.slice(1)]);
   };
   const character = await CharacterLoader.load(url, fetcher, { signal: controller.signal });
   assert.equal(character.id, 'test');

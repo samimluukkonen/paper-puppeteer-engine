@@ -23,6 +23,7 @@ import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js'
 import { animationClipSchema, rigDefinitionSchema } from '../src/engine/schemas.js';
 import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
+import { requestUrl } from './helpers/requestUrl.js';
 
 const root = new URL('../public/characters/demo-puppet/', import.meta.url);
 const files = import.meta.glob('../public/characters/demo-puppet/**/*.json', { eager: true, import: 'default' });
@@ -343,7 +344,7 @@ test('character validation preserves pose leaf diagnostics rather than combining
 test('loader fetches JSON relative to the manifest and leaves image loading to the host', async () => {
   const requested: string[] = [];
   const fetcher = (async (url: string | URL | Request) => {
-    const target = new URL(String(url));
+    const target = new URL(requestUrl(url));
     requested.push(target.pathname);
     const path = target.href.slice(root.href.length);
     return new Response(JSON.stringify(read(path)), { status: 200, headers: { 'content-type': 'application/json' } });

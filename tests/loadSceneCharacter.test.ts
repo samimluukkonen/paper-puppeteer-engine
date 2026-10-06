@@ -5,6 +5,7 @@ import { afterEach, assert, test, vi } from 'vitest';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
+import { requestUrl } from './helpers/requestUrl.js';
 
 vi.mock('phaser', () => ({
   default: {
@@ -138,7 +139,7 @@ test('a metadata failure aborts sibling requests and preserves the original erro
   const aborted = vi.fn();
   let siblingSignal: AbortSignal | undefined;
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
+    const url = requestUrl(input);
     if (url.endsWith('character.json'))
       return Response.json({
         version: 1,
