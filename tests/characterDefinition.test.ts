@@ -3,6 +3,7 @@ import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { demoIK } from '../src/demo/demoIK.js';
 import { demoHipPositions, demoRenderOrder } from '../src/demo/demoPresentation.js';
+import { compileClip } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import {
   CharacterDefinition,
@@ -19,7 +20,9 @@ import {
 } from '../src/engine/externalData.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
+import { parsePoseDefinition, validatePoseDefinition } from '../src/engine/Pose.js';
 import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
+import type { Rig } from '../src/engine/Rig.js';
 import { animationClipSchema, rigDefinitionSchema } from '../src/engine/schemas.js';
 import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
@@ -292,6 +295,68 @@ test('character manifest rejects unsupported versions', () => {
   const data = bundle();
   (data.manifest as typeof manifest & { version: number }).version = 2;
   assert.ok(validateCharacterDefinition(data).some((entry) => entry.path === 'manifest.version'));
+});
+
+test.each(['missing', 'invalid'] as const)('%s rigs do not hide animation or pose file diagnostics', (condition) => {
+  const data = bundle();
+  if (condition === 'missing') delete (data as { rig?: unknown }).rig;
+  else data.rig = { version: 1, root: 'root', bones: [{ id: 'root', parent: 'root' }] };
+  data.animations[manifest.animations[0]!] = { version: 1, name: 'bad', duration: -100, loop: false, tracks: {} };
+  data.animations[manifest.animations[1]!] = {
+    version: 1,
+    name: 'timeline',
+    duration: 1000,
+    loop: false,
+    tracks: {
+      unknown: [
+        { time: 500, x: 1 },
+        { time: 100, x: 2 },
+      ],
+    },
+    events: [{ time: 1001, name: 'late' }],
+  };
+  data.poses[manifest.poses![0]!] = { version: 999, name: 'bad', bones: {} };
+  const issues = validateCharacterDefinition(data);
+  for (const path of [
+    'animations[0].duration',
+    'animations[1].tracks.unknown[1].time',
+    'animations[1].events[0].time',
+    'poses[0].version',
+  ]) {
+    assert.ok(
+      issues.some((issue) => issue.path === path),
+      `Missing diagnostic for ${path}`,
+    );
+  }
+  assert.isFalse(issues.some((issue) => /unknown bone/i.test(issue.message)));
+  assert.throws(() => CharacterDefinition.fromData(data), CharacterValidationError);
+});
+
+test('pose field and duplicate-name diagnostics remain available without a rig', () => {
+  const data = bundle();
+  delete (data as { rig?: unknown }).rig;
+  const path = manifest.poses![0]!;
+  data.poses[path] = { version: 1, name: 'bad', bones: { unknown: { x: 'invalid', extra: true } } };
+  const issues = validateCharacterDefinition(data);
+  assert.ok(issues.some((issue) => issue.path === 'poses[0].bones.unknown.x'));
+  assert.ok(issues.some((issue) => issue.path === 'poses[0].bones.unknown.extra'));
+  data.poses[path] = { version: 1, name: 'rest', bones: { unknown: { x: 1 } } };
+  data.manifest.poses!.push(path);
+  assert.ok(validateCharacterDefinition(data).some((issue) => /Duplicate pose name/.test(issue.message)));
+});
+
+test('standalone public animation and pose APIs still require a rig', () => {
+  const missing = undefined as unknown as Rig;
+  const animation = animationClipSchema.parse(read(manifest.animations[0]!));
+  const pose = read(manifest.poses![0]!);
+  for (const validate of [
+    () => compileClip(animation, missing),
+    () => externalData.validateAnimationDefinition(read(manifest.animations[0]!), missing),
+    () => externalData.parseAnimationClip(read(manifest.animations[0]!), missing),
+    () => validatePoseDefinition(pose, missing),
+    () => parsePoseDefinition(pose, missing),
+  ])
+    assert.throws(validate, /requires a rig/);
 });
 
 test.each([

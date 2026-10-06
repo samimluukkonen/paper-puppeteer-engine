@@ -110,11 +110,9 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       issues.push(issue(`animations[${index}]`, `Missing animation file "${path}".`));
       continue;
     }
-    if (rig) {
-      const clip = inspectAnimationDefinition(value, rig);
-      issues.push(...prefixed(clip.issues, `animations[${index}]`));
-      if (clip.data) result.animations.push(clip.data);
-    }
+    const clip = inspectAnimationDefinition(value, rig);
+    issues.push(...prefixed(clip.issues, `animations[${index}]`));
+    if (clip.data) result.animations.push(clip.data);
     const name: unknown =
       typeof value === 'object' && value !== null ? Object.getOwnPropertyDescriptor(value, 'name')?.value : undefined;
     if (typeof name === 'string') {
@@ -129,7 +127,6 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       issues.push(issue(`poses[${index}]`, `Missing pose file "${path}".`));
       continue;
     }
-    if (!rig) continue;
     const pose = inspectPoseDefinition(value, rig);
     issues.push(...prefixed(pose.issues, `poses[${index}]`));
     if (pose.data) {

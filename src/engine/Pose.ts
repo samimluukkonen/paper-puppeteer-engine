@@ -19,8 +19,8 @@ export class PoseValidationError extends Error {
   }
 }
 
-/** @internal Retain validated poses and individual diagnostics for character assembly. */
-export function inspectPoseDefinition(input: unknown, rig: Rig): ValidationResult<PoseDefinition> {
+/** @internal Inspect pose files independently; check bone references when a valid rig is available. */
+export function inspectPoseDefinition(input: unknown, rig?: Rig): ValidationResult<PoseDefinition> {
   const issues: ValidationIssue[] = [];
   checkJson(input, '', issues);
   if (issues.length) return { issues };
@@ -32,17 +32,20 @@ export function inspectPoseDefinition(input: unknown, rig: Rig): ValidationResul
     return { issues, versionError };
   }
   for (const id of Object.keys(parsed.data.bones))
-    if (!rig.hasBone(id)) issues.push({ severity: 'error', path: `bones.${id}`, message: `Unknown bone "${id}".` });
+    if (rig && !rig.hasBone(id))
+      issues.push({ severity: 'error', path: `bones.${id}`, message: `Unknown bone "${id}".` });
   return issues.length ? { issues, versionError } : { issues, data: parsed.data };
 }
 
 /** Reports JSON, version, field and rig-reference diagnostics without throwing. */
 export function validatePoseDefinition(input: unknown, rig: Rig): ValidationIssue[] {
+  if (!rig) throw new Error('Pose validation requires a rig.');
   return inspectPoseDefinition(input, rig).issues;
 }
 
 /** A pose is sparse and uses absolute local joint values, in radians for rotation. */
 export function parsePoseDefinition(input: unknown, rig: Rig): PoseDefinition {
+  if (!rig) throw new Error('Pose parsing requires a rig.');
   const { issues, data, versionError } = inspectPoseDefinition(input, rig);
   if (!data) {
     if (versionError) throw versionError;

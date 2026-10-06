@@ -127,6 +127,7 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
 
 /** Compile sparse keys per property once rather than searching them every frame. */
 export function compileClip(clip: AnimationClip, rig: Rig): CompiledClip {
+  if (!rig) throw new Error('Animation compilation requires a rig.');
   clip = animationClipSchema.parse(clip);
   checkAnimationReferences(clip, rig, throwValidationIssue);
   return compileValidatedClip(clip);

@@ -179,8 +179,8 @@ export function parseRigDefinition(input: unknown): Rig {
   return new Rig(data);
 }
 
-/** @internal Retains validated clips for character assembly. */
-export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinition): ValidationResult<AnimationClip> {
+/** @internal Inspect files and timelines independently; check bone references when a valid rig is available. */
+export function inspectAnimationDefinition(input: unknown, rig?: Rig | RigDefinition): ValidationResult<AnimationClip> {
   const issues: ValidationIssue[] = [];
   if (!checkJson(input, '', issues)) return { issues };
   const { issues: versionIssues, versionError } = inspectVersion(input, ANIMATION_FORMAT_VERSION, 'animation');
@@ -193,11 +193,13 @@ export function inspectAnimationDefinition(input: unknown, rig: Rig | RigDefinit
 
 /** Reports file, scalar, timeline and rig-reference errors. */
 export function validateAnimationDefinition(input: unknown, rig: Rig | RigDefinition): ValidationIssue[] {
+  if (!rig) throw new Error('Animation validation requires a rig.');
   return inspectAnimationDefinition(input, rig).issues;
 }
 
 /** Validate a versioned file and return an ordinary clip for AnimationPlayer.addAnimation. */
 export function parseAnimationClip(input: unknown, rig: Rig | RigDefinition): AnimationClip {
+  if (!rig) throw new Error('Animation parsing requires a rig.');
   const { issues, data, versionError } = inspectAnimationDefinition(input, rig);
   if (!data) {
     if (versionError) throw versionError;

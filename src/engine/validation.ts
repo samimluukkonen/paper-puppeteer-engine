@@ -136,12 +136,13 @@ export function checkSkinReferences(
 
 export function checkAnimationReferences(
   clip: AnimationClip,
-  rig: Pick<RigDefinition, 'bones'>,
+  rig: Pick<RigDefinition, 'bones'> | undefined,
   report: ReportValidationIssue,
 ): void {
-  const boneIds = new Set(rig.bones.map((bone) => bone.id));
+  // Timeline rules remain checkable even when character assembly has no valid skeleton.
+  const boneIds = rig ? new Set(rig.bones.map((bone) => bone.id)) : undefined;
   for (const [bone, keys] of Object.entries(clip.tracks)) {
-    if (!boneIds.has(bone))
+    if (boneIds && !boneIds.has(bone))
       report(
         {
           severity: 'error',
