@@ -10,8 +10,8 @@ import { type JointTransform, type TransformProperty, transformProperties } from
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
+import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import {
-  findAdjacentBonePropertyKeyframe,
   findBonePropertyKeyframe,
   getEvaluatedBonePropertyValue,
   getEvaluatedBoneTransform,
@@ -22,7 +22,7 @@ import {
   setBonePropertyKeyframe,
 } from './keyframes.js';
 import { animationDurationSeconds } from './timeline.js';
-import { buildTimelineTracks, type KeyframeSelection, type TimelineTrack } from './timelineTracks.js';
+import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export const AUTHORED_FPS_MIN = 1;
@@ -53,18 +53,13 @@ export class AnimationEditorState {
   private cachedDirty: boolean | undefined;
   private issues: readonly ValidationIssue[] = [];
   private history = this.createHistory();
-  private selectedBone: string | null = null;
-  private selectedProperty: TransformProperty | null = null;
-  private selectedKey: KeyframeSelection | null = null;
-  private readonly expandedTimelineBones = new Set<string>();
-  private trackRows: readonly TimelineTrack[] | undefined;
-  private trackAnimation: ReadonlyAnimation | null | undefined;
-  private temporaryTransform: Readonly<Partial<JointTransform>> = Object.freeze({});
+  private readonly selection: AnimationEditorSelection;
 
   constructor(
     readonly rig?: Rig,
     animations: readonly AnimationClip[] = [],
   ) {
+    this.selection = new AnimationEditorSelection(rig);
     for (const animation of animations) {
       const file = this.inspect({ ...animation, version: ANIMATION_FORMAT_VERSION });
       this.animations.set(animation.name, { source: file, saved: file, issues: this.issues });
@@ -76,13 +71,13 @@ export class AnimationEditorState {
     return [...this.animations.keys()];
   }
   get selectedBoneId(): string | null {
-    return this.selectedBone;
+    return this.selection.boneId;
   }
   get selectedTimelineProperty(): TransformProperty | null {
-    return this.selectedProperty;
+    return this.selection.property;
   }
   get selectedKeyframe(): KeyframeSelection | null {
-    return this.selectedKey;
+    return this.selection.key;
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection): boolean {
@@ -92,26 +87,17 @@ export class AnimationEditorState {
     if (!key) return false;
     this.playback.pause();
     this.playback.endScrub();
-    this.clearTransformDraft();
-    this.selectedBone = boneId;
-    this.selectedProperty = property;
-    this.selectedKey = Object.freeze({ boneId, property, time: key.time / 1000 });
-    if (!this.expandedTimelineBones.has(boneId)) {
-      this.expandedTimelineBones.add(boneId);
-      this.trackRows = undefined;
-    }
-    this.updateTime(this.selectedKey.time);
+    this.selection.selectKey({ boneId, property, time: key.time / 1000 });
+    this.updateTime(key.time / 1000);
     this.notify();
     return true;
   }
   clearKeyframeSelection(): void {
-    if (!this.selectedKey) return;
-    this.selectedKey = null;
-    this.notify();
+    if (this.selection.clearKey()) this.notify();
   }
   /** Delete the selected authored time even when the playhead has scrubbed elsewhere. */
   deleteSelectedKeyframe(): boolean {
-    const key = this.selectedKey;
+    const key = this.selection.key;
     if (!key) return false;
     this.playback.pause();
     this.clearTransformDraft();
@@ -119,11 +105,7 @@ export class AnimationEditorState {
   }
   /** Previous/next authored key on the selected property, relative to the current playhead. */
   getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
-    const boneId = this.selectedBone;
-    const property = this.selectedProperty;
-    if (!this.working || !boneId || !property) return undefined;
-    const key = findAdjacentBonePropertyKeyframe(this.working, boneId, property, this.currentTime * 1000, direction);
-    return key ? Object.freeze({ boneId, property, time: key.time / 1000 }) : undefined;
+    return this.selection.adjacentKey(this.working, this.currentTime, direction);
   }
   selectAdjacentKeyframe(direction: -1 | 1): boolean {
     const key = this.getAdjacentKeyframe(direction);
@@ -131,90 +113,64 @@ export class AnimationEditorState {
   }
   /** Authored snapshots are authoritative; history never restores transient selection. */
   private validateKeyframeSelection(): void {
-    const selection = this.selectedKey;
-    if (!selection) return;
-    const key = this.findBonePropertyKeyframe(selection.boneId, selection.property, selection.time);
-    if (!key) this.selectedKey = null;
-    else if (key.time / 1000 !== selection.time)
-      this.selectedKey = Object.freeze({ ...selection, time: key.time / 1000 });
+    this.selection.validateKey(this.working);
   }
   /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
   get timelineTracks(): readonly TimelineTrack[] {
-    if (!this.trackRows || this.trackAnimation !== this.working) {
-      this.trackRows = buildTimelineTracks(this.rig, this.working, this.expandedTimelineBones);
-      this.trackAnimation = this.working;
-    }
-    return this.trackRows;
+    return this.selection.tracks(this.working);
   }
   isTimelineBoneExpanded(boneId: string): boolean {
-    return this.expandedTimelineBones.has(boneId);
+    return this.selection.isExpanded(boneId);
   }
   setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
     if (!this.rig?.hasBone(boneId)) return false;
-    if (this.expandedTimelineBones.has(boneId) !== expanded) {
-      if (expanded) this.expandedTimelineBones.add(boneId);
-      else this.expandedTimelineBones.delete(boneId);
-      this.trackRows = undefined;
-      this.notify();
-    }
+    if (this.selection.setExpanded(boneId, expanded)) this.notify();
     return true;
   }
   /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
     if (!this.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
-    if (this.selectedBone !== boneId || this.selectedProperty !== property || this.selectedKey !== null) {
-      this.selectedBone = boneId;
-      this.selectedProperty = property;
-      this.selectedKey = null;
-      this.clearTransformDraft();
-      this.notify();
-    }
+    if (this.selection.selectProperty(boneId, property)) this.notify();
     return true;
   }
   /** Editor-only prospective local values, never serialized or recorded in history. */
   get boneTransformDraft(): Readonly<Partial<JointTransform>> {
-    return this.temporaryTransform;
+    return this.selection.draft;
   }
   get hasTemporaryTransform(): boolean {
-    return Object.keys(this.temporaryTransform).length > 0;
+    return this.selection.hasDraft;
   }
   get selectedBoneTransform(): JointTransform | undefined {
-    const evaluated = this.selectedBone ? this.getEvaluatedBoneTransform(this.selectedBone) : undefined;
-    return evaluated ? { ...evaluated, ...this.temporaryTransform } : undefined;
+    const evaluated = this.selection.boneId ? this.getEvaluatedBoneTransform(this.selection.boneId) : undefined;
+    return evaluated ? { ...evaluated, ...this.selection.draft } : undefined;
   }
   selectBone(id: string | null): boolean {
     if (id !== null && !this.rig?.hasBone(id)) return false;
-    if (id !== this.selectedBone || this.selectedProperty !== null || this.selectedKey !== null) {
-      this.selectedBone = id;
-      this.selectedProperty = null;
-      this.selectedKey = null;
-      this.clearTransformDraft();
-      this.notify();
-    }
+    if (this.selection.selectBone(id)) this.notify();
     return true;
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
-    if (this.selectedBone && this.working) this.pause();
+    if (this.selection.boneId && this.working) this.pause();
   }
   setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
-    if (!this.selectedBone || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
+    if (!this.selection.boneId || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
       return false;
     this.playback.pause();
-    this.temporaryTransform = Object.freeze({ ...this.temporaryTransform, [property]: value });
+    this.selection.setDraft(property, value);
     this.notify();
     return true;
   }
   commitBoneProperty(property: TransformProperty): boolean {
-    if (!this.selectedBone || !transformProperties.includes(property)) return false;
+    if (!this.selection.boneId || !transformProperties.includes(property)) return false;
     this.beginTransformEdit();
     const value = this.selectedBoneTransform?.[property];
-    return value !== undefined && this.setBonePropertyKeyframe(this.selectedBone, property, value);
+    return value !== undefined && this.setBonePropertyKeyframe(this.selection.boneId, property, value);
   }
   deleteBonePropertyKey(property: TransformProperty): boolean {
-    if (!this.selectedBone || !transformProperties.includes(property)) return false;
+    if (!this.selection.boneId || !transformProperties.includes(property)) return false;
     this.beginTransformEdit();
-    return this.removeBonePropertyKeyframe(this.selectedBone, property);
+    return this.removeBonePropertyKeyframe(this.selection.boneId, property);
   }
   cancelTransformEdit(): void {
     if (!this.hasTemporaryTransform) return;
@@ -222,9 +178,7 @@ export class AnimationEditorState {
     this.notify();
   }
   private clearTransformDraft(): boolean {
-    if (!this.hasTemporaryTransform) return false;
-    this.temporaryTransform = Object.freeze({});
-    return true;
+    return this.selection.clearDraft();
   }
   get selectedAnimationId(): string | null {
     return this.selectedId;
@@ -311,9 +265,7 @@ export class AnimationEditorState {
     this.source = entry?.source ?? null;
     this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
     this.selectedId = id;
-    this.selectedProperty = null;
-    this.selectedKey = null;
-    this.clearTransformDraft();
+    this.selection.resetAnimation();
     this.playback.reset();
     this.issues = [];
     this.saved = this.working;
@@ -406,12 +358,12 @@ export class AnimationEditorState {
         // Clear the key actually removed, even if a distinct nearby authored time is within tolerance.
         if (
           next !== animation &&
-          this.selectedKey?.boneId === boneId &&
-          this.selectedKey.property === property &&
+          this.selection.key?.boneId === boneId &&
+          this.selection.key.property === property &&
           key !== undefined &&
-          key.time / 1000 === this.selectedKey.time
+          key.time / 1000 === this.selection.key.time
         )
-          this.selectedKey = null;
+          this.selection.clearKey();
         return next;
       },
       boneId,
@@ -441,13 +393,11 @@ export class AnimationEditorState {
     }
     // The mutation helper validated the result and shares only this state's owned frozen branches.
     if (
-      boneId === this.selectedBone &&
+      boneId === this.selection.boneId &&
       keyframeTimesMatch(timeSeconds * 1000, this.currentTime * 1000) &&
-      this.temporaryTransform[property] !== undefined
+      this.selection.draft[property] !== undefined
     ) {
-      const draft = { ...this.temporaryTransform };
-      delete draft[property];
-      this.temporaryTransform = Object.freeze(draft);
+      this.selection.clearDraftProperty(property);
     }
     return this.installWorkingAnimation(freezeData(next), true);
   }
