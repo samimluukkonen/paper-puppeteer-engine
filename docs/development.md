@@ -143,6 +143,7 @@ src/devtools/animation-editor/
   main.ts              Animation editor page and Phaser bootstrap
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
   AnimationEditorState.ts  Authored edit coordination, transform drafts, selection and navigation
+  AnimationEditorKeyframeCommands.ts  Keyframe mutation transactions, drag preview, snapping and nudges
   AnimationEditorDocument.ts  Validated animation snapshots, saved baselines, history and export
   AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
@@ -223,3 +224,5 @@ Compiled clips own immutable metadata, property maps, keyframes, playback settin
 Profile dense editor authoring with `VITE_PROFILE=1 npx vitest run tests/animationAuthoring.profile.test.ts --reporter=verbose`. It measures one property-key edit plus inspector sampling on 33 bones with 512 keys per track, using five warmed batches of ten edits. A local comparison measured 242 ms/edit before validation reuse and 164 ms/edit afterward; these CPU measurements exclude DOM and GPU work and are diagnostic, not CI thresholds.
 
 Editor validation is cached per deeply frozen animation snapshot and rig. Mutable and shallow-frozen inputs are checked on every use. Key edits from a validated immutable source check metadata and changed tracks; shared tracks and events retain their validation only when the rig and duration are unchanged. Duration changes receive full validation. Deep immutability checks reuse verified frozen branches, and preview compilation reuses immutable property maps for unchanged track arrays. Each preview keeps independent pose buffers. The public `compileClip` entry point continues to validate all supplied clips.
+
+Keyframe commands and gestures are owned by `AnimationEditorKeyframeCommands`; `AnimationEditorState` retains the existing public API and coordinates navigation, playback, drafts, and snapshot installation. Single-property edits, moves, and selected deletion share one error-handling and installation boundary. Batch deletion resolves all references against the original animation, copies each changed track once, and validates one result for one history action. Selection indexes use exact canonical bone/property/time identities while preserving first-occurrence order, primary-key rules, and distinct authored times within the lookup tolerance.

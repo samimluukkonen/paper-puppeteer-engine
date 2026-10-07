@@ -8,6 +8,7 @@ import {
   type AnimationEditorStateOptions,
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
+import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import {
@@ -16,11 +17,6 @@ import {
   getEvaluatedBoneTransform,
   getKeyedPropertiesAtTime,
   hasKeyframeAtTime,
-  keyframeTimesMatch,
-  moveBonePropertyKeyframe,
-  removeBonePropertyKeyframe,
-  removeBonePropertyKeyframes,
-  setBonePropertyKeyframe,
 } from './keyframes.js';
 import {
   keysInMarquee,
@@ -29,7 +25,7 @@ import {
   type KeyframeMarquee,
   type KeyframeSelectionModifiers,
 } from './keyframeSelection.js';
-import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
+import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
@@ -39,10 +35,7 @@ export const DEFAULT_AUTHORED_FPS = DEFAULT_KEYFRAME_FPS;
 
 export type { AnimationEditorStateOptions, ReadonlyAnimation } from './AnimationEditorDocument.js';
 
-export interface KeyframeDrag {
-  readonly key: KeyframeSelection;
-  readonly previewTime: number;
-}
+export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
@@ -50,8 +43,7 @@ export class AnimationEditorState {
   private readonly listeners = new Set<() => void>();
   private readonly playback = new AnimationEditorPlayback(() => this.duration);
   private readonly selection: AnimationEditorSelection;
-  private drag: KeyframeDrag | null = null;
-  private snapMode: KeyframeSnapMode = 'none';
+  private readonly keyframes: AnimationEditorKeyframeCommands;
 
   constructor(
     readonly rig?: Rig,
@@ -60,6 +52,12 @@ export class AnimationEditorState {
   ) {
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
+    this.keyframes = new AnimationEditorKeyframeCommands(this.document, this.selection, this.playback, {
+      select: (key) => this.selectKeyframe(key),
+      updateTime: (time) => this.updateTime(time),
+      install: (animation, retainDraft) => this.installWorkingAnimation(animation, retainDraft),
+      notify: () => this.notify(),
+    });
   }
 
   private get working(): ReadonlyAnimation | null {
@@ -85,86 +83,34 @@ export class AnimationEditorState {
     return this.selection.key;
   }
   get keyframeDrag(): KeyframeDrag | null {
-    return this.drag;
+    return this.keyframes.keyframeDrag;
   }
   get keyframeSnapMode(): KeyframeSnapMode {
-    return this.snapMode;
+    return this.keyframes.keyframeSnapMode;
   }
   get keyframeFPS(): number {
-    const playback = this.working?.playback;
-    return playback?.mode === 'stepped' ? playback.fps : DEFAULT_KEYFRAME_FPS;
+    return this.keyframes.keyframeFPS;
   }
   setKeyframeSnapMode(mode: KeyframeSnapMode): void {
-    if ((mode !== 'none' && mode !== 'frame') || mode === this.snapMode) return;
-    this.snapMode = mode;
-    this.notify();
+    this.keyframes.setKeyframeSnapMode(mode);
   }
   beginKeyframeDrag(key: KeyframeSelection): boolean {
-    this.cancelKeyframeDrag();
-    if (!this.selectKeyframe(key)) return false;
-    this.drag = Object.freeze({ key: this.selection.key!, previewTime: this.currentTime });
-    this.notify();
-    return true;
+    return this.keyframes.beginKeyframeDrag(key);
   }
   previewKeyframeDrag(time: number, disableSnapping = false): boolean {
-    if (!this.drag || !Number.isFinite(time)) return false;
-    const previewTime = snapKeyframeTime(
-      time,
-      this.duration,
-      disableSnapping ? 'none' : this.snapMode,
-      this.keyframeFPS,
-    );
-    this.drag = Object.freeze({ key: this.drag.key, previewTime });
-    this.updateTime(previewTime);
-    this.notify();
-    return true;
+    return this.keyframes.previewKeyframeDrag(time, disableSnapping);
   }
   commitKeyframeDrag(): boolean {
-    const drag = this.drag;
-    if (!drag) return false;
-    this.drag = null;
-    return this.moveSelectedKeyframe(drag.previewTime);
+    return this.keyframes.commitKeyframeDrag();
   }
   cancelKeyframeDrag(): boolean {
-    if (!this.drag) return false;
-    const time = this.drag.key.time;
-    this.drag = null;
-    this.updateTime(time);
-    this.notify();
-    return true;
+    return this.keyframes.cancelKeyframeDrag();
   }
-  /** Explicit time moves are continuous seconds; only drag/nudge apply editor snapping. */
   moveSelectedKeyframe(time: number): boolean {
-    const key = this.selection.key;
-    if (!key || !Number.isFinite(time)) return false;
-    time = Math.max(0, Math.min(time, this.duration));
-    this.cancelKeyframeDrag();
-    this.playback.pause();
-    return this.editKeyframe(
-      (animation, rig) => {
-        const next = moveBonePropertyKeyframe(animation, rig, key.boneId, key.property, key.time * 1000, time * 1000);
-        const moved = findBonePropertyKeyframe(
-          next,
-          key.boneId,
-          key.property,
-          (next === animation ? key.time : time) * 1000,
-        );
-        if (moved) {
-          this.selection.moveKey(key, { ...key, time: moved.time / 1000 });
-          this.updateTime(moved.time / 1000);
-        }
-        return next;
-      },
-      key.boneId,
-      key.property,
-      key.time,
-    );
+    return this.keyframes.moveSelectedKeyframe(time);
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
-    if (!this.selection.key || this.selectedKeys.length !== 1 || this.drag) return false;
-    const step = this.snapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
-    const time = this.selection.key.time + direction * step * (large ? 10 : 1);
-    return this.moveSelectedKeyframe(snapKeyframeTime(time, this.duration, this.snapMode, this.keyframeFPS));
+    return this.keyframes.nudgeSelectedKeyframe(direction, large);
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
@@ -227,27 +173,10 @@ export class AnimationEditorState {
   selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
     this.selectKeyframes(keysInMarquee(this.timelineTracks, box), additive);
   }
-  /** All selected authored properties are removed before installing one validated history snapshot. */
   deleteSelectedKeyframes(): boolean {
-    this.cancelKeyframeDrag();
-    if (!this.selectedKeys.length || !this.working || !this.rig) return false;
-    this.playback.pause();
-    let next = this.working;
-    try {
-      next = removeBonePropertyKeyframes(
-        this.working,
-        this.rig,
-        this.selectedKeys.map((key) => ({ boneId: key.boneId, property: key.property, timeMs: key.time * 1000 })),
-      );
-    } catch (error) {
-      this.document.reportError(error);
-      this.notify();
-      return false;
-    }
-    this.selection.clearKey();
-    return this.installWorkingAnimation(freezeData(next));
+    return this.keyframes.deleteSelectedKeyframes();
   }
-  /** Compatibility alias: deletion now operates on the whole selection. */
+  /** Compatibility alias: deletion operates on the whole selection. */
   deleteSelectedKeyframe(): boolean {
     return this.deleteSelectedKeyframes();
   }
@@ -470,53 +399,11 @@ export class AnimationEditorState {
     value: number,
     timeSeconds = this.currentTime,
   ): boolean {
-    return this.editKeyframe(
-      (animation, rig) => setBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000, value),
-      boneId,
-      property,
-      timeSeconds,
-    );
+    return this.keyframes.setBonePropertyKeyframe(boneId, property, value, timeSeconds);
   }
 
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
-    return this.editKeyframe(
-      (animation, rig) => {
-        const key = findBonePropertyKeyframe(animation, boneId, property, timeSeconds * 1000);
-        const next = removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000);
-        // Remove exact authored identity before nearby keys can be resolved through tolerance.
-        if (next !== animation && key) this.selection.removeKey({ boneId, property, time: key.time / 1000 });
-        return next;
-      },
-      boneId,
-      property,
-      timeSeconds,
-    );
-  }
-
-  private editKeyframe(
-    edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation,
-    boneId: string,
-    property: TransformProperty,
-    timeSeconds: number,
-  ): boolean {
-    if (!this.working || !this.rig) return false;
-    let next: ReadonlyAnimation;
-    try {
-      next = edit(this.working, this.rig);
-    } catch (error) {
-      this.document.reportError(error);
-      this.notify();
-      return false;
-    }
-    // The mutation helper validated the result and shares only this state's owned frozen branches.
-    if (
-      boneId === this.selection.boneId &&
-      keyframeTimesMatch(timeSeconds * 1000, this.currentTime * 1000) &&
-      this.selection.draft[property] !== undefined
-    ) {
-      this.selection.clearDraftProperty(property);
-    }
-    return this.installWorkingAnimation(freezeData(next), true);
+    return this.keyframes.removeBonePropertyKeyframe(boneId, property, timeSeconds);
   }
 
   /** Queries never install animation snapshots or change validation, history, or dirty state.
@@ -568,7 +455,7 @@ export class AnimationEditorState {
 
   /** Resume the sole editor clock; a completed clip starts again at zero. */
   play(): void {
-    if (this.drag) return;
+    if (this.keyframeDrag) return;
     if (!this.playback.play()) return;
     this.clearTransformDraft();
     this.notify();
