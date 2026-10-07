@@ -287,6 +287,64 @@ function replacePropertyAtTime(
   return nextKeys;
 }
 
+/** Index nearby rows while editing one track; publish and sort its array only once. */
+function setTrackPropertyKeyframes(keys: readonly Keyframe[], edits: readonly PropertyKeyframeEdit[]): Keyframe[] {
+  const rows = new Map<number, Keyframe>();
+  const buckets = new Map<number, Set<number>>();
+  const bucketOf = (time: number): number => Math.floor(time / (2 * KEYFRAME_TIME_TOLERANCE_MS));
+  const add = (key: Keyframe): void => {
+    rows.set(key.time, key);
+    const bucket = bucketOf(key.time);
+    let times = buckets.get(bucket);
+    if (!times) {
+      times = new Set();
+      buckets.set(bucket, times);
+    }
+    times.add(key.time);
+  };
+  const remove = (time: number): void => {
+    rows.delete(time);
+    const bucket = bucketOf(time);
+    const times = buckets.get(bucket)!;
+    times.delete(time);
+    if (!times.size) buckets.delete(bucket);
+  };
+  for (const key of keys) add(key);
+  const matches = (time: number, property: TransformProperty): Keyframe[] => {
+    const bucket = bucketOf(time);
+    const found: Keyframe[] = [];
+    // Deduplicate neighboring buckets when large timestamps round to the same number.
+    for (const nearby of new Set([bucket - 1, bucket, bucket + 1])) {
+      for (const candidate of buckets.get(nearby) ?? []) {
+        const row = rows.get(candidate)!;
+        if (row[property] !== undefined && keyframeTimesMatch(candidate, time)) found.push(row);
+      }
+    }
+    return found;
+  };
+  for (const { property, timeMs, value } of edits) {
+    let time = timeMs;
+    let distance = Infinity;
+    for (const row of matches(timeMs, property)) {
+      const nextDistance = Math.abs(row.time - timeMs);
+      if (nextDistance < distance || (nextDistance === distance && row.time < time)) {
+        time = row.time;
+        distance = nextDistance;
+      }
+    }
+    // Collision removal is centered on the canonical destination, including matches
+    // outside the original query's tolerance. Other properties retain their times.
+    for (const key of matches(time, property)) {
+      const row = { ...key };
+      delete row[property];
+      if (transformProperties.some((entry) => row[entry] !== undefined)) rows.set(row.time, row);
+      else remove(row.time);
+    }
+    add({ ...rows.get(time), time, [property]: value });
+  }
+  return [...rows.values()].sort((a, b) => a.time - b.time);
+}
+
 /** Atomically validate a group, preserve move collision semantics, and optionally extend authored duration. */
 export function setBonePropertyKeyframes<Animation extends AnimationData>(
   animation: Animation,
@@ -308,11 +366,15 @@ export function setBonePropertyKeyframes<Animation extends AnimationData>(
     timeMs: assertTarget(target, rig, edit.boneId, edit.property, edit.timeMs),
   }));
   const tracks = { ...animation.tracks };
-  for (const { boneId, property, timeMs, value } of normalized) {
-    const keys = Object.hasOwn(tracks, boneId) ? tracks[boneId]! : [];
-    const destination = matchingRow(keys, timeMs, property);
-    const time = destination >= 0 ? keys[destination]!.time : timeMs;
-    tracks[boneId] = replacePropertyAtTime(keys, property, time, value);
+  const groups = new Map<string, PropertyKeyframeEdit[]>();
+  for (const edit of normalized) {
+    const group = groups.get(edit.boneId) ?? [];
+    group.push(edit);
+    groups.set(edit.boneId, group);
+  }
+  for (const [boneId, group] of groups) {
+    const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+    tracks[boneId] = setTrackPropertyKeyframes(keys, group);
   }
   return validateEditedAnimation({ ...animation, duration, tracks }, animation, rig);
 }

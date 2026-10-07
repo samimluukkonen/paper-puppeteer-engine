@@ -354,3 +354,56 @@ test('pasting identical values is a selected no-op preserving dirty baseline and
   assert.isFalse(state.dirty);
   assert.isTrue(state.canRedo);
 });
+
+test('bulk edits retain sequential collisions, nearest-time ties and sparse siblings across time buckets', () => {
+  const { rig } = session();
+  // Binary-exact offsets make the nearest-key tie independent of decimal rounding.
+  const step = 2 ** -21;
+  const time = 2 ** -17;
+  const source: AnimationClip = {
+    name: 'batch',
+    duration: 2000,
+    loop: false,
+    tracks: {
+      torso: [
+        { time: time - step, x: 1, y: 2 },
+        { time, x: 3 },
+        { time: time + step * 2, x: 4, rotation: 5 },
+      ],
+      forearm: [{ time: 1000, y: 6 }],
+    },
+  };
+  const before = structuredClone(source);
+  const next = setBonePropertyKeyframes(source, rig, [
+    { boneId: 'torso', property: 'x', timeMs: time + step, value: 10 },
+    { boneId: 'torso', property: 'y', timeMs: time + step * 2, value: 20 },
+    { boneId: 'torso', property: 'x', timeMs: time + step / 2, value: 30 },
+  ]);
+  assert.deepEqual(next.tracks.torso, [
+    { time: time - step, y: 2 },
+    { time, x: 30 },
+    { time: time + step * 2, rotation: 5, y: 20 },
+  ]);
+  assert.strictEqual(next.tracks.forearm, source.tracks.forearm);
+  assert.deepEqual(source, before);
+  assert.isFalse(Object.isFrozen(source.tracks.torso));
+});
+
+test('bulk edits sort out-of-order groups once and retain exact large timestamps', () => {
+  const { rig } = session();
+  const source: AnimationClip = { name: 'batch', duration: 1e308, loop: false, tracks: {} };
+  const next = setBonePropertyKeyframes(source, rig, [
+    { boneId: 'torso', property: 'x', timeMs: 1e308, value: 1 },
+    { boneId: 'torso', property: 'x', timeMs: 0, value: 2 },
+    { boneId: 'torso', property: 'y', timeMs: 1e308, value: 3 },
+    { boneId: 'forearm', property: 'rotation', timeMs: 10, value: 4 },
+    { boneId: 'torso', property: 'x', timeMs: 1e308, value: 5 },
+  ]);
+  assert.deepEqual(next.tracks, {
+    torso: [
+      { time: 0, x: 2 },
+      { time: 1e308, x: 5, y: 3 },
+    ],
+    forearm: [{ time: 10, rotation: 4 }],
+  });
+});

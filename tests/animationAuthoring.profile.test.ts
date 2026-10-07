@@ -1,5 +1,7 @@
 import { test } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { setBonePropertyKeyframes } from '../src/devtools/animation-editor/keyframes.js';
+import { freezeData } from '../src/engine/readonlyData.js';
 import { Rig } from '../src/engine/Rig.js';
 // Diagnostic CPU profile; no timing threshold. Run with VITE_PROFILE=1 and --reporter=verbose.
 test.skipIf(import.meta.env.VITE_PROFILE !== '1')('33 bones, 512 keys: edit and sample', { timeout: 30000 }, () => {
@@ -24,4 +26,29 @@ test.skipIf(import.meta.env.VITE_PROFILE !== '1')('33 bones, 512 keys: edit and 
   run(5);
   const values = Array.from({ length: 5 }, () => run(10)).sort((a, b) => a - b);
   console.log('Dense authoring median ms/edit:', values[2]);
+});
+
+test.skipIf(import.meta.env.VITE_PROFILE !== '1')('dense bulk property edits', { timeout: 30000 }, () => {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  for (const count of [1000, 2000]) {
+    const source = freezeData({
+      name: 'bulk',
+      duration: count * 10,
+      loop: false,
+      tracks: { root: Array.from({ length: count }, (_, i) => ({ time: i * 10, x: i })) },
+    });
+    const edits = Array.from({ length: count }, (_, i) => ({
+      boneId: 'root',
+      property: 'y' as const,
+      timeMs: i * 10 + 1,
+      value: i,
+    }));
+    setBonePropertyKeyframes(source, rig, edits);
+    const values = Array.from({ length: 5 }, () => {
+      const start = performance.now();
+      setBonePropertyKeyframes(source, rig, edits);
+      return performance.now() - start;
+    }).sort((a, b) => a - b);
+    console.log(`${count} bulk keys median ms:`, values[2]);
+  }
 });
