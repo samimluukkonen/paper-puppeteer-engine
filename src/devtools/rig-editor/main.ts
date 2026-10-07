@@ -1,5 +1,4 @@
 import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
-import type { RigDefinition } from '../../engine/types.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { DraftRecovery } from '../shared/DraftRecovery.js';
 import { createEditorGame } from '../shared/editorGame.js';
@@ -10,7 +9,7 @@ import { createHierarchyController } from './HierarchyController.js';
 import { createInspectorController } from './InspectorController.js';
 import type { RigEditor } from './RigEditor.js';
 import { RigEditorScene } from './RigEditorScene.js';
-import type { ReadonlyRigData } from './RigEditorState.js';
+import type { RigEditorRecoverySnapshot } from './RigEditorState.js';
 import { createSessionController } from './SessionController.js';
 import './style.css';
 
@@ -20,7 +19,7 @@ mountEditorMarkup(app);
 const releaseCharacterSelection = bindCharacterSelection(app);
 
 const recoveryStatus = app.querySelector<HTMLElement>('#rig-draft-status')!;
-const recovery = new DraftRecovery<ReadonlyRigData<RigDefinition>>((message) => {
+const recovery = new DraftRecovery<RigEditorRecoverySnapshot>((message) => {
   recoveryStatus.textContent = message;
 });
 let recoveryEditor: RigEditor | undefined;
@@ -34,9 +33,9 @@ const session = createSessionController(
         key: JSON.stringify([globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename]),
         source: JSON.stringify({ name: editor.state.name, rig: editor.state.workingCopy }),
         label: 'rig',
-        snapshot: () => editor.state.workingCopy,
+        snapshot: () => editor.state.recoverySnapshot,
         dirty: () => editor.state.dirty,
-        data: (snapshot) => ({ version: 1, ...snapshot }),
+        data: (snapshot) => editor.state.createRecoveryDraft(snapshot),
         validate: (data) => editor.state.canRestoreDraft(data),
         restore: (data) => {
           const restored = editor.state.restoreDraft(data);

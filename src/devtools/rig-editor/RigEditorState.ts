@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import {
+  checkJson,
   inspectRigDefinition,
   RIG_FORMAT_VERSION,
   type RigJsonDefinition,
@@ -33,7 +35,17 @@ export interface RigEditorStateOptions {
   historyLimit?: number;
 }
 
-type HistoryEntry = ReadonlyEditorData<{ rig: RigDefinition; directions: [string, { x: number; y: number }][] }>;
+export type RigEditorRecoverySnapshot = ReadonlyEditorData<{
+  rig: RigDefinition;
+  directions: [string, { x: number; y: number }][];
+}>;
+type HistoryEntry = RigEditorRecoverySnapshot;
+
+const recoveryDraftSchema = z.strictObject({
+  version: z.literal(1),
+  rig: z.unknown(),
+  directions: z.array(z.tuple([z.string(), z.strictObject({ x: z.number(), y: z.number() })])),
+});
 
 export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
@@ -63,6 +75,7 @@ export class RigEditorState {
   readonly source: Rig;
   private readonly data: WorkingRig;
   private cachedWorkingCopy: ReadonlyRigData<RigDefinition> | undefined;
+  private cachedHistoryEntry: HistoryEntry | undefined;
   readonly rig: Rig;
   selection: RigEditorSelection = null;
   editMode: EditMode = 'joint';
@@ -158,6 +171,7 @@ export class RigEditorState {
 
   private invalidate(): void {
     this.cachedWorkingCopy = undefined;
+    this.cachedHistoryEntry = undefined;
     this.cachedSnapshot = undefined;
     this.cachedDirty = undefined;
     this.validationDirty = true;
@@ -199,7 +213,8 @@ export class RigEditorState {
   }
 
   private historyEntry(): HistoryEntry {
-    return freezeData({ rig: this.workingCopy, directions: [...this.childDirections] });
+    this.cachedHistoryEntry ??= freezeData({ rig: this.workingCopy, directions: [...this.childDirections] });
+    return this.cachedHistoryEntry;
   }
 
   private change(edit: () => void): void {
@@ -309,15 +324,15 @@ export class RigEditorState {
     return this.cachedIssues;
   }
 
-  private exportCandidate(): RigJsonDefinition {
+  private exportCandidate(copy = this.workingCopy): RigJsonDefinition {
     return {
       version: RIG_FORMAT_VERSION,
       ...(this.name === undefined ? {} : { name: this.name }),
-      root: this.workingCopy.root,
-      bones: this.workingCopy.bones,
-      ...(this.workingCopy.slots === undefined ? {} : { slots: this.workingCopy.slots }),
-      ...(this.workingCopy.attachments === undefined ? {} : { attachments: this.workingCopy.attachments }),
-      ...(this.includeSkins && this.workingCopy.skins !== undefined ? { skins: this.workingCopy.skins } : {}),
+      root: copy.root,
+      bones: copy.bones,
+      ...(copy.slots === undefined ? {} : { slots: copy.slots }),
+      ...(copy.attachments === undefined ? {} : { attachments: copy.attachments }),
+      ...(this.includeSkins && copy.skins !== undefined ? { skins: copy.skins } : {}),
     };
   }
 
@@ -326,8 +341,21 @@ export class RigEditorState {
     return this.exportCandidate();
   }
 
-  private inspectDraft(input: unknown): RigDefinition | undefined {
-    const { data } = inspectRigDefinition(input);
+  /** Stable identity includes remembered directions, which cannot be recovered from zero offsets. */
+  get recoverySnapshot(): RigEditorRecoverySnapshot {
+    return this.historyEntry();
+  }
+
+  createRecoveryDraft(snapshot = this.recoverySnapshot) {
+    return { version: 1, rig: this.exportCandidate(snapshot.rig), directions: snapshot.directions };
+  }
+
+  private inspectDraft(input: unknown): HistoryEntry | undefined {
+    const issues: ValidationIssue[] = [];
+    if (!checkJson(input, '', issues) || issues.length) return undefined;
+    const recovery = recoveryDraftSchema.safeParse(input);
+    // Earlier browser drafts stored only the rig file; they remain recoverable.
+    const { data } = inspectRigDefinition(recovery.success ? recovery.data.rig : input);
     if (!data) return undefined;
     const initial = this.initialCopy;
     // A bind editor retains its original topology and artwork identities during authoring.
@@ -358,7 +386,29 @@ export class RigEditorState {
       !equalEditorData(data.skins ?? [], initial.skins ?? [])
     )
       return undefined;
-    return { ...data, slots: data.slots ?? [], attachments: data.attachments ?? [], skins: data.skins ?? [] };
+    const directions = recovery.success
+      ? recovery.data.directions
+      : initial.bones.flatMap((bone): [string, { x: number; y: number }][] => {
+          const distance = Math.hypot(bone.x ?? 0, bone.y ?? 0);
+          return bone.parent !== undefined && distance > 0
+            ? [[bone.id, { x: (bone.x ?? 0) / distance, y: (bone.y ?? 0) / distance }]]
+            : [];
+        });
+    const seen = new Set<string>();
+    for (const [id, direction] of directions) {
+      if (
+        seen.has(id) ||
+        !this.rig.hasBone(id) ||
+        this.rig.getBone(id).parent === undefined ||
+        Math.abs(Math.hypot(direction.x, direction.y) - 1) > 1e-12
+      )
+        return undefined;
+      seen.add(id);
+    }
+    return freezeData({
+      rig: { ...data, slots: data.slots ?? [], attachments: data.attachments ?? [], skins: data.skins ?? [] },
+      directions,
+    });
   }
 
   canRestoreDraft(input: unknown): boolean {
@@ -371,8 +421,7 @@ export class RigEditorState {
     if (!data) return false;
     this.endOperation();
     this.change(() => {
-      this.restore(freezeData(data));
-      this.childDirections.clear();
+      this.restoreHistory(data);
     });
     return true;
   }

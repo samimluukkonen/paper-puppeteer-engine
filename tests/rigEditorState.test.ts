@@ -56,6 +56,80 @@ test('invalid and incompatible rig drafts leave the working copy and history unc
   }
 });
 
+test('recovery retains edited child directions through zero length, undo and redo', () => {
+  const rig = new Rig({
+    root: 'root',
+    bones: [
+      { id: 'root', length: 20 },
+      { id: 'child', parent: 'root', x: 20, y: 0 },
+    ],
+  });
+  const edited = new RigEditorState(rig);
+  edited.editBoneFields('child', { x: -12, y: 16 });
+  edited.editBone('root', 'length', 0);
+  const snapshot = edited.recoverySnapshot;
+  assert.strictEqual(edited.recoverySnapshot, snapshot);
+  const draft = JSON.parse(JSON.stringify(edited.createRecoveryDraft(snapshot))) as unknown;
+  edited.editBone('root', 'length', 40);
+  const restored = new RigEditorState(rig);
+  assert.isTrue(restored.restoreDraft(draft));
+  assert.isTrue(restored.undo());
+  assert.isFalse(restored.dirty);
+  assert.isTrue(restored.redo());
+  restored.editBone('root', 'length', 20);
+  assert.deepEqual([restored.getBone('child').x, restored.getBone('child').y], [-12, 16]);
+  assert.isFalse(Object.hasOwn(restored.exportRig(false), 'directions'));
+});
+
+test('legacy rig drafts recover zero-length children using their source directions', () => {
+  const rig = new Rig({
+    root: 'root',
+    bones: [
+      { id: 'root', length: 20 },
+      { id: 'child', parent: 'root', x: 20, y: 0 },
+    ],
+  });
+  const edited = new RigEditorState(rig);
+  edited.editBone('root', 'length', 0);
+  const restored = new RigEditorState(rig);
+  assert.isTrue(restored.restoreDraft(edited.recoveryDraft));
+  restored.editBone('root', 'length', 20);
+  assert.deepEqual([restored.getBone('child').x, restored.getBone('child').y], [20, 0]);
+});
+
+test('invalid recovery direction metadata is rejected without mutating the rig or history', () => {
+  const state = new RigEditorState(source);
+  const draft = state.createRecoveryDraft();
+  const before = state.recoverySnapshot;
+  for (const directions of [
+    [['missing', { x: 1, y: 0 }]],
+    [['root', { x: 1, y: 0 }]],
+    [['arm', { x: NaN, y: 0 }]],
+    [['arm', { x: 0, y: 0 }]],
+    [['arm', { x: 2, y: 0 }]],
+    [
+      ['arm', { x: 1, y: 0 }],
+      ['arm', { x: 1, y: 0 }],
+    ],
+  ]) {
+    assert.isFalse(state.canRestoreDraft({ ...draft, directions }));
+    assert.isFalse(state.restoreDraft({ ...draft, directions }));
+    assert.strictEqual(state.recoverySnapshot, before);
+    assert.equal(state.historyLength, 0);
+  }
+  let reads = 0;
+  const accessor = { ...draft };
+  Object.defineProperty(accessor, 'directions', {
+    enumerable: true,
+    get() {
+      reads++;
+      return [];
+    },
+  });
+  assert.isFalse(state.canRestoreDraft(accessor));
+  assert.equal(reads, 0);
+});
+
 test('editor state reuses the validated source rig and keeps edits in its working copy', () => {
   const parse = vi.spyOn(rigDefinitionSchema, 'parse');
   try {

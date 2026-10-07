@@ -82,6 +82,28 @@ test('animation drafts recover committed settings, exclude temporary fields and 
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
 });
 
+test("rig recovery retains a child's direction when its parent length was collapsed to zero", async ({ page }) => {
+  await page.goto('rig-editor/');
+  const field = (name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
+  await page.getByRole('treeitem', { name: 'rightForearm', exact: true }).click();
+  await field('x').fill('20');
+  await field('y').fill('0');
+  await page.getByRole('treeitem', { name: 'rightUpperArm', exact: true }).click();
+  await field('length').fill('0');
+  await field('length').press('Tab');
+  page.on('dialog', async (dialog) => {
+    await dialog.accept();
+  });
+  await page.reload();
+  await expect(page.locator('#rig-draft-status')).toContainText('Draft restored');
+  await page.getByRole('treeitem', { name: 'rightUpperArm', exact: true }).click();
+  await field('length').fill('20');
+  await field('length').press('Tab');
+  await page.getByRole('treeitem', { name: 'rightForearm', exact: true }).click();
+  await expect(field('x')).toHaveValue('20');
+  await expect(field('y')).toHaveValue('0');
+});
+
 test('declining animation draft recovery keeps the loaded source and removes the stored draft', async ({ page }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
