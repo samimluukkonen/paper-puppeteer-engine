@@ -4,6 +4,7 @@ import { animationClipSchema } from '../../engine/schemas.js';
 import { findBonePropertyKeyframe, findNextBonePropertyKeyframe } from './keyframeQueries.js';
 import type { AnimationData } from './keyframeTargets.js';
 import type { KeyframeSelection } from './timelineTracks.js';
+import { toMilliseconds, toSeconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 /** Authored segment metadata only. Playback sample timing is deliberately independent. */
@@ -34,7 +35,7 @@ export function getSegmentInterpolation(
   ref: KeyframeSelection,
 ): SegmentInterpolation | undefined {
   if (!animation) return undefined;
-  const start = findBonePropertyKeyframe(animation, ref.boneId, ref.property, ref.time * 1000);
+  const start = findBonePropertyKeyframe(animation, ref.boneId, ref.property, toMilliseconds(ref.time));
   if (!start) return undefined;
   // Inspect sparse authored rows, not sampled poses. Exact canonical times keep nearby distinct keys intact.
   const end = findNextBonePropertyKeyframe(animation, ref.boneId, ref.property, start.time);
@@ -42,8 +43,8 @@ export function getSegmentInterpolation(
   return {
     scope: 'clip',
     mode: getAnimationInterpolation(animation)!,
-    start: { boneId: ref.boneId, property: ref.property, time: start.time / 1000 },
-    end: { boneId: ref.boneId, property: ref.property, time: end.time / 1000 },
+    start: { boneId: ref.boneId, property: ref.property, time: toSeconds(start.time) },
+    end: { boneId: ref.boneId, property: ref.property, time: toSeconds(end.time) },
   };
 }
 
@@ -56,7 +57,7 @@ export function getInterpolationForKeys(
   if (!keys.length) return { kind: 'unavailable', reason: 'empty-selection' };
   let terminal = false;
   for (const ref of keys) {
-    if (!findBonePropertyKeyframe(animation, ref.boneId, ref.property, ref.time * 1000))
+    if (!findBonePropertyKeyframe(animation, ref.boneId, ref.property, toMilliseconds(ref.time)))
       return { kind: 'unavailable', reason: 'missing-key' };
     if (!getSegmentInterpolation(animation, ref)) terminal = true;
   }

@@ -16,18 +16,19 @@ import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import { keyframeTimesMatch } from './keyframeTargets.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection } from './timelineTracks.js';
+import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 export interface KeyframeDrag {
   readonly key: KeyframeSelection;
-  readonly previewTime: number;
+  readonly previewTime: Seconds;
   readonly originalKeys: readonly KeyframeSelection[];
   readonly originalPrimary: KeyframeSelection;
-  readonly previewDelta: number;
+  readonly previewDelta: Seconds;
 }
 
 interface KeyframeCommandActions {
   select(key: KeyframeSelection): boolean;
-  updateTime(time: number): boolean;
+  updateTime(time: Seconds): boolean;
   install(animation: ReadonlyAnimation, retainDraft?: boolean, selectedKeys?: readonly KeyframeSelection[]): boolean;
   notify(): void;
 }
@@ -51,10 +52,10 @@ export class AnimationEditorKeyframeCommands {
   private get rig(): Rig | undefined {
     return this.document.rig;
   }
-  private get currentTime(): number {
+  private get currentTime(): Seconds {
     return this.playback.currentTime;
   }
-  private get duration(): number {
+  private get duration(): Seconds {
     return animationDurationSeconds(this.working);
   }
   private get selectedKeys(): readonly KeyframeSelection[] {
@@ -84,13 +85,13 @@ export class AnimationEditorKeyframeCommands {
     const playback = this.working.playback;
     const step =
       playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0 ? 1 / playback.fps : 0.01;
-    return this.pasteGroup(group, group.anchorTimeMs / 1000 + step);
+    return this.pasteGroup(group, toSeconds(group.anchorTimeMs) + step);
   }
-  private pasteGroup(group: KeyframeClipboard, anchorTime: number): boolean {
+  private pasteGroup(group: KeyframeClipboard, anchorTime: Seconds): boolean {
     if (!this.working || !this.rig || !group.entries.length) return false;
     let pasted: ReturnType<typeof pasteKeyframeClipboard<ReadonlyAnimation>>;
     try {
-      pasted = pasteKeyframeClipboard(this.working, this.rig, group, anchorTime * 1000);
+      pasted = pasteKeyframeClipboard(this.working, this.rig, group, toMilliseconds(anchorTime));
     } catch (error) {
       this.document.reportError(error);
       this.actions.notify();
@@ -140,11 +141,11 @@ export class AnimationEditorKeyframeCommands {
     this.actions.notify();
     return true;
   }
-  previewKeyframeDrag(time: number, disableSnapping = false): boolean {
+  previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
     if (!this.drag || !Number.isFinite(time)) return false;
     const deltaMs = this.movementDelta(this.drag.originalKeys, this.drag.key, time, disableSnapping);
-    const previewDelta = deltaMs / 1000;
-    const previewTime = (this.drag.key.time * 1000 + deltaMs) / 1000;
+    const previewDelta = toSeconds(deltaMs);
+    const previewTime = toSeconds(toMilliseconds(this.drag.key.time) + deltaMs);
     this.drag = Object.freeze({ ...this.drag, previewTime, previewDelta });
     this.actions.updateTime(previewTime);
     this.actions.notify();
@@ -170,18 +171,18 @@ export class AnimationEditorKeyframeCommands {
   private movementDelta(
     keys: readonly KeyframeSelection[],
     anchor: KeyframeSelection,
-    time: number,
+    time: Seconds,
     disableSnapping = false,
-  ): number {
+  ): Milliseconds {
     const target = snapKeyframeTime(time, this.duration, disableSnapping ? 'none' : this.snapMode, this.keyframeFPS);
     return constrainKeyframeMoveDelta(
-      keys.map((key) => key.time * 1000),
-      target * 1000 - anchor.time * 1000,
-      this.duration * 1000,
+      keys.map((key) => toMilliseconds(key.time)),
+      toMilliseconds(target) - toMilliseconds(anchor.time),
+      toMilliseconds(this.duration),
     );
   }
   /** Explicit time moves translate the selection relative to its primary, without snapping. */
-  moveSelectedKeyframe(time: number): boolean {
+  moveSelectedKeyframe(time: Seconds): boolean {
     if (!Number.isFinite(time)) return false;
     this.cancelKeyframeDrag();
     const key = this.selection.key;
@@ -198,14 +199,14 @@ export class AnimationEditorKeyframeCommands {
         keys.map((entry) => ({
           boneId: entry.boneId,
           property: entry.property,
-          timeMs: entry.time * 1000,
+          timeMs: toMilliseconds(entry.time),
         })),
         delta,
       );
       const selection = moved.keys.map((entry) => ({
         boneId: entry.boneId,
         property: entry.property,
-        time: entry.timeMs / 1000,
+        time: toSeconds(entry.timeMs),
       }));
       this.selection.setKeys(selection, selection[primaryIndex] ?? null);
       this.actions.updateTime(this.selection.key!.time);
@@ -216,9 +217,9 @@ export class AnimationEditorKeyframeCommands {
     if (!this.selection.key || this.drag) return false;
     const step = this.snapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
     const anchor = this.selection.key;
-    const time = (anchor.time * 1000 + direction * step * 1000 * (large ? 10 : 1)) / 1000;
+    const time = toSeconds(toMilliseconds(anchor.time) + direction * toMilliseconds(step) * (large ? 10 : 1));
     const delta = this.movementDelta(this.selectedKeys, anchor, time);
-    return this.moveSelectedKeyframe((anchor.time * 1000 + delta) / 1000);
+    return this.moveSelectedKeyframe(toSeconds(toMilliseconds(anchor.time) + delta));
   }
   /** All selected authored properties are removed before installing one validated history snapshot. */
   deleteSelectedKeyframes(): boolean {
@@ -229,7 +230,11 @@ export class AnimationEditorKeyframeCommands {
       const next = removeBonePropertyKeyframes(
         animation,
         rig,
-        this.selectedKeys.map((key) => ({ boneId: key.boneId, property: key.property, timeMs: key.time * 1000 })),
+        this.selectedKeys.map((key) => ({
+          boneId: key.boneId,
+          property: key.property,
+          timeMs: toMilliseconds(key.time),
+        })),
       );
       this.selection.clearKey();
       return next;
@@ -243,7 +248,7 @@ export class AnimationEditorKeyframeCommands {
     timeSeconds = this.currentTime,
   ): boolean {
     return this.editKeyframes(
-      (animation, rig) => setBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000, value),
+      (animation, rig) => setBonePropertyKeyframe(animation, rig, boneId, property, toMilliseconds(timeSeconds), value),
       { boneId, property, time: timeSeconds },
     );
   }
@@ -251,10 +256,10 @@ export class AnimationEditorKeyframeCommands {
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
     return this.editKeyframes(
       (animation, rig) => {
-        const key = findBonePropertyKeyframe(animation, boneId, property, timeSeconds * 1000);
-        const next = removeBonePropertyKeyframe(animation, rig, boneId, property, timeSeconds * 1000);
+        const key = findBonePropertyKeyframe(animation, boneId, property, toMilliseconds(timeSeconds));
+        const next = removeBonePropertyKeyframe(animation, rig, boneId, property, toMilliseconds(timeSeconds));
         // Remove exact authored identity before nearby keys can be resolved through tolerance.
-        if (next !== animation && key) this.selection.removeKey({ boneId, property, time: key.time / 1000 });
+        if (next !== animation && key) this.selection.removeKey({ boneId, property, time: toSeconds(key.time) });
         return next;
       },
       { boneId, property, time: timeSeconds },
@@ -279,7 +284,7 @@ export class AnimationEditorKeyframeCommands {
     // The mutation helper validated the result and shares only the document's owned frozen branches.
     if (
       draftTarget?.boneId === this.selection.boneId &&
-      keyframeTimesMatch(draftTarget.time * 1000, this.currentTime * 1000) &&
+      keyframeTimesMatch(toMilliseconds(draftTarget.time), toMilliseconds(this.currentTime)) &&
       this.selection.draft[draftTarget.property] !== undefined
     ) {
       this.selection.clearDraftProperty(draftTarget.property);

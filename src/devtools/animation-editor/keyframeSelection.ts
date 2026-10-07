@@ -2,6 +2,7 @@ import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
+import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 export interface KeyframeSelectionState {
   readonly selectedKeys: readonly KeyframeSelection[];
@@ -44,8 +45,12 @@ export function resolveKey(
   animation: DeepReadonly<AnimationClip> | null,
   ref: KeyframeSelection,
 ): KeyframeSelection | undefined {
-  const key = animation && findBonePropertyKeyframe(animation, ref.boneId, ref.property, ref.time * 1000);
-  return key ? (key.time / 1000 === ref.time ? ref : Object.freeze({ ...ref, time: key.time / 1000 })) : undefined;
+  const key = animation && findBonePropertyKeyframe(animation, ref.boneId, ref.property, toMilliseconds(ref.time));
+  return key
+    ? toSeconds(key.time) === ref.time
+      ? ref
+      : Object.freeze({ ...ref, time: toSeconds(key.time) })
+    : undefined;
 }
 
 /** Reusable reconciliation for mutations/history: resolve, deduplicate, retain primary or choose first survivor. */
@@ -71,8 +76,8 @@ export function reconcileKeyframeSelection(
 }
 
 export interface KeyframeMarquee {
-  readonly startTime: number;
-  readonly endTime: number;
+  readonly startTime: Seconds;
+  readonly endTime: Seconds;
   readonly firstRow: number;
   readonly lastRow: number;
 }

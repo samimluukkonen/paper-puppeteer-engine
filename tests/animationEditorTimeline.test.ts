@@ -1,4 +1,6 @@
-import { assert, test } from 'vitest';
+import { assert, expectTypeOf, test } from 'vitest';
+import type { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import type { PropertyKeyframeTarget } from '../src/devtools/animation-editor/keyframeEdits.js';
 import {
   animationDurationSeconds,
   clampTime,
@@ -6,6 +8,22 @@ import {
   timelineXToTime,
   timeToTimelineX,
 } from '../src/devtools/animation-editor/timeline.js';
+import type { KeyframeSelection } from '../src/devtools/animation-editor/timelineTracks.js';
+import type { Milliseconds, Seconds, toMilliseconds, toSeconds } from '../src/devtools/animation-editor/timeUnits.js';
+
+test('editor time boundaries distinguish seconds from authored milliseconds while accepting numeric inputs', () => {
+  expectTypeOf<Seconds>().not.toExtend<Milliseconds>();
+  expectTypeOf<Milliseconds>().not.toExtend<Seconds>();
+  expectTypeOf<number>().toExtend<Seconds>();
+  expectTypeOf<number>().toExtend<Milliseconds>();
+  expectTypeOf<KeyframeSelection['time']>().toEqualTypeOf<Seconds>();
+  expectTypeOf<PropertyKeyframeTarget['timeMs']>().toEqualTypeOf<Milliseconds>();
+  expectTypeOf<Parameters<AnimationEditorState['setCurrentTime']>[0]>().toEqualTypeOf<Seconds>();
+  expectTypeOf<Parameters<typeof toMilliseconds>[0]>().toEqualTypeOf<Seconds>();
+  expectTypeOf<Parameters<typeof toSeconds>[0]>().toEqualTypeOf<Milliseconds>();
+  expectTypeOf<ReturnType<typeof toMilliseconds>>().toEqualTypeOf<Milliseconds>();
+  expectTypeOf<ReturnType<typeof toSeconds>>().toEqualTypeOf<Seconds>();
+});
 
 test.each([-10, 0, 0.123456789, 1, 2, 10, Infinity, -Infinity, NaN])('time %s clamps to valid range', (time) => {
   const actual = clampTime(time, 2);

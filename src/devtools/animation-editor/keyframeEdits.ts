@@ -9,6 +9,7 @@ import {
   keyframeTimesMatch,
   matchingRow,
 } from './keyframeTargets.js';
+import { type Milliseconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 /** Persistent authored edit in milliseconds: update a property row or merge into/create a sparse row.
@@ -19,7 +20,7 @@ export function setBonePropertyKeyframe<Animation extends AnimationData>(
   rig: Rig,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
   value: number,
 ): Animation {
   timeMs = assertTarget(animation, rig, boneId, property, timeMs);
@@ -43,7 +44,7 @@ export function removeBonePropertyKeyframe<Animation extends AnimationData>(
   rig: Rig,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): Animation {
   return removeBonePropertyKeyframes(animation, rig, [{ boneId, property, timeMs }]);
 }
@@ -52,7 +53,7 @@ export interface PropertyKeyframeTarget {
   readonly boneId: string;
   readonly property: TransformProperty;
   /** Milliseconds, matching authored keyframe times. */
-  readonly timeMs: number;
+  readonly timeMs: Milliseconds;
 }
 
 export interface PropertyKeyframeEdit extends PropertyKeyframeTarget {
@@ -249,8 +250,8 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   rig: Rig,
   boneId: string,
   property: TransformProperty,
-  fromTime: number,
-  toTime: number,
+  fromTime: Milliseconds,
+  toTime: Milliseconds,
 ): Animation {
   fromTime = assertTarget(animation, rig, boneId, property, fromTime);
   assertFinite(toTime, 'Keyframe destination');
@@ -269,10 +270,14 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
 }
 
 /** Constrain one delta using the group's extrema. All arguments use the same time unit. */
-export function constrainKeyframeMoveDelta(times: readonly number[], delta: number, duration: number): number {
+export function constrainKeyframeMoveDelta(
+  times: readonly Milliseconds[],
+  delta: Milliseconds,
+  duration: Milliseconds,
+): Milliseconds {
   assertFinite(delta, 'Keyframe delta');
   assertFinite(duration, 'Animation duration');
-  let earliest = duration;
+  let earliest: number = duration;
   let latest = 0;
   for (const time of times) {
     assertFinite(time, 'Keyframe time');
@@ -296,7 +301,7 @@ export function moveBonePropertyKeyframes<Animation extends AnimationData>(
   animation: Animation,
   rig: Rig,
   targets: readonly PropertyKeyframeTarget[],
-  deltaMs: number,
+  deltaMs: Milliseconds,
 ): PropertyKeyframeMove<Animation> {
   getValidatedEditorAnimation(animation, rig);
   assertFinite(deltaMs, 'Keyframe delta');

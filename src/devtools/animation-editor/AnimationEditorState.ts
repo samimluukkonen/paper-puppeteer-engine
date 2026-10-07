@@ -37,6 +37,7 @@ import {
 } from './keyframeSelection.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
+import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
@@ -121,7 +122,7 @@ export class AnimationEditorState {
   beginKeyframeDrag(key: KeyframeSelection): boolean {
     return this.keyframes.beginKeyframeDrag(key);
   }
-  previewKeyframeDrag(time: number, disableSnapping = false): boolean {
+  previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
     return this.keyframes.previewKeyframeDrag(time, disableSnapping);
   }
   commitKeyframeDrag(): boolean {
@@ -130,7 +131,7 @@ export class AnimationEditorState {
   cancelKeyframeDrag(): boolean {
     return this.keyframes.cancelKeyframeDrag();
   }
-  moveSelectedKeyframe(time: number): boolean {
+  moveSelectedKeyframe(time: Seconds): boolean {
     return this.keyframes.moveSelectedKeyframe(time);
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
@@ -145,7 +146,7 @@ export class AnimationEditorState {
     this.cancelKeyframeDrag();
     this.playback.pause();
     this.playback.endScrub();
-    const clicked = Object.freeze({ boneId, property, time: key.time / 1000 });
+    const clicked = Object.freeze({ boneId, property, time: toSeconds(key.time) });
     const anchor = this.selection.anchor;
     if (modifiers.range && anchor) {
       // Range stays anchored across repeated Shift-clicks. Cross-track Shift adds and makes the clicked key primary.
@@ -298,10 +299,10 @@ export class AnimationEditorState {
   get workingAnimation(): ReadonlyAnimation | null {
     return this.working;
   }
-  get currentTime(): number {
+  get currentTime(): Seconds {
     return this.playback.currentTime;
   }
-  get duration(): number {
+  get duration(): Seconds {
     return animationDurationSeconds(this.working);
   }
   get isPlaying(): boolean {
@@ -366,7 +367,7 @@ export class AnimationEditorState {
     return selected;
   }
 
-  setCurrentTime(time: number): void {
+  setCurrentTime(time: Seconds): void {
     this.cancelKeyframeDrag();
     // Explicit navigation cancels drafts even when clamping leaves the playhead at the same endpoint.
     const cancelled = this.clearTransformDraft();
@@ -374,14 +375,14 @@ export class AnimationEditorState {
   }
 
   /** Clamp navigation and authored edits using the same loop and scrub playback intent. */
-  private updateTime(time: number): boolean {
+  private updateTime(time: Seconds): boolean {
     const previous = this.currentTime;
     const changed = this.playback.setCurrentTime(time);
     if (previous !== this.currentTime) this.clearTransformDraft();
     return changed;
   }
 
-  private notifyPlaybackChange(previous: number, changed: boolean): void {
+  private notifyPlaybackChange(previous: Seconds, changed: boolean): void {
     if (previous !== this.currentTime) this.clearTransformDraft();
     if (changed) this.notify();
   }
@@ -494,15 +495,17 @@ export class AnimationEditorState {
     property: TransformProperty,
     timeSeconds = this.currentTime,
   ): PropertyKeyframe | undefined {
-    return this.working ? findBonePropertyKeyframe(this.working, boneId, property, timeSeconds * 1000) : undefined;
+    return this.working
+      ? findBonePropertyKeyframe(this.working, boneId, property, toMilliseconds(timeSeconds))
+      : undefined;
   }
 
   hasKeyframeAtTime(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
-    return this.working ? hasKeyframeAtTime(this.working, boneId, property, timeSeconds * 1000) : false;
+    return this.working ? hasKeyframeAtTime(this.working, boneId, property, toMilliseconds(timeSeconds)) : false;
   }
 
   getKeyedPropertiesAtTime(boneId: string, timeSeconds = this.currentTime): TransformProperty[] {
-    return this.working ? getKeyedPropertiesAtTime(this.working, boneId, timeSeconds * 1000) : [];
+    return this.working ? getKeyedPropertiesAtTime(this.working, boneId, toMilliseconds(timeSeconds)) : [];
   }
 
   getEvaluatedBonePropertyValue(
@@ -511,13 +514,13 @@ export class AnimationEditorState {
     timeSeconds = this.currentTime,
   ): number | undefined {
     return this.working && this.rig
-      ? getEvaluatedBonePropertyValue(this.working, this.rig, boneId, property, timeSeconds * 1000)
+      ? getEvaluatedBonePropertyValue(this.working, this.rig, boneId, property, toMilliseconds(timeSeconds))
       : undefined;
   }
 
   getEvaluatedBoneTransform(boneId: string, timeSeconds = this.currentTime): JointTransform | undefined {
     return this.working && this.rig
-      ? getEvaluatedBoneTransform(this.working, this.rig, boneId, timeSeconds * 1000)
+      ? getEvaluatedBoneTransform(this.working, this.rig, boneId, toMilliseconds(timeSeconds))
       : undefined;
   }
 
@@ -556,7 +559,7 @@ export class AnimationEditorState {
   }
 
   /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
-  advancePlayback(deltaSeconds: number): void {
+  advancePlayback(deltaSeconds: Seconds): void {
     this.notifyPlaybackChange(this.currentTime, this.playback.advance(deltaSeconds));
   }
 

@@ -1,18 +1,19 @@
 import { clampTime } from './timeline.js';
+import { type Seconds } from './timeUnits.js';
 
 export const PREVIEW_PLAYBACK_SPEEDS = [0.25, 0.5, 1, 1.5, 2] as const;
 
 /** Sole continuous editor clock; independent of authored data, history, and pose evaluation. */
 export class AnimationEditorPlayback {
-  private time = 0;
+  private time: Seconds = 0;
   private playing = false;
   private loop = false;
   private speed = 1;
   private scrubbing = false;
 
-  constructor(private readonly duration: () => number) {}
+  constructor(private readonly duration: () => Seconds) {}
 
-  get currentTime(): number {
+  get currentTime(): Seconds {
     return this.time;
   }
   get isPlaying(): boolean {
@@ -36,7 +37,7 @@ export class AnimationEditorPlayback {
   }
 
   /** Clamp navigation and duration edits using the same loop and scrub playback intent. */
-  setCurrentTime(time: number): boolean {
+  setCurrentTime(time: Seconds): boolean {
     const duration = this.duration();
     const next = clampTime(time, duration);
     const playing = this.playing && duration > 0 && (this.scrubbing || this.loop || next < duration);
@@ -88,7 +89,7 @@ export class AnimationEditorPlayback {
     return true;
   }
 
-  advance(deltaSeconds: number): boolean {
+  advance(deltaSeconds: Seconds): boolean {
     if (!this.playing || this.scrubbing || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return false;
     const duration = this.duration();
     if (!(duration > 0)) return this.setCurrentTime(0);

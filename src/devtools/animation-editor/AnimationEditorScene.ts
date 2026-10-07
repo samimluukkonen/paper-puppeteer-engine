@@ -5,6 +5,7 @@ import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
+import { toSeconds } from './timeUnits.js';
 
 export interface AnimationEditorSceneOptions {
   /** Resolved relative to the editor document, including when served under a base path. */
@@ -52,7 +53,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.state?.advancePlayback(delta / 1000);
+    this.state?.advancePlayback(toSeconds(delta));
     const overlay = this.selectionOverlay;
     overlay?.clear();
     if (overlay && this.puppet && this.state?.selectedBoneId) {

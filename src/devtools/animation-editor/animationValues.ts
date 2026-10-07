@@ -6,6 +6,7 @@ import { createTransform, type JointTransform, type TransformProperty } from '..
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, assertTarget } from './keyframeTargets.js';
 import { getCompiledPreviewClip } from './previewClip.js';
+import { type Milliseconds } from './timeUnits.js';
 
 /** Reuses the runtime pose buffer and playback quantization without clocks, events, or IK. */
 class AnimationValueSampler {
@@ -21,7 +22,7 @@ class AnimationValueSampler {
     this.clip = getCompiledPreviewClip(animation, rig);
   }
 
-  sample(boneId: string, timeMs: number): JointTransform {
+  sample(boneId: string, timeMs: Milliseconds): JointTransform {
     const time =
       timeMs === this.clip.duration ? timeMs : quantizePlaybackTime(timeMs, this.clip.playback ?? { mode: 'smooth' });
     // Repeated property queries at the same playback frame share one pose evaluation.
@@ -56,7 +57,7 @@ export function getEvaluatedBoneTransform(
   animation: AnimationData,
   rig: Rig,
   boneId: string,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): JointTransform {
   timeMs = assertTarget(animation, rig, boneId, undefined, timeMs);
   return valueSampler(animation, rig).sample(boneId, timeMs);
@@ -68,7 +69,7 @@ export function getEvaluatedBonePropertyValue(
   rig: Rig,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): number {
   timeMs = assertTarget(animation, rig, boneId, property, timeMs);
   return valueSampler(animation, rig).sample(boneId, timeMs)[property];

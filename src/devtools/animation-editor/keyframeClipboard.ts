@@ -6,18 +6,19 @@ import { freezeData } from '../shared/editorData.js';
 import { setBonePropertyKeyframes } from './keyframeEdits.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import type { KeyframeSelection } from './timelineTracks.js';
+import { type Milliseconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 export interface KeyframeClipboardEntry {
   readonly boneId: string;
   readonly property: TransformProperty;
   /** Authored milliseconds relative to the earliest copied key. */
-  readonly relativeTimeMs: number;
+  readonly relativeTimeMs: Milliseconds;
   readonly value: number;
 }
 
 export interface KeyframeClipboard {
   readonly entries: readonly KeyframeClipboardEntry[];
-  readonly anchorTimeMs: number;
+  readonly anchorTimeMs: Milliseconds;
 }
 
 /** Snapshot only authored property samples. Interpolation is clip-level; no per-key metadata exists. */
@@ -26,7 +27,7 @@ export function copyKeyframeSelection(
   keys: readonly KeyframeSelection[],
 ): KeyframeClipboard | null {
   const resolved = keys.flatMap(({ boneId, property, time }) => {
-    const sample = findBonePropertyKeyframe(animation, boneId, property, time * 1000);
+    const sample = findBonePropertyKeyframe(animation, boneId, property, toMilliseconds(time));
     return sample ? [{ boneId, property, ...sample }] : [];
   });
   const samples = [
@@ -55,7 +56,7 @@ export function pasteKeyframeClipboard<Animation extends DeepReadonly<AnimationC
   animation: Animation,
   rig: Rig,
   clipboard: KeyframeClipboard,
-  anchorTimeMs: number,
+  anchorTimeMs: Milliseconds,
 ): { animation: Animation; keys: readonly KeyframeSelection[] } {
   assertFinite(anchorTimeMs, 'Clipboard paste anchor');
   if (anchorTimeMs < 0) throw new Error('Clipboard paste anchor must be nonnegative.');
@@ -71,7 +72,7 @@ export function pasteKeyframeClipboard<Animation extends DeepReadonly<AnimationC
   const keys = edits.map(({ boneId, property, timeMs }) => ({
     boneId,
     property,
-    time: findBonePropertyKeyframe(next, boneId, property, timeMs)!.time / 1000,
+    time: toSeconds(findBonePropertyKeyframe(next, boneId, property, timeMs)!.time),
   }));
   keys.sort((a, b) => a.time - b.time);
   return { animation: next, keys };

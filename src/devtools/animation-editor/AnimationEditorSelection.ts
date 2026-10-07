@@ -11,6 +11,7 @@ import {
   type KeyframeSelectionState,
 } from './keyframeSelection.js';
 import { buildTimelineTracks, type KeyframeSelection, type TimelineTrack } from './timelineTracks.js';
+import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 type AnimationData = DeepReadonly<AnimationClip> | null;
 
@@ -140,12 +141,12 @@ export class AnimationEditorSelection {
     if (anchorMoved) this.rangeAnchor = this.key;
   }
 
-  adjacentKey(animation: AnimationData, timeSeconds: number, direction: -1 | 1): KeyframeSelection | undefined {
+  adjacentKey(animation: AnimationData, timeSeconds: Seconds, direction: -1 | 1): KeyframeSelection | undefined {
     const boneId = this.bone;
     const property = this.selectedProperty;
     if (!animation || !boneId || !property) return undefined;
-    const key = findAdjacentBonePropertyKeyframe(animation, boneId, property, timeSeconds * 1000, direction);
-    return key ? Object.freeze({ boneId, property, time: key.time / 1000 }) : undefined;
+    const key = findAdjacentBonePropertyKeyframe(animation, boneId, property, toMilliseconds(timeSeconds), direction);
+    return key ? Object.freeze({ boneId, property, time: toSeconds(key.time) }) : undefined;
   }
 
   tracks(animation: AnimationData): readonly TimelineTrack[] {

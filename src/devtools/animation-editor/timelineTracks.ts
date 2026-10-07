@@ -5,6 +5,7 @@ import type { Rig } from '../../engine/Rig.js';
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { getAuthoredBoneProperties } from './keyframeQueries.js';
+import { type Seconds, toSeconds } from './timeUnits.js';
 
 interface TimelineTrackBase {
   readonly boneId: string;
@@ -16,7 +17,7 @@ interface TimelineTrackBase {
 export interface KeyframeSelection {
   readonly boneId: string;
   readonly property: TransformProperty;
-  readonly time: number;
+  readonly time: Seconds;
 }
 
 export interface TimelineKeyframe extends KeyframeSelection {
@@ -58,7 +59,7 @@ function propertyKeys(
     keys.flatMap((key) =>
       key[property] === undefined
         ? []
-        : [Object.freeze({ boneId, property, time: key.time / 1000, value: key[property] })],
+        : [Object.freeze({ boneId, property, time: toSeconds(key.time), value: key[property] })],
     ),
   );
   if (isFullyFrozen(keys)) {

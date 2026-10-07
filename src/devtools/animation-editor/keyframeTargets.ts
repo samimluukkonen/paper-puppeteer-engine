@@ -3,18 +3,19 @@ import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { identifierSchema } from '../../engine/schemas.js';
 import { assertFinite, type TransformProperty, transformProperties } from '../../engine/types.js';
+import { type Milliseconds } from './timeUnits.js';
 
 export type AnimationData = DeepReadonly<AnimationClip>;
 
 /** One nanosecond expressed in the external format's milliseconds; never an FPS snap. */
 export const KEYFRAME_TIME_TOLERANCE_MS = 1e-6;
 
-export function keyframeTimesMatch(time: number, other: number): boolean {
+export function keyframeTimesMatch(time: Milliseconds, other: Milliseconds): boolean {
   return Number.isFinite(time) && Number.isFinite(other) && Math.abs(time - other) <= KEYFRAME_TIME_TOLERANCE_MS;
 }
 
 /** Choose the nearest matching row, breaking ties in stored order. Property queries ignore unkeyed rows. */
-export function matchingRow(keys: readonly Keyframe[], time: number, property?: TransformProperty): number {
+export function matchingRow(keys: readonly Keyframe[], time: Milliseconds, property?: TransformProperty): number {
   let match = -1;
   let distance = Infinity;
   for (const [index, key] of keys.entries()) {
@@ -33,8 +34,8 @@ export function assertTarget(
   rig: Rig,
   boneId: string,
   property: TransformProperty | undefined,
-  timeMs: number,
-): number {
+  timeMs: Milliseconds,
+): Milliseconds {
   identifierSchema.parse(boneId);
   rig.getBone(boneId);
   if (property !== undefined && !transformProperties.includes(property))

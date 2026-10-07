@@ -110,6 +110,8 @@ For a custom character, pass `{ characterUrl: '../characters/hero/character.json
 
 ## APIs
 
+Editor time boundaries use `Seconds` for the clock, selections, and timeline coordinates, and `Milliseconds` for authored keyframe operations, queries, and clipboard offsets. `timeUnits.ts` supplies `toMilliseconds()` and `toSeconds()` without snapping or rounding. Plain numeric inputs remain accepted for existing integrations; values carrying either unit type cannot be passed to APIs expecting the other unit. Runtime animation JSON continues to store ordinary numbers in milliseconds.
+
 - `AnimationEditorState(rig?, animations?, options?)`: animation catalogue and owned session. Pass `options.animationPaths` to retain original manifest paths by clip name; `selectedAnimationFilename` exposes the selected export filename.
 - `animationIds`, `selectedAnimationId`, `sourceAnimation`, `workingAnimation`, `currentTime`, `duration`, `loop` (authored), `previewLoop`, `isPlaying`, `isScrubbing`, `dirty`, `validationIssues`: read-only session views.
 - `selectAnimation(id | null, options?)`, `setCurrentTime(seconds)`, `subscribe(listener)`: navigation and notifications.

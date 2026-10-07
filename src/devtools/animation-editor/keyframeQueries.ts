@@ -2,6 +2,7 @@ import type { PropertyKeyframe } from '../../engine/AnimationClip.js';
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, keyframeTimesMatch, matchingRow } from './keyframeTargets.js';
+import { type Milliseconds } from './timeUnits.js';
 
 /** Authored presence anywhere in a track, independent of the playhead and evaluated pose. */
 export function getAuthoredBoneProperties(animation: AnimationData, boneId: string): TransformProperty[] {
@@ -86,7 +87,7 @@ export function findBonePropertyKeyframe(
   animation: AnimationData,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): PropertyKeyframe | undefined {
   if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
   const indexed = indexedKeyframe(animation, boneId, property, timeMs);
@@ -101,7 +102,7 @@ export function hasKeyframeAtTime(
   animation: AnimationData,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): boolean {
   return findBonePropertyKeyframe(animation, boneId, property, timeMs) !== undefined;
 }
@@ -111,7 +112,7 @@ export function findNextBonePropertyKeyframe(
   animation: AnimationData,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): PropertyKeyframe | undefined {
   if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
   const properties = propertyIndexes(animation, boneId);
@@ -137,7 +138,7 @@ export function findAdjacentBonePropertyKeyframe(
   animation: AnimationData,
   boneId: string,
   property: TransformProperty,
-  timeMs: number,
+  timeMs: Milliseconds,
   direction: -1 | 1,
 ): PropertyKeyframe | undefined {
   if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
@@ -173,7 +174,7 @@ export function findAdjacentBonePropertyKeyframe(
 export function getKeyedPropertiesAtTime(
   animation: AnimationData,
   boneId: string,
-  timeMs: number,
+  timeMs: Milliseconds,
 ): TransformProperty[] {
   return transformProperties.filter((property) => hasKeyframeAtTime(animation, boneId, property, timeMs));
 }
