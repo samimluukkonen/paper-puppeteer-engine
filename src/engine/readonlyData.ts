@@ -11,7 +11,8 @@ export function isFullyFrozen(data: object): boolean {
     if (fullyFrozen.has(value) || seen.has(value)) continue;
     seen.add(value);
     if (!Object.isFrozen(value)) return false;
-    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+    for (const key of Reflect.ownKeys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
       // Frozen getters may expose changing data; inspect descriptors without invoking them.
       if (!Object.hasOwn(descriptor, 'value')) return false;
       const child: unknown = descriptor.value;
@@ -24,9 +25,11 @@ export function isFullyFrozen(data: object): boolean {
 
 /** Freeze owned JSON data recursively; callers clone source data before passing it here. */
 export function freezeData<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+  if (value && typeof value === 'object' && !fullyFrozen.has(value)) {
     for (const child of Object.values(value)) freezeData(child);
     Object.freeze(value);
+    // Shallow-frozen caller data still needs traversal; only verified branches can be skipped.
+    isFullyFrozen(value);
   }
   return value;
 }
