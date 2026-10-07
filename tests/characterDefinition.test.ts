@@ -370,7 +370,7 @@ test.each([
   const issues = validateCharacterDefinition(data);
   assert.ok(
     issues.some(
-      (entry) => entry.severity === 'error' && entry.path === 'skins.default' && entry.message.includes(field),
+      (entry) => entry.severity === 'error' && entry.path === `skins.default.${field}` && entry.message.includes(field),
     ),
   );
   assert.throws(() => CharacterDefinition.fromData(data), CharacterValidationError);
@@ -387,6 +387,43 @@ test('standalone skin validation accepts slot mappings and null attachments', ()
   slots.setSkin('default');
   assert.equal(slots.getAttachment('torsoVisual'), null);
   assert.equal(slots.getAttachment('headVisual'), 'headDefault');
+});
+
+test('standalone skin reference errors identify manifest names even after earlier files fail shape validation', () => {
+  const data = bundle();
+  data.skins[manifest.skins.default!] = { version: 1, name: 'default', slots: {}, typo: 1 };
+  const alternate = data.skins[manifest.skins.alternate!] as { slots: Record<string, string> };
+  alternate.slots.torsoVisual = 'missing-attachment';
+  alternate.slots.ghost = 'missing-attachment';
+  const issues = validateCharacterDefinition(data);
+  assert.deepEqual(
+    issues.map((entry) => entry.path),
+    [
+      'skins.default.typo',
+      'skins.alternate.slots.torsoVisual',
+      'skins.alternate.slots.ghost',
+      'skins.alternate.slots.ghost',
+    ],
+  );
+  assert.throws(() => CharacterDefinition.fromData(data), CharacterValidationError);
+});
+
+test('character manifest diagnostics share bracketed array paths and precise unknown-field paths', () => {
+  const data = bundle();
+  const invalid = { ...data, manifest: { ...data.manifest, animations: [123], typo: true } };
+  assert.deepEqual(
+    validateCharacterDefinition(invalid).map((entry) => entry.path),
+    ['manifest.animations[0]', 'manifest.typo'],
+  );
+});
+
+test('embedded skin reference errors retain their rig file location', () => {
+  const data = bundle();
+  data.rig = {
+    ...(data.rig as RigJsonDefinition),
+    skins: [{ version: 1, name: 'embedded', slots: { torsoVisual: 'missing-attachment' } }],
+  };
+  assert.ok(validateCharacterDefinition(data).some((entry) => entry.path === 'rig.skins[0].slots.torsoVisual'));
 });
 
 test('character validation checks pose files against the loaded rig', () => {

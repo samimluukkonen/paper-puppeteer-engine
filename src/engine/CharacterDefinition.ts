@@ -3,6 +3,7 @@ import { type AnimationClip, type CompiledClip, compileClip } from './AnimationC
 import {
   inspectAnimationDefinition,
   inspectRigDefinition,
+  shapeIssues,
   type RigJsonDefinition,
   type ValidationIssue,
   validateSkinReferences,
@@ -52,10 +53,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   if (issues.length) return result;
   const parsed = characterManifestSchema.safeParse(data.manifest);
   if (!parsed.success) {
-    for (const entry of parsed.error.issues) {
-      const path = entry.path.length ? `manifest.${entry.path.join('.')}` : 'manifest';
-      issues.push(issue(path, entry.message));
-    }
+    issues.push(...prefixed(shapeIssues(parsed.error), 'manifest'));
     return result;
   }
   const manifest = parsed.data;
@@ -65,6 +63,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
   if (source) issues.push(...prefixed(source.issues, 'rig'));
 
   const skins = result.skins;
+  const skinPaths: string[] = [];
   for (const [name, path] of Object.entries(manifest.skins)) {
     const value = data.skins && Object.hasOwn(data.skins, path) ? data.skins[path] : undefined;
     if (value === undefined) {
@@ -76,11 +75,11 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     if (issues.length !== previousIssueCount) continue;
     const skin = skinFileSchema.safeParse(value);
     if (!skin.success) {
-      for (const entry of skin.error.issues)
-        issues.push(issue(`skins.${name}${entry.path.length ? `.${entry.path.join('.')}` : ''}`, entry.message));
+      issues.push(...prefixed(shapeIssues(skin.error), `skins.${name}`));
       continue;
     }
     if (skin.data.name !== name) issues.push(issue(`skins.${name}.name`, `Skin name must be "${name}".`));
+    skinPaths.push(`skins.${name}`);
     skins.push(skin.data);
   }
   if (!Object.hasOwn(manifest.skins, manifest.defaultSkin))
@@ -88,7 +87,14 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
 
   if (source?.data) {
     const skinIssues = validateSkinReferences(skins, source.data);
-    issues.push(...prefixed(skinIssues, 'rig'));
+    // Semantic validation indexes only successfully parsed files, not the full manifest list.
+    for (const entry of skinIssues) {
+      const path = entry.path?.replace(
+        /^skins\[(\d+)\]/,
+        (prefix, index: string) => skinPaths[Number(index)] ?? prefix,
+      );
+      issues.push(path === undefined ? entry : { ...entry, path });
+    }
     // Keep checking clips and poses when standalone skins have broken references.
     result.rig = new Rig({
       ...source.data,
