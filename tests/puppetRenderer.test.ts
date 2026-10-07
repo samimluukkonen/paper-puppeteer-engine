@@ -392,6 +392,36 @@ test.each([50, 0, -5])('render order changes preserve runtime slot depth %s', (d
   assert.throws(() => renderer.setSlotDepth('missing', 10), /Unknown slot/);
 });
 
+test('unchanged order and depth overrides skip projection writes and sorting while changes remain visible', () => {
+  const { renderer, rig, slotDepth, containers } = fixture();
+  const renderContainer = vi.mocked(containers.get('puppet-render')!);
+  const branch = containers.get('render-slot-item')!;
+  const writeDepth = vi.spyOn(branch, 'setDepth');
+  const order = renderer.getOrder();
+  renderContainer.sort.mockClear();
+  renderer.setOrder([...rig.renderOrder], new Map([['item', undefined]]));
+  assert.strictEqual(renderer.getOrder(), order);
+  assert.equal(renderContainer.sort.mock.calls.length, 0);
+  assert.equal(writeDepth.mock.calls.length, 0);
+
+  renderer.setOrder(rig.renderOrder, new Map([['item', 50]]));
+  assert.equal(slotDepth('item'), 50);
+  assert.equal(renderContainer.sort.mock.calls.length, 1);
+  writeDepth.mockClear();
+  renderer.setOrder([...rig.renderOrder], new Map([['item', 50]]));
+  assert.equal(renderContainer.sort.mock.calls.length, 1);
+  assert.equal(writeDepth.mock.calls.length, 0);
+  assert.throws(() => renderer.setOrder(rig.renderOrder, new Map([['item', NaN]])), /finite/);
+  assert.equal(slotDepth('item'), 50);
+
+  renderer.setOrder(rig.renderOrder, new Map([['item', undefined]]));
+  assert.equal(slotDepth('item'), 1);
+  assert.equal(renderContainer.sort.mock.calls.length, 2);
+  renderer.setOrder(['hand', 'root']);
+  assert.equal(slotDepth('item'), 11);
+  assert.equal(renderContainer.sort.mock.calls.length, 3);
+});
+
 test('render order batches explicit and restored slot depths with one sort', () => {
   const { renderer, rig, slotDepth, containers } = fixture();
   // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.

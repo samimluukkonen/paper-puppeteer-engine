@@ -129,13 +129,21 @@ export class PuppetRenderer {
       throw new Error('Render order must contain every bone exactly once.');
     }
     for (const id of order) this.rig.getBone(id);
+    const orderChanged = this.order.length !== order.length || this.order.some((id, index) => id !== order[index]);
+    let slotsChanged = false;
     if (slotDepths) {
-      for (const id of slotDepths.keys()) this.getSlotMount(id);
       for (const [id, depth] of slotDepths) {
+        this.getSlotMount(id);
+        if (depth !== undefined) assertFinite(depth, `Slot ${id}.depth`);
+      }
+      for (const [id, depth] of slotDepths) {
+        if (this.slotDepthOverrides.get(id) === depth) continue;
+        slotsChanged = true;
         if (depth === undefined) this.slotDepthOverrides.delete(id);
         else this.slotDepthOverrides.set(id, depth);
       }
     }
+    if (!orderChanged && !slotsChanged) return;
     const boneDepths = new Map(order.map((id, index) => [id, index * 10]));
     for (const [id, depth] of boneDepths) this.branches.get(id)?.root.setDepth(depth);
     for (const slot of this.rig.slots) {
@@ -143,8 +151,7 @@ export class PuppetRenderer {
       this.slotBranches.get(slot.id)!.root.setDepth(this.slotDepthOverrides.get(slot.id) ?? slot.depth ?? anchor + 1);
     }
     this.container.sort('depth');
-    if (this.order.length !== order.length || this.order.some((id, index) => id !== order[index]))
-      this.order = Object.freeze([...order]);
+    if (orderChanged) this.order = Object.freeze([...order]);
   }
 
   getMount(id: string): Phaser.GameObjects.Container {
