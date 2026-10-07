@@ -8,7 +8,8 @@ import { copyKeyframeSelection, pasteKeyframeClipboard, type KeyframeClipboard }
 import {
   findBonePropertyKeyframe,
   keyframeTimesMatch,
-  moveBonePropertyKeyframe,
+  constrainKeyframeMoveDelta,
+  moveBonePropertyKeyframes,
   removeBonePropertyKeyframe,
   removeBonePropertyKeyframes,
   setBonePropertyKeyframe,
@@ -19,6 +20,9 @@ import type { KeyframeSelection } from './timelineTracks.js';
 export interface KeyframeDrag {
   readonly key: KeyframeSelection;
   readonly previewTime: number;
+  readonly originalKeys: readonly KeyframeSelection[];
+  readonly originalPrimary: KeyframeSelection;
+  readonly previewDelta: number;
 }
 
 interface KeyframeCommandActions {
@@ -117,20 +121,31 @@ export class AnimationEditorKeyframeCommands {
   }
   beginKeyframeDrag(key: KeyframeSelection): boolean {
     this.cancelKeyframeDrag();
-    if (!this.actions.select(key)) return false;
-    this.drag = Object.freeze({ key: this.selection.key!, previewTime: this.currentTime });
+    const originalPrimary = this.selection.key;
+    const selected = this.selection.hasKey(key);
+    if (selected) {
+      this.playback.pause();
+      this.playback.endScrub();
+      this.selection.setKeys(this.selectedKeys, key);
+      this.actions.updateTime(key.time);
+    } else if (!this.actions.select(key)) return false;
+    const anchor = this.selection.key!;
+    this.drag = Object.freeze({
+      key: anchor,
+      originalKeys: this.selectedKeys,
+      originalPrimary: selected ? originalPrimary! : anchor,
+      previewTime: anchor.time,
+      previewDelta: 0,
+    });
     this.actions.notify();
     return true;
   }
   previewKeyframeDrag(time: number, disableSnapping = false): boolean {
     if (!this.drag || !Number.isFinite(time)) return false;
-    const previewTime = snapKeyframeTime(
-      time,
-      this.duration,
-      disableSnapping ? 'none' : this.snapMode,
-      this.keyframeFPS,
-    );
-    this.drag = Object.freeze({ key: this.drag.key, previewTime });
+    const deltaMs = this.movementDelta(this.drag.originalKeys, this.drag.key, time, disableSnapping);
+    const previewDelta = deltaMs / 1000;
+    const previewTime = (this.drag.key.time * 1000 + deltaMs) / 1000;
+    this.drag = Object.freeze({ ...this.drag, previewTime, previewDelta });
     this.actions.updateTime(previewTime);
     this.actions.notify();
     return true;
@@ -143,39 +158,67 @@ export class AnimationEditorKeyframeCommands {
   }
   cancelKeyframeDrag(): boolean {
     if (!this.drag) return false;
-    const time = this.drag.key.time;
+    const { key, originalKeys, originalPrimary } = this.drag;
+    const time = key.time;
     this.drag = null;
+    this.selection.setKeys(originalKeys, originalPrimary, false);
     this.actions.updateTime(time);
     this.actions.notify();
     return true;
   }
-  /** Explicit time moves are continuous seconds; only drag/nudge apply editor snapping. */
+  /** Snap the anchor once, then constrain a single delta in authored milliseconds. */
+  private movementDelta(
+    keys: readonly KeyframeSelection[],
+    anchor: KeyframeSelection,
+    time: number,
+    disableSnapping = false,
+  ): number {
+    const target = snapKeyframeTime(time, this.duration, disableSnapping ? 'none' : this.snapMode, this.keyframeFPS);
+    return constrainKeyframeMoveDelta(
+      keys.map((key) => key.time * 1000),
+      target * 1000 - anchor.time * 1000,
+      this.duration * 1000,
+    );
+  }
+  /** Explicit time moves translate the selection relative to its primary, without snapping. */
   moveSelectedKeyframe(time: number): boolean {
-    const key = this.selection.key;
-    if (!key || !Number.isFinite(time)) return false;
-    time = Math.max(0, Math.min(time, this.duration));
+    if (!Number.isFinite(time)) return false;
     this.cancelKeyframeDrag();
+    const key = this.selection.key;
+    if (!key) return false;
     this.playback.pause();
+    this.playback.endScrub();
+    const keys = this.selectedKeys;
+    const primaryIndex = keys.indexOf(key);
+    const delta = this.movementDelta(keys, key, time, true);
     return this.editKeyframes((animation, rig) => {
-      const next = moveBonePropertyKeyframe(animation, rig, key.boneId, key.property, key.time * 1000, time * 1000);
-      const moved = findBonePropertyKeyframe(
-        next,
-        key.boneId,
-        key.property,
-        (next === animation ? key.time : time) * 1000,
+      const moved = moveBonePropertyKeyframes(
+        animation,
+        rig,
+        keys.map((entry) => ({
+          boneId: entry.boneId,
+          property: entry.property,
+          timeMs: entry.time * 1000,
+        })),
+        delta,
       );
-      if (moved) {
-        this.selection.moveKey(key, { ...key, time: moved.time / 1000 });
-        this.actions.updateTime(moved.time / 1000);
-      }
-      return next;
+      const selection = moved.keys.map((entry) => ({
+        boneId: entry.boneId,
+        property: entry.property,
+        time: entry.timeMs / 1000,
+      }));
+      this.selection.setKeys(selection, selection[primaryIndex] ?? null);
+      this.actions.updateTime(this.selection.key!.time);
+      return moved.animation;
     }, key);
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
-    if (!this.selection.key || this.selectedKeys.length !== 1 || this.drag) return false;
+    if (!this.selection.key || this.drag) return false;
     const step = this.snapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
-    const time = this.selection.key.time + direction * step * (large ? 10 : 1);
-    return this.moveSelectedKeyframe(snapKeyframeTime(time, this.duration, this.snapMode, this.keyframeFPS));
+    const anchor = this.selection.key;
+    const time = (anchor.time * 1000 + direction * step * 1000 * (large ? 10 : 1)) / 1000;
+    const delta = this.movementDelta(this.selectedKeys, anchor, time);
+    return this.moveSelectedKeyframe((anchor.time * 1000 + delta) / 1000);
   }
   /** All selected authored properties are removed before installing one validated history snapshot. */
   deleteSelectedKeyframes(): boolean {
@@ -223,6 +266,7 @@ export class AnimationEditorKeyframeCommands {
     edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation,
     draftTarget?: KeyframeSelection,
   ): boolean {
+    this.cancelKeyframeDrag();
     if (!this.working || !this.rig) return false;
     let next: ReadonlyAnimation;
     try {

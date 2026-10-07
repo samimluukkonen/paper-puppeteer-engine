@@ -180,7 +180,7 @@ export class TimelineInputController {
           this.keyPointer.shift = event.shiftKey;
           if (Math.abs(event.clientX - this.keyPointer.startX) > 3) this.keyPointer.moved = true;
           if (this.keyPointer.moved) this.previewKeyDrag();
-          this.endKeyDrag(this.keyPointer?.moved ?? false);
+          this.endKeyDrag(true);
           return;
         }
         if (event.pointerId !== this.pointer) return;

@@ -235,24 +235,26 @@ test('distinct authored times within tolerance stay distinct and deletion never 
   assert.deepEqual(state.selectedKeys, []);
 });
 
-test('existing single-key move follows time; multiple-key drag/nudge is deferred', () => {
+test('single-key and group moves follow selection, and dragging an unselected key replaces the set', () => {
   const { state } = session();
   state.selectKeyframe(key(0.5));
   state.moveSelectedKeyframe(0.6);
   assert.deepEqual(state.primaryKey, key(0.6));
-  assert.deepEqual(state.selectedKeys, [key(0.6)]);
   state.selectKeyframe(key(0.75, 'rotation', 'arm'), { additive: true });
-  const working = state.workingAnimation;
-  assert.isFalse(state.nudgeSelectedKeyframe(1));
-  assert.strictEqual(state.workingAnimation, working);
+  assert.isTrue(state.nudgeSelectedKeyframe(1));
+  assert.deepEqual(state.selectedKeys, [key(0.61), key(0.76, 'rotation', 'arm')]);
   assert.isTrue(state.moveSelectedKeyframe(0.8));
-  assert.deepEqual(state.selectedKeys, [key(0.8), key(0.75, 'rotation', 'arm')]);
+  assert.deepEqual(state.selectedKeys, [key(0.8), key(0.95, 'rotation', 'arm')]);
   assert.deepEqual(state.primaryKey, key(0.8));
-  // A normal pointer drag explicitly selects just its clicked key, preserving established single-key behavior.
   assert.isTrue(state.beginKeyframeDrag(key(0.8)));
   state.previewKeyframeDrag(0.7);
   state.commitKeyframeDrag();
-  assert.deepEqual(state.selectedKeys, [key(0.7)]);
+  assert.deepEqual(state.selectedKeys, [key(0.7), key(0.85, 'rotation', 'arm')]);
+  assert.isTrue(state.beginKeyframeDrag(key(1)));
+  assert.deepEqual(state.selectedKeys, [key(1)]);
+  state.previewKeyframeDrag(1.1);
+  state.commitKeyframeDrag();
+  assert.deepEqual(state.selectedKeys, [key(1.1)]);
 });
 
 test('multi-delete is one history action, preserves sparse siblings/source/events, and undo/redo restores authored data', () => {

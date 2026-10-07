@@ -288,7 +288,11 @@ function replacePropertyAtTime(
 }
 
 /** Index nearby rows while editing one track; publish and sort its array only once. */
-function setTrackPropertyKeyframes(keys: readonly Keyframe[], edits: readonly PropertyKeyframeEdit[]): Keyframe[] {
+function setTrackPropertyKeyframes(
+  keys: readonly Keyframe[],
+  edits: readonly PropertyKeyframeEdit[],
+  preserveTiming = false,
+): Keyframe[] {
   const rows = new Map<number, Keyframe>();
   const buckets = new Map<number, Set<number>>();
   const bucketOf = (time: number): number => Math.floor(time / (2 * KEYFRAME_TIME_TOLERANCE_MS));
@@ -322,10 +326,11 @@ function setTrackPropertyKeyframes(keys: readonly Keyframe[], edits: readonly Pr
     }
     return found;
   };
+  const insertions: Pick<PropertyKeyframeEdit, 'property' | 'timeMs' | 'value'>[] = [];
   for (const { property, timeMs, value } of edits) {
     let time = timeMs;
     let distance = Infinity;
-    for (const row of matches(timeMs, property)) {
+    for (const row of preserveTiming ? [] : matches(timeMs, property)) {
       const nextDistance = Math.abs(row.time - timeMs);
       if (nextDistance < distance || (nextDistance === distance && row.time < time)) {
         time = row.time;
@@ -340,8 +345,12 @@ function setTrackPropertyKeyframes(keys: readonly Keyframe[], edits: readonly Pr
       if (transformProperties.some((entry) => row[entry] !== undefined)) rows.set(row.time, row);
       else remove(row.time);
     }
-    add({ ...rows.get(time), time, [property]: value });
+    if (preserveTiming) insertions.push({ property, timeMs: time, value });
+    else add({ ...rows.get(time), time, [property]: value });
   }
+  // Group members never collide with each other. Replace external matches first,
+  // then insert every translated time exactly, including distinct nearby keys.
+  for (const { property, timeMs: time, value } of insertions) add({ ...rows.get(time), time, [property]: value });
   return [...rows.values()].sort((a, b) => a.time - b.time);
 }
 
@@ -448,6 +457,86 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   const nextKeys = replacePropertyAtTime(keys, property, destinationTime, value, source);
   const next = { ...animation, tracks: { ...animation.tracks, [boneId]: nextKeys } };
   return validateEditedAnimation(next, animation, rig);
+}
+
+/** Constrain one delta using the group's extrema. All arguments use the same time unit. */
+export function constrainKeyframeMoveDelta(times: readonly number[], delta: number, duration: number): number {
+  assertFinite(delta, 'Keyframe delta');
+  assertFinite(duration, 'Animation duration');
+  let earliest = duration;
+  let latest = 0;
+  for (const time of times) {
+    assertFinite(time, 'Keyframe time');
+    earliest = Math.min(earliest, time);
+    latest = Math.max(latest, time);
+  }
+  return times.length ? Math.max(-earliest, Math.min(delta, duration - latest)) : 0;
+}
+
+export interface PropertyKeyframeMove<Animation extends AnimationData> {
+  readonly animation: Animation;
+  readonly keys: readonly PropertyKeyframeTarget[];
+}
+
+/** Atomic time-only translation in milliseconds. Resolve/remove the entire source group
+ * before replacing external property collisions. Group destinations retain exact translated
+ * times rather than canonicalizing each collision independently and distorting spacing.
+ * A single key retains the established canonical destination-time behavior.
+ */
+export function moveBonePropertyKeyframes<Animation extends AnimationData>(
+  animation: Animation,
+  rig: Rig,
+  targets: readonly PropertyKeyframeTarget[],
+  deltaMs: number,
+): PropertyKeyframeMove<Animation> {
+  getValidatedEditorAnimation(animation, rig);
+  assertFinite(deltaMs, 'Keyframe delta');
+  const sources = new Map<string, PropertyKeyframeEdit>();
+  for (const target of targets) {
+    assertTarget(animation, rig, target.boneId, target.property, target.timeMs);
+    const key = findBonePropertyKeyframe(animation, target.boneId, target.property, target.timeMs);
+    if (!key) throw new Error('Cannot move a missing keyframe.');
+    const source = { ...target, timeMs: key.time, value: key.value };
+    sources.set(JSON.stringify([source.boneId, source.property, source.timeMs]), source);
+  }
+  const keys = [...sources.values()];
+  const delta = constrainKeyframeMoveDelta(
+    keys.map((key) => key.timeMs),
+    deltaMs,
+    animation.duration,
+  );
+  if (!keys.length || delta === 0) return { animation, keys };
+  if (keys.length === 1) {
+    const key = keys[0]!;
+    const next = moveBonePropertyKeyframe(animation, rig, key.boneId, key.property, key.timeMs, key.timeMs + delta);
+    const moved = findBonePropertyKeyframe(
+      next,
+      key.boneId,
+      key.property,
+      next === animation ? key.timeMs : key.timeMs + delta,
+    )!;
+    return { animation: next, keys: [{ ...key, timeMs: moved.time }] };
+  }
+  const destinations = keys.map((key) => ({ ...key, timeMs: key.timeMs + delta }));
+  // Validate every destination before building any result. Never clamp members independently.
+  const identities = new Set<string>();
+  for (const key of destinations) {
+    assertTarget(animation, rig, key.boneId, key.property, key.timeMs);
+    const identity = JSON.stringify([key.boneId, key.property, key.timeMs]);
+    if (identities.has(identity)) throw new Error('Keyframe move cannot preserve spacing at this time precision.');
+    identities.add(identity);
+  }
+  const removed = removeBonePropertyKeyframes(animation, rig, keys);
+  const groups = new Map<string, PropertyKeyframeEdit[]>();
+  for (const key of destinations) {
+    const group = groups.get(key.boneId) ?? [];
+    group.push(key);
+    groups.set(key.boneId, group);
+  }
+  const tracks = { ...removed.tracks };
+  for (const [boneId, group] of groups)
+    tracks[boneId] = setTrackPropertyKeyframes(removed.tracks[boneId] ?? [], group, true);
+  return { animation: validateEditedAnimation({ ...animation, tracks }, animation, rig), keys: destinations };
 }
 
 /** Reuses the runtime pose buffer and playback quantization without clocks, events, or IK. */

@@ -78,7 +78,9 @@ test('normal/Ctrl/Cmd/Shift selection, primary context, clear, and playback stay
   await expect(selected(page)).toHaveCount(4);
   await expect(key(page, 0.75)).toHaveAttribute('data-primary', 'true');
   await page.locator('#timeline').press('ArrowRight');
-  await expect(key(page, 0.75)).toHaveCount(1, { timeout: 1000 });
+  await expect(key(page, 0.76)).toHaveAttribute('data-primary', 'true');
+  await expect(selected(page)).toHaveCount(4);
+  await page.locator('#animation-undo').click();
   await page.locator('#timeline').press('Escape');
   await expect(selected(page)).toHaveCount(0);
   await key(page, 0.5).click();

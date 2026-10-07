@@ -166,15 +166,14 @@ export class TimelineTracksController {
     if (changed || width !== this.width || this.drag !== state.keyframeDrag) {
       this.width = width;
       this.drag = state.keyframeDrag;
+      const moving = keyframeSelectionIndex(this.drag?.originalKeys ?? []);
       for (const track of tracks) {
         const row = this.rows.get(trackKey(track))!;
         for (const [time, marker] of row.markers) {
           const dragging =
             track.kind === 'property' &&
-            this.drag?.key.boneId === track.boneId &&
-            this.drag.key.property === track.property &&
-            this.drag.key.time === time;
-          marker.style.left = `${timeToTimelineX(dragging ? this.drag!.previewTime : time, state.duration, width)}px`;
+            moving.has(keyIdentity({ boneId: track.boneId, property: track.property, time }));
+          marker.style.left = `${timeToTimelineX(dragging ? time + this.drag!.previewDelta : time, state.duration, width)}px`;
           setAttribute(marker, 'data-dragging', String(dragging));
         }
       }
