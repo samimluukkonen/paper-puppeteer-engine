@@ -22,7 +22,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   ).toEqual(expectedBones);
   const timeline = page.locator('#timeline');
   await timeline.press('Shift+ArrowRight');
-  const initialTime = await timeline.getAttribute('aria-valuenow');
+  const initialTime = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
   await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
   await expect(labels.getByRole('button', { name: 'Select bone rightForearm', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -44,7 +44,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   await expect(
     page.locator('#timeline-tracks [data-bone-id="rightForearm"][data-property="rotation"]'),
   ).toHaveAttribute('data-selected', 'true');
-  await expect(timeline).toHaveAttribute('aria-valuenow', initialTime!);
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', initialTime!);
 
   await labels.getByRole('button', { name: 'Select bone torso', exact: true }).click();
   await expect(page.locator('#animation-bones').getByRole('button', { name: 'torso', exact: true })).toHaveAttribute(
@@ -124,7 +124,7 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
   await page.mouse.click(box.x + box.width * 0.4, viewport.y + 60);
   expect(await page.locator('.timeline-inset').evaluate((element) => element.scrollTop)).toBe(scrollBeforeScrub);
   expect(await page.evaluate(() => window.scrollY)).toBe(pageScrollBeforeScrub);
-  expect(Number(await timeline.getAttribute('aria-valuenow'))).toBeCloseTo(1.8 * 0.4, 2);
+  expect(Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'))).toBeCloseTo(1.8 * 0.4, 2);
   const playhead = await page.locator('#timeline-playhead').boundingBox();
   expect(playhead!.x).toBeCloseTo(box.x + box.width * 0.4, 0);
   const lastLane = await page.locator('#timeline-tracks .timeline-track-lane').last().boundingBox();
@@ -133,8 +133,10 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
   await page.locator('#preview-loop').click();
   await page.locator('#play-pause').click();
   const scrollTop = await page.locator('.timeline-inset').evaluate((element) => element.scrollTop);
-  const time = Number(await timeline.getAttribute('aria-valuenow'));
-  await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).not.toBe(time);
+  const time = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
+  await expect
+    .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
+    .not.toBe(time);
   await expect(page.getByRole('button', { name: 'Select torso y track', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',

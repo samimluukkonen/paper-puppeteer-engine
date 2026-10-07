@@ -7,7 +7,7 @@ const lane = (page: Page, bone = 'root', property = 'x') =>
 const key = (page: Page, time: number, bone = 'root', property = 'x') =>
   lane(page, bone, property).locator(`.timeline-keyframe[data-time="${time}"]`);
 const selected = (page: Page) => page.locator('.timeline-keyframe[aria-pressed="true"]');
-const time = async (page: Page) => Number(await page.locator('#timeline').getAttribute('aria-valuenow'));
+const time = async (page: Page) => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
 async function openEditor(page: Page) {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();

@@ -47,7 +47,7 @@ test('bone hierarchy keyboard navigation keeps one tab stop without authoring or
   await expect(last).toBeFocused();
   await expect(last).toHaveAttribute('aria-pressed', 'true');
   await expect(hierarchy.locator('[tabindex="0"]')).toHaveCount(1);
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', '0.5');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.5');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(page.locator('#animation-undo')).toBeDisabled();
 });
@@ -112,7 +112,7 @@ test('three-key authoring, exact history, interpolation, parent-local editing an
   await page.locator('#reset-time').click();
   await page.locator('#play-pause').click();
   await expect
-    .poll(async () => Number(await page.locator('#timeline').getAttribute('aria-valuenow')))
+    .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
     .toBeGreaterThan(0);
   await page.waitForTimeout(1100);
   await expect(page.locator('#play-pause')).toHaveText('Pause');
@@ -250,14 +250,14 @@ test('demo bone hierarchy, temporary preview, sparse create/update/delete, and p
   await time(page, 0.5);
   await page.locator('#play-pause').click();
   await expect
-    .poll(async () => Number(await page.locator('#timeline').getAttribute('aria-valuenow')))
+    .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
     .toBeGreaterThan(0.5);
   await input(page, 'rotation').focus();
   await expect(page.locator('#play-pause')).toHaveText('Play');
-  const heldTime = await page.locator('#timeline').getAttribute('aria-valuenow');
+  const heldTime = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
   await input(page, 'rotation').fill('20');
   await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', heldTime!);
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', heldTime!);
   await expect(page.locator('#play-pause')).toHaveText('Play');
   await page.screenshot({ path: test.info().outputPath('bone-authoring.png'), fullPage: true });
 });

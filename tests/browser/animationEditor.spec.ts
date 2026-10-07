@@ -70,20 +70,23 @@ test('ruler, current time, selection and scrubbed artwork update without dirtyin
   await expect(page.locator('.timeline-tick.major').first()).toBeVisible();
   await expect(page.locator('#timeline-playhead')).toBeVisible();
   await page.locator('#animation-selection').selectOption('walk');
-  const duration = Number(await timeline.getAttribute('aria-valuemax'));
+  const duration = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuemax'));
   const canvas = page.locator('#animation-stage canvas');
   const start = await canvas.screenshot();
   const box = await timeline.boundingBox();
   if (!box) throw new Error('Missing timeline bounds.');
   for (const fraction of [0.01, 0.5, 0.99]) {
     await page.mouse.click(box.x + box.width * fraction, box.y + 18);
-    expect(Number(await timeline.getAttribute('aria-valuenow'))).toBeCloseTo(duration * fraction, 2);
+    expect(Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'))).toBeCloseTo(
+      duration * fraction,
+      2,
+    );
   }
   await page.mouse.click(box.x + box.width * 0.25, box.y + 18);
   await expect.poll(async () => (await canvas.screenshot()).equals(start)).toBe(false);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.locator('#reset-time').click();
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await page.locator('#animation-selection').selectOption('idle');
   await expect(page.locator('#current-time')).toHaveText('0.000 / 1.800 s');
 });
@@ -98,18 +101,18 @@ test('captured pointer scrubs outside both edges, release ends drag, keyboard an
   await page.mouse.move(box.x + box.width / 2, box.y + 18);
   await page.mouse.down();
   await page.mouse.move(box.x - 15, box.y + 150, { steps: 4 });
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await page.mouse.move(box.x + box.width + 15, box.y + 150, { steps: 8 });
-  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '1.8');
   await page.mouse.up();
   await page.mouse.move(box.x + box.width / 2, box.y + 18);
-  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '1.8');
   await timeline.press('Home');
   await timeline.press('ArrowRight');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0.01');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.01');
   await timeline.press('End');
   await page.setViewportSize({ width: 620, height: 1100 });
-  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '1.8');
   const resized = await timeline.boundingBox();
   if (!resized) throw new Error('Missing resized timeline.');
   const playhead = await page.locator('#timeline-playhead').boundingBox();
@@ -151,10 +154,9 @@ test('preview speeds scale browser playback while remaining transient across sel
   for (const speed of [0.5, 1, 2]) {
     await page.locator('#playback-speed').selectOption(String(speed));
     await page.locator('#play-pause').click();
-    const timeline = page.locator('#timeline');
-    const initial = Number(await timeline.getAttribute('aria-valuenow'));
+    const initial = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
     await page.clock.runFor(1000);
-    const advancement = Number(await timeline.getAttribute('aria-valuenow')) - initial;
+    const advancement = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')) - initial;
     expect(advancement).toBeCloseTo(speed, 1);
     await page.locator('#play-pause').click();
     await expect(page.locator('#animation-metadata')).toContainText(`Speed: ${speed}×`);
@@ -272,7 +274,7 @@ test('invalid zero-duration data reports shared validation errors and survives r
   await expect(page.locator('#animation-status')).toContainText('Animation duration must be greater than zero');
   await page.setViewportSize({ width: 620, height: 1100 });
   await expect(page.locator('#animation-status')).toContainText('Animation duration must be greater than zero');
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('#timeline')).toHaveAttribute('aria-disabled', 'true');
 });
 
@@ -290,7 +292,7 @@ test('stepped animation metadata and held preview frames use the existing runtim
   await timeline.press('ArrowRight');
   const frame = await canvas.screenshot();
   await timeline.press('ArrowRight');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0.02');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.02');
   expect((await canvas.screenshot()).equals(frame)).toBe(true);
 });
 
@@ -320,7 +322,7 @@ test('play, pause, resume, restart, and completion synchronize the preview and t
   const playPause = page.locator('#play-pause');
   const restart = page.getByRole('button', { name: 'Restart', exact: true });
   const canvas = page.locator('#animation-stage canvas');
-  const time = async () => Number(await timeline.getAttribute('aria-valuenow'));
+  const time = async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
   const initial = await canvas.screenshot();
   await playPause.click();
   await expect(playPause).toHaveText('Pause');
@@ -344,7 +346,7 @@ test('play, pause, resume, restart, and completion synchronize the preview and t
   await expect.poll(time).toBeLessThan(pausedTime);
   await playPause.click();
   await restart.click();
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(playPause).toHaveText('Play');
   expect((await canvas.screenshot()).equals(initial)).toBe(true);
   await timeline.press('End');
@@ -353,7 +355,7 @@ test('play, pause, resume, restart, and completion synchronize the preview and t
   await timeline.press('ArrowLeft');
   await playPause.click();
   await expect(playPause).toHaveText('Play');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '2.05');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '2.05');
   await page.waitForTimeout(150);
   expect((await canvas.screenshot()).equals(finalPose)).toBe(true);
   await playPause.click();
@@ -362,7 +364,7 @@ test('play, pause, resume, restart, and completion synchronize the preview and t
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.locator('#animation-selection').selectOption('walk');
   await expect(playPause).toHaveText('Play');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await page.screenshot({ path: test.info().outputPath('animation-playback-controls.png'), fullPage: true });
 });
 
@@ -404,7 +406,7 @@ test('Space toggles playback once and leaves typing targets alone', async ({ pag
   await expect(playPause).toBeDisabled();
   await expect(page.locator('#reset-time')).toBeDisabled();
   await timeline.press('Space');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
 });
 
 test('Space activates focused Restart and Loop preview buttons without toggling playback', async ({ page }) => {
@@ -414,7 +416,7 @@ test('Space activates focused Restart and Loop preview buttons without toggling 
   await timeline.press('End');
   await page.locator('#reset-time').focus();
   await page.keyboard.press('Space');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(playPause).toHaveText('Play');
   const loop = page.locator('#preview-loop');
   await loop.focus();
@@ -440,6 +442,7 @@ test('playback advances without measuring layout or rewriting unchanged editor c
     await frame();
     await frame();
     const timeline = document.querySelector<HTMLElement>('#timeline')!;
+    const scrubber = document.querySelector<HTMLElement>('#timeline-ruler')!;
     const bounds = timeline.getBoundingClientRect.bind(timeline);
     let measurements = 0;
     let timeUpdates = 0;
@@ -450,11 +453,11 @@ test('playback advances without measuring layout or rewriting unchanged editor c
     };
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.target === timeline && mutation.attributeName === 'aria-valuenow') timeUpdates += 1;
+        if (mutation.target === scrubber && mutation.attributeName === 'aria-valuenow') timeUpdates += 1;
         else unchangedWrites += 1;
       }
     });
-    observer.observe(timeline, {
+    observer.observe(scrubber, {
       attributes: true,
       attributeFilter: ['aria-valuenow', 'aria-valuemax', 'aria-disabled'],
     });
@@ -510,13 +513,12 @@ test('loop preview repeats, remains a preference across selection, and stops at 
   await openEditor(page);
   const loop = page.getByRole('button', { name: 'Loop preview', exact: true });
   const playPause = page.locator('#play-pause');
-  const timeline = page.locator('#timeline');
   await expect(loop).toHaveAttribute('aria-pressed', 'false');
   await loop.click();
   await expect(loop).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#animation-metadata')).toContainText('Authored loop: off · Playback: loop');
   await playPause.click();
-  const wraps = await timeline.evaluate(async (element) => {
+  const wraps = await page.locator('#timeline-ruler').evaluate(async (element) => {
     let previous = Number(element.getAttribute('aria-valuenow'));
     let count = 0;
     return await new Promise<number>((resolve) => {
@@ -540,12 +542,12 @@ test('loop preview repeats, remains a preference across selection, and stops at 
   await expect(playPause).toHaveText('Pause');
   await loop.click();
   await expect(playPause).toHaveText('Play');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0.4');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.4');
   await loop.click();
   await playPause.click();
   await page.locator('#animation-selection').selectOption('walk');
   await expect(playPause).toHaveText('Play');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(loop).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.screenshot({ path: test.info().outputPath('animation-loop-preview.png'), fullPage: true });
@@ -557,7 +559,7 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   const playPause = page.locator('#play-pause');
   const canvas = page.locator('#animation-stage canvas');
   const loop = page.locator('#preview-loop');
-  const time = async () => Number(await timeline.getAttribute('aria-valuenow'));
+  const time = async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
   const box = await timeline.boundingBox();
   if (!box) throw new Error('Missing timeline bounds.');
   await loop.click();
@@ -583,10 +585,10 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   await page.mouse.move(box.x + box.width * 0.3, box.y + 18);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width + 15, box.y + 70);
-  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '1.8');
   await page.mouse.up();
   await page.waitForTimeout(150);
-  await expect(timeline).toHaveAttribute('aria-valuenow', '1.8');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '1.8');
   await expect(playPause).toHaveText('Play');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
@@ -604,11 +606,11 @@ test('selection during a playing drag releases the old pointer without resuming 
   await expect(page.locator('#animation-metadata')).toContainText('Scrubbing');
   await page.locator('#animation-selection').selectOption('walk');
   await expect(page.locator('#play-pause')).toHaveText('Play');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await page.mouse.move(box.x + box.width * 0.7, box.y + 18);
   await page.mouse.up();
   await page.waitForTimeout(150);
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('#animation-metadata')).not.toContainText('Scrubbing');
 });
 
@@ -622,13 +624,15 @@ for (const ending of ['pointercancel', 'lostpointercapture', 'blur'] as const) {
     if (!box) throw new Error('Missing timeline bounds.');
     await page.mouse.move(box.x + box.width * 0.3, box.y + 18);
     await page.mouse.down();
-    const held = Number(await timeline.getAttribute('aria-valuenow'));
+    const held = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
     await timeline.evaluate((element, eventName) => {
       if (eventName === 'blur') window.dispatchEvent(new Event('blur'));
       else element.dispatchEvent(new PointerEvent(eventName, { pointerId: 1, bubbles: true }));
     }, ending);
     await expect(page.locator('#animation-metadata')).not.toContainText('Scrubbing');
-    await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).toBeGreaterThan(held);
+    await expect
+      .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
+      .toBeGreaterThan(held);
     await page.mouse.up();
     await expect(page.locator('#play-pause')).toHaveText('Pause');
     await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -644,7 +648,7 @@ test('Home rewinds from outside the timeline, preserves playback, and ignores ty
   await timeline.press('End');
   await page.locator('#preview-loop').focus();
   await page.keyboard.press('Home');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(playPause).toHaveText('Play');
   await timeline.press('Shift+ArrowRight');
   for (const key of ['Control+Home', 'Alt+Home', 'Meta+Home', 'Control+ArrowRight', 'Alt+End']) {
@@ -657,11 +661,11 @@ test('Home rewinds from outside the timeline, preserves playback, and ignores ty
       metaKey: key.startsWith('Meta'),
       bubbles: true,
     });
-    await expect(timeline).toHaveAttribute('aria-valuenow', '0.1');
+    await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.1');
   }
   await timeline.dispatchEvent('keydown', { key: 'Home', code: 'Home', isComposing: true, bubbles: true });
   await timeline.dispatchEvent('keydown', { key: 'ArrowRight', isComposing: true, bubbles: true });
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0.1');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.1');
   await page.evaluate(() => {
     const host = document.createElement('div');
     host.id = 'home-typing';
@@ -677,7 +681,7 @@ test('Home rewinds from outside the timeline, preserves playback, and ignores ty
     '#home-typing span',
   ]) {
     await page.locator(target).dispatchEvent('keydown', { key: 'Home', code: 'Home', bubbles: true });
-    await expect(timeline).toHaveAttribute('aria-valuenow', '0.1');
+    await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.1');
   }
   await page.locator('#home-typing').evaluate((element) => element.remove());
   await timeline.press('End');
@@ -687,18 +691,19 @@ test('Home rewinds from outside the timeline, preserves playback, and ignores ty
   await playPause.focus();
   await page.keyboard.press('Home');
   await expect(playPause).toHaveText('Pause');
-  await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).toBeLessThan(0.5);
+  await expect
+    .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
+    .toBeLessThan(0.5);
   await playPause.click();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.locator('#animation-selection').selectOption('');
   await timeline.press('Home');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(playPause).toBeDisabled();
 });
 
 test('repeated animation switches reset playback and time while retaining transient preferences', async ({ page }) => {
   await openEditor(page);
-  const timeline = page.locator('#timeline');
   const playPause = page.locator('#play-pause');
   await page.locator('#preview-loop').click();
   await page.locator('#playback-speed').selectOption('2');
@@ -706,7 +711,7 @@ test('repeated animation switches reset playback and time while retaining transi
     if (!(await playPause.isDisabled())) await playPause.click();
     await page.locator('#animation-selection').selectOption(animation);
     await expect(playPause).toHaveText('Play');
-    await expect(timeline).toHaveAttribute('aria-valuenow', '0');
+    await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
     await expect(page.locator('#preview-loop')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#playback-speed')).toHaveValue('2');
     await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -722,7 +727,7 @@ test('hiding the page releases a playing scrub and resumes after visibility retu
   if (!box) throw new Error('Missing timeline bounds.');
   await page.mouse.move(box.x + box.width * 0.2, box.y + 18);
   await page.mouse.down();
-  const held = Number(await timeline.getAttribute('aria-valuenow'));
+  const held = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -734,7 +739,9 @@ test('hiding the page releases a playing scrub and resumes after visibility retu
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await expect(page.locator('#play-pause')).toHaveText('Pause');
-  await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).toBeGreaterThan(held);
+  await expect
+    .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
+    .toBeGreaterThan(held);
   await page.locator('#play-pause').click();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });

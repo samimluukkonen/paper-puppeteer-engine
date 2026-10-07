@@ -43,12 +43,47 @@ function inputFixture(getState: () => AnimationEditorState) {
   vi.stubGlobal('Element', TimelineElement);
   const app = new EventTarget() as unknown as HTMLElement;
   const timeline = new TimelineElement();
-  const create = () => new TimelineInputController(app, timeline as unknown as HTMLElement, getState);
-  return { browser, timeline, create };
+  const scrubber = new TimelineElement();
+  const create = () =>
+    new TimelineInputController(app, timeline as unknown as HTMLElement, getState, scrubber as unknown as HTMLElement);
+  return { browser, timeline, scrubber, create };
 }
 const pointer = (type: string, clientX = 50) =>
   Object.assign(new Event(type, { cancelable: true }), { button: 0, pointerId: 1, clientX });
 const space = () => Object.assign(new Event('keydown', { cancelable: true }), { key: ' ', code: 'Space' });
+
+test('scrubber keyboard navigation preserves selected authored keys and is removed on disposal', () => {
+  const current = state();
+  current.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
+  current.setCurrentTime(0.5);
+  const { scrubber, create } = inputFixture(() => current);
+  const input = create();
+  const animation = current.workingAnimation;
+  for (const [key, time] of [
+    ['ArrowRight', 0.51],
+    ['ArrowUp', 0.52],
+    ['ArrowLeft', 0.51],
+    ['ArrowDown', 0.5],
+    ['Home', 0],
+    ['End', 1],
+  ] as const) {
+    const event = Object.assign(new Event('keydown', { cancelable: true }), { key });
+    scrubber.dispatchEvent(event);
+    assert.isTrue(event.defaultPrevented);
+    assert.closeTo(current.currentTime, time, 1e-9);
+    assert.strictEqual(current.workingAnimation, animation);
+    assert.equal(current.selectedKeyframe?.time, 0);
+    assert.isFalse(current.dirty);
+    assert.equal(current.historyLength, 0);
+  }
+  for (const guard of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { isComposing: true }]) {
+    scrubber.dispatchEvent(Object.assign(new Event('keydown', { cancelable: true }), { key: 'Home', ...guard }));
+    assert.equal(current.currentTime, 1);
+  }
+  input.dispose();
+  scrubber.dispatchEvent(Object.assign(new Event('keydown'), { key: 'Home' }));
+  assert.equal(current.currentTime, 1);
+});
 
 test('input disposal ends scrubbing, releases capture, and permits remount without duplicate shortcuts', () => {
   const previous = state();

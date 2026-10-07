@@ -53,7 +53,7 @@ test('markers align with shared coordinates through resize; clicks pause and coo
   await expect(page.locator('#play-pause')).toHaveText('Pause');
   await key(page, 0.5).click();
   await expect(page.locator('#play-pause')).toHaveText('Play');
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', '0.5');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.5');
   await expect(key(page, 0.5)).toHaveAttribute('aria-pressed', 'true');
   await expect(key(page, 0)).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: root');
@@ -68,12 +68,12 @@ test('markers align with shared coordinates through resize; clicks pause and coo
   const canvas = page.locator('#animation-stage canvas');
   const selectedPose = await canvas.screenshot();
   await key(page, 2).click({ position: { x: 4, y: 12 } });
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', '2');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '2');
   await expect(input(page)).toHaveValue('20');
   expect((await canvas.screenshot()).equals(selectedPose)).toBe(false);
   await key(page, 0).focus();
   await page.keyboard.press('Space');
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(key(page, 0)).toHaveAttribute('aria-pressed', 'true');
   await page.locator('.timeline-panel').screenshot({ path: test.info().outputPath('keyframe-markers.png') });
 });
@@ -92,12 +92,14 @@ test('scrubbing retains selection, playback leaves markers stationary, empty cli
   await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + 18, { steps: 4 });
   await page.mouse.up();
   await expect(key(page, 0.5)).toHaveAttribute('aria-pressed', 'true');
-  expect(Number(await timeline.getAttribute('aria-valuenow'))).toBeCloseTo(1.2, 2);
+  expect(Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'))).toBeCloseTo(1.2, 2);
   await expect(page.locator('[data-keyed-property="x"]')).toHaveAttribute('data-keyed', 'false');
   const markerPosition = await key(page, 0.5).evaluate((element) => element.style.left);
   await page.locator('#preview-loop').click();
   await page.locator('#play-pause').click();
-  await expect.poll(async () => Number(await timeline.getAttribute('aria-valuenow'))).not.toBeCloseTo(1.2, 2);
+  await expect
+    .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
+    .not.toBeCloseTo(1.2, 2);
   expect(await key(page, 0.5).evaluate((element) => element.style.left)).toBe(markerPosition);
   await expect(key(page, 0.5)).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#play-pause').click();
@@ -106,9 +108,9 @@ test('scrubbing retains selection, playback leaves markers stationary, empty cli
   await expect(page.locator('#timeline-delete-key')).toBeDisabled();
   await page.locator('#timeline-previous-key').click();
   await expect(key(page, 0.5)).toHaveAttribute('aria-pressed', 'true');
-  await expect(timeline).toHaveAttribute('aria-valuenow', '0.5');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0.5');
   await page.locator('#timeline-next-key').click();
-  await expect(timeline).toHaveAttribute('aria-valuenow', '2');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '2');
   await expect(page.locator('#timeline-next-key')).toBeDisabled();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
@@ -125,7 +127,7 @@ test('selected deletion uses one history operation after scrubbing and typing/co
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   const timeline = page.locator('#timeline');
   await timeline.press('End');
-  const time = Number(await timeline.getAttribute('aria-valuenow'));
+  const time = Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
   expect(time).toBe(2);
   await timeline.press('Control+Delete');
   await timeline.dispatchEvent('keydown', { key: 'Delete', isComposing: true });

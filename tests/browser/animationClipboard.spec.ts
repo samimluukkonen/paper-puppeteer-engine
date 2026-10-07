@@ -35,7 +35,7 @@ const marker = (page: Page, time: number, bone = 'torso', property = 'x') =>
     `#timeline-tracks .timeline-track-lane[data-bone-id="${bone}"][data-property="${property}"] .timeline-keyframe[data-time="${time}"]`,
   );
 const selected = (page: Page) => page.locator('.timeline-keyframe[aria-pressed="true"]');
-const clock = async (page: Page) => Number(await page.locator('#timeline').getAttribute('aria-valuenow'));
+const clock = async (page: Page) => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
 async function selectGroup(page: Page) {
   await marker(page, 0.5).click();
   for (const [time, bone, property] of [
@@ -75,14 +75,14 @@ test('five keys copy/paste across bones and properties, extend duration, refresh
   await page.locator('#timeline').press('Meta+v');
   await verifyGroup(page, 2);
   expect(await clock(page)).toBe(2);
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuemax', '2.7');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuemax', '2.7');
   await expect(page.locator('#animation-bone-fields input[data-property="x"]')).toHaveValue('4');
   await expect(page.locator('#animation-bone-fields input[data-property="y"]')).toHaveValue('5');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('.timeline-panel').screenshot({ path: test.info().outputPath('pasted-keyframes.png') });
   await page.locator('#animation-undo').click();
   await expect(marker(page, 2)).toHaveCount(0);
-  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuemax', '2');
+  await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuemax', '2');
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.locator('#animation-redo').click();

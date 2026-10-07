@@ -31,7 +31,7 @@ export class TimelineController {
     this.session = new TimelineSessionController(app, () => this.state, {
       endScrub: () => this.input.endScrub(),
     });
-    this.input = new TimelineInputController(app, this.timeline, () => this.state);
+    this.input = new TimelineInputController(app, this.timeline, () => this.state, this.ruler);
     this.width = this.timeline.getBoundingClientRect().width;
     this.resize = new ResizeObserver(() => {
       this.width = this.timeline.getBoundingClientRect().width;
@@ -95,14 +95,15 @@ export class TimelineController {
     const playheadX = `${timeToTimelineX(state.currentTime, state.duration, width)}px`;
     this.playhead.style.left = playheadX;
     this.ruler.style.setProperty('--timeline-playhead-x', playheadX);
-    setAttribute(this.timeline, 'aria-valuemax', String(state.duration));
-    setAttribute(this.timeline, 'aria-valuenow', String(state.currentTime));
+    setAttribute(this.ruler, 'aria-valuemax', String(state.duration));
+    setAttribute(this.ruler, 'aria-valuenow', String(state.currentTime));
     setAttribute(
-      this.timeline,
+      this.ruler,
       'aria-valuetext',
       `${state.currentTime.toFixed(3)} of ${state.duration.toFixed(3)} seconds`,
     );
     setAttribute(this.timeline, 'aria-disabled', String(!animation));
+    setAttribute(this.ruler, 'aria-disabled', String(!animation));
     this.session.render();
   }
 

@@ -25,7 +25,8 @@ export function mountEditorMarkup(app: HTMLElement): void {
         <tr><th scope="row">Shift during key drag</th><td>Bypass snapping.</td></tr>
         <tr><th scope="row">Escape</th><td>Cancel a key drag or rectangle; otherwise clear key selection.</td></tr>
         <tr><th scope="row">Frame snap</th><td>Use authored FPS (10 FPS for smooth clips).</td></tr>
-        <tr><th scope="row">Left / Right Arrow</th><td>Nudge all selected keys together; otherwise scrub the focused timeline.</td></tr>
+        <tr><th scope="row">Left / Right Arrow</th><td>Nudge selected keys in the tracks. When the ruler is focused, scrub time without editing keys.</td></tr>
+        <tr><th scope="row">Ruler Up / Down / Home / End</th><td>Scrub forward/backward or jump to the start/end without editing selected keys.</td></tr>
         <tr><th scope="row">Shift + Arrow</th><td>Nudge ten steps.</td></tr>
         <tr><th scope="row">Move onto another key</th><td>Replace the destination key on the same property.</td></tr>
         <tr><th scope="row">Delete / Backspace</th><td>Remove all selected keys outside inputs.</td></tr>
@@ -33,7 +34,7 @@ export function mountEditorMarkup(app: HTMLElement): void {
         <tr><th scope="row">Ctrl/Cmd + D</th><td>In the timeline, duplicate by one authored frame, or 0.01 s for smooth clips. Collisions replace destination values.</td></tr>
         <tr><th scope="row">Click an empty area</th><td>Clear key selection.</td></tr>
       </tbody></table></details>
-      <div class="timeline-inset"><div class="timeline-label-column"><div class="timeline-label-heading">Bone / property</div><div id="timeline-track-labels" aria-label="Timeline tracks"></div></div><div id="timeline" role="slider" tabindex="0" aria-label="Animation time" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><div id="timeline-ruler" aria-hidden="true"></div><div id="timeline-tracks"></div><div id="timeline-playhead" aria-hidden="true"></div></div></div>
+      <div class="timeline-inset"><div class="timeline-label-column"><div class="timeline-label-heading">Bone / property</div><div id="timeline-track-labels" aria-label="Timeline tracks"></div></div><div id="timeline" role="group" tabindex="-1" aria-label="Animation keyframes"><div id="timeline-ruler" role="slider" tabindex="0" aria-label="Animation time" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></div><div id="timeline-tracks"></div><div id="timeline-playhead" aria-hidden="true"></div></div></div>
     </section>
   </main>`;
 }

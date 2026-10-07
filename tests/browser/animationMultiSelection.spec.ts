@@ -36,7 +36,7 @@ const lane = (page: Page, bone = 'root', property = 'x') =>
 const key = (page: Page, time: number, bone = 'root', property = 'x') =>
   lane(page, bone, property).locator(`[data-time="${time}"]`);
 const selected = (page: Page) => page.locator('.timeline-keyframe[aria-pressed="true"]');
-const time = async (page: Page) => Number(await page.locator('#timeline').getAttribute('aria-valuenow'));
+const time = async (page: Page) => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
 async function marquee(page: Page, additive = false) {
   const inset = page.locator('.timeline-inset');
   await inset.scrollIntoViewIfNeeded();

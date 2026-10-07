@@ -34,6 +34,7 @@ export class TimelineInputController {
     private readonly app: HTMLElement,
     private readonly timeline: HTMLElement,
     private readonly getState: () => AnimationEditorState,
+    private readonly scrubber: HTMLElement,
   ) {
     const options = { signal: this.abort.signal };
     window.addEventListener(
@@ -131,11 +132,12 @@ export class TimelineInputController {
         )
           return;
         event.preventDefault();
-        this.timeline.focus({ preventScroll: true });
         if (event.target instanceof Element && event.target.closest('.timeline-track-lane')) {
+          this.timeline.focus({ preventScroll: true });
           this.beginMarquee(event);
           return;
         }
+        this.scrubber.focus({ preventScroll: true });
         this.pointerAdditive = event.ctrlKey || event.metaKey;
         this.pointer = event.pointerId;
         this.pointerStartX = event.clientX;
@@ -258,6 +260,36 @@ export class TimelineInputController {
                 ? this.state.currentTime + step
                 : undefined;
         if (time === undefined) return;
+        event.preventDefault();
+        this.state.setCurrentTime(time);
+      },
+      options,
+    );
+    this.scrubber.addEventListener(
+      'keydown',
+      (event) => {
+        if (
+          !this.state.workingAnimation ||
+          event.defaultPrevented ||
+          event.isComposing ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey
+        )
+          return;
+        const step = event.shiftKey ? 0.1 : 0.01;
+        const time =
+          event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? this.state.duration
+              : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+                ? this.state.currentTime - step
+                : event.key === 'ArrowRight' || event.key === 'ArrowUp'
+                  ? this.state.currentTime + step
+                  : undefined;
+        if (time === undefined) return;
+        // Consume slider navigation before track/global shortcuts can move authored keys.
         event.preventDefault();
         this.state.setCurrentTime(time);
       },

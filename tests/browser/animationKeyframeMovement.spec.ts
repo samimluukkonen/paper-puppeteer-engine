@@ -28,7 +28,38 @@ async function openEditor(page: Page) {
 const lane = (page: Page, property = 'x') =>
   page.locator(`#timeline-tracks .timeline-track-lane[data-bone-id="root"][data-property="${property}"]`);
 const key = (page: Page, time: number) => lane(page).locator(`.timeline-keyframe[data-time="${time}"]`);
-const time = async (page: Page) => Number(await page.locator('#timeline').getAttribute('aria-valuenow'));
+const time = async (page: Page) => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'));
+
+test('time slider navigation remains separate from selected keyframe authoring', async ({ page }) => {
+  await openEditor(page);
+  const slider = page.getByRole('slider', { name: 'Animation time' });
+  const marker = key(page, 0.5);
+  await marker.focus();
+  await marker.press('Enter');
+  await expect(marker).toHaveAttribute('aria-pressed', 'true');
+  await expect(slider.getByRole('button')).toHaveCount(0);
+  await expect(page.locator('#timeline')).toHaveAttribute('role', 'group');
+  await slider.focus();
+  for (const [command, expected] of [
+    ['ArrowRight', 0.51],
+    ['ArrowUp', 0.52],
+    ['ArrowLeft', 0.51],
+    ['ArrowDown', 0.5],
+    ['Home', 0],
+    ['End', 1],
+  ] as const) {
+    await slider.press(command);
+    await expect.poll(() => time(page)).toBeCloseTo(expected, 6);
+    await expect(marker).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+    await expect(page.locator('#animation-undo')).toBeDisabled();
+  }
+  await marker.focus();
+  await marker.press('ArrowRight');
+  await expect(key(page, 0.51)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+});
+
 async function beginDrag(page: Page, from: number) {
   await key(page, from).scrollIntoViewIfNeeded();
   const marker = await key(page, from).boundingBox();

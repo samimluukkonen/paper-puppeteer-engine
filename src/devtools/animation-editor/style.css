@@ -284,7 +284,8 @@ a {
   cursor: ew-resize;
   background: #e9edde;
 }
-#timeline:focus-visible {
+#timeline:focus-visible,
+#timeline-ruler:focus-visible {
   outline: 2px solid #39574b;
   outline-offset: 4px;
 }
