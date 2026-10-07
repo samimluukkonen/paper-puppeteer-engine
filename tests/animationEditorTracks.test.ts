@@ -246,3 +246,36 @@ test('demo timeline includes every expected bone in the same order as the hierar
   for (const bone of demoRig.bones) state.setTimelineBoneExpanded(bone.id, true);
   assert.lengthOf(state.timelineTracks, demoRig.bones.length * (1 + transformProperties.length));
 });
+
+test('editing one bone retains unrelated row identity through history and expansion changes', () => {
+  const { state } = session();
+  for (const id of ['root', 'zArm']) state.setTimelineBoneExpanded(id, true);
+  const before = state.timelineTracks;
+  const armRows = before.filter((row) => row.boneId === 'zArm');
+  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  for (const read of [() => {}, () => state.undo(), () => state.redo()]) {
+    read();
+    const rows = state.timelineTracks.filter((row) => row.boneId === 'zArm');
+    assert.isTrue(rows.every((row, index) => row === armRows[index]));
+  }
+  state.setTimelineBoneExpanded('hand', true);
+  assert.isTrue(
+    state.timelineTracks.filter((row) => row.boneId === 'zArm').every((row, index) => row === armRows[index]),
+  );
+  assert.notStrictEqual(
+    state.timelineTracks.find((row) => row.kind === 'property' && row.boneId === 'root' && row.property === 'x'),
+    before.find((row) => row.kind === 'property' && row.boneId === 'root' && row.property === 'x'),
+  );
+});
+
+test.each([false, true])('mutable track rows remain fresh when reusing layout, shallow freeze=%s', (shallow) => {
+  const keys = [{ time: 0, x: 1 }];
+  if (shallow) Object.freeze(keys);
+  const animation = clip({ tracks: { root: keys } });
+  const before = buildTimelineTracks(rig, animation, new Set(['root']));
+  keys[0]!.x = 2;
+  const after = buildTimelineTracks(rig, animation, new Set(['root']), before);
+  const track = after.find((row) => row.kind === 'property' && row.property === 'x');
+  assert.isTrue(track?.kind === 'property');
+  if (track?.kind === 'property') assert.equal(track.keyframes[0]!.value, 2);
+});

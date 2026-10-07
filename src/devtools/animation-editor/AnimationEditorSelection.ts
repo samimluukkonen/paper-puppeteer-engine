@@ -23,6 +23,7 @@ export class AnimationEditorSelection {
   private temporary: Readonly<Partial<JointTransform>> = Object.freeze({});
   private readonly expandedBones = new Set<string>();
   private rows: readonly TimelineTrack[] | undefined;
+  private rowsDirty = true;
   private rowAnimation: AnimationData | undefined;
 
   constructor(private readonly rig: Rig | undefined) {}
@@ -148,9 +149,10 @@ export class AnimationEditorSelection {
   }
 
   tracks(animation: AnimationData): readonly TimelineTrack[] {
-    if (!this.rows || this.rowAnimation !== animation) {
-      this.rows = buildTimelineTracks(this.rig, animation, this.expandedBones);
+    if (!this.rows || this.rowsDirty || this.rowAnimation !== animation) {
+      this.rows = buildTimelineTracks(this.rig, animation, this.expandedBones, this.rows);
       this.rowAnimation = animation;
+      this.rowsDirty = false;
     }
     return this.rows;
   }
@@ -162,7 +164,7 @@ export class AnimationEditorSelection {
     if (this.expandedBones.has(boneId) === expanded) return false;
     if (expanded) this.expandedBones.add(boneId);
     else this.expandedBones.delete(boneId);
-    this.rows = undefined;
+    this.rowsDirty = true;
     return true;
   }
 

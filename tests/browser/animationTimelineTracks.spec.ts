@@ -154,9 +154,14 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
   await page.setViewportSize({ width: 620, height: 1100 });
   await alignment();
   await timeline.press('End');
-  const resized = await timeline.boundingBox();
-  const endHead = await page.locator('#timeline-playhead').boundingBox();
-  expect(endHead!.x).toBeCloseTo(resized!.x + resized!.width, 0);
+  // ResizeObserver publishes the new projection asynchronously after viewport layout.
+  await expect
+    .poll(async () => {
+      const resized = await timeline.boundingBox();
+      const endHead = await page.locator('#timeline-playhead').boundingBox();
+      return Math.abs(endHead!.x - resized!.x - resized!.width);
+    })
+    .toBeLessThan(0.5);
   await page.locator('.timeline-inset').screenshot({ path: test.info().outputPath('timeline-tracks-narrow.png') });
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });

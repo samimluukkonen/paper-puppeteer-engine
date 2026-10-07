@@ -2,7 +2,7 @@ import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
-import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
+import { type KeyframeSelection, type TimelineTrack, timelineTrackKey } from './timelineTracks.js';
 
 interface TrackElements {
   readonly label: HTMLElement;
@@ -12,10 +12,11 @@ interface TrackElements {
   /** Full-width time lane; marker centers share ruler/playhead coordinates. */
   readonly lane: HTMLElement;
   readonly markers: Map<number, HTMLButtonElement>;
+  track?: TimelineTrack;
 }
 
 function trackKey(track: TimelineTrack): string {
-  return JSON.stringify([track.boneId, track.kind === 'property' ? track.property : null]);
+  return timelineTrackKey(track.boneId, track.kind === 'property' ? track.property : null);
 }
 
 /** Reconcile only structural changes, preserving surviving buttons, focus and scroll during playback. */
@@ -36,6 +37,7 @@ export class TimelineTracksController {
   private selectedKey: KeyframeSelection | null | undefined;
   private selectedKeys: readonly KeyframeSelection[] | undefined;
   private width = -1;
+  private duration = -1;
   private drag: AnimationEditorState['keyframeDrag'] | undefined;
 
   constructor(
@@ -88,6 +90,8 @@ export class TimelineTracksController {
     this.state = state;
     const tracks = state.timelineTracks;
     const changed = tracks !== this.tracks;
+    const changedRows = new Set<TrackElements>();
+    const newMarkers = new Set<HTMLButtonElement>();
     if (changed) {
       this.tracks = tracks;
       const keys = new Set(tracks.map(trackKey));
@@ -101,6 +105,11 @@ export class TimelineTracksController {
           row = this.createRow(track);
           this.rows.set(key, row);
         }
+        labels.push(row.label);
+        lanes.push(row.lane);
+        if (row.track === track) continue;
+        changedRows.add(row);
+        row.track = track;
         row.label.style.paddingLeft = `${4 + track.depth * 12}px`;
         for (const element of [row.label, row.lane]) setAttribute(element, 'data-has-keys', String(track.hasKeys));
         row.indicator.textContent = track.hasKeys ? '●' : '○';
@@ -130,6 +139,9 @@ export class TimelineTracksController {
               marker.type = 'button';
               marker.className = 'timeline-keyframe';
               marker.dataset.time = String(keyframe.time);
+              setAttribute(marker, 'data-primary', 'false');
+              setAttribute(marker, 'aria-pressed', 'false');
+              newMarkers.add(marker);
               // Markers own clicks; they must not begin a scrub or resume playback on release.
               const button = marker;
               marker.addEventListener('pointerdown', (event) => this.onKeyPointerDown(event, keyframe, button));
@@ -151,8 +163,6 @@ export class TimelineTracksController {
             track.keyframes.map((keyframe) => row.markers.get(keyframe.time)!),
           );
         }
-        labels.push(row.label);
-        lanes.push(row.lane);
       }
       reconcileRows(this.labels, labels);
       reconcileRows(this.lanes, lanes);
@@ -163,18 +173,35 @@ export class TimelineTracksController {
         this.labels.append(empty);
       }
     }
-    if (changed || width !== this.width || this.drag !== state.keyframeDrag) {
-      this.width = width;
-      this.drag = state.keyframeDrag;
+    const resized = width !== this.width || state.duration !== this.duration;
+    const previousDrag = this.drag;
+    this.width = width;
+    this.duration = state.duration;
+    this.drag = state.keyframeDrag;
+    if (changed || resized || previousDrag !== this.drag) {
       const moving = keyframeSelectionIndex(this.drag?.originalKeys ?? []);
-      for (const track of tracks) {
-        const row = this.rows.get(trackKey(track))!;
+      const position = (ref: KeyframeSelection, marker: HTMLButtonElement): void => {
+        const dragging = moving.has(keyIdentity(ref));
+        marker.style.left = `${timeToTimelineX(dragging ? ref.time + this.drag!.previewDelta : ref.time, this.duration, width)}px`;
+        setAttribute(marker, 'data-dragging', String(dragging));
+      };
+      const positionedRows = resized ? new Set(this.rows.values()) : changedRows;
+      for (const row of positionedRows) {
+        const track = row.track;
+        if (track?.kind !== 'property') continue;
         for (const [time, marker] of row.markers) {
-          const dragging =
-            track.kind === 'property' &&
-            moving.has(keyIdentity({ boneId: track.boneId, property: track.property, time }));
-          marker.style.left = `${timeToTimelineX(dragging ? time + this.drag!.previewDelta : time, state.duration, width)}px`;
-          setAttribute(marker, 'data-dragging', String(dragging));
+          position({ boneId: track.boneId, property: track.property, time }, marker);
+        }
+      }
+      if (previousDrag !== this.drag) {
+        const affected = keyframeSelectionIndex([
+          ...(previousDrag?.originalKeys ?? []),
+          ...(this.drag?.originalKeys ?? []),
+        ]);
+        for (const ref of affected.values()) {
+          const row = this.rows.get(timelineTrackKey(ref.boneId, ref.property));
+          const marker = row?.markers.get(ref.time);
+          if (row && marker && !positionedRows.has(row)) position(ref, marker);
         }
       }
     }
@@ -186,6 +213,8 @@ export class TimelineTracksController {
       this.selectedKeys === state.selectedKeys
     )
       return;
+    const previousKeys = this.selectedKeys ?? [];
+    const previousPrimary = this.selectedKey;
     this.selectedBone = state.selectedBoneId;
     this.selectedProperty = state.selectedTimelineProperty;
     this.selectedKey = state.primaryKey;
@@ -197,17 +226,24 @@ export class TimelineTracksController {
         track.boneId === this.selectedBone && (track.kind === 'bone' || track.property === this.selectedProperty);
       for (const element of [row.label, row.lane]) setAttribute(element, 'data-selected', String(selected));
       setAttribute(row.select, 'aria-pressed', String(selected));
-      for (const [time, marker] of row.markers) {
-        // Both times are canonical authored values resolved by the state's tolerant key lookup.
-        const ref = track.kind === 'property' ? { boneId: track.boneId, property: track.property, time } : null;
-        const keySelected = ref !== null && selectionIndex.has(keyIdentity(ref));
-        setAttribute(
-          marker,
-          'data-primary',
-          String(ref !== null && this.selectedKey !== null && sameKey(this.selectedKey, ref)),
-        );
-        setAttribute(marker, 'aria-pressed', String(keySelected));
-      }
+    }
+    const previousIndex = keyframeSelectionIndex(previousKeys);
+    const affected = keyframeSelectionIndex([
+      ...previousKeys,
+      ...this.selectedKeys,
+      ...(previousPrimary ? [previousPrimary] : []),
+      ...(this.selectedKey ? [this.selectedKey] : []),
+    ]);
+    for (const ref of affected.values()) {
+      const marker = this.rows.get(timelineTrackKey(ref.boneId, ref.property))?.markers.get(ref.time);
+      if (!marker) continue;
+      const id = keyIdentity(ref);
+      const selected = selectionIndex.has(id);
+      const primary = this.selectedKey !== null && sameKey(this.selectedKey, ref);
+      const wasPrimary = !!previousPrimary && sameKey(previousPrimary, ref);
+      if (!newMarkers.has(marker) && selected === previousIndex.has(id) && primary === wasPrimary) continue;
+      setAttribute(marker, 'data-primary', String(primary));
+      setAttribute(marker, 'aria-pressed', String(selected));
     }
   }
 
