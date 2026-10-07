@@ -121,8 +121,10 @@ export class RigEditorInputController {
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
       if (isTypingTarget(event.target)) return;
       event.preventDefault();
-      if (event.shiftKey) this.editor.redo();
-      else this.editor.undo();
+      if (!event.repeat) {
+        if (event.shiftKey) this.editor.redo();
+        else this.editor.undo();
+      }
       return;
     }
     if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;

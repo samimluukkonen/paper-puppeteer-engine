@@ -72,3 +72,37 @@ test('unhandled shortcuts still nudge, undo, and redo the selected bone', () => 
     controller.disable();
   }
 });
+
+test.each([{ ctrlKey: true }, { metaKey: true }])(
+  'held Undo/Redo shortcuts ignore repeat with $ctrlKey/$metaKey',
+  (modifier) => {
+    const { editor, state, key, controller } = fixture();
+    try {
+      state.editBone('root', 'x', 20);
+      assert.isTrue(key({ key: 'z', ...modifier }).defaultPrevented);
+      assert.equal(state.getBone('root').x, 10);
+      assert.isTrue(key({ key: 'z', ...modifier, repeat: true }).defaultPrevented);
+      assert.equal(state.getBone('root').x, 10);
+      assert.equal(editor.undo.mock.calls.length, 1);
+
+      assert.isTrue(key({ key: 'z', ...modifier, shiftKey: true }).defaultPrevented);
+      assert.equal(state.getBone('root').x, 20);
+      assert.isTrue(key({ key: 'z', ...modifier, shiftKey: true, repeat: true }).defaultPrevented);
+      assert.equal(state.getBone('root').x, 20);
+      assert.equal(editor.redo.mock.calls.length, 1);
+    } finally {
+      controller.disable();
+    }
+  },
+);
+
+test('held arrow shortcuts keep nudging on repeat', () => {
+  const { state, key, controller } = fixture();
+  try {
+    key({ key: 'ArrowRight' });
+    key({ key: 'ArrowRight', repeat: true });
+    assert.equal(state.getBone('root').x, 12);
+  } finally {
+    controller.disable();
+  }
+});
