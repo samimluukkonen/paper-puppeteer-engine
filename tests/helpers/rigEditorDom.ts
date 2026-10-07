@@ -86,6 +86,11 @@ export function stubRigEditorDom(): (selector: string) => EditorElement {
     return elements.get(selector)!;
   };
   Object.assign(querySelector('#editor-app'), { querySelector });
-  vi.stubGlobal('document', { querySelector, createElement: () => new EditorElement() });
+  vi.stubGlobal('document', {
+    querySelector,
+    createElement: () => new EditorElement(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
   return querySelector;
 }

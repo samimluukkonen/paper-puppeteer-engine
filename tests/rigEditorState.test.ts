@@ -16,6 +16,46 @@ const source = new Rig({
   skins: [{ version: 1, name: 'default', slots: { handVisual: 'hand' } }],
 });
 
+test('restoring a validated rig draft preserves its source and creates one dirty undoable edit', () => {
+  const edited = new RigEditorState(source);
+  edited.beginOperation();
+  edited.editBone('arm', 'x', 99);
+  edited.editSprite('hand', 'y', 8, true);
+  const draft = edited.recoveryDraft;
+  assert.isTrue(edited.validationPending, 'capturing a draft must not end a focused field operation');
+  const restored = new RigEditorState(source);
+  assert.isTrue(restored.restoreDraft(draft));
+  assert.isTrue(restored.dirty);
+  assert.equal(restored.historyLength, 1);
+  assert.equal(restored.getBone('arm').x, 99);
+  assert.equal(restored.getAttachment('hand').y, 8);
+  assert.isUndefined(source.getBone('arm').x);
+  assert.isTrue(restored.undo());
+  assert.isFalse(restored.dirty);
+  assert.isUndefined(restored.getBone('arm').x);
+  restored.redo();
+  assert.equal(restored.getBone('arm').x, 99);
+});
+
+test('invalid and incompatible rig drafts leave the working copy and history unchanged', () => {
+  const state = new RigEditorState(source);
+  const before = state.workingCopy;
+  const file = state.recoveryDraft;
+  const variants = [
+    { ...file, version: 2 },
+    { ...file, bones: file.bones.map((bone) => (bone.id === 'arm' ? { ...bone, x: NaN } : bone)) },
+    { ...file, bones: file.bones.map((bone) => (bone.id === 'arm' ? { ...bone, parent: 'root' } : bone)) },
+    { ...file, slots: [] },
+    { ...file, attachments: file.attachments!.map((attachment) => ({ ...attachment, texture: 'other' })) },
+  ];
+  for (const candidate of variants) {
+    assert.isFalse(state.canRestoreDraft(candidate));
+    assert.isFalse(state.restoreDraft(candidate));
+    assert.strictEqual(state.workingCopy, before);
+    assert.equal(state.historyLength, 0);
+  }
+});
+
 test('editor state reuses the validated source rig and keeps edits in its working copy', () => {
   const parse = vi.spyOn(rigDefinitionSchema, 'parse');
   try {

@@ -7,6 +7,7 @@ import type { RigEditorScene } from './RigEditorScene.js';
 export function createSessionController(
   app: HTMLElement,
   getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
+  onStateChange: (editor: RigEditor) => void = () => {},
 ) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
@@ -23,6 +24,7 @@ export function createSessionController(
     if (lifetime.signal.aborted) return;
     if (editor !== current) ++importSequence;
     editor = current;
+    onStateChange(current);
     const isDirty = current.state.dirty;
     dirty.textContent = isDirty ? 'Unsaved changes *' : 'No changes';
     app.querySelector('#editor-stage')!.classList.toggle('grid-active', current.state.gridSnap !== 0);

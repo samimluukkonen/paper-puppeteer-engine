@@ -1,4 +1,5 @@
 import {
+  inspectRigDefinition,
   RIG_FORMAT_VERSION,
   type RigJsonDefinition,
   type ValidationIssue,
@@ -318,6 +319,62 @@ export class RigEditorState {
       ...(this.workingCopy.attachments === undefined ? {} : { attachments: this.workingCopy.attachments }),
       ...(this.includeSkins && this.workingCopy.skins !== undefined ? { skins: this.workingCopy.skins } : {}),
     };
+  }
+
+  /** Complete authored draft without ending a focused field or drag history operation. */
+  get recoveryDraft(): RigJsonDefinition {
+    return this.exportCandidate();
+  }
+
+  private inspectDraft(input: unknown): RigDefinition | undefined {
+    const { data } = inspectRigDefinition(input);
+    if (!data) return undefined;
+    const initial = this.initialCopy;
+    // A bind editor retains its original topology and artwork identities during authoring.
+    if (
+      data.root !== initial.root ||
+      data.bones.length !== initial.bones.length ||
+      data.bones.some((bone, index) => {
+        const before = initial.bones[index]!;
+        return (
+          bone.id !== before.id ||
+          bone.parent !== before.parent ||
+          Boolean(bone.sprite) !== Boolean(before.sprite) ||
+          bone.sprite?.texture !== before.sprite?.texture ||
+          bone.sprite?.frame !== before.sprite?.frame
+        );
+      }) ||
+      (data.slots ?? []).length !== (initial.slots ?? []).length ||
+      (data.slots ?? []).some(
+        (slot, index) => slot.id !== initial.slots![index]!.id || slot.bone !== initial.slots![index]!.bone,
+      ) ||
+      (data.attachments ?? []).length !== (initial.attachments ?? []).length ||
+      (data.attachments ?? []).some((attachment, index) => {
+        const before = initial.attachments![index]!;
+        return (
+          attachment.id !== before.id || attachment.texture !== before.texture || attachment.frame !== before.frame
+        );
+      }) ||
+      !equalEditorData(data.skins ?? [], initial.skins ?? [])
+    )
+      return undefined;
+    return { ...data, slots: data.slots ?? [], attachments: data.attachments ?? [], skins: data.skins ?? [] };
+  }
+
+  canRestoreDraft(input: unknown): boolean {
+    return this.inspectDraft(input) !== undefined;
+  }
+
+  /** Restored authored changes stay dirty and form one undoable operation. */
+  restoreDraft(input: unknown): boolean {
+    const data = this.inspectDraft(input);
+    if (!data) return false;
+    this.endOperation();
+    this.change(() => {
+      this.restore(freezeData(data));
+      this.childDirections.clear();
+    });
+    return true;
   }
 
   markSaved(savedSnapshot?: string): void {

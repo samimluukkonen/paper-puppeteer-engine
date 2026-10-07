@@ -28,6 +28,8 @@ Filled diamonds identify outgoing Linear segments; hollow diamonds identify keys
 
 Mode/FPS and committed key edits also protect page navigation, refresh, closing, and character selection with the browser's unsaved-change confirmation. Download committed edits, discard them explicitly, or undo them before leaving. Preview navigation and playback preferences do not trigger this confirmation.
 
+Unsaved committed keys and settings also create a browser draft after a short pause and flush when leaving or hiding the page. Returning to an animation offers to restore its draft when the original clip and rig still match. Restoration remains unsaved and forms one Undo action. Temporary field values, selection, playback, IK, facing and history are excluded. Downloading, discarding, undoing to the saved baseline, or declining recovery removes the draft. Each character and animation has a separate draft; invalid, outdated, or incompatible drafts are rejected. Drafts are local to this browser and deployment path, with the latest draft shared between tabs for the same animation. Storage failures display recovery status and leave normal editing available. Continue downloading JSON to save your work in the project.
+
 ## Visual bone keyframing
 
 Select a bone from the **Bones** hierarchy or click its joint marker in the preview. The selected joint has an orange ring. **Show bones** controls the existing skeleton visualization; the hierarchy stays available when overlapping joints are hard to pick. Selection does not edit the animation or rig.
