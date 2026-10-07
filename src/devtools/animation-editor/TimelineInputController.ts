@@ -52,6 +52,26 @@ export class TimelineInputController {
           else this.state.clearKeyframeSelection();
           return;
         }
+        // Clipboard shortcuts belong to the timeline panel; native editing/bookmarks win elsewhere.
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.target instanceof Element &&
+          this.app.contains(event.target) &&
+          event.target.closest('.timeline-panel')
+        ) {
+          const command = event.key.toLowerCase();
+          if (command === 'c' || command === 'v' || command === 'd') {
+            event.preventDefault();
+            if (!event.repeat) {
+              if (command === 'c') this.state.copySelectedKeyframes();
+              else if (command === 'v') this.state.pasteKeyframes();
+              else this.state.duplicateSelectedKeyframes();
+            }
+            return;
+          }
+        }
         // Match the Rig Editor shortcuts while leaving native text-field undo intact.
         if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
           event.preventDefault();

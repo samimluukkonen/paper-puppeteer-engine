@@ -257,6 +257,66 @@ export interface PropertyKeyframeTarget {
   readonly timeMs: number;
 }
 
+export interface PropertyKeyframeEdit extends PropertyKeyframeTarget {
+  readonly value: number;
+}
+
+/** Shared move/paste replacement: remove all tolerant property matches, retaining sparse siblings. */
+function replacePropertyAtTime(
+  keys: readonly Keyframe[],
+  property: TransformProperty,
+  time: number,
+  value: number,
+  source = -1,
+): Keyframe[] {
+  const nextKeys: Keyframe[] = [];
+  for (const [index, key] of keys.entries()) {
+    if (index !== source && !(key[property] !== undefined && keyframeTimesMatch(key.time, time))) {
+      nextKeys.push(key);
+      continue;
+    }
+    const row = { ...key };
+    delete row[property];
+    if (transformProperties.some((entry) => row[entry] !== undefined)) nextKeys.push(row);
+  }
+  // Nearby sibling properties must not shift the inserted property's time.
+  const row = nextKeys.findIndex((key) => key.time === time);
+  if (row >= 0) nextKeys[row] = { ...nextKeys[row]!, [property]: value };
+  else nextKeys.push({ time, [property]: value });
+  nextKeys.sort((a, b) => a.time - b.time);
+  return nextKeys;
+}
+
+/** Atomically validate a group, preserve move collision semantics, and optionally extend authored duration. */
+export function setBonePropertyKeyframes<Animation extends AnimationData>(
+  animation: Animation,
+  rig: Rig,
+  edits: readonly PropertyKeyframeEdit[],
+  options: { extendDuration?: boolean } = {},
+): Animation {
+  getValidatedEditorAnimation(animation, rig);
+  if (!edits.length) return animation;
+  let duration = animation.duration;
+  for (const edit of edits) {
+    assertFinite(edit.timeMs, 'Keyframe time');
+    assertFinite(edit.value, `Keyframe ${edit.boneId}.${edit.property}`);
+    if (options.extendDuration) duration = Math.max(duration, edit.timeMs);
+  }
+  const target = duration === animation.duration ? animation : { ...animation, duration };
+  const normalized = edits.map((edit) => ({
+    ...edit,
+    timeMs: assertTarget(target, rig, edit.boneId, edit.property, edit.timeMs),
+  }));
+  const tracks = { ...animation.tracks };
+  for (const { boneId, property, timeMs, value } of normalized) {
+    const keys = Object.hasOwn(tracks, boneId) ? tracks[boneId]! : [];
+    const destination = matchingRow(keys, timeMs, property);
+    const time = destination >= 0 ? keys[destination]!.time : timeMs;
+    tracks[boneId] = replacePropertyAtTime(keys, property, time, value);
+  }
+  return validateEditedAnimation({ ...animation, duration, tracks }, animation, rig);
+}
+
 /** Resolve against the original snapshot, copy each changed track once, then validate the whole batch. */
 export function removeBonePropertyKeyframes<Animation extends AnimationData>(
   animation: Animation,
@@ -323,21 +383,7 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   const value = keys[source]![property]!;
   // Retain the existing canonical row time on collision, like the setter's tolerance policy.
   const destinationTime = destination >= 0 ? keys[destination]!.time : toTime;
-  const nextKeys: Keyframe[] = [];
-  for (const [index, key] of keys.entries()) {
-    if (index !== source && !(key[property] !== undefined && keyframeTimesMatch(key.time, destinationTime))) {
-      nextKeys.push(key);
-      continue;
-    }
-    const row = { ...key };
-    delete row[property];
-    if (transformProperties.some((entry) => row[entry] !== undefined)) nextKeys.push(row);
-  }
-  // Only merge at the exact destination: nearby sibling properties must not shift this key's time.
-  const row = nextKeys.findIndex((key) => key.time === destinationTime);
-  if (row >= 0) nextKeys[row] = { ...nextKeys[row]!, [property]: value };
-  else nextKeys.push({ time: destinationTime, [property]: value });
-  nextKeys.sort((a, b) => a.time - b.time);
+  const nextKeys = replacePropertyAtTime(keys, property, destinationTime, value, source);
   const next = { ...animation, tracks: { ...animation.tracks, [boneId]: nextKeys } };
   return validateEditedAnimation(next, animation, rig);
 }

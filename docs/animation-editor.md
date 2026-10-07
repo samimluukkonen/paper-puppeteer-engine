@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.5.1
+# Visual Animation Editor — v0.5.2.5.2
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -58,6 +58,24 @@ An empty-lane click clears keys and seeks, retaining bone/property context; Ctrl
 
 **Previous Key** and **Next Key** navigate only the selected bone/property relative to current time, ignoring the held key within the shared tolerance. A destination selects and seeks exactly as a marker click does; unavailable directions are disabled. Time dragging and single-key keyboard nudging are described below.
 
+## Copy, paste and duplicate keyframes
+
+**Copy Keys** or **Ctrl/Cmd+C** copies the entire selection into an internal editor clipboard. It preserves exact authored values and bone/property tracks. The earliest selected authored time is the anchor; each entry stores its offset from that anchor in milliseconds. Copy leaves the animation, dirty state, history, selection, drafts and playhead untouched. Copy with no selected keys retains the previous clipboard. The clipboard survives selection changes, scrubbing, playback, Undo/Redo and switching animations in the same editor session. Reloading or loading another character creates a new session.
+
+**Paste Keys** or **Ctrl/Cmd+V** places the clipboard anchor at the current playhead. For example, keys at 0.5, 0.8 and 1.2 seconds pasted at 2 seconds appear at 2, 2.3 and 2.7 seconds. Original bone/property mappings remain intact; the active track does not remap them. Paste pauses playback, ends scrubbing, cancels drafts/dragging and refreshes the evaluator at the held playhead time. It replaces selection with the resulting canonical keys, choosing the earliest as primary (clipboard order breaks time ties).
+
+The schema's explicit millisecond `duration` grows to include the latest pasted key, in the same history transaction as the keys. Keys are never clamped together at the endpoint. Loop, playback, events and interpolation remain unchanged. Interpolation is clip-level and supports only `linear` in the current format; there is no per-key metadata to copy, and pasting does not overwrite destination clip settings.
+
+Paste uses the established movement collision policy: the closest same-bone/same-property key within the shared nanosecond tolerance supplies the destination's canonical time, with stored-order ties. The copied value replaces every matching destination property sample; sparse siblings keep their original times and values. Other bones/properties remain untouched. Clipboard entries are applied in stable chronological order; later entries win if the group itself collides under that tolerance.
+
+**Duplicate Keys** or **Ctrl/Cmd+D** copies the selection through the same group/paste logic and shifts it by one authored frame (`1 / playback.fps` seconds) for stepped clips. Smooth clips, including omitted playback metadata, use a deterministic 0.01-second step. This offset is independent of the Snap setting and does not snap off-frame authored keys. Duplicate preserves group spacing and the playhead, selects the result, extends duration when needed, and uses the same replacement policy on collisions. It keeps the user's clipboard intact.
+
+Changed paste/duplicate operations each create one Undo action. Undo restores the complete previous snapshot, including replaced collision values and duration; Redo restores the exact result. Selection remains transient and follows existing reconciliation rather than being restored by history. Pasting identical authored data changes selection but adds no history, retains redo and leaves the saved baseline clean. Only the working animation changes; the source stays immutable.
+
+Compatible cross-animation paste works even when destination property tracks are empty. Every entry's bone, transform property, time and value is validated against the destination rig/schema before installation. An invalid entry rejects the entire group, preserves authored data/history/selection, and displays the validation error in the existing status area.
+
+Clipboard shortcuts require focus in the **Animation timeline** panel (lanes, markers or its command/playback buttons). Elsewhere, Ctrl/Cmd+D retains the browser bookmark behavior. Inputs, numeric fields, selects, textareas and inherited content-editable regions retain native editing; IME composition, Alt/Shift modifications and consumed events are ignored. Held shortcut repeats are prevented in timeline context without executing again. The buttons remain available for mouse/touch use and are disabled when their command has no selection/clipboard/animation.
+
 ## Data and preview ownership
 
 `AnimationEditorState` is independent of Phaser and the DOM. Its internal `AnimationEditorSelection` owns transient bone/property/key selection, transform drafts, expansion, and cached timeline rows. The state facade coordinates notifications, playback, validation, authored edits, and history through the existing public API; history snapshots contain only authored animation data. It owns a frozen source snapshot and saved baseline per animation and a separately cloned working animation in the existing versioned file format. `markSaved()` retains the selected animation's working data across selection changes while keeping its original source untouched. Explicitly discarding changes restores the last saved baseline on the next selection. Caller-owned character animations remain untouched. Editor-only selection, time, playback, speed, preview loop preference, scrubbing, validation issues, and history stay outside the serialized data. Authored FPS/mode use the existing `playback` union; no schema or engine changes are needed. `subscribe()` connects external state changes to the preview and UI.
@@ -94,6 +112,7 @@ For a custom character, pass `{ characterUrl: '../characters/hero/character.json
 - `selectedKeys`, `primaryKey`: immutable selection references and inspector context.
 - `selectKeyframe(ref, { additive?, range? })`, `selectKeyframes(refs, additive?)`, `selectKeyframeMarquee(bounds, additive?)`: transient selection commands.
 - `deleteSelectedKeyframes()`: remove the whole selection in one transaction; `deleteSelectedKeyframe()` remains an alias.
+- `keyframeClipboard`, `copySelectedKeyframes()`, `pasteKeyframes()`, `duplicateSelectedKeyframes()`: session-local immutable authored samples and group commands.
 - `moveSelectedKeyframe(seconds)`, `nudgeSelectedKeyframe(-1 | 1, large?)`: centralized time-only moves and one history action per changed nudge.
 - `keyframeSnapMode`, `setKeyframeSnapMode('none' | 'frame')`, `keyframeFPS`, `snapKeyframeTime(seconds, duration, mode, fps?)`, `KeyframeSnapMode`, `DEFAULT_KEYFRAME_FPS`: editor-only snapping and shared 10 FPS fallback.
 - `getAdjacentKeyframe(-1 | 1)`, `selectAdjacentKeyframe(-1 | 1)`: previous/next key query and navigation on the selected property.
@@ -218,6 +237,8 @@ The v0.5.2.4.3 movement architecture and verification results are recorded in [K
 
 ## Deferred features
 
-Event tracks, transform drag handles, copy/paste, duplication, keyframe groups, auto-key, per-keyframe interpolation UI, event authoring, animation import UI, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.5.2+. Property create/update/delete remains available through the inspector and data APIs above.
+Event tracks, transform drag handles, group dragging/nudging, time stretching, auto-key, per-keyframe interpolation UI, event authoring/copying, animation import UI, system clipboard export, track remapping, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.2.5.3+. Property create/update/delete remains available through the inspector and data APIs above.
 
 The v0.5.2.5.1 selection policies, APIs, files and verification results are recorded in [Multi-key selection verification](animation-editor-multi-selection-verification.md).
+
+The v0.5.2.5.2 clipboard policies, APIs, files and verification results are recorded in [Clipboard verification](animation-editor-clipboard-verification.md).

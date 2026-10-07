@@ -4,6 +4,7 @@ import { freezeData } from '../shared/editorData.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import { copyKeyframeSelection, pasteKeyframeClipboard, type KeyframeClipboard } from './keyframeClipboard.js';
 import {
   findBonePropertyKeyframe,
   keyframeTimesMatch,
@@ -23,7 +24,7 @@ export interface KeyframeDrag {
 interface KeyframeCommandActions {
   select(key: KeyframeSelection): boolean;
   updateTime(time: number): boolean;
-  install(animation: ReadonlyAnimation, retainDraft?: boolean): boolean;
+  install(animation: ReadonlyAnimation, retainDraft?: boolean, selectedKeys?: readonly KeyframeSelection[]): boolean;
   notify(): void;
 }
 
@@ -31,6 +32,7 @@ interface KeyframeCommandActions {
 export class AnimationEditorKeyframeCommands {
   private drag: KeyframeDrag | null = null;
   private snapMode: KeyframeSnapMode = 'none';
+  private clipboard: KeyframeClipboard | null = null;
 
   constructor(
     private readonly document: AnimationEditorDocument,
@@ -53,6 +55,49 @@ export class AnimationEditorKeyframeCommands {
   }
   private get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
+  }
+
+  get keyframeClipboard(): KeyframeClipboard | null {
+    return this.clipboard;
+  }
+  /** Copy never touches clocks, drafts, authored history or the saved baseline. Empty copy retains the clipboard. */
+  copySelectedKeyframes(): boolean {
+    if (!this.working) return false;
+    const clipboard = copyKeyframeSelection(this.working, this.selectedKeys);
+    if (!clipboard) return false;
+    this.clipboard = clipboard;
+    this.actions.notify();
+    return true;
+  }
+  pasteKeyframes(): boolean {
+    return this.clipboard ? this.pasteGroup(this.clipboard, this.currentTime) : false;
+  }
+  /** Duplicate shares paste logic without overwriting the user's clipboard or seeking away from the playhead. */
+  duplicateSelectedKeyframes(): boolean {
+    if (!this.working) return false;
+    const group = copyKeyframeSelection(this.working, this.selectedKeys);
+    if (!group) return false;
+    const playback = this.working.playback;
+    const step =
+      playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0 ? 1 / playback.fps : 0.01;
+    return this.pasteGroup(group, group.anchorTimeMs / 1000 + step);
+  }
+  private pasteGroup(group: KeyframeClipboard, anchorTime: number): boolean {
+    if (!this.working || !this.rig || !group.entries.length) return false;
+    let pasted: ReturnType<typeof pasteKeyframeClipboard<ReadonlyAnimation>>;
+    try {
+      pasted = pasteKeyframeClipboard(this.working, this.rig, group, anchorTime * 1000);
+    } catch (error) {
+      this.document.reportError(error);
+      this.actions.notify();
+      return false;
+    }
+    const time = this.currentTime;
+    this.cancelKeyframeDrag();
+    this.playback.pause();
+    this.playback.endScrub();
+    this.actions.updateTime(time);
+    return this.actions.install(freezeData(pasted.animation), false, pasted.keys);
   }
 
   get keyframeDrag(): KeyframeDrag | null {

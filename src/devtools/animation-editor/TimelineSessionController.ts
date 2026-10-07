@@ -23,6 +23,9 @@ export class TimelineSessionController {
   private readonly discard: HTMLButtonElement;
   private readonly exportFeedback: HTMLElement;
   private readonly deleteKey: HTMLButtonElement;
+  private readonly copyKeys: HTMLButtonElement;
+  private readonly pasteKeys: HTMLButtonElement;
+  private readonly duplicateKeys: HTMLButtonElement;
   private readonly previousKey: HTMLButtonElement;
   private readonly nextKey: HTMLButtonElement;
   private readonly snap: HTMLSelectElement;
@@ -52,6 +55,9 @@ export class TimelineSessionController {
     this.discard = this.element<HTMLButtonElement>('#animation-discard');
     this.exportFeedback = this.element('#animation-export-feedback');
     this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
+    this.copyKeys = this.element<HTMLButtonElement>('#timeline-copy-keys');
+    this.pasteKeys = this.element<HTMLButtonElement>('#timeline-paste-keys');
+    this.duplicateKeys = this.element<HTMLButtonElement>('#timeline-duplicate-keys');
     this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
     this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
     this.snap = this.element<HTMLSelectElement>('#timeline-snap');
@@ -120,6 +126,9 @@ export class TimelineSessionController {
       options,
     );
     this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframes(), options);
+    this.copyKeys.addEventListener('click', () => this.state.copySelectedKeyframes(), options);
+    this.pasteKeys.addEventListener('click', () => this.state.pasteKeyframes(), options);
+    this.duplicateKeys.addEventListener('click', () => this.state.duplicateSelectedKeyframes(), options);
     this.previousKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(-1), options);
     this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
   }
@@ -188,6 +197,9 @@ export class TimelineSessionController {
     const previousDisabled = !state.getAdjacentKeyframe(-1);
     const nextDisabled = !state.getAdjacentKeyframe(1);
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
+    this.copyKeys.disabled = deleteDisabled;
+    this.duplicateKeys.disabled = deleteDisabled;
+    this.pasteKeys.disabled = !animation || !state.keyframeClipboard?.entries.length;
     if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
     if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
     setText(

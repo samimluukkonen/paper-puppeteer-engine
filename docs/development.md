@@ -143,7 +143,8 @@ src/devtools/animation-editor/
   main.ts              Animation editor page and Phaser bootstrap
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
   AnimationEditorState.ts  Authored edit coordination, transform drafts, selection and navigation
-  AnimationEditorKeyframeCommands.ts  Keyframe mutation transactions, drag preview, snapping and nudges
+  AnimationEditorKeyframeCommands.ts  Keyframe transactions, session clipboard, duplication, drag preview and nudges
+  keyframeClipboard.ts  Immutable authored clipboard groups, relative timing and validated paste
   AnimationEditorDocument.ts  Validated animation snapshots, saved baselines, history and export
   AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization

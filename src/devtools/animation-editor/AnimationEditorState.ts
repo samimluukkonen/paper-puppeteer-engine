@@ -11,6 +11,7 @@ import {
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import type { KeyframeClipboard } from './keyframeClipboard.js';
 import {
   findBonePropertyKeyframe,
   getEvaluatedBonePropertyValue,
@@ -55,7 +56,8 @@ export class AnimationEditorState {
     this.keyframes = new AnimationEditorKeyframeCommands(this.document, this.selection, this.playback, {
       select: (key) => this.selectKeyframe(key),
       updateTime: (time) => this.updateTime(time),
-      install: (animation, retainDraft) => this.installWorkingAnimation(animation, retainDraft),
+      install: (animation, retainDraft, selectedKeys) =>
+        this.installWorkingAnimation(animation, retainDraft, selectedKeys),
       notify: () => this.notify(),
     });
   }
@@ -81,6 +83,18 @@ export class AnimationEditorState {
   }
   get primaryKey(): KeyframeSelection | null {
     return this.selection.key;
+  }
+  get keyframeClipboard(): KeyframeClipboard | null {
+    return this.keyframes.keyframeClipboard;
+  }
+  copySelectedKeyframes(): boolean {
+    return this.keyframes.copySelectedKeyframes();
+  }
+  pasteKeyframes(): boolean {
+    return this.keyframes.pasteKeyframes();
+  }
+  duplicateSelectedKeyframes(): boolean {
+    return this.keyframes.duplicateSelectedKeyframes();
   }
   get keyframeDrag(): KeyframeDrag | null {
     return this.keyframes.keyframeDrag;
@@ -492,7 +506,11 @@ export class AnimationEditorState {
   }
 
   /** Internal edits have already validated their changes and retain immutable unchanged branches. */
-  private installWorkingAnimation(next: ReadonlyAnimation, retainDraft = false): boolean {
+  private installWorkingAnimation(
+    next: ReadonlyAnimation,
+    retainDraft = false,
+    selectedKeys?: readonly KeyframeSelection[],
+  ): boolean {
     this.cancelKeyframeDrag();
     if (!this.document.install(next)) {
       this.notify();
@@ -500,6 +518,7 @@ export class AnimationEditorState {
     }
     if (!retainDraft) this.clearTransformDraft();
     this.updateTime(this.currentTime);
+    if (selectedKeys) this.selection.setKeys(selectedKeys, selectedKeys[0] ?? null);
     this.validateKeyframeSelection();
     this.notify();
     return true;
