@@ -18,6 +18,40 @@ const input = (page: Page, property: string) =>
   page.locator(`#animation-bone-fields input[data-property="${property}"]`);
 const keyed = (page: Page, property: string) => page.locator(`[data-keyed-property="${property}"]`);
 
+test('bone hierarchy keyboard navigation keeps one tab stop without authoring or seeking', async ({ page }) => {
+  await openEditor(page);
+  await time(page, 0.5);
+  const hierarchy = page.locator('#animation-bones');
+  const root = hierarchy.getByRole('button', { name: 'root', exact: true });
+  const pelvis = hierarchy.getByRole('button', { name: 'pelvis', exact: true });
+  const torso = hierarchy.getByRole('button', { name: 'torso', exact: true });
+  const head = hierarchy.getByRole('button', { name: 'head', exact: true });
+  await expect(hierarchy.locator('[tabindex="0"]')).toHaveCount(1);
+  await root.click();
+  await root.press('ArrowDown');
+  await expect(pelvis).toBeFocused();
+  await pelvis.press('ArrowRight');
+  await expect(torso).toBeFocused();
+  await torso.press('ArrowRight');
+  await expect(head).toBeFocused();
+  await head.press('ArrowLeft');
+  await expect(torso).toBeFocused();
+  await torso.press('ArrowDown');
+  await expect(head).toBeFocused();
+  await head.press('ArrowUp');
+  await expect(torso).toBeFocused();
+  await torso.press('Home');
+  await expect(root).toBeFocused();
+  await root.press('End');
+  const last = hierarchy.getByRole('button').last();
+  await expect(last).toBeFocused();
+  await expect(last).toHaveAttribute('aria-pressed', 'true');
+  await expect(hierarchy.locator('[tabindex="0"]')).toHaveCount(1);
+  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuenow', '0.5');
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+});
+
 test('three-key authoring, exact history, interpolation, parent-local editing and playback', async ({ page }) => {
   await openEditor(page);
   const selectBone = (bone: string) =>

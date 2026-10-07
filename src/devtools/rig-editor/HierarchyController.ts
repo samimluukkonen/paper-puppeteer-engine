@@ -1,3 +1,4 @@
+import { type HierarchyEntry, navigateHierarchy, setHierarchyTabStop } from '../shared/hierarchyNavigation.js';
 import type { RigEditor } from './RigEditor.js';
 
 /** Rebuilds only for new sessions and updates selection without replacing focused buttons. */
@@ -6,48 +7,8 @@ export function createHierarchyController(hierarchy: HTMLElement) {
   let disposed = false;
   let hierarchyEditor: RigEditor | undefined;
   const hierarchyButtons = new Map<string, HTMLButtonElement>();
-  const hierarchyLevels = new Map<HTMLButtonElement, number>();
+  const hierarchyEntries: HierarchyEntry[] = [];
   let selectedHierarchyButton: HTMLButtonElement | undefined;
-  function navigate(button: HTMLButtonElement, event: KeyboardEvent): void {
-    if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
-    const buttons = [...hierarchyButtons.values()];
-    const index = buttons.indexOf(button);
-    let next = index;
-    switch (event.key) {
-      case 'ArrowUp':
-        next = Math.max(0, index - 1);
-        break;
-      case 'ArrowDown':
-        next = Math.min(buttons.length - 1, index + 1);
-        break;
-      case 'Home':
-        next = 0;
-        break;
-      case 'End':
-        next = buttons.length - 1;
-        break;
-      case 'ArrowLeft':
-        for (let previous = index - 1; previous >= 0; previous--) {
-          if (hierarchyLevels.get(buttons[previous]!)! < hierarchyLevels.get(button)!) {
-            next = previous;
-            break;
-          }
-        }
-        break;
-      case 'ArrowRight':
-        if (index + 1 < buttons.length && hierarchyLevels.get(buttons[index + 1]!)! > hierarchyLevels.get(button)!)
-          next = index + 1;
-        break;
-      default:
-        return;
-    }
-    // Consume hierarchy navigation before the window's authored joint shortcuts.
-    event.preventDefault();
-    if (next !== index) {
-      buttons[next]!.focus({ preventScroll: true });
-      buttons[next]!.click();
-    }
-  }
   function buildHierarchy(current: RigEditor): void {
     // Bind edits and history preserve topology; reloads create a new editor.
     if (hierarchyEditor === current) return;
@@ -56,7 +17,7 @@ export function createHierarchyController(hierarchy: HTMLElement) {
     hierarchyEditor = current;
     hierarchy.replaceChildren();
     hierarchyButtons.clear();
-    hierarchyLevels.clear();
+    hierarchyEntries.length = 0;
     selectedHierarchyButton = undefined;
     const { state } = current;
     const appendEntry = (type: 'bone' | 'slot', id: string, depth: number): void => {
@@ -69,9 +30,10 @@ export function createHierarchyController(hierarchy: HTMLElement) {
       button.setAttribute('aria-selected', 'false');
       const level = depth + (type === 'slot' ? 2 : 1);
       button.setAttribute('aria-level', String(level));
-      button.tabIndex = hierarchyButtons.size === 0 ? 0 : -1;
-      hierarchyLevels.set(button, level);
-      button.addEventListener('keydown', (event) => navigate(button, event), { signal: lifetime.signal });
+      hierarchyEntries.push({ button, level });
+      button.addEventListener('keydown', (event) => navigateHierarchy(event, button, hierarchyEntries), {
+        signal: lifetime.signal,
+      });
       button.addEventListener(
         'click',
         () => {
@@ -94,6 +56,7 @@ export function createHierarchyController(hierarchy: HTMLElement) {
       appendEntry('bone', id, depth);
       for (const slot of slotsByBone.get(id) ?? []) appendEntry('slot', slot, depth);
     }
+    setHierarchyTabStop(hierarchyEntries);
   }
 
   function updateHierarchySelection(current: RigEditor): void {
@@ -102,8 +65,7 @@ export function createHierarchyController(hierarchy: HTMLElement) {
     if (selected === selectedHierarchyButton) return;
     selectedHierarchyButton?.setAttribute('aria-selected', 'false');
     selected?.setAttribute('aria-selected', 'true');
-    const first = hierarchyButtons.values().next().value;
-    for (const button of hierarchyButtons.values()) button.tabIndex = button === (selected ?? first) ? 0 : -1;
+    setHierarchyTabStop(hierarchyEntries, selected);
     selectedHierarchyButton = selected;
   }
 
@@ -119,7 +81,7 @@ export function createHierarchyController(hierarchy: HTMLElement) {
       lifetime.abort();
       hierarchyEditor = undefined;
       hierarchyButtons.clear();
-      hierarchyLevels.clear();
+      hierarchyEntries.length = 0;
       selectedHierarchyButton = undefined;
       hierarchy.replaceChildren();
     },

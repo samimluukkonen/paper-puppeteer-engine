@@ -1,6 +1,7 @@
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
+import { type HierarchyEntry, navigateHierarchy, setHierarchyTabStop } from '../shared/hierarchyNavigation.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { toDisplayTransformValue, toLocalTransformValue } from './transformValues.js';
 
@@ -22,6 +23,7 @@ export class BoneInspectorController {
   private readonly fields: HTMLFieldSetElement;
   private readonly cancel: HTMLButtonElement;
   private readonly buttons = new Map<string, HTMLButtonElement>();
+  private readonly hierarchyEntries: HierarchyEntry[] = [];
   private selectedButton: HTMLButtonElement | undefined;
   private readonly rows = new Map<
     TransformProperty,
@@ -132,6 +134,7 @@ export class BoneInspectorController {
     this.state = state;
     this.hierarchy.replaceChildren();
     this.buttons.clear();
+    this.hierarchyEntries.length = 0;
     this.selectedButton = undefined;
     if (state.rig)
       for (const { id, depth } of boneHierarchy(state.rig)) {
@@ -141,10 +144,15 @@ export class BoneInspectorController {
         button.textContent = id;
         button.style.paddingLeft = `${10 + depth * 16}px`;
         button.setAttribute('aria-pressed', 'false');
+        this.hierarchyEntries.push({ button, level: depth + 1 });
+        button.addEventListener('keydown', (event) => navigateHierarchy(event, button, this.hierarchyEntries), {
+          signal: this.hierarchyLifetime.signal,
+        });
         button.addEventListener('click', () => state.selectBone(id), { signal: this.hierarchyLifetime.signal });
         this.hierarchy.append(button);
         this.buttons.set(id, button);
       }
+    setHierarchyTabStop(this.hierarchyEntries);
     this.unsubscribe = state.subscribe(() => this.render());
     this.render(true);
   }
@@ -170,6 +178,7 @@ export class BoneInspectorController {
     if (selected !== this.selectedButton) {
       if (this.selectedButton) setAttribute(this.selectedButton, 'aria-pressed', 'false');
       if (selected) setAttribute(selected, 'aria-pressed', 'true');
+      setHierarchyTabStop(this.hierarchyEntries, selected);
       this.selectedButton = selected;
     }
     for (const [property, { input, indicator, set, remove }] of this.rows) {
@@ -200,6 +209,7 @@ export class BoneInspectorController {
     this.hierarchyLifetime.abort();
     this.state = undefined;
     this.buttons.clear();
+    this.hierarchyEntries.length = 0;
     this.selectedButton = undefined;
     this.rows.clear();
   }
