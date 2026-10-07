@@ -5,7 +5,9 @@ import {
   AUTHORED_FPS_MIN,
   PREVIEW_PLAYBACK_SPEEDS,
 } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { getCompiledPreviewClip } from '../src/devtools/animation-editor/previewClip.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
+import * as externalData from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
@@ -216,4 +218,37 @@ test('implicit smooth mode stays implicit until edited; setting controls are saf
   assert.isFalse(state.selectAnimation(null));
   state.undo();
   assert.isTrue(state.selectAnimation(null));
+});
+
+test('FPS and mode edits validate metadata once and reuse unchanged tracks, events and compiled properties', () => {
+  const state = session();
+  const original = state.workingAnimation!;
+  const compiled = getCompiledPreviewClip(original, rig);
+  const parse = vi.spyOn(externalData, 'parseAnimationClip');
+  try {
+    for (const edit of [
+      () => state.setAuthoredFPS(25),
+      () => state.setAuthoredPlaybackMode('smooth'),
+      () => state.setAuthoredPlaybackMode('stepped'),
+    ]) {
+      parse.mockClear();
+      assert.isTrue(edit());
+      const working = state.workingAnimation!;
+      assert.strictEqual(working.tracks, original.tracks);
+      assert.strictEqual(working.events, original.events);
+      const preview = getCompiledPreviewClip(working, rig);
+      assert.strictEqual(preview.tracks[0]!.properties, compiled.tracks[0]!.properties);
+      assert.equal(parse.mock.calls.length, 1);
+      assert.deepEqual(parse.mock.calls[0]![0], { ...working, tracks: {}, events: [] });
+      assert.strictEqual(parse.mock.calls[0]![1], rig);
+    }
+    parse.mockClear();
+    state.undo();
+    getCompiledPreviewClip(state.workingAnimation!, rig);
+    state.redo();
+    getCompiledPreviewClip(state.workingAnimation!, rig);
+    assert.equal(parse.mock.calls.length, 0);
+  } finally {
+    parse.mockRestore();
+  }
 });

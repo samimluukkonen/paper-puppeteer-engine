@@ -37,6 +37,7 @@ import {
 } from './keyframeSelection.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
+import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export const AUTHORED_FPS_MIN = 1;
@@ -412,18 +413,28 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
-    return this.installWorkingAnimation(freezeData({ ...this.working, playback: { mode: 'stepped', fps } }));
+    return this.setAuthoredPlayback({ mode: 'stepped', fps });
   }
 
   setAuthoredPlaybackMode(mode: AnimationPlaybackMode['mode']): boolean {
     if (!this.working || (mode !== 'smooth' && mode !== 'stepped')) return false;
     if (mode === (this.working.playback?.mode ?? 'smooth')) return true;
-    return this.installWorkingAnimation(
-      freezeData({
-        ...this.working,
-        playback: mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS },
-      }),
-    );
+    return this.setAuthoredPlayback(mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS });
+  }
+
+  private setAuthoredPlayback(playback: AnimationPlaybackMode): boolean {
+    const source = this.working;
+    if (!source || !this.rig) return false;
+    let next: ReadonlyAnimation;
+    try {
+      getValidatedEditorAnimation(source, this.rig);
+      next = validateEditedAnimation({ ...source, playback }, source, this.rig);
+    } catch (error) {
+      this.document.reportError(error);
+      this.notify();
+      return false;
+    }
+    return this.installWorkingAnimation(next);
   }
 
   get authoredInterpolation(): Interpolation | undefined {
