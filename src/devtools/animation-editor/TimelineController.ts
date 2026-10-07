@@ -54,10 +54,8 @@ export class TimelineController {
   }
 
   bind(state: AnimationEditorState, characterId?: string): void {
-    this.input.endMarquee(false);
-    this.input.endKeyDrag(false);
+    this.input.cancelGesture();
     this.state.pause();
-    this.input.endScrub();
     this.unsubscribe?.();
     this.state = state;
     this.session.bind(characterId);
@@ -108,8 +106,7 @@ export class TimelineController {
   }
 
   dispose(): void {
-    this.input.endMarquee(false);
-    this.input.endKeyDrag(false);
+    this.input.cancelGesture();
     this.state.pause();
     this.input.dispose();
     this.session.dispose();

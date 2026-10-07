@@ -33,6 +33,7 @@ class TimelineElement extends EventTarget {
   }
   releasePointerCapture(id: number) {
     this.captures.delete(id);
+    this.dispatchEvent(Object.assign(new Event('lostpointercapture'), { pointerId: id }));
   }
 }
 
@@ -48,8 +49,8 @@ function inputFixture(getState: () => AnimationEditorState) {
     new TimelineInputController(app, timeline as unknown as HTMLElement, getState, scrubber as unknown as HTMLElement);
   return { browser, timeline, scrubber, create };
 }
-const pointer = (type: string, clientX = 50) =>
-  Object.assign(new Event(type, { cancelable: true }), { button: 0, pointerId: 1, clientX });
+const pointer = (type: string, clientX = 50, pointerId = 1) =>
+  Object.assign(new Event(type, { cancelable: true }), { button: 0, pointerId, clientX });
 const space = () => Object.assign(new Event('keydown', { cancelable: true }), { key: ' ', code: 'Space' });
 
 test('scrubber keyboard navigation preserves selected authored keys and is removed on disposal', () => {
@@ -127,6 +128,35 @@ test('input disposal cancels a key drag without committing it', () => {
   assert.equal(current.historyLength, 0);
   assert.isFalse(current.dirty);
   assert.equal(timeline.captures.size, 0);
+});
+
+test('a key drag ignores other pointers and commits once when releasing capture triggers cancellation', () => {
+  const current = state();
+  const { timeline, create } = inputFixture(() => current);
+  const input = create();
+  const commit = vi.spyOn(current, 'commitKeyframeDrag');
+  input.beginKeyDrag(
+    pointer('pointerdown', 0) as unknown as PointerEvent,
+    { boneId: 'root', property: 'x', time: 0 },
+    timeline as unknown as HTMLButtonElement,
+  );
+  timeline.dispatchEvent(pointer('pointerdown', 90, 2));
+  timeline.dispatchEvent(pointer('pointermove', 90, 2));
+  timeline.dispatchEvent(pointer('pointercancel', 90, 2));
+  timeline.dispatchEvent(pointer('pointerup', 90, 2));
+  assert.equal(current.keyframeDrag?.previewTime, 0);
+  assert.isFalse(current.isScrubbing);
+  assert.deepEqual([...timeline.captures], [1]);
+  timeline.dispatchEvent(pointer('pointermove', 75));
+  timeline.dispatchEvent(pointer('pointerup', 75));
+  timeline.dispatchEvent(pointer('pointerup', 75));
+  assert.equal(commit.mock.calls.length, 1);
+  assert.isNull(current.keyframeDrag);
+  assert.equal(current.selectedKeyframe?.time, 0.75);
+  assert.equal(current.historyLength, 1);
+  assert.isTrue(current.dirty);
+  assert.equal(timeline.captures.size, 0);
+  input.dispose();
 });
 
 test('session actions follow replacements and disposed controls do not handle remounted events', async () => {
