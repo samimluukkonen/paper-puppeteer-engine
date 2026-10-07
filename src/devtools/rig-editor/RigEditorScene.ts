@@ -7,6 +7,7 @@ import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { Rig } from '../../engine/Rig.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import { assetFilename } from '../shared/assetFilename.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
 
@@ -30,7 +31,7 @@ export class RigEditorScene extends Phaser.Scene {
     return this.definition?.id ?? 'unknown';
   }
   get rigFilename(): string {
-    return this.loadedFilename ?? this.definition?.rigPath?.split('/').at(-1) ?? 'rig.json';
+    return this.loadedFilename ?? assetFilename(this.definition?.rigPath, 'rig.json');
   }
 
   constructor(

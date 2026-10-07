@@ -110,6 +110,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+test('rig export filenames decode manifest URLs while imported filenames retain their literal spelling', () => {
+  const scene = new RigEditorScene(vi.fn(), vi.fn());
+  assert.equal(scene.rigFilename, 'rig.json');
+  Reflect.set(scene, 'definition', { rigPath: 'rigs/rig%20v2.json?revision=2#asset' });
+  assert.equal(scene.rigFilename, 'rig v2.json');
+  Reflect.set(scene, 'loadedFilename', 'imported%20rig.json');
+  assert.equal(scene.rigFilename, 'imported%20rig.json');
+});
+
 test.each(['matching', 'rig-only', 'absent'] as const)(
   'preview merges standalone skins with %s embedded skins while exports preserve authored skins',
   (kind) => {

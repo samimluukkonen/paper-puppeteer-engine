@@ -7,6 +7,7 @@ import {
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
+import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 
@@ -66,16 +67,7 @@ export class AnimationEditorDocument {
   get selectedAnimationFilename(): string | undefined {
     if (this.selectedId === null) return undefined;
     const fallback = `${this.selectedId.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`;
-    const path = this.animations.get(this.selectedId)?.path;
-    if (!path) return fallback;
-    const basename = new URL(path, 'https://character.invalid/').pathname.split('/').at(-1);
-    if (!basename) return fallback;
-    // Preserve literal percent signs as well as paths with URL-encoded filenames.
-    try {
-      return decodeURIComponent(basename);
-    } catch {
-      return basename;
-    }
+    return assetFilename(this.animations.get(this.selectedId)?.path, fallback);
   }
   get sourceAnimation(): ReadonlyAnimation | null {
     return this.source;
