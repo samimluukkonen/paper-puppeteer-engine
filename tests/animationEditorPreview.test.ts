@@ -18,6 +18,129 @@ vi.mock('phaser', () => ({
   },
 }));
 
+test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
+  '$mode interpolation edits, FPS changes and playback controls immediately sample the authored pose before IK/facing',
+  (playback) => {
+    const rig = new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root' },
+        { id: 'upper', parent: 'root', y: 10 },
+        { id: 'lower', parent: 'upper', y: 60 },
+        { id: 'hand', parent: 'lower', y: 50 },
+      ],
+    });
+    const input: AnimationClip = {
+      name: 'hardening',
+      duration: 1050,
+      loop: true,
+      playback,
+      tracks: {
+        upper: [
+          { time: 0, rotation: 0.1 },
+          { time: 1050, rotation: 0.9 },
+        ],
+      },
+    };
+    const before = JSON.stringify(input);
+    const state = new AnimationEditorState(rig, [input]);
+    state.selectAnimation(input.name);
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const constraint = puppet.addIK({ name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand', mix: 0.5 });
+    let evaluations = 0;
+    constraint.setTargetProvider(() => {
+      evaluations++;
+      assert.approximately(
+        puppet.getBone('upper').pose.rotation,
+        state.getEvaluatedBonePropertyValue('upper', 'rotation')!,
+        1e-12,
+        'the IK provider observes the freshly sampled authored pose',
+      );
+      return { x: puppet.facingDirection === 'left' ? -60 : 60, y: 70 };
+    });
+    const preview = new AnimationEditorPreview(state, puppet);
+    const authoredAt = (time: number) => {
+      const frame = state.workingAnimation!.playback;
+      // Compare nominal frame boundaries independently of accumulated editor-clock roundoff.
+      const nominalTime = Math.round(time * 1e12) / 1e12;
+      const sampled = frame?.mode === 'stepped' && time < 1.05 ? Math.floor(nominalTime * frame.fps) / frame.fps : time;
+      return 0.1 + (0.8 * sampled) / 1.05;
+    };
+    const check = () => {
+      assert.approximately(
+        state.getEvaluatedBonePropertyValue('upper', 'rotation')!,
+        authoredAt(state.currentTime),
+        1e-12,
+      );
+      assert.equal(constraint.status, 'solved');
+    };
+    try {
+      state.setCurrentTime(0.375);
+      const held = evaluations;
+      state.setAuthoredInterpolation('linear');
+      assert.equal(evaluations, held + 1);
+      check();
+      for (const time of [0.376, 0.5, 1.05]) {
+        state.setCurrentTime(time);
+        check();
+      }
+      state.undo();
+      check();
+      state.redo();
+      check();
+      state.setAuthoredPlaybackMode('stepped');
+      state.setAuthoredFPS(20);
+      state.setCurrentTime(0.375);
+      check();
+      assert.equal(state.workingAnimation!.interpolation, 'linear');
+      state.setPreviewLoop(true);
+      state.setPlaybackSpeed(2);
+      state.restart();
+      state.play();
+      state.advancePlayback(0.7);
+      assert.approximately(state.currentTime, 0.35, 1e-12);
+      check();
+      state.pause();
+      const paused = state.currentTime;
+      state.advancePlayback(100);
+      assert.equal(state.currentTime, paused);
+      state.setPlaybackSpeed(0.5);
+      state.play();
+      state.advancePlayback(0.5);
+      check();
+      state.restart();
+      check();
+      assert.isTrue(state.isPlaying);
+      state.beginScrub();
+      state.setCurrentTime(0.875);
+      check();
+      state.advancePlayback(100);
+      assert.equal(state.currentTime, 0.875);
+      state.endScrub();
+      state.advancePlayback(0.2);
+      check();
+      const working = state.workingAnimation;
+      const history = state.historyLength;
+      for (const facing of ['left', 'right', 'left', 'right'] as const) {
+        puppet.setFacing(facing);
+        puppet.syncPose();
+        check();
+        assert.strictEqual(state.workingAnimation, working);
+        assert.equal(state.historyLength, history);
+      }
+      constraint.enabled = false;
+      puppet.syncPose();
+      assert.approximately(puppet.getBone('upper').pose.rotation, authoredAt(state.currentTime), 1e-12);
+      assert.equal(JSON.stringify(input), before);
+      assert.deepEqual(state.sourceAnimation!.tracks, input.tracks);
+      assert.isUndefined(state.sourceAnimation!.interpolation);
+    } finally {
+      preview.dispose();
+      puppet.destroy();
+    }
+  },
+);
+
 test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 1 }])(
   'clip interpolation declaration edits immediately resample the existing $mode preview and preserve playback semantics',
   (playback) => {

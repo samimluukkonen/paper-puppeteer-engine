@@ -25,10 +25,15 @@ export function copyKeyframeSelection(
   animation: DeepReadonly<AnimationClip>,
   keys: readonly KeyframeSelection[],
 ): KeyframeClipboard | null {
-  const samples = keys.flatMap(({ boneId, property, time }) => {
+  const resolved = keys.flatMap(({ boneId, property, time }) => {
     const sample = findBonePropertyKeyframe(animation, boneId, property, time * 1000);
     return sample ? [{ boneId, property, ...sample }] : [];
   });
+  const samples = [
+    ...new Map(
+      resolved.map((sample) => [JSON.stringify([sample.boneId, sample.property, sample.time]), sample]),
+    ).values(),
+  ];
   if (!samples.length) return null;
   samples.sort((a, b) => a.time - b.time);
   const anchorTimeMs = samples[0]!.time;
@@ -43,7 +48,9 @@ export function copyKeyframeSelection(
   });
 }
 
-/** Reject invalid groups before installation. Destination duration grows; collisions use the move policy. */
+/** Reject invalid groups before installation. Like group moves, multi-key paste preserves exact spacing
+ * and only replaces external collisions. Single-key paste keeps canonical destination-time behavior.
+ */
 export function pasteKeyframeClipboard<Animation extends DeepReadonly<AnimationClip>>(
   animation: Animation,
   rig: Rig,
@@ -57,7 +64,10 @@ export function pasteKeyframeClipboard<Animation extends DeepReadonly<AnimationC
     if (relativeTimeMs < 0) throw new Error('Clipboard relative time must be nonnegative.');
     return { boneId, property, timeMs: anchorTimeMs + relativeTimeMs, value };
   });
-  const next = setBonePropertyKeyframes(animation, rig, edits, { extendDuration: true });
+  const next = setBonePropertyKeyframes(animation, rig, edits, {
+    extendDuration: true,
+    preserveTiming: edits.length > 1,
+  });
   const keys = edits.map(({ boneId, property, timeMs }) => ({
     boneId,
     property,

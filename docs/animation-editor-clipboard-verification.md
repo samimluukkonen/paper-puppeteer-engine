@@ -24,9 +24,9 @@ The group becomes one validated batch mutation of `workingAnimation`. Playback p
 
 ## Collision policy
 
-Paste/duplicate share `replacePropertyAtTime()` with `moveBonePropertyKeyframe()`. The nearest same-bone/property sample inside `KEYFRAME_TIME_TOLERANCE_MS` supplies the canonical destination time; stored-order ties follow existing movement behavior. Every property sample within tolerance of that canonical time is replaced. Sparse sibling properties retain their times/values, empty rows disappear and rows stay sorted. Other tracks remain unchanged.
+Single-key paste/duplicate uses the same canonical destination policy as `moveBonePropertyKeyframe()`: the nearest same-bone/property sample inside `KEYFRAME_TIME_TOLERANCE_MS` supplies the destination time; stored-order ties follow existing movement behavior. Every property sample within tolerance of that canonical time is replaced. Sparse sibling properties retain their times/values, empty rows disappear and rows stay sorted. Other tracks remain unchanged.
 
-Entries apply in stable chronological order. If clipboard entries collide under the same tolerance, the later entry wins. Undo/Redo restore exact complete snapshots, including all replaced values and sparse sibling rows.
+Since v0.5.2.6.3, multi-key paste/duplicate follows group movement: external tolerant collisions are removed before inserting all exact translated group times. Distinct nearby group members no longer replace each other. Copy deduplicates repeated canonical references; paste rejects translated duplicate same-property identities caused by floating point precision. Undo/Redo restore exact complete snapshots, including all replaced values and sparse sibling rows. See the [hardening report](animation-editor-interpolation-hardening-verification.md).
 
 ## Duplicate behavior
 

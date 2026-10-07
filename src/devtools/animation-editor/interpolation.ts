@@ -54,11 +54,14 @@ export function getInterpolationForKeys(
 ): InterpolationSelectionState {
   if (!animation) return { kind: 'unavailable', reason: 'no-animation' };
   if (!keys.length) return { kind: 'unavailable', reason: 'empty-selection' };
+  let terminal = false;
   for (const ref of keys) {
     if (!findBonePropertyKeyframe(animation, ref.boneId, ref.property, ref.time * 1000))
       return { kind: 'unavailable', reason: 'missing-key' };
-    if (!getSegmentInterpolation(animation, ref)) return { kind: 'unavailable', reason: 'no-outgoing-segment' };
+    if (!getSegmentInterpolation(animation, ref)) terminal = true;
   }
+  // Missing identities take precedence over terminal segments, regardless of selection order.
+  if (terminal) return { kind: 'unavailable', reason: 'no-outgoing-segment' };
   return { kind: 'uniform', scope: 'clip', mode: getAnimationInterpolation(animation)! };
 }
 

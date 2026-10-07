@@ -244,3 +244,48 @@ test('rebinds use the current state, and disposal/remount do not retain declarat
   await query('#animation-interpolation').dispatch('change');
   assert.equal(current.workingAnimation!.interpolation, 'linear');
 });
+
+test('the inspector reconciles paste, duplicate, group move, delete and repeated history restoration', () => {
+  const { state, query } = fixture();
+  state.selectKeyframes(group);
+  state.setAuthoredInterpolation('linear');
+  assert.equal(query('#timeline-interpolation').value, 'linear');
+  state.copySelectedKeyframes();
+  state.setCurrentTime(1);
+  state.pasteKeyframes();
+  assert.equal(query('#timeline-interpolation').value, '');
+  assert.equal(query('#timeline-interpolation').getAttribute('data-unavailable-reason'), 'no-outgoing-segment');
+  state.duplicateSelectedKeyframes();
+  assert.equal(query('#timeline-interpolation').value, '');
+  state.moveSelectedKeyframe(0.2);
+  assert.equal(query('#timeline-interpolation').value, 'linear');
+  state.deleteSelectedKeyframes();
+  assert.equal(query('#timeline-interpolation').getAttribute('data-unavailable-reason'), 'empty-selection');
+  for (let index = 0; index < 5; index++) {
+    assert.isTrue(state.undo());
+    assert.equal(query('#timeline-interpolation').value, '');
+    assert.equal(query('#animation-interpolation').value, index === 4 ? '' : 'linear');
+  }
+  for (let index = 0; index < 5; index++) {
+    assert.isTrue(state.redo());
+    assert.equal(query('#timeline-interpolation').getAttribute('data-unavailable-reason'), 'empty-selection');
+    assert.equal(query('#animation-interpolation').value, 'linear');
+  }
+  state.selectKeyframe(key());
+  assert.equal(query('#timeline-interpolation').value, 'linear');
+});
+
+test('surviving selected keys refresh availability when their outgoing successor is deleted and restored', () => {
+  const { state, query } = fixture();
+  state.selectKeyframe(key(0.5));
+  assert.equal(query('#timeline-interpolation').value, 'linear');
+  state.removeBonePropertyKeyframe('root', 'x', 1);
+  assert.deepEqual(state.selectedKeys, [key(0.5)]);
+  assert.equal(query('#timeline-interpolation').getAttribute('data-unavailable-reason'), 'no-outgoing-segment');
+  state.undo();
+  assert.equal(query('#timeline-interpolation').value, 'linear');
+  state.redo();
+  assert.equal(query('#timeline-interpolation').value, '');
+  state.removeBonePropertyKeyframe('root', 'x', 0.5);
+  assert.equal(query('#timeline-interpolation').getAttribute('data-unavailable-reason'), 'empty-selection');
+});

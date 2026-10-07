@@ -152,12 +152,15 @@ function setTrackPropertyKeyframes(
   return [...rows.values()].sort((a, b) => a.time - b.time);
 }
 
-/** Atomically validate a group, preserve move collision semantics, and optionally extend authored duration. */
+/** Atomically validate a group and optionally extend authored duration. By default each edit canonicalizes
+ * tolerant collisions sequentially. preserveTiming replaces external collisions before inserting all
+ * group members at their exact times, matching group moves and rejecting duplicate destinations.
+ */
 export function setBonePropertyKeyframes<Animation extends AnimationData>(
   animation: Animation,
   rig: Rig,
   edits: readonly PropertyKeyframeEdit[],
-  options: { extendDuration?: boolean } = {},
+  options: { extendDuration?: boolean; preserveTiming?: boolean } = {},
 ): Animation {
   getValidatedEditorAnimation(animation, rig);
   if (!edits.length) return animation;
@@ -172,6 +175,14 @@ export function setBonePropertyKeyframes<Animation extends AnimationData>(
     ...edit,
     timeMs: assertTarget(target, rig, edit.boneId, edit.property, edit.timeMs),
   }));
+  if (options.preserveTiming) {
+    const identities = new Set<string>();
+    for (const { boneId, property, timeMs } of normalized) {
+      const identity = JSON.stringify([boneId, property, timeMs]);
+      if (identities.has(identity)) throw new Error('Keyframe paste cannot preserve spacing at this time precision.');
+      identities.add(identity);
+    }
+  }
   const tracks = { ...animation.tracks };
   const groups = new Map<string, PropertyKeyframeEdit[]>();
   for (const edit of normalized) {
@@ -181,7 +192,7 @@ export function setBonePropertyKeyframes<Animation extends AnimationData>(
   }
   for (const [boneId, group] of groups) {
     const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
-    tracks[boneId] = setTrackPropertyKeyframes(keys, group);
+    tracks[boneId] = setTrackPropertyKeyframes(keys, group, options.preserveTiming);
   }
   return validateEditedAnimation({ ...animation, duration, tracks }, animation, rig);
 }
