@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sameDraftSource } from './draftSource.js';
 
 const draftSchema = z.strictObject({
   version: z.literal(1),
@@ -69,7 +70,11 @@ export class DraftRecovery<Snapshot> {
           data = undefined;
         }
         const parsed = draftSchema.safeParse(data);
-        if (!parsed.success || parsed.data.source !== session.source || !session.validate(parsed.data.data)) {
+        if (
+          !parsed.success ||
+          !sameDraftSource(parsed.data.source, session.source) ||
+          !session.validate(parsed.data.data)
+        ) {
           this.removeDraft(key, text);
           this.status('An older draft could not be restored and was discarded.');
         } else if (window.confirm(`Restore unsaved ${session.label} edits from this browser?`)) {

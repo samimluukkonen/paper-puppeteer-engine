@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { animationFileSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
 const draftKeys = (page: Page) =>
@@ -102,6 +103,37 @@ test("rig recovery retains a child's direction when its parent length was collap
   await page.getByRole('treeitem', { name: 'rightForearm', exact: true }).click();
   await expect(field('x')).toHaveValue('20');
   await expect(field('y')).toHaveValue('0');
+});
+
+test('animation recovery ignores reordered source tracks but rejects changed authored values', async ({ page }) => {
+  let reordered = false;
+  let changed = false;
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    const animation = animationFileSchema.parse(await response.json());
+    await route.fulfill({
+      json: {
+        ...animation,
+        tracks: reordered ? Object.fromEntries(Object.entries(animation.tracks).reverse()) : animation.tracks,
+        duration: animation.duration + (changed ? 100 : 0),
+      },
+    });
+  });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await page.locator('#animation-mode').selectOption('stepped');
+  page.on('dialog', async (dialog) => {
+    await dialog.accept();
+  });
+  reordered = true;
+  await page.reload();
+  await expect(page.locator('#animation-draft-status')).toContainText('Draft restored');
+  await expect(page.locator('#animation-mode')).toHaveValue('stepped');
+  changed = true;
+  await page.reload();
+  await expect(page.locator('#animation-draft-status')).toContainText('discarded');
+  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect.poll(() => draftKeys(page)).toHaveLength(0);
 });
 
 test('declining animation draft recovery keeps the loaded source and removes the stored draft', async ({ page }) => {

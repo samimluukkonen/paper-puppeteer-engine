@@ -2,6 +2,7 @@ import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
 import { inspectAnimationDefinition } from '../../engine/externalData.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { DraftRecovery } from '../shared/DraftRecovery.js';
+import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
@@ -38,7 +39,7 @@ const scene = new AnimationEditorScene(
         else
           recovery.bind({
             key: JSON.stringify([window.location.pathname, id, animation]),
-            source: JSON.stringify({ rig: state.rig, animation: state.sourceAnimation }),
+            source: draftSource({ rig: state.rig, animation: state.sourceAnimation }),
             label: `animation "${animation}"`,
             snapshot: () => state.workingAnimation,
             dirty: () => state.dirty,

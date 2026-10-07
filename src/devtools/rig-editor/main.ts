@@ -1,6 +1,7 @@
 import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { DraftRecovery } from '../shared/DraftRecovery.js';
+import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { createControlsController } from './ControlsController.js';
@@ -31,7 +32,7 @@ const session = createSessionController(
       recoveryEditor = editor;
       recovery.bind({
         key: JSON.stringify([globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename]),
-        source: JSON.stringify({ name: editor.state.name, rig: editor.state.workingCopy }),
+        source: draftSource({ name: editor.state.name, rig: editor.state.workingCopy }),
         label: 'rig',
         snapshot: () => editor.state.recoverySnapshot,
         dirty: () => editor.state.dirty,

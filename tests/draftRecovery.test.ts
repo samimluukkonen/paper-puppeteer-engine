@@ -1,6 +1,7 @@
 import { afterEach, assert, test, vi } from 'vitest';
 import { z } from 'zod';
 import { DraftRecovery, type DraftSession } from '../src/devtools/shared/DraftRecovery.js';
+import { draftSource } from '../src/devtools/shared/draftSource.js';
 
 const schema = z.strictObject({ value: z.number() });
 type Snapshot = z.infer<typeof schema>;
@@ -190,6 +191,24 @@ test('declining restoration deletes the stored draft and leaves the loaded docum
   recovery.bind(session);
   assert.equal(vi.mocked(session.restore).mock.calls.length, 0);
   assert.isFalse(session.dirty());
+  assert.equal(values.size, 0);
+});
+
+test('legacy fingerprints restore equivalent reordered sources but still reject authored changes', () => {
+  const original = JSON.stringify({ tracks: { root: [{ time: 0, x: 1 }], child: [{ time: 0, y: 2 }] } });
+  const stored = JSON.stringify({ version: 1, source: original, data: { value: 8 } });
+  const { recovery, session, confirm, values } = fixture(stored);
+  const current = draftSource({ tracks: { child: [{ y: 2, time: 0 }], root: [{ x: 1, time: 0 }] } });
+  recovery.bind({ ...session, source: current });
+  assert.equal(confirm.mock.calls.length, 1);
+  assert.isTrue(session.dirty());
+  recovery.flush();
+  assert.include(values.get('paper-puppeteer:draft:a')!, '\\"child\\"');
+  recovery.unbind();
+  values.set('paper-puppeteer:draft:a', stored);
+  confirm.mockClear();
+  recovery.bind({ ...session, source: draftSource({ tracks: {} }), dirty: () => false });
+  assert.equal(confirm.mock.calls.length, 0);
   assert.equal(values.size, 0);
 });
 
