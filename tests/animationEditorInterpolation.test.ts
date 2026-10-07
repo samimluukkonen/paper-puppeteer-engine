@@ -19,6 +19,27 @@ import { freezeData } from '../src/engine/readonlyData.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'root' }] });
+
+test('dense frozen segment queries reuse indexes and preserve nearby distinct successor times', () => {
+  const count = 4096;
+  const input = freezeData({
+    name: 'dense',
+    duration: 5000,
+    loop: false,
+    tracks: { root: Array.from({ length: count }, (_, index) => ({ time: index * 1e-7, x: index })) },
+  });
+  const scan = vi.spyOn(Array.prototype, 'find');
+  try {
+    for (let index = 0; index < count; index++) {
+      const segment = getSegmentInterpolation(input, { boneId: 'root', property: 'x', time: (index * 1e-7) / 1000 });
+      if (index === count - 1) assert.isUndefined(segment);
+      else assert.equal(segment!.end.time, ((index + 1) * 1e-7) / 1000);
+    }
+    assert.equal(scan.mock.calls.length, 0, 'successor queries must not rescan dense authored tracks');
+  } finally {
+    scan.mockRestore();
+  }
+});
 const ref = (time: number, property: KeyframeSelection['property'] = 'x', boneId = 'root'): KeyframeSelection => ({
   time,
   property,

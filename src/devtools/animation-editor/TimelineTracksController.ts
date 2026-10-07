@@ -32,7 +32,7 @@ function reconcileRows(container: HTMLElement, rows: HTMLElement[]): void {
 export class TimelineTracksController {
   private state: AnimationEditorState | undefined;
   private tracks: readonly TimelineTrack[] | undefined;
-  private animation: AnimationEditorState['workingAnimation'] | undefined;
+  private interpolation: AnimationEditorState['authoredInterpolation'];
   private readonly rows = new Map<string, TrackElements>();
   private selectedBone: string | null | undefined;
   private selectedProperty: AnimationEditorState['selectedTimelineProperty'] | undefined;
@@ -92,8 +92,8 @@ export class TimelineTracksController {
     this.state = state;
     const tracks = state.timelineTracks;
     const changed = tracks !== this.tracks;
-    const interpolationChanged = this.animation !== state.workingAnimation;
-    this.animation = state.workingAnimation;
+    const interpolationChanged = this.interpolation !== state.authoredInterpolation;
+    this.interpolation = state.authoredInterpolation;
     const changedRows = new Set<TrackElements>();
     const newMarkers = new Set<HTMLButtonElement>();
     if (changed) {
@@ -180,7 +180,7 @@ export class TimelineTracksController {
     if (changed || interpolationChanged) {
       for (const row of this.rows.values()) {
         const track = row.track;
-        if (track?.kind !== 'property') continue;
+        if (track?.kind !== 'property' || (!interpolationChanged && !changedRows.has(row))) continue;
         for (const key of track.keyframes) {
           const marker = row.markers.get(key.time)!;
           const segment = state.getSegmentInterpolation(key);

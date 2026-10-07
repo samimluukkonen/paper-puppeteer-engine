@@ -1,7 +1,7 @@
 import type { Interpolation } from '../../engine/AnimationClip.js';
 import type { Rig } from '../../engine/Rig.js';
 import { animationClipSchema } from '../../engine/schemas.js';
-import { findBonePropertyKeyframe } from './keyframeQueries.js';
+import { findBonePropertyKeyframe, findNextBonePropertyKeyframe } from './keyframeQueries.js';
 import type { AnimationData } from './keyframeTargets.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
@@ -37,7 +37,7 @@ export function getSegmentInterpolation(
   const start = findBonePropertyKeyframe(animation, ref.boneId, ref.property, ref.time * 1000);
   if (!start) return undefined;
   // Inspect sparse authored rows, not sampled poses. Exact canonical times keep nearby distinct keys intact.
-  const end = animation.tracks[ref.boneId]!.find((row) => row.time > start.time && row[ref.property] !== undefined);
+  const end = findNextBonePropertyKeyframe(animation, ref.boneId, ref.property, start.time);
   if (!end) return undefined;
   return {
     scope: 'clip',

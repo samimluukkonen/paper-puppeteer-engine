@@ -106,6 +106,32 @@ export function hasKeyframeAtTime(
   return findBonePropertyKeyframe(animation, boneId, property, timeMs) !== undefined;
 }
 
+/** Strict successor for outgoing segments; nearby distinct authored times remain separate. */
+export function findNextBonePropertyKeyframe(
+  animation: AnimationData,
+  boneId: string,
+  property: TransformProperty,
+  timeMs: number,
+): PropertyKeyframe | undefined {
+  if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
+  const properties = propertyIndexes(animation, boneId);
+  if (properties !== false) {
+    const keys = properties.get(property) ?? [];
+    let low = 0;
+    let high = keys.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (keys[middle]!.time <= timeMs) low = middle + 1;
+      else high = middle;
+    }
+    const key = keys[low];
+    return key ? { time: key.time, value: key.value } : undefined;
+  }
+  const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
+  const row = rows.find((key) => key.time > timeMs && key[property] !== undefined);
+  return row ? { time: row.time, value: row[property]! } : undefined;
+}
+
 /** Find a strictly previous/next property key, skipping every time within the shared tolerance. */
 export function findAdjacentBonePropertyKeyframe(
   animation: AnimationData,
