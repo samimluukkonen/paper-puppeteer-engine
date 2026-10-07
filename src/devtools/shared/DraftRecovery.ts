@@ -121,7 +121,9 @@ export class DraftRecovery<Snapshot> {
         const data = session.data(this.snapshot!);
         // Keep the last valid draft while an authored edit is temporarily invalid.
         if (!session.validate(data)) return;
-        const text = JSON.stringify({ version: 1, source: session.source, data, revision: crypto.randomUUID() });
+        // getRandomValues is also available on HTTP development hosts, unlike randomUUID.
+        const revision = crypto.getRandomValues(new Uint32Array(4)).join('-');
+        const text = JSON.stringify({ version: 1, source: session.source, data, revision });
         window.localStorage.setItem(key, text);
         this.persisted = text;
       }

@@ -243,3 +243,13 @@ test('unavailable browser storage and quota failures leave authoring usable and 
   assert.doesNotThrow(() => recovery.bind(session));
   assert.include(status.mock.calls.at(-1)![0], 'Download JSON');
 });
+
+test('draft revisions work on HTTP hosts where crypto.randomUUID is unavailable', () => {
+  const { recovery, session, edit, values } = fixture();
+  vi.stubGlobal('crypto', { getRandomValues: (array: Uint32Array) => array.fill(7) });
+  recovery.bind(session);
+  edit(42);
+  recovery.flush();
+  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":42');
+  assert.include(values.get('paper-puppeteer:draft:a')!, '"revision":"7-7-7-7"');
+});
