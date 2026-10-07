@@ -1,6 +1,6 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
-import { findBonePropertyKeyframe } from './keyframes.js';
+import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
 export interface KeyframeSelectionState {

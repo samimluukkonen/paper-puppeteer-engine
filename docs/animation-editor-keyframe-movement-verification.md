@@ -40,7 +40,7 @@ Every changed drag commits one `SnapshotHistory` action on pointer release. Inte
 
 ## Files changed
 
-- `src/devtools/animation-editor/keyframes.ts`: central pure time-move operation.
+- `src/devtools/animation-editor/keyframeEdits.ts`: central pure time-move operation.
 - `src/devtools/animation-editor/timeline.ts`: snap mode, FPS fallback and pure snapping helper.
 - `src/devtools/animation-editor/AnimationEditorState.ts`: gesture state, commit/cancel boundaries, selected moves, nudges and snapping preferences.
 - `src/devtools/animation-editor/TimelineController.ts`: captured pointer gestures, fresh coordinates, guarded shortcuts and snap control.

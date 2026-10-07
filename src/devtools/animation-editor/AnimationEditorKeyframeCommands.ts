@@ -6,14 +6,14 @@ import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { copyKeyframeSelection, pasteKeyframeClipboard, type KeyframeClipboard } from './keyframeClipboard.js';
 import {
-  findBonePropertyKeyframe,
-  keyframeTimesMatch,
   constrainKeyframeMoveDelta,
   moveBonePropertyKeyframes,
   removeBonePropertyKeyframe,
   removeBonePropertyKeyframes,
   setBonePropertyKeyframe,
-} from './keyframes.js';
+} from './keyframeEdits.js';
+import { findBonePropertyKeyframe } from './keyframeQueries.js';
+import { keyframeTimesMatch } from './keyframeTargets.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 

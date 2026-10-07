@@ -11,14 +11,9 @@ import {
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
 import type { KeyframeClipboard } from './keyframeClipboard.js';
-import {
-  findBonePropertyKeyframe,
-  getEvaluatedBonePropertyValue,
-  getEvaluatedBoneTransform,
-  getKeyedPropertiesAtTime,
-  hasKeyframeAtTime,
-} from './keyframes.js';
+import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import {
   keysInMarquee,
   resolveKey,

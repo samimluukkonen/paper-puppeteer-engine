@@ -45,7 +45,7 @@ An identical paste succeeds and selects the resulting keys without creating hist
 ## Files changed
 
 - `src/devtools/animation-editor/keyframeClipboard.ts`: new immutable clipboard types and pure authored group copy/paste.
-- `src/devtools/animation-editor/keyframes.ts`: validated batch setter and shared movement/paste collision replacement.
+- `src/devtools/animation-editor/keyframeEdits.ts`: validated batch setter and shared movement/paste collision replacement.
 - `src/devtools/animation-editor/AnimationEditorKeyframeCommands.ts`: session clipboard and transactional commands.
 - `src/devtools/animation-editor/AnimationEditorState.ts`: command/getter facade and atomic pasted selection during installation.
 - `src/devtools/animation-editor/TimelineInputController.ts`: timeline-scoped C/V/D shortcuts and existing native-editing guards.

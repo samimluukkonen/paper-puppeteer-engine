@@ -2,7 +2,7 @@ import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform, TransformProperty } from '../../engine/types.js';
-import { findAdjacentBonePropertyKeyframe } from './keyframes.js';
+import { findAdjacentBonePropertyKeyframe } from './keyframeQueries.js';
 import {
   keyIdentity,
   keyframeSelectionIndex,

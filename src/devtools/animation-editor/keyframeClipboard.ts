@@ -3,7 +3,8 @@ import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assertFinite, type TransformProperty } from '../../engine/types.js';
 import { freezeData } from '../shared/editorData.js';
-import { findBonePropertyKeyframe, setBonePropertyKeyframes } from './keyframes.js';
+import { setBonePropertyKeyframes } from './keyframeEdits.js';
+import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 
 export interface KeyframeClipboardEntry {

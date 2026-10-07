@@ -144,6 +144,11 @@ src/devtools/animation-editor/
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
   AnimationEditorState.ts  Authored edit coordination, transform drafts, selection and navigation
   AnimationEditorKeyframeCommands.ts  Keyframe transactions, session clipboard, duplication, drag preview and nudges
+  keyframeQueries.ts   Authored-property presence, indexed key lookup and adjacent navigation
+  keyframeEdits.ts     Immutable single/batch edits, group movement and collision replacement
+  keyframeTargets.ts   Shared time tolerance, row matching and target validation
+  animationValues.ts   Cached runtime pose sampling for evaluated transform values
+  keyframes.ts         Compatibility exports for the keyframe data APIs
   keyframeClipboard.ts  Immutable authored clipboard groups, relative timing and validated paste
   AnimationEditorDocument.ts  Validated animation snapshots, saved baselines, history and export
   AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent

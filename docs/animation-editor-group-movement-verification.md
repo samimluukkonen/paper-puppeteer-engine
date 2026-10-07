@@ -44,7 +44,7 @@ Left/Right moves the selection by one frame with frame snapping or 0.01 seconds 
 
 ## Files changed
 
-- `src/devtools/animation-editor/keyframes.ts`: pure group move, shared constraint and indexed replacement mode.
+- `src/devtools/animation-editor/keyframeEdits.ts`: pure group move, shared constraint and indexed replacement mode.
 - `src/devtools/animation-editor/AnimationEditorKeyframeCommands.ts`: group drag/preview/cancel/move/nudge and cancellation before property edits.
 - `src/devtools/animation-editor/TimelineTracksController.ts`: preview every moving marker using the common delta.
 - `src/devtools/animation-editor/TimelineInputController.ts`: commit no-movement clicks without cancelling the clicked primary.

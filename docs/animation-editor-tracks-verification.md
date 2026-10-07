@@ -26,7 +26,7 @@ Selection changes cancel temporary transform drafts while keeping `currentTime` 
 - `src/devtools/animation-editor/TimelineTracksController.ts`: stable label/lane rendering and navigation buttons.
 - `src/devtools/animation-editor/AnimationEditorState.ts`: transient expansion/property state and cached visible rows.
 - `src/devtools/animation-editor/TimelineController.ts`: track adapter integration and disposal.
-- `src/devtools/animation-editor/keyframes.ts`: authored-property presence query.
+- `src/devtools/animation-editor/keyframeQueries.ts`: authored-property presence query.
 - `src/devtools/animation-editor/main.ts`, `style.css`: shared scroll layout, row styling and full-height playhead.
 - `tests/animationEditorTracks.test.ts`: pure track/session regressions.
 - `tests/browser/animationTimelineTracks.spec.ts`: browser integration, geometry and navigation regressions.
