@@ -50,13 +50,14 @@ export class InterpolationController {
     }
     const control = this.control;
     if (this.selection.value !== control.value) this.selection.value = control.value;
-    this.selection.disabled = control.disabled;
+    if (this.selection.disabled !== control.disabled) this.selection.disabled = control.disabled;
     setAttribute(this.selection, 'data-unavailable-reason', control.reason);
     setAttribute(this.selection, 'title', control.help);
     setText(this.help, control.help);
     const value = state.workingAnimation?.interpolation ?? '';
     if (this.declaration.value !== value) this.declaration.value = value;
-    this.declaration.disabled = !state.workingAnimation;
+    const declarationDisabled = !state.workingAnimation;
+    if (this.declaration.disabled !== declarationDisabled) this.declaration.disabled = declarationDisabled;
   }
 
   dispose(): void {

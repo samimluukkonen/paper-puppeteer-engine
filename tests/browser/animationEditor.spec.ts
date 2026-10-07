@@ -464,6 +464,14 @@ test('playback advances without measuring layout or rewriting unchanged editor c
     for (const selector of ['#animation-metadata', '#animation-status', '#animation-dirty', '#play-pause'])
       observer.observe(document.querySelector(selector)!, { childList: true, characterData: true, subtree: true });
     for (const selector of [
+      '#timeline-copy-keys',
+      '#timeline-duplicate-keys',
+      '#timeline-paste-keys',
+      '#timeline-interpolation',
+      '#animation-interpolation',
+    ])
+      observer.observe(document.querySelector(selector)!, { attributes: true, attributeFilter: ['disabled'] });
+    for (const selector of [
       '#animation-bones',
       '#animation-bone-title',
       '#animation-bone-fields',

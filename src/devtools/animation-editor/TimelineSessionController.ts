@@ -197,9 +197,10 @@ export class TimelineSessionController {
     const previousDisabled = !state.getAdjacentKeyframe(-1);
     const nextDisabled = !state.getAdjacentKeyframe(1);
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
-    this.copyKeys.disabled = deleteDisabled;
-    this.duplicateKeys.disabled = deleteDisabled;
-    this.pasteKeys.disabled = !animation || !state.keyframeClipboard?.entries.length;
+    if (this.copyKeys.disabled !== deleteDisabled) this.copyKeys.disabled = deleteDisabled;
+    if (this.duplicateKeys.disabled !== deleteDisabled) this.duplicateKeys.disabled = deleteDisabled;
+    const pasteDisabled = !animation || !state.keyframeClipboard?.entries.length;
+    if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
     if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
     if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
     setText(
