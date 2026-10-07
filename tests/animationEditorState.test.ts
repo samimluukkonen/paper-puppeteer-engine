@@ -64,15 +64,15 @@ test('animation export round-trips authored data without saving drafts or changi
   unsubscribe();
 });
 
-test('sources, working copies, and nested event payloads have independent ownership', () => {
+test('owned frozen snapshots share source data while isolating caller inputs and edits', () => {
   const input = clip();
   const original = JSON.stringify(input);
   const state = new AnimationEditorState(rig, [input]);
   assert.isTrue(state.selectAnimation('move'));
   assert.notStrictEqual(state.sourceAnimation, input);
-  assert.notStrictEqual(state.workingAnimation, state.sourceAnimation);
-  assert.notStrictEqual(state.workingAnimation!.tracks.root, state.sourceAnimation!.tracks.root);
-  assert.notStrictEqual(state.workingAnimation!.events![0]!.data, state.sourceAnimation!.events![0]!.data);
+  assert.strictEqual(state.workingAnimation, state.sourceAnimation);
+  assert.notStrictEqual(state.workingAnimation!.tracks.root, input.tracks.root);
+  assert.notStrictEqual(state.workingAnimation!.events![0]!.data, input.events![0]!.data);
   assert.isTrue(Object.isFrozen(state.workingAnimation!.tracks.root![0]));
   assert.isTrue(Object.isFrozen(state.workingAnimation!.events![0]!.data));
   assert.deepEqual(state.workingAnimation, file(input));
@@ -82,6 +82,13 @@ test('sources, working copies, and nested event payloads have independent owners
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.isFalse(Object.isFrozen(input));
+  state.setBonePropertyKeyframe('root', 'x', 99, 0);
+  assert.equal(state.sourceAnimation!.tracks.root![0]!.x, 0);
+  assert.equal(input.tracks.root![0]!.x, 0);
+  state.selectAnimation('move', { discardChanges: true });
+  assert.strictEqual(state.workingAnimation, state.sourceAnimation);
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'x', 0), 0);
+  assert.isFalse(state.dirty);
 });
 
 test('selection resets continuous time, duration, working copy, playback metadata, and history', () => {
@@ -100,7 +107,7 @@ test('selection resets continuous time, duration, working copy, playback metadat
   assert.isFalse(state.isPlaying);
   assert.isFalse(state.dirty);
   state.selectAnimation('idle');
-  assert.notStrictEqual(state.workingAnimation, previous);
+  assert.strictEqual(state.workingAnimation, previous);
   state.selectAnimation(null);
   assert.isNull(state.workingAnimation);
   assert.isNull(state.sourceAnimation);
@@ -187,7 +194,7 @@ test('saved edits survive switching and deselection with independent animation b
   state.selectAnimation('move');
   assert.equal(state.duration, 3);
   assert.deepEqual(state.workingAnimation, savedMove);
-  assert.notStrictEqual(state.workingAnimation, savedMove);
+  assert.strictEqual(state.workingAnimation, savedMove);
   assert.strictEqual(state.sourceAnimation, source);
   assert.equal(state.sourceAnimation!.duration, 2000);
   assert.equal(input.duration, 2000);

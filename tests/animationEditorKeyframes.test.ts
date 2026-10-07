@@ -586,6 +586,10 @@ test('cached queries remain independent across rigs, edits, selection, and undo/
     assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 4);
     state.selectAnimation(null);
     assert.isUndefined(state.getEvaluatedBoneTransform('root'));
+    const compilations = compile.mock.calls.length;
+    state.selectAnimation('move');
+    assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 10);
+    assert.equal(compile.mock.calls.length, compilations, 'selection reuses the saved snapshot compilation');
     assert.equal(input.tracks.root![0]!.x, 10);
   } finally {
     compile.mockRestore();

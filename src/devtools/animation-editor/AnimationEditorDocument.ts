@@ -130,7 +130,8 @@ export class AnimationEditorDocument {
       return false;
     }
     this.source = entry?.source ?? null;
-    this.working = entry?.saved ? freezeData(structuredClone(entry.saved)) : null;
+    // Edits replace immutable snapshots; retain their identity for validation and preview caches.
+    this.working = entry?.saved ?? null;
     this.selectedId = id;
     this.issues = [];
     this.saved = this.working;
