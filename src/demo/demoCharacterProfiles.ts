@@ -1,7 +1,7 @@
 import type { IKTarget, TwoBoneIKDefinition } from '../engine/core.js';
 import { type DeepReadonly, freezeData } from '../engine/readonlyData.js';
 import { demoPuppetCharacter, sketchCharacter } from '../shared/characterCatalog.js';
-import { demoIK } from './demoIK.js';
+import { getCharacterPreviewSettings } from '../shared/characterPreviewSettings.js';
 
 export type DemoAnimationRole = 'idle' | 'walk' | 'sword';
 
@@ -74,7 +74,6 @@ const common = {
     headwearSkin: 'helmet-only',
   },
   placement: { scale: 1.08, yOffset: 278 },
-  ikChains: structuredClone(demoIK),
   armIK: { left: 'leftArmIK', right: 'rightArmIK' },
   legIK: { left: 'leftLegIK', right: 'rightLegIK' },
   katana: {
@@ -110,6 +109,7 @@ const common = {
 export const demoPuppetProfile: DemoCharacterProfile = freezeData({
   ...common,
   ...demoPuppetCharacter,
+  ...getCharacterPreviewSettings(demoPuppetCharacter.id),
   layout: 'sample',
   swapLimbsWithFacing: false,
   katana: {
@@ -129,6 +129,7 @@ export const demoPuppetProfile: DemoCharacterProfile = freezeData({
 export const sketchProfile: DemoCharacterProfile = freezeData({
   ...common,
   ...sketchCharacter,
+  ...getCharacterPreviewSettings(sketchCharacter.id),
   layout: 'authored',
   swapLimbsWithFacing: true,
   katana: {

@@ -1,11 +1,11 @@
 import { afterEach, assert, test, vi } from 'vitest';
-import { demoIK } from '../src/demo/demoIK.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { IKDebug } from '../src/engine/ik/IKDebug.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { SlotDebug } from '../src/engine/SlotDebug.js';
 import type { Facing } from '../src/engine/types.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { demoRig, guardUpperBody, idle, sword, walk } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 
@@ -31,7 +31,7 @@ function fixture(facing: Facing) {
     rig: demoRig,
     skin: 'default',
     animations: [sword, guardUpperBody, idle, walk],
-    ik: demoIK,
+    ik: paperDollIK,
     x: 380,
     y: 362,
     scale: 1.08,

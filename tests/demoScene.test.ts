@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, assert, test, vi } from 'vitest';
 import { type DemoCharacterProfile, demoPuppetProfile, resolveDemoClip } from '../src/demo/demoCharacterProfiles.js';
-import { demoIK } from '../src/demo/demoIK.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { DemoScene, type DemoState } from '../src/demo/DemoScene.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
@@ -9,6 +8,7 @@ import type { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { demoAnimations, demoRig } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 
@@ -56,7 +56,7 @@ function commandFixture(
     rig,
     skin,
     animations,
-    ik: demoIK,
+    ik: paperDollIK,
     x: 380,
     y: 362,
     scale: 1.08,

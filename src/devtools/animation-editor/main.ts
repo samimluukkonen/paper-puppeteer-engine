@@ -1,5 +1,5 @@
-import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
 import { inspectAnimationDefinition } from '../../engine/externalData.js';
+import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { DraftRecovery } from '../shared/DraftRecovery.js';
 import { draftSource } from '../shared/draftSource.js';
@@ -59,7 +59,7 @@ const scene = new AnimationEditorScene(
   (message) => timeline.showError(message),
   {
     characterUrl: `../characters/${selectedCharacterId()}/character.json`,
-    ikChains: getDemoCharacterProfile(selectedCharacterId()).ikChains,
+    ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
   },
 );
 const previewControls = new AbortController();

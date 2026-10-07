@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
-import { demoIK } from '../src/demo/demoIK.js';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
 import { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
@@ -14,6 +13,7 @@ import { Rig } from '../src/engine/Rig.js';
 import { rigDefinitionSchema } from '../src/engine/schemas.js';
 import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
 vi.mock('phaser', () => ({
@@ -175,7 +175,7 @@ function fixture(sceneOverride?: RigEditorScene) {
     root: 'root',
     bones: [
       { id: 'root', sprite: { texture: 'body' } },
-      ...demoIK.flatMap((chain) => [
+      ...paperDollIK.flatMap((chain) => [
         { id: chain.rootBone, parent: 'root' },
         { id: chain.middleBone, parent: chain.rootBone, y: 20 },
         { id: chain.endBone, parent: chain.middleBone, y: 20 },
@@ -184,7 +184,7 @@ function fixture(sceneOverride?: RigEditorScene) {
     skins: [{ version: 1, name: 'default', slots: {} }],
   };
   const onReady = vi.fn();
-  const scene = sceneOverride ?? new RigEditorScene(onReady, vi.fn(), { ikChains: demoIK });
+  const scene = sceneOverride ?? new RigEditorScene(onReady, vi.fn(), { ikChains: paperDollIK });
   Reflect.set(scene, 'definition', {
     id: 'test-character',
     defaultSkin: 'default',
@@ -211,7 +211,7 @@ function fixture(sceneOverride?: RigEditorScene) {
   return { scene, file, editor, puppet, onReady, disable, assertPreserved };
 }
 
-test.each(demoIK)('rejects a valid rig with a disconnected $name chain before creating a replacement', (chain) => {
+test.each(paperDollIK)('rejects a valid rig with a disconnected $name chain before creating a replacement', (chain) => {
   const { scene, file, assertPreserved } = fixture();
   const incompatible = structuredClone(file);
   incompatible.bones.find((bone) => bone.id === chain.middleBone)!.parent = 'root';
@@ -412,7 +412,7 @@ test.each(['original', 'exported', 'imported'] as const)(
 
 test('an inspector depth edit updates draw order and undo restores the rig and panel', async () => {
   const { editor, puppet, element } = await panelFixture();
-  const bone = demoIK[0]!.rootBone;
+  const bone = paperDollIK[0]!.rootBone;
   const before = editor.exportJson(false);
   const order = [...editor.state.rig.renderOrder];
   await editNumber(element, bone, 'depth', [-5, -8]);
@@ -449,7 +449,7 @@ test.each(['malformed JSON', 'invalid rig', 'incompatible preview', 'enable fail
     else if (failure === 'invalid rig') json = JSON.stringify({ ...file, root: 'missing' });
     else {
       if (failure === 'incompatible preview')
-        imported.bones.find((bone) => bone.id === demoIK[0]!.middleBone)!.parent = 'root';
+        imported.bones.find((bone) => bone.id === paperDollIK[0]!.middleBone)!.parent = 'root';
       else
         vi.spyOn(RigEditorOverlay.prototype, 'draw').mockImplementationOnce(() => {
           throw new Error('Overlay draw failed');

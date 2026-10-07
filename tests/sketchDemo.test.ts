@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { sketchProfile } from '../src/demo/demoCharacterProfiles.js';
-import { demoIK } from '../src/demo/demoIK.js';
 import { DemoKatanaController } from '../src/demo/DemoKatanaController.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { Katana, katanaGrips } from '../src/demo/Katana.js';
@@ -11,6 +10,7 @@ import { SketchFacingLayout } from '../src/demo/SketchFacingLayout.js';
 import { CharacterDefinition, type CharacterManifest } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { SlotDebug } from '../src/engine/SlotDebug.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -56,7 +56,7 @@ function fixture() {
     image.height = png.readUInt32BE(20);
     return image;
   };
-  const puppet = new Puppet(scene, { definition, ik: demoIK, x: 380, y: 362, scale: 1.08, autoUpdate: false });
+  const puppet = new Puppet(scene, { definition, ik: paperDollIK, x: 380, y: 362, scale: 1.08, autoUpdate: false });
   return { scene, puppet };
 }
 

@@ -126,7 +126,6 @@ src/demo/
   DemoKatanaGripSolver.ts  Rear-palm clearance, path continuity and reach recovery
   demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
   demoCharacterProfiles.ts  Per-character placement, facing, grips, foot contacts and IK configuration
-  demoIK.ts            Default arm/leg chains with explicit execution priorities
   Katana.ts            Placeholder weapon transform and two data-defined grips
 src/devtools/rig-editor/
   main.ts              Page bootstrap and controller wiring
@@ -163,6 +162,9 @@ src/devtools/shared/
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
   editorData.ts        Readonly data and editor number rounding
 src/shared/
+  characterCatalog.ts  Character identities and picker labels
+  characterPreviewSettings.ts  Optional immutable IK settings shared by demo and editors
+  paperDollIK.ts        Default arm/leg chains with explicit execution priorities
   domUpdates.ts        Conditional DOM writes for demo and editor playback notifications
   downloadJson.ts       Browser JSON download and temporary URL cleanup
   loadSceneCharacter.ts  Cancelable metadata and artwork loading for a scene session
@@ -173,7 +175,9 @@ src/main.ts            Demo bootstrap and control panel
 
 The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with two factors representing their composed ancestor transform. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. Debug overlays allocate their Phaser objects only when first enabled and reuse them across toggles; label-side settings made before enabling debug are retained. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
 
-Demo character identities and picker labels live in `src/shared/characterCatalog.ts`; presentation is configured in `src/demo/demoCharacterProfiles.ts`. Each profile supplies clip names for the idle, walk, and sword actions, the upper-body clip and bone mask, combat pose name, appearance overrides, stage placement, IK definitions and names, layout/facing behavior, katana grip and clearance settings, and foot contact settings. The default skin comes from the character definition. The demo scene, presenter, pose authoring, and rig-editor IK preview consume those profiles. Register another catalog entry and profile alongside its character definition to add a demo character; sample layout and sketch limb swapping still expect their existing humanoid bone and limb attachment conventions.
+Character identities and picker labels live in `src/shared/characterCatalog.ts`; optional preview IK chains live in `src/shared/characterPreviewSettings.ts`, with the bundled arm/leg definitions in `src/shared/paperDollIK.ts`. The demo and both editors share immutable preview settings. Characters without registered preview settings receive an empty chain list, allowing editor-only characters with arbitrary rigs to load without a demo presentation profile. Register preview settings separately when a character needs IK preview.
+
+Demo presentation is configured in `src/demo/demoCharacterProfiles.ts`. Each profile supplies clip names for the idle, walk, and sword actions, the upper-body clip and bone mask, combat pose name, appearance overrides, stage placement, IK names, layout/facing behavior, katana grip and clearance settings, and foot contact settings, and includes its shared preview chains. The default skin comes from the character definition. The demo scene, presenter, and pose authoring consume those profiles. Register another catalog entry and presentation profile alongside its character definition to add a demo character; sample layout and sketch limb swapping still expect their existing humanoid bone and limb attachment conventions.
 
 To profile dense animation playback and nonsequential scrubbing, run:
 

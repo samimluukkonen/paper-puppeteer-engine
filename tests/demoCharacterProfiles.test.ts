@@ -5,7 +5,8 @@ import {
   getDemoCharacterProfile,
   sketchProfile,
 } from '../src/demo/demoCharacterProfiles.js';
-import { demoIK } from '../src/demo/demoIK.js';
+import { getCharacterPreviewSettings } from '../src/shared/characterPreviewSettings.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { characterChoices } from '../src/ui/characterSelection.js';
 
 test('character selection and presentation resolve the same registered profiles', () => {
@@ -27,11 +28,12 @@ test('shared presentation settings are immutable and own their IK definitions', 
     assert.isTrue(Object.isFrozen(profile.upperBody.mask));
     assert.isTrue(Object.isFrozen(profile.appearance));
     assert.isTrue(Object.isFrozen(profile.ikChains));
-    assert.notStrictEqual(profile.ikChains, demoIK);
+    assert.strictEqual(profile.ikChains, getCharacterPreviewSettings(profile.id).ikChains);
+    assert.notStrictEqual(profile.ikChains, paperDollIK);
     for (const [index, chain] of profile.ikChains.entries()) {
-      assert.notStrictEqual(chain, demoIK[index]);
+      assert.notStrictEqual(chain, paperDollIK[index]);
       assert.isTrue(Object.isFrozen(chain));
     }
   }
-  assert.isFalse(Object.isFrozen(demoIK));
+  assert.isFalse(Object.isFrozen(paperDollIK));
 });

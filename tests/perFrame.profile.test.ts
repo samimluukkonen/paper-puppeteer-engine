@@ -1,11 +1,11 @@
 import { assert, test, vi } from 'vitest';
-import { demoIK } from '../src/demo/demoIK.js';
 import { demoRenderOrder } from '../src/demo/demoPresentation.js';
 import { DemoPresenter } from '../src/demo/DemoPresenter.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { demoRig, idle, sword, walk } from './helpers/demoCharacter.js';
 import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -118,7 +118,7 @@ for (const facing of ['left', 'right'] as const) {
       rig: demoRig,
       skin: 'default',
       animations: [idle, walk, sword],
-      ik: demoIK,
+      ik: paperDollIK,
       x: 380,
       y: 362,
       scale: 1.08,

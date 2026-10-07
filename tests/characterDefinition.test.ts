@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
-import { demoIK } from '../src/demo/demoIK.js';
 import { demoHipPositions, demoRenderOrder } from '../src/demo/demoPresentation.js';
 import { compileClip } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
@@ -26,6 +25,7 @@ import type { Rig } from '../src/engine/Rig.js';
 import { animationClipSchema, rigDefinitionSchema } from '../src/engine/schemas.js';
 import { SlotState } from '../src/engine/SlotState.js';
 import type { RigDefinition } from '../src/engine/types.js';
+import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { requestUrl } from './helpers/requestUrl.js';
 
 const root = new URL('../public/characters/demo-puppet/', import.meta.url);
@@ -150,7 +150,7 @@ test('complete sample character validates and already-parsed data becomes runtim
   const joints = new Map(definition.rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
   const player = new AnimationPlayer(definition.rig, joints);
   for (const clip of definition.animations) player.addAnimation(clip);
-  for (const chain of demoIK) assert.ok(new TwoBoneIKConstraint(chain, definition.rig, joints));
+  for (const chain of paperDollIK) assert.ok(new TwoBoneIKConstraint(chain, definition.rig, joints));
   assert.notDeepEqual(demoHipPositions(definition.rig, 'left'), demoHipPositions(definition.rig, 'right'));
   assert.notDeepEqual(
     demoRenderOrder(definition.rig, 'walk', 'left'),

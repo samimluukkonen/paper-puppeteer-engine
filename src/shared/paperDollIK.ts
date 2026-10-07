@@ -1,6 +1,7 @@
-import type { TwoBoneIKDefinition } from '../engine/index.js';
+import type { TwoBoneIKDefinition } from '../engine/core.js';
 
-export const demoIK: readonly TwoBoneIKDefinition[] = [
+/** Default arm/leg chains for the two bundled paper dolls. */
+export const paperDollIK: readonly TwoBoneIKDefinition[] = [
   {
     name: 'rightArmIK',
     rootBone: 'rightUpperArm',

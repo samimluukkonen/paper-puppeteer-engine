@@ -1,4 +1,4 @@
-import { getDemoCharacterProfile } from '../../demo/demoCharacterProfiles.js';
+import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { DraftRecovery } from '../shared/DraftRecovery.js';
 import { draftSource } from '../shared/draftSource.js';
@@ -60,7 +60,7 @@ const render = (editor: RigEditor): void => {
 };
 const scene = new RigEditorScene(render, inspector.showError, {
   characterUrl: `../characters/${selectedCharacterId()}/character.json`,
-  ikChains: getDemoCharacterProfile(selectedCharacterId()).ikChains,
+  ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
 });
 const game = createEditorGame('editor-stage', scene);
 if (import.meta.hot)
