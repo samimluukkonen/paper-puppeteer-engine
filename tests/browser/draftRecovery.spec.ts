@@ -4,6 +4,24 @@ import { test } from './fixtures.js';
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
 
+test("navigating away from a clean tab preserves another tab's unsaved animation draft", async ({ page }) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  const clean = await page.context().newPage();
+  try {
+    await clean.goto(page.url());
+    await expect(clean.locator('#animation-status')).toHaveText('Validation: OK');
+    await page.locator('#animation-mode').selectOption('stepped');
+    await expect.poll(() => draftKeys(page)).toHaveLength(1);
+    const stored = await page.evaluate(() => JSON.stringify(localStorage));
+    await clean.goto(new URL('../', page.url()).href);
+    expect(await page.evaluate(() => JSON.stringify(localStorage))).toEqual(stored);
+    await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  } finally {
+    await clean.close();
+  }
+});
+
 test('rig draft recovery restores unsaved numeric edits as one undoable operation after reload', async ({ page }) => {
   await page.goto('rig-editor/');
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();

@@ -126,6 +126,51 @@ test('an invalid intermediate edit retains the last valid stored draft', () => {
   assert.equal(values.get('paper-puppeteer:draft:a'), valid);
 });
 
+test("a clean second tab cannot delete another tab's draft on update, navigation or disposal", () => {
+  const { recovery, session, edit, values } = fixture();
+  recovery.bind(session);
+  const clean = new DraftRecovery<Snapshot>(() => {});
+  recoveries.push(clean);
+  clean.bind({ ...session, snapshot: () => ({ value: 0 }), dirty: () => false });
+  edit(42);
+  recovery.flush();
+  const stored = values.get('paper-puppeteer:draft:a');
+  clean.update();
+  clean.flush();
+  clean.dispose();
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+});
+
+test('saving an older revision preserves a newer draft, including identical authored values', () => {
+  const { recovery, session, edit, values } = fixture();
+  recovery.bind(session);
+  edit(42);
+  recovery.flush();
+  const second = new DraftRecovery<Snapshot>(() => {});
+  recoveries.push(second);
+  second.bind({ ...session, snapshot: () => ({ value: 42 }), dirty: () => true, restore: () => true });
+  second.flush();
+  const newer = values.get('paper-puppeteer:draft:a');
+  edit(42, false);
+  assert.equal(values.get('paper-puppeteer:draft:a'), newer);
+});
+
+test("lifecycle flushes do not rewrite unchanged snapshots or overwrite a newer tab's draft", () => {
+  const { recovery, session, edit, storage, values } = fixture();
+  recovery.bind(session);
+  edit(1);
+  recovery.flush();
+  const newer = JSON.stringify({ version: 1, source: 'original', data: { value: 2 }, revision: 'other-tab' });
+  values.set('paper-puppeteer:draft:a', newer);
+  recovery.flush();
+  recovery.flush();
+  assert.equal(storage.setItem.mock.calls.length, 1);
+  assert.equal(values.get('paper-puppeteer:draft:a'), newer);
+  edit(3);
+  recovery.flush();
+  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":3');
+});
+
 test('compatible validated drafts restore only after accepting the prompt', () => {
   const { recovery, session, confirm, status } = fixture(
     JSON.stringify({ version: 1, source: 'original', data: { value: 8 } }),

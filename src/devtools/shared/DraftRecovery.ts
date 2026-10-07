@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-const draftSchema = z.strictObject({ version: z.literal(1), source: z.string(), data: z.unknown() });
+const draftSchema = z.strictObject({
+  version: z.literal(1),
+  source: z.string(),
+  data: z.unknown(),
+  revision: z.string().optional(),
+});
 
 export interface DraftSession<Snapshot> {
   readonly key: string;
@@ -18,6 +23,8 @@ export class DraftRecovery<Snapshot> {
   private session: DraftSession<Snapshot> | undefined;
   private snapshot: Snapshot | undefined;
   private dirty: boolean | undefined;
+  private persisted: string | null = null;
+  private pendingFlush = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private readonly lifetime = new AbortController();
 
@@ -38,11 +45,18 @@ export class DraftRecovery<Snapshot> {
     return `paper-puppeteer:draft:${session.key}`;
   }
 
+  /** Another tab may have replaced the shared draft since this session read or wrote it. */
+  private removeDraft(key: string, expected: string | null): void {
+    if (expected !== null && window.localStorage.getItem(key) === expected) window.localStorage.removeItem(key);
+  }
+
   bind(session: DraftSession<Snapshot>): void {
     this.flush();
     this.session = session;
     this.snapshot = undefined;
     this.dirty = undefined;
+    this.persisted = null;
+    this.pendingFlush = false;
     this.status('');
     try {
       const key = this.storageKey(session);
@@ -56,15 +70,16 @@ export class DraftRecovery<Snapshot> {
         }
         const parsed = draftSchema.safeParse(data);
         if (!parsed.success || parsed.data.source !== session.source || !session.validate(parsed.data.data)) {
-          window.localStorage.removeItem(key);
+          this.removeDraft(key, text);
           this.status('An older draft could not be restored and was discarded.');
         } else if (window.confirm(`Restore unsaved ${session.label} edits from this browser?`)) {
+          this.persisted = text;
           if (session.restore(parsed.data.data)) this.status('Draft restored. Download JSON to save your work.');
           else {
-            window.localStorage.removeItem(key);
+            this.removeDraft(key, text);
             this.status('The draft could not be restored.');
           }
-        } else window.localStorage.removeItem(key);
+        } else this.removeDraft(key, text);
       }
     } catch {
       this.status('Browser draft recovery is unavailable. Download JSON to save your work.');
@@ -81,6 +96,7 @@ export class DraftRecovery<Snapshot> {
     if (snapshot === this.snapshot && dirty === this.dirty) return;
     this.snapshot = snapshot;
     this.dirty = dirty;
+    this.pendingFlush = true;
     this.cancelTimer();
     if (!dirty) this.flush();
     else this.timer = setTimeout(() => this.flush(), 300);
@@ -90,16 +106,21 @@ export class DraftRecovery<Snapshot> {
   flush(): void {
     this.cancelTimer();
     const session = this.session;
-    if (!session || this.dirty === undefined) return;
+    if (!session || this.dirty === undefined || !this.pendingFlush) return;
     try {
       const key = this.storageKey(session);
-      if (!this.dirty) window.localStorage.removeItem(key);
-      else {
+      if (!this.dirty) {
+        this.removeDraft(key, this.persisted);
+        this.persisted = null;
+      } else {
         const data = session.data(this.snapshot!);
         // Keep the last valid draft while an authored edit is temporarily invalid.
         if (!session.validate(data)) return;
-        window.localStorage.setItem(key, JSON.stringify({ version: 1, source: session.source, data }));
+        const text = JSON.stringify({ version: 1, source: session.source, data, revision: crypto.randomUUID() });
+        window.localStorage.setItem(key, text);
+        this.persisted = text;
       }
+      this.pendingFlush = false;
     } catch {
       this.status('Could not save a browser draft. Download JSON to save your work.');
     }
@@ -110,6 +131,8 @@ export class DraftRecovery<Snapshot> {
     this.session = undefined;
     this.snapshot = undefined;
     this.dirty = undefined;
+    this.persisted = null;
+    this.pendingFlush = false;
   }
 
   private cancelTimer(): void {
