@@ -120,7 +120,7 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
   if (!box || !viewport) throw new Error('Missing timeline bounds.');
   const scrollBeforeScrub = await page.locator('.timeline-inset').evaluate((element) => element.scrollTop);
   const pageScrollBeforeScrub = await page.evaluate(() => window.scrollY);
-  // Scrub a visible lane after the ruler has scrolled out of view.
+  // Scrub a visible lane beneath the floating ruler.
   await page.mouse.click(box.x + box.width * 0.4, viewport.y + 60);
   expect(await page.locator('.timeline-inset').evaluate((element) => element.scrollTop)).toBe(scrollBeforeScrub);
   expect(await page.evaluate(() => window.scrollY)).toBe(pageScrollBeforeScrub);

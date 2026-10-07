@@ -92,7 +92,9 @@ export class TimelineController {
         }),
       );
     }
-    this.playhead.style.left = `${timeToTimelineX(state.currentTime, state.duration, width)}px`;
+    const playheadX = `${timeToTimelineX(state.currentTime, state.duration, width)}px`;
+    this.playhead.style.left = playheadX;
+    this.ruler.style.setProperty('--timeline-playhead-x', playheadX);
     setAttribute(this.timeline, 'aria-valuemax', String(state.duration));
     setAttribute(this.timeline, 'aria-valuenow', String(state.currentTime));
     setAttribute(
