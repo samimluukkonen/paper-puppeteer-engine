@@ -60,6 +60,14 @@ Key times and durations are **milliseconds**. Values are **absolute local transf
 
 Looping wraps the clock at the duration; use matching start/end poses for a seamless cycle. Nonlooping clips stop at their exact final pose. Shortest-path rotation interpolation is intended for joint poses, not authored full-turn spins.
 
+### Interpolation and sample timing
+
+Version 1 supports only linear interpolation. The optional clip-level `interpolation: 'linear'` declaration states that behavior; omitting it produces the same result. Tracks and keyframes have no interpolation metadata or outgoing-segment mode. A property's last key has no outgoing segment, and a single-key property remains constant.
+
+`playback.mode` controls when the linear evaluator samples the clip. `smooth` uses continuous time; `stepped` rounds sample time down to an FPS boundary and holds that evaluated pose until the next boundary. For keys at 0 ms (`x: 0`) and 1000 ms (`x: 100`), sampling at 550 ms produces `x: 55` in smooth mode and `x: 50` at 10 FPS in stepped mode. Both use the same linear segment. Rotation segments use the existing shortest angular path.
+
+Clip `playback` settings are authored data. A player's default playback mode is runtime configuration, and editor preview speed/loop settings are transient preferences. Per-key or per-track interpolation would require an explicit extension to the schema, compiler, and runtime evaluator before authoring APIs could expose it.
+
 `stop()` freezes every layer. `restart()` resets every selected layer to time zero and clears its fade, retaining clip speeds, masks, weights, the global speed, playback mode, and pause state. Time-zero events fire after all restarted layers have been synchronized. To restart only one layer, call `play(name, { layer, speed })` with its desired settings.
 
 ## Playback, events and layers

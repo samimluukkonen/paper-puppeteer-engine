@@ -7,6 +7,7 @@ import type { JointTransform, TransformProperty } from './types.js';
 import { assertFinite, transformProperties } from './types.js';
 import { checkAnimationReferences, throwValidationIssue } from './validation.js';
 
+/** Version 1 supports linear segments only. Smooth/stepped describe playback sample timing. */
 export type Interpolation = 'linear';
 
 export interface Keyframe extends Partial<JointTransform> {
@@ -18,6 +19,7 @@ export interface AnimationClip {
   name: string;
   duration: number;
   loop: boolean;
+  /** Optional clip-level declaration; omitting it also uses linear interpolation. No per-key/track overrides. */
   interpolation?: Interpolation;
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
   events?: readonly AnimationEvent[];
@@ -36,6 +38,7 @@ export function copyAnimationEvent<Event extends AnimationEvent>(event: Event): 
   return Object.hasOwn(event, 'data') ? { ...event, data: copyJsonData(event.data) } : { ...event };
 }
 
+/** Smooth samples continuous time; stepped quantizes time before evaluating the same linear segments. */
 export type AnimationPlaybackMode = { mode: 'smooth' } | { mode: 'stepped'; fps: number };
 
 export interface PropertyKeyframe {
