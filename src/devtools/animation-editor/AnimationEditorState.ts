@@ -1,4 +1,9 @@
-import type { AnimationClip, AnimationPlaybackMode, PropertyKeyframe } from '../../engine/AnimationClip.js';
+import type {
+  AnimationClip,
+  AnimationPlaybackMode,
+  Interpolation,
+  PropertyKeyframe,
+} from '../../engine/AnimationClip.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
@@ -12,6 +17,15 @@ import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationE
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
+import {
+  getAnimationInterpolation,
+  getInterpolationForKeys,
+  getSegmentInterpolation,
+  type InterpolationSelectionState,
+  type SegmentInterpolation,
+  setAnimationInterpolation,
+  setInterpolationForKeys,
+} from './interpolation.js';
 import type { KeyframeClipboard } from './keyframeClipboard.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import {
@@ -410,6 +424,41 @@ export class AnimationEditorState {
         playback: mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS },
       }),
     );
+  }
+
+  get authoredInterpolation(): Interpolation | undefined {
+    return getAnimationInterpolation(this.working);
+  }
+
+  get selectedInterpolation(): InterpolationSelectionState {
+    return getInterpolationForKeys(this.working, this.selectedKeys);
+  }
+
+  getSegmentInterpolation(key: KeyframeSelection): SegmentInterpolation | undefined {
+    return getSegmentInterpolation(this.working, key);
+  }
+
+  /** Clip-level declaration only; undefined restores the implicit linear default. */
+  setAuthoredInterpolation(mode: Interpolation | undefined): boolean {
+    if (!this.working || !this.rig) return false;
+    try {
+      const next = setAnimationInterpolation(this.working, this.rig, mode);
+      if (next === this.working) return true;
+      return this.installWorkingAnimation(freezeData(next));
+    } catch {
+      return false;
+    }
+  }
+
+  /** The current format has no per-key overrides; unavailable edits preserve all session state. */
+  setSelectedKeyframeInterpolation(mode: Interpolation): boolean {
+    if (!this.working) return false;
+    try {
+      setInterpolationForKeys(this.working, this.selectedKeys, mode);
+    } catch {
+      return false;
+    }
+    return false;
   }
 
   /** State-facing authoring uses continuous seconds, defaulting to the sole editor clock. */

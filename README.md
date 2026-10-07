@@ -19,6 +19,8 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 
 The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` supports playback preview, property keyframing, multi-key selection, dragging, clipboard commands, and undo/redo. Use the [Rig Editor](docs/rig-editor.md) at `/rig-editor/` to edit bind poses. Both editors keep changes in memory; download JSON to save your work.
 
+The v0.5.2.6.1 [interpolation authoring core](docs/animation-editor-interpolation-verification.md) adds clip metadata edits and segment/selection queries. The existing format supports clip-level linear interpolation; smooth/stepped remain playback sampling modes. Per-key interpolation editing remains unavailable.
+
 ## Quick start
 
 Build the library with `npm run build:lib`, then install this checkout in your Phaser project:
