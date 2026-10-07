@@ -1,7 +1,13 @@
 import { assert, test } from 'vitest';
+import { AnimationEditorSelection } from '../src/devtools/animation-editor/AnimationEditorSelection.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { KEYFRAME_TIME_TOLERANCE_MS } from '../src/devtools/animation-editor/keyframes.js';
-import { keysInMarquee, reconcileKeyframeSelection } from '../src/devtools/animation-editor/keyframeSelection.js';
+import {
+  keyIdentity,
+  keyframeSelectionIndex,
+  keysInMarquee,
+  reconcileKeyframeSelection,
+} from '../src/devtools/animation-editor/keyframeSelection.js';
 import type { KeyframeSelection } from '../src/devtools/animation-editor/timelineTracks.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -10,6 +16,49 @@ const key = (time: number, property: KeyframeSelection['property'] = 'x', boneId
   boneId,
   property,
   time,
+});
+
+test('selection indexes preserve exact identities and order, and cache only deeply immutable references', () => {
+  const near = key(0.5 + KEYFRAME_TIME_TOLERANCE_MS / 2000);
+  const first = Object.freeze(key(0.5));
+  const keys = Object.freeze([first, Object.freeze(near), Object.freeze(key(0.5))]);
+  const index = keyframeSelectionIndex(keys);
+  assert.deepEqual([...index.values()], [first, near]);
+  assert.strictEqual(index.get(keyIdentity(first)), first);
+  assert.strictEqual(keyframeSelectionIndex(keys), index);
+  assert.notEqual(keyIdentity(key(1, 'x', 'a:x')), keyIdentity(key(1, 'x', 'a')));
+  const mutable = [{ boneId: 'root', property: 'x' as const, time: 0 }];
+  const before = keyframeSelectionIndex(mutable);
+  mutable[0]!.time = 1;
+  assert.isTrue(keyframeSelectionIndex(mutable).has(keyIdentity(key(1))));
+  assert.isFalse(before.has(keyIdentity(key(1))));
+  Object.freeze(mutable);
+  mutable[0]!.time = 2;
+  assert.isTrue(keyframeSelectionIndex(mutable).has(keyIdentity(key(2))));
+});
+
+test('dense selection deduplication reads identities in linear work and retains deterministic primary order', () => {
+  let identityReads = 0;
+  const keys = Array.from(
+    { length: 2000 },
+    (_, time) =>
+      new Proxy(key(time), {
+        get(target, property, receiver): unknown {
+          if (property === 'boneId') identityReads += 1;
+          return Reflect.get(target, property, receiver);
+        },
+      }),
+  );
+  const selection = new AnimationEditorSelection(undefined);
+  selection.setKeys([...keys, ...keys], key(1000));
+  assert.equal(selection.keys.length, 2000);
+  assert.deepEqual(selection.key, key(1000));
+  assert.deepEqual(
+    selection.keys.map((entry) => entry.time),
+    Array.from({ length: 2000 }, (_, time) => time),
+  );
+  assert.isBelow(identityReads, keys.length * 4, 'duplicates must not rescan the growing selection');
+  assert.isTrue(selection.hasKey(key(1999)));
 });
 function session() {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'root' }] });

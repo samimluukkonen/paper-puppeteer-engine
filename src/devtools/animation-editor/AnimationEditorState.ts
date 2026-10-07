@@ -192,7 +192,7 @@ export class AnimationEditorState {
       this.selection.setKeys(modifiers.additive ? [...this.selectedKeys, ...range] : range, clicked);
       this.updateTime(clicked.time);
     } else if (modifiers.additive) {
-      const exists = this.selectedKeys.some((entry) => sameKey(entry, clicked));
+      const exists = this.selection.hasKey(clicked);
       this.selection.setKeys(
         exists ? this.selectedKeys.filter((entry) => !sameKey(entry, clicked)) : [...this.selectedKeys, clicked],
         this.primaryKey,

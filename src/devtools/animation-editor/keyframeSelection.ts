@@ -20,6 +20,26 @@ export function sameKey(a: KeyframeSelection, b: KeyframeSelection): boolean {
   return a.boneId === b.boneId && a.property === b.property && a.time === b.time;
 }
 
+/** Canonical times stay exact; tuple encoding also keeps punctuation in bone ids unambiguous. */
+export function keyIdentity(key: KeyframeSelection): string {
+  return JSON.stringify([key.boneId, key.property, key.time]);
+}
+
+const selectionIndexes = new WeakMap<readonly KeyframeSelection[], ReadonlyMap<string, KeyframeSelection>>();
+
+/** Retain first-occurrence order and reuse membership lookups for owned immutable selections. */
+export function keyframeSelectionIndex(keys: readonly KeyframeSelection[]): ReadonlyMap<string, KeyframeSelection> {
+  const cached = selectionIndexes.get(keys);
+  if (cached) return cached;
+  const index = new Map<string, KeyframeSelection>();
+  for (const key of keys) {
+    const id = keyIdentity(key);
+    if (!index.has(id)) index.set(id, key);
+  }
+  if (Object.isFrozen(keys) && keys.every(Object.isFrozen)) selectionIndexes.set(keys, index);
+  return index;
+}
+
 export function resolveKey(
   animation: DeepReadonly<AnimationClip> | null,
   ref: KeyframeSelection,
@@ -33,13 +53,14 @@ export function reconcileKeyframeSelection(
   animation: DeepReadonly<AnimationClip> | null,
   state: KeyframeSelectionState,
 ): KeyframeSelectionState {
-  const selectedKeys: KeyframeSelection[] = [];
+  const index = new Map<string, KeyframeSelection>();
   for (const ref of state.selectedKeys) {
     const key = resolveKey(animation, ref);
-    if (key && !selectedKeys.some((entry) => sameKey(entry, key))) selectedKeys.push(key);
+    if (key && !index.has(keyIdentity(key))) index.set(keyIdentity(key), key);
   }
+  const selectedKeys = [...index.values()];
   const primary = state.primaryKey && resolveKey(animation, state.primaryKey);
-  const primaryKey = (primary && selectedKeys.find((key) => sameKey(key, primary))) || selectedKeys[0] || null;
+  const primaryKey = (primary && index.get(keyIdentity(primary))) || selectedKeys[0] || null;
   if (
     primaryKey === state.primaryKey &&
     selectedKeys.length === state.selectedKeys.length &&

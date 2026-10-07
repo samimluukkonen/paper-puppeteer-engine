@@ -1,6 +1,6 @@
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
-import { sameKey } from './keyframeSelection.js';
+import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 
@@ -191,6 +191,7 @@ export class TimelineTracksController {
     this.selectedProperty = state.selectedTimelineProperty;
     this.selectedKey = state.primaryKey;
     this.selectedKeys = state.selectedKeys;
+    const selectionIndex = keyframeSelectionIndex(this.selectedKeys);
     for (const track of tracks) {
       const row = this.rows.get(trackKey(track))!;
       const selected =
@@ -200,7 +201,7 @@ export class TimelineTracksController {
       for (const [time, marker] of row.markers) {
         // Both times are canonical authored values resolved by the state's tolerant key lookup.
         const ref = track.kind === 'property' ? { boneId: track.boneId, property: track.property, time } : null;
-        const keySelected = ref !== null && this.selectedKeys.some((key) => sameKey(key, ref));
+        const keySelected = ref !== null && selectionIndex.has(keyIdentity(ref));
         setAttribute(
           marker,
           'data-primary',

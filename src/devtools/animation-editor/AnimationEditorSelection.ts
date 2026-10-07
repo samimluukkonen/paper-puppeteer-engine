@@ -3,7 +3,13 @@ import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform, TransformProperty } from '../../engine/types.js';
 import { findAdjacentBonePropertyKeyframe } from './keyframes.js';
-import { reconcileKeyframeSelection, sameKey, type KeyframeSelectionState } from './keyframeSelection.js';
+import {
+  keyIdentity,
+  keyframeSelectionIndex,
+  reconcileKeyframeSelection,
+  sameKey,
+  type KeyframeSelectionState,
+} from './keyframeSelection.js';
 import { buildTimelineTracks, type KeyframeSelection, type TimelineTrack } from './timelineTracks.js';
 
 type AnimationData = DeepReadonly<AnimationClip> | null;
@@ -67,20 +73,21 @@ export class AnimationEditorSelection {
   }
 
   setKeys(keys: readonly KeyframeSelection[], primary: KeyframeSelection | null, clearDraft = true): void {
-    const selectedKeys: KeyframeSelection[] = [];
-    for (const key of keys) {
-      if (!selectedKeys.some((entry) => sameKey(entry, key)))
-        selectedKeys.push(
-          Object.isFrozen(key) && !('value' in key)
-            ? key
-            : Object.freeze({ boneId: key.boneId, property: key.property, time: key.time }),
-        );
-    }
-    const primaryKey = (primary && selectedKeys.find((key) => sameKey(key, primary))) || selectedKeys[0] || null;
-    this.keySelection = Object.freeze({ selectedKeys: Object.freeze(selectedKeys), primaryKey });
+    const selectedKeys = [...keyframeSelectionIndex(keys).values()].map((key) =>
+      Object.isFrozen(key) && !('value' in key)
+        ? key
+        : Object.freeze({ boneId: key.boneId, property: key.property, time: key.time }),
+    );
+    Object.freeze(selectedKeys);
+    const index = keyframeSelectionIndex(selectedKeys);
+    const primaryKey = (primary && index.get(keyIdentity(primary))) || selectedKeys[0] || null;
+    this.keySelection = Object.freeze({ selectedKeys, primaryKey });
     this.followPrimary(clearDraft);
-    if (!this.rangeAnchor || !selectedKeys.some((key) => sameKey(key, this.rangeAnchor!)))
-      this.rangeAnchor = primaryKey;
+    if (!this.rangeAnchor || !index.has(keyIdentity(this.rangeAnchor))) this.rangeAnchor = primaryKey;
+  }
+
+  hasKey(key: KeyframeSelection): boolean {
+    return keyframeSelectionIndex(this.keys).has(keyIdentity(key));
   }
 
   private followPrimary(clearDraft = true): void {
@@ -110,12 +117,12 @@ export class AnimationEditorSelection {
     if (next === this.keySelection) return;
     this.keySelection = next;
     this.followPrimary(false);
-    if (!this.rangeAnchor || !this.keys.some((key) => sameKey(key, this.rangeAnchor!))) this.rangeAnchor = this.key;
+    if (!this.rangeAnchor || !this.hasKey(this.rangeAnchor)) this.rangeAnchor = this.key;
   }
 
   /** Authored deletion removes the exact resolved reference before tolerant reconciliation. */
   removeKey(ref: KeyframeSelection): void {
-    if (!this.keys.some((key) => sameKey(key, ref))) return;
+    if (!this.hasKey(ref)) return;
     this.setKeys(
       this.keys.filter((key) => !sameKey(key, ref)),
       this.key,
