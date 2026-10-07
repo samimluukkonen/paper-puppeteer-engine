@@ -19,7 +19,7 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 
 The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` supports playback preview, property keyframing, multi-key selection, dragging, clipboard commands, and undo/redo. Use the [Rig Editor](docs/rig-editor.md) at `/rig-editor/` to edit bind poses. Both editors keep changes in memory; download JSON to save your work.
 
-The v0.5.2.6.1 [interpolation authoring core](docs/animation-editor-interpolation-verification.md) adds clip metadata edits and segment/selection queries. The existing format supports clip-level linear interpolation; smooth/stepped remain playback sampling modes. Per-key interpolation editing remains unavailable.
+The v0.5.2.6.2 [interpolation UI](docs/animation-editor-interpolation-ui-verification.md) exposes selection inspection, clip declaration edits, and outgoing/terminal marker indicators using the existing [authoring core](docs/animation-editor-interpolation-verification.md). The format supports clip-level linear interpolation; smooth/stepped remain playback sampling modes. Per-key interpolation editing and mixed modes remain unavailable.
 
 ## Quick start
 

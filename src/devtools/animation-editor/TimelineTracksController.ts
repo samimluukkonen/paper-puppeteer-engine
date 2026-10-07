@@ -1,5 +1,6 @@
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
 import { type KeyframeSelection, type TimelineTrack, timelineTrackKey } from './timelineTracks.js';
@@ -31,6 +32,7 @@ function reconcileRows(container: HTMLElement, rows: HTMLElement[]): void {
 export class TimelineTracksController {
   private state: AnimationEditorState | undefined;
   private tracks: readonly TimelineTrack[] | undefined;
+  private animation: AnimationEditorState['workingAnimation'] | undefined;
   private readonly rows = new Map<string, TrackElements>();
   private selectedBone: string | null | undefined;
   private selectedProperty: AnimationEditorState['selectedTimelineProperty'] | undefined;
@@ -90,6 +92,8 @@ export class TimelineTracksController {
     this.state = state;
     const tracks = state.timelineTracks;
     const changed = tracks !== this.tracks;
+    const interpolationChanged = this.animation !== state.workingAnimation;
+    this.animation = state.workingAnimation;
     const changedRows = new Set<TrackElements>();
     const newMarkers = new Set<HTMLButtonElement>();
     if (changed) {
@@ -156,7 +160,6 @@ export class TimelineTracksController {
             }
             const description = `Select ${keyframe.boneId} ${keyframe.property} key at ${keyframe.time} s`;
             setAttribute(marker, 'aria-label', description);
-            marker.title = `${description} (value ${keyframe.value})`;
           }
           reconcileRows(
             row.lane,
@@ -171,6 +174,26 @@ export class TimelineTracksController {
         empty.className = 'timeline-empty';
         empty.textContent = 'No bones available.';
         this.labels.append(empty);
+      }
+    }
+    // Metadata-only edits retain authored track/marker identities. Refresh independently of row reconciliation.
+    if (changed || interpolationChanged) {
+      for (const row of this.rows.values()) {
+        const track = row.track;
+        if (track?.kind !== 'property') continue;
+        for (const key of track.keyframes) {
+          const marker = row.markers.get(key.time)!;
+          const segment = state.getSegmentInterpolation(key);
+          setAttribute(marker, 'data-interpolation', segment?.mode ?? 'unavailable');
+          const interpolation = segment
+            ? `${interpolationLabel(segment.mode)} (inherited from clip)`
+            : 'Unavailable (no outgoing segment)';
+          setAttribute(
+            marker,
+            'title',
+            `${key.boneId}.${key.property}\nTime: ${key.time.toFixed(3)} s (value ${key.value})\nInterpolation: ${interpolation}`,
+          );
+        }
       }
     }
     const resized = width !== this.width || state.duration !== this.duration;

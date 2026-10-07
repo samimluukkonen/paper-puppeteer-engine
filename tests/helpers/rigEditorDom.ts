@@ -14,7 +14,11 @@ export class EditorElement {
   files: { name: string; text: () => Promise<string> }[] = [];
   children: EditorElement[] = [];
   classList = { add: vi.fn(), toggle: vi.fn() };
-  setAttribute = vi.fn();
+  private readonly attributes = new Map<string, string>();
+  setAttribute = vi.fn((name: string, value: string) => this.attributes.set(name, value));
+  getAttribute(name: string): string | null {
+    return this.attributes.get(name) ?? null;
+  }
   setCustomValidity = vi.fn();
   reportValidity = vi.fn();
   private readonly listeners = new Map<string, ((event: { target: EditorElement }) => unknown)[]>();

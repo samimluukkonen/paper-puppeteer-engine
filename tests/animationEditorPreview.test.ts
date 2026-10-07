@@ -18,6 +18,60 @@ vi.mock('phaser', () => ({
   },
 }));
 
+test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 1 }])(
+  'clip interpolation declaration edits immediately resample the existing $mode preview and preserve playback semantics',
+  (playback) => {
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const input: AnimationClip = {
+      name: 'rotate',
+      duration: 1000,
+      loop: false,
+      playback,
+      tracks: {
+        root: [
+          { time: 0, rotation: 0 },
+          { time: 1000, rotation: 1 },
+        ],
+      },
+    };
+    const state = new AnimationEditorState(rig, [input]);
+    state.selectAnimation('rotate');
+    state.selectKeyframe({ boneId: 'root', property: 'rotation', time: 0 });
+    const source = JSON.stringify(input);
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const preview = new AnimationEditorPreview(state, puppet);
+    const sync = vi.spyOn(puppet, 'syncPose');
+    const expected = (time: number) => (playback.mode === 'stepped' && time < 1 ? 0 : time);
+    try {
+      for (const time of [0, 0.25, 0.5, 0.75, 1]) {
+        state.setCurrentTime(time);
+        assert.approximately(puppet.getBone('root').pose.rotation, expected(time), 1e-12);
+      }
+      state.setCurrentTime(0.375);
+      const selection = state.selectedKeys;
+      sync.mockClear();
+      assert.isTrue(state.setAuthoredInterpolation('linear'));
+      assert.equal(sync.mock.calls.length, 1, 'a changed working snapshot refreshes immediately at the held time');
+      assert.approximately(puppet.getBone('root').pose.rotation, expected(0.375), 1e-12);
+      state.undo();
+      assert.equal(sync.mock.calls.length, 2);
+      state.redo();
+      assert.equal(sync.mock.calls.length, 3);
+      assert.equal(state.currentTime, 0.375);
+      assert.strictEqual(state.selectedKeys, selection);
+      state.setCurrentTime(0);
+      state.play();
+      state.advancePlayback(0.375);
+      assert.equal(state.currentTime, 0.375);
+      assert.approximately(puppet.getBone('root').pose.rotation, expected(0.375), 1e-12);
+      assert.equal(JSON.stringify(input), source);
+    } finally {
+      preview.dispose();
+      puppet.destroy();
+    }
+  },
+);
+
 test.each(['smooth', 'stepped'] as const)(
   'key movement refreshes %s preview/evaluator without baking facing',
   (mode) => {

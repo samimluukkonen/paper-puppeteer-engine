@@ -189,6 +189,22 @@ a {
   margin: 0 24px 12px;
   font-size: 12px;
 }
+.timeline-interpolation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 24px 12px;
+  font-size: 12px;
+}
+.timeline-interpolation label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.timeline-interpolation-legend {
+  flex-basis: 100%;
+}
 .timeline-instructions summary {
   cursor: pointer;
   padding: 4px 0;
@@ -245,6 +261,9 @@ a {
   background: #b7543a;
   border-color: #75341f;
   box-shadow: 0 0 0 2px #fff2ce;
+}
+.timeline-keyframe[data-interpolation="unavailable"]::before {
+  background: transparent;
 }
 .timeline-keyframe[data-dragging="true"] {
   z-index: 3;
