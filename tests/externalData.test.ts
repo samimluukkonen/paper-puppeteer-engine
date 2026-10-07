@@ -13,7 +13,34 @@ import {
   validateRigDefinition,
 } from '../src/engine/externalData.js';
 import { Joint } from '../src/engine/Joint.js';
+import { checkJson } from '../src/engine/jsonData.js';
 import { Rig } from '../src/engine/Rig.js';
+
+test('deep parsed JSON returns bounded diagnostics instead of overflowing validation', () => {
+  const depth = 10000;
+  const nested: unknown = JSON.parse('{"child":'.repeat(depth) + 'null' + '}'.repeat(depth));
+  const input = { ...rigFile, extra: nested };
+  const issues = validateRigDefinition(input);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0]!.message, /nesting.*256/);
+  assert.throws(() => parseRigDefinition(input), RigValidationError);
+  const animation = { ...clipFile, events: [{ time: 0, name: 'deep', data: nested }] };
+  assert.match(validateAnimationDefinition(animation, new Rig(rigFile))[0]!.message, /nesting.*256/);
+  assert.throws(() => parseAnimationClip(animation, new Rig(rigFile)), AnimationValidationError);
+});
+
+test('JSON nesting limit accepts 256 containers and rejects the next level for objects and arrays', () => {
+  for (const array of [false, true]) {
+    let value: unknown = null;
+    for (let depth = 0; depth < 256; depth++) value = array ? [value] : { child: value };
+    const issues: Parameters<typeof checkJson>[2] = [];
+    assert.isTrue(checkJson(value, '', issues));
+    assert.deepEqual(issues, []);
+    value = array ? [value] : { child: value };
+    assert.isFalse(checkJson(value, '', issues));
+    assert.match(issues[0]!.message, /nesting.*256/);
+  }
+});
 
 const rigFile: RigJsonDefinition = {
   version: 1,

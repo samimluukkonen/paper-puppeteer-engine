@@ -2,6 +2,9 @@ import type { ValidationIssue } from './validation.js';
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
+// Bound recursion before schema parsing, cloning, freezing, or serialization can overflow.
+const maximumJsonNesting = 256;
+
 export function childPath(base: string, key: string | number): string {
   if (typeof key === 'number') return `${base}[${key}]`;
   return base ? `${base}.${key}` : key;
@@ -14,6 +17,16 @@ export function checkJson(
   issues: ValidationIssue[],
   ancestors = new Set<object>(),
 ): boolean {
+  return inspectJson(value, path, issues, ancestors, 0);
+}
+
+function inspectJson(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+  ancestors: Set<object>,
+  depth: number,
+): boolean {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) issues.push({ severity: 'error', path, message: 'Must be a finite JSON number.' });
@@ -25,6 +38,10 @@ export function checkJson(
       path,
       message: 'Must be a JSON value (no functions, undefined, bigint, or symbols).',
     });
+    return false;
+  }
+  if (depth >= maximumJsonNesting) {
+    issues.push({ severity: 'error', path, message: `JSON nesting must not exceed ${maximumJsonNesting} levels.` });
     return false;
   }
   if (ancestors.has(value)) {
@@ -54,7 +71,8 @@ export function checkJson(
           path: childPath(path, index),
           message: 'Accessor properties are not JSON data.',
         });
-      } else if (!checkJson(descriptor.value, childPath(path, index), issues, ancestors)) safeToInspect = false;
+      } else if (!inspectJson(descriptor.value, childPath(path, index), issues, ancestors, depth + 1))
+        safeToInspect = false;
     }
     for (const key of Reflect.ownKeys(value)) {
       if (key === 'length') continue;
@@ -80,7 +98,8 @@ export function checkJson(
           path: childPath(path, key),
           message: 'Hidden or accessor properties are not JSON data.',
         });
-      } else if (!checkJson(descriptor.value, childPath(path, key), issues, ancestors)) safeToInspect = false;
+      } else if (!inspectJson(descriptor.value, childPath(path, key), issues, ancestors, depth + 1))
+        safeToInspect = false;
     }
   }
   ancestors.delete(value);

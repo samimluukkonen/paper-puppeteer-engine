@@ -99,6 +99,8 @@ const poseIssues = validatePoseDefinition(poseJson, rig);
 
 The parsers accept already-loaded JavaScript values and require no `fetch`. They return the existing `Rig` and `AnimationClip` runtime types. Invalid files throw `RigValidationError` or `AnimationValidationError`, each with an `issues` array of severity, path, and message. Unsupported versions throw `UnsupportedFormatVersionError`. Validation catches duplicate and missing bones, invalid parents and cycles, nonfinite transforms, negative lengths, invalid timeline times, unknown track bones, invalid FPS, and non-JSON values such as functions, `Map`, `Set`, and cyclic references. Existing unversioned TypeScript `RigDefinition` and `AnimationClip` inputs still work through their original constructors and registration APIs. The external format has no migration support yet.
 
+External JSON supports at most 256 nested object/array levels, including event payloads. Deeper input returns a validation issue before parsing, cloning, or serialization can overflow the call stack.
+
 Pose validation uses the same severity/path/message diagnostics through `validatePoseDefinition`. Character validation preserves every pose issue with its file prefix, such as `poses[0].bones.arm.rotation`, so tools can highlight individual fields. `parsePoseDefinition` retains its `PoseValidationError` and `UnsupportedFormatVersionError` behavior.
 
 ## Slots, sprite attachments, and skins
