@@ -10,6 +10,7 @@ import {
   KEYFRAME_TIME_TOLERANCE_MS,
   keyframeTimesMatch,
   removeBonePropertyKeyframe,
+  removeBonePropertyKeyframes,
   setBonePropertyKeyframe,
 } from '../src/devtools/animation-editor/keyframes.js';
 import { freezeData } from '../src/devtools/shared/editorData.js';
@@ -35,6 +36,60 @@ const clip = (patch: Partial<AnimationClip> = {}): AnimationClip & { version: 1 
   tracks: {},
   events: [{ time: 0, name: 'start', data: { nested: [1, 2] } }],
   ...patch,
+});
+
+test('batch removal resolves original identities once and preserves sparse siblings and shared branches', () => {
+  const near = 500 + KEYFRAME_TIME_TOLERANCE_MS / 2;
+  const input = freezeData(
+    clip({
+      tracks: {
+        root: [
+          { time: 0, x: 1 },
+          { time: 500, x: 2, y: 3 },
+          { time: near, x: 4 },
+        ],
+        child: [{ time: 0, rotation: 1 }],
+      },
+    }),
+  );
+  const next = removeBonePropertyKeyframes(input, rig, [
+    { boneId: 'root', property: 'x', timeMs: 500 },
+    { boneId: 'root', property: 'x', timeMs: 500 },
+    { boneId: 'root', property: 'x', timeMs: 0 },
+  ]);
+  assert.deepEqual(next.tracks.root, [
+    { time: 500, y: 3 },
+    { time: near, x: 4 },
+  ]);
+  assert.strictEqual(next.tracks.root![1], input.tracks.root![2]);
+  assert.strictEqual(next.tracks.child, input.tracks.child);
+  assert.strictEqual(next.events, input.events);
+  assert.equal(input.tracks.root!.length, 3);
+  assert.deepEqual(validateAnimationDefinition(next, rig), []);
+  assert.strictEqual(removeBonePropertyKeyframes(next, rig, []), next);
+  assert.strictEqual(removeBonePropertyKeyframes(next, rig, [{ boneId: 'child', property: 'x', timeMs: 0 }]), next);
+});
+
+test('batch removal rejects invalid targets atomically and never freezes mutable caller data', () => {
+  const input = clip({ tracks: { root: [{ time: 0, x: 1, y: 2 }], child: [{ time: 0, x: 3 }] } });
+  const before = structuredClone(input);
+  assert.throws(
+    () =>
+      removeBonePropertyKeyframes(input, rig, [
+        { boneId: 'root', property: 'x', timeMs: 0 },
+        { boneId: 'missing', property: 'x', timeMs: 0 },
+      ]),
+    /Unknown bone/,
+  );
+  assert.deepEqual(input, before);
+  const next = removeBonePropertyKeyframes(input, rig, [
+    { boneId: 'root', property: 'x', timeMs: 0 },
+    { boneId: 'root', property: 'y', timeMs: 0 },
+    { boneId: 'child', property: 'x', timeMs: 0 },
+  ]);
+  assert.deepEqual(next.tracks, {});
+  assert.deepEqual(input, before);
+  assert.isFalse(Object.isFrozen(input.tracks.root));
 });
 
 test('frozen property indexes avoid rescanning dense tracks and preserve sparse, duplicate, and unsorted matches', () => {

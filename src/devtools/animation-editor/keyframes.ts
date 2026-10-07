@@ -247,19 +247,56 @@ export function removeBonePropertyKeyframe<Animation extends AnimationData>(
   property: TransformProperty,
   timeMs: number,
 ): Animation {
-  timeMs = assertTarget(animation, rig, boneId, property, timeMs);
+  return removeBonePropertyKeyframes(animation, rig, [{ boneId, property, timeMs }]);
+}
+
+export interface PropertyKeyframeTarget {
+  readonly boneId: string;
+  readonly property: TransformProperty;
+  /** Milliseconds, matching authored keyframe times. */
+  readonly timeMs: number;
+}
+
+/** Resolve against the original snapshot, copy each changed track once, then validate the whole batch. */
+export function removeBonePropertyKeyframes<Animation extends AnimationData>(
+  animation: Animation,
+  rig: Rig,
+  targets: readonly PropertyKeyframeTarget[],
+): Animation {
+  const normalized = targets.map((target) => ({
+    ...target,
+    timeMs: assertTarget(animation, rig, target.boneId, target.property, target.timeMs),
+  }));
   getValidatedEditorAnimation(animation, rig);
-  const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
-  const index = matchingRow(keys, timeMs, property);
-  if (index < 0) return animation;
-  const row = { ...keys[index]! };
-  delete row[property];
-  const nextKeys = [...keys];
-  if (transformProperties.some((entry) => row[entry] !== undefined)) nextKeys[index] = row;
-  else nextKeys.splice(index, 1);
+  const removals = new Map<string, Map<number, Set<TransformProperty>>>();
+  for (const { boneId, property, timeMs } of normalized) {
+    const key = findBonePropertyKeyframe(animation, boneId, property, timeMs);
+    if (!key) continue;
+    let rows = removals.get(boneId);
+    if (!rows) {
+      rows = new Map();
+      removals.set(boneId, rows);
+    }
+    let properties = rows.get(key.time);
+    if (!properties) {
+      properties = new Set();
+      rows.set(key.time, properties);
+    }
+    properties.add(property);
+  }
+  if (!removals.size) return animation;
   const tracks = { ...animation.tracks };
-  if (nextKeys.length) tracks[boneId] = nextKeys;
-  else delete tracks[boneId];
+  for (const [boneId, removalsByTime] of removals) {
+    const nextKeys = animation.tracks[boneId]!.flatMap((key) => {
+      const properties = removalsByTime.get(key.time);
+      if (!properties) return [key];
+      const row = { ...key };
+      for (const property of properties) delete row[property];
+      return transformProperties.some((property) => row[property] !== undefined) ? [row] : [];
+    });
+    if (nextKeys.length) tracks[boneId] = nextKeys;
+    else delete tracks[boneId];
+  }
   const next = { ...animation, tracks };
   return validateEditedAnimation(next, animation, rig);
 }

@@ -19,6 +19,7 @@ import {
   keyframeTimesMatch,
   moveBonePropertyKeyframe,
   removeBonePropertyKeyframe,
+  removeBonePropertyKeyframes,
   setBonePropertyKeyframe,
 } from './keyframes.js';
 import {
@@ -233,8 +234,11 @@ export class AnimationEditorState {
     this.playback.pause();
     let next = this.working;
     try {
-      for (const key of this.selectedKeys)
-        next = removeBonePropertyKeyframe(next, this.rig, key.boneId, key.property, key.time * 1000);
+      next = removeBonePropertyKeyframes(
+        this.working,
+        this.rig,
+        this.selectedKeys.map((key) => ({ boneId: key.boneId, property: key.property, timeMs: key.time * 1000 })),
+      );
     } catch (error) {
       this.document.reportError(error);
       this.notify();
