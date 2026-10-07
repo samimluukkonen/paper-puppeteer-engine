@@ -22,6 +22,61 @@ const clip = (patch: Partial<AnimationClip> = {}): AnimationClip => ({
 });
 const file = (animation: AnimationClip) => ({ ...animation, version: 1 });
 
+test('subscriber failures still publish committed edits to every view and preserve history', () => {
+  const state = new AnimationEditorState(rig, [clip()]);
+  state.selectAnimation('move');
+  const failure = new Error('View failed');
+  const release = state.subscribe(() => {
+    throw failure;
+  });
+  const observed: number[] = [];
+  state.subscribe(() => observed.push(state.workingAnimation!.tracks.root![0]!.x!));
+  assert.throws(() => state.setBonePropertyKeyframe('root', 'x', 42, 0), /View failed/);
+  assert.deepEqual(observed, [42]);
+  assert.isTrue(state.dirty);
+  assert.equal(state.historyLength, 1);
+  release();
+  assert.isTrue(state.undo());
+  assert.deepEqual(observed, [42, 0]);
+});
+
+test('notifications snapshot subscriptions before callbacks change them', () => {
+  const state = new AnimationEditorState(rig, [clip()]);
+  state.selectAnimation('move');
+  const observed: string[] = [];
+  const late = () => {
+    observed.push('late');
+  };
+  let releaseSecond = () => {};
+  state.subscribe(() => {
+    observed.push('first');
+    releaseSecond();
+    state.subscribe(late);
+  });
+  releaseSecond = state.subscribe(() => {
+    observed.push('second');
+  });
+  state.setCurrentTime(0.5);
+  assert.deepEqual(observed, ['first', 'second']);
+  state.setCurrentTime(1);
+  assert.deepEqual(observed, ['first', 'second', 'first', 'late']);
+});
+
+test('multiple subscriber failures are aggregated after the remaining subscribers run', () => {
+  const state = new AnimationEditorState();
+  const reached = vi.fn();
+  state.subscribe(() => {
+    throw new Error('First view failed');
+  });
+  state.subscribe(() => {
+    throw new Error('Second view failed');
+  });
+  state.subscribe(reached);
+  assert.throws(() => state.setPreviewLoop(true), AggregateError);
+  assert.equal(reached.mock.calls.length, 1);
+  assert.isTrue(state.previewLoop);
+});
+
 test('export filenames preserve owned manifest paths and fall back to sanitized clip names', () => {
   const paths = { move: 'animations/combat%20idle.json?revision=2#clip' };
   const state = new AnimationEditorState(rig, [clip()], { animationPaths: paths });

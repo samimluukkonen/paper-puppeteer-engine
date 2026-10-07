@@ -325,7 +325,18 @@ export class AnimationEditorState {
   }
 
   private notify(): void {
-    for (const listener of this.listeners) listener();
+    const errors: unknown[] = [];
+    // Keep this notification stable when a subscriber adds or removes listeners.
+    // oxlint-disable-next-line unicorn/no-useless-spread -- Preserve the listener snapshot during callbacks.
+    for (const listener of [...this.listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Animation editor listeners failed.');
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
