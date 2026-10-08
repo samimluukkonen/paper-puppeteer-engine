@@ -86,3 +86,105 @@ test('a failed download retains unsaved changes and reports an actionable error'
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
   await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
 });
+
+test('clipboard and repeated downloads share canonical JSON across smooth and stepped playback', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      json: {
+        ...animationFileSchema.parse(await response.json()),
+        duration: 1000,
+        interpolation: 'linear',
+        playback: { mode: 'smooth' },
+        tracks: {
+          root: [
+            { time: 0, x: 0 },
+            { time: 500, y: 10 },
+            { time: 1000, x: 4 },
+          ],
+          torso: [
+            { time: 250, rotation: 0.1 },
+            { time: 750, rotation: 0.2 },
+          ],
+        },
+        events: [
+          { time: 1000, name: 'end' },
+          { time: 500, name: 'first', data: { z: [null, { b: true, a: 0.30000000000000004 }], a: 1 } },
+          { time: 500, name: 'second', data: null },
+        ],
+      },
+    });
+  });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await editRoot(page, '0.30000000000000004');
+  for (const mode of ['smooth', 'stepped'] as const) {
+    await page.locator('#animation-mode').selectOption(mode);
+    if (mode === 'stepped') {
+      await page.locator('#animation-fps').fill('12.5');
+      await page.locator('#animation-fps').press('Tab');
+    }
+    await page.getByRole('button', { name: 'Copy Animation JSON', exact: true }).click();
+    await expect(page.locator('#animation-export-feedback')).toHaveText('Animation JSON copied.');
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toMatch(/^\{\n  "version": 1,/);
+    expect(copied.endsWith('\n')).toBe(true);
+    const animation = animationFileSchema.parse(JSON.parse(copied));
+    expect(Object.keys(JSON.parse(copied) as object)).toEqual([
+      'version',
+      'name',
+      'duration',
+      'loop',
+      'interpolation',
+      'playback',
+      'tracks',
+      'events',
+    ]);
+    expect(Object.keys(animation.tracks)).toEqual(['root', 'torso']);
+    expect(animation.tracks.root?.[0]?.x).toBe(0.3);
+    expect(animation.interpolation).toBe('linear');
+    expect(animation.playback).toEqual(mode === 'smooth' ? { mode: 'smooth' } : { mode: 'stepped', fps: 12.5 });
+    expect(animation.events).toEqual([
+      { time: 500, name: 'first', data: { a: 1, z: [null, { a: 0.30000000000000004, b: true }] } },
+      { time: 500, name: 'second', data: null },
+      { time: 1000, name: 'end' },
+    ]);
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const waiting = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Download animation.json', exact: true }).click();
+      const download = await waiting;
+      expect(download.suggestedFilename()).toBe('idle.json');
+      const path = await download.path();
+      if (!path) throw new Error('Animation download has no local file.');
+      expect(await readFile(path, 'utf8')).toBe(copied);
+    }
+    await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  }
+});
+
+test('clipboard failure offers download and console alternatives without saving edits', async ({ page }) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-selection')).toHaveValue('idle');
+  await editRoot(page, '17');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+  });
+  await page.locator('#animation-copy-json').click();
+  await expect(page.locator('#animation-export-feedback')).toContainText('Clipboard API is unavailable');
+  await expect(page.locator('#animation-export-feedback')).toContainText(
+    'Download animation.json or Log Animation JSON',
+  );
+  await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  const waiting = page.waitForEvent('console', {
+    predicate: (message) => message.type() === 'log' && message.text().startsWith('{\n'),
+  });
+  await page.locator('#animation-log-json').click();
+  const logged = (await waiting).text();
+  expect(animationFileSchema.parse(JSON.parse(logged)).tracks.root?.[0]?.x).toBe(17);
+  await expect(page.locator('#animation-export-feedback')).toHaveText('Animation JSON logged to the console.');
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});

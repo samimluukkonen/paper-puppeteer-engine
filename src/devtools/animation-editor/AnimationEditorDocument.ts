@@ -3,13 +3,13 @@ import {
   ANIMATION_FORMAT_VERSION,
   AnimationValidationError,
   inspectAnimationDefinition,
-  parseAnimationClip,
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { serializeAnimation, type AnimationExportResult } from './animationSerialization.js';
 
 /** Same external file fields; event data remains unknown to callers and is validated as JSON before ownership. */
 export type ReadonlyAnimation = ReadonlyEditorData<AnimationClip> & {
@@ -163,17 +163,24 @@ export class AnimationEditorDocument {
   }
 
   /** Export committed authored data only; drafts, selection, history and preview preferences stay local. */
-  exportJson(): string {
-    if (!this.working || !this.rig) throw new Error('No animation is selected.');
-    const animation = parseAnimationClip(this.working, this.rig);
-    return `${JSON.stringify({ version: ANIMATION_FORMAT_VERSION, ...animation }, null, 2)}\n`;
+  exportAnimation(): AnimationExportResult {
+    if (!this.working || !this.rig)
+      return { success: false, issues: [{ severity: 'error', message: 'No animation is selected.' }] };
+    return serializeAnimation(this.working, this.rig);
   }
 
-  markSaved(): void {
+  exportJson(): string {
+    if (!this.working || !this.rig) throw new Error('No animation is selected.');
+    const result = this.exportAnimation();
+    if (!result.success) throw new AnimationValidationError(result.issues);
+    return result.json;
+  }
+
+  markSaved(snapshot: ReadonlyAnimation | null = this.working): void {
     const entry = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
-    if (entry) entry.saved = this.working;
-    this.saved = this.working;
-    this.cachedDirty = false;
+    if (entry) entry.saved = snapshot;
+    this.saved = snapshot;
+    this.cachedDirty = undefined;
     this.issues = [];
   }
 

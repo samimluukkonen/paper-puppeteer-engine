@@ -20,6 +20,8 @@ export class TimelineSessionController {
   private readonly undo: HTMLButtonElement;
   private readonly redo: HTMLButtonElement;
   private readonly download: HTMLButtonElement;
+  private readonly copyJson: HTMLButtonElement;
+  private readonly logJson: HTMLButtonElement;
   private readonly discard: HTMLButtonElement;
   private readonly exportFeedback: HTMLElement;
   private readonly deleteKey: HTMLButtonElement;
@@ -32,6 +34,9 @@ export class TimelineSessionController {
   private externalError = '';
   private authoredFPS = '';
   private animation: AnimationEditorState['workingAnimation'] = null;
+  private exportSequence = 0;
+  private committedExportSequence = 0;
+  private sessionGeneration = 0;
 
   constructor(
     private readonly app: HTMLElement,
@@ -52,6 +57,8 @@ export class TimelineSessionController {
     this.undo = this.element<HTMLButtonElement>('#animation-undo');
     this.redo = this.element<HTMLButtonElement>('#animation-redo');
     this.download = this.element<HTMLButtonElement>('#animation-download');
+    this.copyJson = this.element<HTMLButtonElement>('#animation-copy-json');
+    this.logJson = this.element<HTMLButtonElement>('#animation-log-json');
     this.discard = this.element<HTMLButtonElement>('#animation-discard');
     this.exportFeedback = this.element('#animation-export-feedback');
     this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
@@ -73,7 +80,10 @@ export class TimelineSessionController {
       'change',
       () => {
         this.input.endScrub();
-        if (this.state.selectAnimation(this.selection.value || null)) setText(this.exportFeedback, '');
+        if (this.state.selectAnimation(this.selection.value || null)) {
+          ++this.sessionGeneration;
+          setText(this.exportFeedback, '');
+        }
       },
       options,
     );
@@ -103,15 +113,21 @@ export class TimelineSessionController {
     this.download.addEventListener(
       'click',
       () => {
-        try {
-          const json = this.state.exportJson();
-          const filename = this.state.selectedAnimationFilename!;
-          downloadJson(json, filename);
-          this.state.markSaved();
-          setText(this.exportFeedback, `Animation JSON download started: ${filename}`);
-        } catch (error) {
-          setText(this.exportFeedback, `Could not download animation: ${String(error)}`);
-        }
+        void this.exportTo('download');
+      },
+      options,
+    );
+    this.copyJson.addEventListener(
+      'click',
+      () => {
+        void this.exportTo('clipboard');
+      },
+      options,
+    );
+    this.logJson.addEventListener(
+      'click',
+      () => {
+        void this.exportTo('console');
       },
       options,
     );
@@ -120,8 +136,10 @@ export class TimelineSessionController {
       () => {
         if (!this.state.dirty || !window.confirm('Discard unsaved animation changes?')) return;
         this.input.endScrub();
-        if (this.state.selectAnimation(this.state.selectedAnimationId, { discardChanges: true }))
+        if (this.state.selectAnimation(this.state.selectedAnimationId, { discardChanges: true })) {
+          ++this.sessionGeneration;
           setText(this.exportFeedback, 'Changes discarded. The last saved animation was restored.');
+        }
       },
       options,
     );
@@ -137,6 +155,55 @@ export class TimelineSessionController {
     return this.getState();
   }
 
+  private async exportTo(destination: 'download' | 'clipboard' | 'console'): Promise<void> {
+    const state = this.state;
+    const id = state.selectedAnimationId;
+    const generation = this.sessionGeneration;
+    const sequence = ++this.exportSequence;
+    const isCurrent = (): boolean =>
+      !this.abort.signal.aborted &&
+      this.state === state &&
+      state.selectedAnimationId === id &&
+      generation === this.sessionGeneration;
+    try {
+      const result = state.exportAnimation();
+      if (!result.success)
+        throw new Error(result.issues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n'));
+      const snapshot = state.workingAnimation;
+      const filename = state.selectedAnimationFilename ?? 'animation.json';
+      let message: string;
+      if (destination === 'clipboard') {
+        if (!navigator.clipboard?.writeText)
+          throw new Error('Clipboard API is unavailable. Use Download animation.json or Log Animation JSON.');
+        try {
+          await navigator.clipboard.writeText(result.json);
+        } catch (error) {
+          throw new Error('Clipboard access failed. Use Download animation.json or Log Animation JSON.', {
+            cause: error,
+          });
+        }
+        message = 'Animation JSON copied.';
+      } else if (destination === 'download') {
+        downloadJson(result.json, filename);
+        message = `Animation JSON download started: ${filename}`;
+      } else {
+        console.log(result.json);
+        message = 'Animation JSON logged to the console.';
+      }
+      if (!isCurrent() || sequence < this.committedExportSequence) return;
+      this.committedExportSequence = sequence;
+      // Clipboard writes can finish after further edits: save only the exported snapshot.
+      state.markSaved(snapshot);
+      if (sequence === this.exportSequence) setText(this.exportFeedback, message);
+    } catch (error) {
+      if (isCurrent() && sequence === this.exportSequence)
+        setText(
+          this.exportFeedback,
+          `Could not export animation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
+  }
+
   private element<T extends HTMLElement = HTMLElement>(selector: string): T {
     const element = this.app.querySelector<T>(selector);
     if (!element) throw new Error(`Missing animation editor element ${selector}.`);
@@ -144,6 +211,7 @@ export class TimelineSessionController {
   }
 
   bind(characterId?: string): void {
+    ++this.sessionGeneration;
     const state = this.state;
     this.externalError = '';
     setText(this.exportFeedback, '');
@@ -192,6 +260,8 @@ export class TimelineSessionController {
     if (this.undo.disabled !== !state.canUndo) this.undo.disabled = !state.canUndo;
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
     if (this.download.disabled !== !animation) this.download.disabled = !animation;
+    if (this.copyJson.disabled !== !animation) this.copyJson.disabled = !animation;
+    if (this.logJson.disabled !== !animation) this.logJson.disabled = !animation;
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = state.selectedKeys.length === 0;
     const previousDisabled = !state.getAdjacentKeyframe(-1);

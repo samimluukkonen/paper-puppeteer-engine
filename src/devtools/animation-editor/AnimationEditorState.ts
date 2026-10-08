@@ -28,6 +28,7 @@ import {
   type AnimationEventRef,
   type EventTimelineTrack,
 } from './animationEvents.js';
+import type { AnimationExportResult } from './animationSerialization.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
 import { collectEditorPlaybackEvents, getEditorEventClip } from './editorPlaybackEvents.js';
 import {
@@ -63,6 +64,7 @@ export type { AnimationEditorStateOptions, ReadonlyAnimation } from './Animation
 
 export type { EventDrag } from './AnimationEditorEventCommands.js';
 export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
+export type { AnimationExportResult } from './animationSerialization.js';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
@@ -783,12 +785,16 @@ export class AnimationEditorState {
   }
 
   /** Export committed authored data only; drafts, selection, history and preview preferences stay local. */
+  exportAnimation(): AnimationExportResult {
+    return this.document.exportAnimation();
+  }
+
   exportJson(): string {
     return this.document.exportJson();
   }
 
-  markSaved(): void {
-    this.document.markSaved();
+  markSaved(snapshot: ReadonlyAnimation | null = this.workingAnimation): void {
+    this.document.markSaved(snapshot);
     this.notify();
   }
 
