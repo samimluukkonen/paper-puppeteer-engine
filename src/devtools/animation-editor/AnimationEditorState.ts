@@ -18,16 +18,13 @@ import {
   type AnimationEditorStateOptions,
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
+import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import {
-  addAnimationEvent,
   buildEventTimelineTrack,
   findAnimationEvent,
-  getAnimationEventReferences,
-  removeAnimationEvent,
-  updateAnimationEvent,
   type AnimationEventRef,
   type EventTimelineTrack,
 } from './animationEvents.js';
@@ -51,13 +48,8 @@ import {
   type KeyframeMarquee,
   type KeyframeSelectionModifiers,
 } from './keyframeSelection.js';
-import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
-import {
-  TimelineClipboard,
-  copyEventSelection,
-  pasteEventClipboard,
-  type EventClipboard,
-} from './TimelineClipboard.js';
+import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, type KeyframeSnapMode } from './timeline.js';
+import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
@@ -69,14 +61,8 @@ export const DEFAULT_AUTHORED_FPS = DEFAULT_KEYFRAME_FPS;
 
 export type { AnimationEditorStateOptions, ReadonlyAnimation } from './AnimationEditorDocument.js';
 
+export type { EventDrag } from './AnimationEditorEventCommands.js';
 export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
-
-export interface EventDrag {
-  readonly ref: AnimationEventRef;
-  readonly originalTime: Seconds;
-  readonly previewTime: Seconds;
-  readonly previewEvent: DeepReadonly<AnimationEvent>;
-}
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
@@ -87,7 +73,7 @@ export class AnimationEditorState {
   private readonly playback = new AnimationEditorPlayback(() => this.working?.duration ?? 0);
   private readonly selection: AnimationEditorSelection;
   private readonly keyframes: AnimationEditorKeyframeCommands;
-  private dragEvent: EventDrag | null = null;
+  private readonly events: AnimationEditorEventCommands;
 
   constructor(
     readonly rig?: Rig,
@@ -108,6 +94,21 @@ export class AnimationEditorState {
         notify: () => this.notify(),
       },
       this.clipboard,
+    );
+    this.events = new AnimationEditorEventCommands(
+      this.document,
+      this.selection,
+      this.playback,
+      {
+        select: (ref) => this.selectAnimationEvent(ref),
+        cancelTimelineDrag: () => this.cancelTimelineDrag(),
+        updateTime: (time) => this.updateTime(time),
+        updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
+        install: (animation) => this.installWorkingAnimation(animation),
+        notify: () => this.notify(),
+      },
+      this.clipboard,
+      this.keyframes,
     );
   }
 
@@ -131,8 +132,7 @@ export class AnimationEditorState {
     return this.selection.event;
   }
   get selectedEventData() {
-    if (this.dragEvent?.ref === this.selectedEvent) return this.dragEvent.previewEvent;
-    return this.selectedEvent ? findAnimationEvent(this.working, this.selectedEvent) : undefined;
+    return this.events.selectedEventData;
   }
   get eventTimelineTrack(): EventTimelineTrack {
     return buildEventTimelineTrack(this.working);
@@ -159,95 +159,35 @@ export class AnimationEditorState {
     const event = this.selection.clearEvent();
     if (keys || event) this.notify();
   }
-  /** Authored event fields use the existing strict file schema and immutable mutation API. */
   addAnimationEvent(event: DeepReadonly<AnimationEvent>): boolean {
-    return this.editEvents((animation, rig) => addAnimationEvent(animation, rig, event));
+    return this.events.addAnimationEvent(event);
   }
   updateAnimationEvent(ref: AnimationEventRef, event: DeepReadonly<AnimationEvent>): boolean {
-    return this.editEvents((animation, rig) => updateAnimationEvent(animation, rig, ref, event));
+    return this.events.updateAnimationEvent(ref, event);
   }
   removeAnimationEvent(ref: AnimationEventRef): boolean {
-    return this.editEvents((animation, rig) => removeAnimationEvent(animation, rig, ref));
+    return this.events.removeAnimationEvent(ref);
   }
-  private editEvents(edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation): boolean {
-    this.cancelTimelineDrag();
-    if (!this.working || !this.rig) return false;
-    let next: ReadonlyAnimation;
-    try {
-      next = edit(this.working, this.rig);
-    } catch (error) {
-      this.document.reportError(error);
-      this.notify();
-      return false;
-    }
-    this.playback.pause();
-    this.playback.endScrub();
-    return this.installWorkingAnimation(next);
-  }
-  /** The required name gets a neutral default; the UI immediately focuses it for editing. */
   createAnimationEvent(): boolean {
-    this.cancelTimelineDrag();
-    const previous = new Set(getAnimationEventReferences(this.working));
-    if (!this.addAnimationEvent({ time: this.playback.currentTimeMilliseconds, name: 'event' })) return false;
-    const ref = getAnimationEventReferences(this.working).find((entry) => !previous.has(entry));
-    return ref ? this.selectAnimationEvent(ref) : false;
+    return this.events.createAnimationEvent();
   }
   deleteSelectedEvent(): boolean {
-    return this.selectedEvent ? this.removeAnimationEvent(this.selectedEvent) : false;
+    return this.events.deleteSelectedEvent();
   }
   get timelineClipboard() {
     return this.clipboard.content;
   }
   get eventClipboard(): EventClipboard | null {
-    return this.clipboard.content?.kind === 'event' ? this.clipboard.content.data : null;
+    return this.events.eventClipboard;
   }
   copySelectedEvent(): boolean {
-    if (!this.working || !this.selectedEvent) return false;
-    const data = copyEventSelection(this.working, this.selectedEvent);
-    if (!data) return false;
-    this.clipboard.content = Object.freeze({ kind: 'event', data });
-    this.notify();
-    return true;
+    return this.events.copySelectedEvent();
   }
   pasteEvent(): boolean {
-    const time = this.playback.currentTimeMilliseconds;
-    return this.eventClipboard ? this.pasteEventAt(this.eventClipboard, time) : false;
+    return this.events.pasteEvent();
   }
   duplicateSelectedEvent(): boolean {
-    if (!this.working || !this.selectedEvent) return false;
-    const data = copyEventSelection(this.working, this.selectedEvent);
-    if (!data) return false;
-    const playback = this.working.playback;
-    const step =
-      playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0
-        ? 1 / playback.fps
-        : this.keyframeSnapMode === 'frame'
-          ? 1 / this.keyframeFPS
-          : 0.01;
-    const source = data.event.time;
-    const duration = this.working.duration;
-    // At the endpoint step backwards; otherwise clamp forwards to a distinct, valid time.
-    const target =
-      source < duration
-        ? Math.min(duration, source + toMilliseconds(step))
-        : Math.max(0, source - toMilliseconds(step));
-    if (target === source) return false;
-    return this.pasteEventAt(data, target);
-  }
-  private pasteEventAt(data: EventClipboard, time: Milliseconds): boolean {
-    if (!this.working || !this.rig) return false;
-    let pasted: ReturnType<typeof pasteEventClipboard>;
-    try {
-      pasted = pasteEventClipboard(this.working, this.rig, data, time);
-    } catch (error) {
-      this.document.reportError(error);
-      this.notify();
-      return false;
-    }
-    if (!this.editEvents(() => pasted.animation)) return false;
-    this.selection.selectEvent(pasted.ref);
-    this.notify();
-    return true;
+    return this.events.duplicateSelectedEvent();
   }
   copyTimelineSelection(): boolean {
     return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
@@ -258,92 +198,29 @@ export class AnimationEditorState {
   duplicateTimelineSelection(): boolean {
     return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
   }
-  /** Empty text removes optional data; explicit JSON null remains an authored payload. */
   setSelectedEventDataJson(text: string): boolean {
-    this.cancelTimelineDrag();
-    const event = this.selectedEventData;
-    const ref = this.selectedEvent;
-    if (!event || !ref) return false;
-    let next: DeepReadonly<AnimationEvent>;
-    try {
-      next = text.trim() ? { ...event, data: JSON.parse(text) as unknown } : { time: event.time, name: event.name };
-    } catch {
-      this.document.reportIssues([
-        { severity: 'error', path: 'events.data', message: 'Event data must be valid JSON.' },
-      ]);
-      this.notify();
-      return false;
-    }
-    return this.updateAnimationEvent(ref, next);
+    return this.events.setSelectedEventDataJson(text);
   }
   get eventDrag(): EventDrag | null {
-    return this.dragEvent;
+    return this.events.eventDrag;
   }
   beginEventDrag(ref: AnimationEventRef): boolean {
-    if (!this.selectAnimationEvent(ref)) return false;
-    const event = this.selectedEventData!;
-    this.dragEvent = Object.freeze({
-      ref,
-      originalTime: toSeconds(event.time),
-      previewTime: toSeconds(event.time),
-      previewEvent: event,
-    });
-    this.notify();
-    return true;
+    return this.events.beginEventDrag(ref);
   }
   previewEventDrag(time: Seconds, disableSnapping = false): boolean {
-    const drag = this.dragEvent;
-    if (!drag || !Number.isFinite(time)) return false;
-    const previewTime = snapKeyframeTime(
-      time,
-      this.duration,
-      disableSnapping ? 'none' : this.keyframeSnapMode,
-      this.keyframeFPS,
-    );
-    this.dragEvent = Object.freeze({
-      ...drag,
-      previewTime,
-      previewEvent: Object.freeze({ ...drag.previewEvent, time: toMilliseconds(previewTime) }),
-    });
-    this.updateTime(previewTime);
-    this.notify();
-    return true;
+    return this.events.previewEventDrag(time, disableSnapping);
   }
   commitEventDrag(): boolean {
-    const drag = this.dragEvent;
-    if (!drag) return false;
-    this.dragEvent = null;
-    return this.moveSelectedEvent(drag.previewTime);
+    return this.events.commitEventDrag();
   }
   cancelEventDrag(): boolean {
-    const drag = this.dragEvent;
-    if (!drag) return false;
-    this.dragEvent = null;
-    this.updateTime(drag.originalTime);
-    this.notify();
-    return true;
+    return this.events.cancelEventDrag();
   }
-  /** Explicit inspector time edits clamp without snapping; gestures apply the shared snap policy first. */
   moveSelectedEvent(time: Seconds): boolean {
-    this.cancelTimelineDrag();
-    const event = this.selectedEventData;
-    const ref = this.selectedEvent;
-    if (!event || !ref) return false;
-    if (!Number.isFinite(time)) return this.updateAnimationEvent(ref, { ...event, time: toMilliseconds(time) });
-    const target = snapKeyframeTime(time, this.duration, 'none');
-    // Preserve exact fractional milliseconds when displaying/committing an
-    // unchanged seconds value; a unit round trip can otherwise change one bit.
-    const authoredTime = target === toSeconds(event.time) ? event.time : toMilliseconds(target);
-    if (!this.updateAnimationEvent(ref, { ...event, time: authoredTime })) return false;
-    this.updateTimeMilliseconds(authoredTime);
-    this.notify();
-    return true;
+    return this.events.moveSelectedEvent(time);
   }
   nudgeSelectedEvent(direction: -1 | 1, large = false): boolean {
-    if (!this.selectedEventData || this.eventDrag) return false;
-    const step = this.keyframeSnapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
-    const time = toSeconds(this.selectedEventData.time) + direction * step * (large ? 10 : 1);
-    return this.moveSelectedEvent(snapKeyframeTime(time, this.duration, this.keyframeSnapMode, this.keyframeFPS));
+    return this.events.nudgeSelectedEvent(direction, large);
   }
   private cancelTimelineDrag(): boolean {
     const event = this.cancelEventDrag();
