@@ -18,6 +18,8 @@ Choose **Joint** to drag a joint and change its local position; descendants foll
 
 Bone depth edits change preview draw order; enter a lower value to move a piece back or a higher value to move it forward. Slot depth is a global numeric draw depth. **Dim unselected artwork** helps expose overlapping parts. **IK Preview** pins the current chain endpoints and runs the existing solver as the rig changes; its temporary pose does not enter the working rig. Visibility controls show artwork, bones, names, lengths, slots, origins, and IK chains. Left-button drag on the canvas background moves the whole character preview, including its pinned IK targets, without changing rig values or undo history. A background click clears the selection; a background drag keeps it. Mouse wheel zoom and middle mouse pan affect only the camera.
 
+In **Sprite** mode, click and drag artwork directly to select and move it. Selecting a bone also lets you drag artwork in its attached slots; the corresponding slot becomes selected so its artwork offsets appear in the inspector. Selected artwork takes priority over overlapping bone lines and other artwork. Without a selection, overlapping artwork is picked in draw order. Square slot markers still move the slot itself.
+
 Production workflow:
 
 1. Start the rig editor and load the sample character. Select bones or slots in the hierarchy or canvas.

@@ -10,7 +10,7 @@ export function mountEditorMarkup(app: HTMLElement): void {
     <section class="editor-center"><div id="editor-stage" aria-label="Rig canvas"></div><details class="shortcut-help"><summary>Controls and shortcuts</summary><div class="shortcut-table-wrap"><table><thead><tr><th scope="col">Action</th><th scope="col">Control</th></tr></thead><tbody>
       <tr><td>Select a bone or slot</td><td>Click the hierarchy or canvas; <kbd>Alt</kbd>+click prefers slots</td></tr>
       <tr><td>Move a joint or slot</td><td>Drag its canvas marker</td></tr>
-      <tr><td>Edit artwork offset</td><td>Choose Sprite mode, then drag selected artwork</td></tr>
+      <tr><td>Edit artwork offset</td><td>Choose Sprite mode, then click and drag artwork; selecting its bone also works</td></tr>
       <tr><td>Nudge a joint</td><td>Arrow keys; hold <kbd>Shift</kbd> for larger steps</td></tr>
       <tr><td>Rotate a joint</td><td><kbd>,</kbd> / <kbd>.</kbd>; hold <kbd>Shift</kbd> for larger steps</td></tr>
       <tr><td>Undo / redo</td><td><kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> / <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td></tr>

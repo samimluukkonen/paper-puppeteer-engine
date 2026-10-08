@@ -34,6 +34,60 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
 });
 
+for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
+  for (const selection of ['none', 'head', '◇ headVisual']) {
+    test(`Sprite mode drags ${character} artwork with ${selection} selected`, async ({ page }) => {
+      if (character !== 'demo-puppet') {
+        await page.goto(`rig-editor/?character=${character}`);
+        await expect(page.locator('#validation')).toHaveText('Validation: OK');
+      }
+      const original = (await (await page.request.get(`characters/${character}/rig.json`)).json()) as RigJsonDefinition;
+      if (selection !== 'none') await page.getByRole('treeitem', { name: selection, exact: true }).click();
+      await page.locator('#edit-mode').selectOption('sprite');
+      const box = await page.locator('#editor-stage canvas').boundingBox();
+      if (!box) throw new Error('Missing editor canvas');
+      // With a selection, start on the artwork where its joint marker overlaps it.
+      const jointY = character === 'demo-puppet' ? 313 : 284.5;
+      const start = {
+        x: box.x + (380 / 760) * box.width,
+        y: box.y + ((jointY - (selection === 'none' ? 15 : 0)) / 640) * box.height,
+      };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await expect(page.locator('#inspector h3')).toHaveText('Slot: headVisual');
+      // Selecting artwork can reflow the session header and shift the canvas vertically.
+      const selectedBox = await page.locator('#editor-stage canvas').boundingBox();
+      if (!selectedBox) throw new Error('Missing editor canvas');
+      await page.mouse.move(
+        selectedBox.x + ((380 + 24) / 760) * selectedBox.width,
+        selectedBox.y + ((jointY - (selection === 'none' ? 15 : 0) + 12) / 640) * selectedBox.height,
+        { steps: 4 },
+      );
+      await page.mouse.up();
+      await expect(page.locator('#inspector h3')).toHaveText('Slot: headVisual');
+      const offset = (axis: string) => page.locator(`#inspector input[data-scope="attachment"][data-field="${axis}"]`);
+      // Mouse events use whole CSS pixels, while the canvas can have fractional CSS dimensions.
+      await expect.poll(async () => Math.abs(Number(await offset('x').inputValue()) - 24)).toBeLessThan(1);
+      await expect.poll(async () => Math.abs(Number(await offset('y').inputValue()) - 12)).toBeLessThan(1);
+      await expect(page.locator('#inspector input[data-scope="slot"][data-field="x"]')).toHaveValue('0');
+      await expect(page.locator('#inspector input[data-scope="slot"][data-field="y"]')).toHaveValue('0');
+      await page.locator('#undo').click();
+      await expect(offset('x')).toHaveValue('0');
+      await expect(offset('y')).toHaveValue('0');
+      await expect(page.locator('#undo')).toBeDisabled();
+      await page.locator('#redo').click();
+      const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
+      await page.locator('#log-json').click();
+      const exported = JSON.parse((await logged).text()) as RigJsonDefinition;
+      expect(exported.bones).toEqual(original.bones);
+      expect(exported.slots).toEqual(original.slots);
+      const attachment = exported.attachments?.find((entry) => entry.id === 'headDefault');
+      expect(Math.abs(attachment!.x! - 24)).toBeLessThan(1);
+      expect(Math.abs(attachment!.y! - 12)).toBeLessThan(1);
+    });
+  }
+}
+
 test('numeric inputs retain precision and clearing length removes the override', async ({ page }) => {
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   await field(page, 'x').fill('0.123456789');

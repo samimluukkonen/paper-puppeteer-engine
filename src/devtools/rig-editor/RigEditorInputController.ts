@@ -5,6 +5,7 @@ import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigEditorOverlay } from './RigEditorOverlay.js';
+import type { RigEditorSelection } from './RigEditorState.js';
 
 /** Owns canvas gestures, keyboard commands, and their activation lifetime. */
 export class RigEditorInputController {
@@ -105,7 +106,10 @@ export class RigEditorInputController {
   }
 
   private imageContains(pointer: Phaser.Input.Pointer, image: Phaser.GameObjects.Image | undefined): boolean {
-    if (!image) return false;
+    if (!image || image.visible === false || !this.state.visibility.artwork) return false;
+    for (let parent = image.parentContainer; parent; parent = parent.parentContainer) {
+      if (parent.visible === false) return false;
+    }
     const point = worldToLocal(this.world(pointer), image.getWorldTransformMatrix());
     return (
       !!point &&
@@ -114,6 +118,39 @@ export class RigEditorInputController {
       point.y >= -image.height * image.originY &&
       point.y <= image.height * (1 - image.originY)
     );
+  }
+
+  private pickArtwork(pointer: Phaser.Input.Pointer, selected: RigEditorSelection): RigEditorSelection {
+    const candidates: { selection: NonNullable<RigEditorSelection>; image: Phaser.GameObjects.Image }[] = [];
+    for (const bone of this.state.rig.bones) {
+      const image = this.puppet.getBone(bone.id).sprite;
+      if (bone.sprite && image && this.imageContains(pointer, image))
+        candidates.push({ selection: { type: 'bone', id: bone.id }, image });
+    }
+    for (const slot of this.state.rig.slots) {
+      const image = this.puppet.getSlotImage(slot.id);
+      if (image && this.imageContains(pointer, image))
+        candidates.push({ selection: { type: 'slot', id: slot.id }, image });
+    }
+    // Keep selected artwork draggable where other artwork or bone lines overlap it.
+    const exact = candidates.find(({ selection }) => selection.type === selected?.type && selection.id === selected.id);
+    if (exact) return exact.selection;
+    const preferred = candidates.filter(
+      ({ selection }) =>
+        selected?.type === 'bone' && selection.type === 'slot' && this.state.getSlot(selection.id).bone === selected.id,
+    );
+    const hits = preferred.length ? preferred : candidates;
+    // Phaser's container indices describe the actual draw order, including slot depth overrides.
+    hits.sort((a, b) => {
+      const aIndices = a.image.getIndexList();
+      const bIndices = b.image.getIndexList();
+      for (let i = 0; i < Math.max(aIndices.length, bIndices.length); i++) {
+        const difference = (bIndices[i] ?? -1) - (aIndices[i] ?? -1);
+        if (difference) return difference;
+      }
+      return 0;
+    });
+    return hits[0]?.selection ?? null;
   }
 
   private keyDown = (event: KeyboardEvent): void => {
@@ -183,29 +220,26 @@ export class RigEditorInputController {
     if (this.panning || !pointer.leftButtonDown()) return;
     const selected = this.state.selection;
     const picked = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false);
-    const target = picked ?? selected;
-    const image = target
-      ? target.type === 'bone'
-        ? this.puppet.getBone(target.id).sprite
-        : this.puppet.getSlotImage(target.id)
-      : undefined;
-    if (!picked && !(this.state.editMode === 'sprite' && this.imageContains(pointer, image))) {
+    const artwork =
+      this.state.editMode === 'sprite' && picked?.type !== 'slot' ? this.pickArtwork(pointer, selected) : null;
+    const target = artwork ?? picked ?? selected;
+    if (!picked && !artwork) {
       const start = this.characterPoint(pointer);
       if (start) this.characterDrag = { start, value: { x: this.puppet.container.x, y: this.puppet.container.y } };
       return;
     }
     if (!target) return;
-    if (picked) this.state.selection = picked;
+    if (artwork || picked) this.state.selection = target;
     const parent =
       target.type === 'slot'
         ? this.puppet.getBone(this.state.getSlot(target.id).bone).container
         : this.puppet.getBone(target.id).container.parentContainer;
     const local = this.local(pointer, parent);
     if (!local) return;
-    if (target.type === 'slot' && this.state.editMode === 'sprite' && !picked && this.imageContains(pointer, image)) {
+    if (target.type === 'slot' && artwork) {
       const attachmentId = this.puppet.getAttachment(target.id);
       const attachment = attachmentId ? this.state.getAttachment(attachmentId) : undefined;
-      const mount = image?.parentContainer;
+      const mount = this.puppet.getSlotImage(target.id)?.parentContainer;
       const inMount = mount ? this.local(pointer, mount) : undefined;
       if (attachment && inMount)
         this.drag = {
