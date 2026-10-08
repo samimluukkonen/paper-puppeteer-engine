@@ -69,9 +69,17 @@ a {
   font-size: 13px;
   margin: 0;
 }
-#animation-status {
+#animation-status,
+#animation-import-feedback {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+#animation-import-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+  resize: vertical;
 }
 #animation-stage {
   width: 100%;

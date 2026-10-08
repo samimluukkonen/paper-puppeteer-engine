@@ -31,25 +31,36 @@ const scene = new AnimationEditorScene(
     timeline.bind(state, id);
     inspector.bind(state);
     let recoveryAnimation: string | null | undefined;
+    let recoverySource: ReadonlyAnimation | null | undefined;
+    let recoveryImportRevision = state.importRevision;
     const synchronizeRecovery = (): void => {
       const animation = state.selectedAnimationId;
-      if (animation !== recoveryAnimation) {
+      const source = state.sourceAnimation;
+      const imported = state.importRevision !== recoveryImportRevision;
+      recoveryImportRevision = state.importRevision;
+      if (animation !== recoveryAnimation || source !== recoverySource) {
+        // A same-name import establishes a new baseline and clears this session's previous draft.
+        if (animation === recoveryAnimation) recovery.update();
         recoveryAnimation = animation;
+        recoverySource = source;
         if (animation === null) recovery.unbind();
         else
-          recovery.bind({
-            key: JSON.stringify([window.location.pathname, id, animation]),
-            source: draftSource({ rig: state.rig, animation: state.sourceAnimation }),
-            label: `animation "${animation}"`,
-            snapshot: () => state.workingAnimation,
-            dirty: () => state.dirty,
-            data: (snapshot) => snapshot,
-            validate: (data) => {
-              const inspected = inspectAnimationDefinition(data, state.rig);
-              return inspected.data?.name === animation;
+          recovery.bind(
+            {
+              key: JSON.stringify([window.location.pathname, id, animation]),
+              source: draftSource({ rig: state.rig, animation: state.sourceAnimation }),
+              label: `animation "${animation}"`,
+              snapshot: () => state.workingAnimation,
+              dirty: () => state.dirty,
+              data: (snapshot) => snapshot,
+              validate: (data) => {
+                const inspected = inspectAnimationDefinition(data, state.rig);
+                return inspected.data?.name === animation;
+              },
+              restore: (data) => state.replaceWorkingAnimation(data),
             },
-            restore: (data) => state.replaceWorkingAnimation(data),
-          });
+            { recover: !imported },
+          );
       }
       recovery.update();
     };

@@ -169,6 +169,10 @@ export class AnimationEditorKeyframeCommands {
     this.actions.notify();
     return true;
   }
+  /** A new document session discards the gesture without restoring old navigation or notifying midway. */
+  resetSession(): void {
+    this.drag = null;
+  }
   /** Snap the anchor once, then constrain a single delta in authored milliseconds. */
   private movementDelta(
     keys: readonly KeyframeSelection[],

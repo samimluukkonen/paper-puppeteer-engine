@@ -220,6 +220,10 @@ export class AnimationEditorEventCommands {
     this.actions.notify();
     return true;
   }
+  /** A new document session discards the gesture without restoring old navigation or notifying midway. */
+  resetSession(): void {
+    this.dragEvent = null;
+  }
   /** Explicit inspector time edits clamp without snapping; gestures apply the shared snap policy first. */
   moveSelectedEvent(time: Seconds): boolean {
     this.actions.cancelTimelineDrag();

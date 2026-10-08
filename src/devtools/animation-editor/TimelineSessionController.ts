@@ -24,6 +24,11 @@ export class TimelineSessionController {
   private readonly logJson: HTMLButtonElement;
   private readonly discard: HTMLButtonElement;
   private readonly exportFeedback: HTMLElement;
+  private readonly importPanel: HTMLElement;
+  private readonly importText: HTMLTextAreaElement;
+  private readonly importFile: HTMLInputElement;
+  private readonly importFeedback: HTMLElement;
+  private readonly reloadExport: HTMLButtonElement;
   private readonly deleteKey: HTMLButtonElement;
   private readonly copyKeys: HTMLButtonElement;
   private readonly pasteKeys: HTMLButtonElement;
@@ -37,6 +42,8 @@ export class TimelineSessionController {
   private exportSequence = 0;
   private committedExportSequence = 0;
   private sessionGeneration = 0;
+  private importSequence = 0;
+  private animationIdsKey = '';
 
   constructor(
     private readonly app: HTMLElement,
@@ -61,6 +68,11 @@ export class TimelineSessionController {
     this.logJson = this.element<HTMLButtonElement>('#animation-log-json');
     this.discard = this.element<HTMLButtonElement>('#animation-discard');
     this.exportFeedback = this.element('#animation-export-feedback');
+    this.importPanel = this.element('#animation-import-panel');
+    this.importText = this.element<HTMLTextAreaElement>('#animation-import-text');
+    this.importFile = this.element<HTMLInputElement>('#animation-import-file');
+    this.importFeedback = this.element('#animation-import-feedback');
+    this.reloadExport = this.element<HTMLButtonElement>('#animation-reload-export');
     this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
     this.copyKeys = this.element<HTMLButtonElement>('#timeline-copy-keys');
     this.pasteKeys = this.element<HTMLButtonElement>('#timeline-paste-keys');
@@ -69,6 +81,56 @@ export class TimelineSessionController {
     this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
     this.snap = this.element<HTMLSelectElement>('#timeline-snap');
     const options = { signal: this.abort.signal };
+    // Invalid inspector drafts can add errors on blur and move these buttons between down/up.
+    // Hold focus until the replacement clears those drafts so the native click stays on its target.
+    this.reloadExport.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (event.button === 0) event.preventDefault();
+      },
+      options,
+    );
+    this.element('#animation-import-paste').addEventListener(
+      'click',
+      () => {
+        this.importPanel.hidden = false;
+        this.importText.focus();
+      },
+      options,
+    );
+    this.element('#animation-import-cancel').addEventListener(
+      'click',
+      () => {
+        ++this.importSequence;
+        this.importPanel.hidden = true;
+        this.importText.value = '';
+        setText(this.importFeedback, '');
+      },
+      options,
+    );
+    this.element('#animation-import-submit').addEventListener(
+      'click',
+      () => {
+        ++this.importSequence;
+        this.finishImport(this.state.importJson(this.importText.value));
+      },
+      options,
+    );
+    this.importFile.addEventListener(
+      'change',
+      () => {
+        void this.importLocalFile();
+      },
+      options,
+    );
+    this.reloadExport.addEventListener(
+      'click',
+      () => {
+        ++this.importSequence;
+        this.finishImport(this.state.reloadCurrentExport());
+      },
+      options,
+    );
     this.snap.addEventListener(
       'change',
       () => {
@@ -155,15 +217,67 @@ export class TimelineSessionController {
     return this.getState();
   }
 
+  private finishImport(imported: boolean): void {
+    if (!imported) {
+      setText(
+        this.importFeedback,
+        this.state.validationIssues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n'),
+      );
+      return;
+    }
+    ++this.sessionGeneration;
+    this.importPanel.hidden = true;
+    this.importText.value = '';
+    this.externalError = '';
+    setText(this.exportFeedback, '');
+    setText(
+      this.importFeedback,
+      `Imported "${this.state.selectedAnimationId}". Clean session; playback paused at zero.`,
+    );
+    this.render();
+  }
+
+  private async importLocalFile(): Promise<void> {
+    const file = this.importFile.files?.[0];
+    this.importFile.value = '';
+    if (!file) return;
+    const state = this.state;
+    const animation = state.workingAnimation;
+    const generation = this.sessionGeneration;
+    const sequence = ++this.importSequence;
+    const isCurrent = (): boolean =>
+      !this.abort.signal.aborted &&
+      this.state === state &&
+      this.sessionGeneration === generation &&
+      this.importSequence === sequence;
+    try {
+      const json = await file.text();
+      if (!isCurrent()) return;
+      if (state.workingAnimation !== animation) {
+        setText(this.importFeedback, 'Animation changed while reading the file. Choose the file again to import.');
+        return;
+      }
+      this.finishImport(state.importJson(json));
+    } catch (error) {
+      if (isCurrent())
+        setText(
+          this.importFeedback,
+          `Could not read animation file: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
+  }
+
   private async exportTo(destination: 'download' | 'clipboard' | 'console'): Promise<void> {
     const state = this.state;
     const id = state.selectedAnimationId;
+    const source = state.sourceAnimation;
     const generation = this.sessionGeneration;
     const sequence = ++this.exportSequence;
     const isCurrent = (): boolean =>
       !this.abort.signal.aborted &&
       this.state === state &&
       state.selectedAnimationId === id &&
+      state.sourceAnimation === source &&
       generation === this.sessionGeneration;
     try {
       const result = state.exportAnimation();
@@ -215,9 +329,19 @@ export class TimelineSessionController {
     const state = this.state;
     this.externalError = '';
     setText(this.exportFeedback, '');
-    const empty = new Option('No animation selected', '');
-    this.selection.replaceChildren(empty, ...state.animationIds.map((id) => new Option(id, id)));
+    setText(this.importFeedback, '');
+    this.importPanel.hidden = true;
+    this.importText.value = '';
+    this.updateAnimationOptions(state);
     this.element('#character-status').textContent = characterId ? `Character: ${characterId}` : 'No character loaded.';
+  }
+
+  private updateAnimationOptions(state: AnimationEditorState): void {
+    const ids = state.animationIds;
+    const key = JSON.stringify(ids);
+    if (key === this.animationIdsKey) return;
+    this.animationIdsKey = key;
+    this.selection.replaceChildren(new Option('No animation selected', ''), ...ids.map((id) => new Option(id, id)));
   }
 
   showError(message: string): void {
@@ -227,6 +351,7 @@ export class TimelineSessionController {
 
   render(): void {
     const state = this.state;
+    this.updateAnimationOptions(state);
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
@@ -262,6 +387,9 @@ export class TimelineSessionController {
     if (this.download.disabled !== !animation) this.download.disabled = !animation;
     if (this.copyJson.disabled !== !animation) this.copyJson.disabled = !animation;
     if (this.logJson.disabled !== !animation) this.logJson.disabled = !animation;
+    this.reloadExport.disabled = !animation;
+    this.importFile.disabled = !state.rig;
+    this.element<HTMLButtonElement>('#animation-import-paste').disabled = !state.rig;
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = state.selectedKeys.length === 0;
     const previousDisabled = !state.getAdjacentKeyframe(-1);

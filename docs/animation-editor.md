@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.8.1
+# Visual Animation Editor — v0.5.2.8.2
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -301,3 +301,13 @@ Numeric cleanup reuses `roundEditorNumber()` for six-decimal candidates but acce
 Clipboard failures offer Download and Log alternatives. Download filenames retain manifest basenames, with a sanitized animation-name fallback and `animation.json` when no name is available. Copy/download/log establish session checkpoints and retain Undo/Redo history; they do not overwrite source files. Saved authored snapshots retain their original precision. A page reload still reads character assets.
 
 See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. Animation import/reload, file dropping, round-trip visual comparison, onion skinning, ghost poses, mirrored tools, IK target animation and baking remain deferred to v0.5.2.8.2+.
+
+## Animation import and reload
+
+**Import / Paste Animation JSON** opens a text area with **Parse / Import** and **Cancel**. **Import local animation JSON** reads a local `.json` file through the same pipeline. Load a character first: its rig supplies bone-reference validation. The file must have supported animation `version: 1`; unknown bones, unsupported versions, syntax errors and invalid authored data produce field-path diagnostics before replacement.
+
+Successful import replaces current edits, registers/selects the imported clip name, creates independent immutable source and working snapshots, and establishes a clean baseline. Undo/Redo history, bone/property/key/event selection, transform and inspector drafts, drags, scrubbing and marquee state reset. Playback pauses at zero, and timeline/preview subscribers immediately rebuild using the existing runtime evaluator. Import does not fire events. Bone expansion, clipboard contents, speed, loop-preview and snapping preferences persist for the loaded rig. Rejected imports update diagnostics while retaining authored data, history and transient session state.
+
+**Reload Current Export** serializes committed authored data and runs the same import path. It normalizes export floats and creates a fresh clean session without downloading or firing events. Download before import/reload if you need to retain previous edits. Imported clips remain available in this in-memory session; importing does not change the character manifest or write files. File reads superseded by another import, session change or controller disposal are ignored; edits during a pending read require choosing the file again.
+
+Development APIs: `importAnimationJson(text, rig)` returns a discriminated result containing a validated frozen snapshot or structured issues. `state.importJson(text)` and `state.reloadCurrentExport()` return success booleans and coordinate session reset. `verifyAnimationRoundTrip(input, rig)` compares canonical export → import → export JSON and returns `equivalent`, both JSON strings and the imported snapshot. These are editor APIs; engine file formats and runtime evaluators remain unchanged. See [import verification](animation-editor-import-verification.md).

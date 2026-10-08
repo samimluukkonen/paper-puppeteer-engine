@@ -76,6 +76,7 @@ export class AnimationEditorState {
   private readonly selection: AnimationEditorSelection;
   private readonly keyframes: AnimationEditorKeyframeCommands;
   private readonly events: AnimationEditorEventCommands;
+  private importedSessions = 0;
 
   constructor(
     readonly rig?: Rig,
@@ -782,6 +783,35 @@ export class AnimationEditorState {
     this.validateKeyframeSelection();
     this.notify();
     return true;
+  }
+
+  /** Advances only for successful imports/reloads, so adapters can distinguish them from selection. */
+  get importRevision(): number {
+    return this.importedSessions;
+  }
+
+  /** Validate before touching navigation; notify once with the complete fresh session and pose at zero. */
+  importJson(json: string): boolean {
+    const imported = this.document.importJson(json);
+    if (imported) {
+      ++this.importedSessions;
+      this.keyframes.resetSession();
+      this.events.resetSession();
+      this.selection.resetAnimation();
+      this.selection.selectBone(null);
+      this.playback.reset();
+    }
+    this.notify();
+    return imported;
+  }
+
+  /** Reload committed export through the same validated import boundary, without saving on failure. */
+  reloadCurrentExport(): boolean {
+    const result = this.exportAnimation();
+    if (result.success) return this.importJson(result.json);
+    this.document.reportIssues(result.issues);
+    this.notify();
+    return false;
   }
 
   /** Export committed authored data only; drafts, selection, history and preview preferences stay local. */

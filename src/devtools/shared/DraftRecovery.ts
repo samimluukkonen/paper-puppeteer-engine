@@ -51,7 +51,8 @@ export class DraftRecovery<Snapshot> {
     if (expected !== null && window.localStorage.getItem(key) === expected) window.localStorage.removeItem(key);
   }
 
-  bind(session: DraftSession<Snapshot>): void {
+  /** Explicit imported baselines can skip restoration while retaining normal persistence afterward. */
+  bind(session: DraftSession<Snapshot>, options: { recover?: boolean } = {}): void {
     this.flush();
     this.session = session;
     this.snapshot = undefined;
@@ -62,7 +63,7 @@ export class DraftRecovery<Snapshot> {
     try {
       const key = this.storageKey(session);
       const text = window.localStorage.getItem(key);
-      if (text !== null) {
+      if (text !== null && options.recover !== false) {
         let data: unknown;
         try {
           data = JSON.parse(text);

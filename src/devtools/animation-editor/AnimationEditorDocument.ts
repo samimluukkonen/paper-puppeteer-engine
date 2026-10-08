@@ -9,6 +9,7 @@ import type { Rig } from '../../engine/Rig.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { importAnimationJson } from './animationImport.js';
 import { serializeAnimation, type AnimationExportResult } from './animationSerialization.js';
 
 /** Same external file fields; event data remains unknown to callers and is validated as JSON before ownership. */
@@ -135,6 +136,29 @@ export class AnimationEditorDocument {
     this.selectedId = id;
     this.issues = [];
     this.saved = this.working;
+    this.cachedDirty = false;
+    this.history = this.createHistory();
+    return true;
+  }
+
+  /** Import starts a clean session; rejection changes diagnostics only. */
+  importJson(json: string): boolean {
+    const result = importAnimationJson(json, this.rig);
+    this.reportIssues(result.issues);
+    if (!result.success) return false;
+    const source = result.data;
+    const working = freezeData(structuredClone(source));
+    const path = this.animations.get(source.name)?.path;
+    this.animations.set(source.name, {
+      source,
+      saved: working,
+      issues: [],
+      ...(path === undefined ? {} : { path }),
+    });
+    this.source = source;
+    this.working = working;
+    this.saved = working;
+    this.selectedId = source.name;
     this.cachedDirty = false;
     this.history = this.createHistory();
     return true;

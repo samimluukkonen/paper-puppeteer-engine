@@ -290,3 +290,48 @@ test('event dragging starts after inspector blur commits caused by focusing its 
   assert.equal(current.selectedEventData?.time, 700);
   input.dispose();
 });
+
+for (const kind of ['scrub', 'key', 'event'] as const) {
+  test(`import releases an active ${kind} pointer without carrying gesture state or edits forward`, () => {
+    const current = state();
+    const { timeline, create } = inputFixture(() => current);
+    const input = create();
+    const unsubscribe = current.subscribe(() => input.synchronize());
+    if (kind === 'scrub') timeline.dispatchEvent(pointer('pointerdown', 50));
+    if (kind === 'key')
+      input.beginKeyDrag(
+        pointer('pointerdown', 0) as unknown as PointerEvent,
+        { boneId: 'root', property: 'x', time: 0 },
+        timeline as unknown as HTMLButtonElement,
+      );
+    if (kind === 'event') {
+      current.createAnimationEvent();
+      input.beginEventDrag(
+        pointer('pointerdown', 0) as unknown as PointerEvent,
+        current.selectedEvent!,
+        timeline as unknown as HTMLButtonElement,
+      );
+    }
+    timeline.dispatchEvent(pointer('pointermove', 75));
+    assert.equal(timeline.captures.size, 1);
+    const json = JSON.stringify({
+      version: 1,
+      name: 'fresh',
+      duration: 2000,
+      loop: false,
+      tracks: { root: [{ time: 0, x: 10 }] },
+    });
+    assert.isFalse(current.importJson('{bad'));
+    assert.equal(timeline.captures.size, 1);
+    assert.isTrue(current.importJson(json));
+    assert.equal(timeline.captures.size, 0);
+    const working = current.workingAnimation;
+    timeline.dispatchEvent(pointer('pointermove', 90));
+    timeline.dispatchEvent(pointer('pointerup', 90));
+    assert.strictEqual(current.workingAnimation, working);
+    assert.equal(current.currentTime, 0);
+    assert.equal(current.historyLength, 0);
+    unsubscribe();
+    input.dispose();
+  });
+}

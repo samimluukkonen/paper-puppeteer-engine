@@ -253,3 +253,18 @@ test('draft revisions work on HTTP hosts where crypto.randomUUID is unavailable'
   assert.include(values.get('paper-puppeteer:draft:a')!, '"value":42');
   assert.include(values.get('paper-puppeteer:draft:a')!, '"revision":"7-7-7-7"');
 });
+
+test('explicit import baselines skip recovery without prompting or restoring an older matching draft', () => {
+  const stored = JSON.stringify({ version: 1, source: 'original', data: { value: 99 } });
+  const { recovery, session, confirm, values, edit } = fixture(stored);
+  recovery.bind(session, { recover: false });
+  assert.equal(confirm.mock.calls.length, 0);
+  assert.equal(vi.mocked(session.restore).mock.calls.length, 0);
+  assert.isFalse(session.dirty());
+  assert.deepEqual(session.snapshot(), { value: 0 });
+  // The older entry can belong to another tab; subsequent authored edits save the new session normally.
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+  edit(5);
+  vi.advanceTimersByTime(300);
+  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":5');
+});
