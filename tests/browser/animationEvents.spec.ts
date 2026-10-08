@@ -243,3 +243,73 @@ test('event drag uses shared snap policy, follows playhead, nudges, cancels and 
   await page.keyboard.press('Control+z');
   await expect(marker).toHaveCount(1);
 });
+
+test('event clipboard shortcuts/buttons preserve payloads, same-time identities, selection and history', async ({
+  page,
+}) => {
+  await openEditor(page);
+  await event(page, 'step-left').click();
+  await expect(page.locator('#timeline-copy-keys')).toHaveText('Copy Event');
+  await page.keyboard.press('ControlOrMeta+c');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+  await expect(page.locator('#timeline-paste-keys')).toHaveText('Paste Event');
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect(event(page, 'step-left')).toHaveCount(2);
+  await expect(event(page, 'step-left').last()).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.timeline-event[data-time="0.5"]')).toHaveCount(3);
+  await expect(page.locator('#animation-event-data')).toHaveValue(/"foot": "left"/);
+  await page.locator('#timeline-duplicate-keys').click();
+  await expect(event(page, 'step-left')).toHaveCount(3);
+  await expect(page.locator('.timeline-event[data-time="0.51"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#animation-event-time')).toHaveValue('0.51');
+  await page.locator('#animation-undo').click();
+  await expect(event(page, 'step-left')).toHaveCount(2);
+  await page.locator('#animation-undo').click();
+  await expect(event(page, 'step-left')).toHaveCount(1);
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.locator('#animation-redo').click();
+  await page.locator('#animation-redo').click();
+  await expect(event(page, 'step-left')).toHaveCount(3);
+  await page.locator('#animation-undo').click();
+  await page.locator('#animation-undo').click();
+  await page.getByRole('button', { name: 'Expand root properties' }).click();
+  await key(page).click();
+  await expect(page.locator('#animation-event-inspector')).toBeHidden();
+  // Paste follows clipboard content, even when keys are selected.
+  await page.locator('#timeline-paste-keys').click();
+  await expect(page.locator('#animation-event-inspector')).toBeVisible();
+  await expect(key(page)).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#animation-undo').click();
+  await key(page).click();
+  await page.locator('#timeline-copy-keys').click();
+  await event(page, 'step-left').click();
+  await expect(page.locator('#timeline-paste-keys')).toHaveText('Paste Keys');
+});
+
+test('event clipboard persists across animations and respects native name/JSON clipboard shortcuts', async ({
+  page,
+}) => {
+  await openEditor(page);
+  await event(page, 'step-left').click();
+  await page.locator('#timeline-copy-keys').click();
+  const native = await page.evaluate(() =>
+    ['#animation-event-name', '#animation-event-data'].flatMap((selector) =>
+      ['c', 'v', 'd'].map((key) =>
+        document
+          .querySelector(selector)!
+          .dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ctrlKey: true, key })),
+      ),
+    ),
+  );
+  expect(native.every(Boolean)).toBe(true);
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+  await page.locator('#animation-selection').selectOption('walk');
+  await page.locator('#timeline-ruler').press('End');
+  const destination = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
+  await page.locator('#timeline-paste-keys').click();
+  await expect(page.locator('#animation-event-name')).toHaveValue('step-left');
+  await expect(page.locator('#animation-event-time')).toHaveValue(destination!);
+  await expect(page.locator('#animation-event-data')).toHaveValue(/"count": 1/);
+  await page.locator('#animation-undo').click();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});

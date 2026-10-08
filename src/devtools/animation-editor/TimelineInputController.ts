@@ -81,9 +81,9 @@ export class TimelineInputController {
           if (command === 'c' || command === 'v' || command === 'd') {
             event.preventDefault();
             if (!event.repeat) {
-              if (command === 'c') this.state.copySelectedKeyframes();
-              else if (command === 'v') this.state.pasteKeyframes();
-              else this.state.duplicateSelectedKeyframes();
+              if (command === 'c') this.state.copyTimelineSelection();
+              else if (command === 'v') this.state.pasteTimelineClipboard();
+              else this.state.duplicateTimelineSelection();
             }
             return;
           }

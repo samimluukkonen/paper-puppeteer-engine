@@ -1,19 +1,23 @@
 import { clampTime } from './timeline.js';
-import { type Seconds } from './timeUnits.js';
+import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 export const PREVIEW_PLAYBACK_SPEEDS = [0.25, 0.5, 1, 1.5, 2] as const;
 
-/** Sole continuous editor clock; independent of authored data, history, and pose evaluation. */
+/** Sole continuous editor clock; authored milliseconds avoid lossy event-boundary unit round trips. */
 export class AnimationEditorPlayback {
-  private time: Seconds = 0;
+  private time: Milliseconds = 0;
   private playing = false;
   private loop = false;
   private speed = 1;
   private scrubbing = false;
+  private startPending = true;
 
-  constructor(private readonly duration: () => Seconds) {}
+  constructor(private readonly duration: () => Milliseconds) {}
 
   get currentTime(): Seconds {
+    return toSeconds(this.time);
+  }
+  get currentTimeMilliseconds(): Milliseconds {
     return this.time;
   }
   get isPlaying(): boolean {
@@ -34,14 +38,24 @@ export class AnimationEditorPlayback {
     this.time = 0;
     this.playing = false;
     this.scrubbing = false;
+    this.startPending = true;
   }
 
-  /** Clamp navigation and duration edits using the same loop and scrub playback intent. */
+  /** Seconds remain the navigation API. Preserve an unchanged held millisecond timestamp exactly. */
   setCurrentTime(time: Seconds): boolean {
+    const duration = this.duration();
+    const next = clampTime(time, toSeconds(duration));
+    return this.setCurrentTimeMilliseconds(
+      next === this.currentTime ? this.time : next === toSeconds(duration) ? duration : toMilliseconds(next),
+    );
+  }
+
+  setCurrentTimeMilliseconds(time: Milliseconds): boolean {
     const duration = this.duration();
     const next = clampTime(time, duration);
     const playing = this.playing && duration > 0 && (this.scrubbing || this.loop || next < duration);
     if (next === this.time && playing === this.playing) return false;
+    if (next !== this.time) this.startPending = next === 0 && !this.scrubbing;
     this.time = next;
     this.playing = playing;
     return true;
@@ -50,7 +64,7 @@ export class AnimationEditorPlayback {
   setPreviewLoop(loop: boolean): boolean {
     if (loop === this.loop) return false;
     this.loop = loop;
-    this.setCurrentTime(this.time);
+    this.setCurrentTimeMilliseconds(this.time);
     return true;
   }
 
@@ -70,7 +84,8 @@ export class AnimationEditorPlayback {
   endScrub(): boolean {
     if (!this.scrubbing) return false;
     this.scrubbing = false;
-    this.setCurrentTime(this.time);
+    this.startPending = false;
+    this.setCurrentTimeMilliseconds(this.time);
     return true;
   }
 
@@ -78,7 +93,10 @@ export class AnimationEditorPlayback {
   play(): boolean {
     const duration = this.duration();
     if (this.playing || !(duration > 0)) return false;
-    if (this.time >= duration) this.time = 0;
+    if (this.time >= duration) {
+      this.time = 0;
+      this.startPending = true;
+    }
     this.playing = true;
     return true;
   }
@@ -89,15 +107,39 @@ export class AnimationEditorPlayback {
     return true;
   }
 
+  requestStart(): void {
+    this.startPending = true;
+  }
+
+  /** A real playback start consumes this once; pause/resume and scrub release do not restart events. */
+  consumeStart(): boolean {
+    if (!this.playing || this.scrubbing || !this.startPending || this.time !== 0) return false;
+    this.startPending = false;
+    return true;
+  }
+
   advance(deltaSeconds: Seconds): boolean {
     if (!this.playing || this.scrubbing || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return false;
     const duration = this.duration();
-    if (!(duration > 0)) return this.setCurrentTime(0);
-    const distance = deltaSeconds * this.speed;
-    // Reduce before addition; if scaling overflows, reduce real time by one preview loop first.
-    const loopDistance = Number.isFinite(distance)
-      ? distance % duration
-      : (deltaSeconds % (duration / this.speed)) * this.speed;
-    return this.setCurrentTime(this.loop ? (this.time + loopDistance) % duration : this.time + distance);
+    if (!(duration > 0)) return this.setCurrentTimeMilliseconds(0);
+    const distance = toMilliseconds(deltaSeconds) * this.speed;
+    const end = this.time + distance;
+    let next = end;
+    if (this.loop) {
+      if (Number.isFinite(end)) next = end % duration;
+      else {
+        // Event-free clocks retain finite wrapping even when scaling/addition overflows.
+        const period = toSeconds(duration) / this.speed;
+        const reduced = Number.isFinite(distance)
+          ? distance % duration
+          : period > 0
+            ? toMilliseconds((deltaSeconds % period) * this.speed)
+            : (toMilliseconds(deltaSeconds % duration) * this.speed) % duration;
+        next = reduced >= duration - this.time ? reduced - (duration - this.time) : this.time + reduced;
+      }
+    }
+    const changed = this.setCurrentTimeMilliseconds(next);
+    this.startPending = false;
+    return changed;
   }
 }

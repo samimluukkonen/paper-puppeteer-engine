@@ -1,8 +1,15 @@
 import type { AnimationClip, AnimationEvent, AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
-import { compileClip, copyAnimationEvent, ownCompiledClip } from './AnimationClip.js';
+import { compileClip, ownCompiledClip } from './AnimationClip.js';
 import { type AnimationLayer, AnimationLayerEvaluator, type AnimationState } from './AnimationLayerEvaluator.js';
+import { dispatchAnimationEvents } from './animationNotifications.js';
 import type { AnimationPose } from './AnimationPose.js';
-import { advanceAnimationTime, collectAnimationEvents, countAnimationEvents } from './animationTimeline.js';
+import {
+  advanceAnimationTime,
+  assertAnimationEventBudget,
+  collectAnimationEvents,
+  collectAnimationStartEvents,
+  countAnimationEvents,
+} from './animationTimeline.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
 import { assertFinite } from './types.js';
@@ -33,8 +40,6 @@ function validateSpeed(speed: number): void {
   assertFinite(speed, 'Animation speed');
   if (speed < 0) throw new Error('Animation speed cannot be negative.');
 }
-
-const maximumEventsPerUpdate = 10_000;
 
 /** Evaluates authored poses and layers. Puppet applies IK after this player writes the pose. */
 export class AnimationPlayer {
@@ -186,8 +191,7 @@ export class AnimationPlayer {
       layer.state = { ...layer.state, time: 0, playing: true };
       layer.transition = undefined;
       layer.stopped = false;
-      for (const marker of layer.state.clip.events)
-        if (marker.time === 0) events.push({ ...marker, clip: layer.state.clip.name, layer: name });
+      for (const event of collectAnimationStartEvents(layer.state.clip, name)) events.push(event);
     }
     this.poseEvaluator.invalidate();
     this.applyCurrentPose();
@@ -308,10 +312,7 @@ export class AnimationPlayer {
       if (state?.playing) {
         const end = advanceAnimationTime(state, delta, this.speed);
         eventCount += countAnimationEvents(state.clip, state.time, end);
-        if (eventCount > maximumEventsPerUpdate)
-          throw new Error(
-            `Animation update exceeds ${maximumEventsPerUpdate} events. Reduce the delta or playback speed.`,
-          );
+        assertAnimationEventBudget(eventCount);
       }
       const source = layer.transition?.source;
       if (!layer.stopped && source && !(source instanceof Map) && source.playing)
@@ -384,10 +385,7 @@ export class AnimationPlayer {
   }
 
   private fireStartEvents(clip: CompiledClip, layer: string): void {
-    this.dispatchNotifications(
-      clip.events.filter((marker) => marker.time === 0).map((marker) => ({ ...marker, clip: clip.name, layer })),
-      [],
-    );
+    this.dispatchNotifications(collectAnimationStartEvents(clip, layer), []);
   }
 
   /** Listener failures must not prevent other markers or completion notifications. */
@@ -395,19 +393,7 @@ export class AnimationPlayer {
     events: readonly FiredAnimationEvent[],
     completions: readonly AnimationCompletion[],
   ): void {
-    const errors: unknown[] = [];
-    for (const event of events) {
-      // Snapshot listeners so callbacks can subscribe/unsubscribe during dispatch.
-      // oxlint-disable-next-line unicorn/no-useless-spread
-      for (const listener of [...this.eventListeners]) {
-        if (this.disposed) break;
-        try {
-          listener(copyAnimationEvent(event));
-        } catch (error) {
-          errors.push(error);
-        }
-      }
-    }
+    const errors = dispatchAnimationEvents(events, this.eventListeners, () => !this.disposed);
     for (const event of completions) {
       // oxlint-disable-next-line unicorn/no-useless-spread -- Preserve the listener snapshot during callbacks.
       for (const listener of [...this.completionListeners]) {

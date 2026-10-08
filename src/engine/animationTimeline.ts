@@ -1,6 +1,20 @@
 import type { AnimationEvent, CompiledClip } from './AnimationClip.js';
 import { assertFinite } from './types.js';
 
+export const MAXIMUM_ANIMATION_EVENTS_PER_UPDATE = 10_000;
+
+/** Runtime start/restart convention, separate from the exclusive lower bound used by crossings. */
+export function collectAnimationStartEvents(clip: CompiledClip, layer: string) {
+  return clip.events.filter((marker) => marker.time === 0).map((marker) => ({ ...marker, clip: clip.name, layer }));
+}
+
+export function assertAnimationEventBudget(count: number): void {
+  if (count > MAXIMUM_ANIMATION_EVENTS_PER_UPDATE)
+    throw new Error(
+      `Animation update exceeds ${MAXIMUM_ANIMATION_EVENTS_PER_UPDATE} events. Reduce the delta or playback speed.`,
+    );
+}
+
 interface AnimationClock {
   readonly clip: Pick<CompiledClip, 'duration' | 'loop'>;
   readonly time: number;

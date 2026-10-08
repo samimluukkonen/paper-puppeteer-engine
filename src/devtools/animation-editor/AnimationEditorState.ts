@@ -5,6 +5,9 @@ import type {
   Interpolation,
   PropertyKeyframe,
 } from '../../engine/AnimationClip.js';
+import { dispatchAnimationEvents } from '../../engine/animationNotifications.js';
+import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
+import { collectAnimationStartEvents } from '../../engine/animationTimeline.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -29,6 +32,7 @@ import {
   type EventTimelineTrack,
 } from './animationEvents.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
+import { collectEditorPlaybackEvents, getEditorEventClip } from './editorPlaybackEvents.js';
 import {
   getAnimationInterpolation,
   getInterpolationForKeys,
@@ -48,8 +52,14 @@ import {
   type KeyframeSelectionModifiers,
 } from './keyframeSelection.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
+import {
+  TimelineClipboard,
+  copyEventSelection,
+  pasteEventClipboard,
+  type EventClipboard,
+} from './TimelineClipboard.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
-import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
+import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
@@ -72,7 +82,9 @@ export interface EventDrag {
 export class AnimationEditorState {
   private readonly document: AnimationEditorDocument;
   private readonly listeners = new Set<() => void>();
-  private readonly playback = new AnimationEditorPlayback(() => this.duration);
+  private readonly eventListeners = new Set<(event: FiredAnimationEvent) => void>();
+  private readonly clipboard = new TimelineClipboard();
+  private readonly playback = new AnimationEditorPlayback(() => this.working?.duration ?? 0);
   private readonly selection: AnimationEditorSelection;
   private readonly keyframes: AnimationEditorKeyframeCommands;
   private dragEvent: EventDrag | null = null;
@@ -84,13 +96,19 @@ export class AnimationEditorState {
   ) {
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
-    this.keyframes = new AnimationEditorKeyframeCommands(this.document, this.selection, this.playback, {
-      select: (key) => this.selectKeyframe(key),
-      updateTime: (time) => this.updateTime(time),
-      install: (animation, retainDraft, selectedKeys) =>
-        this.installWorkingAnimation(animation, retainDraft, selectedKeys),
-      notify: () => this.notify(),
-    });
+    this.keyframes = new AnimationEditorKeyframeCommands(
+      this.document,
+      this.selection,
+      this.playback,
+      {
+        select: (key) => this.selectKeyframe(key),
+        updateTime: (time) => this.updateTime(time),
+        install: (animation, retainDraft, selectedKeys) =>
+          this.installWorkingAnimation(animation, retainDraft, selectedKeys),
+        notify: () => this.notify(),
+      },
+      this.clipboard,
+    );
   }
 
   private get working(): ReadonlyAnimation | null {
@@ -127,7 +145,7 @@ export class AnimationEditorState {
     this.playback.pause();
     this.playback.endScrub();
     this.selection.selectEvent(ref);
-    this.updateTime(toSeconds(event.time));
+    this.updateTimeMilliseconds(event.time);
     this.notify();
     return true;
   }
@@ -170,12 +188,75 @@ export class AnimationEditorState {
   createAnimationEvent(): boolean {
     this.cancelTimelineDrag();
     const previous = new Set(getAnimationEventReferences(this.working));
-    if (!this.addAnimationEvent({ time: toMilliseconds(this.currentTime), name: 'event' })) return false;
+    if (!this.addAnimationEvent({ time: this.playback.currentTimeMilliseconds, name: 'event' })) return false;
     const ref = getAnimationEventReferences(this.working).find((entry) => !previous.has(entry));
     return ref ? this.selectAnimationEvent(ref) : false;
   }
   deleteSelectedEvent(): boolean {
     return this.selectedEvent ? this.removeAnimationEvent(this.selectedEvent) : false;
+  }
+  get timelineClipboard() {
+    return this.clipboard.content;
+  }
+  get eventClipboard(): EventClipboard | null {
+    return this.clipboard.content?.kind === 'event' ? this.clipboard.content.data : null;
+  }
+  copySelectedEvent(): boolean {
+    if (!this.working || !this.selectedEvent) return false;
+    const data = copyEventSelection(this.working, this.selectedEvent);
+    if (!data) return false;
+    this.clipboard.content = Object.freeze({ kind: 'event', data });
+    this.notify();
+    return true;
+  }
+  pasteEvent(): boolean {
+    const time = this.playback.currentTimeMilliseconds;
+    return this.eventClipboard ? this.pasteEventAt(this.eventClipboard, time) : false;
+  }
+  duplicateSelectedEvent(): boolean {
+    if (!this.working || !this.selectedEvent) return false;
+    const data = copyEventSelection(this.working, this.selectedEvent);
+    if (!data) return false;
+    const playback = this.working.playback;
+    const step =
+      playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0
+        ? 1 / playback.fps
+        : this.keyframeSnapMode === 'frame'
+          ? 1 / this.keyframeFPS
+          : 0.01;
+    const source = data.event.time;
+    const duration = this.working.duration;
+    // At the endpoint step backwards; otherwise clamp forwards to a distinct, valid time.
+    const target =
+      source < duration
+        ? Math.min(duration, source + toMilliseconds(step))
+        : Math.max(0, source - toMilliseconds(step));
+    if (target === source) return false;
+    return this.pasteEventAt(data, target);
+  }
+  private pasteEventAt(data: EventClipboard, time: Milliseconds): boolean {
+    if (!this.working || !this.rig) return false;
+    let pasted: ReturnType<typeof pasteEventClipboard>;
+    try {
+      pasted = pasteEventClipboard(this.working, this.rig, data, time);
+    } catch (error) {
+      this.document.reportError(error);
+      this.notify();
+      return false;
+    }
+    if (!this.editEvents(() => pasted.animation)) return false;
+    this.selection.selectEvent(pasted.ref);
+    this.notify();
+    return true;
+  }
+  copyTimelineSelection(): boolean {
+    return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
+  }
+  pasteTimelineClipboard(): boolean {
+    return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.pasteKeyframes();
+  }
+  duplicateTimelineSelection(): boolean {
+    return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
   }
   /** Empty text removes optional data; explicit JSON null remains an authored payload. */
   setSelectedEventDataJson(text: string): boolean {
@@ -254,7 +335,7 @@ export class AnimationEditorState {
     // unchanged seconds value; a unit round trip can otherwise change one bit.
     const authoredTime = target === toSeconds(event.time) ? event.time : toMilliseconds(target);
     if (!this.updateAnimationEvent(ref, { ...event, time: authoredTime })) return false;
-    this.updateTime(target);
+    this.updateTimeMilliseconds(authoredTime);
     this.notify();
     return true;
   }
@@ -341,7 +422,7 @@ export class AnimationEditorState {
             )
           : [...this.selectedKeys, clicked];
       this.selection.setKeys(modifiers.additive ? [...this.selectedKeys, ...range] : range, clicked);
-      this.updateTime(clicked.time);
+      this.updateTimeMilliseconds(key.time);
     } else if (modifiers.additive) {
       const exists = this.selection.hasKey(clicked);
       this.selection.setKeys(
@@ -351,7 +432,7 @@ export class AnimationEditorState {
       // Add/toggle retains primary where possible; fallback primary never seeks.
     } else {
       this.selection.selectKey(clicked);
-      this.updateTime(clicked.time);
+      this.updateTimeMilliseconds(key.time);
     }
     this.notify();
     return true;
@@ -563,6 +644,13 @@ export class AnimationEditorState {
     return changed;
   }
 
+  private updateTimeMilliseconds(time: Milliseconds): boolean {
+    const previous = this.currentTime;
+    const changed = this.playback.setCurrentTimeMilliseconds(time);
+    if (previous !== this.currentTime) this.clearTransformDraft();
+    return changed;
+  }
+
   private notifyPlaybackChange(previous: Seconds, changed: boolean): void {
     if (previous !== this.currentTime) this.clearTransformDraft();
     if (changed) this.notify();
@@ -722,7 +810,9 @@ export class AnimationEditorState {
     if (this.keyframeDrag || this.eventDrag) return;
     if (!this.playback.play()) return;
     this.clearTransformDraft();
+    const events = this.startEvents();
     this.notify();
+    this.dispatchEvents(events);
   }
 
   pause(): void {
@@ -736,12 +826,53 @@ export class AnimationEditorState {
 
   /** Rewind immediately, preserving whether playback is active. */
   restart(): void {
+    this.playback.requestStart();
     this.setCurrentTime(0);
+    this.dispatchEvents(this.startEvents());
   }
 
   /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
   advancePlayback(deltaSeconds: Seconds): void {
+    let events: FiredAnimationEvent[] = [];
+    if (
+      this.isPlaying &&
+      !this.isScrubbing &&
+      Number.isFinite(deltaSeconds) &&
+      deltaSeconds > 0 &&
+      this.working?.events?.length &&
+      this.rig
+    ) {
+      try {
+        events = collectEditorPlaybackEvents(
+          getEditorEventClip(this.working, this.rig, this.previewLoop),
+          this.playback.currentTimeMilliseconds,
+          deltaSeconds,
+          this.playbackSpeed,
+        );
+      } catch (error) {
+        this.document.reportError(error);
+        this.notify();
+        return;
+      }
+    }
     this.notifyPlaybackChange(this.currentTime, this.playback.advance(deltaSeconds));
+    this.dispatchEvents(events);
+  }
+
+  /** Runtime-compatible notifications are delivered after preview subscribers synchronize the held pose. */
+  onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
+  }
+  private startEvents(): FiredAnimationEvent[] {
+    return this.playback.consumeStart() && this.working && this.rig
+      ? collectAnimationStartEvents(getEditorEventClip(this.working, this.rig, this.previewLoop), 'base')
+      : [];
+  }
+  private dispatchEvents(events: readonly FiredAnimationEvent[]): void {
+    const errors = dispatchAnimationEvents(events, this.eventListeners);
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Animation editor event listeners failed.');
   }
 
   /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */

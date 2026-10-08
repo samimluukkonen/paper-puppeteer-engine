@@ -15,6 +15,7 @@ import {
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import { keyframeTimesMatch } from './keyframeTargets.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
+import type { TimelineClipboard } from './TimelineClipboard.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
@@ -37,13 +38,13 @@ interface KeyframeCommandActions {
 export class AnimationEditorKeyframeCommands {
   private drag: KeyframeDrag | null = null;
   private snapMode: KeyframeSnapMode = 'none';
-  private clipboard: KeyframeClipboard | null = null;
 
   constructor(
     private readonly document: AnimationEditorDocument,
     private readonly selection: AnimationEditorSelection,
     private readonly playback: AnimationEditorPlayback,
     private readonly actions: KeyframeCommandActions,
+    private readonly clipboard: TimelineClipboard,
   ) {}
 
   private get working(): ReadonlyAnimation | null {
@@ -63,19 +64,20 @@ export class AnimationEditorKeyframeCommands {
   }
 
   get keyframeClipboard(): KeyframeClipboard | null {
-    return this.clipboard;
+    return this.clipboard.content?.kind === 'keyframes' ? this.clipboard.content.data : null;
   }
   /** Copy never touches clocks, drafts, authored history or the saved baseline. Empty copy retains the clipboard. */
   copySelectedKeyframes(): boolean {
     if (!this.working) return false;
     const clipboard = copyKeyframeSelection(this.working, this.selectedKeys);
     if (!clipboard) return false;
-    this.clipboard = clipboard;
+    this.clipboard.content = Object.freeze({ kind: 'keyframes', data: clipboard });
     this.actions.notify();
     return true;
   }
   pasteKeyframes(): boolean {
-    return this.clipboard ? this.pasteGroup(this.clipboard, this.currentTime) : false;
+    const clipboard = this.keyframeClipboard;
+    return clipboard ? this.pasteGroup(clipboard, this.currentTime) : false;
   }
   /** Duplicate shares paste logic without overwriting the user's clipboard or seeking away from the playhead. */
   duplicateSelectedKeyframes(): boolean {

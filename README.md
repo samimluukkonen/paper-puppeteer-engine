@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The [interpolation UI](docs/animation-editor-interpolation-ui-verification.md) exposes selection inspection, clip declaration edits, and outgoing/terminal marker indicators using the existing [authoring core](docs/animation-editor-interpolation-verification.md). The v0.5.2.6.3 [hardening regression](docs/animation-editor-interpolation-hardening-verification.md) covers key workflows, history, serialization, and preview integration, including exact spacing for nearby pasted keys. The format supports clip-level linear interpolation; smooth/stepped remain playback sampling modes. Per-key interpolation editing and mixed modes remain unavailable.
 
-The v0.5.2.7.2 [animation event authoring](docs/animation-editor-event-authoring-verification.md) adds events at the playhead, editable name/time/JSON data, deletion, dragging, snapping, and keyboard nudging with Undo/Redo. Same-time events stay separate, and preview navigation never dispatches gameplay callbacks.
+The v0.5.2.7.3 [event clipboard and playback](docs/animation-editor-event-hardening-verification.md) completes event authoring: editable name/time/JSON data, movement/snapping/nudging, copy/paste/duplicate and Undo/Redo. Same-time events stay separate. Normal playback reuses runtime event crossings, including loops and large deltas; navigation stays silent.
 
 ## Quick start
 

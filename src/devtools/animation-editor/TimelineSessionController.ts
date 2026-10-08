@@ -126,9 +126,9 @@ export class TimelineSessionController {
       options,
     );
     this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframes(), options);
-    this.copyKeys.addEventListener('click', () => this.state.copySelectedKeyframes(), options);
-    this.pasteKeys.addEventListener('click', () => this.state.pasteKeyframes(), options);
-    this.duplicateKeys.addEventListener('click', () => this.state.duplicateSelectedKeyframes(), options);
+    this.copyKeys.addEventListener('click', () => this.state.copyTimelineSelection(), options);
+    this.pasteKeys.addEventListener('click', () => this.state.pasteTimelineClipboard(), options);
+    this.duplicateKeys.addEventListener('click', () => this.state.duplicateTimelineSelection(), options);
     this.previousKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(-1), options);
     this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
   }
@@ -197,9 +197,13 @@ export class TimelineSessionController {
     const previousDisabled = !state.getAdjacentKeyframe(-1);
     const nextDisabled = !state.getAdjacentKeyframe(1);
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
-    if (this.copyKeys.disabled !== deleteDisabled) this.copyKeys.disabled = deleteDisabled;
-    if (this.duplicateKeys.disabled !== deleteDisabled) this.duplicateKeys.disabled = deleteDisabled;
-    const pasteDisabled = !animation || !state.keyframeClipboard?.entries.length;
+    const copyDisabled = deleteDisabled && !state.selectedEvent;
+    if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
+    if (this.duplicateKeys.disabled !== copyDisabled) this.duplicateKeys.disabled = copyDisabled;
+    setText(this.copyKeys, state.selectedEvent ? 'Copy Event' : 'Copy Keys');
+    setText(this.duplicateKeys, state.selectedEvent ? 'Duplicate Event' : 'Duplicate Keys');
+    setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
+    const pasteDisabled = !animation || !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
     if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
     if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;

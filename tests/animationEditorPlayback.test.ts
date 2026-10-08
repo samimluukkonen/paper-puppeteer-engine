@@ -221,7 +221,9 @@ test.each([
   { start: 0.25, delta: 2_000_000.5, expected: 0.75 },
   { start: 0.25, delta: Number.MAX_VALUE, expected: 0.25 },
 ])('preview loop preserves overshoot for $start + $delta', ({ start, delta, expected }) => {
-  const state = session();
+  // Event-free clocks can reduce even astronomical deltas; event catch-up is bounded separately.
+  const state = new AnimationEditorState(rig, [{ ...clip, events: [] }]);
+  state.selectAnimation('move');
   state.setPreviewLoop(true);
   state.setCurrentTime(start);
   state.play();
@@ -422,4 +424,16 @@ test('repeated commands and animation switches leave one coherent transient sess
     assert.equal(state.historyLength, 0);
   }
   assert.equal(JSON.stringify(clip), before);
+});
+
+test('event-free looping remains finite when a positive millisecond duration underflows in seconds', () => {
+  const state = new AnimationEditorState(rig, [{ ...clip, duration: Number.MIN_VALUE, tracks: {}, events: [] }]);
+  assert.isTrue(state.selectAnimation('move'));
+  state.setPreviewLoop(true);
+  state.play();
+  state.advancePlayback(Number.MAX_VALUE);
+  assert.isTrue(Number.isFinite(state.currentTime));
+  assert.equal(state.currentTime, 0);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
 });

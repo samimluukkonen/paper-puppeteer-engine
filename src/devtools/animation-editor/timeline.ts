@@ -5,7 +5,9 @@ export function animationDurationSeconds(animation: { readonly duration: Millise
   return animation && Number.isFinite(animation.duration) ? Math.max(0, toSeconds(animation.duration)) : 0;
 }
 
-export function clampTime(time: Seconds, duration: Seconds): Seconds {
+export function clampTime(time: Seconds, duration: Seconds): Seconds;
+export function clampTime(time: Milliseconds, duration: Milliseconds): Milliseconds;
+export function clampTime(time: number, duration: number): number {
   if (Number.isNaN(time) || !(duration > 0) || !Number.isFinite(duration)) return 0;
   return Math.max(0, Math.min(time, duration));
 }
