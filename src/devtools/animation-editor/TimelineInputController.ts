@@ -323,13 +323,13 @@ export class TimelineInputController {
     event.stopPropagation();
     if (event.button !== 0 || this.gesture) return;
     event.preventDefault();
+    // Commit the previous inspector field before selection changes or a drag acquires state.
+    marker.focus({ preventScroll: true });
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       this.state.selectKeyframe(key, { additive: event.ctrlKey || event.metaKey, range: event.shiftKey });
-      marker.focus({ preventScroll: true });
       return;
     }
     if (!this.state.beginKeyframeDrag(key)) return;
-    marker.focus({ preventScroll: true });
     const bounds = this.timeline.getBoundingClientRect();
     this.gesture = {
       kind: 'key-drag',

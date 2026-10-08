@@ -34,6 +34,57 @@ async function openEditor(page: Page, empty = false) {
 const event = (page: Page, name: string) => page.locator(`.timeline-event[data-event-name="${name}"]`);
 const key = (page: Page) => page.getByRole('button', { name: 'Select root x key at 0.5 s', exact: true });
 
+for (const { field, value, modifiers } of [
+  { field: 'name', value: 'edited-step', modifiers: [] },
+  { field: 'data', value: '{"foot":"edited","count":2}', modifiers: ['Shift'] },
+  { field: 'time', value: '0.75', modifiers: ['ControlOrMeta'] },
+] as const) {
+  test(`event ${field} drafts commit before keyframe selection`, async ({ page }) => {
+    await openEditor(page);
+    await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
+    await event(page, 'step-left').click();
+    await page.locator(`#animation-event-${field}`).fill(value);
+    await key(page).click({ modifiers: [...modifiers] });
+    await expect(key(page)).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+    const edited = event(page, field === 'name' ? value : 'step-left');
+    await edited.click();
+    if (field === 'data') {
+      expect(JSON.parse(await page.locator('#animation-event-data').inputValue())).toEqual({
+        foot: 'edited',
+        count: 2,
+      });
+    } else await expect(page.locator(`#animation-event-${field}`)).toHaveValue(value);
+    await page.locator('#animation-undo').click();
+    await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+    await page.locator('#animation-redo').click();
+    await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  });
+}
+
+test('event draft commits before acquiring a keyframe drag', async ({ page }) => {
+  await openEditor(page);
+  await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
+  await event(page, 'step-left').click();
+  await page.locator('#animation-event-name').fill('edited-step');
+  await key(page).scrollIntoViewIfNeeded();
+  const bounds = (await page.locator('#timeline').boundingBox())!;
+  const marker = (await key(page).boundingBox())!;
+  await page.mouse.move(marker.x + marker.width / 2, marker.y + marker.height / 2);
+  await page.mouse.down();
+  await expect(event(page, 'edited-step')).toHaveCount(1);
+  await page.mouse.move(bounds.x + bounds.width * 0.4, marker.y + marker.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const moved = page.locator('.timeline-keyframe[aria-pressed="true"]');
+  await expect.poll(async () => Number(await moved.getAttribute('data-time'))).toBeCloseTo(0.8, 2);
+  await page.locator('#animation-undo').click();
+  await expect(key(page)).toBeVisible();
+  await expect(event(page, 'edited-step')).toHaveCount(1);
+  await page.locator('#animation-undo').click();
+  await expect(event(page, 'step-left')).toHaveCount(1);
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
+
 test('event markers align with ruler endpoints on resize, and same-time events remain independently selectable', async ({
   page,
 }) => {
