@@ -1,7 +1,7 @@
-import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef } from './animationEvents.js';
 import { timelineXToTime, timeToTimelineX } from './timeline.js';
+import { TimelineKeyboardController } from './TimelineKeyboardController.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 
 interface ScrubGesture {
@@ -40,10 +40,11 @@ interface MarqueeGesture {
 
 type TimelineGesture = ScrubGesture | KeyDragGesture | MarqueeGesture;
 
-/** Owns shortcuts and one exclusive pointer gesture with a shared capture/cancellation lifecycle. */
+/** Owns one exclusive pointer gesture and composes keyboard routing with its capture/cancellation lifecycle. */
 export class TimelineInputController {
   private readonly abort = new AbortController();
   private gesture: TimelineGesture | undefined;
+  private readonly keyboard: TimelineKeyboardController;
 
   constructor(
     private readonly app: HTMLElement,
@@ -52,94 +53,10 @@ export class TimelineInputController {
     private readonly scrubber: HTMLElement,
   ) {
     const options = { signal: this.abort.signal };
-    window.addEventListener(
-      'keydown',
-      (event) => {
-        if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
-          return;
-        if (event.key === 'Escape' && (this.state.keyframeDrag || this.state.eventDrag)) {
-          event.preventDefault();
-          this.cancelGesture();
-          return;
-        }
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          if (this.gesture?.kind === 'marquee') this.cancelGesture();
-          else this.state.clearTimelineSelection();
-          return;
-        }
-        // Clipboard shortcuts belong to the timeline panel; native editing/bookmarks win elsewhere.
-        if (
-          (event.ctrlKey || event.metaKey) &&
-          !event.altKey &&
-          !event.shiftKey &&
-          event.target instanceof Element &&
-          this.app.contains(event.target) &&
-          event.target.closest('.timeline-panel')
-        ) {
-          const command = event.key.toLowerCase();
-          if (command === 'c' || command === 'v' || command === 'd') {
-            event.preventDefault();
-            if (!event.repeat) {
-              if (command === 'c') this.state.copyTimelineSelection();
-              else if (command === 'v') this.state.pasteTimelineClipboard();
-              else this.state.duplicateTimelineSelection();
-            }
-            return;
-          }
-        }
-        // Match the Rig Editor shortcuts while leaving native text-field undo intact.
-        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
-          event.preventDefault();
-          if (!event.repeat) {
-            if (event.shiftKey) this.state.redo();
-            else this.state.undo();
-          }
-          return;
-        }
-        if (
-          (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
-          (this.state.selectedKeyframe || this.state.selectedEvent) &&
-          !event.altKey &&
-          !event.ctrlKey &&
-          !event.metaKey
-        ) {
-          event.preventDefault();
-          if (this.state.selectedEvent)
-            this.state.nudgeSelectedEvent(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
-          else this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
-          return;
-        }
-        if (
-          (event.key === 'Delete' || event.key === 'Backspace') &&
-          !event.altKey &&
-          !event.ctrlKey &&
-          !event.metaKey
-        ) {
-          // Prevent native Backspace navigation even when there is no selected key.
-          event.preventDefault();
-          if (!event.repeat) {
-            if (this.state.selectedEvent) this.state.deleteSelectedEvent();
-            else this.state.deleteSelectedKeyframes();
-          }
-          return;
-        }
-        if (
-          (event.code !== 'Space' && event.key !== 'Home') ||
-          event.altKey ||
-          event.ctrlKey ||
-          event.metaKey ||
-          (event.code === 'Space' && event.target instanceof Element && event.target.closest('button, a[href]'))
-        )
-          return;
-        event.preventDefault();
-        if (!event.repeat) {
-          if (event.key === 'Home') this.state.restart();
-          else this.state.togglePlayback();
-        }
-      },
-      options,
-    );
+    this.keyboard = new TimelineKeyboardController(app, timeline, getState, scrubber, {
+      cancelGesture: () => this.cancelGesture(),
+      hasMarquee: () => this.gesture?.kind === 'marquee',
+    });
     this.timeline.addEventListener(
       'pointerdown',
       (event) => {
@@ -202,75 +119,6 @@ export class TimelineInputController {
         if (document.hidden) {
           this.cancelGesture();
         }
-      },
-      options,
-    );
-    this.timeline.addEventListener(
-      'keydown',
-      (event) => {
-        if (
-          !this.state.workingAnimation ||
-          event.defaultPrevented ||
-          event.isComposing ||
-          event.altKey ||
-          event.ctrlKey ||
-          event.metaKey ||
-          isTypingTarget(event.target)
-        )
-          return;
-        // Handle selected-key arrows before this bubbling event reaches the global shortcuts.
-        if (
-          (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
-          (this.state.selectedKeyframe || this.state.selectedEvent)
-        ) {
-          event.preventDefault();
-          if (this.state.selectedEvent)
-            this.state.nudgeSelectedEvent(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
-          else this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
-          return;
-        }
-        const step = event.shiftKey ? 0.1 : 0.01;
-        const time =
-          event.key === 'End'
-            ? this.state.duration
-            : event.key === 'ArrowLeft'
-              ? this.state.currentTime - step
-              : event.key === 'ArrowRight'
-                ? this.state.currentTime + step
-                : undefined;
-        if (time === undefined) return;
-        event.preventDefault();
-        this.state.setCurrentTime(time);
-      },
-      options,
-    );
-    this.scrubber.addEventListener(
-      'keydown',
-      (event) => {
-        if (
-          !this.state.workingAnimation ||
-          event.defaultPrevented ||
-          event.isComposing ||
-          event.altKey ||
-          event.ctrlKey ||
-          event.metaKey
-        )
-          return;
-        const step = event.shiftKey ? 0.1 : 0.01;
-        const time =
-          event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? this.state.duration
-              : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
-                ? this.state.currentTime - step
-                : event.key === 'ArrowRight' || event.key === 'ArrowUp'
-                  ? this.state.currentTime + step
-                  : undefined;
-        if (time === undefined) return;
-        // Consume slider navigation before track/global shortcuts can move authored keys.
-        event.preventDefault();
-        this.state.setCurrentTime(time);
       },
       options,
     );
@@ -506,6 +354,7 @@ export class TimelineInputController {
 
   dispose(): void {
     this.cancelGesture();
+    this.keyboard.dispose();
     this.abort.abort();
   }
 }
