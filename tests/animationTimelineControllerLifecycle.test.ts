@@ -181,3 +181,112 @@ test('session actions follow replacements and disposed controls do not handle re
   await query('#play-pause').click();
   assert.isTrue(current.isPlaying);
 });
+
+test('event pointer movement commits once, preserves identity and cancels cleanly across capture lifecycle', () => {
+  const current = state();
+  current.addAnimationEvent({ time: 250, name: 'event', data: { keep: true } });
+  const ref = current.eventTimelineTrack.markers[0]!.ref;
+  current.markSaved();
+  const original = current.workingAnimation;
+  const initialHistory = current.historyLength;
+  const { timeline, create } = inputFixture(() => current);
+  const input = create();
+  input.beginEventDrag(
+    pointer('pointerdown', 25) as unknown as PointerEvent,
+    ref,
+    timeline as unknown as HTMLButtonElement,
+  );
+  timeline.dispatchEvent(pointer('pointermove', 90, 2));
+  assert.equal(current.eventDrag?.previewTime, 0.25);
+  timeline.dispatchEvent(pointer('pointermove', 75));
+  assert.equal(current.eventDrag?.previewTime, 0.75);
+  assert.equal(current.currentTime, 0.75);
+  assert.strictEqual(current.workingAnimation, original);
+  assert.equal(current.historyLength, initialHistory);
+  assert.isFalse(current.dirty);
+  timeline.dispatchEvent(pointer('pointerup', 75));
+  timeline.dispatchEvent(pointer('pointerup', 75));
+  assert.isNull(current.eventDrag);
+  assert.strictEqual(current.selectedEvent, ref);
+  assert.deepEqual(current.selectedEventData, { time: 750, name: 'event', data: { keep: true } });
+  assert.equal(current.historyLength, initialHistory + 1);
+  assert.equal(timeline.captures.size, 0);
+  const moved = current.workingAnimation;
+  input.beginEventDrag(
+    pointer('pointerdown', 75) as unknown as PointerEvent,
+    ref,
+    timeline as unknown as HTMLButtonElement,
+  );
+  timeline.dispatchEvent(pointer('pointermove', 40));
+  timeline.dispatchEvent(pointer('pointercancel', 40));
+  assert.equal(current.currentTime, 0.75);
+  assert.strictEqual(current.workingAnimation, moved);
+  assert.equal(current.historyLength, initialHistory + 1);
+  input.beginEventDrag(
+    pointer('pointerdown', 75) as unknown as PointerEvent,
+    ref,
+    timeline as unknown as HTMLButtonElement,
+  );
+  timeline.dispatchEvent(pointer('pointermove', 40));
+  input.dispose();
+  assert.isNull(current.eventDrag);
+  assert.equal(timeline.captures.size, 0);
+  assert.strictEqual(current.workingAnimation, moved);
+});
+
+test('selected event shortcuts nudge/delete, typing and modifiers stay guarded, and ruler only navigates', () => {
+  const current = state();
+  current.createAnimationEvent();
+  const ref = current.selectedEvent!;
+  const { browser, timeline, scrubber, create } = inputFixture(() => current);
+  const input = create();
+  const key = (key: string, extra = {}) => Object.assign(new Event('keydown', { cancelable: true }), { key, ...extra });
+  const ignored = key('ArrowRight', { ctrlKey: true });
+  browser.dispatchEvent(ignored);
+  assert.equal(current.selectedEventData?.time, 0);
+  for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) {
+    const typing = new TimelineElement();
+    Object.assign(typing, { tagName });
+    const e = key('Delete');
+    Object.defineProperty(e, 'target', { value: typing });
+    browser.dispatchEvent(e);
+    assert.strictEqual(current.selectedEvent, ref);
+  }
+  timeline.dispatchEvent(key('ArrowRight'));
+  assert.equal(current.selectedEventData?.time, 10);
+  browser.dispatchEvent(key('ArrowRight', { shiftKey: true }));
+  assert.equal(current.selectedEventData?.time, 110);
+  const authored = current.workingAnimation;
+  scrubber.dispatchEvent(key('End'));
+  assert.equal(current.currentTime, 1);
+  assert.strictEqual(current.workingAnimation, authored);
+  browser.dispatchEvent(key('Delete'));
+  assert.isNull(current.selectedEvent);
+  assert.equal(current.workingAnimation?.events?.length, 0);
+  browser.dispatchEvent(key('z', { ctrlKey: true }));
+  assert.strictEqual(current.workingAnimation, authored);
+  input.dispose();
+});
+
+test('event dragging starts after inspector blur commits caused by focusing its marker', () => {
+  const current = state();
+  current.createAnimationEvent();
+  const ref = current.selectedEvent!;
+  const { timeline, create } = inputFixture(() => current);
+  const input = create();
+  // Browser focus dispatches blur synchronously on the inspector's previous field.
+  const marker = new TimelineElement();
+  marker.focus = () => {
+    current.moveSelectedEvent(0.2);
+  };
+  input.beginEventDrag(
+    pointer('pointerdown', 20) as unknown as PointerEvent,
+    ref,
+    marker as unknown as HTMLButtonElement,
+  );
+  assert.equal(current.eventDrag?.originalTime, 0.2);
+  timeline.dispatchEvent(pointer('pointermove', 70));
+  timeline.dispatchEvent(pointer('pointerup', 70));
+  assert.equal(current.selectedEventData?.time, 700);
+  input.dispose();
+});

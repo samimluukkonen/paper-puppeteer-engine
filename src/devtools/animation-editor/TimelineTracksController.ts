@@ -1,5 +1,6 @@
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import type { AnimationEventRef } from './animationEvents.js';
 import { EventTrackController } from './EventTrackController.js';
 import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
@@ -31,7 +32,7 @@ function reconcileRows(container: HTMLElement, rows: HTMLElement[]): void {
 
 /** Label/lanes adapter. Selection, expansion, data and the clock are owned by AnimationEditorState. */
 export class TimelineTracksController {
-  private readonly events = new EventTrackController();
+  private readonly events: EventTrackController;
   private state: AnimationEditorState | undefined;
   private tracks: readonly TimelineTrack[] | undefined;
   private interpolation: AnimationEditorState['authoredInterpolation'];
@@ -48,7 +49,10 @@ export class TimelineTracksController {
     private readonly labels: HTMLElement,
     private readonly lanes: HTMLElement,
     private readonly onKeyPointerDown: (event: PointerEvent, key: KeyframeSelection, marker: HTMLButtonElement) => void,
-  ) {}
+    onEventPointerDown?: (event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement) => void,
+  ) {
+    this.events = new EventTrackController(onEventPointerDown);
+  }
 
   private createRow(track: TimelineTrack): TrackElements {
     const label = document.createElement('div');

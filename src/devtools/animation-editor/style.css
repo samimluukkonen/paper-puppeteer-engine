@@ -294,7 +294,7 @@ a {
   border: 0;
   background: transparent;
   transform: translate(-50%, -50%);
-  cursor: pointer;
+  cursor: ew-resize;
   touch-action: none;
   z-index: 2;
 }
@@ -556,4 +556,18 @@ a {
 }
 .timeline-track-lane {
   cursor: crosshair;
+}
+
+#animation-event-inspector label {
+  display: block;
+  margin-bottom: 6px;
+}
+#animation-event-data {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+}
+#animation-event-error {
+  color: #75341f;
 }

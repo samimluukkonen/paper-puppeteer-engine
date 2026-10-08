@@ -104,7 +104,9 @@ export function updateAnimationEvent<Animation extends AnimationData>(
       ref: refs[index]!,
     })),
   );
-  return equalEditorData(animation, next) ? animation : next;
+  // Selecting/releasing a marker or committing an unchanged field must not sort
+  // a valid, originally unsorted event array into a new authored history entry.
+  return equalEditorData(previous, event) || equalEditorData(animation, next) ? animation : next;
 }
 
 export function removeAnimationEvent<Animation extends AnimationData>(

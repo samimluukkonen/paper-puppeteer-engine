@@ -3,7 +3,7 @@ import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef, EventTimelineTrack } from './animationEvents.js';
 import { timeToTimelineX } from './timeline.js';
 
-/** Separate event lane: no bone ids, property keys, key dragging, or runtime callbacks. */
+/** Separate event lane: no bone ids, property keys, key collisions, or runtime callbacks. */
 export class EventTrackController {
   readonly label = document.createElement('div');
   readonly lane = document.createElement('div');
@@ -16,7 +16,11 @@ export class EventTrackController {
   private duration = -1;
   private selected: AnimationEventRef | null | undefined;
 
-  constructor() {
+  private drag: AnimationEditorState['eventDrag'] | undefined;
+
+  constructor(
+    private readonly onPointerDown?: (event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement) => void,
+  ) {
     this.label.className = 'timeline-track-label timeline-event-track';
     this.lane.className = 'timeline-track-lane timeline-event-track';
     this.select.type = 'button';
@@ -52,6 +56,10 @@ export class EventTrackController {
           marker.type = 'button';
           marker.className = 'timeline-event';
           marker.addEventListener('pointerdown', (event) => {
+            if (this.onPointerDown) {
+              this.onPointerDown(event, model.ref, marker!);
+              return;
+            }
             event.stopPropagation();
             if (event.button !== 0) return;
             event.preventDefault();
@@ -76,11 +84,13 @@ export class EventTrackController {
         if (this.lane.children[index] !== marker) this.lane.insertBefore(marker, this.lane.children[index] ?? null);
       }
     }
-    if (changed || width !== this.width || state.duration !== this.duration) {
+    if (changed || width !== this.width || state.duration !== this.duration || state.eventDrag !== this.drag) {
+      this.drag = state.eventDrag;
       this.width = width;
       this.duration = state.duration;
       for (const model of track.markers)
-        this.markers.get(model.ref)!.style.left = `${timeToTimelineX(model.time, state.duration, width)}px`;
+        this.markers.get(model.ref)!.style.left =
+          `${timeToTimelineX(this.drag?.ref === model.ref ? this.drag.previewTime : model.time, state.duration, width)}px`;
     }
     this.select.disabled = !state.workingAnimation;
     if (changed || this.selected !== state.selectedEvent) {

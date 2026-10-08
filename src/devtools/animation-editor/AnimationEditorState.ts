@@ -22,6 +22,7 @@ import {
   addAnimationEvent,
   buildEventTimelineTrack,
   findAnimationEvent,
+  getAnimationEventReferences,
   removeAnimationEvent,
   updateAnimationEvent,
   type AnimationEventRef,
@@ -46,7 +47,7 @@ import {
   type KeyframeMarquee,
   type KeyframeSelectionModifiers,
 } from './keyframeSelection.js';
-import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, type KeyframeSnapMode } from './timeline.js';
+import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
@@ -60,6 +61,13 @@ export type { AnimationEditorStateOptions, ReadonlyAnimation } from './Animation
 
 export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 
+export interface EventDrag {
+  readonly ref: AnimationEventRef;
+  readonly originalTime: Seconds;
+  readonly previewTime: Seconds;
+  readonly previewEvent: DeepReadonly<AnimationEvent>;
+}
+
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
   private readonly document: AnimationEditorDocument;
@@ -67,6 +75,7 @@ export class AnimationEditorState {
   private readonly playback = new AnimationEditorPlayback(() => this.duration);
   private readonly selection: AnimationEditorSelection;
   private readonly keyframes: AnimationEditorKeyframeCommands;
+  private dragEvent: EventDrag | null = null;
 
   constructor(
     readonly rig?: Rig,
@@ -104,6 +113,7 @@ export class AnimationEditorState {
     return this.selection.event;
   }
   get selectedEventData() {
+    if (this.dragEvent?.ref === this.selectedEvent) return this.dragEvent.previewEvent;
     return this.selectedEvent ? findAnimationEvent(this.working, this.selectedEvent) : undefined;
   }
   get eventTimelineTrack(): EventTimelineTrack {
@@ -113,7 +123,7 @@ export class AnimationEditorState {
   selectAnimationEvent(ref: AnimationEventRef): boolean {
     const event = findAnimationEvent(this.working, ref);
     if (!event) return false;
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     this.playback.pause();
     this.playback.endScrub();
     this.selection.selectEvent(ref);
@@ -122,15 +132,16 @@ export class AnimationEditorState {
     return true;
   }
   clearEventSelection(): void {
+    this.cancelEventDrag();
     if (this.selection.clearEvent()) this.notify();
   }
   clearTimelineSelection(): void {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     const keys = this.selection.clearKey();
     const event = this.selection.clearEvent();
     if (keys || event) this.notify();
   }
-  /** Programmatic authored foundations; event editing controls are intentionally deferred. */
+  /** Authored event fields use the existing strict file schema and immutable mutation API. */
   addAnimationEvent(event: DeepReadonly<AnimationEvent>): boolean {
     return this.editEvents((animation, rig) => addAnimationEvent(animation, rig, event));
   }
@@ -141,6 +152,7 @@ export class AnimationEditorState {
     return this.editEvents((animation, rig) => removeAnimationEvent(animation, rig, ref));
   }
   private editEvents(edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation): boolean {
+    this.cancelTimelineDrag();
     if (!this.working || !this.rig) return false;
     let next: ReadonlyAnimation;
     try {
@@ -150,7 +162,111 @@ export class AnimationEditorState {
       this.notify();
       return false;
     }
+    this.playback.pause();
+    this.playback.endScrub();
     return this.installWorkingAnimation(next);
+  }
+  /** The required name gets a neutral default; the UI immediately focuses it for editing. */
+  createAnimationEvent(): boolean {
+    this.cancelTimelineDrag();
+    const previous = new Set(getAnimationEventReferences(this.working));
+    if (!this.addAnimationEvent({ time: toMilliseconds(this.currentTime), name: 'event' })) return false;
+    const ref = getAnimationEventReferences(this.working).find((entry) => !previous.has(entry));
+    return ref ? this.selectAnimationEvent(ref) : false;
+  }
+  deleteSelectedEvent(): boolean {
+    return this.selectedEvent ? this.removeAnimationEvent(this.selectedEvent) : false;
+  }
+  /** Empty text removes optional data; explicit JSON null remains an authored payload. */
+  setSelectedEventDataJson(text: string): boolean {
+    this.cancelTimelineDrag();
+    const event = this.selectedEventData;
+    const ref = this.selectedEvent;
+    if (!event || !ref) return false;
+    let next: DeepReadonly<AnimationEvent>;
+    try {
+      next = text.trim() ? { ...event, data: JSON.parse(text) as unknown } : { time: event.time, name: event.name };
+    } catch {
+      this.document.reportIssues([
+        { severity: 'error', path: 'events.data', message: 'Event data must be valid JSON.' },
+      ]);
+      this.notify();
+      return false;
+    }
+    return this.updateAnimationEvent(ref, next);
+  }
+  get eventDrag(): EventDrag | null {
+    return this.dragEvent;
+  }
+  beginEventDrag(ref: AnimationEventRef): boolean {
+    if (!this.selectAnimationEvent(ref)) return false;
+    const event = this.selectedEventData!;
+    this.dragEvent = Object.freeze({
+      ref,
+      originalTime: toSeconds(event.time),
+      previewTime: toSeconds(event.time),
+      previewEvent: event,
+    });
+    this.notify();
+    return true;
+  }
+  previewEventDrag(time: Seconds, disableSnapping = false): boolean {
+    const drag = this.dragEvent;
+    if (!drag || !Number.isFinite(time)) return false;
+    const previewTime = snapKeyframeTime(
+      time,
+      this.duration,
+      disableSnapping ? 'none' : this.keyframeSnapMode,
+      this.keyframeFPS,
+    );
+    this.dragEvent = Object.freeze({
+      ...drag,
+      previewTime,
+      previewEvent: Object.freeze({ ...drag.previewEvent, time: toMilliseconds(previewTime) }),
+    });
+    this.updateTime(previewTime);
+    this.notify();
+    return true;
+  }
+  commitEventDrag(): boolean {
+    const drag = this.dragEvent;
+    if (!drag) return false;
+    this.dragEvent = null;
+    return this.moveSelectedEvent(drag.previewTime);
+  }
+  cancelEventDrag(): boolean {
+    const drag = this.dragEvent;
+    if (!drag) return false;
+    this.dragEvent = null;
+    this.updateTime(drag.originalTime);
+    this.notify();
+    return true;
+  }
+  /** Explicit inspector time edits clamp without snapping; gestures apply the shared snap policy first. */
+  moveSelectedEvent(time: Seconds): boolean {
+    this.cancelTimelineDrag();
+    const event = this.selectedEventData;
+    const ref = this.selectedEvent;
+    if (!event || !ref) return false;
+    if (!Number.isFinite(time)) return this.updateAnimationEvent(ref, { ...event, time: toMilliseconds(time) });
+    const target = snapKeyframeTime(time, this.duration, 'none');
+    // Preserve exact fractional milliseconds when displaying/committing an
+    // unchanged seconds value; a unit round trip can otherwise change one bit.
+    const authoredTime = target === toSeconds(event.time) ? event.time : toMilliseconds(target);
+    if (!this.updateAnimationEvent(ref, { ...event, time: authoredTime })) return false;
+    this.updateTime(target);
+    this.notify();
+    return true;
+  }
+  nudgeSelectedEvent(direction: -1 | 1, large = false): boolean {
+    if (!this.selectedEventData || this.eventDrag) return false;
+    const step = this.keyframeSnapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
+    const time = toSeconds(this.selectedEventData.time) + direction * step * (large ? 10 : 1);
+    return this.moveSelectedEvent(snapKeyframeTime(time, this.duration, this.keyframeSnapMode, this.keyframeFPS));
+  }
+  private cancelTimelineDrag(): boolean {
+    const event = this.cancelEventDrag();
+    return this.cancelKeyframeDrag() || event;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -183,6 +299,7 @@ export class AnimationEditorState {
     this.keyframes.setKeyframeSnapMode(mode);
   }
   beginKeyframeDrag(key: KeyframeSelection): boolean {
+    this.cancelEventDrag();
     return this.keyframes.beginKeyframeDrag(key);
   }
   previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
@@ -206,7 +323,7 @@ export class AnimationEditorState {
     if (!this.rig?.hasBone(boneId)) return false;
     const key = this.findBonePropertyKeyframe(boneId, property, time);
     if (!key) return false;
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     this.playback.pause();
     this.playback.endScrub();
     const clicked = Object.freeze({ boneId, property, time: toSeconds(key.time) });
@@ -240,12 +357,12 @@ export class AnimationEditorState {
     return true;
   }
   clearKeyframeSelection(): void {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (this.selection.clearKey()) this.notify();
   }
   /** Resolve externally supplied references before installing transient box selection. */
   selectKeyframes(keys: readonly KeyframeSelection[], additive = false): void {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     this.playback.pause();
     this.playback.endScrub();
     const resolved = keys.flatMap((key) => {
@@ -290,14 +407,14 @@ export class AnimationEditorState {
   }
   setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
     if (!this.rig?.hasBone(boneId)) return false;
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (this.selection.setExpanded(boneId, expanded)) this.notify();
     return true;
   }
   /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
     if (!this.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (this.selection.selectProperty(boneId, property)) this.notify();
     return true;
   }
@@ -314,19 +431,19 @@ export class AnimationEditorState {
   }
   selectBone(id: string | null): boolean {
     if (id !== null && !this.rig?.hasBone(id)) return false;
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (this.selection.selectBone(id)) this.notify();
     return true;
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (this.selection.boneId && this.working) this.pause();
   }
   setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
     if (!this.selection.boneId || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
       return false;
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     this.playback.pause();
     this.selection.setDraft(property, value);
     this.notify();
@@ -421,7 +538,7 @@ export class AnimationEditorState {
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     const selected = this.document.selectAnimation(id, options);
     if (selected) {
       this.selection.resetAnimation();
@@ -432,7 +549,7 @@ export class AnimationEditorState {
   }
 
   setCurrentTime(time: Seconds): void {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     // Explicit navigation cancels drafts even when clamping leaves the playhead at the same endpoint.
     const cancelled = this.clearTransformDraft();
     if (this.updateTime(time) || cancelled) this.notify();
@@ -590,7 +707,7 @@ export class AnimationEditorState {
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
   beginScrub(): void {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (!this.working) return;
     const cancelled = this.clearTransformDraft();
     if (this.playback.beginScrub() || cancelled) this.notify();
@@ -602,7 +719,7 @@ export class AnimationEditorState {
 
   /** Resume the sole editor clock; a completed clip starts again at zero. */
   play(): void {
-    if (this.keyframeDrag) return;
+    if (this.keyframeDrag || this.eventDrag) return;
     if (!this.playback.play()) return;
     this.clearTransformDraft();
     this.notify();
@@ -644,7 +761,7 @@ export class AnimationEditorState {
     retainDraft = false,
     selectedKeys?: readonly KeyframeSelection[],
   ): boolean {
-    this.cancelKeyframeDrag();
+    this.cancelTimelineDrag();
     if (!this.document.install(next)) {
       this.notify();
       return false;
@@ -675,7 +792,7 @@ export class AnimationEditorState {
   }
   private restoreHistory(restore: () => boolean): boolean {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.
-    const cancelledDrag = this.cancelKeyframeDrag();
+    const cancelledDrag = this.cancelTimelineDrag();
     const cancelled = this.clearTransformDraft() || cancelledDrag;
     const changed = restore();
     if (changed) {

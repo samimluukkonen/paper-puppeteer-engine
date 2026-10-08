@@ -1,5 +1,6 @@
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import type { AnimationEventRef } from './animationEvents.js';
 import { timelineXToTime, timeToTimelineX } from './timeline.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 
@@ -12,7 +13,7 @@ interface ScrubGesture {
 }
 
 interface KeyDragGesture {
-  kind: 'key-drag';
+  kind: 'key-drag' | 'event-drag';
   id: number;
   startX: number;
   clientX: number;
@@ -56,7 +57,7 @@ export class TimelineInputController {
       (event) => {
         if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
           return;
-        if (event.key === 'Escape' && this.state.keyframeDrag) {
+        if (event.key === 'Escape' && (this.state.keyframeDrag || this.state.eventDrag)) {
           event.preventDefault();
           this.cancelGesture();
           return;
@@ -98,13 +99,15 @@ export class TimelineInputController {
         }
         if (
           (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
-          this.state.selectedKeyframe &&
+          (this.state.selectedKeyframe || this.state.selectedEvent) &&
           !event.altKey &&
           !event.ctrlKey &&
           !event.metaKey
         ) {
           event.preventDefault();
-          this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+          if (this.state.selectedEvent)
+            this.state.nudgeSelectedEvent(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+          else this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
           return;
         }
         if (
@@ -115,7 +118,10 @@ export class TimelineInputController {
         ) {
           // Prevent native Backspace navigation even when there is no selected key.
           event.preventDefault();
-          if (!event.repeat) this.state.deleteSelectedKeyframes();
+          if (!event.repeat) {
+            if (this.state.selectedEvent) this.state.deleteSelectedEvent();
+            else this.state.deleteSelectedKeyframes();
+          }
           return;
         }
         if (
@@ -139,7 +145,10 @@ export class TimelineInputController {
       (event) => {
         if (event.button !== 0 || this.gesture || !this.state.workingAnimation) return;
         event.preventDefault();
-        if (event.target instanceof Element && event.target.closest('.timeline-track-lane')) {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('.timeline-track-lane:not(.timeline-event-track)')
+        ) {
           this.timeline.focus({ preventScroll: true });
           this.beginMarquee(event);
           return;
@@ -210,9 +219,14 @@ export class TimelineInputController {
         )
           return;
         // Handle selected-key arrows before this bubbling event reaches the global shortcuts.
-        if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && this.state.selectedKeyframe) {
+        if (
+          (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+          (this.state.selectedKeyframe || this.state.selectedEvent)
+        ) {
           event.preventDefault();
-          this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+          if (this.state.selectedEvent)
+            this.state.nudgeSelectedEvent(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
+          else this.state.nudgeSelectedKeyframe(event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey);
           return;
         }
         const step = event.shiftKey ? 0.1 : 0.01;
@@ -278,7 +292,9 @@ export class TimelineInputController {
           this.state.isPlaying
         : gesture.kind === 'key-drag'
           ? !this.state.keyframeDrag
-          : !this.state.isScrubbing;
+          : gesture.kind === 'event-drag'
+            ? !this.state.eventDrag
+            : !this.state.isScrubbing;
     if (invalid) this.cancelGesture();
   }
 
@@ -327,11 +343,39 @@ export class TimelineInputController {
     this.timeline.setPointerCapture(event.pointerId);
   }
 
+  beginEventDrag(event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement): void {
+    event.stopPropagation();
+    if (event.button !== 0 || this.gesture) return;
+    event.preventDefault();
+    // Blurring an inspector field can commit an edit and cancel gestures. Finish
+    // that focus transition before acquiring the new event drag transaction.
+    marker.focus({ preventScroll: true });
+    if (!this.state.beginEventDrag(ref)) return;
+    const bounds = this.timeline.getBoundingClientRect();
+    this.gesture = {
+      kind: 'event-drag',
+      id: event.pointerId,
+      startX: event.clientX,
+      clientX: event.clientX,
+      offset:
+        event.clientX -
+        bounds.left -
+        timeToTimelineX(this.state.eventDrag!.originalTime, this.state.duration, bounds.width),
+      moved: false,
+      shift: event.shiftKey,
+    };
+    this.timeline.setPointerCapture(event.pointerId);
+  }
+
   previewKeyDrag(): void {
     const pointer = this.gesture;
-    if (pointer?.kind !== 'key-drag' || !pointer.moved) return;
+    if ((pointer?.kind !== 'key-drag' && pointer?.kind !== 'event-drag') || !pointer.moved) return;
     const bounds = this.timeline.getBoundingClientRect();
-    this.state.previewKeyframeDrag(
+    const preview =
+      pointer.kind === 'event-drag'
+        ? this.state.previewEventDrag.bind(this.state)
+        : this.state.previewKeyframeDrag.bind(this.state);
+    preview(
       timelineXToTime(pointer.clientX - bounds.left - pointer.offset, this.state.duration, bounds.width),
       pointer.shift,
     );
@@ -437,6 +481,10 @@ export class TimelineInputController {
         if (commit) this.state.commitKeyframeDrag();
         else this.state.cancelKeyframeDrag();
         break;
+      case 'event-drag':
+        if (commit) this.state.commitEventDrag();
+        else this.state.cancelEventDrag();
+        break;
       case 'marquee':
         if (commit) this.commitMarquee(gesture);
         break;
@@ -447,6 +495,7 @@ export class TimelineInputController {
     this.endGesture(false);
     // State-only commands can begin/cancel a drag before a DOM pointer is acquired.
     this.state.cancelKeyframeDrag();
+    this.state.cancelEventDrag();
     this.state.endScrub();
   }
 

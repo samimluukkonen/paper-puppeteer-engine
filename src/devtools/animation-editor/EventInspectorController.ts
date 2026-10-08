@@ -1,24 +1,98 @@
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { toSeconds } from './timeUnits.js';
 
-/** Read-only authored values. Use text nodes for event names and arbitrary JSON payloads. */
+/** Local text drafts commit once on blur/Enter; authored snapshots remain authoritative. */
 export class EventInspectorController {
+  private readonly abort = new AbortController();
   private event: AnimationEditorState['selectedEventData'];
-  constructor(private readonly app: HTMLElement) {}
+  private ref: AnimationEditorState['selectedEvent'] | undefined;
+  private readonly time: HTMLInputElement;
+  private readonly name: HTMLInputElement;
+  private readonly data: HTMLTextAreaElement;
+  private readonly add: HTMLButtonElement;
+  private readonly remove: HTMLButtonElement;
+  private readonly error: HTMLElement;
+
+  constructor(
+    private readonly app: HTMLElement,
+    private readonly getState: () => AnimationEditorState,
+  ) {
+    this.time = app.querySelector<HTMLInputElement>('#animation-event-time')!;
+    this.name = app.querySelector<HTMLInputElement>('#animation-event-name')!;
+    this.data = app.querySelector<HTMLTextAreaElement>('#animation-event-data')!;
+    this.add = app.querySelector<HTMLButtonElement>('#timeline-add-event')!;
+    this.remove = app.querySelector<HTMLButtonElement>('#animation-delete-event')!;
+    this.error = app.querySelector<HTMLElement>('#animation-event-error')!;
+    const options = { signal: this.abort.signal };
+    this.add.addEventListener(
+      'click',
+      () => {
+        if (this.getState().createAnimationEvent()) {
+          this.name.focus();
+          this.name.select();
+        }
+      },
+      options,
+    );
+    this.remove.addEventListener('click', () => this.getState().deleteSelectedEvent(), options);
+    for (const field of [this.time, this.name, this.data]) {
+      field.addEventListener('focus', () => this.getState().pause(), options);
+      field.addEventListener('blur', () => this.commit(field), options);
+      field.addEventListener(
+        'keydown',
+        (inputEvent) => {
+          const event = inputEvent as KeyboardEvent;
+          if (event.isComposing) return;
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            this.reset(this.getState());
+          } else if (event.key === 'Enter' && (field !== this.data || event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            this.commit(field);
+          }
+        },
+        options,
+      );
+    }
+  }
+
+  private commit(field: HTMLInputElement | HTMLTextAreaElement): void {
+    const state = this.getState();
+    const ref = state.selectedEvent;
+    const event = state.selectedEventData;
+    // A field belonging to a replaced selection/session cannot author a different event.
+    if (!event || !ref || ref !== this.ref) return;
+    const ok =
+      field === this.time
+        ? state.moveSelectedEvent(field.value.trim() ? Number(field.value) : NaN)
+        : field === this.name
+          ? state.updateAnimationEvent(ref, { ...event, name: field.value })
+          : state.setSelectedEventDataJson(field.value);
+    this.error.textContent = ok ? '' : state.validationIssues.map(({ message }) => message).join('\n');
+    if (ok) this.reset(state);
+  }
+
+  private reset(state: AnimationEditorState): void {
+    const event = state.selectedEventData;
+    this.time.value = event ? String(toSeconds(event.time)) : '';
+    this.name.value = event?.name ?? '';
+    this.data.value = event && Object.hasOwn(event, 'data') ? JSON.stringify(event.data, null, 2) : '';
+    this.error.textContent = '';
+  }
 
   render(state: AnimationEditorState): void {
     const event = state.selectedEventData;
-    const panel = this.app.querySelector<HTMLElement>('#animation-event-inspector')!;
-    panel.hidden = !event;
-    if (event === this.event) return;
+    this.app.querySelector<HTMLElement>('#animation-event-inspector')!.hidden = !event;
+    this.add.disabled = !state.workingAnimation;
+    this.remove.disabled = !event;
+    this.time.max = String(state.duration);
+    if (event === this.event && state.selectedEvent === this.ref) return;
     this.event = event;
-    this.app.querySelector<HTMLElement>('#animation-event-time')!.textContent = event
-      ? `${toSeconds(event.time).toFixed(3)} s`
-      : '';
-    this.app.querySelector<HTMLElement>('#animation-event-name')!.textContent = event?.name ?? '';
-    const data = this.app.querySelector<HTMLElement>('#animation-event-data')!;
-    const payload = this.app.querySelector<HTMLElement>('#animation-event-payload')!;
-    payload.hidden = !event || !Object.hasOwn(event, 'data');
-    data.textContent = event && Object.hasOwn(event, 'data') ? JSON.stringify(event.data, null, 2) : '';
+    this.ref = state.selectedEvent;
+    this.reset(state);
+  }
+
+  dispose(): void {
+    this.abort.abort();
   }
 }

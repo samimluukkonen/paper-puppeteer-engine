@@ -31,12 +31,13 @@ export class TimelineController {
       this.element('#timeline-track-labels'),
       this.element('#timeline-tracks'),
       (event, key, marker) => this.input.beginKeyDrag(event, key, marker),
+      (event, ref, marker) => this.input.beginEventDrag(event, ref, marker),
     );
     this.session = new TimelineSessionController(app, () => this.state, {
       endScrub: () => this.input.endScrub(),
     });
     this.interpolation = new InterpolationController(app, () => this.state);
-    this.eventInspector = new EventInspectorController(app);
+    this.eventInspector = new EventInspectorController(app, () => this.state);
     this.input = new TimelineInputController(app, this.timeline, () => this.state, this.ruler);
     this.width = this.timeline.getBoundingClientRect().width;
     this.resize = new ResizeObserver(() => {
@@ -119,6 +120,7 @@ export class TimelineController {
     this.input.dispose();
     this.session.dispose();
     this.interpolation.dispose();
+    this.eventInspector.dispose();
     this.resize.disconnect();
     this.unsubscribe?.();
     this.tracks.dispose();
