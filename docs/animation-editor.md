@@ -1,4 +1,4 @@
-# Visual Animation Editor — v0.5.2.6.1
+# Visual Animation Editor — v0.5.2.7.1
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
@@ -47,6 +47,12 @@ For example, at **0.5 s**, select `rightForearm`, enter **35** in Rotation, and 
 Explicit time navigation and starting a scrub cancel drafts even when the playhead stays at the same time or clamps to its current endpoint. Restart at zero also cancels drafts. Undo/Redo cancel drafts even when their history stack is empty; cancelled fields refresh immediately, including focused fields. Other preview preferences retain drafts. Uncommitted FPS text is replaced by the held authored value when the working snapshot changes, so it cannot carry into another animation or a restored history snapshot.
 
 ## Bone and property timeline tracks
+
+The dedicated **Events** row precedes the bone/property rows. Its circular markers represent authored `events` only; bone/property diamonds remain keyframes. Event marker centers share ruler/playhead coordinates at zero, intermediate times, and duration. Multiple events at the exact same time stack vertically in authored order without shifting their time coordinates. The row's height grows for these stacks; label and lane heights stay synchronized. Empty event lists retain the Events row and show a count of zero.
+
+Click an event marker or focus it and press Enter/Space to select one event, pause playback, end any scrub, cancel drafts/key dragging, clear key selection, and seek to the event's exact authored time. The read-only event inspector shows Time in seconds, Name, and Data when present (including explicit `null`). Selecting a key, bone, or property clears event selection. Scrubbing/playback retain the selected event without forcing the clock back; Escape or an empty-area click clears it. Selection never edits authored data, dirty state, history, or serialized JSON. Preview continues to sample poses without dispatching events, including time-zero selection and recompilation.
+
+Editor references live in sidecar maps beside immutable event arrays; JSON remains `{ time, name, data? }` with millisecond timestamps. Programmatic event query/mutation APIs provide the foundation for future controls and reuse strict file validation plus document history. Authored edits retain surviving event references across sorting, movement, and Undo/Redo; deleted events clear selection and history does not restore cleared selection. Importing a replacement JSON snapshot creates fresh event references and clears stale selection. Event creation/editing/movement/copy/paste controls are deferred. See the [event verification report](animation-editor-events-verification.md).
 
 Every rig bone has a row in the same parent-first depth-first order as the Bones hierarchy. Expand a bone with its arrow to show `x`, `y`, `rotation`, `scaleX`, and `scaleY` in runtime order. Collapsing hides that bone's properties while keeping descendant bones available. **●** indicates authored keys anywhere in the animation; **○** indicates no authored keys. This differs from the inspector's indicator, which checks only the current playhead time. Bind-pose values and evaluated poses do not affect timeline key presence.
 

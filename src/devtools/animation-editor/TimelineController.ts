@@ -1,5 +1,6 @@
 import { setAttribute } from '../../shared/domUpdates.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
+import { EventInspectorController } from './EventInspectorController.js';
 import { InterpolationController } from './InterpolationController.js';
 import { generateRulerTicks, timeToTimelineX } from './timeline.js';
 import { TimelineInputController } from './TimelineInputController.js';
@@ -18,6 +19,7 @@ export class TimelineController {
   private readonly session: TimelineSessionController;
   private readonly tracks: TimelineTracksController;
   private readonly interpolation: InterpolationController;
+  private readonly eventInspector: EventInspectorController;
   private width = 0;
   private rulerKey = '';
 
@@ -34,6 +36,7 @@ export class TimelineController {
       endScrub: () => this.input.endScrub(),
     });
     this.interpolation = new InterpolationController(app, () => this.state);
+    this.eventInspector = new EventInspectorController(app);
     this.input = new TimelineInputController(app, this.timeline, () => this.state, this.ruler);
     this.width = this.timeline.getBoundingClientRect().width;
     this.resize = new ResizeObserver(() => {
@@ -77,6 +80,7 @@ export class TimelineController {
     const width = this.width;
     this.tracks.render(state, width);
     this.interpolation.render();
+    this.eventInspector.render(state);
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
       this.rulerKey = rulerKey;

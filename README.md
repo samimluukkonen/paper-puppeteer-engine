@@ -21,6 +21,8 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The [interpolation UI](docs/animation-editor-interpolation-ui-verification.md) exposes selection inspection, clip declaration edits, and outgoing/terminal marker indicators using the existing [authoring core](docs/animation-editor-interpolation-verification.md). The v0.5.2.6.3 [hardening regression](docs/animation-editor-interpolation-hardening-verification.md) covers key workflows, history, serialization, and preview integration, including exact spacing for nearby pasted keys. The format supports clip-level linear interpolation; smooth/stepped remain playback sampling modes. Per-key interpolation editing and mixed modes remain unavailable.
 
+The v0.5.2.7.1 [animation event track](docs/animation-editor-events-verification.md) displays authored events, including events sharing one time. Selecting an event pauses, seeks the preview, and shows its read-only name, time, and optional JSON data. Event selection and scrubbing never dispatch gameplay callbacks. Event editing controls are deferred.
+
 ## Quick start
 
 Build the library with `npm run build:lib`, then install this checkout in your Phaser project:

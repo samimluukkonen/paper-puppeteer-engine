@@ -1,5 +1,6 @@
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { EventTrackController } from './EventTrackController.js';
 import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
@@ -30,6 +31,7 @@ function reconcileRows(container: HTMLElement, rows: HTMLElement[]): void {
 
 /** Label/lanes adapter. Selection, expansion, data and the clock are owned by AnimationEditorState. */
 export class TimelineTracksController {
+  private readonly events = new EventTrackController();
   private state: AnimationEditorState | undefined;
   private tracks: readonly TimelineTrack[] | undefined;
   private interpolation: AnimationEditorState['authoredInterpolation'];
@@ -90,6 +92,7 @@ export class TimelineTracksController {
 
   render(state: AnimationEditorState, width: number): void {
     this.state = state;
+    this.events.render(state, width);
     const tracks = state.timelineTracks;
     const changed = tracks !== this.tracks;
     const interpolationChanged = this.interpolation !== state.authoredInterpolation;
@@ -100,8 +103,8 @@ export class TimelineTracksController {
       this.tracks = tracks;
       const keys = new Set(tracks.map(trackKey));
       for (const key of this.rows.keys()) if (!keys.has(key)) this.rows.delete(key);
-      const labels: HTMLElement[] = [];
-      const lanes: HTMLElement[] = [];
+      const labels: HTMLElement[] = [this.events.label];
+      const lanes: HTMLElement[] = [this.events.lane];
       for (const track of tracks) {
         const key = trackKey(track);
         let row = this.rows.get(key);
@@ -271,6 +274,7 @@ export class TimelineTracksController {
   }
 
   dispose(): void {
+    this.events.dispose();
     this.state = undefined;
     this.rows.clear();
     this.labels.replaceChildren();

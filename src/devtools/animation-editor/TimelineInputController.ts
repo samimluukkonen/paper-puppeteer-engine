@@ -64,7 +64,7 @@ export class TimelineInputController {
         if (event.key === 'Escape') {
           event.preventDefault();
           if (this.gesture?.kind === 'marquee') this.cancelGesture();
-          else this.state.clearKeyframeSelection();
+          else this.state.clearTimelineSelection();
           return;
         }
         // Clipboard shortcuts belong to the timeline panel; native editing/bookmarks win elsewhere.
@@ -165,7 +165,7 @@ export class TimelineInputController {
         const gesture = this.gesture;
         if (!gesture || event.pointerId !== gesture.id) return;
         this.updateGesture(event);
-        if (gesture.kind === 'scrub' && !gesture.additive && !gesture.moved) this.state.clearKeyframeSelection();
+        if (gesture.kind === 'scrub' && !gesture.additive && !gesture.moved) this.state.clearTimelineSelection();
         this.endGesture(true);
       },
       options,
@@ -394,7 +394,7 @@ export class TimelineInputController {
   private commitMarquee(box: MarqueeGesture): void {
     if (!box.moved) {
       if (!box.additive) {
-        this.state.clearKeyframeSelection();
+        this.state.clearTimelineSelection();
         this.scrub(box.clientX);
       }
       return;
@@ -402,7 +402,10 @@ export class TimelineInputController {
     const bounds = this.timeline.getBoundingClientRect();
     const minY = Math.min(box.startY, box.clientY - bounds.top);
     const maxY = Math.max(box.startY, box.clientY - bounds.top);
-    const rows = Array.from(this.timeline.querySelectorAll<HTMLElement>('.timeline-track-lane'));
+    // Event lanes have their own height/identity and never participate in key marquee row indices.
+    const rows = Array.from(
+      this.timeline.querySelectorAll<HTMLElement>('.timeline-track-lane:not(.timeline-event-track)'),
+    );
     const included = rows.flatMap((row, index) => {
       const rect = row.getBoundingClientRect();
       const center = rect.top - bounds.top + rect.height / 2;

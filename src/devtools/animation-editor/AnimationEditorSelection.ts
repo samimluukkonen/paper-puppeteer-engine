@@ -2,6 +2,7 @@ import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform, TransformProperty } from '../../engine/types.js';
+import { findAnimationEvent, type AnimationEventRef } from './animationEvents.js';
 import { findAdjacentBonePropertyKeyframe } from './keyframeQueries.js';
 import {
   keyIdentity,
@@ -19,6 +20,7 @@ type AnimationData = DeepReadonly<AnimationClip> | null;
 export class AnimationEditorSelection {
   private bone: string | null = null;
   private selectedProperty: TransformProperty | null = null;
+  private selectedEvent: AnimationEventRef | null = null;
   private keySelection: KeyframeSelectionState = Object.freeze({ selectedKeys: Object.freeze([]), primaryKey: null });
   private rangeAnchor: KeyframeSelection | null = null;
   private temporary: Readonly<Partial<JointTransform>> = Object.freeze({});
@@ -31,6 +33,27 @@ export class AnimationEditorSelection {
 
   get boneId(): string | null {
     return this.bone;
+  }
+  get event(): AnimationEventRef | null {
+    return this.selectedEvent;
+  }
+
+  selectEvent(ref: AnimationEventRef): void {
+    this.clearKey();
+    this.clearDraft();
+    this.bone = null;
+    this.selectedProperty = null;
+    this.selectedEvent = ref;
+  }
+
+  clearEvent(): boolean {
+    if (!this.selectedEvent) return false;
+    this.selectedEvent = null;
+    return true;
+  }
+
+  validateEvent(animation: AnimationData): void {
+    if (this.selectedEvent && !findAnimationEvent(animation, this.selectedEvent)) this.clearEvent();
   }
   get property(): TransformProperty | null {
     return this.selectedProperty;
@@ -52,7 +75,9 @@ export class AnimationEditorSelection {
   }
 
   selectBone(id: string | null): boolean {
-    if (id === this.bone && this.selectedProperty === null && this.keys.length === 0) return false;
+    if (id === this.bone && this.selectedProperty === null && this.keys.length === 0 && !this.selectedEvent)
+      return false;
+    this.clearEvent();
     this.bone = id;
     this.selectedProperty = null;
     this.clearKey();
@@ -61,7 +86,9 @@ export class AnimationEditorSelection {
   }
 
   selectProperty(boneId: string, property: TransformProperty): boolean {
-    if (this.bone === boneId && this.selectedProperty === property && this.keys.length === 0) return false;
+    if (this.bone === boneId && this.selectedProperty === property && this.keys.length === 0 && !this.selectedEvent)
+      return false;
+    this.clearEvent();
     this.bone = boneId;
     this.selectedProperty = property;
     this.clearKey();
@@ -75,6 +102,7 @@ export class AnimationEditorSelection {
   }
 
   setKeys(keys: readonly KeyframeSelection[], primary: KeyframeSelection | null, clearDraft = true): void {
+    this.clearEvent();
     const selectedKeys = [...keyframeSelectionIndex(keys).values()].map((key) =>
       Object.isFrozen(key) && !('value' in key)
         ? key
@@ -109,6 +137,7 @@ export class AnimationEditorSelection {
   }
 
   resetAnimation(): void {
+    this.clearEvent();
     this.selectedProperty = null;
     this.clearKey();
     this.clearDraft();

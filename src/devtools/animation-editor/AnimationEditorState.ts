@@ -1,10 +1,12 @@
 import type {
   AnimationClip,
+  AnimationEvent,
   AnimationPlaybackMode,
   Interpolation,
   PropertyKeyframe,
 } from '../../engine/AnimationClip.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
+import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { freezeData } from '../shared/editorData.js';
@@ -16,6 +18,15 @@ import {
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import {
+  addAnimationEvent,
+  buildEventTimelineTrack,
+  findAnimationEvent,
+  removeAnimationEvent,
+  updateAnimationEvent,
+  type AnimationEventRef,
+  type EventTimelineTrack,
+} from './animationEvents.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
 import {
   getAnimationInterpolation,
@@ -88,6 +99,58 @@ export class AnimationEditorState {
   }
   get selectedKeyframe(): KeyframeSelection | null {
     return this.selection.key;
+  }
+  get selectedEvent(): AnimationEventRef | null {
+    return this.selection.event;
+  }
+  get selectedEventData() {
+    return this.selectedEvent ? findAnimationEvent(this.working, this.selectedEvent) : undefined;
+  }
+  get eventTimelineTrack(): EventTimelineTrack {
+    return buildEventTimelineTrack(this.working);
+  }
+  /** Transient navigation only: preview sampling never dispatches authored events. */
+  selectAnimationEvent(ref: AnimationEventRef): boolean {
+    const event = findAnimationEvent(this.working, ref);
+    if (!event) return false;
+    this.cancelKeyframeDrag();
+    this.playback.pause();
+    this.playback.endScrub();
+    this.selection.selectEvent(ref);
+    this.updateTime(toSeconds(event.time));
+    this.notify();
+    return true;
+  }
+  clearEventSelection(): void {
+    if (this.selection.clearEvent()) this.notify();
+  }
+  clearTimelineSelection(): void {
+    this.cancelKeyframeDrag();
+    const keys = this.selection.clearKey();
+    const event = this.selection.clearEvent();
+    if (keys || event) this.notify();
+  }
+  /** Programmatic authored foundations; event editing controls are intentionally deferred. */
+  addAnimationEvent(event: DeepReadonly<AnimationEvent>): boolean {
+    return this.editEvents((animation, rig) => addAnimationEvent(animation, rig, event));
+  }
+  updateAnimationEvent(ref: AnimationEventRef, event: DeepReadonly<AnimationEvent>): boolean {
+    return this.editEvents((animation, rig) => updateAnimationEvent(animation, rig, ref, event));
+  }
+  removeAnimationEvent(ref: AnimationEventRef): boolean {
+    return this.editEvents((animation, rig) => removeAnimationEvent(animation, rig, ref));
+  }
+  private editEvents(edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation): boolean {
+    if (!this.working || !this.rig) return false;
+    let next: ReadonlyAnimation;
+    try {
+      next = edit(this.working, this.rig);
+    } catch (error) {
+      this.document.reportError(error);
+      this.notify();
+      return false;
+    }
+    return this.installWorkingAnimation(next);
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -216,6 +279,7 @@ export class AnimationEditorState {
   /** Authored snapshots are authoritative; history never restores transient selection. */
   private validateKeyframeSelection(): void {
     this.selection.validateKey(this.working);
+    this.selection.validateEvent(this.working);
   }
   /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
   get timelineTracks(): readonly TimelineTrack[] {
