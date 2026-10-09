@@ -179,3 +179,29 @@ test('an older pending copy cannot replace a newer successful export', async () 
   querySelector('#reload-exported').click();
   assert.equal(scene.reloadRig.mock.calls[0]![0].bones[0]!.x, 2);
 });
+
+test('an older copy may save its snapshot while feedback belongs to a newer pending export', async () => {
+  const { state, copy, resolve, writeText, feedback } = await fixture();
+  state.editBone('root', 'x', 1);
+  copy();
+  let finishNewer!: () => void;
+  writeText.mockImplementationOnce(
+    () =>
+      new Promise<void>((done) => {
+        finishNewer = done;
+      }),
+  );
+  state.editBone('root', 'x', 2);
+  copy();
+  const message = feedback.textContent;
+  resolve();
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(feedback.textContent, message);
+  assert.isTrue(state.dirty);
+  state.undo();
+  assert.isFalse(state.dirty);
+  state.redo();
+  finishNewer();
+  await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
+  assert.isFalse(state.dirty);
+});

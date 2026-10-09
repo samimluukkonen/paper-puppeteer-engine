@@ -1,5 +1,6 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { downloadJson } from '../../shared/downloadJson.js';
+import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { AnimationImportOptions } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { TimelineInputController } from './TimelineInputController.js';
@@ -42,10 +43,7 @@ export class TimelineSessionController {
   private externalError = '';
   private authoredFPS = '';
   private animation: AnimationEditorState['workingAnimation'] = null;
-  private exportSequence = 0;
-  private committedExportSequence = 0;
-  private sessionGeneration = 0;
-  private importSequence = 0;
+  private readonly requests = new SessionActionGuard(this.abort.signal);
   private animationIdsKey = '';
 
   constructor(
@@ -107,7 +105,7 @@ export class TimelineSessionController {
     this.element('#animation-import-cancel').addEventListener(
       'click',
       () => {
-        ++this.importSequence;
+        this.requests.cancelImports();
         this.importPanel.hidden = true;
         this.importText.value = '';
         this.setImportFeedback('');
@@ -117,7 +115,7 @@ export class TimelineSessionController {
     this.element('#animation-import-submit').addEventListener(
       'click',
       () => {
-        ++this.importSequence;
+        this.requests.cancelImports();
         this.replaceSession((options) => this.state.importJson(this.importText.value, options));
       },
       options,
@@ -132,7 +130,7 @@ export class TimelineSessionController {
     this.reloadExport.addEventListener(
       'click',
       () => {
-        ++this.importSequence;
+        this.requests.cancelImports();
         this.replaceSession((options) => this.state.reloadCurrentExport(options));
       },
       options,
@@ -150,7 +148,7 @@ export class TimelineSessionController {
         const discardChanges =
           this.state.dirty && window.confirm('Discard unsaved animation changes and select another animation?');
         if (this.state.selectAnimation(this.selection.value || null, { discardChanges })) {
-          ++this.sessionGeneration;
+          this.requests.invalidate();
           this.setExportFeedback('');
         }
         this.render();
@@ -207,7 +205,7 @@ export class TimelineSessionController {
         if (!this.state.dirty || !window.confirm('Discard unsaved animation changes?')) return;
         this.input.endScrub();
         if (this.state.selectAnimation(this.state.selectedAnimationId, { discardChanges: true })) {
-          ++this.sessionGeneration;
+          this.requests.invalidate();
           this.setExportFeedback('Changes discarded. The last saved animation was restored.');
         }
       },
@@ -219,8 +217,7 @@ export class TimelineSessionController {
         if (this.state.dirty && !window.confirm('Discard unsaved animation changes and revert to the session source?'))
           return;
         if (this.state.revertAnimation({ discardChanges: true })) {
-          ++this.sessionGeneration;
-          ++this.importSequence;
+          this.requests.invalidate();
           this.externalError = '';
           this.setImportFeedback('');
           this.setExportFeedback('Animation reverted to its loaded/imported source. Clean session; history reset.');
@@ -270,7 +267,7 @@ export class TimelineSessionController {
       );
       return;
     }
-    ++this.sessionGeneration;
+    this.requests.invalidate();
     this.importPanel.hidden = true;
     this.importText.value = '';
     this.externalError = '';
@@ -285,25 +282,18 @@ export class TimelineSessionController {
     if (!file) return;
     const state = this.state;
     const animation = state.workingAnimation;
-    const generation = this.sessionGeneration;
     const revision = state.sessionRevision;
-    const sequence = ++this.importSequence;
-    const isCurrent = (): boolean =>
-      !this.abort.signal.aborted &&
-      this.state === state &&
-      state.sessionRevision === revision &&
-      this.sessionGeneration === generation &&
-      this.importSequence === sequence;
+    const request = this.requests.beginImport(() => this.state === state && state.sessionRevision === revision);
     try {
       const json = await file.text();
-      if (!isCurrent()) return;
+      if (!request.isCurrent()) return;
       if (state.workingAnimation !== animation) {
         this.setImportFeedback('Animation changed while reading the file. Choose the file again to import.');
         return;
       }
       this.replaceSession((options) => state.importJson(json, options));
     } catch (error) {
-      if (isCurrent())
+      if (request.isCurrent())
         this.setImportFeedback(
           `Could not read animation file: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -314,16 +304,14 @@ export class TimelineSessionController {
     const state = this.state;
     const id = state.selectedAnimationId;
     const source = state.sourceAnimation;
-    const generation = this.sessionGeneration;
     const revision = state.sessionRevision;
-    const sequence = ++this.exportSequence;
-    const isCurrent = (): boolean =>
-      !this.abort.signal.aborted &&
-      this.state === state &&
-      state.sessionRevision === revision &&
-      state.selectedAnimationId === id &&
-      state.sourceAnimation === source &&
-      generation === this.sessionGeneration;
+    const request = this.requests.beginExport(
+      () =>
+        this.state === state &&
+        state.sessionRevision === revision &&
+        state.selectedAnimationId === id &&
+        state.sourceAnimation === source,
+    );
     try {
       const result = state.exportAnimation();
       if (!result.success)
@@ -349,13 +337,12 @@ export class TimelineSessionController {
         console.log(result.json);
         message = 'Animation JSON logged to the console.';
       }
-      if (!isCurrent() || sequence < this.committedExportSequence) return;
-      this.committedExportSequence = sequence;
+      if (!request.commit()) return;
       // Clipboard writes can finish after further edits: save only the exported snapshot.
       state.markSaved(snapshot);
-      if (sequence === this.exportSequence) this.setExportFeedback(message);
+      if (request.isLatest()) this.setExportFeedback(message);
     } catch (error) {
-      if (isCurrent() && sequence === this.exportSequence)
+      if (request.isLatest())
         this.setExportFeedback(`Could not export animation: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -367,7 +354,7 @@ export class TimelineSessionController {
   }
 
   bind(characterId?: string): void {
-    ++this.sessionGeneration;
+    this.requests.invalidate();
     const state = this.state;
     this.externalError = '';
     this.setExportFeedback('');

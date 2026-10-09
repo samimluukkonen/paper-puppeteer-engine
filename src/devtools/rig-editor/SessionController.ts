@@ -1,5 +1,6 @@
 import { type RigJsonDefinition, validateRigDefinition } from '../../engine/externalData.js';
 import { downloadJson } from '../../shared/downloadJson.js';
+import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigEditorScene } from './RigEditorScene.js';
 
@@ -17,12 +18,10 @@ export function createSessionController(
   const feedback = app.querySelector<HTMLElement>('#action-feedback')!;
   let lastExport: RigJsonDefinition | undefined;
   let lastExportFilename: string | undefined;
-  let exportSequence = 0;
-  let committedExportSequence = 0;
-  let importSequence = 0;
+  const requests = new SessionActionGuard(lifetime.signal);
   function updateStatus(current: RigEditor): void {
     if (lifetime.signal.aborted) return;
-    if (editor !== current) ++importSequence;
+    if (editor !== current) requests.invalidate();
     editor = current;
     onStateChange(current);
     const isDirty = current.state.dirty;
@@ -83,22 +82,21 @@ export function createSessionController(
     feedback.textContent = warnings.length
       ? `Ready with warnings: ${warnings.map((issue) => issue.message).join(' · ')}`
       : 'Rig JSON ready.';
+    const exportingEditor = editor;
     return {
       editor,
       json,
       rig: JSON.parse(json) as RigJsonDefinition,
       filename: getScene().rigFilename,
       snapshot: editor.state.workingSnapshot,
-      sequence: ++exportSequence,
+      request: requests.beginExport(() => editor === exportingEditor),
     };
   };
   const commitExport = (prepared: ReturnType<typeof prepareExport>): boolean => {
     // A delayed copy must not replace a newer successful export or another session.
-    if (lifetime.signal.aborted || editor !== prepared.editor || prepared.sequence < committedExportSequence)
-      return false;
+    if (!prepared.request.commit()) return false;
     lastExport = prepared.rig;
     lastExportFilename = prepared.filename;
-    committedExportSequence = prepared.sequence;
     prepared.editor.state.markSaved(prepared.snapshot);
     updateStatus(prepared.editor);
     return true;
@@ -111,10 +109,10 @@ export function createSessionController(
       await navigator.clipboard.writeText(prepared.json);
     } catch (error) {
       // Failed requests must not overwrite feedback from a replacement session or newer export.
-      if (editor === prepared.editor && prepared.sequence === exportSequence) throw error;
+      if (prepared.request.isLatest()) throw error;
       return;
     }
-    if (commitExport(prepared)) feedback.textContent = 'Rig JSON copied.';
+    if (commitExport(prepared) && prepared.request.isLatest()) feedback.textContent = 'Rig JSON copied.';
   });
   action('download-json', () => {
     const prepared = prepareExport();
@@ -131,13 +129,13 @@ export function createSessionController(
   action('reload-exported', () => {
     if (!lastExport) throw new Error('Export the rig first.');
     if (editor?.state.dirty && !window.confirm('Discard edits made since the last export?')) return;
-    ++importSequence;
+    requests.cancelImports();
     getScene().reloadRig(lastExport, lastExportFilename);
     feedback.textContent = 'Exported rig reloaded and validated.';
   });
   action('reload-original', () => {
     if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and reload the original?')) return;
-    ++importSequence;
+    requests.cancelImports();
     getScene().reloadOriginal();
     feedback.textContent = 'Original rig reloaded.';
   });
@@ -147,13 +145,11 @@ export function createSessionController(
     if (!file) return;
     // Capture the file before clearing so selecting it again starts a new request.
     input.value = '';
-    const sequence = ++importSequence;
     const sessionEditor = editor;
-    const isCurrent = (): boolean =>
-      !lifetime.signal.aborted && sequence === importSequence && editor === sessionEditor;
+    const request = requests.beginImport(() => editor === sessionEditor);
     try {
       const text = await file.text();
-      if (!isCurrent()) return;
+      if (!request.isCurrent()) return;
       const json = JSON.parse(text) as RigJsonDefinition;
       const issues = validateRigDefinition(json);
       if (issues.some((issue) => issue.severity === 'error'))
@@ -164,7 +160,7 @@ export function createSessionController(
       getScene().reloadRig(json, file.name);
       feedback.textContent = `${file.name} loaded and validated.`;
     } catch (error) {
-      if (isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
+      if (request.isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
     }
   };
   app.querySelector<HTMLInputElement>('#load-json')!.addEventListener(
