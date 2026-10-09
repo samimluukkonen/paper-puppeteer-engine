@@ -59,3 +59,36 @@ test('edits and selection leave unrelated dense timeline markers untouched', asy
   await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
+
+test('dense collapsed summaries follow zoom while individual keys retain exact timestamps', async ({ page }) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    await route.fulfill({
+      json: {
+        version: 1,
+        name: 'idle',
+        duration: 5120,
+        loop: false,
+        events: [],
+        tracks: { root: Array.from({ length: 513 }, (_, index) => ({ time: index * 10, x: index })) },
+      },
+    });
+  });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  const summaries = page.locator('[data-bone-id="root"] .timeline-summary');
+  await expect.poll(() => summaries.count()).toBeGreaterThan(0);
+  expect(await summaries.count()).toBeLessThan(513);
+  await page.locator('#timeline-zoom').selectOption('8');
+  await expect(summaries).toHaveCount(513);
+  await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
+  await expect(summaries).toHaveCount(0);
+  const keys = page.locator('#timeline-tracks [data-bone-id="root"][data-property="x"] .timeline-keyframe');
+  await expect(keys).toHaveCount(513);
+  expect(
+    await keys.evaluateAll((markers) => markers.map((marker) => Number(marker.getAttribute('data-time')))),
+  ).toEqual(Array.from({ length: 513 }, (_, index) => (index * 10) / 1000));
+  await page.locator('#timeline-zoom').selectOption('1');
+  await expect(keys).toHaveCount(513);
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+});

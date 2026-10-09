@@ -235,6 +235,17 @@ For stateless pose tooling, import `compileClip` and `evaluateClip` from `/core`
 
 Compiled clips own immutable metadata, property maps, keyframes, playback settings, and JSON event payloads, so they can be shared between compatible players. `AnimationPlayer` takes an independent snapshot of externally assembled compiled clips. Non-JSON runtime event payloads retain reference semantics; listener notifications receive independent metadata and copies of JSON payloads.
 
+Profile timeline DOM work locally with `PLAYWRIGHT_CHANNEL=chrome npm run profile:timeline` (or omit the channel to use installed Playwright Chromium). The script starts a temporary local Vite server, opens three fresh browser pages with 512 keys on each of the sample rig's 16 bones, and reports collapsed summary counts plus synchronous expansion/collapse costs including layout. It closes the browser and server afterward. This is a local diagnostic, excluded from CI; timings are observations without pass/fail thresholds.
+
+Collapsed summaries combine timestamps within each seven-pixel interval at the current zoom. Expanded property keys and event markers retain their separate identities and exact authored times. Zooming or resizing rebuilds the summaries from authored data. One local Chrome comparison measured:
+
+| Collapsed summaries | DOM elements | Median expand: ms | Median collapse: ms |
+| ------------------- | -----------: | ----------------: | ------------------: |
+| One per timestamp   |        8,192 |              58.0 |                17.5 |
+| Grouped by pixels   |        2,608 |              56.9 |                11.5 |
+
+The comparison used a 1440×900 viewport and a 1142-pixel timeline. Expansion still creates all individual property markers, so this change primarily reduces collapsed DOM size and collapse work. These measurements include browser layout and vary by machine and run.
+
 Profile dense editor authoring with `VITE_PROFILE=1 npx vitest run tests/animationAuthoring.profile.test.ts --reporter=verbose`. It measures one property-key edit plus inspector sampling on 33 bones with 512 keys per track, using five warmed batches of ten edits. A local comparison measured 242 ms/edit before validation reuse and 164 ms/edit afterward; these CPU measurements exclude DOM and GPU work and are diagnostic, not CI thresholds.
 
 Editor validation is cached per deeply frozen animation snapshot and rig. Mutable and shallow-frozen inputs are checked on every use. Key edits from a validated immutable source check metadata and changed tracks; shared tracks and events retain their validation only when the rig and duration are unchanged. Duration changes receive full validation. Deep immutability checks reuse verified frozen branches, and preview compilation reuses immutable property maps for unchanged track arrays. Each preview keeps independent pose buffers. The public `compileClip` entry point continues to validate all supplied clips.

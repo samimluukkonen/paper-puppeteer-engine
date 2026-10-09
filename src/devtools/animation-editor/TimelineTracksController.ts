@@ -5,8 +5,8 @@ import { EventTrackController } from './EventTrackController.js';
 import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
+import { summarizeKeyframeTimes } from './timelineSummaries.js';
 import { type KeyframeSelection, type TimelineTrack, timelineTrackKey } from './timelineTracks.js';
-import { toSeconds } from './timeUnits.js';
 
 interface TrackElements {
   readonly label: HTMLElement;
@@ -215,13 +215,7 @@ export class TimelineTracksController {
         if (track?.kind !== 'bone') continue;
         const authored = state.workingAnimation?.tracks;
         const keys = authored && Object.hasOwn(authored, track.boneId) ? authored[track.boneId]! : [];
-        const times = new Set(
-          track.expanded
-            ? []
-            : keys
-                .filter((key) => Object.keys(key).some((property) => property !== 'time'))
-                .map((key) => toSeconds(key.time)),
-        );
+        const times = track.expanded ? new Set<number>() : summarizeKeyframeTimes(keys, state.duration, width);
         for (const [time, marker] of row.summaries) {
           if (times.has(time)) continue;
           marker.remove();
@@ -236,7 +230,8 @@ export class TimelineTracksController {
             row.lane.append(marker);
             row.summaries.set(time, marker);
           }
-          marker.style.left = `${timeToTimelineX(time, state.duration, width)}px`;
+          const left = `${timeToTimelineX(time, state.duration, width)}px`;
+          if (marker.style.left !== left) marker.style.left = left;
         }
       }
     }
