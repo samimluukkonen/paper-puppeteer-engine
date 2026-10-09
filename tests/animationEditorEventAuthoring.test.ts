@@ -28,6 +28,31 @@ function session() {
   return { state, input, source, before };
 }
 
+test('event commands publish one complete selection and playhead state', () => {
+  const { state } = session();
+  state.setCurrentTime(0.2);
+  const observed: { time: number; eventTime: number | undefined; dragging: boolean }[] = [];
+  state.subscribe(() => {
+    observed.push({ time: state.currentTime, eventTime: state.selectedEventData?.time, dragging: !!state.eventDrag });
+  });
+  state.createAnimationEvent();
+  assert.deepEqual(observed.splice(0), [{ time: 0.2, eventTime: 200, dragging: false }]);
+  state.moveSelectedEvent(0.8);
+  assert.deepEqual(observed.splice(0), [{ time: 0.8, eventTime: 800, dragging: false }]);
+  state.beginEventDrag(state.selectedEvent!);
+  assert.deepEqual(observed.splice(0), [{ time: 0.8, eventTime: 800, dragging: true }]);
+  state.previewEventDrag(0.9);
+  observed.length = 0;
+  state.moveSelectedEvent(1.2);
+  assert.deepEqual(observed.splice(0), [{ time: 1.2, eventTime: 1200, dragging: false }]);
+  state.copySelectedEvent();
+  observed.length = 0;
+  state.setCurrentTime(1.5);
+  observed.length = 0;
+  state.pasteEvent();
+  assert.deepEqual(observed, [{ time: 1.5, eventTime: 1500, dragging: false }]);
+});
+
 test('creation uses currentTime, selects its identity, pauses and records one reversible owned snapshot', () => {
   const { state, source, input, before } = session();
   state.setCurrentTime(0.75);
