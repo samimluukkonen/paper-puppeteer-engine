@@ -7,6 +7,7 @@ import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { ReadonlyAnimation } from './AnimationEditorState.js';
+import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { mountEditorMarkup } from './editorMarkup.js';
 import { TimelineController } from './TimelineController.js';
@@ -25,11 +26,28 @@ const recovery = new DraftRecovery<ReadonlyAnimation | null>((message) => {
   recoveryStatus.textContent = message;
 });
 let releaseRecovery: (() => void) | undefined;
+let releaseWorkspaceSelection: (() => void) | undefined;
 const scene = new AnimationEditorScene(
   (state, id) => {
+    scene.fitPreview();
     releaseRecovery?.();
     timeline.bind(state, id);
     inspector.bind(state);
+    releaseWorkspaceSelection?.();
+    let selectedBone = state.selectedBoneId;
+    let selectedEvent = state.selectedEvent;
+    let selectedKeys = state.selectedKeys;
+    releaseWorkspaceSelection = state.subscribe(() => {
+      if (
+        (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
+        (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
+        (state.selectedKeys.length && state.selectedKeys !== selectedKeys)
+      )
+        workspace.revealInspector();
+      selectedBone = state.selectedBoneId;
+      selectedEvent = state.selectedEvent;
+      selectedKeys = state.selectedKeys;
+    });
     let recoveryAnimation: string | null | undefined;
     let recoverySource: ReadonlyAnimation | null | undefined;
     let recoveryImportRevision = state.importRevision;
@@ -97,9 +115,15 @@ app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
   { signal: previewControls.signal },
 );
 const game = createEditorGame('animation-stage', scene);
+const workspace = new AnimationWorkspaceController(app, () => {
+  game.scale.getParentBounds();
+  game.scale.refresh();
+});
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
     releaseRecovery?.();
+    releaseWorkspaceSelection?.();
+    workspace.dispose();
     recovery.dispose();
     releaseNavigationGuard();
     timeline.dispose();

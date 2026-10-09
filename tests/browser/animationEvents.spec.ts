@@ -233,6 +233,7 @@ test('event creation, field commits, JSON validation, same-time edits and exact 
   await page.locator('#animation-delete-event').click();
   await expect(event(page, 'authored')).toHaveCount(0);
   await expect(page.locator('#animation-event-inspector')).toBeHidden();
+  await expect(page.locator('#timeline-add-event')).toBeFocused();
   await page.locator('#animation-undo').click();
   await event(page, 'authored').click();
   await expect(data).toHaveValue(/"nested"/);

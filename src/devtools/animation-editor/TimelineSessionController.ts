@@ -110,7 +110,7 @@ export class TimelineSessionController {
         ++this.importSequence;
         this.importPanel.hidden = true;
         this.importText.value = '';
-        setText(this.importFeedback, '');
+        this.setImportFeedback('');
       },
       options,
     );
@@ -151,7 +151,7 @@ export class TimelineSessionController {
           this.state.dirty && window.confirm('Discard unsaved animation changes and select another animation?');
         if (this.state.selectAnimation(this.selection.value || null, { discardChanges })) {
           ++this.sessionGeneration;
-          setText(this.exportFeedback, '');
+          this.setExportFeedback('');
         }
         this.render();
       },
@@ -208,7 +208,7 @@ export class TimelineSessionController {
         this.input.endScrub();
         if (this.state.selectAnimation(this.state.selectedAnimationId, { discardChanges: true })) {
           ++this.sessionGeneration;
-          setText(this.exportFeedback, 'Changes discarded. The last saved animation was restored.');
+          this.setExportFeedback('Changes discarded. The last saved animation was restored.');
         }
       },
       options,
@@ -222,11 +222,8 @@ export class TimelineSessionController {
           ++this.sessionGeneration;
           ++this.importSequence;
           this.externalError = '';
-          setText(this.importFeedback, '');
-          setText(
-            this.exportFeedback,
-            'Animation reverted to its loaded/imported source. Clean session; history reset.',
-          );
+          this.setImportFeedback('');
+          this.setExportFeedback('Animation reverted to its loaded/imported source. Clean session; history reset.');
           this.render();
         }
       },
@@ -238,6 +235,16 @@ export class TimelineSessionController {
     this.duplicateKeys.addEventListener('click', () => this.state.duplicateTimelineSelection(), options);
     this.previousKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(-1), options);
     this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
+  }
+
+  private setImportFeedback(message: string): void {
+    setText(this.importFeedback, message);
+    setText(this.element('#animation-file-import-feedback'), message);
+  }
+
+  private setExportFeedback(message: string): void {
+    setText(this.exportFeedback, message);
+    setText(this.element('#animation-file-export-feedback'), message);
   }
 
   private get state(): AnimationEditorState {
@@ -252,14 +259,13 @@ export class TimelineSessionController {
         return !cancelled;
       },
     });
-    if (cancelled) setText(this.importFeedback, 'Replacement cancelled. Current animation retained.');
+    if (cancelled) this.setImportFeedback('Replacement cancelled. Current animation retained.');
     else this.finishImport(imported);
   }
 
   private finishImport(imported: boolean): void {
     if (!imported) {
-      setText(
-        this.importFeedback,
+      this.setImportFeedback(
         this.state.validationIssues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n'),
       );
       return;
@@ -268,11 +274,8 @@ export class TimelineSessionController {
     this.importPanel.hidden = true;
     this.importText.value = '';
     this.externalError = '';
-    setText(this.exportFeedback, '');
-    setText(
-      this.importFeedback,
-      `Imported "${this.state.selectedAnimationId}". Clean session; playback paused at zero.`,
-    );
+    this.setExportFeedback('');
+    this.setImportFeedback(`Imported "${this.state.selectedAnimationId}". Clean session; playback paused at zero.`);
     this.render();
   }
 
@@ -295,14 +298,13 @@ export class TimelineSessionController {
       const json = await file.text();
       if (!isCurrent()) return;
       if (state.workingAnimation !== animation) {
-        setText(this.importFeedback, 'Animation changed while reading the file. Choose the file again to import.');
+        this.setImportFeedback('Animation changed while reading the file. Choose the file again to import.');
         return;
       }
       this.replaceSession((options) => state.importJson(json, options));
     } catch (error) {
       if (isCurrent())
-        setText(
-          this.importFeedback,
+        this.setImportFeedback(
           `Could not read animation file: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
@@ -351,13 +353,10 @@ export class TimelineSessionController {
       this.committedExportSequence = sequence;
       // Clipboard writes can finish after further edits: save only the exported snapshot.
       state.markSaved(snapshot);
-      if (sequence === this.exportSequence) setText(this.exportFeedback, message);
+      if (sequence === this.exportSequence) this.setExportFeedback(message);
     } catch (error) {
       if (isCurrent() && sequence === this.exportSequence)
-        setText(
-          this.exportFeedback,
-          `Could not export animation: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.setExportFeedback(`Could not export animation: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -371,8 +370,8 @@ export class TimelineSessionController {
     ++this.sessionGeneration;
     const state = this.state;
     this.externalError = '';
-    setText(this.exportFeedback, '');
-    setText(this.importFeedback, '');
+    this.setExportFeedback('');
+    this.setImportFeedback('');
     this.importPanel.hidden = true;
     this.importText.value = '';
     this.updateAnimationOptions(state);

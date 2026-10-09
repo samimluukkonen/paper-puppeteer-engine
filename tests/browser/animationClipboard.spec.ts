@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page, stepped = false) {
   await page.route(/\/animations\/(idle|walk)\.json$/, async (route) => {
@@ -124,7 +124,7 @@ test('duplicate shortcut uses one authored frame and selects the group; button w
   await page.locator('#animation-undo').click();
   await expect(marker(page, 0.55)).toHaveCount(0);
   await expect(page.locator('#animation-undo')).toBeDisabled();
-  await page.locator('#animation-mode').selectOption('smooth');
+  await (await animationControl(page, '#animation-mode')).selectOption('smooth');
   await selectGroup(page);
   await page.locator('#timeline-duplicate-keys').click();
   await verifyGroup(page, 0.51);

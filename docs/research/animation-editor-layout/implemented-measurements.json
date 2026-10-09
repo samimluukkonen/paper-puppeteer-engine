@@ -1,0 +1,193 @@
+{
+  "capturedOn": "2026-10-10",
+  "scenario": "demo-puppet, idle, time zero, selected root; inspector drawer closed on narrow screens",
+  "measurements": [
+    {
+      "viewport": "1440x900",
+      "pageHeight": 900,
+      "pageWidth": 1440,
+      "headerHeight": 49,
+      "commandBarHeight": 73,
+      "preview": {
+        "x": 16,
+        "y": 138,
+        "width": 976,
+        "height": 435,
+        "bottom": 573
+      },
+      "timelinePanel": {
+        "x": 16,
+        "y": 585,
+        "width": 1408,
+        "height": 303,
+        "bottom": 888
+      },
+      "ruler": {
+        "x": 269,
+        "y": 660,
+        "width": 1142,
+        "height": 36,
+        "bottom": 696
+      },
+      "animationSelectorTop": 68,
+      "undoTop": 68,
+      "downloadTop": 68
+    },
+    {
+      "viewport": "1280x800",
+      "pageHeight": 800,
+      "pageWidth": 1280,
+      "headerHeight": 49,
+      "commandBarHeight": 73,
+      "preview": {
+        "x": 16,
+        "y": 138,
+        "width": 816,
+        "height": 377,
+        "bottom": 515
+      },
+      "timelinePanel": {
+        "x": 16,
+        "y": 527,
+        "width": 1248,
+        "height": 261,
+        "bottom": 788
+      },
+      "ruler": {
+        "x": 269,
+        "y": 602,
+        "width": 982,
+        "height": 36,
+        "bottom": 638
+      },
+      "animationSelectorTop": 68,
+      "undoTop": 68,
+      "downloadTop": 68
+    },
+    {
+      "viewport": "1920x1080",
+      "pageHeight": 1080,
+      "pageWidth": 1920,
+      "headerHeight": 49,
+      "commandBarHeight": 73,
+      "preview": {
+        "x": 16,
+        "y": 138,
+        "width": 1456,
+        "height": 539,
+        "bottom": 677
+      },
+      "timelinePanel": {
+        "x": 16,
+        "y": 689,
+        "width": 1888,
+        "height": 379,
+        "bottom": 1068
+      },
+      "ruler": {
+        "x": 269,
+        "y": 764,
+        "width": 1622,
+        "height": 36,
+        "bottom": 800
+      },
+      "animationSelectorTop": 68,
+      "undoTop": 68,
+      "downloadTop": 68
+    },
+    {
+      "viewport": "1000x768",
+      "pageHeight": 768,
+      "pageWidth": 1000,
+      "headerHeight": 49,
+      "commandBarHeight": 109,
+      "preview": {
+        "x": 16,
+        "y": 174,
+        "width": 536,
+        "height": 338,
+        "bottom": 512
+      },
+      "timelinePanel": {
+        "x": 16,
+        "y": 524,
+        "width": 968,
+        "height": 232,
+        "bottom": 756
+      },
+      "ruler": {
+        "x": 269,
+        "y": 599,
+        "width": 702,
+        "height": 36,
+        "bottom": 635
+      },
+      "animationSelectorTop": 68,
+      "undoTop": 68,
+      "downloadTop": 104
+    },
+    {
+      "viewport": "768x1024",
+      "pageHeight": 1024,
+      "pageWidth": 768,
+      "headerHeight": 83,
+      "commandBarHeight": 109,
+      "preview": {
+        "x": 16,
+        "y": 208,
+        "width": 736,
+        "height": 466,
+        "bottom": 674
+      },
+      "timelinePanel": {
+        "x": 16,
+        "y": 686,
+        "width": 736,
+        "height": 326,
+        "bottom": 1012
+      },
+      "ruler": {
+        "x": 269,
+        "y": 797,
+        "width": 470,
+        "height": 36,
+        "bottom": 833
+      },
+      "animationSelectorTop": 102,
+      "undoTop": 102,
+      "downloadTop": 138
+    },
+    {
+      "viewport": "390x844",
+      "pageHeight": 850,
+      "pageWidth": 390,
+      "headerHeight": 112,
+      "commandBarHeight": 135,
+      "preview": {
+        "x": 10,
+        "y": 263,
+        "width": 370,
+        "height": 242,
+        "bottom": 505
+      },
+      "timelinePanel": {
+        "x": 10,
+        "y": 517,
+        "width": 370,
+        "height": 322,
+        "bottom": 838
+      },
+      "ruler": {
+        "x": 169,
+        "y": 688,
+        "width": 202,
+        "height": 36,
+        "bottom": 724
+      },
+      "animationSelectorTop": 129,
+      "undoTop": 129,
+      "downloadTop": 197
+    }
+  ],
+  "pageErrors": []
+}

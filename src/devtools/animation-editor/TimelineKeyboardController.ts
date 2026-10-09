@@ -23,6 +23,7 @@ export class TimelineKeyboardController {
       (event) => {
         if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
           return;
+        if (event.target instanceof Element && event.target.closest('dialog')) return;
         if (event.key === 'Escape' && (this.state.keyframeDrag || this.state.eventDrag)) {
           event.preventDefault();
           this.gestures.cancelGesture();
@@ -83,7 +84,9 @@ export class TimelineKeyboardController {
           event.altKey ||
           event.ctrlKey ||
           event.metaKey ||
-          (event.code === 'Space' && event.target instanceof Element && event.target.closest('button, a[href]'))
+          (event.code === 'Space' &&
+            event.target instanceof Element &&
+            event.target.closest('button, a[href], summary'))
         )
           return;
         event.preventDefault();

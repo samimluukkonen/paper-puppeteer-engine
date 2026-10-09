@@ -1,0 +1,1981 @@
+{
+  "measurements": [
+    {
+      "label": "1440x900 idle bone-selected",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollY": 0,
+      "documentHeight": 2487,
+      "documentWidth": 1440,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1384,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 906,
+          "height": 809,
+          "bottom": 1035,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 904,
+          "height": 761,
+          "bottom": 1034,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 952,
+          "y": 226,
+          "width": 460,
+          "height": 1345,
+          "bottom": 1571,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 973,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 973,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1053,
+          "width": 906,
+          "height": 518,
+          "bottom": 1571,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1072,
+          "width": 904,
+          "height": 44,
+          "bottom": 1116,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1242,
+          "width": 856,
+          "height": 310,
+          "bottom": 1552,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 36,
+          "bottom": 1278,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 546,
+          "bottom": 1788,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1589,
+          "width": 1384,
+          "height": 874,
+          "bottom": 2463,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1706,
+          "width": 240,
+          "height": 22,
+          "bottom": 1728,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1944,
+          "width": 49,
+          "height": 27,
+          "bottom": 1971,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1971,
+          "width": 168,
+          "height": 27,
+          "bottom": 1998,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2244,
+          "width": 1342,
+          "height": 21,
+          "bottom": 2265,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "1280x800 idle bone-selected",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "scrollY": 0,
+      "documentHeight": 2373,
+      "documentWidth": 1280,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1224,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 746,
+          "height": 675,
+          "bottom": 900,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 744,
+          "height": 627,
+          "bottom": 899,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 792,
+          "y": 226,
+          "width": 460,
+          "height": 1211,
+          "bottom": 1436,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 813,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 813,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 918,
+          "width": 746,
+          "height": 518,
+          "bottom": 1436,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 937,
+          "width": 744,
+          "height": 44,
+          "bottom": 981,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1107,
+          "width": 696,
+          "height": 310,
+          "bottom": 1417,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 340,
+          "y": 1107,
+          "width": 397,
+          "height": 36,
+          "bottom": 1143,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 340,
+          "y": 1107,
+          "width": 397,
+          "height": 546,
+          "bottom": 1653,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1454,
+          "width": 1224,
+          "height": 895,
+          "bottom": 2349,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1572,
+          "width": 240,
+          "height": 22,
+          "bottom": 1594,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1809,
+          "width": 49,
+          "height": 27,
+          "bottom": 1836,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1836,
+          "width": 168,
+          "height": 27,
+          "bottom": 1863,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2130,
+          "width": 1182,
+          "height": 21,
+          "bottom": 2151,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "1920x1080 idle bone-selected",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "scrollY": 0,
+      "documentHeight": 2537,
+      "documentWidth": 1920,
+      "boxes": {
+        ".view-header": {
+          "x": 238,
+          "y": 0,
+          "width": 1444,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 238,
+          "y": 226,
+          "width": 966,
+          "height": 860,
+          "bottom": 1085,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 239,
+          "y": 273,
+          "width": 964,
+          "height": 812,
+          "bottom": 1084,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 1222,
+          "y": 226,
+          "width": 460,
+          "height": 1396,
+          "bottom": 1621,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 1243,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 1243,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 238,
+          "y": 1103,
+          "width": 966,
+          "height": 518,
+          "bottom": 1621,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 239,
+          "y": 1122,
+          "width": 964,
+          "height": 44,
+          "bottom": 1166,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 263,
+          "y": 1292,
+          "width": 916,
+          "height": 310,
+          "bottom": 1602,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 643,
+          "y": 1292,
+          "width": 524,
+          "height": 36,
+          "bottom": 1328,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 643,
+          "y": 1292,
+          "width": 524,
+          "height": 546,
+          "bottom": 1838,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 238,
+          "y": 1639,
+          "width": 1444,
+          "height": 874,
+          "bottom": 2513,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 259,
+          "y": 1757,
+          "width": 240,
+          "height": 22,
+          "bottom": 1779,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 259,
+          "y": 1995,
+          "width": 49,
+          "height": 27,
+          "bottom": 2022,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 417,
+          "y": 2022,
+          "width": 168,
+          "height": 27,
+          "bottom": 2048,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 259,
+          "y": 2295,
+          "width": 1402,
+          "height": 21,
+          "bottom": 2316,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "1600x1400 idle bone-selected",
+      "viewport": {
+        "width": 1600,
+        "height": 1400
+      },
+      "scrollY": 0,
+      "documentHeight": 2537,
+      "documentWidth": 1600,
+      "boxes": {
+        ".view-header": {
+          "x": 78,
+          "y": 0,
+          "width": 1444,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 78,
+          "y": 226,
+          "width": 966,
+          "height": 860,
+          "bottom": 1085,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 79,
+          "y": 273,
+          "width": 964,
+          "height": 812,
+          "bottom": 1084,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 1062,
+          "y": 226,
+          "width": 460,
+          "height": 1396,
+          "bottom": 1621,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 1083,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 1083,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 78,
+          "y": 1103,
+          "width": 966,
+          "height": 518,
+          "bottom": 1621,
+          "visibleInViewport": true
+        },
+        ".timeline-toolbar": {
+          "x": 79,
+          "y": 1122,
+          "width": 964,
+          "height": 44,
+          "bottom": 1166,
+          "visibleInViewport": true
+        },
+        ".timeline-inset": {
+          "x": 103,
+          "y": 1292,
+          "width": 916,
+          "height": 310,
+          "bottom": 1602,
+          "visibleInViewport": true
+        },
+        "#timeline-ruler": {
+          "x": 483,
+          "y": 1292,
+          "width": 524,
+          "height": 36,
+          "bottom": 1328,
+          "visibleInViewport": true
+        },
+        "#timeline": {
+          "x": 483,
+          "y": 1292,
+          "width": 524,
+          "height": 546,
+          "bottom": 1838,
+          "visibleInViewport": true
+        },
+        ".animation-session": {
+          "x": 78,
+          "y": 1639,
+          "width": 1444,
+          "height": 874,
+          "bottom": 2513,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 99,
+          "y": 1757,
+          "width": 240,
+          "height": 22,
+          "bottom": 1779,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 99,
+          "y": 1995,
+          "width": 49,
+          "height": 27,
+          "bottom": 2022,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 257,
+          "y": 2022,
+          "width": 168,
+          "height": 27,
+          "bottom": 2048,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 99,
+          "y": 2295,
+          "width": 1402,
+          "height": 21,
+          "bottom": 2316,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "1024x768 idle bone-selected",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "scrollY": 0,
+      "documentHeight": 2299,
+      "documentWidth": 1024,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 968,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 490,
+          "height": 459,
+          "bottom": 685,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 488,
+          "height": 411,
+          "bottom": 684,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 536,
+          "y": 226,
+          "width": 460,
+          "height": 1095,
+          "bottom": 1321,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 557,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 557,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 703,
+          "width": 490,
+          "height": 618,
+          "bottom": 1321,
+          "visibleInViewport": true
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 722,
+          "width": 488,
+          "height": 90,
+          "bottom": 812,
+          "visibleInViewport": true
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 992,
+          "width": 440,
+          "height": 310,
+          "bottom": 1302,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 233,
+          "y": 992,
+          "width": 248,
+          "height": 36,
+          "bottom": 1028,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 233,
+          "y": 992,
+          "width": 248,
+          "height": 546,
+          "bottom": 1538,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1339,
+          "width": 968,
+          "height": 936,
+          "bottom": 2275,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1456,
+          "width": 240,
+          "height": 22,
+          "bottom": 1478,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1694,
+          "width": 49,
+          "height": 27,
+          "bottom": 1721,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1721,
+          "width": 168,
+          "height": 27,
+          "bottom": 1748,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2035,
+          "width": 926,
+          "height": 21,
+          "bottom": 2056,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "1000x768 idle bone-selected",
+      "viewport": {
+        "width": 1000,
+        "height": 768
+      },
+      "scrollY": 0,
+      "documentHeight": 3308,
+      "documentWidth": 1000,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 944,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 944,
+          "height": 841,
+          "bottom": 1067,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 942,
+          "height": 793,
+          "bottom": 1066,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 28,
+          "y": 1085,
+          "width": 944,
+          "height": 709,
+          "bottom": 1794,
+          "visibleInViewport": false
+        },
+        "#animation-bones": {
+          "x": 49,
+          "y": 1136,
+          "width": 902,
+          "height": 190,
+          "bottom": 1326,
+          "visibleInViewport": false
+        },
+        "#animation-bone-fields": {
+          "x": 49,
+          "y": 1377,
+          "width": 902,
+          "height": 280,
+          "bottom": 1657,
+          "visibleInViewport": false
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1812,
+          "width": 944,
+          "height": 518,
+          "bottom": 2330,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1831,
+          "width": 942,
+          "height": 44,
+          "bottom": 1875,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 2001,
+          "width": 894,
+          "height": 310,
+          "bottom": 2311,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 423,
+          "y": 2001,
+          "width": 512,
+          "height": 36,
+          "bottom": 2037,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 423,
+          "y": 2001,
+          "width": 512,
+          "height": 546,
+          "bottom": 2547,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 2348,
+          "width": 944,
+          "height": 936,
+          "bottom": 3284,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 2465,
+          "width": 240,
+          "height": 22,
+          "bottom": 2487,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 2703,
+          "width": 49,
+          "height": 27,
+          "bottom": 2730,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 2730,
+          "width": 168,
+          "height": 27,
+          "bottom": 2757,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 3045,
+          "width": 902,
+          "height": 21,
+          "bottom": 3066,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "768x1024 idle bone-selected",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "scrollY": 0,
+      "documentHeight": 3275,
+      "documentWidth": 768,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 712,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 712,
+          "height": 646,
+          "bottom": 871,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 710,
+          "height": 598,
+          "bottom": 870,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 28,
+          "y": 889,
+          "width": 712,
+          "height": 709,
+          "bottom": 1599,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 49,
+          "y": 941,
+          "width": 670,
+          "height": 190,
+          "bottom": 1131,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 49,
+          "y": 1182,
+          "width": 670,
+          "height": 280,
+          "bottom": 1462,
+          "visibleInViewport": false
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1617,
+          "width": 712,
+          "height": 562,
+          "bottom": 2179,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1636,
+          "width": 710,
+          "height": 88,
+          "bottom": 1724,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1850,
+          "width": 662,
+          "height": 310,
+          "bottom": 2160,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 326,
+          "y": 1850,
+          "width": 377,
+          "height": 36,
+          "bottom": 1886,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 326,
+          "y": 1850,
+          "width": 377,
+          "height": 546,
+          "bottom": 2396,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 2197,
+          "width": 712,
+          "height": 1054,
+          "bottom": 3251,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 2314,
+          "width": 240,
+          "height": 22,
+          "bottom": 2336,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 2573,
+          "width": 49,
+          "height": 27,
+          "bottom": 2600,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 2600,
+          "width": 168,
+          "height": 27,
+          "bottom": 2626,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2970,
+          "width": 670,
+          "height": 21,
+          "bottom": 2991,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "390x844 idle bone-selected",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollY": 0,
+      "documentHeight": 3967,
+      "documentWidth": 390,
+      "boxes": {
+        ".view-header": {
+          "x": 16,
+          "y": 0,
+          "width": 358,
+          "height": 236,
+          "bottom": 236,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 16,
+          "y": 252,
+          "width": 358,
+          "height": 385,
+          "bottom": 636,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 17,
+          "y": 336,
+          "width": 356,
+          "height": 300,
+          "bottom": 635,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 16,
+          "y": 654,
+          "width": 358,
+          "height": 1031,
+          "bottom": 1686,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 37,
+          "y": 706,
+          "width": 316,
+          "height": 190,
+          "bottom": 896,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 37,
+          "y": 947,
+          "width": 316,
+          "height": 530,
+          "bottom": 1477,
+          "visibleInViewport": false
+        },
+        ".timeline-panel": {
+          "x": 16,
+          "y": 1704,
+          "width": 358,
+          "height": 690,
+          "bottom": 2394,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 17,
+          "y": 1723,
+          "width": 356,
+          "height": 134,
+          "bottom": 1857,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 41,
+          "y": 2065,
+          "width": 308,
+          "height": 310,
+          "bottom": 2375,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 165,
+          "y": 2065,
+          "width": 172,
+          "height": 36,
+          "bottom": 2101,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 165,
+          "y": 2065,
+          "width": 172,
+          "height": 546,
+          "bottom": 2611,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 16,
+          "y": 2412,
+          "width": 358,
+          "height": 1540,
+          "bottom": 3951,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 37,
+          "y": 2529,
+          "width": 240,
+          "height": 22,
+          "bottom": 2551,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 37,
+          "y": 2829,
+          "width": 49,
+          "height": 27,
+          "bottom": 2856,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 37,
+          "y": 2891,
+          "width": 168,
+          "height": 27,
+          "bottom": 2918,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 37,
+          "y": 3504,
+          "width": 316,
+          "height": 21,
+          "bottom": 3525,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "select walk with Playwright selectOption (programmatic control action)",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollY": 0,
+      "documentHeight": 2487,
+      "documentWidth": 1440,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1384,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 906,
+          "height": 809,
+          "bottom": 1035,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 904,
+          "height": 761,
+          "bottom": 1034,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 952,
+          "y": 226,
+          "width": 460,
+          "height": 1345,
+          "bottom": 1571,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 973,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 973,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1053,
+          "width": 906,
+          "height": 518,
+          "bottom": 1571,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1072,
+          "width": 904,
+          "height": 44,
+          "bottom": 1116,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1242,
+          "width": 856,
+          "height": 310,
+          "bottom": 1552,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 36,
+          "bottom": 1278,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 546,
+          "bottom": 1788,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1589,
+          "width": 1384,
+          "height": 874,
+          "bottom": 2463,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1706,
+          "width": 240,
+          "height": 22,
+          "bottom": 1728,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1944,
+          "width": 49,
+          "height": 27,
+          "bottom": 1971,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1971,
+          "width": 168,
+          "height": 27,
+          "bottom": 1998,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2244,
+          "width": 1342,
+          "height": 21,
+          "bottom": 2265,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "author rightForearm rotation 35 at zero",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollY": 0,
+      "documentHeight": 2487,
+      "documentWidth": 1440,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1384,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 906,
+          "height": 809,
+          "bottom": 1035,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 904,
+          "height": 761,
+          "bottom": 1034,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 952,
+          "y": 226,
+          "width": 460,
+          "height": 1345,
+          "bottom": 1571,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 973,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 973,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1053,
+          "width": 906,
+          "height": 518,
+          "bottom": 1571,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1072,
+          "width": 904,
+          "height": 44,
+          "bottom": 1116,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1242,
+          "width": 856,
+          "height": 310,
+          "bottom": 1552,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 36,
+          "bottom": 1278,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 546,
+          "bottom": 1788,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1589,
+          "width": 1384,
+          "height": 874,
+          "bottom": 2463,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1706,
+          "width": 240,
+          "height": 22,
+          "bottom": 1728,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1944,
+          "width": 49,
+          "height": 27,
+          "bottom": 1971,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1971,
+          "width": 168,
+          "height": 27,
+          "bottom": 1998,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2244,
+          "width": 1342,
+          "height": 21,
+          "bottom": 2265,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "click Undo after bone edit",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollY": 1508,
+      "documentHeight": 2487,
+      "documentWidth": 1440,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1384,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": false
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 906,
+          "height": 809,
+          "bottom": 1035,
+          "visibleInViewport": false
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 904,
+          "height": 761,
+          "bottom": 1034,
+          "visibleInViewport": false
+        },
+        ".animation-authoring": {
+          "x": 952,
+          "y": 226,
+          "width": 460,
+          "height": 1345,
+          "bottom": 1571,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 973,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": false
+        },
+        "#animation-bone-fields": {
+          "x": 973,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": false
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1053,
+          "width": 906,
+          "height": 518,
+          "bottom": 1571,
+          "visibleInViewport": true
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1072,
+          "width": 904,
+          "height": 44,
+          "bottom": 1116,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1242,
+          "width": 856,
+          "height": 310,
+          "bottom": 1552,
+          "visibleInViewport": true
+        },
+        "#timeline-ruler": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 36,
+          "bottom": 1278,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 546,
+          "bottom": 1788,
+          "visibleInViewport": true
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1589,
+          "width": 1384,
+          "height": 874,
+          "bottom": 2463,
+          "visibleInViewport": true
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1706,
+          "width": 240,
+          "height": 22,
+          "bottom": 1728,
+          "visibleInViewport": true
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1944,
+          "width": 49,
+          "height": 27,
+          "bottom": 1971,
+          "visibleInViewport": true
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1971,
+          "width": 168,
+          "height": 27,
+          "bottom": 1998,
+          "visibleInViewport": true
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2244,
+          "width": 1342,
+          "height": 21,
+          "bottom": 2265,
+          "visibleInViewport": true
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 1508,
+          "width": 0,
+          "height": 0,
+          "bottom": 1508,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "before event add",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollY": 0,
+      "documentHeight": 2487,
+      "documentWidth": 1440,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1384,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": true
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 906,
+          "height": 809,
+          "bottom": 1035,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 904,
+          "height": 761,
+          "bottom": 1034,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 952,
+          "y": 226,
+          "width": 460,
+          "height": 1345,
+          "bottom": 1571,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 973,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": true
+        },
+        "#animation-bone-fields": {
+          "x": 973,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1053,
+          "width": 906,
+          "height": 518,
+          "bottom": 1571,
+          "visibleInViewport": false
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1072,
+          "width": 904,
+          "height": 44,
+          "bottom": 1116,
+          "visibleInViewport": false
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1242,
+          "width": 856,
+          "height": 310,
+          "bottom": 1552,
+          "visibleInViewport": false
+        },
+        "#timeline-ruler": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 36,
+          "bottom": 1278,
+          "visibleInViewport": false
+        },
+        "#timeline": {
+          "x": 407,
+          "y": 1242,
+          "width": 490,
+          "height": 546,
+          "bottom": 1788,
+          "visibleInViewport": false
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1589,
+          "width": 1384,
+          "height": 874,
+          "bottom": 2463,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 1706,
+          "width": 240,
+          "height": 22,
+          "bottom": 1728,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 1944,
+          "width": 49,
+          "height": 27,
+          "bottom": 1971,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 1971,
+          "width": 168,
+          "height": 27,
+          "bottom": 1998,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2244,
+          "width": 1342,
+          "height": 21,
+          "bottom": 2265,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "bottom": 0,
+          "visibleInViewport": false
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    },
+    {
+      "label": "after event add",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollY": 636,
+      "documentHeight": 2781,
+      "documentWidth": 1440,
+      "boxes": {
+        ".view-header": {
+          "x": 28,
+          "y": 0,
+          "width": 1384,
+          "height": 202,
+          "bottom": 202,
+          "visibleInViewport": false
+        },
+        ".animation-preview": {
+          "x": 28,
+          "y": 226,
+          "width": 906,
+          "height": 809,
+          "bottom": 1035,
+          "visibleInViewport": true
+        },
+        "#animation-stage": {
+          "x": 29,
+          "y": 273,
+          "width": 904,
+          "height": 761,
+          "bottom": 1034,
+          "visibleInViewport": true
+        },
+        ".animation-authoring": {
+          "x": 952,
+          "y": 226,
+          "width": 460,
+          "height": 1639,
+          "bottom": 1865,
+          "visibleInViewport": true
+        },
+        "#animation-bones": {
+          "x": 973,
+          "y": 277,
+          "width": 418,
+          "height": 190,
+          "bottom": 467,
+          "visibleInViewport": false
+        },
+        "#animation-bone-fields": {
+          "x": 973,
+          "y": 518,
+          "width": 418,
+          "height": 280,
+          "bottom": 798,
+          "visibleInViewport": true
+        },
+        ".timeline-panel": {
+          "x": 28,
+          "y": 1053,
+          "width": 906,
+          "height": 812,
+          "bottom": 1865,
+          "visibleInViewport": true
+        },
+        ".timeline-toolbar": {
+          "x": 29,
+          "y": 1072,
+          "width": 904,
+          "height": 44,
+          "bottom": 1116,
+          "visibleInViewport": true
+        },
+        ".timeline-inset": {
+          "x": 53,
+          "y": 1536,
+          "width": 856,
+          "height": 310,
+          "bottom": 1846,
+          "visibleInViewport": true
+        },
+        "#timeline-ruler": {
+          "x": 407,
+          "y": 1536,
+          "width": 490,
+          "height": 36,
+          "bottom": 1572,
+          "visibleInViewport": true
+        },
+        "#timeline": {
+          "x": 407,
+          "y": 1536,
+          "width": 490,
+          "height": 546,
+          "bottom": 2082,
+          "visibleInViewport": true
+        },
+        ".animation-session": {
+          "x": 28,
+          "y": 1883,
+          "width": 1384,
+          "height": 874,
+          "bottom": 2757,
+          "visibleInViewport": false
+        },
+        "#animation-selection": {
+          "x": 49,
+          "y": 2000,
+          "width": 240,
+          "height": 22,
+          "bottom": 2022,
+          "visibleInViewport": false
+        },
+        "#animation-undo": {
+          "x": 49,
+          "y": 2238,
+          "width": 49,
+          "height": 27,
+          "bottom": 2265,
+          "visibleInViewport": false
+        },
+        "#animation-download": {
+          "x": 207,
+          "y": 2265,
+          "width": 168,
+          "height": 27,
+          "bottom": 2292,
+          "visibleInViewport": false
+        },
+        "#animation-dirty": {
+          "x": 49,
+          "y": 2538,
+          "width": 1342,
+          "height": 21,
+          "bottom": 2559,
+          "visibleInViewport": false
+        },
+        "#animation-event-inspector": {
+          "x": 29,
+          "y": 1206,
+          "width": 904,
+          "height": 286,
+          "bottom": 1492,
+          "visibleInViewport": true
+        }
+      },
+      "bones": 16,
+      "rows": 17,
+      "keys": 0,
+      "disabledInterpolation": true
+    }
+  ],
+  "errors": []
+}

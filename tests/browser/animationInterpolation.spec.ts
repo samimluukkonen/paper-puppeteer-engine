@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -69,7 +69,7 @@ test('clip declaration UI preserves multi-selection, marker buttons and time thr
   await key(page).evaluate((element) => {
     element.dataset.identityProbe = 'surviving';
   });
-  await page.locator('#animation-interpolation').selectOption('linear');
+  await (await animationControl(page, '#animation-interpolation')).selectOption('linear');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await expect(ruler).toHaveAttribute('aria-valuenow', heldTime!);
   await expect(rotation(page)).toHaveValue(heldRotation);
@@ -78,12 +78,12 @@ test('clip declaration UI preserves multi-selection, marker buttons and time thr
   await expect(key(page)).toHaveAttribute('data-primary', 'true');
   await expect(key(page)).toHaveAttribute('data-identity-probe', 'surviving');
   await page.locator('#animation-undo').click();
-  await expect(page.locator('#animation-interpolation')).toHaveValue('');
+  await expect(await animationControl(page, '#animation-interpolation')).toHaveValue('');
   await expect(page.locator('#timeline-interpolation')).toHaveValue('linear');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await page.locator('#animation-redo').click();
-  await expect(page.locator('#animation-interpolation')).toHaveValue('linear');
+  await expect(await animationControl(page, '#animation-interpolation')).toHaveValue('linear');
   await expect(key(page)).toHaveAttribute('data-interpolation', 'linear');
   await expect(key(page)).toHaveAttribute('data-identity-probe', 'surviving');
   await expect(ruler).toHaveAttribute('aria-valuenow', heldTime!);
@@ -91,7 +91,7 @@ test('clip declaration UI preserves multi-selection, marker buttons and time thr
     await expect(key(page, 0, property)).toHaveAttribute('aria-pressed', 'true');
   await expect(key(page)).toHaveAttribute('data-primary', 'true');
   await expect(rotation(page)).toHaveValue(heldRotation);
-  await page.locator('#animation-interpolation').selectOption('');
+  await (await animationControl(page, '#animation-interpolation')).selectOption('');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
 
@@ -102,9 +102,9 @@ test('smooth/stepped sample timing uses the existing evaluator and does not chan
   await key(page, 0, 'rotation').click();
   const ruler = page.locator('#timeline-ruler');
   for (const mode of ['smooth', 'stepped']) {
-    await page.locator('#animation-mode').selectOption(mode);
-    if (mode === 'stepped') await page.locator('#animation-fps').fill('1');
-    if (mode === 'stepped') await page.locator('#animation-fps').press('Tab');
+    await (await animationControl(page, '#animation-mode')).selectOption(mode);
+    if (mode === 'stepped') await (await animationControl(page, '#animation-fps')).fill('1');
+    if (mode === 'stepped') await (await animationControl(page, '#animation-fps')).press('Tab');
     await ruler.press('Home');
     for (const time of [0, 0.25, 0.5, 0.75, 1]) {
       if (time !== 0) for (let step = 0; step < 25; step++) await ruler.press('ArrowRight');
@@ -160,7 +160,7 @@ const hardeningKey = (page: Page, time: number, property = 'rotation', bone = 'r
   page.getByRole('button', { name: `Select ${bone} ${property} key at ${time} s`, exact: true });
 async function downloadAnimation(page: Page) {
   const waiting = page.waitForEvent('download');
-  await page.locator('#animation-download').click();
+  await (await animationControl(page, '#animation-download')).click();
   const path = await (await waiting).path();
   if (!path) throw new Error('Animation download has no local file.');
   return animationFileSchema.parse(JSON.parse(await readFile(path, 'utf8')));
@@ -175,7 +175,7 @@ test('multi-track interpolation inspection stays coherent through the complete k
   await hardeningKey(page, 0.2, 'x', 'torso').click({ modifiers: ['ControlOrMeta'] });
   const inspector = page.locator('#timeline-interpolation');
   await expect(inspector).toHaveValue('linear');
-  await page.locator('#animation-interpolation').selectOption('linear');
+  await (await animationControl(page, '#animation-interpolation')).selectOption('linear');
   await page.locator('#timeline').press('ArrowRight');
   await expect(hardeningKey(page, 0.01)).toHaveAttribute('data-interpolation', 'linear');
   await expect(hardeningKey(page, 0.51)).toHaveAttribute('aria-pressed', 'true');
@@ -195,16 +195,16 @@ test('multi-track interpolation inspection stays coherent through the complete k
   for (let index = 0; index < 6; index++) await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  await expect(page.locator('#animation-interpolation')).toHaveValue('');
+  await expect(await animationControl(page, '#animation-interpolation')).toHaveValue('');
   await expect(hardeningKey(page, 1)).toHaveAttribute('title', /value 1/);
   await expect(hardeningKey(page, 0.5)).toHaveAttribute('data-interpolation', 'linear');
   for (let index = 0; index < 6; index++) await page.locator('#animation-redo').click();
   await expect(page.locator('#animation-redo')).toBeDisabled();
-  await expect(page.locator('#animation-interpolation')).toHaveValue('linear');
+  await expect(await animationControl(page, '#animation-interpolation')).toHaveValue('linear');
   await expect(inspector).toHaveAttribute('data-unavailable-reason', 'empty-selection');
-  await page.locator('#animation-mode').selectOption('stepped');
-  await page.locator('#animation-fps').fill('10');
-  await page.locator('#animation-fps').press('Tab');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  await (await animationControl(page, '#animation-fps')).fill('10');
+  await (await animationControl(page, '#animation-fps')).press('Tab');
   const beforePreview = await downloadAnimation(page);
   expect(beforePreview.interpolation).toBe('linear');
   expect(beforePreview.playback).toEqual({ mode: 'stepped', fps: 10 });

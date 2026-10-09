@@ -34,7 +34,21 @@ export class EventInspectorController {
       },
       options,
     );
-    this.remove.addEventListener('click', () => this.getState().deleteSelectedEvent(), options);
+    // Hold field focus until deletion clears its drafts; blur validation can move the button before mouseup.
+    this.remove.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (event.button === 0) event.preventDefault();
+      },
+      options,
+    );
+    this.remove.addEventListener(
+      'click',
+      () => {
+        if (this.getState().deleteSelectedEvent()) this.add.focus({ preventScroll: true });
+      },
+      options,
+    );
     for (const field of [this.time, this.name, this.data]) {
       field.addEventListener('focus', () => this.getState().pause(), options);
       field.addEventListener('blur', () => this.commit(field), options);
@@ -82,7 +96,10 @@ export class EventInspectorController {
 
   render(state: AnimationEditorState): void {
     const event = state.selectedEventData;
-    this.app.querySelector<HTMLElement>('#animation-event-inspector')!.hidden = !event;
+    const eventPanel = this.app.querySelector<HTMLElement>('#animation-event-inspector')!;
+    const bonePanel = this.app.querySelector<HTMLElement>('#animation-bone-inspector')!;
+    if (eventPanel.hidden !== !event) eventPanel.hidden = !event;
+    if (bonePanel.hidden !== !!event) bonePanel.hidden = !!event;
     this.add.disabled = !state.workingAnimation;
     this.remove.disabled = !event;
     this.time.max = String(state.duration);

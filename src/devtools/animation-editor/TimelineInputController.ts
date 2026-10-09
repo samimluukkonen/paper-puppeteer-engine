@@ -300,6 +300,7 @@ export class TimelineInputController {
     );
     const included = rows.flatMap((row, index) => {
       const rect = row.getBoundingClientRect();
+      if (rect.height === 0) return [];
       const center = rect.top - bounds.top + rect.height / 2;
       return center >= minY && center <= maxY ? [index] : [];
     });

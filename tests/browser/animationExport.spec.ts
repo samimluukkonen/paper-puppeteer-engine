@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, animationFileAction, test } from './fixtures.js';
 
 async function editRoot(page: Page, value: string): Promise<void> {
   await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
@@ -20,7 +20,7 @@ for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
     ]) {
       await page.locator('#animation-selection').selectOption(name!);
       const waiting = page.waitForEvent('download');
-      await page.locator('#animation-download').click();
+      await (await animationControl(page, '#animation-download')).click();
       const download = await waiting;
       expect(download.suggestedFilename()).toBe(filename);
       const path = await download.path();
@@ -40,7 +40,7 @@ test('download saves authored JSON and allows switching; discard restores the do
   // A field draft is preview-only and must not appear in the downloaded file.
   await page.locator('#animation-bone-fields input[data-property="x"]').fill('99');
   const waiting = page.waitForEvent('download');
-  await page.locator('#animation-download').click();
+  await (await animationControl(page, '#animation-download')).click();
   const download = await waiting;
   expect(download.suggestedFilename()).toBe('idle.json');
   const path = await download.path();
@@ -57,13 +57,13 @@ test('download saves authored JSON and allows switching; discard restores the do
   await editRoot(page, '23');
   await Promise.all([
     page.waitForEvent('dialog').then((dialog) => dialog.dismiss()),
-    page.locator('#animation-discard').click(),
+    animationFileAction(page, '#animation-discard', (control) => control.click()),
   ]);
   await expect(x).toHaveValue('23');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await Promise.all([
     page.waitForEvent('dialog').then((dialog) => dialog.accept()),
-    page.locator('#animation-discard').click(),
+    animationFileAction(page, '#animation-discard', (control) => control.click()),
   ]);
   await expect(x).toHaveValue('17');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -79,7 +79,7 @@ test('a failed download retains unsaved changes and reports an actionable error'
       throw new Error('Download unavailable');
     };
   });
-  await page.locator('#animation-download').click();
+  await (await animationControl(page, '#animation-download')).click();
   await expect(page.locator('#animation-export-feedback')).toContainText('Download unavailable');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-selection').selectOption('walk');
@@ -123,12 +123,12 @@ test('clipboard and repeated downloads share canonical JSON across smooth and st
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await editRoot(page, '0.30000000000000004');
   for (const mode of ['smooth', 'stepped'] as const) {
-    await page.locator('#animation-mode').selectOption(mode);
+    await (await animationControl(page, '#animation-mode')).selectOption(mode);
     if (mode === 'stepped') {
-      await page.locator('#animation-fps').fill('12.5');
-      await page.locator('#animation-fps').press('Tab');
+      await (await animationControl(page, '#animation-fps')).fill('12.5');
+      await (await animationControl(page, '#animation-fps')).press('Tab');
     }
-    await page.getByRole('button', { name: 'Copy Animation JSON', exact: true }).click();
+    await animationFileAction(page, '#animation-copy-json', (control) => control.click());
     await expect(page.locator('#animation-export-feedback')).toHaveText('Animation JSON copied.');
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toMatch(/^\{\n  "version": 1,/);
@@ -155,7 +155,7 @@ test('clipboard and repeated downloads share canonical JSON across smooth and st
     ]);
     for (let repeat = 0; repeat < 2; repeat++) {
       const waiting = page.waitForEvent('download');
-      await page.getByRole('button', { name: 'Download animation.json', exact: true }).click();
+      await page.getByRole('button', { name: 'Download JSON', exact: true }).click();
       const download = await waiting;
       expect(download.suggestedFilename()).toBe('idle.json');
       const path = await download.path();
@@ -173,7 +173,7 @@ test('clipboard failure offers download and console alternatives without saving 
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
   });
-  await page.locator('#animation-copy-json').click();
+  await animationFileAction(page, '#animation-copy-json', (control) => control.click());
   await expect(page.locator('#animation-export-feedback')).toContainText('Clipboard API is unavailable');
   await expect(page.locator('#animation-export-feedback')).toContainText(
     'Download animation.json or Log Animation JSON',
@@ -182,7 +182,7 @@ test('clipboard failure offers download and console alternatives without saving 
   const waiting = page.waitForEvent('console', {
     predicate: (message) => message.type() === 'log' && message.text().startsWith('{\n'),
   });
-  await page.locator('#animation-log-json').click();
+  await animationFileAction(page, '#animation-log-json', (control) => control.click());
   const logged = (await waiting).text();
   expect(animationFileSchema.parse(JSON.parse(logged)).tracks.root?.[0]?.x).toBe(17);
   await expect(page.locator('#animation-export-feedback')).toHaveText('Animation JSON logged to the console.');

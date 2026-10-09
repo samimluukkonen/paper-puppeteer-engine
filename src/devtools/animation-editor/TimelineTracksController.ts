@@ -6,6 +6,7 @@ import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
 import { type KeyframeSelection, type TimelineTrack, timelineTrackKey } from './timelineTracks.js';
+import { toSeconds } from './timeUnits.js';
 
 interface TrackElements {
   readonly label: HTMLElement;
@@ -15,6 +16,7 @@ interface TrackElements {
   /** Full-width time lane; marker centers share ruler/playhead coordinates. */
   readonly lane: HTMLElement;
   readonly markers: Map<number, HTMLButtonElement>;
+  readonly summaries: Map<number, HTMLElement>;
   track?: TimelineTrack;
 }
 
@@ -44,6 +46,7 @@ export class TimelineTracksController {
   private width = -1;
   private duration = -1;
   private drag: AnimationEditorState['keyframeDrag'] | undefined;
+  private summaryAnimation: AnimationEditorState['workingAnimation'] | undefined;
 
   constructor(
     private readonly labels: HTMLElement,
@@ -91,7 +94,7 @@ export class TimelineTracksController {
     const indicator = document.createElement('span');
     indicator.className = 'timeline-key-presence';
     label.append(select, indicator);
-    return { label, select, expand, indicator, lane, markers: new Map() };
+    return { label, select, expand, indicator, lane, markers: new Map(), summaries: new Map() };
   }
 
   render(state: AnimationEditorState, width: number): void {
@@ -99,6 +102,8 @@ export class TimelineTracksController {
     this.events.render(state, width);
     const tracks = state.timelineTracks;
     const changed = tracks !== this.tracks;
+    const summariesChanged = changed || this.summaryAnimation !== state.workingAnimation;
+    this.summaryAnimation = state.workingAnimation;
     const interpolationChanged = this.interpolation !== state.authoredInterpolation;
     this.interpolation = state.authoredInterpolation;
     const changedRows = new Set<TrackElements>();
@@ -204,6 +209,37 @@ export class TimelineTracksController {
       }
     }
     const resized = width !== this.width || state.duration !== this.duration;
+    if (summariesChanged || resized) {
+      for (const row of this.rows.values()) {
+        const track = row.track;
+        if (track?.kind !== 'bone') continue;
+        const authored = state.workingAnimation?.tracks;
+        const keys = authored && Object.hasOwn(authored, track.boneId) ? authored[track.boneId]! : [];
+        const times = new Set(
+          track.expanded
+            ? []
+            : keys
+                .filter((key) => Object.keys(key).some((property) => property !== 'time'))
+                .map((key) => toSeconds(key.time)),
+        );
+        for (const [time, marker] of row.summaries) {
+          if (times.has(time)) continue;
+          marker.remove();
+          row.summaries.delete(time);
+        }
+        for (const time of times) {
+          let marker = row.summaries.get(time);
+          if (!marker) {
+            marker = document.createElement('span');
+            marker.className = 'timeline-summary';
+            marker.setAttribute('aria-hidden', 'true');
+            row.lane.append(marker);
+            row.summaries.set(time, marker);
+          }
+          marker.style.left = `${timeToTimelineX(time, state.duration, width)}px`;
+        }
+      }
+    }
     const previousDrag = this.drag;
     this.width = width;
     this.duration = state.duration;
@@ -274,6 +310,23 @@ export class TimelineTracksController {
       if (!newMarkers.has(marker) && selected === previousIndex.has(id) && primary === wasPrimary) continue;
       setAttribute(marker, 'data-primary', String(primary));
       setAttribute(marker, 'aria-pressed', String(selected));
+    }
+  }
+
+  /** Keep original row indices for marquee selection while changing only visibility. */
+  filter(mode: string, state: AnimationEditorState): void {
+    for (const row of this.rows.values()) {
+      const track = row.track!;
+      const hidden =
+        mode === 'keyed' ? !track.hasKeys : mode === 'selected' ? track.boneId !== state.selectedBoneId : false;
+      if (
+        hidden &&
+        !row.label.hidden &&
+        (row.label.contains(document.activeElement) || row.lane.contains(document.activeElement))
+      )
+        this.lanes.parentElement?.focus({ preventScroll: true });
+      if (row.label.hidden !== hidden) row.label.hidden = hidden;
+      if (row.lane.hidden !== hidden) row.lane.hidden = hidden;
     }
   }
 

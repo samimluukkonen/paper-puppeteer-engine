@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, animationFileAction, test } from './fixtures.js';
 
 const animation = {
   version: 1,
@@ -30,21 +30,21 @@ const animation = {
   ],
 };
 async function paste(page: Page, json: string) {
-  await page.locator('#animation-import-paste').click();
-  await page.locator('#animation-import-text').fill(json);
+  await animationFileAction(page, '#animation-import-paste', (control) => control.click());
+  await animationFileAction(page, '#animation-import-text', (control) => control.fill(json));
   const acceptReplacement = (dialog: import('@playwright/test').Dialog): void => {
     void dialog.accept();
   };
   page.on('dialog', acceptReplacement);
   try {
-    await page.locator('#animation-import-submit').click();
+    await animationFileAction(page, '#animation-import-submit', (control) => control.click());
   } finally {
     page.off('dialog', acceptReplacement);
   }
 }
 async function download(page: Page) {
   const waiting = page.waitForEvent('download');
-  await page.locator('#animation-download').click();
+  await (await animationControl(page, '#animation-download')).click();
   const downloaded = await waiting;
   const path = await downloaded.path();
   if (!path) throw new Error('Missing local animation download.');
@@ -65,8 +65,8 @@ test('paste and downloaded file imports restore authored data, timeline and rend
   await expect(page.locator('#animation-selection')).toHaveValue('roundTrip');
   await expect(page.locator('#animation-import-panel')).toBeHidden();
   await expect(page.locator('#current-time')).toHaveText('0.000 / 1.500 s');
-  await expect(page.locator('#animation-fps')).toHaveValue('12.5');
-  await expect(page.locator('#animation-interpolation')).toHaveValue('linear');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('12.5');
+  await expect(await animationControl(page, '#animation-interpolation')).toHaveValue('linear');
   await expect(page.locator('.timeline-event')).toHaveCount(5);
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
   const lane = page.locator('#timeline-tracks [data-bone-id="root"][data-property="x"]');
@@ -95,7 +95,7 @@ test('paste and downloaded file imports restore authored data, timeline and rend
   await expect(page.locator('#play-pause')).toHaveText('Pause');
   await Promise.all([
     page.waitForEvent('dialog').then((dialog) => dialog.accept()),
-    page.locator('#animation-import-file').setInputFiles(exported.path),
+    animationFileAction(page, '#animation-import-file', (control) => control.setInputFiles(exported.path)),
   ]);
   await expect(page.locator('#play-pause')).toHaveText('Play');
   await expect(page.locator('#current-time')).toHaveText('0.000 / 1.500 s');
@@ -109,7 +109,7 @@ test('paste and downloaded file imports restore authored data, timeline and rend
   await editRoot(page, '35');
   await page.getByRole('button', { name: 'Select root x key at 0 s', exact: true }).click();
   await page.keyboard.press('ArrowRight');
-  await page.locator('#animation-interpolation').selectOption('');
+  await (await animationControl(page, '#animation-interpolation')).selectOption('');
   await page.locator('#timeline-add-event').click();
   await page.locator('#animation-event-name').fill('afterImport');
   await page.locator('#animation-event-name').press('Tab');
@@ -118,7 +118,7 @@ test('paste and downloaded file imports restore authored data, timeline and rend
   expect((await download(page)).json).toBe(exported.json);
   for (let i = 0; i < 5; i++) await page.locator('#animation-redo').click();
   expect((await download(page)).json).toBe(edited);
-  await page.locator('#animation-reload-export').click();
+  await animationFileAction(page, '#animation-reload-export', (control) => control.click());
   await expect(page.locator('#animation-undo')).toBeDisabled();
   expect((await download(page)).json).toBe(edited);
 });
@@ -143,7 +143,7 @@ test('invalid JSON, versions and bones retain working animation and usable histo
     await expect(page.locator('#animation-selection')).toHaveValue('roundTrip');
     expect((await download(page)).json).toBe(working);
   }
-  await page.locator('#animation-import-cancel').click();
+  await animationFileAction(page, '#animation-import-cancel', (control) => control.click());
   await expect(page.locator('#animation-import-panel')).toBeHidden();
   await page.locator('#animation-undo').click();
   expect(animationFileSchema.parse(JSON.parse((await download(page)).json)).tracks.root![0]!.x).toBe(20);
@@ -173,7 +173,7 @@ test('import cancels an active marquee and clears temporary event inspector edit
   await page.locator('#animation-event-data').fill('{invalid');
   await Promise.all([
     page.waitForEvent('dialog').then((dialog) => dialog.accept()),
-    page.locator('#animation-reload-export').click(),
+    animationFileAction(page, '#animation-reload-export', (control) => control.click()),
   ]);
   await expect(page.locator('#animation-event-inspector')).toBeHidden();
   await expect(page.locator('#animation-event-data')).toHaveValue('');

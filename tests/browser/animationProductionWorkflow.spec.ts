@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { test } from './fixtures.js';
+import { animationControl, animationFileAction, test } from './fixtures.js';
 
 async function editRoot(page: Page, value: string) {
   await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
@@ -29,9 +29,9 @@ test('switch, file import, round-trip reload and source revert confirm dirty rep
   };
   for (const action of [
     () => page.locator('#animation-selection').selectOption('walk'),
-    () => page.locator('#animation-import-file').setInputFiles(file),
-    () => page.locator('#animation-reload-export').click(),
-    () => page.locator('#animation-revert').click(),
+    () => animationFileAction(page, '#animation-import-file', (control) => control.setInputFiles(file)),
+    () => animationFileAction(page, '#animation-reload-export', (control) => control.click()),
+    () => animationFileAction(page, '#animation-revert', (control) => control.click()),
   ]) {
     await Promise.all([page.waitForEvent('dialog').then((dialog) => dialog.dismiss()), action()]);
     await expect(page.locator('#animation-selection')).toHaveValue('idle');
@@ -56,14 +56,14 @@ test('revert restores loaded source after export and pauses/resets preview witho
   const x = page.locator('#animation-bone-fields input[data-property="x"]');
   const original = await x.inputValue();
   await editRoot(page, '130');
-  await Promise.all([page.waitForEvent('download'), page.locator('#animation-download').click()]);
+  await Promise.all([page.waitForEvent('download'), (await animationControl(page, '#animation-download')).click()]);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.locator('#play-pause').click();
   const fetchedAssets: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/characters/')) fetchedAssets.push(request.url());
   });
-  await page.locator('#animation-revert').click();
+  await animationFileAction(page, '#animation-revert', (control) => control.click());
   await expect(page.locator('#play-pause')).toHaveText('Play');
   await expect(page.locator('#current-time')).toContainText('0.000 /');
   await expect(page.locator('#animation-bone-title')).toHaveText('Select a bone');
@@ -80,35 +80,37 @@ for (const mode of ['smooth', 'stepped']) {
   }) => {
     await page.goto('animation-editor/');
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-    await page.locator('#animation-import-paste').click();
-    await page.locator('#animation-import-text').fill(
-      JSON.stringify({
-        version: 1,
-        name: 'visual',
-        duration: 1033,
-        loop: false,
-        interpolation: 'linear',
-        playback: mode === 'stepped' ? { mode, fps: 12.5 } : { mode },
-        tracks: {
-          root: [
-            { time: 0, x: 0 },
-            { time: 400, x: 25 },
-            { time: 1033, x: -20 },
+    await animationFileAction(page, '#animation-import-paste', (control) => control.click());
+    await animationFileAction(page, '#animation-import-text', (control) =>
+      control.fill(
+        JSON.stringify({
+          version: 1,
+          name: 'visual',
+          duration: 1033,
+          loop: false,
+          interpolation: 'linear',
+          playback: mode === 'stepped' ? { mode, fps: 12.5 } : { mode },
+          tracks: {
+            root: [
+              { time: 0, x: 0 },
+              { time: 400, x: 25 },
+              { time: 1033, x: -20 },
+            ],
+            torso: [
+              { time: 0, rotation: 0.2 },
+              { time: 800, rotation: -0.2 },
+            ],
+          },
+          events: [
+            { time: 0, name: 'start' },
+            { time: 500, name: 'first', data: { value: [null, true, 0.3] } },
+            { time: 500, name: 'second' },
+            { time: 1033, name: 'end' },
           ],
-          torso: [
-            { time: 0, rotation: 0.2 },
-            { time: 800, rotation: -0.2 },
-          ],
-        },
-        events: [
-          { time: 0, name: 'start' },
-          { time: 500, name: 'first', data: { value: [null, true, 0.3] } },
-          { time: 500, name: 'second' },
-          { time: 1033, name: 'end' },
-        ],
-      }),
+        }),
+      ),
     );
-    await page.locator('#animation-import-submit').click();
+    await animationFileAction(page, '#animation-import-submit', (control) => control.click());
     await page.locator('#animation-show-bones').uncheck();
     await page.locator('#animation-facing').selectOption('left');
     await page.locator('#animation-ik-preview').check();
@@ -129,7 +131,7 @@ for (const mode of ['smooth', 'stepped']) {
     };
     const poses: Buffer[] = [];
     for (const time of times) poses.push(await capture(time));
-    await page.locator('#animation-reload-export').click();
+    await animationFileAction(page, '#animation-reload-export', (control) => control.click());
     await expect(page.locator('.timeline-event')).toHaveCount(4);
     for (let index = 0; index < times.length; ++index)
       await expect.poll(async () => (await capture(times[index]!)).equals(poses[index]!)).toBe(true);

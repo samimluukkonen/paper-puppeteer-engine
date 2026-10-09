@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -33,9 +33,9 @@ test('unsaved animation settings protect navigation, refresh, and character sele
   page,
 }) => {
   await openEditor(page);
-  await page.locator('#animation-mode').selectOption('stepped');
-  await page.locator('#animation-fps').fill('12');
-  await page.locator('#animation-fps').press('Tab');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  await (await animationControl(page, '#animation-fps')).fill('12');
+  await (await animationControl(page, '#animation-fps')).press('Tab');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   const dismissNavigation = async (): Promise<void> => {
     const dialog = await page.waitForEvent('dialog');
@@ -54,7 +54,7 @@ test('unsaved animation settings protect navigation, refresh, and character sele
     page.locator('#character-selection').selectOption('random-paperdoll-sketch'),
   ]);
   await expect(page.locator('#character-selection')).toHaveValue('demo-puppet');
-  await expect(page.locator('#animation-fps')).toHaveValue('12');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('12');
   await page.locator('#animation-undo').click();
   await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -186,22 +186,23 @@ test('authored mode and FPS update the paused pose immediately and undo restores
     });
   });
   await openEditor(page);
-  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
-  await expect(page.locator('#animation-fps')).toBeDisabled();
-  await page.locator('#animation-mode').selectOption('stepped');
-  await expect(page.locator('#animation-fps')).toHaveValue('10');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
+  await expect(await animationControl(page, '#animation-fps')).toBeDisabled();
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('10');
   const timeline = page.locator('#timeline');
   for (let step = 0; step < 15; step += 1) await timeline.press('ArrowRight');
   const canvas = page.locator('#animation-stage canvas');
   const capturePose = async (): Promise<Buffer> => {
-    // Settings are below the preview. Keep the canvas at the same viewport position
-    // so scrolling to Undo does not change subpixel screenshot rasterization.
-    await page.evaluate(() => window.scrollTo(0, 0));
+    // Compare artwork with the settings popover dismissed, at a stable viewport position.
+    const settings = page.locator('#animation-clip-settings');
+    if (await settings.evaluate((element) => (element as HTMLDetailsElement).open))
+      await settings.locator('summary').press('Escape');
     return canvas.screenshot();
   };
   const steppedPose = await capturePose();
-  await page.locator('#animation-fps').fill('20');
-  await page.locator('#animation-fps').press('Tab');
+  await (await animationControl(page, '#animation-fps')).fill('20');
+  await (await animationControl(page, '#animation-fps')).press('Tab');
   await expect(page.locator('#animation-metadata')).toContainText('Mode: stepped · FPS: 20');
   await expect(page.locator('#current-time')).toHaveText('0.150 / 2.000 s');
   expect((await capturePose()).equals(steppedPose)).toBe(false);
@@ -210,12 +211,12 @@ test('authored mode and FPS update the paused pose immediately and undo restores
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
   await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
   await page.locator('#animation-undo').click();
-  await expect(page.locator('#animation-fps')).toHaveValue('10');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('10');
   expect((await capturePose()).equals(steppedPose)).toBe(true);
   await page.locator('#animation-redo').click();
-  await expect(page.locator('#animation-fps')).toHaveValue('20');
-  await page.locator('#animation-mode').selectOption('smooth');
-  await expect(page.locator('#animation-fps')).toBeDisabled();
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('20');
+  await (await animationControl(page, '#animation-mode')).selectOption('smooth');
+  await expect(await animationControl(page, '#animation-fps')).toBeDisabled();
   const smoothPose = await capturePose();
   await timeline.press('ArrowRight');
   expect((await capturePose()).equals(smoothPose)).toBe(false);
@@ -223,7 +224,7 @@ test('authored mode and FPS update the paused pose immediately and undo restores
   await page.locator('#animation-undo').click();
   await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await page.locator('#animation-selection').selectOption('walk');
   await expect(page.locator('#animation-selection')).toHaveValue('walk');
   await page.screenshot({ path: test.info().outputPath('animation-settings-desktop.png'), fullPage: true });
@@ -235,8 +236,8 @@ test('invalid FPS restores the authored value and typing while playing retains t
   page,
 }) => {
   await openEditor(page);
-  await page.locator('#animation-mode').selectOption('stepped');
-  const fps = page.locator('#animation-fps');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  const fps = await animationControl(page, '#animation-fps');
   for (const invalid of ['-1', '0', '241', '']) {
     await fps.fill(invalid);
     await fps.press('Tab');

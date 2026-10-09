@@ -87,6 +87,21 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.puppet?.setDebug(visible);
   }
 
+  /** Frame the loaded artwork once; keep the camera stable while authoring and playing. */
+  fitPreview(): void {
+    const bounds = this.puppet?.container.getBounds();
+    if (
+      !bounds ||
+      !(bounds.width > 0) ||
+      !(bounds.height > 0) ||
+      ![bounds.width, bounds.height, bounds.centerX, bounds.centerY].every(Number.isFinite)
+    )
+      return;
+    const camera = this.cameras.main;
+    camera.setZoom(Math.min(camera.width / (bounds.width + 120), camera.height / (bounds.height + 120)));
+    camera.centerOn(bounds.centerX, bounds.centerY);
+  }
+
   /** Pin current end joints in canonical puppet space; mirroring only changes their world projection. */
   setIKPreview(enabled: boolean): void {
     this.ikPreviewEnabled = enabled;

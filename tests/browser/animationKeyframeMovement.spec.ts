@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -159,9 +159,9 @@ test('frame snap uses authored FPS/fallback, Shift bypasses, Escape/pointer canc
   await page.mouse.up();
   await expect(key(page, 0.5)).toHaveCount(1);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  await page.locator('#animation-mode').selectOption('stepped');
-  await page.locator('#animation-fps').fill('20');
-  await page.locator('#animation-fps').press('Tab');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  await (await animationControl(page, '#animation-fps')).fill('20');
+  await (await animationControl(page, '#animation-fps')).press('Tab');
   y = await beginDrag(page, 0.5);
   await movePointer(page, 0.143, y);
   await expect.poll(() => time(page)).toBe(0.15);

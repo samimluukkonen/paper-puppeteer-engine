@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationControl, test } from './fixtures.js';
 
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
@@ -12,7 +12,7 @@ test("navigating away from a clean tab preserves another tab's unsaved animation
   try {
     await clean.goto(page.url());
     await expect(clean.locator('#animation-status')).toHaveText('Validation: OK');
-    await page.locator('#animation-mode').selectOption('stepped');
+    await (await animationControl(page, '#animation-mode')).selectOption('stepped');
     await expect.poll(() => draftKeys(page)).toHaveLength(1);
     const stored = await page.evaluate(() => JSON.stringify(localStorage));
     await clean.goto(new URL('../', page.url()).href);
@@ -56,9 +56,9 @@ test('animation drafts recover committed settings, exclude temporary fields and 
 }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  await page.locator('#animation-mode').selectOption('stepped');
-  await page.locator('#animation-fps').fill('17');
-  await page.locator('#animation-fps').press('Tab');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  await (await animationControl(page, '#animation-fps')).fill('17');
+  await (await animationControl(page, '#animation-fps')).press('Tab');
   await page.locator('#animation-bones').getByRole('button', { name: 'head', exact: true }).click();
   const x = page.locator('#animation-bone-fields input[data-property="x"]');
   await x.fill('123');
@@ -68,17 +68,17 @@ test('animation drafts recover committed settings, exclude temporary fields and 
   // Reload immediately: the unload flush must preserve the last edit before the debounce fires.
   await page.reload();
   await expect(page.locator('#animation-draft-status')).toContainText('Draft restored');
-  await expect(page.locator('#animation-mode')).toHaveValue('stepped');
-  await expect(page.locator('#animation-fps')).toHaveValue('17');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('stepped');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('17');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-bones').getByRole('button', { name: 'head', exact: true }).click();
   await expect(x).toHaveValue('0');
   await page.locator('#animation-undo').click();
-  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
   await page.locator('#animation-redo').click();
-  await expect(page.locator('#animation-fps')).toHaveValue('17');
-  await Promise.all([page.waitForEvent('download'), page.locator('#animation-download').click()]);
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('17');
+  await Promise.all([page.waitForEvent('download'), (await animationControl(page, '#animation-download')).click()]);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
 });
@@ -121,32 +121,32 @@ test('animation recovery ignores reordered source tracks but rejects changed aut
   });
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  await page.locator('#animation-mode').selectOption('stepped');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
   page.on('dialog', async (dialog) => {
     await dialog.accept();
   });
   reordered = true;
   await page.reload();
   await expect(page.locator('#animation-draft-status')).toContainText('Draft restored');
-  await expect(page.locator('#animation-mode')).toHaveValue('stepped');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('stepped');
   changed = true;
   await page.reload();
   await expect(page.locator('#animation-draft-status')).toContainText('discarded');
-  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
 });
 
 test('declining animation draft recovery keeps the loaded source and removes the stored draft', async ({ page }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  await page.locator('#animation-mode').selectOption('stepped');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
   page.on('dialog', async (dialog) => {
     if (dialog.type() === 'beforeunload') await dialog.accept();
     else await dialog.dismiss();
   });
   await page.reload();
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
 });

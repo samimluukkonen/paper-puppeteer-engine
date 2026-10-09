@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { test } from './fixtures.js';
+import { animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -98,14 +98,14 @@ test('three-key authoring, exact history, interpolation, parent-local editing an
   await time(page, 0.2);
   for (let step = 0; step < 5; step += 1) await page.locator('#timeline').press('ArrowRight');
   await expect(input(page, 'rotation')).toHaveValue('12.5');
-  await page.locator('#animation-mode').selectOption('stepped');
+  await (await animationControl(page, '#animation-mode')).selectOption('stepped');
   await expect(input(page, 'rotation')).toHaveValue('6');
-  for (const fps of ['12', '15', '20']) await page.locator('#animation-fps').fill(fps);
-  await page.locator('#animation-fps').press('Tab');
+  for (const fps of ['12', '15', '20']) await (await animationControl(page, '#animation-fps')).fill(fps);
+  await (await animationControl(page, '#animation-fps')).press('Tab');
   await page.locator('#animation-undo').click();
-  await expect(page.locator('#animation-fps')).toHaveValue('10');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('10');
   await page.locator('#animation-undo').click();
-  await expect(page.locator('#animation-mode')).toHaveValue('smooth');
+  await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect(input(page, 'rotation')).toHaveValue('12.5');
   await page.locator('#preview-loop').click();
   await page.locator('#playback-speed').selectOption('2');
@@ -208,9 +208,10 @@ test('demo bone hierarchy, temporary preview, sparse create/update/delete, and p
   const previewBounds = await page.locator('#animation-stage canvas').boundingBox();
   if (!previewBounds) throw new Error('Missing puppet preview.');
   await page.locator('#animation-stage canvas').click({
-    position: { x: previewBounds.width / 2, y: (previewBounds.height * 435) / 640 },
+    // The framed artwork places the torso joint at the canvas center.
+    position: { x: previewBounds.width / 2, y: previewBounds.height / 2 },
   });
-  await expect(page.locator('#animation-bone-title')).toHaveText('Bone: root');
+  await expect(page.locator('#animation-bone-title')).toHaveText('Bone: torso');
   await time(page, 0.5);
   await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
   await expect(keyed(page, 'rotation')).toHaveAttribute('data-keyed', 'false');
@@ -298,6 +299,7 @@ test('draft cancel, navigation, invalid fields, and preview-only IK/facing', asy
   await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.setViewportSize({ width: 600, height: 1000 });
+  await page.locator('#animation-inspector-toggle').click();
   await expect(input(page, 'rotation')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('bone-authoring-mobile.png'), fullPage: true });
 });
