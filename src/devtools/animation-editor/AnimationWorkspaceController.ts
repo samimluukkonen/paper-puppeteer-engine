@@ -2,9 +2,6 @@
 export class AnimationWorkspaceController {
   private readonly abort = new AbortController();
   private readonly previewResize: ResizeObserver;
-  private readonly inspector: HTMLElement;
-  private readonly toggle: HTMLButtonElement;
-  private readonly narrow = window.matchMedia('(max-width: 900px)');
   private resizeFrame = 0;
 
   constructor(
@@ -12,29 +9,6 @@ export class AnimationWorkspaceController {
     refreshPreview: () => void,
   ) {
     const options = { signal: this.abort.signal };
-    this.inspector = app.querySelector<HTMLElement>('#animation-inspector')!;
-    this.toggle = app.querySelector<HTMLButtonElement>('#animation-inspector-toggle')!;
-    const setInspector = (open: boolean): void => {
-      app.classList.toggle('inspector-open', open);
-      this.toggle.setAttribute('aria-expanded', String(open));
-      this.inspector.inert = this.narrow.matches && !open;
-    };
-    this.toggle.addEventListener(
-      'click',
-      () => setInspector(this.toggle.getAttribute('aria-expanded') !== 'true'),
-      options,
-    );
-    app.querySelector('#animation-inspector-close')!.addEventListener(
-      'click',
-      () => {
-        setInspector(false);
-        this.toggle.focus({ preventScroll: true });
-      },
-      options,
-    );
-    this.narrow.addEventListener('change', () => setInspector(false), options);
-    setInspector(false);
-
     // Native modal dialogs provide focus containment, Escape, and focus restoration.
     for (const name of ['tools', 'help']) {
       const dialog = app.querySelector<HTMLDialogElement>(`#animation-${name}-dialog`)!;
@@ -60,10 +34,6 @@ export class AnimationWorkspaceController {
         if (settings.open) {
           settings.open = false;
           settings.querySelector('summary')!.focus();
-          event.preventDefault();
-        } else if (this.narrow.matches && app.classList.contains('inspector-open')) {
-          setInspector(false);
-          this.toggle.focus({ preventScroll: true });
           event.preventDefault();
         }
       },
@@ -140,7 +110,7 @@ export class AnimationWorkspaceController {
           control.dispatchEvent(new Event('change'));
         }
         inset.scrollLeft = 0;
-        setInspector(false);
+        app.dispatchEvent(new Event('workspace:reset-inspector'));
       },
       options,
     );
@@ -230,10 +200,7 @@ export class AnimationWorkspaceController {
   }
 
   revealInspector(): void {
-    if (!this.narrow.matches) return;
-    this.app.classList.add('inspector-open');
-    this.toggle.setAttribute('aria-expanded', 'true');
-    this.inspector.inert = false;
+    this.app.dispatchEvent(new Event('workspace:reveal-inspector'));
   }
 
   dispose(): void {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 const narrowQuery = '(max-width: 900px)';
 function subscribeNarrow(listener: () => void): () => void {
@@ -20,10 +20,14 @@ export function useWorkspaceInspector() {
     media.addEventListener('change', reset);
     return () => media.removeEventListener('change', reset);
   }, []);
-  const close = (): void => {
+  const close = useCallback((): void => {
     setOpen(false);
     toggle.current?.focus({ preventScroll: true });
-  };
+  }, []);
+  const reset = useCallback((): void => {
+    if (panel.current) panel.current.scrollTop = 0;
+    close();
+  }, [close]);
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (
@@ -47,13 +51,13 @@ export function useWorkspaceInspector() {
     };
     const host = panel.current?.closest('.workspace-shell');
     host?.addEventListener('workspace:reveal-inspector', reveal);
-    return () => host?.removeEventListener('workspace:reveal-inspector', reveal);
-  }, []);
-  const reset = (): void => {
-    if (panel.current) panel.current.scrollTop = 0;
-    close();
-  };
-  return { open, narrow, toggle, panel, close, reset, toggleOpen: () => setOpen(!open) };
+    host?.addEventListener('workspace:reset-inspector', reset);
+    return () => {
+      host?.removeEventListener('workspace:reveal-inspector', reveal);
+      host?.removeEventListener('workspace:reset-inspector', reset);
+    };
+  }, [reset]);
+  return { open, narrow, toggle, panel, close, reset, toggleOpen: () => setOpen((held) => !held) };
 }
 
 /** Native dialogs provide Escape, focus containment, and restoration to the opening button. */

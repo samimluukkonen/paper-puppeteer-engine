@@ -1,9 +1,11 @@
 import { ViewHeader } from '../../ui/viewShell.js';
+import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { AUTHORED_INTERPOLATION_MODES, interpolationLabel } from './interpolationPresentation.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
 export function AnimationEditorView() {
+  const inspector = useWorkspaceInspector();
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
     <option key={mode} value={mode}>
       {interpolationLabel(mode)}
@@ -81,7 +83,14 @@ export function AnimationEditorView() {
         <button id="animation-reset-layout" type="button">
           Reset layout
         </button>
-        <button id="animation-inspector-toggle" type="button" aria-expanded="false" aria-controls="animation-inspector">
+        <button
+          ref={inspector.toggle}
+          id="animation-inspector-toggle"
+          type="button"
+          aria-expanded={inspector.open}
+          aria-controls="animation-inspector"
+          onClick={inspector.toggleOpen}
+        >
           Inspector
         </button>
         <div className="animation-save">
@@ -104,7 +113,7 @@ export function AnimationEditorView() {
           <p id="animation-import-feedback" role="status"></p>
         </div>
       </section>
-      <main className="animation-layout view-content">
+      <main className={`animation-layout view-content ${inspector.open ? 'inspector-open' : ''}`}>
         <section className="animation-preview" aria-label="Animation preview">
           <div className="animation-preview-options">
             <label>
@@ -123,10 +132,16 @@ export function AnimationEditorView() {
           </div>
           <div id="animation-stage" aria-label="Puppet preview"></div>
         </section>
-        <aside id="animation-inspector" className="animation-authoring" aria-label="Selection inspector">
+        <aside
+          ref={inspector.panel}
+          id="animation-inspector"
+          className="animation-authoring"
+          inert={inspector.narrow && !inspector.open}
+          aria-label="Selection inspector"
+        >
           <div className="animation-inspector-heading">
             <h2>Inspector</h2>
-            <button id="animation-inspector-close" type="button">
+            <button id="animation-inspector-close" type="button" onClick={inspector.close}>
               Close
             </button>
           </div>
