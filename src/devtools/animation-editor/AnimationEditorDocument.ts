@@ -28,6 +28,11 @@ export interface AnimationEditorStateOptions {
   animationPaths?: Readonly<Record<string, string>>;
 }
 
+export interface AnimationImportOptions {
+  /** UI adapters can confirm loss of dirty edits after validation, before installing a new session. */
+  confirmDiscard?: () => boolean;
+}
+
 /** Owns validated authored snapshots, saved baselines and history independently of editor navigation. */
 export class AnimationEditorDocument {
   private readonly animations = new Map<string, AnimationEntry>();
@@ -142,10 +147,13 @@ export class AnimationEditorDocument {
   }
 
   /** Import starts a clean session; rejection changes diagnostics only. */
-  importJson(json: string): boolean {
+  importJson(json: string, options: AnimationImportOptions = {}): boolean {
     const result = importAnimationJson(json, this.rig);
-    this.reportIssues(result.issues);
-    if (!result.success) return false;
+    if (!result.success) {
+      this.reportIssues(result.issues);
+      return false;
+    }
+    if (this.dirty && options.confirmDiscard && !options.confirmDiscard()) return false;
     const source = result.data;
     const working = freezeData(structuredClone(source));
     const path = this.animations.get(source.name)?.path;
@@ -159,6 +167,16 @@ export class AnimationEditorDocument {
     this.working = working;
     this.saved = working;
     this.selectedId = source.name;
+    this.cachedDirty = false;
+    this.history = this.createHistory();
+    return true;
+  }
+
+  /** Restore the immutable loaded/imported source locally, even after an export checkpoint. */
+  revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
+    if (!this.source || (this.dirty && !options.discardChanges)) return false;
+    this.working = freezeData(structuredClone(this.source));
+    this.markSaved();
     this.cachedDirty = false;
     this.history = this.createHistory();
     return true;

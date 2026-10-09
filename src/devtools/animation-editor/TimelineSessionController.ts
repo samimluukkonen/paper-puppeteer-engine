@@ -1,5 +1,6 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { downloadJson } from '../../shared/downloadJson.js';
+import type { AnimationImportOptions } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { TimelineInputController } from './TimelineInputController.js';
 
@@ -23,6 +24,8 @@ export class TimelineSessionController {
   private readonly copyJson: HTMLButtonElement;
   private readonly logJson: HTMLButtonElement;
   private readonly discard: HTMLButtonElement;
+  private readonly revert: HTMLButtonElement;
+  private readonly sessionStatus: HTMLElement;
   private readonly exportFeedback: HTMLElement;
   private readonly importPanel: HTMLElement;
   private readonly importText: HTMLTextAreaElement;
@@ -67,6 +70,8 @@ export class TimelineSessionController {
     this.copyJson = this.element<HTMLButtonElement>('#animation-copy-json');
     this.logJson = this.element<HTMLButtonElement>('#animation-log-json');
     this.discard = this.element<HTMLButtonElement>('#animation-discard');
+    this.revert = this.element<HTMLButtonElement>('#animation-revert');
+    this.sessionStatus = this.element('#animation-session-status');
     this.exportFeedback = this.element('#animation-export-feedback');
     this.importPanel = this.element('#animation-import-panel');
     this.importText = this.element<HTMLTextAreaElement>('#animation-import-text');
@@ -83,13 +88,14 @@ export class TimelineSessionController {
     const options = { signal: this.abort.signal };
     // Invalid inspector drafts can add errors on blur and move these buttons between down/up.
     // Hold focus until the replacement clears those drafts so the native click stays on its target.
-    this.reloadExport.addEventListener(
-      'pointerdown',
-      (event) => {
-        if (event.button === 0) event.preventDefault();
-      },
-      options,
-    );
+    for (const button of [this.reloadExport, this.revert, this.discard])
+      button.addEventListener(
+        'pointerdown',
+        (event) => {
+          if (event.button === 0) event.preventDefault();
+        },
+        options,
+      );
     this.element('#animation-import-paste').addEventListener(
       'click',
       () => {
@@ -112,7 +118,7 @@ export class TimelineSessionController {
       'click',
       () => {
         ++this.importSequence;
-        this.finishImport(this.state.importJson(this.importText.value));
+        this.replaceSession((options) => this.state.importJson(this.importText.value, options));
       },
       options,
     );
@@ -127,7 +133,7 @@ export class TimelineSessionController {
       'click',
       () => {
         ++this.importSequence;
-        this.finishImport(this.state.reloadCurrentExport());
+        this.replaceSession((options) => this.state.reloadCurrentExport(options));
       },
       options,
     );
@@ -141,11 +147,13 @@ export class TimelineSessionController {
     this.selection.addEventListener(
       'change',
       () => {
-        this.input.endScrub();
-        if (this.state.selectAnimation(this.selection.value || null)) {
+        const discardChanges =
+          this.state.dirty && window.confirm('Discard unsaved animation changes and select another animation?');
+        if (this.state.selectAnimation(this.selection.value || null, { discardChanges })) {
           ++this.sessionGeneration;
           setText(this.exportFeedback, '');
         }
+        this.render();
       },
       options,
     );
@@ -205,6 +213,25 @@ export class TimelineSessionController {
       },
       options,
     );
+    this.revert.addEventListener(
+      'click',
+      () => {
+        if (this.state.dirty && !window.confirm('Discard unsaved animation changes and revert to the session source?'))
+          return;
+        if (this.state.revertAnimation({ discardChanges: true })) {
+          ++this.sessionGeneration;
+          ++this.importSequence;
+          this.externalError = '';
+          setText(this.importFeedback, '');
+          setText(
+            this.exportFeedback,
+            'Animation reverted to its loaded/imported source. Clean session; history reset.',
+          );
+          this.render();
+        }
+      },
+      options,
+    );
     this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframes(), options);
     this.copyKeys.addEventListener('click', () => this.state.copyTimelineSelection(), options);
     this.pasteKeys.addEventListener('click', () => this.state.pasteTimelineClipboard(), options);
@@ -215,6 +242,18 @@ export class TimelineSessionController {
 
   private get state(): AnimationEditorState {
     return this.getState();
+  }
+
+  private replaceSession(run: (options: AnimationImportOptions) => boolean): void {
+    let cancelled = false;
+    const imported = run({
+      confirmDiscard: () => {
+        cancelled = !window.confirm('Discard unsaved animation changes and replace the current animation session?');
+        return !cancelled;
+      },
+    });
+    if (cancelled) setText(this.importFeedback, 'Replacement cancelled. Current animation retained.');
+    else this.finishImport(imported);
   }
 
   private finishImport(imported: boolean): void {
@@ -244,10 +283,12 @@ export class TimelineSessionController {
     const state = this.state;
     const animation = state.workingAnimation;
     const generation = this.sessionGeneration;
+    const revision = state.sessionRevision;
     const sequence = ++this.importSequence;
     const isCurrent = (): boolean =>
       !this.abort.signal.aborted &&
       this.state === state &&
+      state.sessionRevision === revision &&
       this.sessionGeneration === generation &&
       this.importSequence === sequence;
     try {
@@ -257,7 +298,7 @@ export class TimelineSessionController {
         setText(this.importFeedback, 'Animation changed while reading the file. Choose the file again to import.');
         return;
       }
-      this.finishImport(state.importJson(json));
+      this.replaceSession((options) => state.importJson(json, options));
     } catch (error) {
       if (isCurrent())
         setText(
@@ -272,10 +313,12 @@ export class TimelineSessionController {
     const id = state.selectedAnimationId;
     const source = state.sourceAnimation;
     const generation = this.sessionGeneration;
+    const revision = state.sessionRevision;
     const sequence = ++this.exportSequence;
     const isCurrent = (): boolean =>
       !this.abort.signal.aborted &&
       this.state === state &&
+      state.sessionRevision === revision &&
       state.selectedAnimationId === id &&
       state.sourceAnimation === source &&
       generation === this.sessionGeneration;
@@ -388,6 +431,7 @@ export class TimelineSessionController {
     if (this.copyJson.disabled !== !animation) this.copyJson.disabled = !animation;
     if (this.logJson.disabled !== !animation) this.logJson.disabled = !animation;
     this.reloadExport.disabled = !animation;
+    this.revert.disabled = !animation;
     this.importFile.disabled = !state.rig;
     this.element<HTMLButtonElement>('#animation-import-paste').disabled = !state.rig;
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
@@ -412,6 +456,10 @@ export class TimelineSessionController {
         : 'Select an animation to preview its pose.',
     );
     setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
+    setText(
+      this.sessionStatus,
+      `Animation: ${state.selectedAnimationId ?? 'none'} · Status: ${animation ? (state.dirty ? 'Modified' : 'Clean') : 'No animation'}`,
+    );
     setText(
       this.status,
       this.externalError ||

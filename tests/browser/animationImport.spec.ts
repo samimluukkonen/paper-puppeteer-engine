@@ -32,7 +32,15 @@ const animation = {
 async function paste(page: Page, json: string) {
   await page.locator('#animation-import-paste').click();
   await page.locator('#animation-import-text').fill(json);
-  await page.locator('#animation-import-submit').click();
+  const acceptReplacement = (dialog: import('@playwright/test').Dialog): void => {
+    void dialog.accept();
+  };
+  page.on('dialog', acceptReplacement);
+  try {
+    await page.locator('#animation-import-submit').click();
+  } finally {
+    page.off('dialog', acceptReplacement);
+  }
 }
 async function download(page: Page) {
   const waiting = page.waitForEvent('download');
@@ -85,7 +93,10 @@ test('paste and downloaded file imports restore authored data, timeline and rend
   await editRoot(page, '140');
   await page.locator('#play-pause').click();
   await expect(page.locator('#play-pause')).toHaveText('Pause');
-  await page.locator('#animation-import-file').setInputFiles(exported.path);
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.accept()),
+    page.locator('#animation-import-file').setInputFiles(exported.path),
+  ]);
   await expect(page.locator('#play-pause')).toHaveText('Play');
   await expect(page.locator('#current-time')).toHaveText('0.000 / 1.500 s');
   await expect(page.locator('#animation-bone-title')).toHaveText('Select a bone');
@@ -160,7 +171,10 @@ test('import cancels an active marquee and clears temporary event inspector edit
   await expect(page.locator('.timeline-keyframe[aria-pressed="true"]')).toHaveCount(0);
   await page.locator('#timeline-add-event').click();
   await page.locator('#animation-event-data').fill('{invalid');
-  await page.locator('#animation-reload-export').click();
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.accept()),
+    page.locator('#animation-reload-export').click(),
+  ]);
   await expect(page.locator('#animation-event-inspector')).toBeHidden();
   await expect(page.locator('#animation-event-data')).toHaveValue('');
   await expect(page.locator('#animation-event-error')).toHaveText('');
@@ -170,8 +184,10 @@ test('import cancels an active marquee and clears temporary event inspector edit
 test('reimporting a clip with a previous browser draft starts clean without a recovery prompt', async ({ page }) => {
   const dialogs: string[] = [];
   page.on('dialog', async (dialog) => {
-    dialogs.push(dialog.message());
-    await dialog.dismiss();
+    if (!dialog.message().startsWith('Discard unsaved animation changes')) {
+      dialogs.push(dialog.message());
+      await dialog.dismiss();
+    }
   });
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');

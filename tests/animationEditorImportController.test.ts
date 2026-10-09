@@ -24,6 +24,7 @@ function fixture() {
   state.setBonePropertyKeyframe('root', 'x', 33);
   const query = stubRigEditorDom();
   vi.stubGlobal('Option', EditorElement);
+  vi.stubGlobal('window', { confirm: vi.fn(() => true) });
   Object.assign(query('#animation-import-text'), { focus: vi.fn() });
   const controller = new TimelineSessionController(query('#editor-app') as unknown as HTMLElement, () => state, {
     endScrub() {},
@@ -74,7 +75,8 @@ test('file and paste controls use the same state import path and allow rechoosin
   query('#animation-import-file').value = 'animation.json';
   await query('#animation-import-file').dispatch('change');
   await vi.waitFor(() => assert.equal(imported.mock.calls.length, 1));
-  assert.deepEqual(imported.mock.calls[0], [json]);
+  assert.equal(imported.mock.calls[0]?.[0], json);
+  assert.isFunction(imported.mock.calls[0]?.[1]?.confirmDiscard);
   assert.equal(query('#animation-import-file').value, '');
   const source = state.sourceAnimation;
   await query('#animation-import-file').dispatch('change');
@@ -106,7 +108,18 @@ test('file syntax/validation/read failures preserve the session and report usefu
   controller.dispose();
 });
 
-for (const action of ['paste', 'reload', 'bind', 'dispose', 'cancel', 'edit', 'direct-import', 'new-file'] as const) {
+for (const action of [
+  'paste',
+  'reload',
+  'revert',
+  'switch-back',
+  'bind',
+  'dispose',
+  'cancel',
+  'edit',
+  'direct-import',
+  'new-file',
+] as const) {
   test(`a pending file read cannot replace state after ${action}`, async () => {
     const { state, query, controller } = fixture();
     const pending = deferred<string>();
@@ -117,6 +130,11 @@ for (const action of ['paste', 'reload', 'bind', 'dispose', 'cancel', 'edit', 'd
       await query('#animation-import-submit').click();
     }
     if (action === 'reload') await query('#animation-reload-export').click();
+    if (action === 'revert') state.revertAnimation({ discardChanges: true });
+    if (action === 'switch-back') {
+      state.selectAnimation(null, { discardChanges: true });
+      state.selectAnimation('old');
+    }
     if (action === 'bind') controller.bind('other');
     if (action === 'dispose') controller.dispose();
     if (action === 'cancel') await query('#animation-import-cancel').click();

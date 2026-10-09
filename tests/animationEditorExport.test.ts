@@ -127,13 +127,18 @@ test('an older copy cannot replace a newer successful download checkpoint or fee
   controller.dispose();
 });
 
-for (const action of ['switch', 'discard', 'dispose', 'bind'] as const) {
+for (const action of ['switch', 'switch-back', 'revert', 'discard', 'dispose', 'bind'] as const) {
   test(`pending clipboard completion is ignored after ${action}`, async () => {
     const { current, query, controller } = fixture();
     const pending = deferred();
     vi.stubGlobal('navigator', { clipboard: { writeText: () => pending.promise } });
     await query('#animation-copy-json').click();
     if (action === 'switch') current.selectAnimation('idle', { discardChanges: true });
+    if (action === 'switch-back') {
+      current.selectAnimation('idle', { discardChanges: true });
+      current.selectAnimation('move');
+    }
+    if (action === 'revert') current.revertAnimation({ discardChanges: true });
     if (action === 'discard') {
       vi.stubGlobal('window', { confirm: () => true });
       await query('#animation-discard').click();

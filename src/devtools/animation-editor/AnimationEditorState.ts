@@ -16,6 +16,7 @@ import { freezeData } from '../shared/editorData.js';
 import {
   AnimationEditorDocument,
   type AnimationEditorStateOptions,
+  type AnimationImportOptions,
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
 import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
@@ -60,7 +61,11 @@ export const AUTHORED_FPS_MIN = 1;
 export const AUTHORED_FPS_MAX = 240;
 export const DEFAULT_AUTHORED_FPS = DEFAULT_KEYFRAME_FPS;
 
-export type { AnimationEditorStateOptions, ReadonlyAnimation } from './AnimationEditorDocument.js';
+export type {
+  AnimationEditorStateOptions,
+  AnimationImportOptions,
+  ReadonlyAnimation,
+} from './AnimationEditorDocument.js';
 
 export type { EventDrag } from './AnimationEditorEventCommands.js';
 export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
@@ -77,6 +82,7 @@ export class AnimationEditorState {
   private readonly keyframes: AnimationEditorKeyframeCommands;
   private readonly events: AnimationEditorEventCommands;
   private importedSessions = 0;
+  private animationSessions = 0;
 
   constructor(
     readonly rig?: Rig,
@@ -499,11 +505,9 @@ export class AnimationEditorState {
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
-    this.cancelTimelineDrag();
     const selected = this.document.selectAnimation(id, options);
     if (selected) {
-      this.selection.resetAnimation();
-      this.playback.reset();
+      this.resetAnimationSession();
     }
     this.notify();
     return selected;
@@ -790,25 +794,43 @@ export class AnimationEditorState {
     return this.importedSessions;
   }
 
+  /** Every successful selection, import, reload or revert invalidates pending session actions. */
+  get sessionRevision(): number {
+    return this.animationSessions;
+  }
+
+  private resetAnimationSession(clearBone = false): void {
+    ++this.animationSessions;
+    this.keyframes.resetSession();
+    this.events.resetSession();
+    this.selection.resetAnimation();
+    if (clearBone) this.selection.selectBone(null);
+    this.playback.reset();
+  }
+
+  /** Revert uses the current session's source, never a network reload or the last exported copy. */
+  revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
+    const reverted = this.document.revertAnimation(options);
+    if (reverted) this.resetAnimationSession(true);
+    this.notify();
+    return reverted;
+  }
+
   /** Validate before touching navigation; notify once with the complete fresh session and pose at zero. */
-  importJson(json: string): boolean {
-    const imported = this.document.importJson(json);
+  importJson(json: string, options: AnimationImportOptions = {}): boolean {
+    const imported = this.document.importJson(json, options);
     if (imported) {
       ++this.importedSessions;
-      this.keyframes.resetSession();
-      this.events.resetSession();
-      this.selection.resetAnimation();
-      this.selection.selectBone(null);
-      this.playback.reset();
+      this.resetAnimationSession(true);
     }
     this.notify();
     return imported;
   }
 
   /** Reload committed export through the same validated import boundary, without saving on failure. */
-  reloadCurrentExport(): boolean {
+  reloadCurrentExport(options: AnimationImportOptions = {}): boolean {
     const result = this.exportAnimation();
-    if (result.success) return this.importJson(result.json);
+    if (result.success) return this.importJson(result.json, options);
     this.document.reportIssues(result.issues);
     this.notify();
     return false;

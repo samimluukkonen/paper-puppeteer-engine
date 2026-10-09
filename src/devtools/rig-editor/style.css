@@ -155,6 +155,8 @@ input {
   gap: 7px;
 }
 #dirty-status {
+  /* Reserve the status line before loading so Phaser's initial canvas bounds stay current. */
+  min-height: 1.6em;
   color: #a04c30;
   font-weight: 600;
 }
