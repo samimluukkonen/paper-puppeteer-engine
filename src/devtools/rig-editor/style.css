@@ -14,25 +14,6 @@ select,
 input {
   font: inherit;
 }
-.editor-layout {
-  display: grid;
-  grid-template-columns: minmax(200px, 250px) minmax(0, 1fr) minmax(210px, 260px);
-  gap: 18px;
-}
-.editor-panel {
-  background: #f8f5ec;
-  border: 1px solid #d6d7c8;
-  border-radius: 6px;
-  padding: 18px 14px;
-  min-width: 0;
-}
-.editor-panel h2 {
-  margin: 0 0 12px;
-  color: #6d786a;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
 #hierarchy {
   max-height: 460px;
   overflow: auto;
@@ -87,9 +68,6 @@ input {
   background: white;
   color: #34473e;
 }
-.editor-center {
-  min-width: 0;
-}
 #editor-stage {
   aspect-ratio: 760 / 640;
   width: 100%;
@@ -105,11 +83,6 @@ input {
 }
 #editor-stage canvas {
   display: block;
-}
-.editor-center p {
-  color: #798376;
-  font-size: 11px;
-  line-height: 1.5;
 }
 .inspector h3 {
   font-size: 14px;
@@ -251,23 +224,4 @@ input {
 .shortcut-help kbd {
   white-space: nowrap;
   font: inherit;
-}
-@media (max-width: 1050px) {
-  .editor-layout {
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
-  .inspector {
-    grid-column: 1 / -1;
-  }
-}
-@media (max-width: 660px) {
-  .editor-layout {
-    grid-template-columns: 1fr;
-  }
-  .editor-center {
-    grid-row: 1;
-  }
-  .inspector {
-    grid-column: auto;
-  }
 }

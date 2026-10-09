@@ -16,6 +16,8 @@ import type { RigDefinition } from '../src/engine/types.js';
 import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
+vi.mock('../src/ui/observePreview.js', () => ({ observePreview: () => vi.fn() }));
+
 vi.mock('phaser', () => ({
   default: {
     Game: vi.fn(),
@@ -332,7 +334,8 @@ async function panelFixture() {
   const element = stubRigEditorDom();
   vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
   vi.resetModules();
-  await import('../src/devtools/rig-editor/main.js');
+  const { initializeRigEditor } = await import('../src/devtools/rig-editor/initializeRigEditor.js');
+  initializeRigEditor(element('#editor-app') as unknown as HTMLElement);
   const scene = vi.mocked(Phaser.Game).mock.lastCall![0]!.scene as RigEditorScene[];
   return { ...fixture(scene[0]), element };
 }

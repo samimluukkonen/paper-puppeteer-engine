@@ -2,6 +2,8 @@
 
 [All guides](../README.md#guides)
 
+The demo shares the Animation Editor's compact viewport layout: navigation and character selection at the top, a command bar, a large canvas, and a scrolling Controls panel on the right. Playback status stays below the canvas. On narrow screens, the **Controls** button opens the panel; Close or Escape returns focus to that button. **Help** opens a modal dialog, and **Reset layout** closes the drawer and resets panel scrolling while preserving playback and scene settings.
+
 Shortcuts leave form controls and editable text alone. Ctrl/Cmd combinations and composition input retain browser behavior; Alt is reserved for pose translation. Space activates a focused button or link normally. Held Q/E rotation is suspended while editing a form control.
 
 | Key                           | Action                                                                                                |

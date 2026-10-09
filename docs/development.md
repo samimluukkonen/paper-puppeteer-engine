@@ -18,9 +18,9 @@ npm run preview
 
 Use `npm run format` / `npm run format:check` for formatting, and `npm run lint` / `npm run lint:fix` for linting. Oxfmt's root `.oxfmtrc.json` keeps two-space indentation, single quotes in JavaScript/TypeScript, double quotes in CSS, semicolons, trailing commas, 120-column lines, and sorted imports. Side-effect imports retain their order; embedded code snippets and package fields are not reorganized. Oxfmt covers TypeScript, JavaScript, JSON/JSONC, CSS, HTML, Markdown, and YAML. Dependency/build/coverage/browser-test outputs, caches, temporary directories, and the npm lockfile are excluded. `plans/` holds historical and in-progress design notes and is excluded from formatting to avoid rewriting those records.
 
-Oxlint's root `.oxlintrc.json` uses JSON so it works across the project's supported Node versions. `options.typeAware: true` activates the installed `oxlint-tsgolint` backend with TypeScript 7; experimental compiler diagnostics (`typeCheck`) are deliberately omitted. Correctness rules are errors, with explicit checks for floating/misused promises, awaiting non-promises, array `for-in` loops, unnecessary assertions, unsafe arguments/assignments/calls/member access/returns, type-only imports, duplicate/self imports, and unsafe promise patterns. Non-null assertions remain allowed. React hooks and JSX accessibility checks apply to future `.tsx`/`.jsx` files; the current application uses Phaser and DOM controllers.
+Oxlint's root `.oxlintrc.json` uses JSON so it works across the project's supported Node versions. `options.typeAware: true` activates the installed `oxlint-tsgolint` backend with TypeScript 7; experimental compiler diagnostics (`typeCheck`) are deliberately omitted. Correctness rules are errors, with explicit checks for floating/misused promises, awaiting non-promises, array `for-in` loops, unnecessary assertions, unsafe arguments/assignments/calls/member access/returns, type-only imports, duplicate/self imports, and unsafe promise patterns. Non-null assertions remain allowed. React hooks and JSX accessibility checks apply to the `.tsx` view components. React owns the workspace UI; Phaser owns canvas rendering and the animation loop.
 
-Unsafe-value and unbound-method rules are errors throughout application code, tests, and scripts; the migration's transitional warning overrides have been removed. Mock callbacks use explicit signatures, dynamic values are narrowed or validated before use, and deliberately invalid fixtures remain `unknown`. Package scripts validate manifest fields with Zod, and browser fixtures validate shipped data before applying their intentional mutations. Narrow, explained inline exceptions preserve Phaser's explicit listener contexts, deliberately borrowed test methods, listener snapshots, aggregate-error contents, arbitrary validation diagnostics, and intentionally invalid test inputs. Unused exceptions are errors. `eslint/preserve-caught-error` and future React hook dependency checks remain warning-level rules, with no current findings. Suspicious rules are selected individually rather than enabling noisy assertion/style restrictions across the engine.
+Unsafe-value and unbound-method rules are errors throughout application code, tests, and scripts; the migration's transitional warning overrides have been removed. Mock callbacks use explicit signatures, dynamic values are narrowed or validated before use, and deliberately invalid fixtures remain `unknown`. Package scripts validate manifest fields with Zod, and browser fixtures validate shipped data before applying their intentional mutations. Narrow, explained inline exceptions preserve Phaser's explicit listener contexts, deliberately borrowed test methods, listener snapshots, aggregate-error contents, arbitrary validation diagnostics, and intentionally invalid test inputs. Unused exceptions are errors. `eslint/preserve-caught-error` and React hook dependency checks remain warning-level rules, with no current findings. Suspicious rules are selected individually rather than enabling noisy assertion/style restrictions across the engine.
 
 Install the recommended `oxc.oxc-vscode` extension for format-on-save and explicit safe fixes on save. Existing character JSON schema associations are retained, and the editor inherits type-aware linting from the root config.
 
@@ -79,9 +79,13 @@ Bones without authored sprites allocate an independent render branch only when `
 
 Container counts include the source skeleton and fixture root. Each additional prop mount allocates two transform containers once and reuses them thereafter. Dense artwork now requires linear storage and synchronization work. One local CPU profile measured the 128-bone dense chain at about 26 microseconds per synchronization, versus about 459 microseconds before this change; timings vary by machine. Sparse rigs still traverse their skeleton during full synchronization, so their CPU cost depends on bone count even with only one drawable.
 
-Direct dependencies use exact versions: Zod **4.6.5**, Oxfmt **0.72.0**, Oxlint **1.87.0**, oxlint-tsgolint **7.0.2003**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, and Node type definitions **24.19.1**. `package-lock.json` locks the resolved dependency graph. The Oxc tools use the latest npm releases at migration time; TypeScript **7.0.2** remains the latest stable compiler.
+Direct dependencies use exact versions: Zod **4.6.5**, Oxfmt **0.72.0**, Oxlint **1.87.0**, oxlint-tsgolint **7.0.2003**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, Node type definitions **24.19.1**, and React / React DOM / their type definitions **19.3.0**. React is a development dependency used by the bundled demo/editor applications; it does not become a dependency of the engine package. `package-lock.json` locks the resolved dependency graph. The Oxc tools use the latest npm releases at migration time; TypeScript **7.0.2** remains the latest stable compiler.
 
 ## Architecture
+
+All three applications use React 19.3.0 with TypeScript JSX and Vite's JSX transform. `ui/viewShell.tsx` shares navigation and character identity, and `ui/workspace.css` shares the compact header, command bar, canvas/inspector layout, and narrow-screen drawer styling. `ui/mountView.tsx` initializes Phaser and the editing controllers in a layout effect after React commits their hosts; unmounting releases controllers, observers, and the game before React removes the DOM.
+
+The engine stays independent of React. The demo uses `DemoUIStore` and `useSyncExternalStore` to render commands and status from scene notifications. Each command subscribes to its own pressed value, so crossfade status updates do not render unchanged controls. Rig and animation state, history, import/export, and the existing controller-managed inspector/timeline regions remain in their current modules. Those regions are stable hosts in React components; keep their child content under one owner when migrating additional controls. Layout preferences never enter authored JSON.
 
 ```text
 src/engine/
@@ -128,8 +132,8 @@ src/demo/
   demoCharacterProfiles.ts  Per-character placement, facing, grips, foot contacts and IK configuration
   Katana.ts            Placeholder weapon transform and two data-defined grips
 src/devtools/rig-editor/
-  main.ts              Page bootstrap and controller wiring
-  editorMarkup.ts      Static page shell
+  main.tsx             React page bootstrap and lifetime
+  editorMarkup.tsx     React workspace shell
   InspectorController.ts  Numeric editing, derived labels, and field undo grouping
   HierarchyController.ts  Cached tree rendering and selection
   ControlsController.ts   Editing, snapping, visibility, and preview controls
@@ -139,7 +143,7 @@ src/devtools/rig-editor/
   RigEditorInputController.ts  Dragging, keyboard commands, and input listener lifecycle
   RigEditorState.ts    Working rig, validation, bounded history, and serialization
 src/devtools/animation-editor/
-  main.ts              Animation editor page and Phaser bootstrap
+  main.tsx             React animation editor and Phaser lifetime
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
   AnimationEditorState.ts  Authored edit coordination, transform drafts, selection and navigation
   AnimationEditorKeyframeCommands.ts  Keyframe transactions, session clipboard, duplication, drag preview and nudges
@@ -170,7 +174,7 @@ src/shared/
   loadSceneCharacter.ts  Cancelable metadata and artwork loading for a scene session
 public/characters/demo-puppet/  Shipped rig, skins, animations, poses, and artwork
 docs/                  Focused user and developer guides
-src/main.ts            Demo bootstrap and control panel
+src/main.tsx           React demo bootstrap and Phaser lifetime
 ```
 
 The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with two factors representing their composed ancestor transform. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. Debug overlays allocate their Phaser objects only when first enabled and reuse them across toggles; label-side settings made before enabling debug are retained. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.

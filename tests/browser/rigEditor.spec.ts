@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { RigJsonDefinition } from '../../src/engine/externalData.js';
-import { test } from './fixtures.js';
+import { rigFileAction, test } from './fixtures.js';
 
 const field = (page: Page, name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
 
@@ -23,7 +23,7 @@ test('unsaved edits block navigation and refresh until exported', async ({ page 
     }),
   ]);
   await expect(field(page, 'x')).toHaveValue('12');
-  await page.locator('#log-json').click();
+  await rigFileAction(page, '#log-json', (control) => control.click());
   await page.getByRole('link', { name: 'Engine demo' }).click();
   await expect(page.locator('#status-text')).toContainText('Current: idle');
 });
@@ -77,7 +77,7 @@ for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
       await expect(page.locator('#undo')).toBeDisabled();
       await page.locator('#redo').click();
       const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
-      await page.locator('#log-json').click();
+      await rigFileAction(page, '#log-json', (control) => control.click());
       const exported = JSON.parse((await logged).text()) as RigJsonDefinition;
       expect(exported.bones).toEqual(original.bones);
       expect(exported.slots).toEqual(original.slots);
@@ -107,7 +107,7 @@ test('numeric inputs retain precision and clearing length removes the override',
   await page.locator('#redo').click();
   await expect(length).toHaveValue('');
   const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
-  await page.locator('#log-json').click();
+  await rigFileAction(page, '#log-json', (control) => control.click());
   const rig = JSON.parse((await logged).text()) as RigJsonDefinition;
   expect(rig.bones.find((bone) => bone.id === 'head')).not.toHaveProperty('length');
 });
@@ -272,11 +272,13 @@ test('hierarchy selection retains button focus and rebuilds for a different impo
     ],
     slots: [...(original.slots ?? []), { id: 'importedVisual', bone: 'importedChild' }],
   };
-  await page.locator('#load-json').setInputFiles({
-    name: 'different.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify(imported)),
-  });
+  await rigFileAction(page, '#load-json', (control) =>
+    control.setInputFiles({
+      name: 'different.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(imported)),
+    }),
+  );
   const hierarchy = page.locator('#hierarchy');
   await expect(page.locator('#action-feedback')).toHaveText('different.json loaded and validated.');
   await expect(hierarchy.getByRole('treeitem')).toHaveCount(imported.bones.length + imported.slots!.length);
@@ -380,7 +382,7 @@ test('exported, original and imported reloads keep controls attached to the acti
   const original = await (await page.request.get('characters/demo-puppet/rig.json')).text();
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   await field(page, 'x').fill('12');
-  await page.locator('#log-json').click();
+  await rigFileAction(page, '#log-json', (control) => control.click());
   await expect(page.locator('#dirty-status')).toHaveText('No changes');
 
   for (const source of ['exported', 'original', 'imported'] as const) {
@@ -390,14 +392,16 @@ test('exported, original and imported reloads keep controls attached to the acti
     await page.locator('#opacity').selectOption('0.25');
     await page.locator('input[data-visibility="artwork"]').uncheck();
     if (source === 'imported') {
-      await page.locator('#load-json').setInputFiles({
-        name: 'imported.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(original),
-      });
+      await rigFileAction(page, '#load-json', (control) =>
+        control.setInputFiles({
+          name: 'imported.json',
+          mimeType: 'application/json',
+          buffer: Buffer.from(original),
+        }),
+      );
       await expect(page.locator('#action-feedback')).toHaveText('imported.json loaded and validated.');
     } else {
-      await page.locator(`#reload-${source}`).click();
+      await rigFileAction(page, `#reload-${source}`, (control) => control.click());
       await expect(page.locator('#action-feedback')).toHaveText(
         source === 'exported' ? 'Exported rig reloaded and validated.' : 'Original rig reloaded.',
       );

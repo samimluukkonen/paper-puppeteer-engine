@@ -11,6 +11,11 @@ export default defineConfig({
         rigEditor: fileURLToPath(new URL('./rig-editor/index.html', import.meta.url)),
         animationEditor: fileURLToPath(new URL('./animation-editor/index.html', import.meta.url)),
       },
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'react', test: /node_modules[\\/](?:react|react-dom|scheduler)[\\/]/ }],
+        },
+      },
     },
     // The demo includes Phaser; the library build leaves it external.
     chunkSizeWarningLimit: 1600,

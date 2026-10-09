@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { parseRigDefinition } from '../../src/engine/externalData.js';
-import { test } from './fixtures.js';
+import { rigFileAction, test } from './fixtures.js';
 
 for (const route of ['', 'rig-editor/', 'animation-editor/']) {
   test(`logo navigation preserves the selected character from ${route || 'demo'}`, async ({ page }) => {
@@ -53,7 +53,7 @@ test('sketch loads all parts, exports edits, and stays selected across views', a
   const download = page.waitForEvent('download');
   await page.locator('#download-json').click();
   expect((await download).suggestedFilename()).toBe('rig.json');
-  await page.locator('#reload-exported').click();
+  await rigFileAction(page, '#reload-exported', (control) => control.click());
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   await expect(x).toHaveValue('4');
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
@@ -130,7 +130,7 @@ test('character selection protects unsaved rig edits and can return to the demo 
   ]);
   await expect(x).toHaveValue('8');
   await expect(page.locator('#character-selection')).toHaveValue('random-paperdoll-sketch');
-  await page.locator('#log-json').click();
+  await rigFileAction(page, '#log-json', (control) => control.click());
   await page.getByRole('combobox', { name: 'Character', exact: true }).selectOption('demo-puppet');
   await expect(page.locator('#session-status')).toContainText('Character: demo-puppet');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');

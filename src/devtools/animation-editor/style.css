@@ -41,69 +41,8 @@ a {
   outline: 2px solid #39574b;
   outline-offset: 2px;
 }
-.animation-workspace.view-shell {
-  --view-gutter: 16px;
+.animation-workspace {
   --timeline-label-width: 240px;
-  max-width: none;
-  height: 100dvh;
-  min-height: 700px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-bottom: 12px;
-}
-.animation-workspace .view-header {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 auto;
-  padding: 8px 0;
-}
-.animation-workspace .view-header-top {
-  gap: 12px;
-}
-.animation-workspace .wordmark {
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-.animation-workspace .mark {
-  width: 32px;
-  height: 32px;
-}
-.animation-workspace .wordmark-sub {
-  display: none;
-}
-.animation-workspace .view-header-main {
-  flex: 1;
-  margin: 0;
-  flex-wrap: nowrap;
-}
-.animation-workspace .view-heading {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-.animation-workspace .view-heading h1 {
-  margin: 0;
-  font-size: 22px;
-}
-.animation-workspace #character-status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.animation-workspace .character-choice {
-  margin: 0;
-}
-.animation-workspace .view-navigation {
-  flex-wrap: nowrap;
-}
-.animation-workspace .view-navigation a {
-  padding: 6px 8px;
-  white-space: nowrap;
 }
 .animation-command-bar {
   position: relative;

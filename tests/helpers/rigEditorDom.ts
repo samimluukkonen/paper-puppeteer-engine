@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 
 /** Minimal DOM adapter for exercising the editor panel's event handlers in Node. */
 export class EditorElement {
+  dispatchEvent = vi.fn();
   textContent = '';
   innerHTML = '';
   type = '';

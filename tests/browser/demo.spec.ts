@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { test } from './fixtures.js';
+import { rigFileAction, test } from './fixtures.js';
 
 test('crossfade updates reuse controls and leave unchanged DOM untouched', async ({ page }) => {
   await page.goto('./');
@@ -29,11 +29,11 @@ test('crossfade updates reuse controls and leave unchanged DOM untouched', async
     };
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.target === status) statusWrites += 1;
+        if (mutation.target === status || status.contains(mutation.target)) statusWrites += 1;
         else controlWrites += 1;
       }
     });
-    observer.observe(status, { childList: true });
+    observer.observe(status, { childList: true, characterData: true, subtree: true });
     observer.observe(statusDot, { attributes: true, attributeFilter: ['class'] });
     for (const button of buttons) observer.observe(button, { attributes: true, attributeFilter: ['aria-pressed'] });
     const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -123,7 +123,7 @@ test('demo and editor navigation preserves the deployment path and loads fresh s
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   const x = page.locator('#inspector input[data-field="x"]');
   await x.fill('12');
-  await page.locator('#log-json').click();
+  await rigFileAction(page, '#log-json', (control) => control.click());
   await expect(page.locator('#dirty-status')).toHaveText('No changes');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await page.getByRole('link', { name: 'Engine demo' }).click();

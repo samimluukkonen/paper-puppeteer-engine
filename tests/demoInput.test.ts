@@ -193,8 +193,8 @@ test('buttons retain their actions when keyboard shortcuts switch to pose editin
 test('every demo button resolves a command and keyboard shortcuts have one binding each', () => {
   const { scene } = fixture();
   const commands = createDemoCommands(scene as unknown as DemoScene);
-  const markup = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-  const buttons = [...markup.matchAll(/<button[^>]*data-action="([^"]+)"/g)];
+  const markup = readFileSync(new URL('../src/demo/DemoControls.tsx', import.meta.url), 'utf8');
+  const buttons = [...markup.matchAll(/<DemoButton[^>]*action="([^"]+)"/g)];
   assert.isAbove(buttons.length, 0);
   for (const [, action] of buttons) assert.isFunction(commands[action!]!.run, `Missing command for ${action}`);
   const keys = Object.values(commands).flatMap((command) => (command.code ? [command.code] : []));

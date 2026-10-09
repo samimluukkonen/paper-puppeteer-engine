@@ -1,5 +1,18 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
+/** Follow the rig workspace's File tools dialog, then return focus to the editor. */
+export async function rigFileAction<T>(
+  page: Page,
+  selector: string,
+  action: (control: Locator) => Promise<T>,
+): Promise<T> {
+  const dialog = page.locator('#rig-tools-dialog');
+  if (!(await dialog.isVisible())) await page.locator('#rig-tools-open').click();
+  const result = await action(page.locator(selector));
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  return result;
+}
+
 /** Follow the workspace's settings disclosure before interacting with authored controls. */
 export async function animationControl(page: Page, selector: string): Promise<Locator> {
   if (selector === '#animation-download') {
