@@ -34,7 +34,8 @@ function fixture(stored?: string) {
   vi.stubGlobal('window', windowTarget);
   vi.stubGlobal('document', documentTarget);
   const status = vi.fn<(message: string) => void>();
-  const recovery = new DraftRecovery<Snapshot>(status);
+  const retainedCounts = vi.fn<(count: number) => void>();
+  const recovery = new DraftRecovery<Snapshot>(status, retainedCounts);
   recoveries.push(recovery);
   let snapshot: Snapshot = Object.freeze({ value: 0 });
   let dirty = false;
@@ -57,7 +58,7 @@ function fixture(stored?: string) {
     dirty = unsaved;
     recovery.update();
   };
-  return { recovery, session, values, storage, confirm, status, edit, windowTarget, documentTarget };
+  return { recovery, session, values, storage, confirm, status, retainedCounts, edit, windowTarget, documentTarget };
 }
 
 test('authored edits debounce and unchanged playback notifications do not postpone or repeat writes', () => {
@@ -239,7 +240,7 @@ test('declining the newest draft offers the next compatible draft and excludes i
   assert.include(confirm.mock.calls[0]![0], 'Draft 1 of 2. Saved 2026-10-11');
   assert.include(confirm.mock.calls[1]![0], 'Draft 2 of 2. Saved 2026-10-10');
   assert.isFalse(values.has('paper-puppeteer:draft:a:session:new'));
-  assert.isFalse(values.has('paper-puppeteer:draft:a:session:stale'));
+  assert.isTrue(values.has('paper-puppeteer:draft:a:session:stale'));
 });
 
 test('dated drafts precede legacy drafts and missing, invalid or equal dates retain stable order', () => {
@@ -285,20 +286,94 @@ test('legacy fingerprints restore equivalent reordered sources but still reject 
   confirm.mockClear();
   recovery.bind({ ...session, source: draftSource({ tracks: {} }), dirty: () => false });
   assert.equal(confirm.mock.calls.length, 0);
-  assert.equal(values.size, 0);
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
 });
 
+test.each(['broken JSON', JSON.stringify({ version: 2, source: 'original', data: { value: 8 } })])(
+  'invalid draft %s is rejected before prompting or modifying the document',
+  (stored) => {
+    const { recovery, session, confirm, values } = fixture(stored);
+    recovery.bind(session);
+    assert.equal(confirm.mock.calls.length, 0);
+    assert.equal(vi.mocked(session.restore).mock.calls.length, 0);
+    assert.equal(values.size, 0);
+  },
+);
+
 test.each([
-  'broken JSON',
-  JSON.stringify({ version: 2, source: 'original', data: { value: 8 } }),
-  JSON.stringify({ version: 1, source: 'old source', data: { value: 8 } }),
-  JSON.stringify({ version: 1, source: 'original', data: { value: 'invalid' } }),
-])('invalid or stale draft %s is rejected before prompting or modifying the document', (stored) => {
-  const { recovery, session, confirm, values } = fixture(stored);
+  { source: 'old source', data: { value: 8 } },
+  { source: 'original', data: { value: 'invalid' } },
+])('incompatible drafts survive clean sessions, edits, saves and disposal: %j', (draft) => {
+  const stored = JSON.stringify({ version: 1, ...draft, revision: 'original-revision' });
+  const { recovery, session, confirm, values, edit, status } = fixture(stored);
   recovery.bind(session);
   assert.equal(confirm.mock.calls.length, 0);
   assert.equal(vi.mocked(session.restore).mock.calls.length, 0);
-  assert.equal(values.size, 0);
+  assert.include(status.mock.calls.at(-1)![0], 'retained');
+  const archive = recovery.retainedDraftsJson()!;
+  assert.include(archive, stored);
+  assert.deepEqual(JSON.parse(archive), { version: 1, drafts: [JSON.parse(stored) as unknown] });
+  edit(10);
+  recovery.flush();
+  assert.equal(values.size, 2);
+  edit(10, false);
+  assert.equal(values.size, 1);
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+  recovery.dispose();
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+});
+
+test('failed restoration retains the draft for manual download', () => {
+  const stored = JSON.stringify({ version: 1, source: 'original', data: { value: 8 } });
+  const { recovery, session, values } = fixture(stored);
+  session.restore = () => false;
+  recovery.bind(session);
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+  assert.include(recovery.retainedDraftsJson()!, stored);
+});
+
+test('replacing a source within one controller cannot overwrite its retained draft', () => {
+  const { recovery, session, edit, values } = fixture();
+  recovery.bind(session);
+  edit(8);
+  recovery.flush();
+  const [key, stored] = [...values][0]!;
+  recovery.bind({ ...session, source: 'updated source' });
+  edit(10);
+  recovery.flush();
+  assert.equal(values.get(key), stored);
+  assert.equal(values.size, 2);
+  assert.include(recovery.retainedDraftsJson()!, stored);
+  edit(10, false);
+  assert.equal(values.size, 1);
+  assert.equal(values.get(key), stored);
+  recovery.bind(session);
+  assert.deepEqual(session.snapshot(), { value: 8 });
+  assert.isTrue(session.dirty());
+  assert.isUndefined(recovery.retainedDraftsJson());
+});
+
+test('retained downloads belong to the bound document and compatible recovery preserves other drafts', () => {
+  const stored = JSON.stringify({ version: 1, source: 'old source', data: { value: 8 } });
+  const { recovery, session, values, status, retainedCounts } = fixture(stored);
+  const compatibleKey = 'paper-puppeteer:draft:a:session:compatible';
+  values.set(compatibleKey, JSON.stringify({ version: 1, source: 'original', data: { value: 9 } }));
+  recovery.bind(session);
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 1);
+  assert.include(status.mock.calls.at(-1)![0], 'Draft restored');
+  assert.include(status.mock.calls.at(-1)![0], 'retained');
+  recovery.flush();
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+  assert.isFalse(values.has(compatibleKey));
+  recovery.bind({ ...session, key: 'b', dirty: () => false });
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 0);
+  assert.isUndefined(recovery.retainedDraftsJson());
+  recovery.bind({ ...session, dirty: () => false });
+  assert.include(recovery.retainedDraftsJson()!, stored);
+  recovery.unbind();
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 0);
+  assert.isUndefined(recovery.retainedDraftsJson());
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
 });
 
 test('unavailable browser storage and quota failures leave authoring usable and report recovery status', () => {

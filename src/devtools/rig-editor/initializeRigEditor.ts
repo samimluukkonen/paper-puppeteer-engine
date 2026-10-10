@@ -1,7 +1,7 @@
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { observePreview } from '../../ui/observePreview.js';
-import { DraftRecovery } from '../shared/DraftRecovery.js';
+import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
@@ -17,10 +17,11 @@ import { createSessionController } from './SessionController.js';
 export function initializeRigEditor(app: HTMLElement): () => void {
   const releaseCharacterSelection = bindCharacterSelection(app);
 
-  const recoveryStatus = app.querySelector<HTMLElement>('#rig-draft-status')!;
-  const recovery = new DraftRecovery<RigEditorRecoverySnapshot>((message) => {
-    recoveryStatus.textContent = message;
-  });
+  const recoveryControls = new DraftRecoveryControls<RigEditorRecoverySnapshot>(
+    app.querySelector<HTMLElement>('#rig-draft-status')!,
+    app.querySelector<HTMLButtonElement>('#rig-download-retained-drafts')!,
+  );
+  const recovery = recoveryControls.recovery;
   let recoveryEditor: RigEditor | undefined;
   const session = createSessionController(
     app,
@@ -70,7 +71,7 @@ export function initializeRigEditor(app: HTMLElement): () => void {
   return () => {
     releaseResize();
 
-    recovery.dispose();
+    recoveryControls.dispose();
     releaseNavigationGuard();
     releaseCharacterSelection();
     inspector.dispose();

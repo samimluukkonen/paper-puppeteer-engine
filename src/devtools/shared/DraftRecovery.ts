@@ -31,8 +31,12 @@ export class DraftRecovery<Snapshot> {
   private pendingFlush = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private readonly lifetime = new AbortController();
+  private readonly retained: { text: string }[] = [];
 
-  constructor(private readonly status: (message: string) => void) {
+  constructor(
+    private readonly status: (message: string) => void,
+    private readonly retainedDraftsChanged: (count: number) => void = () => {},
+  ) {
     const options = { signal: this.lifetime.signal };
     window.addEventListener('pagehide', () => this.flush(), options);
     window.addEventListener('beforeunload', () => this.flush(), options);
@@ -43,6 +47,19 @@ export class DraftRecovery<Snapshot> {
       },
       options,
     );
+  }
+
+  private reportStatus(message: string): void {
+    const retained = this.retained.length
+      ? `${this.retained.length} older draft(s) could not be restored and were retained. Download retained drafts to recover their JSON manually.`
+      : '';
+    this.status([message, retained].filter(Boolean).join(' '));
+  }
+
+  /** Preserve original envelopes and authored data; downloading never changes storage or the saved baseline. */
+  retainedDraftsJson(): string | undefined {
+    if (!this.retained.length) return undefined;
+    return `{\n  "version": 1,\n  "drafts": [\n${this.retained.map(({ text }) => text).join(',\n')}\n  ]\n}\n`;
   }
 
   private storageKey(session: DraftSession<Snapshot>): string {
@@ -82,13 +99,13 @@ export class DraftRecovery<Snapshot> {
         data = undefined;
       }
       const parsed = draftSchema.safeParse(data);
-      if (
-        !parsed.success ||
-        !sameDraftSource(parsed.data.source, session.source) ||
-        !session.validate(parsed.data.data)
-      ) {
+      if (!parsed.success) {
         this.removeDraft(key, text);
-        this.status('An older draft could not be restored and was discarded.');
+        this.reportStatus('An invalid draft was discarded.');
+        return [];
+      }
+      if (!sameDraftSource(parsed.data.source, session.source) || !session.validate(parsed.data.data)) {
+        this.retained.push({ text });
         return [];
       }
       const timestamp = Date.parse(parsed.data.savedAt ?? '');
@@ -105,12 +122,16 @@ export class DraftRecovery<Snapshot> {
   bind(session: DraftSession<Snapshot>, options: { recover?: boolean } = {}): void {
     this.flush();
     this.session = session;
+    // A replacement source must not overwrite an incompatible draft from this same controller.
+    this.owner = undefined;
     this.snapshot = undefined;
     this.dirty = undefined;
     this.persisted = null;
     this.recovered = undefined;
     this.pendingFlush = false;
-    this.status('');
+    this.retained.length = 0;
+    this.retainedDraftsChanged(0);
+    this.reportStatus('');
     try {
       const candidates = options.recover === false ? [] : this.recoveryCandidates(session);
       for (const [index, { key, text, draft }] of candidates.entries()) {
@@ -121,17 +142,19 @@ export class DraftRecovery<Snapshot> {
         ) {
           if (session.restore(draft.data)) {
             this.recovered = { key, text };
-            this.status('Draft restored. Download JSON to save your work.');
+            this.reportStatus('Draft restored. Download JSON to save your work.');
             break;
           } else {
-            this.removeDraft(key, text);
-            this.status('The draft could not be restored.');
+            this.retained.push({ text });
+            this.reportStatus('The draft could not be restored.');
           }
         } else this.removeDraft(key, text);
       }
+      if (this.retained.length && !this.recovered) this.reportStatus('');
     } catch {
-      this.status('Browser draft recovery is unavailable. Download JSON to save your work.');
+      this.reportStatus('Browser draft recovery is unavailable. Download JSON to save your work.');
     }
+    this.retainedDraftsChanged(this.retained.length);
     this.update();
   }
 
@@ -184,7 +207,7 @@ export class DraftRecovery<Snapshot> {
       }
       this.pendingFlush = false;
     } catch {
-      this.status('Could not save a browser draft. Download JSON to save your work.');
+      this.reportStatus('Could not save a browser draft. Download JSON to save your work.');
     }
   }
 
@@ -196,6 +219,9 @@ export class DraftRecovery<Snapshot> {
     this.persisted = null;
     this.recovered = undefined;
     this.pendingFlush = false;
+    this.retained.length = 0;
+    this.retainedDraftsChanged(0);
+    this.reportStatus('');
   }
 
   private cancelTimer(): void {
@@ -207,5 +233,6 @@ export class DraftRecovery<Snapshot> {
     this.flush();
     this.lifetime.abort();
     this.session = undefined;
+    this.retained.length = 0;
   }
 }

@@ -1,5 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
-import { animationFileSchema } from '../../src/engine/schemas.js';
+import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
 import { animationControl, test } from './fixtures.js';
 
 const draftKeys = (page: Page) =>
@@ -150,7 +151,7 @@ test("rig recovery retains a child's direction when its parent length was collap
   await expect(field('y')).toHaveValue('0');
 });
 
-test('animation recovery ignores reordered source tracks but rejects changed authored values', async ({ page }) => {
+test('animation recovery ignores reordered tracks and retains changed-source drafts for download', async ({ page }) => {
   let reordered = false;
   let changed = false;
   await page.route('**/animations/idle.json', async (route) => {
@@ -176,9 +177,19 @@ test('animation recovery ignores reordered source tracks but rejects changed aut
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('stepped');
   changed = true;
   await page.reload();
-  await expect(page.locator('#animation-draft-status')).toContainText('discarded');
+  await expect(page.locator('#animation-draft-status')).toContainText('retained');
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
-  await expect.poll(() => draftKeys(page)).toHaveLength(0);
+  await expect.poll(() => draftKeys(page)).toHaveLength(1);
+  const stored = await page.evaluate(() => JSON.stringify(localStorage));
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#animation-download-retained-drafts').click(),
+  ]);
+  const json = await readFile(await download.path(), 'utf8');
+  expect(json).toContain('"stepped"');
+  expect(download.suggestedFilename()).toBe('retained-editor-drafts.json');
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(stored);
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
 
 test('declining animation draft recovery keeps the loaded source and removes the stored draft', async ({ page }) => {
@@ -194,4 +205,37 @@ test('declining animation draft recovery keeps the loaded source and removes the
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
+});
+
+test('rig source changes retain unsaved edits for manual download', async ({ page }) => {
+  let changed = false;
+  await page.route('**/demo-puppet/rig.json', async (route) => {
+    const response = await route.fetch();
+    const rig = rigFileSchema.parse(await response.json());
+    await route.fulfill({ json: { ...rig, ...(changed ? { name: 'Updated source' } : {}) } });
+  });
+  await page.goto('rig-editor/');
+  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
+  await x.fill('44');
+  await x.press('Tab');
+  await expect.poll(() => draftKeys(page)).toHaveLength(1);
+  page.on('dialog', async (dialog) => {
+    await dialog.accept();
+  });
+  changed = true;
+  await page.reload();
+  await expect(page.locator('#rig-draft-status')).toContainText('retained');
+  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await expect(x).toHaveValue('0');
+  const stored = await page.evaluate(() => JSON.stringify(localStorage));
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#rig-download-retained-drafts').click(),
+  ]);
+  const json = await readFile(await download.path(), 'utf8');
+  expect(json).toContain('"x":44');
+  expect(json).toContain('"directions"');
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(stored);
+  await expect(page.locator('#dirty-status')).toHaveText('No changes');
 });

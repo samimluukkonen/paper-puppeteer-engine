@@ -2,7 +2,7 @@ import { inspectAnimationDefinition } from '../../engine/externalData.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { mountView } from '../../ui/mountView.js';
-import { DraftRecovery } from '../shared/DraftRecovery.js';
+import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
@@ -26,10 +26,11 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
   const releaseNavigationGuard = protectUnsavedChanges(() => timeline.hasUnsavedChanges);
-  const recoveryStatus = app.querySelector<HTMLElement>('#animation-draft-status')!;
-  const recovery = new DraftRecovery<ReadonlyAnimation | null>((message) => {
-    recoveryStatus.textContent = message;
-  });
+  const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
+    app.querySelector<HTMLElement>('#animation-draft-status')!,
+    app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
+  );
+  const recovery = recoveryControls.recovery;
   let releaseRecovery: (() => void) | undefined;
   let releaseWorkspaceSelection: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
@@ -136,7 +137,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
     releaseWorkspaceSelection?.();
     mirrorTools.dispose();
     workspace.dispose();
-    recovery.dispose();
+    recoveryControls.dispose();
     releaseNavigationGuard();
     timeline.dispose();
     inspector.dispose();

@@ -112,6 +112,9 @@ export function AnimationEditorView({ mirrorTools }: { mirrorTools: MirrorToolsC
             Loading character…
           </p>
           <p id="animation-draft-status" role="status"></p>
+          <button id="animation-download-retained-drafts" type="button" hidden>
+            Download retained drafts
+          </button>
           <p id="animation-export-feedback" role="status"></p>
           <p id="animation-import-feedback" role="status"></p>
         </div>

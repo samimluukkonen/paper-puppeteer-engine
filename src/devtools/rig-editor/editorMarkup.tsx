@@ -80,6 +80,9 @@ export function RigEditorView() {
         <div className="workspace-feedback">
           <div id="validation" role="status" />
           <p id="rig-draft-status" role="status" />
+          <button id="rig-download-retained-drafts" type="button" hidden>
+            Download retained drafts
+          </button>
           <div id="action-feedback" role="status" />
         </div>
       </section>
