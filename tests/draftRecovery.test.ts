@@ -16,6 +16,10 @@ function fixture(stored?: string) {
   vi.useFakeTimers();
   const values = new Map<string, string>(stored === undefined ? [] : [['paper-puppeteer:draft:a', stored]]);
   const storage = {
+    get length() {
+      return values.size;
+    },
+    key: (index: number) => [...values.keys()][index] ?? null,
     getItem: (key: string) => values.get(key) ?? null,
     setItem: vi.fn((key: string, value: string) => {
       values.set(key, value);
@@ -99,7 +103,7 @@ test.each(['pagehide', 'beforeunload', 'hidden', 'dispose'])(
       documentTarget.visibilityState = 'hidden';
       documentTarget.dispatchEvent(new Event('visibilitychange'));
     } else windowTarget.dispatchEvent(new Event(event));
-    assert.include(values.get('paper-puppeteer:draft:a')!, '"value":4');
+    assert.include([...values.values()].at(-1)!, '"value":4');
   },
 );
 
@@ -111,9 +115,13 @@ test('switching documents flushes the last captured snapshot under its own key',
   session.snapshot = () => ({ value: 99 });
   const next = { ...session, key: 'b', snapshot: () => ({ value: 99 }), dirty: () => true };
   recovery.bind(next);
-  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":1');
+  assert.include([...values.values()].at(-1)!, '"value":1');
   vi.advanceTimersByTime(300);
-  assert.include(values.get('paper-puppeteer:draft:b')!, '"value":99');
+  assert.ok(
+    [...values].some(
+      ([key, text]) => key.startsWith('paper-puppeteer:draft:b:session:') && text.includes('"value":99'),
+    ),
+  );
 });
 
 test('an invalid intermediate edit retains the last valid stored draft', () => {
@@ -121,10 +129,10 @@ test('an invalid intermediate edit retains the last valid stored draft', () => {
   recovery.bind(session);
   edit(1);
   vi.advanceTimersByTime(300);
-  const valid = values.get('paper-puppeteer:draft:a');
+  const valid = [...values.values()].at(-1);
   edit(NaN);
   vi.advanceTimersByTime(300);
-  assert.equal(values.get('paper-puppeteer:draft:a'), valid);
+  assert.equal([...values.values()].at(-1), valid);
 });
 
 test("a clean second tab cannot delete another tab's draft on update, navigation or disposal", () => {
@@ -135,11 +143,11 @@ test("a clean second tab cannot delete another tab's draft on update, navigation
   clean.bind({ ...session, snapshot: () => ({ value: 0 }), dirty: () => false });
   edit(42);
   recovery.flush();
-  const stored = values.get('paper-puppeteer:draft:a');
+  const stored = [...values.values()].at(-1);
   clean.update();
   clean.flush();
   clean.dispose();
-  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+  assert.equal([...values.values()].at(-1), stored);
 });
 
 test('saving an older revision preserves a newer draft, including identical authored values', () => {
@@ -151,9 +159,9 @@ test('saving an older revision preserves a newer draft, including identical auth
   recoveries.push(second);
   second.bind({ ...session, snapshot: () => ({ value: 42 }), dirty: () => true, restore: () => true });
   second.flush();
-  const newer = values.get('paper-puppeteer:draft:a');
+  const newer = [...values.values()].at(-1);
   edit(42, false);
-  assert.equal(values.get('paper-puppeteer:draft:a'), newer);
+  assert.equal([...values.values()].at(-1), newer);
 });
 
 test("lifecycle flushes do not rewrite unchanged snapshots or overwrite a newer tab's draft", () => {
@@ -166,10 +174,11 @@ test("lifecycle flushes do not rewrite unchanged snapshots or overwrite a newer 
   recovery.flush();
   recovery.flush();
   assert.equal(storage.setItem.mock.calls.length, 1);
-  assert.equal(values.get('paper-puppeteer:draft:a'), newer);
+  assert.equal([...values.values()].at(-1), newer);
   edit(3);
   recovery.flush();
-  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":3');
+  assert.equal(values.get('paper-puppeteer:draft:a'), newer);
+  assert.ok([...values.values()].some((text) => text.includes('"value":3')));
 });
 
 test('compatible validated drafts restore only after accepting the prompt', () => {
@@ -203,8 +212,9 @@ test('legacy fingerprints restore equivalent reordered sources but still reject 
   assert.equal(confirm.mock.calls.length, 1);
   assert.isTrue(session.dirty());
   recovery.flush();
-  assert.include(values.get('paper-puppeteer:draft:a')!, '\\"child\\"');
+  assert.include([...values.values()].at(-1)!, '\\"child\\"');
   recovery.unbind();
+  values.clear();
   values.set('paper-puppeteer:draft:a', stored);
   confirm.mockClear();
   recovery.bind({ ...session, source: draftSource({ tracks: {} }), dirty: () => false });
@@ -250,8 +260,8 @@ test('draft revisions work on HTTP hosts where crypto.randomUUID is unavailable'
   recovery.bind(session);
   edit(42);
   recovery.flush();
-  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":42');
-  assert.include(values.get('paper-puppeteer:draft:a')!, '"revision":"7-7-7-7"');
+  assert.include([...values.values()].at(-1)!, '"value":42');
+  assert.include([...values.values()].at(-1)!, '"revision":"7-7-7-7"');
 });
 
 test('explicit import baselines skip recovery without prompting or restoring an older matching draft', () => {
@@ -263,8 +273,43 @@ test('explicit import baselines skip recovery without prompting or restoring an 
   assert.isFalse(session.dirty());
   assert.deepEqual(session.snapshot(), { value: 0 });
   // The older entry can belong to another tab; subsequent authored edits save the new session normally.
-  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+  assert.equal([...values.values()].at(-1), stored);
   edit(5);
   vi.advanceTimersByTime(300);
-  assert.include(values.get('paper-puppeteer:draft:a')!, '"value":5');
+  assert.include([...values.values()].at(-1)!, '"value":5');
+  assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+});
+
+test('concurrent dirty sessions retain independent drafts through edits, save and recovery', () => {
+  const { recovery, session, edit, values } = fixture();
+  recovery.bind(session);
+  let otherSnapshot: Readonly<Snapshot> = Object.freeze({ value: 0 });
+  let otherDirty = false;
+  const other = new DraftRecovery<Snapshot>(() => {});
+  recoveries.push(other);
+  other.bind({ ...session, snapshot: () => otherSnapshot, dirty: () => otherDirty });
+  edit(10);
+  recovery.flush();
+  otherSnapshot = Object.freeze({ value: 20 });
+  otherDirty = true;
+  other.update();
+  other.flush();
+  edit(11);
+  recovery.flush();
+  assert.equal(values.size, 2);
+  assert.deepEqual(
+    [...values.values()]
+      .map((text) => z.object({ data: schema }).parse(JSON.parse(text)).data.value)
+      .sort((left, right) => left - right),
+    [11, 20],
+  );
+  edit(0, false);
+  assert.equal(values.size, 1);
+  assert.include([...values.values()][0]!, '"value":20');
+  const restored = new DraftRecovery<Snapshot>(() => {});
+  recoveries.push(restored);
+  restored.bind(session);
+  assert.equal(session.snapshot().value, 20);
+  restored.flush();
+  assert.equal(values.size, 1);
 });

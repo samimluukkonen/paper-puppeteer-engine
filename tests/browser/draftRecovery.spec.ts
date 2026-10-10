@@ -5,6 +5,51 @@ import { animationControl, test } from './fixtures.js';
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
 
+test('two dirty tabs retain independent drafts and saving one preserves the other', async ({ page }) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  const other = await page.context().newPage();
+  try {
+    await other.goto(page.url());
+    await expect(other.locator('#animation-status')).toHaveText('Validation: OK');
+    for (const tab of [page, other]) await (await animationControl(tab, '#animation-mode')).selectOption('stepped');
+    await expect.poll(() => draftKeys(page)).toHaveLength(2);
+    for (const [tab, fps] of [
+      [page, '17'],
+      [other, '23'],
+    ] as const) {
+      const input = await animationControl(tab, '#animation-fps');
+      await input.fill(fps);
+      await input.press('Tab');
+    }
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            Object.values(localStorage).filter(
+              (text: unknown) => typeof text === 'string' && (text.includes('"fps":17') || text.includes('"fps":23')),
+            ).length,
+        ),
+      )
+      .toBe(2);
+    await Promise.all([page.waitForEvent('download'), (await animationControl(page, '#animation-download')).click()]);
+    await expect.poll(() => draftKeys(page)).toHaveLength(1);
+    await expect(other.locator('#animation-dirty')).toHaveText('Unsaved changes');
+    other.on('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+    await other.reload();
+    await expect(await animationControl(other, '#animation-fps')).toHaveValue('23');
+    await expect(other.locator('#animation-draft-status')).toContainText('Draft restored');
+    await expect.poll(() => draftKeys(page)).toHaveLength(1);
+  } finally {
+    other.on('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+    await other.close();
+  }
+});
+
 test("navigating away from a clean tab preserves another tab's unsaved animation draft", async ({ page }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');

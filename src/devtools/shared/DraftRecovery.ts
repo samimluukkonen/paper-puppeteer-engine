@@ -6,6 +6,7 @@ const draftSchema = z.strictObject({
   source: z.string(),
   data: z.unknown(),
   revision: z.string().optional(),
+  savedAt: z.string().optional(),
 });
 
 export interface DraftSession<Snapshot> {
@@ -25,6 +26,8 @@ export class DraftRecovery<Snapshot> {
   private snapshot: Snapshot | undefined;
   private dirty: boolean | undefined;
   private persisted: string | null = null;
+  private owner: string | undefined;
+  private recovered: { key: string; text: string } | undefined;
   private pendingFlush = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private readonly lifetime = new AbortController();
@@ -46,6 +49,23 @@ export class DraftRecovery<Snapshot> {
     return `paper-puppeteer:draft:${session.key}`;
   }
 
+  private ownedKey(session: DraftSession<Snapshot>): string {
+    this.owner ??= crypto.getRandomValues(new Uint32Array(4)).join('-');
+    return `${this.storageKey(session)}:session:${this.owner}`;
+  }
+
+  private draftKeys(session: DraftSession<Snapshot>): string[] {
+    const base = this.storageKey(session);
+    const storage = window.localStorage;
+    // Earlier releases stored one shared draft per document.
+    const keys = storage.getItem(base) === null ? [] : [base];
+    for (let index = 0; index < storage.length; ++index) {
+      const key = storage.key(index);
+      if (key?.startsWith(`${base}:session:`)) keys.push(key);
+    }
+    return keys;
+  }
+
   /** Another tab may have replaced the shared draft since this session read or wrote it. */
   private removeDraft(key: string, expected: string | null): void {
     if (expected !== null && window.localStorage.getItem(key) === expected) window.localStorage.removeItem(key);
@@ -58,12 +78,14 @@ export class DraftRecovery<Snapshot> {
     this.snapshot = undefined;
     this.dirty = undefined;
     this.persisted = null;
+    this.recovered = undefined;
     this.pendingFlush = false;
     this.status('');
     try {
-      const key = this.storageKey(session);
-      const text = window.localStorage.getItem(key);
-      if (text !== null && options.recover !== false) {
+      const keys = options.recover === false ? [] : this.draftKeys(session);
+      for (const [index, key] of keys.entries()) {
+        const text = window.localStorage.getItem(key);
+        if (text === null) continue;
         let data: unknown;
         try {
           data = JSON.parse(text);
@@ -78,10 +100,16 @@ export class DraftRecovery<Snapshot> {
         ) {
           this.removeDraft(key, text);
           this.status('An older draft could not be restored and was discarded.');
-        } else if (window.confirm(`Restore unsaved ${session.label} edits from this browser?`)) {
-          this.persisted = text;
-          if (session.restore(parsed.data.data)) this.status('Draft restored. Download JSON to save your work.');
-          else {
+        } else if (
+          window.confirm(
+            `Restore unsaved ${session.label} edits from this browser?${keys.length > 1 ? ` Draft ${index + 1} of ${keys.length}.` : ''}${parsed.data.savedAt ? ` Saved ${parsed.data.savedAt}.` : ''}`,
+          )
+        ) {
+          if (session.restore(parsed.data.data)) {
+            this.recovered = { key, text };
+            this.status('Draft restored. Download JSON to save your work.');
+            break;
+          } else {
             this.removeDraft(key, text);
             this.status('The draft could not be restored.');
           }
@@ -114,7 +142,7 @@ export class DraftRecovery<Snapshot> {
     const session = this.session;
     if (!session || this.dirty === undefined || !this.pendingFlush) return;
     try {
-      const key = this.storageKey(session);
+      const key = this.ownedKey(session);
       if (!this.dirty) {
         this.removeDraft(key, this.persisted);
         this.persisted = null;
@@ -124,9 +152,21 @@ export class DraftRecovery<Snapshot> {
         if (!session.validate(data)) return;
         // getRandomValues is also available on HTTP development hosts, unlike randomUUID.
         const revision = crypto.getRandomValues(new Uint32Array(4)).join('-');
-        const text = JSON.stringify({ version: 1, source: session.source, data, revision });
+        const text = JSON.stringify({
+          version: 1,
+          source: session.source,
+          data,
+          revision,
+          savedAt: new Date().toISOString(),
+        });
         window.localStorage.setItem(key, text);
         this.persisted = text;
+      }
+      // Transfer a restored draft only after its replacement is durable. Other
+      // sessions always write their own keys, even when edits happen concurrently.
+      if (this.recovered) {
+        if (this.recovered.key !== key || !this.dirty) this.removeDraft(this.recovered.key, this.recovered.text);
+        this.recovered = undefined;
       }
       this.pendingFlush = false;
     } catch {
@@ -140,6 +180,7 @@ export class DraftRecovery<Snapshot> {
     this.snapshot = undefined;
     this.dirty = undefined;
     this.persisted = null;
+    this.recovered = undefined;
     this.pendingFlush = false;
   }
 
