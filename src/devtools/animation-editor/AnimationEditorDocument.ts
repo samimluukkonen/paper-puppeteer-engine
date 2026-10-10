@@ -171,6 +171,7 @@ export class AnimationEditorDocument {
     this.working = working;
     this.saved = working;
     this.selectedId = source.name;
+    this.issues = [];
     this.cachedDirty = false;
     this.history = this.createHistory();
     return true;

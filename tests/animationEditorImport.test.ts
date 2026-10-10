@@ -142,6 +142,24 @@ for (const [label, json, message] of invalid) {
   });
 }
 
+test('successful imports clear previous diagnostics before notifying the fresh session', () => {
+  const state = session();
+  for (const json of ['{broken', JSON.stringify({ ...file(), version: 99 })]) {
+    assert.isFalse(state.importJson(json));
+    assert.isAbove(state.validationIssues.length, 0);
+    const notified = vi.fn(() => {
+      assert.deepEqual(state.validationIssues, []);
+      assert.equal(state.selectedAnimationId, 'imported');
+      assert.isFalse(state.dirty);
+    });
+    const release = state.subscribe(notified);
+    assert.isTrue(state.importJson(JSON.stringify(file())));
+    assert.equal(notified.mock.calls.length, 1);
+    release();
+    assert.deepEqual(state.validationIssues, []);
+  }
+});
+
 test.each(['key', 'event', 'scrub', 'draft'] as const)(
   'successful import resets %s transient state with one final notification and no events',
   (kind) => {
