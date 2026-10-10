@@ -8,8 +8,11 @@ import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 export interface GhostSamplingSettings {
   /** Optional spacing rate; absent uses authored stepped FPS, then the shared 10 FPS fallback. */
   readonly fps?: number;
-  /** Positive integer authored frames between the playhead and each neighbor; defaults to one. */
+  /** Integer authored frames between neighbors, 1–5; defaults to one. */
   readonly frameSpacing?: number;
+  /** Independently visible samples per direction, 0–3; each defaults to one. */
+  readonly previousCount?: number;
+  readonly nextCount?: number;
 }
 
 export interface GhostSampleTime {
@@ -23,7 +26,7 @@ export interface GhostPoseSample extends GhostSampleTime {
   readonly pose: AnimationPose;
 }
 
-/** Pure time arithmetic: at most one previous and one next sample, never wrapping or snapping the clock. */
+/** Pure time arithmetic: previous then next, nearest first in each direction; never snaps the clock. */
 export function getGhostSampleTimes(
   currentTime: Seconds,
   duration: Seconds,
@@ -38,7 +41,10 @@ export function getGhostSampleTimes(
   )
     return [];
   const frames = settings.frameSpacing ?? 1;
-  if (!Number.isSafeInteger(frames) || frames <= 0) return [];
+  const previousCount = settings.previousCount ?? 1;
+  const nextCount = settings.nextCount ?? 1;
+  if (!Number.isInteger(frames) || frames < 1 || frames > 5) return [];
+  if ([previousCount, nextCount].some((count) => !Number.isInteger(count) || count < 0 || count > 3)) return [];
   const fps =
     settings.fps !== undefined && Number.isFinite(settings.fps) && settings.fps > 0
       ? settings.fps
@@ -47,13 +53,19 @@ export function getGhostSampleTimes(
   if (!Number.isFinite(spacing) || spacing <= 0) return [];
   const samples: GhostSampleTime[] = [];
   // Normalize only arithmetic roundoff at endpoints, never a genuinely out-of-range neighbor.
-  const tolerance = Math.min(spacing / 4, 4 * Number.EPSILON * Math.max(currentTime, spacing));
   for (const direction of ['previous', 'next'] as const) {
-    const candidate = currentTime + (direction === 'previous' ? -spacing : spacing);
-    if (!Number.isFinite(candidate) || candidate < -tolerance || candidate > duration + tolerance) continue;
-    const time = Math.max(0, Math.min(candidate, duration));
-    if (direction === 'previous' ? time >= currentTime : time <= currentTime) continue;
-    samples.push({ time, direction });
+    const count = direction === 'previous' ? previousCount : nextCount;
+    let lastTime = currentTime;
+    for (let index = 1; index <= count; ++index) {
+      const offset = spacing * index;
+      const tolerance = Math.min(spacing / 4, 4 * Number.EPSILON * Math.max(currentTime, offset));
+      const candidate = currentTime + (direction === 'previous' ? -offset : offset);
+      if (!Number.isFinite(candidate) || candidate < -tolerance || candidate > duration + tolerance) break;
+      const time = Math.max(0, Math.min(candidate, duration));
+      if (direction === 'previous' ? time >= lastTime : time <= lastTime) break;
+      samples.push({ time, direction });
+      lastTime = time;
+    }
   }
   return samples;
 }

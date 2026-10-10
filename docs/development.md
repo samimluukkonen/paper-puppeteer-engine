@@ -120,6 +120,8 @@ src/devtools/animation-editor/
   AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
   AnimationEditorGhostLayer.ts  Render-only neighboring poses sharing engine artwork and affine projection
+  onionSkinSettings.ts   Frozen scene-only count, spacing, opacity and tint preferences
+  OnionSkinControlsController.ts  Native preference inputs and abortable event listener lifecycle
   TimelineController.ts   Session coordination, responsive ruler, tracks and playhead
   TimelineInputController.ts  Pointer capture, gestures, keyboard navigation and cancellation
   TimelineSessionController.ts  Selection, settings, history and status display

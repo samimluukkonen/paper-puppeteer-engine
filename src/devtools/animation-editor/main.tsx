@@ -11,6 +11,7 @@ import type { ReadonlyAnimation } from './AnimationEditorState.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { TimelineController } from './TimelineController.js';
 import './style.css';
 
@@ -108,11 +109,7 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
     },
     { signal: previewControls.signal },
   );
-  app
-    .querySelector<HTMLInputElement>('#animation-onion-skinning')!
-    .addEventListener('change', (event) => scene.setOnionSkinning((event.target as HTMLInputElement).checked), {
-      signal: previewControls.signal,
-    });
+  const onionControls = new OnionSkinControlsController(app, scene);
   app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
     'change',
     (event) => {
@@ -134,6 +131,7 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
     releaseNavigationGuard();
     timeline.dispose();
     inspector.dispose();
+    onionControls.dispose();
     previewControls.abort();
     releaseCharacterSelection();
     game.destroy(true);

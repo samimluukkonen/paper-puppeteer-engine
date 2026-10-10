@@ -1,5 +1,7 @@
 # Ghost pose rendering — v0.5.3.2
 
+The [v0.5.3.3 extension](onion-skin-controls.md) adds a six-instance pool, configurable counts/spacing/opacity/tints and a compact settings panel while retaining this rendering foundation.
+
 Package SemVer: `0.5.3-2`. Enable **Onion Skinning** above the Animation Editor canvas to see one previous and one next pose. The checkbox starts off, stays in scene memory, and never enters animation JSON, dirty tracking, history or draft recovery.
 
 ## Architecture and transforms

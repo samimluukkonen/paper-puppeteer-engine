@@ -129,6 +129,27 @@ export function AnimationEditorView() {
             <label>
               <input id="animation-onion-skinning" type="checkbox" /> Onion Skinning
             </label>
+            <details className="animation-onion-settings">
+              <summary>Onion settings</summary>
+              <section className="animation-onion-panel" aria-label="Onion Skinning settings">
+                <h2>Onion Skinning</h2>
+                <label htmlFor="animation-onion-previous-count">Previous poses</label>
+                <input id="animation-onion-previous-count" type="number" min="0" max="3" step="1" />
+                <label htmlFor="animation-onion-next-count">Next poses</label>
+                <input id="animation-onion-next-count" type="number" min="0" max="3" step="1" />
+                <label htmlFor="animation-onion-spacing">Frame spacing</label>
+                <input id="animation-onion-spacing" type="number" min="1" max="5" step="1" />
+                <label htmlFor="animation-onion-previous-opacity">Previous opacity</label>
+                <input id="animation-onion-previous-opacity" type="range" min="0.05" max="0.6" step="0.01" />
+                <label htmlFor="animation-onion-next-opacity">Next opacity</label>
+                <input id="animation-onion-next-opacity" type="range" min="0.05" max="0.6" step="0.01" />
+                <label htmlFor="animation-onion-previous-color">Previous color</label>
+                <input id="animation-onion-previous-color" type="color" />
+                <label htmlFor="animation-onion-next-color">Next color</label>
+                <input id="animation-onion-next-color" type="color" />
+                <p>Set a pose count to zero to hide that direction. Spacing uses authored frames.</p>
+              </section>
+            </details>
             <label>
               <input id="animation-ik-preview" type="checkbox" /> IK preview (fixed targets)
             </label>

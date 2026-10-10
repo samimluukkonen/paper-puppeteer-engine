@@ -6,6 +6,7 @@ import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { AnimationEditorGhostLayer } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
+import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
 import { toSeconds } from './timeUnits.js';
 
 export interface AnimationEditorSceneOptions {
@@ -18,7 +19,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   private puppet: Puppet | undefined;
   private preview: AnimationEditorPreview | undefined;
   private ghosts: AnimationEditorGhostLayer | undefined;
-  private onionSkinning = false;
+  private onionSkinSettings = DEFAULT_ONION_SKIN_SETTINGS;
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
   private selectionOverlay: Phaser.GameObjects.Graphics | undefined;
@@ -91,8 +92,16 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   setOnionSkinning(enabled: boolean): void {
-    this.onionSkinning = enabled;
-    this.ghosts?.setEnabled(enabled);
+    this.setOnionSkinSettings({ enabled });
+  }
+
+  getOnionSkinSettings(): OnionSkinSettings {
+    return this.onionSkinSettings;
+  }
+
+  setOnionSkinSettings(patch: Partial<OnionSkinSettings>): void {
+    this.onionSkinSettings = updateOnionSkinSettings(this.onionSkinSettings, patch);
+    this.ghosts?.setSettings(this.onionSkinSettings);
   }
 
   setBonesVisible(visible: boolean): void {
@@ -160,7 +169,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       });
       preview = new AnimationEditorPreview(state, puppet);
       ghosts = new AnimationEditorGhostLayer(this, state, puppet);
-      ghosts.setEnabled(this.onionSkinning);
+      ghosts.setSettings(this.onionSkinSettings);
       this.ghosts = ghosts;
       this.puppet = puppet;
       this.preview = preview;

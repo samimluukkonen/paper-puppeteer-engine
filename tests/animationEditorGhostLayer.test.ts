@@ -73,7 +73,7 @@ function fixture() {
   state.setCurrentTime(0.5);
   const preview = new AnimationEditorPreview(state, puppet);
   const layer = new AnimationEditorGhostLayer(scene, state, puppet);
-  const ghosts = Reflect.get(layer, 'instances') as Map<'previous' | 'next', Ghost>;
+  const ghosts = Reflect.get(layer, 'instances') as Map<string, Ghost>;
   const dispose = () => {
     layer.dispose();
     preview.dispose();
@@ -96,6 +96,147 @@ function reference(scene: Phaser.Scene, rig: Rig, state: AnimationEditorState, t
   return puppet;
 }
 
+test('six ghosts match sampled affine poses and immediately reuse their pool across counts, spacing, tint and opacity', () => {
+  const f = fixture();
+  try {
+    const settings = { enabled: true, previousCount: 3, nextCount: 3, frameSpacing: 1 };
+    f.layer.setSettings(settings);
+    assert.equal(f.ghosts.size, 6);
+    for (const direction of ['previous', 'next'] as const) {
+      for (let distance = 1; distance <= 3; ++distance) {
+        const ghost = f.ghosts.get(`${direction}-${distance}`)!;
+        const time = 0.5 + ((direction === 'previous' ? -1 : 1) * distance) / 10;
+        const expected = reference(f.scene, f.rig, f.state, time);
+        try {
+          matrixClose(ghost.bones.get('arm')!.sprite!, expected.getBone('arm').sprite!);
+          matrixClose(ghost.renderer.getSlotImage('glove')!, expected.getSlotImage('glove')!);
+          assert.isTrue(ghost.container.visible);
+          assert.isBelow(ghost.container.depth, f.puppet.container.depth);
+        } finally {
+          expected.destroy();
+        }
+      }
+    }
+    const pool = [...f.ghosts.values()];
+    const createImage = vi.spyOn(f.scene.add, 'image');
+    const createContainer = vi.spyOn(f.scene.add, 'container');
+    const sample = vi.spyOn(f.state, 'sampleGhostPoses');
+    f.layer.setSettings({ previousOpacity: 0.05, nextOpacity: 0.6, previousTint: 0x123456, nextTint: 0xfedcba });
+    assert.equal(sample.mock.calls.length, 0, 'appearance changes reuse pose samples');
+    for (const [key, ghost] of f.ghosts) {
+      assert.equal(ghost.container.alpha, key.startsWith('previous') ? 0.05 : 0.6);
+      assert.equal(
+        Reflect.get(ghost.renderer.getSlotImage('glove')!, 'tint'),
+        key.startsWith('previous') ? 0x123456 : 0xfedcba,
+      );
+    }
+    for (const [previousCount, nextCount] of [
+      [3, 0],
+      [0, 3],
+      [0, 0],
+      [1, 1],
+      [3, 3],
+    ] as const) {
+      f.layer.setSettings({ previousCount, nextCount });
+      assert.equal(pool.filter((ghost) => ghost.container.visible).length, previousCount + nextCount);
+    }
+    for (const spacing of [2, 5, 1]) {
+      f.layer.setSettings({ frameSpacing: spacing });
+      for (const direction of ['previous', 'next'] as const) {
+        const samples = f.state
+          .sampleGhostPoses({ ...settings, frameSpacing: spacing })
+          .filter((entry) => entry.direction === direction);
+        for (let distance = 1; distance <= 3; ++distance) {
+          const ghost = f.ghosts.get(`${direction}-${distance}`)!;
+          assert.equal(ghost.container.visible, distance <= samples.length);
+          if (distance <= samples.length)
+            assert.deepEqual(ghost.bones.get('root')!.pose, samples[distance - 1]!.pose.get('root'));
+        }
+      }
+    }
+    f.puppet.setSkin('red');
+    createImage.mockClear(); // The active Puppet replaces its own selected attachment.
+    f.layer.sync();
+    for (const ghost of pool) assert.equal(ghost.renderer.getSlotImage('glove')!.texture.key, 'glove2');
+    for (let i = 0; i < 10; ++i) f.layer.updateFrame(() => f.state.setCurrentTime(0.5 + i / 100));
+    assert.deepEqual([...f.ghosts.values()], pool);
+    assert.equal(createContainer.mock.calls.length, 0);
+    assert.equal(createImage.mock.calls.length, 0);
+    assert.equal(f.puppet.container.alpha, 1);
+    f.layer.dispose();
+    for (const ghost of pool) assert.isTrue(ghost.container.isDestroyed);
+  } finally {
+    f.dispose();
+  }
+});
+
+test('zero counts, hidden preview and boundaries never allocate invisible ghosts', () => {
+  const f = fixture();
+  try {
+    f.layer.setSettings({ enabled: true, previousCount: 0, nextCount: 0 });
+    assert.equal(f.ghosts.size, 0);
+    f.puppet.container.setVisible(false);
+    f.layer.setSettings({ previousCount: 3, nextCount: 3 });
+    assert.equal(f.ghosts.size, 0);
+    f.state.setCurrentTime(0);
+    f.puppet.container.setVisible(true);
+    f.layer.sync();
+    assert.equal(f.ghosts.size, 3);
+    assert.deepEqual([...f.ghosts.keys()], ['next-1', 'next-2', 'next-3']);
+    f.state.setCurrentTime(1);
+    assert.equal(f.ghosts.size, 6);
+    for (const [key, ghost] of f.ghosts) assert.equal(ghost.container.visible, key.startsWith('previous'));
+    assert.isFalse(f.state.dirty);
+  } finally {
+    f.dispose();
+  }
+});
+
+test('all pooled ghosts follow working key movement, history, interpolation, FPS and animation switches', () => {
+  const f = fixture();
+  const settings = { enabled: true, previousCount: 3, nextCount: 3, frameSpacing: 1 };
+  try {
+    f.layer.setSettings(settings);
+    const verify = () => {
+      const samples = f.state.sampleGhostPoses(settings);
+      for (const direction of ['previous', 'next'] as const) {
+        const group = samples.filter((entry) => entry.direction === direction);
+        for (let distance = 1; distance <= 3; ++distance) {
+          const ghost = f.ghosts.get(`${direction}-${distance}`)!;
+          assert.equal(ghost.container.visible, distance <= group.length);
+          if (distance <= group.length) {
+            for (const [id, bone] of ghost.bones) assert.deepEqual(bone.pose, group[distance - 1]!.pose.get(id));
+          }
+        }
+      }
+    };
+    f.state.setBonePropertyKeyframe('root', 'x', 150, 0.5);
+    verify();
+    f.state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
+    f.state.moveSelectedKeyframe(0.6);
+    verify();
+    f.state.undo();
+    verify();
+    f.state.redo();
+    verify();
+    f.state.setAuthoredPlaybackMode('stepped');
+    f.state.setAuthoredFPS(12);
+    verify();
+    f.state.setAuthoredInterpolation('linear');
+    verify();
+    f.state.undo();
+    verify();
+    f.state.selectAnimation('empty');
+    verify();
+    f.state.selectAnimation('move');
+    f.state.setCurrentTime(0.537);
+    verify();
+    assert.equal(f.ghosts.size, 6);
+  } finally {
+    f.dispose();
+  }
+});
+
 test('projects complete neighboring poses through the real renderer, preserving nested affine transforms and pivots', () => {
   const f = fixture();
   try {
@@ -105,7 +246,7 @@ test('projects complete neighboring poses through the real renderer, preserving 
       ['previous', 0.4],
       ['next', 0.6],
     ] as const) {
-      const ghost = f.ghosts.get(direction)!;
+      const ghost = f.ghosts.get(`${direction}-1`)!;
       const expected = reference(f.scene, f.rig, f.state, time);
       try {
         matrixClose(ghost.bones.get('arm')!.sprite!, expected.getBone('arm').sprite!);
@@ -121,10 +262,10 @@ test('projects complete neighboring poses through the real renderer, preserving 
     }
     assert.equal(f.puppet.container.alpha, 1);
     assert.notEqual(
-      f.ghosts.get('previous')!.bones.get('leg')!.pose.rotation,
-      f.ghosts.get('next')!.bones.get('leg')!.pose.rotation,
+      f.ghosts.get('previous-1')!.bones.get('leg')!.pose.rotation,
+      f.ghosts.get('next-1')!.bones.get('leg')!.pose.rotation,
     );
-    assert.isUndefined(f.ghosts.get('previous')!.renderer.getSlotImage('glove')!.input);
+    assert.isUndefined(f.ghosts.get('previous-1')!.renderer.getSlotImage('glove')!.input);
   } finally {
     f.dispose();
   }
@@ -134,7 +275,7 @@ test('follows skin/frame, visibility, attachment layout, depth, placement and fa
   const f = fixture();
   try {
     f.layer.setEnabled(true);
-    const ghost = f.ghosts.get('previous')!;
+    const ghost = f.ghosts.get('previous-1')!;
     const image = ghost.renderer.getSlotImage('glove')!;
     const createImage = vi.spyOn(f.scene.add, 'image');
     const createContainer = vi.spyOn(f.scene.add, 'container');
@@ -161,7 +302,7 @@ test('follows skin/frame, visibility, attachment layout, depth, placement and fa
     assert.approximately(ghost.container.rotation, 0.8, 1e-12);
     assert.equal(ghost.container.depth, 38);
     assert.equal(Reflect.get(image, 'tint'), 0x65a9ed);
-    assert.equal(Reflect.get(f.ghosts.get('next')!.renderer.getSlotImage('glove')!, 'tint'), 0xf0a15d);
+    assert.equal(Reflect.get(f.ghosts.get('next-1')!.renderer.getSlotImage('glove')!, 'tint'), 0xf0a15d);
     const parent = f.scene.add.container(25, 35).setRotation(-0.2).setScale(0.7, 1.4);
     parent.add(f.puppet.container);
     f.layer.sync();
@@ -202,8 +343,8 @@ test('disabled layers allocate nothing; toggles/boundaries/selection hide and re
     assert.equal(sample.mock.calls.length, 0);
     assert.equal(createImage.mock.calls.length, 0);
     f.layer.setEnabled(true);
-    const previous = f.ghosts.get('previous')!;
-    const next = f.ghosts.get('next')!;
+    const previous = f.ghosts.get('previous-1')!;
+    const next = f.ghosts.get('next-1')!;
     const images = [previous.renderer.getSlotImage('glove')!, next.renderer.getSlotImage('glove')!];
     f.layer.setEnabled(false);
     assert.isFalse(previous.container.visible);
@@ -213,8 +354,8 @@ test('disabled layers allocate nothing; toggles/boundaries/selection hide and re
     f.layer.sync();
     assert.equal(sample.mock.calls.length, 0);
     f.layer.setEnabled(true);
-    assert.strictEqual(f.ghosts.get('previous'), previous);
-    assert.strictEqual(f.ghosts.get('next'), next);
+    assert.strictEqual(f.ghosts.get('previous-1'), previous);
+    assert.strictEqual(f.ghosts.get('next-1'), next);
     f.state.setCurrentTime(0);
     assert.isFalse(previous.container.visible);
     assert.isTrue(next.container.visible);
@@ -249,7 +390,7 @@ test('scrubs/playback/working edits refresh authored ghosts while idle selection
   const f = fixture();
   try {
     f.layer.setEnabled(true);
-    const ghost = f.ghosts.get('previous')!;
+    const ghost = f.ghosts.get('previous-1')!;
     const sample = vi.spyOn(f.state, 'sampleGhostPoses');
     f.state.selectBone('leg');
     f.layer.sync();
@@ -291,8 +432,17 @@ test('ghost rendering leaves active pose, IK, events, clock, history and authore
     const prepare = vi.spyOn(f.puppet, 'preparePose');
     const sync = vi.spyOn(f.puppet, 'syncPose');
     try {
-      f.layer.setEnabled(true);
+      f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
       for (let i = 0; i < 10; ++i) f.layer.sync();
+      f.layer.setSettings({
+        previousCount: 0,
+        frameSpacing: 5,
+        previousOpacity: 0.05,
+        nextOpacity: 0.6,
+        previousTint: 0,
+        nextTint: 0xffffff,
+      });
+      f.layer.setSettings({ previousCount: 3, frameSpacing: 1 });
       f.layer.setEnabled(false);
       assert.deepEqual(
         f.rig.bones.map((bone) => f.puppet.getBone(bone.id).pose),
@@ -305,7 +455,7 @@ test('ghost rendering leaves active pose, IK, events, clock, history and authore
       assert.equal(prepare.mock.calls.length, 0);
       assert.equal(sync.mock.calls.length, 0);
       assert.equal(events.mock.calls.length, 0);
-      assert.deepEqual(f.ghosts.get('previous')!.bones.get('arm')!.pose, f.state.sampleGhostPose(0.4)!.get('arm'));
+      assert.deepEqual(f.ghosts.get('previous-1')!.bones.get('arm')!.pose, f.state.sampleGhostPose(0.4)!.get('arm'));
     } finally {
       unsubscribe();
     }
@@ -317,20 +467,23 @@ test('ghost rendering leaves active pose, IK, events, clock, history and authore
 test('scene frames project each ghost once while paused edits still refresh immediately', () => {
   const f = fixture();
   try {
-    f.layer.setEnabled(true);
-    const previous = f.ghosts.get('previous')!;
-    const next = f.ghosts.get('next')!;
+    f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    const allSyncs = [...f.ghosts.values()].map((ghost) => vi.spyOn(ghost.renderer, 'sync'));
+    const previous = f.ghosts.get('previous-1')!;
+    const next = f.ghosts.get('next-1')!;
     const previousSync = vi.spyOn(previous.renderer, 'sync');
     const nextSync = vi.spyOn(next.renderer, 'sync');
     f.state.play();
     previousSync.mockClear();
     nextSync.mockClear();
+    for (const spy of allSyncs) spy.mockClear();
     f.layer.updateFrame(() => {
       f.state.advancePlayback(0.05);
       f.puppet.setSkin('red');
     });
     assert.equal(previousSync.mock.calls.length, 1);
     assert.equal(nextSync.mock.calls.length, 1);
+    for (const spy of allSyncs) assert.equal(spy.mock.calls.length, 1);
     assert.approximately(previous.bones.get('root')!.pose.x, 50.5, 1e-10);
     assert.equal(previous.renderer.getSlotImage('glove')!.texture.key, 'glove2');
 

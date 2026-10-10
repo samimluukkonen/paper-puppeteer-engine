@@ -58,14 +58,17 @@ test('preview preferences chosen while loading apply before the ready callback',
     assert.equal(puppet.getIK('arm').status, 'solved');
     assert.isFalse(state.dirty);
     const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
-    assert.isTrue(Reflect.get(ghosts, 'enabled'));
-    assert.equal((Reflect.get(ghosts, 'instances') as Map<string, unknown>).size, 1);
+    assert.isTrue((Reflect.get(ghosts, 'settings') as { enabled: boolean }).enabled);
+    assert.equal((Reflect.get(ghosts, 'instances') as Map<string, unknown>).size, 3);
+    assert.equal(scene.getOnionSkinSettings().previousCount, 0);
+    assert.equal(scene.getOnionSkinSettings().nextCount, 3);
   });
   scene.create();
   scene.setFacing('left');
   scene.setBonesVisible(false);
   scene.setIKPreview(true);
   scene.setOnionSkinning(true);
+  scene.setOnionSkinSettings({ previousCount: 0, nextCount: 3, nextOpacity: 0.5, nextTint: 0x123456 });
   finishLoad(demoCharacter);
   await vi.waitFor(() => {
     assert.deepEqual(error.mock.calls, []);
@@ -81,7 +84,7 @@ test('preview preferences chosen while loading apply before the ready callback',
   assert.isFalse(puppet.getIK('arm').enabled);
   const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
   scene.setOnionSkinning(false);
-  assert.isFalse(Reflect.get(ghosts, 'enabled'));
+  assert.isFalse((Reflect.get(ghosts, 'settings') as { enabled: boolean }).enabled);
   scene.events.emit('shutdown');
   assert.isUndefined(Reflect.get(scene, 'ghosts'));
   assert.isTrue(Reflect.get(ghosts, 'disposed'));

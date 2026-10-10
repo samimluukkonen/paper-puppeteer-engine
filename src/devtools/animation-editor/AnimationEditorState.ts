@@ -748,7 +748,7 @@ export class AnimationEditorState {
     return sampleGhostPose(this.working, this.rig, timeSeconds);
   }
 
-  /** One neighboring authored frame on either side; never moves or notifies the editor clock. */
+  /** Up to three spaced authored poses per direction; never moves or notifies the editor clock. */
   sampleGhostPoses(settings: GhostSamplingSettings = {}): GhostPoseSample[] {
     return sampleGhostPoses(this.working, this.rig, this.currentTime, settings);
   }

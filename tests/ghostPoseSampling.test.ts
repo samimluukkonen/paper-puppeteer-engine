@@ -93,7 +93,61 @@ test('frame spacing changes the distance while retaining only one pose per direc
   ]);
 });
 
-test.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+test.each([1, 2, 5])('multiple neighbors use %s authored frames from the continuous playhead', (frameSpacing) => {
+  const currentTime = 1.037;
+  const samples = getGhostSampleTimes(currentTime, 3, { fps: 10, previousCount: 3, nextCount: 2, frameSpacing });
+  const previousCount = frameSpacing === 5 ? 2 : 3;
+  assert.equal(samples.length, previousCount + 2);
+  for (const direction of ['previous', 'next'] as const) {
+    const group = samples.filter((sample) => sample.direction === direction);
+    group.forEach((sample, index) => {
+      assert.approximately(
+        sample.time,
+        currentTime + ((direction === 'previous' ? -1 : 1) * (index + 1) * frameSpacing) / 10,
+        1e-14,
+      );
+    });
+  }
+});
+
+test('zero/max counts and independent visibility are bounded to six unique sample times', () => {
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { previousCount: 0, nextCount: 0 }), []);
+  const all = getGhostSampleTimes(0.5, 1, { previousCount: 3, nextCount: 3 });
+  assert.equal(all.length, 6);
+  assert.equal(new Set(all.map((sample) => sample.time)).size, 6);
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { previousCount: 3, nextCount: 0 }), all.slice(0, 3));
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { previousCount: 0, nextCount: 3 }), all.slice(3));
+});
+
+test('multi-sample boundaries omit only out-of-range offsets, retaining exact endpoints once', () => {
+  const settings = { previousCount: 3, nextCount: 3 };
+  const start = getGhostSampleTimes(0, 1, settings);
+  assert.deepEqual(
+    start.map((sample) => sample.direction),
+    ['next', 'next', 'next'],
+  );
+  const end = getGhostSampleTimes(1, 1, settings);
+  assert.deepEqual(
+    end.map((sample) => sample.direction),
+    ['previous', 'previous', 'previous'],
+  );
+  const nearStart = getGhostSampleTimes(0.2, 0.4, settings);
+  assert.deepEqual(
+    nearStart.map((sample) => sample.time),
+    [0.1, 0, 0.30000000000000004, 0.4],
+  );
+  assert.equal(getGhostSampleTimes(0.3, 1, { ...settings, fps: 10 }).filter((sample) => sample.time === 0).length, 1);
+});
+
+test.each([-1, 4, 1.5, NaN, Infinity, Number.MAX_VALUE])(
+  'invalid ghost count %s never produces unbounded samples',
+  (count) => {
+    assert.deepEqual(getGhostSampleTimes(0.5, 1, { previousCount: count }), []);
+    assert.deepEqual(getGhostSampleTimes(0.5, 1, { nextCount: count }), []);
+  },
+);
+
+test.each([0, -1, 6, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
   'invalid frame spacing %s omits samples',
   (frameSpacing) => {
     assert.deepEqual(getGhostSampleTimes(0.5, 1, { frameSpacing }), []);
@@ -258,11 +312,13 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const release = state.subscribe(notify);
     const releaseEvents = state.onAnimationEvent(events);
     try {
-      const expected = state.sampleGhostPoses();
+      const settings = { previousCount: 3, nextCount: 3, frameSpacing: 1 };
+      const expected = state.sampleGhostPoses(settings);
+      assert.equal(expected.length, 6);
       assert.equal(expected[0]!.pose.get('root')!.y, 88, 'the edited working copy is sampled');
       assert.equal(source!.tracks.root![0]!.y, undefined);
       for (let repeat = 0; repeat < 5; repeat++) {
-        assert.deepEqual(state.sampleGhostPoses(), expected);
+        assert.deepEqual(state.sampleGhostPoses(settings), expected);
         for (const time of [0, 0.4, 0.6, 1.05]) state.sampleGhostPose(time);
       }
       assert.deepEqual(snapshot(), held);
