@@ -164,7 +164,7 @@ Keyframe commands and gestures are owned by `AnimationEditorKeyframeCommands`; `
 
 Timeline playback notifications update time-dependent controls and the playhead. Authored rows, filters, inspectors, file controls, and document status refresh when their document, selection, gesture, or layout dependencies change. Animation IDs are immutable cached lists, so clock updates do not rebuild or serialize the selection options.
 
-Saved baselines retain immutable authored snapshots directly. Rig export serializes its validated file once; delayed clipboard completion retains the captured working snapshot without parsing JSON or marking later edits saved. Animation import and revert reuse validated frozen source snapshots, and subsequent edits replace changed branches while preserving the source.
+Saved baselines retain immutable authored snapshots directly. Rig inspector inputs remain mounted for the selected bone or slot across refreshes, history restores and preview-control changes. Authored values update in place while unchanged focused fields retain unfinished text; selecting another object or replacing the session rebuilds the available fields. Rig export serializes its validated file once; delayed clipboard completion retains the captured working snapshot without parsing JSON or marking later edits saved. Animation import and revert reuse validated frozen source snapshots, and subsequent edits replace changed branches while preserving the source.
 
 ## Use as a local package
 

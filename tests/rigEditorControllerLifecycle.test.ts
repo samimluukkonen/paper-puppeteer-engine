@@ -106,6 +106,39 @@ test('inspector disposal closes an edit and prevents duplicate handlers on remou
   second.dispose();
 });
 
+test('inspector refresh preserves focused text while history restores update the retained field', async () => {
+  const query = stubRigEditorDom();
+  const host = query('#inspector');
+  const current = editor();
+  current.state.selectBone('root');
+  const input = new EditorElement();
+  input.type = 'number';
+  input.dataset = { scope: 'bone', field: 'x' };
+  vi.spyOn(host, 'querySelectorAll').mockImplementation((selector) =>
+    selector === 'input[type="number"]' ? [input] : [],
+  );
+  const controller = createInspectorController(host as unknown as HTMLElement, vi.fn());
+  controller.render(current.runtime);
+  assert.equal(input.value, '0');
+  Object.assign(document, { activeElement: input });
+  input.value = '3.';
+  controller.render(current.runtime);
+  assert.equal(input.value, '3.');
+  await host.dispatch('focusin', input);
+  input.value = '3.50';
+  await host.dispatch('input', input);
+  controller.render(current.runtime);
+  assert.equal(input.value, '3.50');
+  current.state.endOperation();
+  current.state.undo();
+  controller.render(current.runtime);
+  assert.equal(input.value, '0');
+  current.state.redo();
+  controller.render(current.runtime);
+  assert.equal(input.value, '3.5');
+  controller.dispose();
+});
+
 test.each(['resolve', 'reject'] as const)(
   'disposed session ignores pending clipboard %s and supports remount',
   async (finish) => {

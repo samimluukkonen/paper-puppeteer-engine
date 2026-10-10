@@ -375,6 +375,17 @@ for (const name of ['head', '◇ headVisual']) {
     await page.locator('#redo').click();
     await expect(rotation).toHaveValue('0.5');
     await expect(degrees).toHaveText('28.6479°');
+    await page.locator('input[data-visibility="artwork"]').uncheck();
+    expect(
+      await originalRotation.evaluate(
+        (input) => input === document.querySelector('#inspector input[data-field="rotation"]'),
+      ),
+    ).toBe(true);
+    expect(
+      await originalScaleX.evaluate(
+        (input) => input === document.querySelector('#inspector input[data-field="scaleX"]'),
+      ),
+    ).toBe(true);
   });
 }
 

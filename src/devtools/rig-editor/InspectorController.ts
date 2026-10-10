@@ -69,11 +69,36 @@ function numberRows<Scope extends keyof ScopeFields>(
 export function createInspectorController(inspector: HTMLElement, updateStatus: (editor: RigEditor) => void) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
-  function updateInspectorLabels(current: RigEditor): void {
+  let renderedState: RigEditor['state'] | undefined;
+  let renderedKey = '';
+  const authoredValues = new WeakMap<HTMLInputElement, number | undefined>();
+
+  function updateInspectorValues(current: RigEditor, editedInput?: HTMLInputElement): void {
     const { state } = current;
     const selection = state.selection;
     if (!selection) return;
     const selected = selection.type === 'bone' ? state.getBone(selection.id) : state.getSlot(selection.id);
+    const attachmentId = selection.type === 'slot' ? current.getAttachment(selection.id) : undefined;
+    const valuesByScope: Record<keyof ScopeFields, Partial<Record<BoneField | SpriteField, number>> | undefined> = {
+      bone: selection.type === 'bone' ? state.getBone(selection.id) : undefined,
+      slot: selection.type === 'slot' ? state.getSlot(selection.id) : undefined,
+      sprite: selection.type === 'bone' ? state.getBone(selection.id).sprite : undefined,
+      attachment: attachmentId ? state.getAttachment(attachmentId) : undefined,
+    };
+    for (const input of inspector.querySelectorAll<HTMLInputElement>('input[type="number"]')) {
+      const { scope, field } = input.dataset;
+      if (scope !== 'bone' && scope !== 'slot' && scope !== 'sprite' && scope !== 'attachment') continue;
+      const definition = fieldsByScope[scope].find((entry) => entry.field === field);
+      if (!definition) continue;
+      const value = valuesByScope[scope]?.[definition.field];
+      // Keep partially typed text during unrelated refreshes. External edits and
+      // history restores still replace a focused field when its authored value changes.
+      if (input !== editedInput && (document.activeElement !== input || authoredValues.get(input) !== value)) {
+        input.value = String(value ?? (definition.fallback === 'Auto' ? '' : definition.fallback));
+        input.setCustomValidity('');
+      }
+      authoredValues.set(input, value);
+    }
     for (const label of inspector.querySelectorAll<HTMLElement>('[data-derived="rotation-degrees"]'))
       label.textContent = `${format(((selected.rotation ?? 0) * 180) / Math.PI)}°`;
   }
@@ -82,9 +107,27 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     const { state } = current;
     const selection = state.selection;
     if (!selection) {
-      inspector.textContent = 'Select a bone or slot to edit its bind values.';
+      if (renderedState !== state || renderedKey !== 'empty') {
+        renderedState = state;
+        renderedKey = 'empty';
+        inspector.textContent = 'Select a bone or slot to edit its bind values.';
+      }
       return;
     }
+    const attachmentId = selection.type === 'slot' ? current.getAttachment(selection.id) : undefined;
+    const key = JSON.stringify([
+      selection.type,
+      selection.id,
+      attachmentId,
+      selection.type === 'bone' && !!state.getBone(selection.id).sprite,
+    ]);
+    if (renderedState === state && renderedKey === key) {
+      updateInspectorValues(current);
+      return;
+    }
+    // Rebuild only when selection, session, or the available artwork fields change.
+    renderedState = state;
+    renderedKey = key;
     if (selection.type === 'bone') {
       const bone = state.getBone(selection.id);
       const sprite = bone.sprite;
@@ -97,7 +140,6 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       ].join('');
     } else {
       const slot = state.getSlot(selection.id);
-      const attachmentId = current.getAttachment(slot.id);
       const attachment = attachmentId ? state.getAttachment(attachmentId) : undefined;
       inspector.innerHTML = [
         `<h3>Slot: ${escapeHtml(slot.id)}</h3>`,
@@ -108,6 +150,7 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
         attachment ? numberRows('attachment', attachment, fieldsByScope.attachment) : '',
       ].join('');
     }
+    updateInspectorValues(current);
   }
 
   inspector.addEventListener(
@@ -139,7 +182,7 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       } else throw new Error(`Unknown inspector scope "${scope}".`);
       input.setCustomValidity('');
       updateStatus(editor);
-      updateInspectorLabels(editor);
+      updateInspectorValues(editor, input);
     } catch (error) {
       input.setCustomValidity(String(error));
       input.reportValidity();
@@ -164,26 +207,23 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
         applyInput(input, undefined);
       if (editor) {
         updateStatus(editor);
-        updateInspectorLabels(editor);
+        updateInspectorValues(editor, input);
       }
     },
     { signal: lifetime.signal },
   );
   inspector.addEventListener(
     'focusout',
-    (event) => {
+    () => {
       editor?.state.endOperation();
       if (editor) {
         updateStatus(editor);
-        updateInspectorLabels(editor);
+        updateInspectorValues(editor);
       }
-      // During native Tab navigation activeElement can still be the body at focusout.
-      // Preserve the inputs when the browser is about to focus another inspector field.
-      const next = event.relatedTarget;
-      if (next && next instanceof Element && next.closest('#inspector')) return;
+      // Normalize the blurred field after native focus navigation completes;
+      // the next inspector field retains its node and any unfinished text.
       queueMicrotask(() => {
-        if (!lifetime.signal.aborted && editor && !document.activeElement?.closest('#inspector'))
-          renderInspector(editor);
+        if (!lifetime.signal.aborted && editor) renderInspector(editor);
       });
     },
     { signal: lifetime.signal },
@@ -197,6 +237,8 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     },
     showError(this: void, message: string): void {
       if (lifetime.signal.aborted) return;
+      renderedState = undefined;
+      renderedKey = '';
       inspector.textContent = `Character load failed: ${message}`;
     },
     dispose(): void {
