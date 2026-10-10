@@ -5,10 +5,8 @@ import type {
   Interpolation,
   PropertyKeyframe,
 } from '../../engine/AnimationClip.js';
-import { dispatchAnimationEvents } from '../../engine/animationNotifications.js';
 import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
-import { collectAnimationStartEvents } from '../../engine/animationTimeline.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -23,6 +21,8 @@ import {
 import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
+import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
+import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import {
   buildEventTimelineTrack,
@@ -32,7 +32,6 @@ import {
 } from './animationEvents.js';
 import type { AnimationExportResult } from './animationSerialization.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
-import { collectEditorPlaybackEvents, getEditorEventClip } from './editorPlaybackEvents.js';
 import {
   type GhostPoseSample,
   type GhostSamplingSettings,
@@ -57,16 +56,13 @@ import {
   type KeyframeMarquee,
   type KeyframeSelectionModifiers,
 } from './keyframeSelection.js';
-import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, type KeyframeSnapMode } from './timeline.js';
+import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
-import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
-export const AUTHORED_FPS_MIN = 1;
-export const AUTHORED_FPS_MAX = 240;
-export const DEFAULT_AUTHORED_FPS = DEFAULT_KEYFRAME_FPS;
+export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
 
 export type {
   AnimationEditorStateOptions,
@@ -82,12 +78,13 @@ export type { AnimationExportResult } from './animationSerialization.js';
 export class AnimationEditorState {
   private readonly document: AnimationEditorDocument;
   private readonly listeners = new Set<() => void>();
-  private readonly eventListeners = new Set<(event: FiredAnimationEvent) => void>();
   private readonly clipboard = new TimelineClipboard();
   private readonly playback = new AnimationEditorPlayback(() => this.working?.duration ?? 0);
   private readonly selection: AnimationEditorSelection;
   private readonly keyframes: AnimationEditorKeyframeCommands;
   private readonly events: AnimationEditorEventCommands;
+  private readonly playbackController: AnimationEditorPlaybackController;
+  private readonly playbackCommands: AnimationEditorPlaybackCommands;
   private notificationDepth = 0;
   private notificationPending = false;
   private importedSessions = 0;
@@ -128,6 +125,15 @@ export class AnimationEditorState {
       this.clipboard,
       this.keyframes,
     );
+    this.playbackController = new AnimationEditorPlaybackController(this.document, this.selection, this.playback, {
+      notify: () => this.notify(),
+      navigate: (time) => this.setCurrentTime(time),
+      isDragging: () => !!(this.keyframeDrag || this.eventDrag),
+    });
+    this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, {
+      install: (animation) => this.installWorkingAnimation(animation),
+      notify: () => this.notify(),
+    });
   }
 
   private get working(): ReadonlyAnimation | null {
@@ -582,77 +588,29 @@ export class AnimationEditorState {
 
   /** Clamp navigation and authored edits using the same loop and scrub playback intent. */
   private updateTime(time: Seconds): boolean {
-    const previous = this.currentTime;
-    const changed = this.playback.setCurrentTime(time);
-    if (previous !== this.currentTime) this.clearTransformDraft();
-    return changed;
+    return this.playbackController.setCurrentTime(time);
   }
 
   private updateTimeMilliseconds(time: Milliseconds): boolean {
-    const previous = this.currentTime;
-    const changed = this.playback.setCurrentTimeMilliseconds(time);
-    if (previous !== this.currentTime) this.clearTransformDraft();
-    return changed;
-  }
-
-  private notifyPlaybackChange(previous: Seconds, changed: boolean): void {
-    if (previous !== this.currentTime) this.clearTransformDraft();
-    if (changed) this.notify();
+    return this.playbackController.setCurrentTimeMilliseconds(time);
   }
 
   /** Preview preferences stay outside authored data and history. */
   setPreviewLoop(loop: boolean): void {
-    this.notifyPlaybackChange(this.currentTime, this.playback.setPreviewLoop(loop));
+    this.playbackController.setPreviewLoop(loop);
   }
 
-  /** A preview preference, never serialized or recorded in authored history. */
   setPlaybackSpeed(speed: number): boolean {
-    const previous = this.playbackSpeed;
-    if (!this.playback.setPlaybackSpeed(speed)) return false;
-    if (speed !== previous) this.notify();
-    return true;
+    return this.playbackController.setPlaybackSpeed(speed);
   }
 
-  /** FPS only exists on stepped clips in the runtime format; keys and events retain millisecond times. */
+  /** Authored metadata edits share the session's atomic notification boundary. */
   setAuthoredFPS(fps: number): boolean {
-    return this.batchNotifications(() => {
-      if (this.working?.playback?.mode !== 'stepped') return false;
-      if (!Number.isFinite(fps) || fps < AUTHORED_FPS_MIN || fps > AUTHORED_FPS_MAX) {
-        this.document.reportIssues([
-          {
-            severity: 'error',
-            path: 'playback.fps',
-            message: `Animation FPS must be a finite number from ${AUTHORED_FPS_MIN} to ${AUTHORED_FPS_MAX}.`,
-          },
-        ]);
-        this.notify();
-        return false;
-      }
-      return this.setAuthoredPlayback({ mode: 'stepped', fps });
-    });
+    return this.batchNotifications(() => this.playbackCommands.setAuthoredFPS(fps));
   }
 
   setAuthoredPlaybackMode(mode: AnimationPlaybackMode['mode']): boolean {
-    return this.batchNotifications(() => {
-      if (!this.working || (mode !== 'smooth' && mode !== 'stepped')) return false;
-      if (mode === (this.working.playback?.mode ?? 'smooth')) return true;
-      return this.setAuthoredPlayback(mode === 'smooth' ? { mode } : { mode, fps: DEFAULT_AUTHORED_FPS });
-    });
-  }
-
-  private setAuthoredPlayback(playback: AnimationPlaybackMode): boolean {
-    const source = this.working;
-    if (!source || !this.rig) return false;
-    let next: ReadonlyAnimation;
-    try {
-      getValidatedEditorAnimation(source, this.rig);
-      next = validateEditedAnimation({ ...source, playback }, source, this.rig);
-    } catch (error) {
-      this.document.reportError(error);
-      this.notify();
-      return false;
-    }
-    return this.installWorkingAnimation(next);
+    return this.batchNotifications(() => this.playbackCommands.setAuthoredPlaybackMode(mode));
   }
 
   get authoredInterpolation(): Interpolation | undefined {
@@ -757,84 +715,38 @@ export class AnimationEditorState {
   beginScrub(): void {
     return this.batchNotifications(() => {
       this.cancelTimelineDrag();
-      if (!this.working) return;
-      const cancelled = this.clearTransformDraft();
-      if (this.playback.beginScrub() || cancelled) this.notify();
+      this.playbackController.beginScrub();
     });
   }
 
   endScrub(): void {
-    this.notifyPlaybackChange(this.currentTime, this.playback.endScrub());
+    this.playbackController.endScrub();
   }
 
-  /** Resume the sole editor clock; a completed clip starts again at zero. */
   play(): void {
-    if (this.keyframeDrag || this.eventDrag) return;
-    if (!this.playback.play()) return;
-    this.clearTransformDraft();
-    const events = this.startEvents();
-    this.notify();
-    this.dispatchEvents(events);
+    this.playbackController.play();
   }
 
   pause(): void {
-    this.notifyPlaybackChange(this.currentTime, this.playback.pause());
+    this.playbackController.pause();
   }
 
   togglePlayback(): void {
-    if (this.isPlaying) this.pause();
-    else this.play();
+    this.playbackController.togglePlayback();
   }
 
-  /** Rewind immediately, preserving whether playback is active. */
   restart(): void {
-    this.playback.requestStart();
-    this.setCurrentTime(0);
-    this.dispatchEvents(this.startEvents());
+    this.playbackController.restart();
   }
 
   /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
   advancePlayback(deltaSeconds: Seconds): void {
-    let events: FiredAnimationEvent[] = [];
-    if (
-      this.isPlaying &&
-      !this.isScrubbing &&
-      Number.isFinite(deltaSeconds) &&
-      deltaSeconds > 0 &&
-      this.working?.events?.length &&
-      this.rig
-    ) {
-      try {
-        events = collectEditorPlaybackEvents(
-          getEditorEventClip(this.working, this.rig, this.previewLoop),
-          this.playback.currentTimeMilliseconds,
-          deltaSeconds,
-          this.playbackSpeed,
-        );
-      } catch (error) {
-        this.document.reportError(error);
-        this.notify();
-        return;
-      }
-    }
-    this.notifyPlaybackChange(this.currentTime, this.playback.advance(deltaSeconds));
-    this.dispatchEvents(events);
+    this.playbackController.advancePlayback(deltaSeconds);
   }
 
   /** Runtime-compatible notifications are delivered after preview subscribers synchronize the held pose. */
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
-    this.eventListeners.add(listener);
-    return () => this.eventListeners.delete(listener);
-  }
-  private startEvents(): FiredAnimationEvent[] {
-    return this.playback.consumeStart() && this.working && this.rig
-      ? collectAnimationStartEvents(getEditorEventClip(this.working, this.rig, this.previewLoop), 'base')
-      : [];
-  }
-  private dispatchEvents(events: readonly FiredAnimationEvent[]): void {
-    const errors = dispatchAnimationEvents(events, this.eventListeners);
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) throw new AggregateError(errors, 'Animation editor event listeners failed.');
+    return this.playbackController.onAnimationEvent(listener);
   }
 
   /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */
