@@ -1,0 +1,309 @@
+import { assert, test, vi } from 'vitest';
+import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
+import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { getEvaluatedAnimationPose } from '../src/devtools/animation-editor/animationValues.js';
+import {
+  getGhostSampleTimes,
+  sampleGhostPose,
+  sampleGhostPoses,
+} from '../src/devtools/animation-editor/ghostPoseSampling.js';
+import { type AnimationClip, type AnimationPlaybackMode, compileClip } from '../src/engine/AnimationClip.js';
+import { AnimationPlayer, type FiredAnimationEvent } from '../src/engine/AnimationPlayer.js';
+import { Joint } from '../src/engine/Joint.js';
+import { Puppet } from '../src/engine/Puppet.js';
+import { Rig } from '../src/engine/Rig.js';
+import { createTransform } from '../src/engine/types.js';
+import { puppetScene } from './helpers/puppetScene.js';
+
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
+
+const rig = new Rig({
+  root: 'root',
+  bones: [
+    { id: 'root', x: 30, y: 40, scaleX: 2, length: 10 },
+    { id: 'upper', parent: 'root', y: 99, rotation: 0.2 },
+    { id: 'lower', parent: 'upper', y: 60, scaleY: 1.2 },
+    { id: 'hand', parent: 'lower', y: 50 },
+  ],
+});
+
+function clip(playback?: AnimationPlaybackMode): AnimationClip {
+  return {
+    name: 'ghost',
+    duration: 1050,
+    loop: true,
+    interpolation: 'linear',
+    ...(playback ? { playback } : {}),
+    tracks: {
+      root: [
+        { time: 0, x: 0 },
+        { time: 1050, x: 105 },
+      ],
+      upper: [
+        { time: 0, rotation: (179 * Math.PI) / 180 },
+        { time: 1050, rotation: (-179 * Math.PI) / 180 },
+      ],
+      lower: [
+        { time: 200, x: 7 },
+        { time: 800, x: 13 },
+      ],
+      hand: [],
+    },
+    events: [
+      { time: 0, name: 'start', data: { nested: [1] } },
+      { time: 400, name: 'before' },
+      { time: 600, name: 'after' },
+      { time: 1050, name: 'end' },
+    ],
+  };
+}
+
+test('default neighbors use one 10 FPS frame and preserve continuous off-frame time', () => {
+  assert.deepEqual(getGhostSampleTimes(0.5, 1), [
+    { time: 0.4, direction: 'previous' },
+    { time: 0.6, direction: 'next' },
+  ]);
+  const times = getGhostSampleTimes(0.537, 1);
+  assert.approximately(times[0]!.time, 0.437, 1e-15);
+  assert.approximately(times[1]!.time, 0.637, 1e-15);
+});
+
+test.each([8, 12, 23.976, 300])(
+  'spacing supports valid authored FPS %s, including fractional/runtime-only rates',
+  (fps) => {
+    const times = getGhostSampleTimes(0.5, 1, { fps });
+    assert.approximately(times[0]!.time, 0.5 - 1 / fps, 1e-15);
+    assert.approximately(times[1]!.time, 0.5 + 1 / fps, 1e-15);
+  },
+);
+
+test.each([0, -10, NaN, Infinity, -Infinity])('invalid FPS %s falls back to the shared 10 FPS aesthetic', (fps) => {
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { fps }), getGhostSampleTimes(0.5, 1));
+});
+
+test('frame spacing changes the distance while retaining only one pose per direction', () => {
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { fps: 10, frameSpacing: 2 }), [
+    { time: 0.3, direction: 'previous' },
+    { time: 0.7, direction: 'next' },
+  ]);
+});
+
+test.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+  'invalid frame spacing %s omits samples',
+  (frameSpacing) => {
+    assert.deepEqual(getGhostSampleTimes(0.5, 1, { frameSpacing }), []);
+  },
+);
+
+test('start/end and short animations omit out-of-range neighbors without wrapping or clamping duplicates', () => {
+  assert.deepEqual(getGhostSampleTimes(0, 1), [{ time: 0.1, direction: 'next' }]);
+  assert.deepEqual(getGhostSampleTimes(1, 1), [{ time: 0.9, direction: 'previous' }]);
+  const nearStart = getGhostSampleTimes(0.05, 1);
+  assert.equal(nearStart.length, 1);
+  assert.equal(nearStart[0]!.direction, 'next');
+  assert.approximately(nearStart[0]!.time, 0.15, 1e-15);
+  assert.deepEqual(getGhostSampleTimes(0, 0.05), []);
+  assert.deepEqual(getGhostSampleTimes(0.025, 0.05), []);
+  assert.deepEqual(getGhostSampleTimes(0, 0.1), [{ time: 0.1, direction: 'next' }]);
+  assert.deepEqual(getGhostSampleTimes(0.1, 0.1), [{ time: 0, direction: 'previous' }]);
+  assert.deepEqual(getGhostSampleTimes(0.3, 1, { frameSpacing: 3 }), [
+    { time: 0, direction: 'previous' },
+    { time: 0.6, direction: 'next' },
+  ]);
+  assert.deepEqual(getGhostSampleTimes(0.05, 1e20), [{ time: 0.05 + 0.1, direction: 'next' }]);
+  assert.deepEqual(
+    getGhostSampleTimes(0.3 - 1e-8, 1, { frameSpacing: 3 }).map((sample) => sample.direction),
+    ['next'],
+  );
+});
+
+test.each([0, -1, NaN, Infinity])('invalid/zero duration %s produces no samples', (duration) => {
+  assert.deepEqual(getGhostSampleTimes(0, duration), []);
+  assert.deepEqual(sampleGhostPoses({ ...clip(), duration }, rig, 0), []);
+  assert.isUndefined(sampleGhostPose({ ...clip(), duration }, rig, 0));
+});
+
+test.each([-0.01, 1.1, NaN, Infinity, -Infinity])('invalid sampling time %s produces no samples', (time) => {
+  assert.deepEqual(getGhostSampleTimes(time, 1), []);
+  assert.deepEqual(sampleGhostPoses(clip(), rig, time), []);
+  assert.isUndefined(sampleGhostPose(clip(), rig, time));
+});
+
+test('unrepresentable spacing cannot produce duplicate boundary or current-time samples', () => {
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { fps: Number.MAX_VALUE }), []);
+  assert.deepEqual(getGhostSampleTimes(0.5, 1, { fps: Number.MIN_VALUE }), []);
+});
+
+test('missing animations and rigs produce no poses', () => {
+  assert.deepEqual(sampleGhostPoses(null, rig, 0.5), []);
+  assert.deepEqual(sampleGhostPoses(clip(), undefined, 0.5), []);
+  assert.isUndefined(sampleGhostPose(null, rig, 0.5));
+  assert.isUndefined(sampleGhostPose(clip(), undefined, 0.5));
+  assert.deepEqual(new AnimationEditorState().sampleGhostPoses(), []);
+});
+
+test.each<AnimationPlaybackMode | undefined>([undefined, { mode: 'smooth' }, { mode: 'stepped', fps: 10 }])(
+  'complete local ghost poses match runtime evaluation for playback %j, including hierarchy, partial tracks and endpoints',
+  (playback) => {
+    const input = clip(playback);
+    const before = structuredClone(input);
+    const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+    const runtime = new AnimationPlayer(rig, joints, [compileClip({ ...input, loop: false }, rig)]);
+    runtime.play(input.name);
+    runtime.pause();
+    for (const time of [0, 0.175, 0.525, 0.999, 1.05, 0.2]) {
+      for (const joint of joints.values()) joint.reset();
+      runtime.sample(time * 1000, { mode: 'playback' });
+      const pose = sampleGhostPose(input, rig, time)!;
+      assert.equal(pose.size, rig.bones.length);
+      for (const [id, joint] of joints) assert.deepEqual(pose.get(id), joint.pose);
+      assert.equal(pose.get('upper')!.y, 10, 'resolved rig lengths remain local bind-pose values');
+      assert.deepEqual(pose.get('hand'), createTransform(rig.getBone('hand')));
+    }
+    assert.equal(sampleGhostPose(input, rig, 1.05)!.get('root')!.x, 105, 'off-frame end remains exact');
+    assert.approximately(sampleGhostPose(input, rig, 0.525)!.get('upper')!.rotation!, Math.PI, 0.001);
+    assert.deepEqual(input, before);
+    assert.isFalse(Object.isFrozen(input));
+    runtime.dispose();
+  },
+);
+
+test('authored FPS drives neighbors; preview rate changes sampling but does not retime the editor clock', () => {
+  const state = new AnimationEditorState(rig, [clip({ mode: 'stepped', fps: 20 })]);
+  state.selectAnimation('ghost');
+  state.setCurrentTime(0.537);
+  const samples = state.sampleGhostPoses();
+  assert.approximately(samples[0]!.time, 0.487, 1e-15);
+  assert.approximately(samples[1]!.time, 0.587, 1e-15);
+  assert.equal(samples[0]!.pose.get('root')!.x, 45);
+  assert.approximately(samples[1]!.pose.get('root')!.x!, 55, 1e-12);
+  assert.equal(state.currentTime, 0.537);
+  assert.isFalse(state.dirty);
+  assert.equal(state.historyLength, 0);
+  assert.approximately(state.sampleGhostPoses({ fps: 10 })[0]!.time, 0.437, 1e-15);
+  state.setAuthoredPlaybackMode('smooth');
+  assert.approximately(state.sampleGhostPoses()[0]!.pose.get('root')!.x!, 43.7, 1e-12);
+});
+
+test('sampling returns detached deterministic snapshots and observes mutable inputs afresh', () => {
+  const input = clip();
+  const first = sampleGhostPoses(input, rig, 0.5);
+  const before = structuredClone(first);
+  const second = sampleGhostPoses(input, rig, 0.5);
+  assert.deepEqual(first, second);
+  second[0]!.pose.get('root')!.x = 999;
+  second[1]!.pose.clear();
+  assert.deepEqual(first, before);
+  assert.deepEqual(sampleGhostPoses(input, rig, 0.5), before);
+  input.tracks = { root: [{ time: 0, x: 77 }] };
+  assert.equal(sampleGhostPose(input, rig, 0.5)!.get('root')!.x, 77);
+  assert.throws(() => getEvaluatedAnimationPose(input, rig, NaN), /finite/);
+  assert.throws(() => getEvaluatedAnimationPose(input, rig, -1), /within/);
+});
+
+test.each(['paused', 'playing', 'scrubbing'] as const)(
+  'sampling working snapshots preserves %s state, events, drafts, dirty state, undo/redo and all preview/IK poses',
+  (mode) => {
+    const input = clip({ mode: 'stepped', fps: 10 });
+    const original = structuredClone(input);
+    const state = new AnimationEditorState(rig, [input]);
+    state.selectAnimation('ghost');
+    state.setBonePropertyKeyframe('root', 'y', 88, 0);
+    state.setBonePropertyKeyframe('root', 'scaleY', 3, 0);
+    state.undo();
+    state.selectBone('upper');
+    state.setTemporaryBoneProperty('rotation', 0.6);
+    state.setPreviewLoop(true);
+    state.setPlaybackSpeed(2);
+    state.setCurrentTime(0.5);
+    if (mode !== 'paused') state.play();
+    if (mode === 'scrubbing') state.beginScrub();
+    if (mode !== 'playing') state.setTemporaryBoneProperty('rotation', 0.6);
+    const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+    const constraint = puppet.addIK({ name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand', mix: 1 });
+    const target = vi.fn(() => ({ x: 70, y: 80 }));
+    constraint.setTargetProvider(target);
+    const preview = new AnimationEditorPreview(state, puppet);
+    const snapshot = () => ({
+      currentTime: state.currentTime,
+      playing: state.isPlaying,
+      scrubbing: state.isScrubbing,
+      dirty: state.dirty,
+      history: state.historyLength,
+      undo: state.canUndo,
+      redo: state.canRedo,
+      loop: state.previewLoop,
+      speed: state.playbackSpeed,
+      selectedBone: state.selectedBoneId,
+      draft: state.boneTransformDraft,
+      issues: state.validationIssues,
+      pose: rig.bones.map((bone) => ({ ...puppet.getBone(bone.id).pose })),
+      ikStatus: constraint.status,
+    });
+    const held = snapshot();
+    const working = state.workingAnimation;
+    const source = state.sourceAnimation;
+    const workingJson = JSON.stringify(working);
+    const sourceJson = JSON.stringify(source);
+    const notify = vi.fn();
+    const events = vi.fn<(event: FiredAnimationEvent) => void>();
+    const sync = vi.spyOn(puppet, 'syncPose');
+    const prepare = vi.spyOn(puppet, 'preparePose');
+    target.mockClear();
+    const release = state.subscribe(notify);
+    const releaseEvents = state.onAnimationEvent(events);
+    try {
+      const expected = state.sampleGhostPoses();
+      assert.equal(expected[0]!.pose.get('root')!.y, 88, 'the edited working copy is sampled');
+      assert.equal(source!.tracks.root![0]!.y, undefined);
+      for (let repeat = 0; repeat < 5; repeat++) {
+        assert.deepEqual(state.sampleGhostPoses(), expected);
+        for (const time of [0, 0.4, 0.6, 1.05]) state.sampleGhostPose(time);
+      }
+      assert.deepEqual(snapshot(), held);
+      assert.strictEqual(state.workingAnimation, working);
+      assert.strictEqual(state.sourceAnimation, source);
+      assert.equal(JSON.stringify(working), workingJson);
+      assert.equal(JSON.stringify(source), sourceJson);
+      assert.deepEqual(input, original);
+      assert.equal(notify.mock.calls.length, 0);
+      assert.equal(events.mock.calls.length, 0);
+      assert.equal(sync.mock.calls.length, 0);
+      assert.equal(prepare.mock.calls.length, 0);
+      assert.equal(target.mock.calls.length, 0);
+      assert.notEqual(
+        expected[0]!.pose.get('upper')!.rotation,
+        held.pose[1]!.rotation,
+        'ghosts exclude the draft and active IK correction',
+      );
+      expected[0]!.pose.get('root')!.y = 999;
+      assert.equal(state.sampleGhostPoses()[0]!.pose.get('root')!.y, 88);
+      state.pause();
+      state.endScrub();
+      state.restart();
+      state.play();
+      state.advancePlayback(0.35);
+      assert.equal(
+        events.mock.calls.filter(([event]) => event.name === 'start').length,
+        1,
+        'sampling leaves time-zero event intent untouched',
+      );
+      assert.isTrue(
+        events.mock.calls.some(([event]) => event.name === 'after'),
+        'normal event delivery remains active',
+      );
+    } finally {
+      release();
+      releaseEvents();
+      sync.mockRestore();
+      prepare.mockRestore();
+      preview.dispose();
+      puppet.destroy();
+    }
+  },
+);

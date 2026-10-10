@@ -1,8 +1,8 @@
 import type { CompiledClip } from '../../engine/AnimationClip.js';
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
-import { ClipPoseBuffer } from '../../engine/AnimationPose.js';
+import { type AnimationPose, ClipPoseBuffer } from '../../engine/AnimationPose.js';
 import type { Rig } from '../../engine/Rig.js';
-import { createTransform, type JointTransform, type TransformProperty } from '../../engine/types.js';
+import { assertFinite, createTransform, type JointTransform, type TransformProperty } from '../../engine/types.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, assertTarget } from './keyframeTargets.js';
 import { getCompiledPreviewClip } from './previewClip.js';
@@ -22,7 +22,7 @@ class AnimationValueSampler {
     this.clip = getCompiledPreviewClip(animation, rig);
   }
 
-  sample(boneId: string, timeMs: Milliseconds): JointTransform {
+  private evaluate(timeMs: Milliseconds): AnimationPose {
     const time =
       timeMs === this.clip.duration ? timeMs : quantizePlaybackTime(timeMs, this.clip.playback ?? { mode: 'smooth' });
     // Repeated property queries at the same playback frame share one pose evaluation.
@@ -30,8 +30,27 @@ class AnimationValueSampler {
       this.pose = this.buffer.evaluate(this.clip, time);
       this.sampledTime = time;
     }
-    return { ...createTransform(this.rig.getBone(boneId)), ...this.pose?.get(boneId) };
+    return this.pose!;
   }
+
+  sample(boneId: string, timeMs: Milliseconds): JointTransform {
+    return { ...createTransform(this.rig.getBone(boneId)), ...this.evaluate(timeMs).get(boneId) };
+  }
+
+  samplePose(timeMs: Milliseconds): AnimationPose {
+    const sparse = this.evaluate(timeMs);
+    return new Map(this.rig.bones.map((bone) => [bone.id, { ...createTransform(bone), ...sparse.get(bone.id) }]));
+  }
+}
+
+/** Detached complete bone-local pose before drafts, presets, IK and render projection.
+ * Hierarchy/appearance remain in the rig; no Puppet or player state is read or written.
+ */
+export function getEvaluatedAnimationPose(animation: AnimationData, rig: Rig, timeMs: Milliseconds): AnimationPose {
+  assertFinite(timeMs, 'Sample time');
+  if (timeMs < 0 || timeMs > animation.duration)
+    throw new Error('Sample time must stay within the animation duration.');
+  return valueSampler(animation, rig).samplePose(timeMs);
 }
 
 const valueSamplers = new WeakMap<AnimationData, WeakMap<Rig, AnimationValueSampler>>();

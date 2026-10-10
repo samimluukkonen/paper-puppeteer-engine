@@ -7,6 +7,7 @@ import type {
 } from '../../engine/AnimationClip.js';
 import { dispatchAnimationEvents } from '../../engine/animationNotifications.js';
 import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
+import type { AnimationPose } from '../../engine/AnimationPose.js';
 import { collectAnimationStartEvents } from '../../engine/animationTimeline.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
@@ -32,6 +33,12 @@ import {
 import type { AnimationExportResult } from './animationSerialization.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
 import { collectEditorPlaybackEvents, getEditorEventClip } from './editorPlaybackEvents.js';
+import {
+  type GhostPoseSample,
+  type GhostSamplingSettings,
+  sampleGhostPose,
+  sampleGhostPoses,
+} from './ghostPoseSampling.js';
 import {
   getAnimationInterpolation,
   getInterpolationForKeys,
@@ -734,6 +741,16 @@ export class AnimationEditorState {
     return this.working && this.rig
       ? getEvaluatedBoneTransform(this.working, this.rig, boneId, toMilliseconds(timeSeconds))
       : undefined;
+  }
+
+  /** Read-only complete authored pose at arbitrary continuous seconds, before drafts/presets/IK. */
+  sampleGhostPose(timeSeconds: Seconds): AnimationPose | undefined {
+    return sampleGhostPose(this.working, this.rig, timeSeconds);
+  }
+
+  /** One neighboring authored frame on either side; never moves or notifies the editor clock. */
+  sampleGhostPoses(settings: GhostSamplingSettings = {}): GhostPoseSample[] {
+    return sampleGhostPoses(this.working, this.rig, this.currentTime, settings);
   }
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */

@@ -226,6 +226,8 @@ Pure queries are `findBonePropertyKeyframe(animation, boneId, property, timeMs)`
 
 `getEvaluatedBonePropertyValue(animation, rig, boneId, property, timeMs)` uses the runtime pose buffer and playback quantization, compiling an event-free, nonlooping preview clip. `getEvaluatedBoneTransform(animation, rig, boneId, timeMs)` reads all five local properties together. Fully frozen animation snapshots cache compilation per rig and reuse pose evaluation within the same sampled frame; mutable or shallow-frozen caller data is validated and compiled afresh. Returned transforms are detached copies. Sampling never advances a clock or stores an evaluated pose as authored data. Smooth interpolation and shortest-path rotation come from the runtime; stepped clips hold at authored FPS boundaries and retain the exact endpoint. Before the first property key and after its last, the runtime holds the nearest value. A wholly unkeyed property falls back to the rig bind pose. Results represent the animation's local transform before optional presets, IK, and facing. Invalid evaluation targets throw.
 
+The v0.5.3.1 [ghost pose sampling foundation](ghost-pose-sampling.md) extends this sampler with `getEvaluatedAnimationPose(animation, rig, timeMs)` for complete detached local poses. `state.sampleGhostPose(timeSeconds)` samples any in-range authored time; `state.sampleGhostPoses(settings?)` returns previous/next frame samples from the current working copy without changing the playhead or preview. No onion-skin rendering or UI controls exist in this phase.
+
 State methods use **seconds**, defaulting to `currentTime`:
 
 ```ts
