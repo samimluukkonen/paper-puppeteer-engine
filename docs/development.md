@@ -12,17 +12,12 @@ npm test
 npm run check
 npm run build
 npm run preview
+npm run test:package
 ```
 
 `check` runs Oxfmt formatting validation, Oxlint linting (including type-aware TypeScript rules), and TypeScript 7's authoritative `tsc --noEmit` check. `npm run check:fix` applies Oxlint's safe fixes, formats with Oxfmt, and checks types. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
-Use `npm run format` / `npm run format:check` for formatting, and `npm run lint` / `npm run lint:fix` for linting. Oxfmt's root `.oxfmtrc.json` keeps two-space indentation, single quotes in JavaScript/TypeScript, double quotes in CSS, semicolons, trailing commas, 120-column lines, and sorted imports. Side-effect imports retain their order; embedded code snippets and package fields are not reorganized. Oxfmt covers TypeScript, JavaScript, JSON/JSONC, CSS, HTML, Markdown, and YAML. Dependency/build/coverage/browser-test outputs, caches, temporary directories, and the npm lockfile are excluded. `plans/` holds historical and in-progress design notes and is excluded from formatting to avoid rewriting those records.
-
-Oxlint's root `.oxlintrc.json` uses JSON so it works across the project's supported Node versions. `options.typeAware: true` activates the installed `oxlint-tsgolint` backend with TypeScript 7; experimental compiler diagnostics (`typeCheck`) are deliberately omitted. Correctness rules are errors, with explicit checks for floating/misused promises, awaiting non-promises, array `for-in` loops, unnecessary assertions, unsafe arguments/assignments/calls/member access/returns, type-only imports, duplicate/self imports, and unsafe promise patterns. Non-null assertions remain allowed. React hooks and JSX accessibility checks apply to the `.tsx` view components. React owns the workspace UI; Phaser owns canvas rendering and the animation loop.
-
-Unsafe-value and unbound-method rules are errors throughout application code, tests, and scripts; the migration's transitional warning overrides have been removed. Mock callbacks use explicit signatures, dynamic values are narrowed or validated before use, and deliberately invalid fixtures remain `unknown`. Package scripts validate manifest fields with Zod, and browser fixtures validate shipped data before applying their intentional mutations. Narrow, explained inline exceptions preserve Phaser's explicit listener contexts, deliberately borrowed test methods, listener snapshots, aggregate-error contents, arbitrary validation diagnostics, and intentionally invalid test inputs. Unused exceptions are errors. `eslint/preserve-caught-error` and React hook dependency checks remain warning-level rules, with no current findings. Suspicious rules are selected individually rather than enabling noisy assertion/style restrictions across the engine.
-
-Install the recommended `oxc.oxc-vscode` extension for format-on-save and explicit safe fixes on save. Existing character JSON schema associations are retained, and the editor inherits type-aware linting from the root config.
+### Local browser checks
 
 Browser smoke tests are local-only by project policy. Keep them out of CI and do not propose adding them to CI in improvement reviews unless the user explicitly changes this preference. Run the suite locally against the real rig editor, Phaser canvas, and shipped character assets:
 
@@ -33,53 +28,19 @@ npm run test:browser
 
 The command builds the demo, then runs every scenario against both the Vite development server and the production preview under `/paper-puppeteer-engine/`. Tests cover animation playback, global Home navigation, shortcut typing/modifier/IME guards, repeated animation switching, scrub interruption, demo playback, facing, skins, IK controls, navigation between demo and editor, dragging outside the canvas, inspector focus and per-field undo, exported/original/imported rig reloads plus a page reload, animation replacement confirmations and source revert, and smooth/stepped canvas round trips with facing and fixed-target IK. They verify artwork changes through canvas screenshots and catch browser exceptions and failed local asset requests. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
 
-Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, active/inactive IK, and the full demo presentation loop with walk, steady sword grip, out-of-reach targets, head crossings, and upper-body grip in both facings. Demo cases use shipped PNG dimensions and real affine transforms, animation, IK, and render projection. They report mean/maximum `syncPose()` and `syncIK()` calls and the percentage of frames requiring katana corrections. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements. Add `VITE_PROFILE_UNCACHED=1` to recreate unconditional render-order application, or `VITE_PROFILE_FULL_IK_SYNC=1` to compare corrections using the previous full-puppet synchronization path.
+See the [profiling guide](profiling.md) for optional CPU and browser profiles, workload descriptions, and historical measurements. Profiles are local diagnostics and have no timing thresholds.
 
-The rig editor caches unchanged overlay geometry and labels, redrawing after edits, selection/visibility changes, camera changes, or preview invalidation. Run `VITE_PROFILE=1 npx vitest run tests/rigEditorOverlay.test.ts --reporter=verbose` to compare cached idle frames with forced redraws. This profile uses 33 joints and a minimal scene, excluding browser/GPU costs, and reports timings without performance thresholds.
+## Tooling
 
-One local run of the earlier full-sync correction path on Node 24.19.0 measured the following. Sync counts include warmup:
+Use `npm run format` / `npm run format:check` for formatting, and `npm run lint` / `npm run lint:fix` for linting. Oxfmt's root `.oxfmtrc.json` keeps two-space indentation, single quotes in JavaScript/TypeScript, double quotes in CSS, semicolons, trailing commas, 120-column lines, and sorted imports. Side-effect imports retain their order; embedded code snippets and package fields are not reorganized. Oxfmt covers TypeScript, JavaScript, JSON/JSONC, CSS, HTML, Markdown, and YAML. Dependency/build/coverage/browser-test outputs, caches, temporary directories, and the npm lockfile are excluded. `plans/` holds historical and in-progress design notes and is excluded from formatting to avoid rewriting those records.
 
-| Katana workload           | Left: µs/frame | Right: µs/frame | Left: mean/max syncs | Right: mean/max syncs |
-| ------------------------- | -------------: | --------------: | -------------------: | --------------------: |
-| Steady reachable grip     |          93.04 |           64.51 |             1.00 / 1 |              1.00 / 1 |
-| Out-of-reach target sweep |         230.99 |          120.66 |            5.73 / 25 |              2.92 / 8 |
-| Head crossing sweep       |          79.76 |           77.25 |             1.02 / 2 |              1.39 / 3 |
-| Upper-body grip           |          82.71 |           74.18 |             1.00 / 1 |              1.00 / 1 |
+Oxlint's root `.oxlintrc.json` uses JSON so it works across the project's supported Node versions. `options.typeAware: true` activates the installed `oxlint-tsgolint` backend with TypeScript 7; experimental compiler diagnostics (`typeCheck`) are deliberately omitted. Correctness rules are errors, with explicit checks for floating/misused promises, awaiting non-promises, array `for-in` loops, unnecessary assertions, unsafe arguments/assignments/calls/member access/returns, type-only imports, duplicate/self imports, and unsafe promise patterns. Non-null assertions remain allowed. React hooks and JSX accessibility checks apply to the `.tsx` view components. React owns the workspace UI; Phaser owns canvas rendering and the animation loop.
 
-The correction loops can dominate out-of-reach frames. The demo now performs one full `syncPose()` per frame, then uses `syncIK()` for target corrections, restoring and projecting only affected IK joints. It defers debug overlays until the final corrected pose and caches render order to skip depth updates/sorting when the order is already applied. The three correction loops remain bounded at 24, 6, and 12 passes, while full synchronizations remain at one. The current profile selects the default skin so body silhouette checks run against the visible cutouts. The profile reports both kinds of passes and debug refreshes. Each profiling case has a 30-second timeout to accommodate slower machines.
+Unsafe-value and unbound-method rules are errors throughout application code, tests, and scripts; the migration's transitional warning overrides have been removed. Mock callbacks use explicit signatures, dynamic values are narrowed or validated before use, and deliberately invalid fixtures remain `unknown`. Package scripts validate manifest fields with Zod, and browser fixtures validate shipped data before applying their intentional mutations. Narrow, explained inline exceptions preserve Phaser's explicit listener contexts, deliberately borrowed test methods, listener snapshots, aggregate-error contents, arbitrary validation diagnostics, and intentionally invalid test inputs. Unused exceptions are errors. `eslint/preserve-caught-error` and React hook dependency checks remain warning-level rules, with no current findings. Suspicious rules are selected individually rather than enabling noisy assertion/style restrictions across the engine.
 
-Grip correction also reuses transformed head, torso, pelvis, and leg corners within each solve. These passes change arm targets while the body pose and leg targets stay fixed; the next frame rebuilds the cache to reflect animation, placement, facing, and skin changes. Corrections stop when floating-point rounding can no longer move the target, while useful corrections retain the existing iteration limits. Both arms' reach limits are recovered, and body clearance is checked again after smoothing so those adjustments cannot move the rear grip through a cutout.
+Install the recommended `oxc.oxc-vscode` extension for format-on-save and explicit safe fixes on save. Existing character JSON schema associations are retained, and the editor inherits type-aware linting from the root config.
 
-A local comparison against `89c64e6` on Node 24.19.0, x86_64, used the same scene fixture and seven batches of 2,000 frames after 1,000 warmup frames. Median CPU times in microseconds per frame:
-
-| Scenario                                            | Before |  After |
-| --------------------------------------------------- | -----: | -----: |
-| 32 tracked bones, base animation                    |  56.61 |  40.65 |
-| 32 tracked bones, three layers with fades           | 170.53 | 114.17 |
-| 36 bones, one active and 12 inactive IK constraints |  41.19 |  10.37 |
-
-Animation evaluation reuses working poses, clip buffers, and controlled-property sets. IK reuses rotation snapshots and synchronizes each changed bone into its descendant render branches before later target providers run. Inactive constraints still update their status without adding projection passes.
-
-Profile renderer scaling separately from animation and IK:
-
-```bash
-VITE_PROFILE=1 npx vitest run tests/puppetRenderer.profile.test.ts --reporter=verbose
-```
-
-The profile compares 32- and 128-bone chains with a leaf slot, chains with artwork on every bone, and shallow rigs with a leaf slot. It reports actual container/transform-copy allocations and warmed CPU synchronization medians, excluding browser/GPU costs. Timings are diagnostic and have no test thresholds.
-
-Bones without authored sprites allocate an independent render branch only when `attach()` needs a prop mount. Each sprite, slot, or prop branch uses two transform containers to represent its complete affine transform, including shear, reflection, and singular scales. The renderer composes skeleton matrices in parent order once per full synchronization. Partial IK synchronization recomposes only the changed bone's subtree, preserving unrelated unpublished edits and making descendant mounts current before later target providers run. Creating a lazy mount publishes current source transforms to the renderer before attaching the prop, so subsequent partial updates retain that same ancestor state. The mount uses the current draw order immediately.
-
-| Workload           | Bones | Previous transform copies | Current transform factors | Previous containers | Current containers |
-| ------------------ | ----: | ------------------------: | ------------------------: | ------------------: | -----------------: |
-| Chain, leaf slot   |    32 |                        32 |                         2 |                  68 |                 37 |
-| Chain, leaf slot   |   128 |                       128 |                         2 |                 260 |                133 |
-| Chain, all sprites |    32 |                       528 |                        64 |                 594 |                 98 |
-| Chain, all sprites |   128 |                     8,256 |                       256 |               8,514 |                386 |
-
-Container counts include the source skeleton and fixture root. Each additional prop mount allocates two transform containers once and reuses them thereafter. Dense artwork now requires linear storage and synchronization work. One local CPU profile measured the 128-bone dense chain at about 26 microseconds per synchronization, versus about 459 microseconds before this change; timings vary by machine. Sparse rigs still traverse their skeleton during full synchronization, so their CPU cost depends on bone count even with only one drawable.
-
-Direct dependencies use exact versions: Zod **4.6.5**, Oxfmt **0.72.0**, Oxlint **1.87.0**, oxlint-tsgolint **7.0.2003**, Phaser **4.2.1**, Vite **8.3.1**, TypeScript **7.0.2**, Vitest **5.0.2**, Playwright **1.63.0**, Node type definitions **24.19.1**, and React / React DOM / their type definitions **19.3.0**. React is a development dependency used by the bundled demo/editor applications; it does not become a dependency of the engine package. `package-lock.json` locks the resolved dependency graph. The Oxc tools use the latest npm releases at migration time; TypeScript **7.0.2** remains the latest stable compiler.
+Direct dependency versions are pinned in [package.json](../package.json), and `package-lock.json` locks the resolved dependency graph. React is a development dependency used by the bundled demo/editor applications; it does not become a dependency of the engine package.
 
 ## Architecture
 
@@ -162,7 +123,7 @@ src/devtools/animation-editor/
   TimelineController.ts   Session coordination, responsive ruler, tracks and playhead
   TimelineInputController.ts  Pointer capture, gestures, keyboard navigation and cancellation
   TimelineSessionController.ts  Selection, settings, history and status display
-  AnimationFileController.ts  Import/export, source reload/revert and asynchronous request lifetime
+  AnimationFileController.ts  Import/export, export reload/source revert and asynchronous request lifetime
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
 src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
@@ -187,23 +148,13 @@ Character identities and picker labels live in `src/shared/characterCatalog.ts`;
 
 Demo presentation is configured in `src/demo/demoCharacterProfiles.ts`. Each profile supplies clip names for the idle, walk, and sword actions, the upper-body clip and bone mask, combat pose name, appearance overrides, stage placement, IK names, layout/facing behavior, katana grip and clearance settings, and foot contact settings, and includes its shared preview chains. The default skin comes from the character definition. The demo scene, presenter, and pose authoring consume those profiles. Register another catalog entry and presentation profile alongside its character definition to add a demo character; sample layout and sketch limb swapping still expect their existing humanoid bone and limb attachment conventions.
 
-To profile dense animation playback and nonsequential scrubbing, run:
-
-```bash
-VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose -t dense
-```
-
-The profiles cover 32 tracked bones with two properties per track, 128 or 512 keys, base playback, three layers with fades, and backward/forward scrubbing. Property sampling uses binary search without a mutable cursor. A local comparison of warmed CPU medians (microseconds per frame, excluding browser/GPU costs) measured:
-
-| 512-key workload        | Linear scan | Binary search |
-| ----------------------- | ----------: | ------------: |
-| Base animation          |      156.72 |         47.22 |
-| Three layers with fades |      656.91 |        155.48 |
-| Nonsequential scrubbing |      135.47 |         33.35 |
-
-These are diagnostic measurements from one machine, not CI timing thresholds. The two-key control profiles remain available by omitting `-t dense`.
-
 Character definitions lazily cache compiler-owned immutable clips in `compiledAnimations`. Puppets created from the same definition share those clips while retaining independent clocks, event listeners, pose buffers, and disposal. Supplying `animations` explicitly (including an empty array) overrides the character clips and keeps ordinary runtime validation and snapshot ownership.
+
+Editor validation is cached per deeply frozen animation snapshot and rig. Mutable and shallow-frozen inputs are checked on every use. Key edits from a validated immutable source check metadata and changed tracks; shared tracks and events retain their validation only when the rig and duration are unchanged. Duration changes receive full validation. Deep immutability checks reuse verified frozen branches, and preview compilation and property-key indexes reuse unchanged immutable track arrays across snapshots. Each preview keeps independent pose buffers. The public `compileClip` entry point continues to validate all supplied clips.
+
+Keyframe commands and gestures are owned by `AnimationEditorKeyframeCommands`; `AnimationEditorState` retains the existing public API and coordinates navigation, playback, drafts, and snapshot installation. `AnimationEditorEventCommands` owns event edits, JSON payload commits, clipboard commands, and drag/nudge state, using the same document, selection, playback clock, clipboard, and snapping preferences. The session still coordinates cancellation between event and keyframe gestures. Single-property edits, moves, and selected deletion share one error-handling and installation boundary. Batch deletion resolves all references against the original animation, copies each changed track once, and validates one result for one history action. Selection indexes use exact canonical bone/property/time identities while preserving first-occurrence order, primary-key rules, and distinct authored times within the lookup tolerance.
+
+`TimelineInputController` owns pointer capture, scrubbing, dragging, and marquee geometry. It composes `TimelineKeyboardController`, which routes shortcuts and ruler navigation with typing, modifier, IME, repeat, and clipboard-scope guards. Keyboard cancellation uses the pointer owner's gesture lifecycle, and disposing the input controller releases both sets of listeners.
 
 ## Use as a local package
 
@@ -238,22 +189,3 @@ const player = new AnimationPlayer(character.rig, joints);
 For stateless pose tooling, import `compileClip` and `evaluateClip` from `/core`: `compileClip(clip, rig)` validates and prepares an authored clip, and `evaluateClip(compiled, timeMilliseconds)` returns its sparse interpolated pose. `CompiledClip`, `CompiledTrack`, and `PropertyKeyframe` are also exported types. This evaluator uses raw interpolation; use `AnimationPlayer.sample(time, { mode: 'playback' })` for playback-aware previews.
 
 Compiled clips own immutable metadata, property maps, keyframes, playback settings, and JSON event payloads, so they can be shared between compatible players. `AnimationPlayer` takes an independent snapshot of externally assembled compiled clips. Non-JSON runtime event payloads retain reference semantics; listener notifications receive independent metadata and copies of JSON payloads.
-
-Profile timeline DOM work locally with `PLAYWRIGHT_CHANNEL=chrome npm run profile:timeline` (or omit the channel to use installed Playwright Chromium). The script starts a temporary local Vite server, opens three fresh browser pages with 512 keys on each of the sample rig's 16 bones, and reports collapsed summary counts plus synchronous expansion/collapse costs including layout. It closes the browser and server afterward. This is a local diagnostic, excluded from CI; timings are observations without pass/fail thresholds.
-
-Collapsed summaries combine timestamps within each seven-pixel interval at the current zoom. Expanded property keys and event markers retain their separate identities and exact authored times. Zooming or resizing rebuilds the summaries from authored data. One local Chrome comparison measured:
-
-| Collapsed summaries | DOM elements | Median expand: ms | Median collapse: ms |
-| ------------------- | -----------: | ----------------: | ------------------: |
-| One per timestamp   |        8,192 |              58.0 |                17.5 |
-| Grouped by pixels   |        2,608 |              56.9 |                11.5 |
-
-The comparison used a 1440×900 viewport and a 1142-pixel timeline. Expansion still creates all individual property markers, so this change primarily reduces collapsed DOM size and collapse work. These measurements include browser layout and vary by machine and run.
-
-Profile dense editor authoring with `VITE_PROFILE=1 npx vitest run tests/animationAuthoring.profile.test.ts --reporter=verbose`. It measures one property-key edit plus inspector sampling on 33 bones with 512 keys per track, using five warmed batches of ten edits. A local comparison measured 242 ms/edit before validation reuse and 164 ms/edit afterward; these CPU measurements exclude DOM and GPU work and are diagnostic, not CI thresholds.
-
-Editor validation is cached per deeply frozen animation snapshot and rig. Mutable and shallow-frozen inputs are checked on every use. Key edits from a validated immutable source check metadata and changed tracks; shared tracks and events retain their validation only when the rig and duration are unchanged. Duration changes receive full validation. Deep immutability checks reuse verified frozen branches, and preview compilation reuses immutable property maps for unchanged track arrays. Each preview keeps independent pose buffers. The public `compileClip` entry point continues to validate all supplied clips.
-
-Keyframe commands and gestures are owned by `AnimationEditorKeyframeCommands`; `AnimationEditorState` retains the existing public API and coordinates navigation, playback, drafts, and snapshot installation. `AnimationEditorEventCommands` owns event edits, JSON payload commits, clipboard commands, and drag/nudge state, using the same document, selection, playback clock, clipboard, and snapping preferences. The session still coordinates cancellation between event and keyframe gestures. Single-property edits, moves, and selected deletion share one error-handling and installation boundary. Batch deletion resolves all references against the original animation, copies each changed track once, and validates one result for one history action. Selection indexes use exact canonical bone/property/time identities while preserving first-occurrence order, primary-key rules, and distinct authored times within the lookup tolerance.
-
-`TimelineInputController` owns pointer capture, scrubbing, dragging, and marquee geometry. It composes `TimelineKeyboardController`, which routes shortcuts and ruler navigation with typing, modifier, IME, repeat, and clipboard-scope guards. Keyboard cancellation uses the pointer owner's gesture lifecycle, and disposing the input controller releases both sets of listeners.

@@ -56,7 +56,8 @@ scene.load.start();
 | [Character assets and rigs](docs/characters.md)      | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
 | [Animation and poses](docs/animation.md)             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
 | [IK and object attachments](docs/ik.md)              | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |
-| [Development and package usage](docs/development.md) | Checks, browser tests, profiling, architecture, packaging, and Node APIs                                |
+| [Development and package usage](docs/development.md) | Checks, browser tests, architecture, packaging, and Node APIs                                           |
+| [Performance profiling](docs/profiling.md)           | Local CPU/browser profiles, workloads, and historical measurements                                      |
 
 ## Development checks
 
@@ -70,7 +71,7 @@ npm run test:package
 
 `npm run check` validates Oxfmt formatting, Oxlint's type-aware lint rules, and TypeScript 7 types. Use `npm run check:fix` to apply safe lint fixes and formatting. VS Code recommends the official Oxc extension for formatting and fixes on save.
 
-Browser smoke tests are local-only and excluded from CI. For local browser checks, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. The [development guide](docs/development.md#checks-and-profiling) describes the test suites and profiling commands.
+Browser smoke tests are local-only and excluded from CI. For local browser checks, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. The [development guide](docs/development.md#checks-and-profiling) describes the test suites; the [profiling guide](docs/profiling.md) covers optional performance measurements.
 
 ## Current limitations
 
