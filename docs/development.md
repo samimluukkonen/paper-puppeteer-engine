@@ -159,7 +159,8 @@ src/devtools/animation-editor/
   AnimationEditorGhostLayer.ts  Render-only neighboring poses sharing engine artwork and affine projection
   TimelineController.ts   Session coordination, responsive ruler, tracks and playhead
   TimelineInputController.ts  Pointer capture, gestures, keyboard navigation and cancellation
-  TimelineSessionController.ts  Selection, settings, history, exports and status display
+  TimelineSessionController.ts  Selection, settings, history and status display
+  AnimationFileController.ts  Import/export, source reload/revert and asynchronous request lifetime
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
 src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping

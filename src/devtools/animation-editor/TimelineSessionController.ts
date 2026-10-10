@@ -1,11 +1,9 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
-import { downloadJson } from '../../shared/downloadJson.js';
-import { SessionActionGuard } from '../shared/SessionActionGuard.js';
-import type { AnimationImportOptions } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { AnimationFileController } from './AnimationFileController.js';
 import type { TimelineInputController } from './TimelineInputController.js';
 
-/** Settings, animation selection, history, export actions, and session status. */
+/** Settings, animation selection, history and session status; file controls have their own lifetime. */
 export class TimelineSessionController {
   private readonly abort = new AbortController();
   private readonly selection: HTMLSelectElement;
@@ -21,18 +19,8 @@ export class TimelineSessionController {
   private readonly fps: HTMLInputElement;
   private readonly undo: HTMLButtonElement;
   private readonly redo: HTMLButtonElement;
-  private readonly download: HTMLButtonElement;
-  private readonly copyJson: HTMLButtonElement;
-  private readonly logJson: HTMLButtonElement;
   private readonly discard: HTMLButtonElement;
-  private readonly revert: HTMLButtonElement;
   private readonly sessionStatus: HTMLElement;
-  private readonly exportFeedback: HTMLElement;
-  private readonly importPanel: HTMLElement;
-  private readonly importText: HTMLTextAreaElement;
-  private readonly importFile: HTMLInputElement;
-  private readonly importFeedback: HTMLElement;
-  private readonly reloadExport: HTMLButtonElement;
   private readonly deleteKey: HTMLButtonElement;
   private readonly copyKeys: HTMLButtonElement;
   private readonly pasteKeys: HTMLButtonElement;
@@ -43,7 +31,7 @@ export class TimelineSessionController {
   private externalError = '';
   private authoredFPS = '';
   private animation: AnimationEditorState['workingAnimation'] = null;
-  private readonly requests = new SessionActionGuard(this.abort.signal);
+  private readonly files: AnimationFileController;
   private animationIdsKey = '';
 
   constructor(
@@ -64,18 +52,8 @@ export class TimelineSessionController {
     this.fps = this.element<HTMLInputElement>('#animation-fps');
     this.undo = this.element<HTMLButtonElement>('#animation-undo');
     this.redo = this.element<HTMLButtonElement>('#animation-redo');
-    this.download = this.element<HTMLButtonElement>('#animation-download');
-    this.copyJson = this.element<HTMLButtonElement>('#animation-copy-json');
-    this.logJson = this.element<HTMLButtonElement>('#animation-log-json');
     this.discard = this.element<HTMLButtonElement>('#animation-discard');
-    this.revert = this.element<HTMLButtonElement>('#animation-revert');
     this.sessionStatus = this.element('#animation-session-status');
-    this.exportFeedback = this.element('#animation-export-feedback');
-    this.importPanel = this.element('#animation-import-panel');
-    this.importText = this.element<HTMLTextAreaElement>('#animation-import-text');
-    this.importFile = this.element<HTMLInputElement>('#animation-import-file');
-    this.importFeedback = this.element('#animation-import-feedback');
-    this.reloadExport = this.element<HTMLButtonElement>('#animation-reload-export');
     this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
     this.copyKeys = this.element<HTMLButtonElement>('#timeline-copy-keys');
     this.pasteKeys = this.element<HTMLButtonElement>('#timeline-paste-keys');
@@ -83,55 +61,17 @@ export class TimelineSessionController {
     this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
     this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
     this.snap = this.element<HTMLSelectElement>('#timeline-snap');
+    this.files = new AnimationFileController(app, getState, () => {
+      this.externalError = '';
+      this.render();
+    });
     const options = { signal: this.abort.signal };
     // Invalid inspector drafts can add errors on blur and move these buttons between down/up.
     // Hold focus until the replacement clears those drafts so the native click stays on its target.
-    for (const button of [this.reloadExport, this.revert, this.discard])
-      button.addEventListener(
-        'pointerdown',
-        (event) => {
-          if (event.button === 0) event.preventDefault();
-        },
-        options,
-      );
-    this.element('#animation-import-paste').addEventListener(
-      'click',
-      () => {
-        this.importPanel.hidden = false;
-        this.importText.focus();
-      },
-      options,
-    );
-    this.element('#animation-import-cancel').addEventListener(
-      'click',
-      () => {
-        this.requests.cancelImports();
-        this.importPanel.hidden = true;
-        this.importText.value = '';
-        this.setImportFeedback('');
-      },
-      options,
-    );
-    this.element('#animation-import-submit').addEventListener(
-      'click',
-      () => {
-        this.requests.cancelImports();
-        this.replaceSession((options) => this.state.importJson(this.importText.value, options));
-      },
-      options,
-    );
-    this.importFile.addEventListener(
-      'change',
-      () => {
-        void this.importLocalFile();
-      },
-      options,
-    );
-    this.reloadExport.addEventListener(
-      'click',
-      () => {
-        this.requests.cancelImports();
-        this.replaceSession((options) => this.state.reloadCurrentExport(options));
+    this.discard.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (event.button === 0) event.preventDefault();
       },
       options,
     );
@@ -148,8 +88,7 @@ export class TimelineSessionController {
         const discardChanges =
           this.state.dirty && window.confirm('Discard unsaved animation changes and select another animation?');
         if (this.state.selectAnimation(this.selection.value || null, { discardChanges })) {
-          this.requests.invalidate();
-          this.setExportFeedback('');
+          this.files.invalidateSession();
         }
         this.render();
       },
@@ -178,50 +117,13 @@ export class TimelineSessionController {
     );
     this.undo.addEventListener('click', () => this.state.undo(), options);
     this.redo.addEventListener('click', () => this.state.redo(), options);
-    this.download.addEventListener(
-      'click',
-      () => {
-        void this.exportTo('download');
-      },
-      options,
-    );
-    this.copyJson.addEventListener(
-      'click',
-      () => {
-        void this.exportTo('clipboard');
-      },
-      options,
-    );
-    this.logJson.addEventListener(
-      'click',
-      () => {
-        void this.exportTo('console');
-      },
-      options,
-    );
     this.discard.addEventListener(
       'click',
       () => {
         if (!this.state.dirty || !window.confirm('Discard unsaved animation changes?')) return;
         this.input.endScrub();
         if (this.state.selectAnimation(this.state.selectedAnimationId, { discardChanges: true })) {
-          this.requests.invalidate();
-          this.setExportFeedback('Changes discarded. The last saved animation was restored.');
-        }
-      },
-      options,
-    );
-    this.revert.addEventListener(
-      'click',
-      () => {
-        if (this.state.dirty && !window.confirm('Discard unsaved animation changes and revert to the session source?'))
-          return;
-        if (this.state.revertAnimation({ discardChanges: true })) {
-          this.requests.invalidate();
-          this.externalError = '';
-          this.setImportFeedback('');
-          this.setExportFeedback('Animation reverted to its loaded/imported source. Clean session; history reset.');
-          this.render();
+          this.files.invalidateSession('Changes discarded. The last saved animation was restored.');
         }
       },
       options,
@@ -234,117 +136,8 @@ export class TimelineSessionController {
     this.nextKey.addEventListener('click', () => this.state.selectAdjacentKeyframe(1), options);
   }
 
-  private setImportFeedback(message: string): void {
-    setText(this.importFeedback, message);
-    setText(this.element('#animation-file-import-feedback'), message);
-  }
-
-  private setExportFeedback(message: string): void {
-    setText(this.exportFeedback, message);
-    setText(this.element('#animation-file-export-feedback'), message);
-  }
-
   private get state(): AnimationEditorState {
     return this.getState();
-  }
-
-  private replaceSession(run: (options: AnimationImportOptions) => boolean): void {
-    let cancelled = false;
-    const imported = run({
-      confirmDiscard: () => {
-        cancelled = !window.confirm('Discard unsaved animation changes and replace the current animation session?');
-        return !cancelled;
-      },
-    });
-    if (cancelled) this.setImportFeedback('Replacement cancelled. Current animation retained.');
-    else this.finishImport(imported);
-  }
-
-  private finishImport(imported: boolean): void {
-    if (!imported) {
-      this.setImportFeedback(
-        this.state.validationIssues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n'),
-      );
-      return;
-    }
-    this.requests.invalidate();
-    this.importPanel.hidden = true;
-    this.importText.value = '';
-    this.externalError = '';
-    this.setExportFeedback('');
-    this.setImportFeedback(`Imported "${this.state.selectedAnimationId}". Clean session; playback paused at zero.`);
-    this.render();
-  }
-
-  private async importLocalFile(): Promise<void> {
-    const file = this.importFile.files?.[0];
-    this.importFile.value = '';
-    if (!file) return;
-    const state = this.state;
-    const animation = state.workingAnimation;
-    const revision = state.sessionRevision;
-    const request = this.requests.beginImport(() => this.state === state && state.sessionRevision === revision);
-    try {
-      const json = await file.text();
-      if (!request.isCurrent()) return;
-      if (state.workingAnimation !== animation) {
-        this.setImportFeedback('Animation changed while reading the file. Choose the file again to import.');
-        return;
-      }
-      this.replaceSession((options) => state.importJson(json, options));
-    } catch (error) {
-      if (request.isCurrent())
-        this.setImportFeedback(
-          `Could not read animation file: ${error instanceof Error ? error.message : String(error)}`,
-        );
-    }
-  }
-
-  private async exportTo(destination: 'download' | 'clipboard' | 'console'): Promise<void> {
-    const state = this.state;
-    const id = state.selectedAnimationId;
-    const source = state.sourceAnimation;
-    const revision = state.sessionRevision;
-    const request = this.requests.beginExport(
-      () =>
-        this.state === state &&
-        state.sessionRevision === revision &&
-        state.selectedAnimationId === id &&
-        state.sourceAnimation === source,
-    );
-    try {
-      const result = state.exportAnimation();
-      if (!result.success)
-        throw new Error(result.issues.map((issue) => `${issue.path ?? 'animation'}: ${issue.message}`).join('\n'));
-      const snapshot = state.workingAnimation;
-      const filename = state.selectedAnimationFilename ?? 'animation.json';
-      let message: string;
-      if (destination === 'clipboard') {
-        if (!navigator.clipboard?.writeText)
-          throw new Error('Clipboard API is unavailable. Use Download animation.json or Log Animation JSON.');
-        try {
-          await navigator.clipboard.writeText(result.json);
-        } catch (error) {
-          throw new Error('Clipboard access failed. Use Download animation.json or Log Animation JSON.', {
-            cause: error,
-          });
-        }
-        message = 'Animation JSON copied.';
-      } else if (destination === 'download') {
-        downloadJson(result.json, filename);
-        message = `Animation JSON download started: ${filename}`;
-      } else {
-        console.log(result.json);
-        message = 'Animation JSON logged to the console.';
-      }
-      if (!request.commit()) return;
-      // Clipboard writes can finish after further edits: save only the exported snapshot.
-      state.markSaved(snapshot);
-      if (request.isLatest()) this.setExportFeedback(message);
-    } catch (error) {
-      if (request.isLatest())
-        this.setExportFeedback(`Could not export animation: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 
   private element<T extends HTMLElement = HTMLElement>(selector: string): T {
@@ -354,13 +147,9 @@ export class TimelineSessionController {
   }
 
   bind(characterId?: string): void {
-    this.requests.invalidate();
+    this.files.reset();
     const state = this.state;
     this.externalError = '';
-    this.setExportFeedback('');
-    this.setImportFeedback('');
-    this.importPanel.hidden = true;
-    this.importText.value = '';
     this.updateAnimationOptions(state);
     this.element('#character-status').textContent = characterId ? `Character: ${characterId}` : 'No character loaded.';
   }
@@ -413,13 +202,7 @@ export class TimelineSessionController {
     if (this.fps.disabled !== fpsDisabled) this.fps.disabled = fpsDisabled;
     if (this.undo.disabled !== !state.canUndo) this.undo.disabled = !state.canUndo;
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
-    if (this.download.disabled !== !animation) this.download.disabled = !animation;
-    if (this.copyJson.disabled !== !animation) this.copyJson.disabled = !animation;
-    if (this.logJson.disabled !== !animation) this.logJson.disabled = !animation;
-    this.reloadExport.disabled = !animation;
-    this.revert.disabled = !animation;
-    this.importFile.disabled = !state.rig;
-    this.element<HTMLButtonElement>('#animation-import-paste').disabled = !state.rig;
+    this.files.render();
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = state.selectedKeys.length === 0;
     const previousDisabled = !state.getAdjacentKeyframe(-1);
@@ -462,6 +245,7 @@ export class TimelineSessionController {
   }
 
   dispose(): void {
+    this.files.dispose();
     this.abort.abort();
   }
 }
