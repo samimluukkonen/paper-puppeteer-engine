@@ -236,8 +236,10 @@ test('status and history reuse validation and serialization until the rig change
     assert.equal(validation.mock.calls.length, 2);
     assert.equal(stringify.mock.calls.length, 0);
     const exported = state.workingSnapshot;
-    assert.equal(state.workingSnapshot, exported);
-    assert.equal(stringify.mock.calls.length, 1);
+    assert.strictEqual(state.workingSnapshot, exported);
+    assert.strictEqual(exported, state.workingCopy);
+    assert.isTrue(Object.isFrozen(exported));
+    assert.equal(stringify.mock.calls.length, 0);
 
     state.undo();
     assert.isFalse(state.dirty);
@@ -246,7 +248,7 @@ test('status and history reuse validation and serialization until the rig change
     assert.isTrue(state.dirty);
     state.validationIssues();
     assert.equal(validation.mock.calls.length, 4);
-    assert.equal(stringify.mock.calls.length, 1);
+    assert.equal(stringify.mock.calls.length, 0);
   } finally {
     validation.mockRestore();
     stringify.mockRestore();

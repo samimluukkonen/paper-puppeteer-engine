@@ -194,8 +194,8 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.equal(state.keyframeSnapMode, 'frame');
     assert.deepEqual(state.workingAnimation, file());
     assert.deepEqual(state.sourceAnimation, file());
-    assert.notStrictEqual(state.sourceAnimation, state.workingAnimation);
-    assert.notStrictEqual(state.sourceAnimation!.tracks, state.workingAnimation!.tracks);
+    assert.strictEqual(state.sourceAnimation, state.workingAnimation);
+    assert.strictEqual(state.sourceAnimation!.tracks, state.workingAnimation!.tracks);
     assert.isTrue(isFullyFrozen(state.sourceAnimation!));
     assert.isTrue(isFullyFrozen(state.workingAnimation!));
     assert.isFalse(state.undo());

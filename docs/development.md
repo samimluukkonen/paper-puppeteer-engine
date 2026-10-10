@@ -164,6 +164,8 @@ Keyframe commands and gestures are owned by `AnimationEditorKeyframeCommands`; `
 
 Timeline playback notifications update time-dependent controls and the playhead. Authored rows, filters, inspectors, file controls, and document status refresh when their document, selection, gesture, or layout dependencies change. Animation IDs are immutable cached lists, so clock updates do not rebuild or serialize the selection options.
 
+Saved baselines retain immutable authored snapshots directly. Rig export serializes its validated file once; delayed clipboard completion retains the captured working snapshot without parsing JSON or marking later edits saved. Animation import and revert reuse validated frozen source snapshots, and subsequent edits replace changed branches while preserving the source.
+
 ## Use as a local package
 
 `new Rig(existingRig)` shares its validated immutable skeleton and indexes. Pass a second skin array to create a rig with independently validated, owned skins: `new Rig(existingRig, skins)`. The rig editor uses this to retain authored skins separately from preview skins, and its working copy stays independent of the shared source skeleton. New JSON imports still receive full rig validation.

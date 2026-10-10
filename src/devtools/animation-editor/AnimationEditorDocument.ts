@@ -157,7 +157,7 @@ export class AnimationEditorDocument {
     }
     if (this.dirty && options.confirmDiscard && !options.confirmDiscard()) return false;
     const source = result.data;
-    const working = freezeData(structuredClone(source));
+    const working = source;
     const path = this.animations.get(source.name)?.path;
     this.animations.set(source.name, {
       source,
@@ -178,7 +178,7 @@ export class AnimationEditorDocument {
   /** Restore the immutable loaded/imported source locally, even after an export checkpoint. */
   revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
     if (!this.source || (this.dirty && !options.discardChanges)) return false;
-    this.working = freezeData(structuredClone(this.source));
+    this.working = this.source;
     this.markSaved();
     this.cachedDirty = false;
     this.history = this.createHistory();

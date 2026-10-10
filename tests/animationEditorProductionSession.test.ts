@@ -82,7 +82,7 @@ test('full authoring workflow keeps checkpoints, history and loaded/imported sou
   assert.equal(state.historyLength, 4);
   assert.isTrue(state.revertAnimation({ discardChanges: true }));
   assert.strictEqual(state.sourceAnimation, source);
-  assert.notStrictEqual(state.workingAnimation, source);
+  assert.strictEqual(state.workingAnimation, source);
   assert.equal(state.exportJson(), original);
   assert.isFalse(state.dirty);
   assert.isFalse(state.canUndo);

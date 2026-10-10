@@ -6,7 +6,7 @@ The Animation Editor supports **Import / Paste Animation JSON**, **Parse / Impor
 
 ## Import pipeline
 
-Paste and file text both call `AnimationEditorState.importJson()` → `AnimationEditorDocument.importJson()` → `importAnimationJson()`. JSON is assigned to `unknown`, then the existing `inspectAnimationDefinition()` checks strict file schema, supported version, scalar/timeline constraints, JSON payloads and references against the loaded rig. Validated runtime data is wrapped in supported version metadata and deeply frozen. The document clones it into an independent working snapshot before installing the new session. No validators or evaluators were duplicated.
+Paste and file text both call `AnimationEditorState.importJson()` → `AnimationEditorDocument.importJson()` → `importAnimationJson()`. JSON is assigned to `unknown`, then the existing `inspectAnimationDefinition()` checks strict file schema, supported version, scalar/timeline constraints, JSON payloads and references against the loaded rig. Validated runtime data is wrapped in supported version metadata and deeply frozen. The document shares that immutable snapshot as the initial source and working data. Edits replace changed branches without modifying the source. No validators or evaluators were duplicated.
 
 ## Transactional failure behavior
 

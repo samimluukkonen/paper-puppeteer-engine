@@ -20,7 +20,7 @@ Use the [artist workflow](animation-editor.md#production-animation-workflow): lo
 | Successful copy/download/log | Unchanged                        | Exported snapshot becomes Clean checkpoint; later edits stay Modified | History retained                                                            |
 | Failed export                | Unchanged                        | Checkpoint unchanged                                                  | Session retained                                                            |
 | Discard changes              | Unchanged                        | Last saved checkpoint                                                 | History reset, paused at zero                                               |
-| Revert Animation             | Unchanged; no fetch              | Fresh source clone becomes Clean checkpoint                           | History, selection, drafts and gestures reset; paused at zero               |
+| Revert Animation             | Unchanged; no fetch              | Immutable source becomes Clean checkpoint                             | History, selection, drafts and gestures reset; paused at zero               |
 | Import/reload                | New immutable imported source    | Independent imported working snapshot; Clean                          | Fresh history, cleared selection/drafts/gestures, paused at zero; no events |
 
 Revert restores the loaded/imported source even after a successful export. It is available on clean sessions because the source and export checkpoint can differ. Import changes the source used by later reverts. Other saved animation checkpoints remain available within the loaded character session.

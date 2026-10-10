@@ -52,7 +52,7 @@ async function fixture() {
   const session = createSessionController({ querySelector } as unknown as HTMLElement, () => scene);
   const load = () => {
     const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root', x: 0 }] }));
-    const editor = { state, exportJson: (save: boolean) => state.exportJson(save) } as RigEditor;
+    const editor = { state, exportRig: (save: boolean) => state.exportRig(save) } as RigEditor;
     session.updateStatus(editor);
     return state;
   };
@@ -76,6 +76,28 @@ test('clipboard completion saves the captured snapshot and leaves later edits di
   assert.isFalse(state.dirty);
   state.redo();
   assert.isTrue(state.dirty);
+});
+
+test('rig export serializes once and delayed save retains the immutable capture without parsing', async () => {
+  const { state, copy, resolve, feedback } = await fixture();
+  state.editBone('root', 'x', 1);
+  const captured = state.workingSnapshot;
+  const stringify = vi.spyOn(JSON, 'stringify');
+  const parse = vi.spyOn(JSON, 'parse');
+  copy();
+  assert.equal(stringify.mock.calls.length, 1);
+  assert.equal(parse.mock.calls.length, 0);
+  state.editBone('root', 'x', 2);
+  assert.equal(captured.bones[0]!.x, 1);
+  assert.isTrue(Object.isFrozen(captured.bones[0]));
+  resolve();
+  await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
+  assert.equal(stringify.mock.calls.length, 1);
+  assert.equal(parse.mock.calls.length, 0);
+  assert.isTrue(state.dirty);
+  state.undo();
+  assert.strictEqual(state.workingSnapshot, captured);
+  assert.isFalse(state.dirty);
 });
 
 test('clipboard completion does not mark a replacement session saved', async () => {

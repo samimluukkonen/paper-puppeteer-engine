@@ -19,9 +19,9 @@ function editor() {
     state,
     refresh: vi.fn(),
     undo: vi.fn(),
-    exportJson: (save: boolean) => state.exportJson(save),
+    exportRig: (save: boolean) => state.exportRig(save),
     editBone: vi.fn<RigEditor['editBone']>((id, field, value) => state.editBone(id, field, value)),
-  } satisfies Pick<RigEditor, 'state' | 'refresh' | 'undo' | 'exportJson' | 'editBone'>;
+  } satisfies Pick<RigEditor, 'state' | 'refresh' | 'undo' | 'exportRig' | 'editBone'>;
   return { ...controls, runtime: controls as unknown as RigEditor };
 }
 

@@ -56,8 +56,6 @@ type WorkingRig = {
   skins?: SkinDefinition[];
 };
 
-const snapshot = (rig: RigDefinition): string => JSON.stringify(rig);
-
 /** Undefined removes an optional authored field rather than serializing a placeholder value. */
 function patchFields<Field extends string>(
   target: Partial<Record<Field, number>>,
@@ -99,7 +97,6 @@ export class RigEditorState {
   private readonly initialCopy: ReadonlyRigData<RigDefinition>;
   private saved: ReadonlyRigData<RigDefinition>;
   private cachedDirty: boolean | undefined;
-  private cachedSnapshot: string | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
   private validationDirty = true;
   private readonly history: SnapshotHistory<HistoryEntry>;
@@ -164,15 +161,13 @@ export class RigEditorState {
   }
 
   /** Reused by history, status, and asynchronous export completion. */
-  get workingSnapshot(): string {
-    this.cachedSnapshot ??= snapshot(this.workingCopy);
-    return this.cachedSnapshot;
+  get workingSnapshot(): ReadonlyRigData<RigDefinition> {
+    return this.workingCopy;
   }
 
   private invalidate(): void {
     this.cachedWorkingCopy = undefined;
     this.cachedHistoryEntry = undefined;
-    this.cachedSnapshot = undefined;
     this.cachedDirty = undefined;
     this.validationDirty = true;
   }
@@ -426,12 +421,9 @@ export class RigEditorState {
     return true;
   }
 
-  markSaved(savedSnapshot?: string): void {
+  markSaved(savedSnapshot: ReadonlyRigData<RigDefinition> = this.workingSnapshot): void {
     // A delayed export can save an older working copy after subsequent edits.
-    this.saved =
-      savedSnapshot === undefined || savedSnapshot === this.workingSnapshot
-        ? this.workingCopy
-        : freezeData(JSON.parse(savedSnapshot) as RigDefinition);
+    this.saved = savedSnapshot;
     this.cachedDirty = undefined;
   }
 

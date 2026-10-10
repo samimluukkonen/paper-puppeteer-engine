@@ -77,7 +77,8 @@ export function createSessionController(
   });
   const prepareExport = () => {
     if (!editor) throw new Error('No rig is loaded.');
-    const json = editor.exportJson(false);
+    const rig = editor.exportRig(false);
+    const json = `${JSON.stringify(rig, null, 2)}\n`;
     const warnings = editor.state.validationIssues().filter((issue) => issue.severity === 'warning');
     feedback.textContent = warnings.length
       ? `Ready with warnings: ${warnings.map((issue) => issue.message).join(' · ')}`
@@ -86,7 +87,7 @@ export function createSessionController(
     return {
       editor,
       json,
-      rig: JSON.parse(json) as RigJsonDefinition,
+      rig,
       filename: getScene().rigFilename,
       snapshot: editor.state.workingSnapshot,
       request: requests.beginExport(() => editor === exportingEditor),
