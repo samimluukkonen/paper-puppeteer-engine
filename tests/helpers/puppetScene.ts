@@ -86,7 +86,12 @@ class Container {
     this.crop = x === undefined ? undefined : { x, y, width, height };
     return this;
   }
-  sort(_property: string) {
+  sort(property: keyof Container) {
+    this.list.sort((left, right) => {
+      const a = left[property];
+      const b = right[property];
+      return typeof a === 'number' && typeof b === 'number' ? a - b : 0;
+    });
     return this;
   }
   clear() {

@@ -172,3 +172,44 @@ test('invalid slot props fail before allocating wrappers or changing an existing
   create.mockRestore();
   puppet.destroy();
 });
+
+test('slot artwork replacement preserves props on both sides of its depth', () => {
+  const scene = puppetScene();
+  const puppet = new Puppet(scene, {
+    rig: {
+      root: 'root',
+      bones: [{ id: 'root' }],
+      slots: [{ id: 'hand', bone: 'root' }],
+      attachments: [
+        { id: 'open', texture: 'open-hand' },
+        { id: 'closed', texture: 'closed-hand' },
+      ],
+      skins: [
+        { version: 1, name: 'default', slots: { hand: 'open' } },
+        { version: 1, name: 'alternate', slots: { hand: 'closed' } },
+      ],
+    },
+    skin: 'default',
+    autoUpdate: false,
+  });
+  const front = scene.add.container();
+  const behind = scene.add.container();
+  puppet.attachToSlot('hand', front, { depth: 1 });
+  puppet.attachToSlot('hand', behind, { depth: -1 });
+  const mount = front.parentContainer.parentContainer;
+  const assertOrder = () => {
+    assert.deepEqual(mount.list, [behind.parentContainer, puppet.getSlotImage('hand')!, front.parentContainer]);
+  };
+  assertOrder();
+  puppet.setAttachment('hand', 'closed');
+  assertOrder();
+  puppet.setSkin('default');
+  assertOrder();
+  puppet.applySkin('alternate');
+  assertOrder();
+  puppet.clearAttachment('hand');
+  assert.deepEqual(mount.list, [behind.parentContainer, front.parentContainer]);
+  puppet.setAttachment('hand', 'open');
+  assertOrder();
+  puppet.destroy();
+});

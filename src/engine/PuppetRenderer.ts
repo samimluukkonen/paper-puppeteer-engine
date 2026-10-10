@@ -248,7 +248,7 @@ export class PuppetRenderer {
       .setOrigin(definition.originX ?? 0.5, definition.originY ?? 0.5)
       .setRotation(definition.rotation ?? 0)
       .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
-    mount.add(image);
+    mount.add(image).sort('depth');
     this.slotImages.set(id, image);
   }
 
