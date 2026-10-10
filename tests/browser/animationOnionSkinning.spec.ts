@@ -1,6 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationControl, test } from './fixtures.js';
+import { animationControl, animationFileAction, test } from './fixtures.js';
 
 test('onion skins render through scrubbing, facing, playback and boundaries without blocking editing or dirtying', async ({
   page,
@@ -161,4 +162,49 @@ test('artist controls render multiple directions, spacing, opacity and tint whil
   await expect(page.getByLabel('Next color', { exact: true })).toBeInViewport();
   await page.locator('.animation-preview').screenshot({ path: test.info().outputPath('onion-controls-mobile.png') });
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
+
+test('six ghosts survive JSON round trips and IK preview; route changes keep onion controls exclusive to animation', async ({
+  page,
+}) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await page.locator('#animation-selection').selectOption('walk');
+  const downloadJson = async () => {
+    const waiting = page.waitForEvent('download');
+    await (await animationControl(page, '#animation-download')).click();
+    const path = await (await waiting).path();
+    if (!path) throw new Error('Missing animation download.');
+    return readFile(path, 'utf8');
+  };
+  const original = await downloadJson();
+  await page.locator('#animation-onion-skinning').check();
+  const panel = page.locator('.animation-onion-settings');
+  await panel.locator('summary').click();
+  await expect(panel).toContainText('Ghosts show authored poses before IK preview');
+  await page.locator('#animation-onion-previous-count').fill('3');
+  await page.locator('#animation-onion-next-count').fill('3');
+  await panel.locator('summary').click();
+  const ruler = page.getByRole('slider', { name: 'Animation time' });
+  await ruler.focus();
+  await ruler.press('ArrowRight');
+  const time = await ruler.getAttribute('aria-valuenow');
+  await page.locator('#animation-ik-preview').check();
+  await expect(ruler).toHaveAttribute('aria-valuenow', time!);
+  expect(await downloadJson()).toBe(original);
+  await animationFileAction(page, '#animation-import-paste', (control) => control.click());
+  await animationFileAction(page, '#animation-import-text', (control) => control.fill(original));
+  await animationFileAction(page, '#animation-import-submit', (control) => control.click());
+  await expect(ruler).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#animation-onion-skinning')).toBeChecked();
+  expect(await downloadJson()).toBe(original);
+  await page.locator('#animation-ik-preview').uncheck();
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  await expect(page.locator('#animation-onion-skinning')).toHaveCount(0);
+  await page.goto('animation-editor/?character=random-paperdoll-sketch');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await expect(page.locator('#animation-onion-skinning')).not.toBeChecked();
+  await page.locator('#animation-onion-skinning').check();
+  await page.locator('#animation-onion-skinning').uncheck();
 });

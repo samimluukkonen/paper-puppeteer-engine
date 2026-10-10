@@ -96,3 +96,7 @@ Summaries reuse unchanged immutable track arrays. Edits to another track or play
 ## Dense editor authoring
 
 Profile dense editor authoring with `VITE_PROFILE=1 npx vitest run tests/animationAuthoring.profile.test.ts --reporter=verbose`. It measures one property-key edit plus inspector sampling on 33 bones with 512 keys per track, using five warmed batches of ten edits. An earlier local comparison measured 242 ms/edit before validation reuse and 164 ms/edit afterward; these CPU measurements exclude DOM and GPU work and are diagnostic, not CI thresholds.
+
+## Onion-skin sampling and rendering
+
+Run `VITE_PROFILE=1 npx vitest run tests/animationOnionSkinningPerformance.test.ts --silent=false --reporter=verbose` for local CPU diagnostics with one or three ghosts per direction. The workload uses 32 tracked bones, 96 attachment slots, a 60-second animation, nonsequential scrubbing and normal playback in smooth/stepped modes. Normal tests assert bounded pooling and no new images, containers or texture checks after initial allocation; optional timings have no thresholds and exclude GPU/browser costs. See [production verification](animation-editor-onion-skinning-verification.md#performance-findings) for workload details and one local measurement.

@@ -226,7 +226,7 @@ Pure queries are `findBonePropertyKeyframe(animation, boneId, property, timeMs)`
 
 `getEvaluatedBonePropertyValue(animation, rig, boneId, property, timeMs)` uses the runtime pose buffer and playback quantization, compiling an event-free, nonlooping preview clip. `getEvaluatedBoneTransform(animation, rig, boneId, timeMs)` reads all five local properties together. Fully frozen animation snapshots cache compilation per rig and reuse pose evaluation within the same sampled frame; mutable or shallow-frozen caller data is validated and compiled afresh. Returned transforms are detached copies. Sampling never advances a clock or stores an evaluated pose as authored data. Smooth interpolation and shortest-path rotation come from the runtime; stepped clips hold at authored FPS boundaries and retain the exact endpoint. Before the first property key and after its last, the runtime holds the nearest value. A wholly unkeyed property falls back to the rig bind pose. Results represent the animation's local transform before optional presets, IK, and facing. Invalid evaluation targets throw.
 
-The v0.5.3.1 [ghost pose sampling foundation](ghost-pose-sampling.md) extends this sampler with `getEvaluatedAnimationPose(animation, rig, timeMs)` for complete detached local poses. `state.sampleGhostPose(timeSeconds)` samples any in-range authored time; `state.sampleGhostPoses(settings?)` returns previous/next frame samples from the current working copy without changing the playhead or preview. The [multi-ghost artist controls](onion-skin-controls.md) display these samples through the **Onion Skinning** checkbox above the preview. Open **Onion settings** to choose 0–3 poses per direction, 1–5 authored frames of spacing, independent opacity (0.05–0.6) and previous/next colors. Set a count to zero to hide that direction. Defaults remain one cool previous and one warm next pose at 22% opacity behind the current puppet. Spacing follows authored stepped FPS or the 10 FPS fallback; out-of-range neighbors are omitted. These transient scene preferences leave dirty/history/exports unchanged, and ghosts show authored poses before procedural IK and temporary inspector drafts.
+The [ghost pose sampling foundation](ghost-pose-sampling.md) extends this sampler with `getEvaluatedAnimationPose(animation, rig, timeMs)` for complete detached local poses. `state.sampleGhostPose(timeSeconds)` samples any in-range authored time; `state.sampleGhostPoses(settings?)` returns previous/next frame samples from the current working copy without changing the playhead or preview. The sampler retains at most eight evaluated times per immutable snapshot and rig, so neighboring stepped poses can reuse held frames. Every returned pose is detached. See [onion-skin production verification](animation-editor-onion-skinning-verification.md) for regression and lifecycle details.
 
 State methods use **seconds**, defaulting to `currentTime`:
 
@@ -250,6 +250,23 @@ For example, explicitly key the value visible at a paused playhead:
 const value = state.getEvaluatedBonePropertyValue('head', 'rotation');
 if (value !== undefined) state.setBonePropertyKeyframe('head', 'rotation', value);
 ```
+
+## Onion skinning while authoring
+
+Onion skinning overlays neighboring animation poses behind the current puppet so you can judge the spacing and direction of a movement. Enable **Onion Skinning** above the preview, then open **Onion settings**. Previous poses are cool blue by default; next poses are warm orange. Each direction can show 0–3 poses; zero hides that direction. Farther poses sit behind nearer ones. Ghosts use the current skin, sprite origins, attachment layout, preview scale and facing.
+
+**Frame spacing** selects 1–5 authored frames between poses. For stepped playback, spacing follows the clip's authored FPS: at 12 FPS, spacing 2 means about 0.167 seconds between neighbors. Smooth clips use the shared 10 FPS fallback, so spacing 2 means 0.2 seconds. Timeline snapping and preview playback speed do not change this spacing or snap the continuous playhead. Each neighbor is evaluated using the clip's normal smooth or stepped playback rules, including shortest-path rotations and bind-pose fallback for unkeyed properties.
+
+Each direction has its own **opacity** slider (0.05–0.6) and **color** input. Lower opacity helps distinguish the active artwork when several poses overlap. The default is one pose per direction, one frame apart, at 22% opacity. Neighbors outside the animation duration are omitted, even when preview looping is enabled. At time zero only next poses can appear; at the end only previous poses can appear. A clip shorter than the chosen spacing may have no visible neighbors. Empty clips show bind poses at valid neighboring times; an invalid or zero-duration clip shows no ghosts.
+
+Ghosts display committed authored transforms **before procedural IK preview and temporary inspector drafts**. With fixed-target IK enabled, the active arm or leg may therefore differ from its ghosts. Disable IK preview to judge authored motion directly. Ghosts have no handles or input and cannot be edited. Adjust the current pose and commit its keys; neighboring poses refresh after key edits, movement, paste, duplication, interpolation/playback changes, Undo/Redo, import and revert. Ghosts create no animation events, keys or history entries. Counts, spacing, colors and opacity stay in the editor scene and never enter animation JSON, rig JSON or character manifests.
+
+To refine an arm swing:
+
+1. Select the arm bone and scrub to the middle of the movement. Disable IK preview while checking authored rotations.
+2. Enable onion skinning with three previous and three next poses, spacing 1 and low opacity. Compare the hand positions for sudden gaps or reversals.
+3. Adjust the current arm rotation and use **Set Rotation key**. The neighboring poses update from the working animation immediately. Use spacing 2 or 3 to check the broader arc.
+4. Play the movement at a slower preview speed, then pause and refine another key. Undo/Redo updates the ghosts too. Export normally when satisfied; ghost settings and evaluated poses are never saved as animation data.
 
 ## Authoring verification
 

@@ -78,6 +78,8 @@ for (const mode of ['smooth', 'stepped']) {
   test(`${mode} rendered poses at keys, between keys and endpoints survive export/reload with facing and IK preview`, async ({
     page,
   }) => {
+    // Sixteen canvas captures plus import/reload can exceed 30 seconds with software rendering.
+    test.setTimeout(60000);
     await page.goto('animation-editor/');
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
     await animationFileAction(page, '#animation-import-paste', (control) => control.click());

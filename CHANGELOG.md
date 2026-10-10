@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.3-4
+
+The v0.5.3.4 [onion-skin production hardening](docs/animation-editor-onion-skinning-verification.md) completes the v0.5.3 onion-skin milestone. An eight-time runtime pose cache reuses held stepped neighbors, and hidden pool entries release obsolete pose references. Expanded regressions compare ghosts against runtime playback through authoring transactions, import/export, transforms, events and scene cleanup. Artist documentation explains FPS, boundaries, authored-pose IK limitations and an arm-swing workflow; the settings panel identifies ghosts as read-only authored poses.
+
 ## 0.5.3-3
 
 The v0.5.3.3 [multi-ghost artist controls](docs/onion-skin-controls.md) extend onion skinning to zero through three poses per direction, spaced by one through five authored frames. A compact native panel adds independent counts, opacity sliders and color inputs. Frozen scene preferences stay outside animation JSON, dirty tracking and history. A lazy six-instance render pool reuses artwork and poses, follows working edits and playback immediately, and preserves the authoritative active preview.

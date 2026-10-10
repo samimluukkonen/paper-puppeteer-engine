@@ -37,6 +37,11 @@ class GhostInstance {
     }
   }
 
+  hide(): void {
+    this.container.setVisible(false);
+    this.sample = undefined;
+  }
+
   syncAppearance(puppet: Puppet, settings: OnionSkinSettings): void {
     const source = puppet.container;
     const parentChanged = this.container.parentContainer !== source.parentContainer;
@@ -62,6 +67,7 @@ class GhostInstance {
   }
 
   destroy(): void {
+    this.sample = undefined;
     this.renderer.destroy();
     this.container.destroy();
     this.bones.clear();
@@ -102,7 +108,7 @@ export class AnimationEditorGhostLayer {
       this.animation = undefined;
     this.settings = next;
     if (!next.enabled) {
-      for (const ghost of this.instances.values()) ghost.container.setVisible(false);
+      for (const ghost of this.instances.values()) ghost.hide();
       this.samples = [];
       this.animation = undefined;
       this.time = undefined;
@@ -130,7 +136,10 @@ export class AnimationEditorGhostLayer {
       this.time = this.state.currentTime;
     }
     for (const ghost of this.instances.values()) ghost.container.setVisible(false);
-    if (!this.puppet.container.visible) return;
+    if (!this.puppet.container.visible) {
+      for (const ghost of this.instances.values()) ghost.hide();
+      return;
+    }
     for (const direction of ['previous', 'next'] as const) {
       let distance = 0;
       for (const sample of this.samples) {
@@ -147,6 +156,8 @@ export class AnimationEditorGhostLayer {
         ghost.container.setVisible(true);
       }
     }
+    // Retain render objects for reuse, but release obsolete pose references in unused slots.
+    for (const ghost of this.instances.values()) if (!ghost.container.visible) ghost.hide();
   }
 
   dispose(): void {

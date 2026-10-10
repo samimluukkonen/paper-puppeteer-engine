@@ -148,6 +148,7 @@ export function AnimationEditorView() {
                 <label htmlFor="animation-onion-next-color">Next color</label>
                 <input id="animation-onion-next-color" type="color" />
                 <p>Set a pose count to zero to hide that direction. Spacing uses authored frames.</p>
+                <p>Ghosts show authored poses before IK preview. They are read-only and never exported.</p>
               </section>
             </details>
             <label>

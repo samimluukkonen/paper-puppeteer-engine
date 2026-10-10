@@ -9,6 +9,7 @@ import {
 } from '../src/devtools/animation-editor/ghostPoseSampling.js';
 import { type AnimationClip, type AnimationPlaybackMode, compileClip } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer, type FiredAnimationEvent } from '../src/engine/AnimationPlayer.js';
+import { ClipPoseBuffer } from '../src/engine/AnimationPose.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -259,6 +260,63 @@ test('sampling returns detached deterministic snapshots and observes mutable inp
   assert.throws(() => getEvaluatedAnimationPose(input, rig, NaN), /finite/);
   assert.throws(() => getEvaluatedAnimationPose(input, rig, -1), /within/);
 });
+
+test('bounded sampling cache reuses six held stepped frames without sharing mutable output or stale edits', () => {
+  const state = new AnimationEditorState(rig, [clip({ mode: 'stepped', fps: 10 })]);
+  state.selectAnimation('ghost');
+  state.setCurrentTime(0.501);
+  const evaluate = vi.spyOn(ClipPoseBuffer.prototype, 'evaluate');
+  try {
+    const settings = { previousCount: 3, nextCount: 3 };
+    const first = state.sampleGhostPoses(settings);
+    assert.equal(evaluate.mock.calls.length, 6);
+    for (const time of [0.51, 0.52, 0.53, 0.501]) {
+      state.setCurrentTime(time);
+      const next = state.sampleGhostPoses(settings);
+      assert.deepEqual(
+        next.map((sample) => sample.pose),
+        first.map((sample) => sample.pose),
+      );
+    }
+    assert.equal(evaluate.mock.calls.length, 6, 'continuous scrubs within held frames reuse runtime evaluation');
+    first[0]!.pose.get('root')!.x = 999;
+    first[1]!.pose.clear();
+    assert.equal(state.sampleGhostPoses(settings)[0]!.pose.get('root')!.x, 40);
+    assert.equal(state.sampleGhostPoses(settings)[1]!.pose.size, rig.bones.length);
+
+    // Fill beyond the eight-time LRU, then request an evicted time.
+    for (let index = 0; index <= 10; ++index) state.sampleGhostPose(index / 10);
+    const count = evaluate.mock.calls.length;
+    state.sampleGhostPose(0);
+    assert.equal(evaluate.mock.calls.length, count + 1);
+    state.sampleGhostPose(0);
+    assert.equal(evaluate.mock.calls.length, count + 1);
+
+    assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 222, 0.4));
+    assert.equal(state.sampleGhostPose(0.4)!.get('root')!.x, 222);
+    state.undo();
+    assert.equal(state.sampleGhostPose(0.4)!.get('root')!.x, 40);
+    state.redo();
+    assert.equal(state.sampleGhostPose(0.4)!.get('root')!.x, 222);
+    const otherRig = new Rig({ root: 'root', bones: [{ id: 'root', y: 987 }, ...rig.bones.slice(1)] });
+    assert.equal(sampleGhostPose(state.workingAnimation, otherRig, 0.4)!.get('root')!.y, 987);
+  } finally {
+    evaluate.mockRestore();
+  }
+});
+
+test.each([{}, { root: [{ time: 0, x: 77 }] }])(
+  'empty and single-key clips retain complete finite bind fallback',
+  (tracks) => {
+    const input = { ...clip(), tracks };
+    for (const sample of sampleGhostPoses(input, rig, 0.5, { previousCount: 3, nextCount: 3 })) {
+      assert.equal(sample.pose.size, rig.bones.length);
+      assert.deepEqual(sample.pose.get('hand'), createTransform(rig.getBone('hand')));
+      assert.equal(sample.pose.get('root')!.x, tracks.root ? 77 : 30);
+      for (const values of sample.pose.values()) assert.isTrue(Object.values(values).every(Number.isFinite));
+    }
+  },
+);
 
 test.each(['paused', 'playing', 'scrubbing'] as const)(
   'sampling working snapshots preserves %s state, events, drafts, dirty state, undo/redo and all preview/IK poses',

@@ -12,8 +12,9 @@ import { type Milliseconds } from './timeUnits.js';
 class AnimationValueSampler {
   private readonly clip: CompiledClip;
   private readonly buffer = new ClipPoseBuffer();
-  private sampledTime: number | undefined;
-  private pose: ReturnType<ClipPoseBuffer['evaluate']> | undefined;
+  // Six neighbors plus the inspector/current pose fit without reevaluating held stepped frames.
+  // Snapshot/rig ownership is weak; each sampler retains at most eight detached sparse poses.
+  private readonly poses = new Map<number, AnimationPose>();
 
   constructor(
     animation: AnimationData,
@@ -25,12 +26,17 @@ class AnimationValueSampler {
   private evaluate(timeMs: Milliseconds): AnimationPose {
     const time =
       timeMs === this.clip.duration ? timeMs : quantizePlaybackTime(timeMs, this.clip.playback ?? { mode: 'smooth' });
-    // Repeated property queries at the same playback frame share one pose evaluation.
-    if (time !== this.sampledTime) {
-      this.pose = this.buffer.evaluate(this.clip, time);
-      this.sampledTime = time;
+    const cached = this.poses.get(time);
+    if (cached) {
+      this.poses.delete(time);
+      this.poses.set(time, cached);
+      return cached;
     }
-    return this.pose!;
+    // The runtime buffer mutates on its next evaluation, so cache an owned sparse snapshot.
+    const pose = new Map([...this.buffer.evaluate(this.clip, time)].map(([id, values]) => [id, { ...values }]));
+    this.poses.set(time, pose);
+    if (this.poses.size > 8) this.poses.delete(this.poses.keys().next().value!);
+    return pose;
   }
 
   sample(boneId: string, timeMs: Milliseconds): JointTransform {

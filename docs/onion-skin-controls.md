@@ -1,5 +1,7 @@
 # Multi-ghost onion skinning — v0.5.3.3
 
+The [v0.5.3.4 production hardening](animation-editor-onion-skinning-verification.md) completes this milestone with bounded pose reuse, pooled-reference cleanup, expanded regressions and an [artist workflow](animation-editor.md#onion-skinning-while-authoring). The results and deferred items below describe the historical phase.
+
 Package SemVer: `0.5.3-3`. Enable **Onion Skinning** above the Animation Editor preview, then open **Onion settings**. Configure 0–3 previous poses, 0–3 next poses, spacing of 1–5 authored frames, independent opacity sliders (0.05–0.6), and native previous/next color inputs. Zero hides a direction; both counts can be zero. Defaults retain one pose each, one-frame spacing, 0.22 opacity, cool previous `#65a9ed` and warm next `#f0a15d`. Opacity is uniform within each direction; no distance falloff is applied.
 
 ## Settings and state ownership

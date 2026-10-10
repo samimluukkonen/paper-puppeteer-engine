@@ -168,3 +168,86 @@ test('scene owns options before loading and retains its IK chains after caller m
     scene.events.emit('shutdown');
   }
 });
+
+test('late character load after shutdown cannot create ghosts or deliver a stale ready callback', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  let finishLoad!: (definition: typeof demoCharacter) => void;
+  vi.mocked(loadSceneCharacter).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finishLoad = resolve;
+      }),
+  );
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  const create = vi.spyOn(fixture.add, 'container');
+  try {
+    Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+    scene.setOnionSkinSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    scene.create();
+    scene.events.emit('shutdown');
+    finishLoad(demoCharacter);
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(create.mock.calls.length, 0);
+    assert.equal(ready.mock.calls.length, 0);
+    assert.equal(error.mock.calls.length, 0);
+    assert.isUndefined(Reflect.get(scene, 'ghosts'));
+  } finally {
+    create.mockRestore();
+  }
+});
+
+test('ready failure destroys ghost artwork and subscriptions; a restarted scene gets a fresh pool', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn<() => void>(() => {
+    throw new Error('ready failed');
+  });
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  const input = new EventEmitter();
+  const createContainer = vi.spyOn(fixture.add, 'container');
+  const createImage = vi.spyOn(fixture.add, 'image');
+  const characterBefore = JSON.stringify(demoCharacter);
+  const rigBefore = JSON.stringify(demoCharacter.rig);
+  try {
+    Object.assign(scene, { add: fixture.add, textures: fixture.textures, input });
+    scene.setBonesVisible(false);
+    scene.setOnionSkinSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    scene.create();
+    await vi.waitFor(() => assert.equal(error.mock.calls.length, 1));
+    assert.include(error.mock.calls[0]![0] as string, 'ready failed');
+    assert.isUndefined(Reflect.get(scene, 'ghosts'));
+    assert.equal(input.listenerCount('pointerdown'), 0);
+    for (const result of [...createContainer.mock.results, ...createImage.mock.results])
+      if (result.type === 'return') assert.isTrue(result.value.isDestroyed);
+    scene.events.emit('shutdown');
+    createContainer.mockClear();
+    createImage.mockClear();
+    ready.mockImplementation(() => {});
+    scene.create();
+    await vi.waitFor(() => assert.equal(ready.mock.calls.length, 2));
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
+    state.setCurrentTime(0.5);
+    scene.events.emit('shutdown');
+    assert.isTrue(Reflect.get(ghosts, 'disposed'));
+    assert.equal(input.listenerCount('pointerdown'), 0);
+    for (const result of [...createContainer.mock.results, ...createImage.mock.results])
+      if (result.type === 'return') assert.isTrue(result.value.isDestroyed);
+    createContainer.mockClear();
+    state.setCurrentTime(0.2);
+    scene.update(0, 16);
+    assert.equal(createContainer.mock.calls.length, 0);
+    assert.equal(JSON.stringify(demoCharacter), characterBefore);
+    assert.equal(JSON.stringify(demoCharacter.rig), rigBefore);
+  } finally {
+    scene.events.emit('shutdown');
+    createContainer.mockRestore();
+    createImage.mockRestore();
+  }
+});

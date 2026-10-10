@@ -3,6 +3,8 @@ import { afterEach, assert, test, vi } from 'vitest';
 import { AnimationEditorGhostLayer } from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { getCompiledPreviewClip } from '../src/devtools/animation-editor/previewClip.js';
+import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import type { Bone } from '../src/engine/Bone.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import type { PuppetRenderer } from '../src/engine/PuppetRenderer.js';
@@ -90,9 +92,14 @@ function matrixClose(actual: Phaser.GameObjects.Image, expected: Phaser.GameObje
 
 function reference(scene: Phaser.Scene, rig: Rig, state: AnimationEditorState, time: number) {
   const puppet = new Puppet(scene, { rig, skin: 'blue', x: 90, y: 120, scale: 1.5, autoUpdate: false });
-  const pose = state.sampleGhostPose(time)!;
-  for (const definition of rig.bones) Object.assign(puppet.getBone(definition.id).pose, pose.get(definition.id));
+  const player = new AnimationPlayer(rig, new Map(rig.bones.map((bone) => [bone.id, puppet.getBone(bone.id)])), [
+    getCompiledPreviewClip(state.workingAnimation!, rig),
+  ]);
+  player.play(state.workingAnimation!.name);
+  player.pause();
+  player.sample(time * 1000, { mode: 'playback' });
   puppet.syncPose();
+  player.dispose();
   return puppet;
 }
 
@@ -511,3 +518,218 @@ test('scene frames project each ghost once while paused edits still refresh imme
     f.dispose();
   }
 });
+
+test('every authoring transaction, import and revert immediately renders the current working copy and stays event-silent', () => {
+  const f = fixture();
+  const events = vi.fn();
+  const release = f.state.onAnimationEvent(events);
+  try {
+    f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    const source = JSON.stringify(f.state.sourceAnimation);
+    const verify = () => {
+      const samples = f.state.sampleGhostPoses({ previousCount: 3, nextCount: 3 });
+      for (const direction of ['previous', 'next'] as const) {
+        const group = samples.filter((sample) => sample.direction === direction);
+        for (let distance = 1; distance <= 3; ++distance) {
+          const ghost = f.ghosts.get(`${direction}-${distance}`);
+          assert.equal(ghost?.container.visible ?? false, distance <= group.length);
+          if (distance <= group.length) {
+            const expected = reference(f.scene, f.rig, f.state, group[distance - 1]!.time);
+            try {
+              matrixClose(ghost!.bones.get('arm')!.sprite!, expected.getBone('arm').sprite!);
+              matrixClose(ghost!.renderer.getSlotImage('glove')!, expected.getSlotImage('glove')!);
+              for (const [id, bone] of ghost!.bones) assert.deepEqual(bone.pose, expected.getBone(id).pose);
+            } finally {
+              expected.destroy();
+            }
+          }
+        }
+      }
+      assert.equal(events.mock.calls.length, 0);
+    };
+    for (const value of [120, 180]) {
+      assert.isTrue(f.state.setBonePropertyKeyframe('root', 'x', value, 0.4));
+      verify();
+    }
+    assert.isTrue(f.state.setBonePropertyKeyframe('arm', 'rotation', 0.7, 0.4));
+    verify();
+    f.state.selectKeyframes([
+      { boneId: 'root', property: 'x', time: 0.4 },
+      { boneId: 'arm', property: 'rotation', time: 0.4 },
+    ]);
+    assert.isTrue(f.state.beginKeyframeDrag(f.state.primaryKey!));
+    f.state.previewKeyframeDrag(0.5);
+    verify(); // During a drag the authored working copy remains authoritative.
+    assert.isTrue(f.state.commitKeyframeDrag());
+    verify();
+    assert.isTrue(f.state.copySelectedKeyframes());
+    f.state.setCurrentTime(0.7);
+    assert.isTrue(f.state.pasteKeyframes());
+    verify();
+    assert.isTrue(f.state.duplicateSelectedKeyframes());
+    verify();
+    assert.isTrue(f.state.deleteSelectedKeyframes());
+    verify();
+    assert.isTrue(f.state.removeBonePropertyKeyframe('root', 'x', 0.5));
+    verify();
+    assert.isTrue(f.state.setAuthoredInterpolation('linear'));
+    verify();
+    assert.isTrue(f.state.setAuthoredPlaybackMode('stepped'));
+    assert.isTrue(f.state.setAuthoredFPS(12));
+    verify();
+    for (let index = 0; index < 4; ++index) {
+      assert.isTrue(f.state.undo());
+      verify();
+    }
+    for (let index = 0; index < 4; ++index) {
+      assert.isTrue(f.state.redo());
+      verify();
+    }
+    assert.equal(JSON.stringify(f.state.sourceAnimation), source);
+    const exported = f.state.exportJson();
+    f.layer.setEnabled(false);
+    assert.equal(f.state.exportJson(), exported);
+    f.layer.setEnabled(true);
+    assert.isFalse(f.state.importJson('{invalid', { confirmDiscard: () => true }));
+    verify();
+    assert.isTrue(f.state.importJson(exported, { confirmDiscard: () => true }));
+    verify(); // Import resets the clock and keeps only next neighbors.
+    f.state.setCurrentTime(0.5);
+    verify();
+    assert.isTrue(f.state.setBonePropertyKeyframe('root', 'x', -333, 0.4));
+    verify();
+    assert.isTrue(f.state.revertAnimation({ discardChanges: true }));
+    verify();
+    assert.equal(f.state.exportJson(), exported);
+    f.state.selectAnimation(null);
+    verify();
+  } finally {
+    release();
+    f.dispose();
+  }
+});
+
+test('onion visibility preserves speed, restart, loops, snapping and active playback event crossings', () => {
+  const enabled = fixture();
+  const disabled = fixture();
+  const withGhosts = vi.fn();
+  const withoutGhosts = vi.fn();
+  const releases = [enabled.state.onAnimationEvent(withGhosts), disabled.state.onAnimationEvent(withoutGhosts)];
+  try {
+    enabled.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    const compare = () => {
+      assert.equal(enabled.state.currentTime, disabled.state.currentTime);
+      assert.equal(enabled.state.isPlaying, disabled.state.isPlaying);
+      assert.deepEqual(withGhosts.mock.calls, withoutGhosts.mock.calls);
+      for (const bone of enabled.rig.bones)
+        assert.deepEqual(enabled.puppet.getBone(bone.id).pose, disabled.puppet.getBone(bone.id).pose);
+      assert.equal(enabled.state.exportJson(), disabled.state.exportJson());
+    };
+    for (const f of [enabled, disabled]) {
+      f.state.setKeyframeSnapMode('frame');
+      f.state.setPlaybackSpeed(2);
+      f.state.setPreviewLoop(true);
+      f.state.restart();
+      f.state.play();
+    }
+    compare();
+    for (const delta of [0.2, 0.2, 0.3, 1.7, 0.016]) {
+      enabled.layer.updateFrame(() => enabled.state.advancePlayback(delta));
+      disabled.layer.updateFrame(() => disabled.state.advancePlayback(delta));
+      compare();
+      const held = enabled.state.currentTime;
+      enabled.layer.setEnabled(false);
+      enabled.layer.setEnabled(true);
+      assert.equal(enabled.state.currentTime, held);
+    }
+    assert.isTrue(withGhosts.mock.calls.length > 0);
+    for (const f of [enabled, disabled]) {
+      f.state.beginScrub();
+      f.state.setCurrentTime(0.537);
+      f.state.endScrub();
+      f.state.pause();
+      f.state.restart();
+    }
+    compare();
+  } finally {
+    for (const release of releases) release();
+    enabled.dispose();
+    disabled.dispose();
+  }
+});
+
+test('unused pool entries release sampled poses while retaining reusable render objects', () => {
+  const f = fixture();
+  try {
+    f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    const pool = [...f.ghosts.values()];
+    const assertReleased = (ghost: Ghost) => {
+      assert.isFalse(ghost.container.visible);
+      assert.isUndefined(Reflect.get(ghost, 'sample'));
+    };
+    f.layer.setSettings({ previousCount: 0 });
+    for (const [key, ghost] of f.ghosts) if (key.startsWith('previous')) assertReleased(ghost);
+    f.state.selectAnimation('empty');
+    for (const ghost of pool) assertReleased(ghost);
+    f.state.selectAnimation('move');
+    f.state.setCurrentTime(0.5);
+    f.puppet.container.setVisible(false);
+    f.layer.sync();
+    for (const ghost of pool) assertReleased(ghost);
+    f.puppet.container.setVisible(true);
+    f.layer.setSettings({ previousCount: 3 });
+    assert.isTrue(pool.every((ghost) => ghost.container.visible));
+    f.layer.setEnabled(false);
+    for (const ghost of pool) assertReleased(ghost);
+    assert.deepEqual(Reflect.get(f.layer, 'samples'), []);
+    f.layer.setEnabled(true);
+    assert.deepEqual([...f.ghosts.values()], pool);
+  } finally {
+    f.dispose();
+  }
+});
+
+test.each(['left', 'right'] as const)(
+  'all sprites and slot attachments align with runtime under %s facing and nested placement',
+  (facing) => {
+    const f = fixture();
+    const parent = f.scene.add.container(25, 35).setRotation(-0.2).setScale(0.7, 1.4);
+    try {
+      parent.add(f.puppet.container);
+      f.puppet.setFacing(facing);
+      f.puppet.container
+        .setPosition(-10, 52)
+        .setRotation(0.8)
+        .setScale(facing === 'left' ? -2 : 2, 0.7)
+        .setAlpha(0.4);
+      f.puppet.setSkin('red');
+      f.puppet.setSlotTransform('glove', { x: 17, y: -4, rotation: -0.4, scaleY: 1.7 });
+      f.puppet.setSlotDepth('glove', 45);
+      f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+      const distances = { previous: 0, next: 0 };
+      for (const sample of f.state.sampleGhostPoses({ previousCount: 3, nextCount: 3 })) {
+        const distance = ++distances[sample.direction];
+        const ghost = f.ghosts.get(`${sample.direction}-${distance}`)!;
+        const expected = reference(f.scene, f.rig, f.state, sample.time);
+        try {
+          parent.add(expected.container);
+          expected.container.setPosition(-10, 52).setRotation(0.8).setScale(f.puppet.container.scaleX, 0.7);
+          expected.setSkin('red');
+          expected.setSlotTransform('glove', { x: 17, y: -4, rotation: -0.4, scaleY: 1.7 });
+          expected.setSlotDepth('glove', 45);
+          matrixClose(ghost.bones.get('arm')!.sprite!, expected.getBone('arm').sprite!);
+          matrixClose(ghost.renderer.getSlotImage('glove')!, expected.getSlotImage('glove')!);
+          assert.approximately(ghost.container.alpha, 0.4 * 0.22, 1e-12);
+        } finally {
+          expected.destroy();
+        }
+      }
+      parent.remove(f.puppet.container);
+      f.layer.sync();
+      for (const ghost of f.ghosts.values()) assert.isNull(ghost.container.parentContainer);
+    } finally {
+      f.dispose();
+      parent.destroy();
+    }
+  },
+);

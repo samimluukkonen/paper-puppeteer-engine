@@ -1,5 +1,7 @@
 # Ghost pose sampling foundation — v0.5.3.1
 
+The [v0.5.3.4 production hardening](animation-editor-onion-skinning-verification.md) completes this milestone with bounded pose reuse, pooled-reference cleanup, expanded regressions and an [artist workflow](animation-editor.md#onion-skinning-while-authoring). The results and deferred items below describe the historical phase.
+
 The [v0.5.3.3 extension](onion-skin-controls.md) adds optional `previousCount` / `nextCount` (0–3, default one) and bounds `frameSpacing` to 1–5. Samples remain previous then next, nearest first within each direction; all pose evaluation and state isolation below still apply. The original single-neighbor API calls retain their behavior.
 
 Package SemVer: `0.5.3-1`. This phase implements data sampling for future onion skinning. React continues to own the existing workspace UI, Phaser owns rendering, and this phase adds no components, controls, overlays or dependencies.

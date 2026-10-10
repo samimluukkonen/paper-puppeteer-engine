@@ -532,7 +532,7 @@ test('frozen value queries share compilation and stepped-frame evaluation withou
     assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'root', 'x', 850), 80);
     assert.equal(evaluate.mock.calls.length, 2);
     assert.equal(getEvaluatedBonePropertyValue(animation, rig, 'root', 'x', 749), 70);
-    assert.equal(evaluate.mock.calls.length, 3);
+    assert.equal(evaluate.mock.calls.length, 2, 'returning to a cached stepped frame reuses its detached pose');
     assert.equal(compile.mock.calls.length, 1);
   } finally {
     compile.mockRestore();
