@@ -1,3 +1,4 @@
+import type { Keyframe } from '../../engine/AnimationClip.js';
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef } from './animationEvents.js';
@@ -18,7 +19,10 @@ interface TrackElements {
   readonly markers: Map<number, HTMLButtonElement>;
   readonly summaries: Map<number, HTMLElement>;
   track?: TimelineTrack;
+  summary?: { keys: readonly Keyframe[]; expanded: boolean; duration: number; width: number };
 }
+
+const emptyKeys: readonly Keyframe[] = Object.freeze([]);
 
 function trackKey(track: TimelineTrack): string {
   return timelineTrackKey(track.boneId, track.kind === 'property' ? track.property : null);
@@ -214,7 +218,16 @@ export class TimelineTracksController {
         const track = row.track;
         if (track?.kind !== 'bone') continue;
         const authored = state.workingAnimation?.tracks;
-        const keys = authored && Object.hasOwn(authored, track.boneId) ? authored[track.boneId]! : [];
+        const keys = authored && Object.hasOwn(authored, track.boneId) ? authored[track.boneId]! : emptyKeys;
+        const summary = row.summary;
+        if (
+          summary?.keys === keys &&
+          summary.expanded === track.expanded &&
+          summary.duration === state.duration &&
+          summary.width === width
+        )
+          continue;
+        row.summary = { keys, expanded: track.expanded, duration: state.duration, width };
         const times = track.expanded ? new Set<number>() : summarizeKeyframeTimes(keys, state.duration, width);
         for (const [time, marker] of row.summaries) {
           if (times.has(time)) continue;

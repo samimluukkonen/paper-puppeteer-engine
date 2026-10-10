@@ -1,4 +1,4 @@
-import type { PropertyKeyframe } from '../../engine/AnimationClip.js';
+import type { Keyframe, PropertyKeyframe } from '../../engine/AnimationClip.js';
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, keyframeTimesMatch, matchingRow } from './keyframeTargets.js';
@@ -14,7 +14,8 @@ interface IndexedKeyframe extends PropertyKeyframe {
   order: number;
 }
 
-const keyframeIndexes = new WeakMap<AnimationData, Map<string, Map<TransformProperty, IndexedKeyframe[]>>>();
+const keyframeIndexes = new WeakMap<readonly Keyframe[], Map<TransformProperty, IndexedKeyframe[]>>();
+const emptyKeys: readonly Keyframe[] = Object.freeze([]);
 
 function lowerBound(keys: readonly IndexedKeyframe[], time: number): number {
   let low = 0;
@@ -27,18 +28,13 @@ function lowerBound(keys: readonly IndexedKeyframe[], time: number): number {
   return low;
 }
 
-/** Immutable editor snapshots share sorted property indexes; caller-owned mutable data stays uncached. */
+/** Unchanged immutable tracks share indexes across snapshots; caller-owned mutable data stays uncached. */
 function propertyIndexes(animation: AnimationData, boneId: string): Map<TransformProperty, IndexedKeyframe[]> | false {
-  let tracks = keyframeIndexes.get(animation);
-  if (!tracks) {
-    if (!isFullyFrozen(animation)) return false;
-    tracks = new Map();
-    keyframeIndexes.set(animation, tracks);
-  }
-  let properties = tracks.get(boneId);
+  if (!isFullyFrozen(animation)) return false;
+  const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : emptyKeys;
+  let properties = keyframeIndexes.get(rows);
   if (!properties) {
     properties = new Map();
-    const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
     for (const [order, row] of rows.entries()) {
       for (const entry of transformProperties) {
         const value = row[entry];
@@ -52,7 +48,7 @@ function propertyIndexes(animation: AnimationData, boneId: string): Map<Transfor
       }
     }
     for (const keys of properties.values()) keys.sort((a, b) => a.time - b.time || a.order - b.order);
-    tracks.set(boneId, properties);
+    keyframeIndexes.set(rows, properties);
   }
   return properties;
 }

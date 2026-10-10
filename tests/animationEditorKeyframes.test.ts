@@ -540,6 +540,29 @@ test('frozen value queries share compilation and stepped-frame evaluation withou
   }
 });
 
+test('property indexes reuse shared immutable tracks across metadata and unrelated edits', () => {
+  const animation = freezeData(clip({ tracks: { root: [{ time: 0, x: 10, y: 20 }] } }));
+  const metadataEdit = freezeData({ ...animation, playback: { mode: 'stepped' as const, fps: 10 } });
+  const unrelatedEdit = freezeData({ ...metadataEdit, tracks: { ...animation.tracks, child: [{ time: 0, x: 30 }] } });
+  const changedTrack = freezeData({ ...animation, tracks: { root: [{ time: 0, x: 40 }] } });
+  const sort = vi.spyOn(Array.prototype, 'sort');
+  try {
+    assert.equal(findBonePropertyKeyframe(animation, 'root', 'x', 0)!.value, 10);
+    const builds = sort.mock.calls.length;
+    assert.isAbove(builds, 0);
+    assert.equal(findBonePropertyKeyframe(metadataEdit, 'root', 'y', 0)!.value, 20);
+    assert.equal(findBonePropertyKeyframe(unrelatedEdit, 'root', 'x', 0)!.value, 10);
+    assert.equal(sort.mock.calls.length, builds);
+    assert.equal(findBonePropertyKeyframe(changedTrack, 'root', 'x', 0)!.value, 40);
+    assert.isAbove(sort.mock.calls.length, builds);
+    sort.mockClear();
+    assert.equal(findBonePropertyKeyframe(animation, 'root', 'x', 0)!.value, 10);
+    assert.equal(sort.mock.calls.length, 0);
+  } finally {
+    sort.mockRestore();
+  }
+});
+
 test.each([false, true])('mutable nested data stays fresh with shallow-frozen root=%s', (shallowFreeze) => {
   const animation = clip({ tracks: { root: [{ time: 0, x: 10 }] } });
   if (shallowFreeze) Object.freeze(animation);

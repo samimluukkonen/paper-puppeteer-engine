@@ -92,3 +92,60 @@ test('dense collapsed summaries follow zoom while individual keys retain exact t
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(page.locator('#animation-undo')).toBeDisabled();
 });
+
+test('unrelated edits and playback metadata reuse collapsed summaries', async ({ page }) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    await route.fulfill({
+      json: {
+        version: 1,
+        name: 'idle',
+        duration: 2000,
+        loop: false,
+        tracks: { root: Array.from({ length: 128 }, (_, index) => ({ time: index * 10, x: index })) },
+      },
+    });
+  });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await expect(page.locator('#timeline-tracks [data-bone-id="root"] .timeline-summary').first()).toBeVisible();
+  await page.getByRole('button', { name: 'torso', exact: true }).click();
+  const reads = await page.evaluate(() => {
+    const styles = new Set(
+      Array.from(
+        document.querySelectorAll<HTMLElement>('#timeline-tracks [data-bone-id="root"] .timeline-summary'),
+        (marker) => marker.style,
+      ),
+    );
+    let reads = 0;
+    const originals = new Map([...styles].map((style) => [style, Object.getOwnPropertyDescriptor(style, 'left')]));
+    for (const style of styles)
+      Object.defineProperty(style, 'left', {
+        configurable: true,
+        get() {
+          reads++;
+          return style.getPropertyValue('left');
+        },
+        set(value: string) {
+          style.setProperty('left', value);
+        },
+      });
+    try {
+      document
+        .querySelector<HTMLInputElement>('#animation-bone-fields [data-property="x"]')!
+        .closest('.animation-property')!
+        .querySelector<HTMLButtonElement>('button')!
+        .click();
+      const mode = document.querySelector<HTMLSelectElement>('#animation-mode')!;
+      mode.value = 'stepped';
+      mode.dispatchEvent(new Event('change'));
+      document.querySelector<HTMLButtonElement>('#animation-undo')!.click();
+      return reads;
+    } finally {
+      for (const [style, descriptor] of originals) {
+        if (descriptor) Object.defineProperty(style, 'left', descriptor);
+        else Reflect.deleteProperty(style, 'left');
+      }
+    }
+  });
+  expect(reads).toBe(0);
+});
