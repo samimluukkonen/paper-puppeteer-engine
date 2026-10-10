@@ -71,6 +71,36 @@ export class DraftRecovery<Snapshot> {
     if (expected !== null && window.localStorage.getItem(key) === expected) window.localStorage.removeItem(key);
   }
 
+  private recoveryCandidates(session: DraftSession<Snapshot>) {
+    const candidates = this.draftKeys(session).flatMap((key) => {
+      const text = window.localStorage.getItem(key);
+      if (text === null) return [];
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = undefined;
+      }
+      const parsed = draftSchema.safeParse(data);
+      if (
+        !parsed.success ||
+        !sameDraftSource(parsed.data.source, session.source) ||
+        !session.validate(parsed.data.data)
+      ) {
+        this.removeDraft(key, text);
+        this.status('An older draft could not be restored and was discarded.');
+        return [];
+      }
+      const timestamp = Date.parse(parsed.data.savedAt ?? '');
+      return [{ key, text, draft: parsed.data, timestamp: Number.isFinite(timestamp) ? timestamp : -Infinity }];
+    });
+    // Storage enumeration has no chronological meaning. Stable ties retain the
+    // existing order for legacy drafts with missing or invalid timestamps.
+    return candidates.sort((left, right) =>
+      left.timestamp === right.timestamp ? 0 : right.timestamp - left.timestamp,
+    );
+  }
+
   /** Explicit imported baselines can skip restoration while retaining normal persistence afterward. */
   bind(session: DraftSession<Snapshot>, options: { recover?: boolean } = {}): void {
     this.flush();
@@ -82,30 +112,14 @@ export class DraftRecovery<Snapshot> {
     this.pendingFlush = false;
     this.status('');
     try {
-      const keys = options.recover === false ? [] : this.draftKeys(session);
-      for (const [index, key] of keys.entries()) {
-        const text = window.localStorage.getItem(key);
-        if (text === null) continue;
-        let data: unknown;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = undefined;
-        }
-        const parsed = draftSchema.safeParse(data);
+      const candidates = options.recover === false ? [] : this.recoveryCandidates(session);
+      for (const [index, { key, text, draft }] of candidates.entries()) {
         if (
-          !parsed.success ||
-          !sameDraftSource(parsed.data.source, session.source) ||
-          !session.validate(parsed.data.data)
-        ) {
-          this.removeDraft(key, text);
-          this.status('An older draft could not be restored and was discarded.');
-        } else if (
           window.confirm(
-            `Restore unsaved ${session.label} edits from this browser?${keys.length > 1 ? ` Draft ${index + 1} of ${keys.length}.` : ''}${parsed.data.savedAt ? ` Saved ${parsed.data.savedAt}.` : ''}`,
+            `Restore unsaved ${session.label} edits from this browser?${candidates.length > 1 ? ` Draft ${index + 1} of ${candidates.length}.` : ''}${draft.savedAt ? ` Saved ${draft.savedAt}.` : ''}`,
           )
         ) {
-          if (session.restore(parsed.data.data)) {
+          if (session.restore(draft.data)) {
             this.recovered = { key, text };
             this.status('Draft restored. Download JSON to save your work.');
             break;

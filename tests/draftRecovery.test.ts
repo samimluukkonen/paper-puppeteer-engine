@@ -28,7 +28,7 @@ function fixture(stored?: string) {
       values.delete(key);
     }),
   };
-  const confirm = vi.fn(() => true);
+  const confirm = vi.fn((_message: string) => true);
   const windowTarget = Object.assign(new EventTarget(), { localStorage: storage, confirm });
   const documentTarget = Object.assign(new EventTarget(), { visibilityState: 'visible' });
   vi.stubGlobal('window', windowTarget);
@@ -201,6 +201,72 @@ test('declining restoration deletes the stored draft and leaves the loaded docum
   assert.equal(vi.mocked(session.restore).mock.calls.length, 0);
   assert.isFalse(session.dirty());
   assert.equal(values.size, 0);
+});
+
+test('recovery offers the newest compatible draft first regardless of storage order', () => {
+  const { recovery, session, values, confirm } = fixture();
+  const olderKey = 'paper-puppeteer:draft:a:session:older';
+  const newerKey = 'paper-puppeteer:draft:a:session:newer';
+  const older = JSON.stringify({ version: 1, source: 'original', data: { value: 1 }, savedAt: '2026-10-10T10:00:00Z' });
+  values.set(olderKey, older);
+  values.set(
+    newerKey,
+    JSON.stringify({ version: 1, source: 'original', data: { value: 2 }, savedAt: '2026-10-11T10:00:00Z' }),
+  );
+  recovery.bind(session);
+  assert.equal(session.snapshot().value, 2);
+  assert.equal(confirm.mock.calls.length, 1);
+  assert.include(confirm.mock.calls[0]![0], 'Saved 2026-10-11T10:00:00Z');
+  recovery.flush();
+  assert.equal(values.get(olderKey), older);
+  assert.isFalse(values.has(newerKey));
+});
+
+test('declining the newest draft offers the next compatible draft and excludes invalid candidates', () => {
+  const { recovery, session, values, confirm } = fixture();
+  const add = (id: string, value: number, savedAt: string, source = 'original'): void => {
+    values.set(
+      `paper-puppeteer:draft:a:session:${id}`,
+      JSON.stringify({ version: 1, source, data: { value }, savedAt }),
+    );
+  };
+  add('old', 1, '2026-10-10T10:00:00Z');
+  add('new', 2, '2026-10-11T10:00:00Z');
+  add('stale', 3, '2026-10-12T10:00:00Z', 'different source');
+  confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
+  recovery.bind(session);
+  assert.equal(session.snapshot().value, 1);
+  assert.include(confirm.mock.calls[0]![0], 'Draft 1 of 2. Saved 2026-10-11');
+  assert.include(confirm.mock.calls[1]![0], 'Draft 2 of 2. Saved 2026-10-10');
+  assert.isFalse(values.has('paper-puppeteer:draft:a:session:new'));
+  assert.isFalse(values.has('paper-puppeteer:draft:a:session:stale'));
+});
+
+test('dated drafts precede legacy drafts and missing, invalid or equal dates retain stable order', () => {
+  const { recovery, session, values, confirm, storage } = fixture();
+  const dates = [undefined, 'invalid date', '2026-10-11T10:00:00Z', '2026-10-11T10:00:00Z'];
+  dates.forEach((savedAt, value) => {
+    values.set(
+      `paper-puppeteer:draft:a:session:${value}`,
+      JSON.stringify({ version: 1, source: 'original', data: { value }, savedAt }),
+    );
+  });
+  confirm.mockReturnValue(false);
+  recovery.bind(session);
+  assert.equal(confirm.mock.calls.length, 4);
+  assert.include(confirm.mock.calls[0]![0], 'Saved 2026-10-11');
+  assert.include(confirm.mock.calls[1]![0], 'Saved 2026-10-11');
+  assert.notInclude(confirm.mock.calls[2]![0], 'Saved');
+  assert.include(confirm.mock.calls[3]![0], 'Saved invalid date');
+  assert.deepEqual(
+    storage.removeItem.mock.calls.map(([key]) => key),
+    [
+      'paper-puppeteer:draft:a:session:2',
+      'paper-puppeteer:draft:a:session:3',
+      'paper-puppeteer:draft:a:session:0',
+      'paper-puppeteer:draft:a:session:1',
+    ],
+  );
 });
 
 test('legacy fingerprints restore equivalent reordered sources but still reject authored changes', () => {
