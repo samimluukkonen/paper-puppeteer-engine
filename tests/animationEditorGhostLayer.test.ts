@@ -313,3 +313,48 @@ test('ghost rendering leaves active pose, IK, events, clock, history and authore
     f.dispose();
   }
 });
+
+test('scene frames project each ghost once while paused edits still refresh immediately', () => {
+  const f = fixture();
+  try {
+    f.layer.setEnabled(true);
+    const previous = f.ghosts.get('previous')!;
+    const next = f.ghosts.get('next')!;
+    const previousSync = vi.spyOn(previous.renderer, 'sync');
+    const nextSync = vi.spyOn(next.renderer, 'sync');
+    f.state.play();
+    previousSync.mockClear();
+    nextSync.mockClear();
+    f.layer.updateFrame(() => {
+      f.state.advancePlayback(0.05);
+      f.puppet.setSkin('red');
+    });
+    assert.equal(previousSync.mock.calls.length, 1);
+    assert.equal(nextSync.mock.calls.length, 1);
+    assert.approximately(previous.bones.get('root')!.pose.x, 50.5, 1e-10);
+    assert.equal(previous.renderer.getSlotImage('glove')!.texture.key, 'glove2');
+
+    f.state.pause();
+    previousSync.mockClear();
+    f.state.setCurrentTime(0.7);
+    assert.equal(previousSync.mock.calls.length, 1);
+    assert.approximately(previous.bones.get('root')!.pose.x, 64, 1e-10);
+    f.layer.updateFrame(() => f.puppet.container.setPosition(20, 30));
+    assert.equal(previous.container.x, 20);
+    assert.equal(previous.container.y, 30);
+
+    const failure = new Error('frame failed');
+    assert.throws(
+      () =>
+        f.layer.updateFrame(() => {
+          throw failure;
+        }),
+      'frame failed',
+    );
+    previousSync.mockClear();
+    f.state.setCurrentTime(0.5);
+    assert.equal(previousSync.mock.calls.length, 1);
+  } finally {
+    f.dispose();
+  }
+});

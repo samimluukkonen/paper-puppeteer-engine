@@ -58,8 +58,9 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.state?.advancePlayback(toSeconds(delta));
-    this.ghosts?.sync();
+    const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
+    if (this.ghosts) this.ghosts.updateFrame(advance);
+    else advance();
     const overlay = this.selectionOverlay;
     overlay?.clear();
     if (overlay && this.puppet && this.state?.selectedBoneId) {

@@ -103,7 +103,7 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
     state,
     preview: { dispose },
     puppet: { destroy },
-    ghosts: { sync: vi.fn(), dispose: disposeGhosts },
+    ghosts: { updateFrame: (update: () => void) => update(), dispose: disposeGhosts },
   });
   state.play();
   scene.update(12345, 250);

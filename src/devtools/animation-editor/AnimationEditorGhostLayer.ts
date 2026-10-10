@@ -39,18 +39,21 @@ class GhostInstance {
 
   syncAppearance(puppet: Puppet): void {
     const source = puppet.container;
-    if (this.container.parentContainer !== source.parentContainer) {
+    const parentChanged = this.container.parentContainer !== source.parentContainer;
+    if (parentChanged) {
       this.container.parentContainer?.remove(this.container);
       source.parentContainer?.add(this.container);
     }
     const style = styles[this.direction];
+    const depth = source.depth + style.depth;
+    const depthChanged = this.container.depth !== depth;
     this.container
       .setPosition(source.x, source.y)
       .setRotation(source.rotation)
       .setScale(source.scaleX, source.scaleY)
       .setAlpha(source.alpha * 0.22)
-      .setDepth(source.depth + style.depth);
-    source.parentContainer?.sort('depth');
+      .setDepth(depth);
+    if (parentChanged || depthChanged) source.parentContainer?.sort('depth');
     puppet.copyAppearanceTo(this.renderer, style.tint);
     this.renderer.sync();
   }
@@ -68,6 +71,7 @@ export class AnimationEditorGhostLayer {
   private readonly unsubscribe: () => void;
   private enabled = false;
   private disposed = false;
+  private frameDepth = 0;
   private animation: ReadonlyAnimation | null | undefined;
   private time: number | undefined;
   private samples: GhostPoseSample[] = [];
@@ -91,9 +95,20 @@ export class AnimationEditorGhostLayer {
     } else this.sync();
   }
 
+  /** Coalesce playback notifications and appearance changes into one projection per scene frame. */
+  updateFrame(update: () => void): void {
+    ++this.frameDepth;
+    try {
+      update();
+    } finally {
+      --this.frameDepth;
+      if (this.frameDepth === 0) this.sync();
+    }
+  }
+
   /** Also called each scene frame to follow skin, frame, visibility, facing and preview layout changes. */
   sync(): void {
-    if (this.disposed || !this.enabled) return;
+    if (this.disposed || !this.enabled || this.frameDepth > 0) return;
     const changed = this.animation !== this.state.workingAnimation || this.time !== this.state.currentTime;
     if (changed) {
       this.samples = this.state.sampleGhostPoses();
