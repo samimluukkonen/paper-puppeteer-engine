@@ -85,6 +85,8 @@ Direct dependencies use exact versions: Zod **4.6.5**, Oxfmt **0.72.0**, Oxlint 
 
 All three applications use React 19.3.0 with TypeScript JSX and Vite's JSX transform. `ui/viewShell.tsx` shares navigation and character identity, and `ui/workspace.css` shares the compact header, command bar, canvas/inspector layout, and narrow-screen drawer styling. `ui/mountView.tsx` initializes Phaser and the editing controllers in a layout effect after React commits their hosts; unmounting releases controllers, observers, and the game before React removes the DOM.
 
+The demo build emits separate Phaser and React vendor chunks. Changes to application modules retain the vendor chunk hashes, so browsers can reuse cached runtimes across application releases. The library build continues to leave Phaser external for the consuming application to supply.
+
 The engine stays independent of React. The demo uses `DemoUIStore` and `useSyncExternalStore` to render commands and status from scene notifications. Each command subscribes to its own pressed value, so crossfade status updates do not render unchanged controls. Rig and animation state, history, import/export, and the existing controller-managed inspector/timeline regions remain in their current modules. Those regions are stable hosts in React components; keep their child content under one owner when migrating additional controls. Layout preferences never enter authored JSON.
 
 ```text

@@ -13,7 +13,11 @@ export default defineConfig({
       },
       output: {
         codeSplitting: {
-          groups: [{ name: 'react', test: /node_modules[\\/](?:react|react-dom|scheduler)[\\/]/ }],
+          // Keep vendor hashes independent of changes to shared application modules.
+          groups: [
+            { name: 'phaser', test: /node_modules[\\/]phaser[\\/]/ },
+            { name: 'react', test: /node_modules[\\/](?:react|react-dom|scheduler)[\\/]/ },
+          ],
         },
       },
     },
