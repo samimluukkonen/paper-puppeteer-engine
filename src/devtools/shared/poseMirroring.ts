@@ -12,6 +12,7 @@ export type MirrorDirection = 'left-to-right' | 'right-to-left' | 'swap';
 export type PoseMirrorIssueCode =
   | BoneSymmetryIssueCode
   | 'invalid-direction'
+  | 'invalid-source'
   | 'invalid-transform'
   | 'singular-transform'
   | 'unsupported-scale'
@@ -51,6 +52,7 @@ export function mirrorPose(
   rig: Rig,
   mapping: BoneSymmetryMapping,
   direction: MirrorDirection,
+  options: { readonly sourceBoneIds?: readonly string[] } = {},
 ): PoseMirrorResult {
   // Mapping construction deliberately permits hierarchy warnings. Pose math needs corresponding parents.
   const issues: PoseMirrorIssue[] = validateBoneSymmetryMapping(rig, mapping).map((entry) => ({
@@ -59,6 +61,24 @@ export function mirrorPose(
   }));
   if (direction !== 'left-to-right' && direction !== 'right-to-left' && direction !== 'swap')
     issues.push(diagnostic('invalid-direction', 'Choose left-to-right, right-to-left or swap.', []));
+  const sources = options.sourceBoneIds === undefined ? undefined : new Set(options.sourceBoneIds);
+  if (sources) {
+    const eligible = new Set(
+      mapping.pairs.flatMap(({ leftBoneId, rightBoneId }) =>
+        direction === 'left-to-right'
+          ? [leftBoneId]
+          : direction === 'right-to-left'
+            ? [rightBoneId]
+            : [leftBoneId, rightBoneId],
+      ),
+    );
+    for (const id of sources) {
+      if (!eligible.has(id))
+        issues.push(
+          diagnostic('invalid-source', `Bone "${id}" needs a symmetry pair on the source side of ${direction}.`, [id]),
+        );
+    }
+  }
   if (issues.length) return failure(issues);
 
   const bind = new Map(rig.bones.map((bone) => [bone.id, createTransform(bone)]));
@@ -154,8 +174,8 @@ export function mirrorPose(
     });
   };
   for (const { leftBoneId, rightBoneId } of mapping.pairs) {
-    if (direction !== 'right-to-left') reflect(leftBoneId, rightBoneId);
-    if (direction !== 'left-to-right') reflect(rightBoneId, leftBoneId);
+    if (direction !== 'right-to-left' && (!sources || sources.has(leftBoneId))) reflect(leftBoneId, rightBoneId);
+    if (direction !== 'left-to-right' && (!sources || sources.has(rightBoneId))) reflect(rightBoneId, leftBoneId);
   }
   return issues.length ? failure(issues) : { success: true, pose: result, issues: Object.freeze([]) };
 }

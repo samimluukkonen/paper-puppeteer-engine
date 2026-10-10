@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.4-3
+
+The v0.5.4.3 [mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) adds explicit current-pose and selected-key commands for left-to-right, right-to-left and snapshot-based swap. Existing runtime evaluation supplies pre-IK context, while sparse property projection preserves selected properties, exact times, duration and clip interpolation/playback metadata. Batch replacement reuses group collision semantics and validation, with one document/history transaction and coherent destination selection. React mirror controls and automated generation remain deferred.
+
 ## 0.5.4-2
 
 The v0.5.4.2 [pose mirroring core](docs/pose-mirroring.md) adds pure left-to-right, right-to-left and snapshot-based swap operations using the existing bone symmetry mapping. Bind-relative affine reflection respects resolved rest offsets, rotations, scale and corresponding parent frames. Unsupported hierarchy, singular scales, animated scale-sign changes and unrepresentable shear return structured atomic failures. Authored pre-IK data, unpaired bones, centerline motion, artwork and attachments retain their existing ownership; keyframe writing and React controls remain deferred.

@@ -1,6 +1,8 @@
 import type { Rig } from '../../engine/Rig.js';
 import type { TransformProperty } from '../../engine/types.js';
+import type { BoneSymmetryMapping } from '../shared/boneSymmetry.js';
 import { freezeData } from '../shared/editorData.js';
+import type { MirrorDirection } from '../shared/poseMirroring.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
@@ -12,6 +14,12 @@ import {
   removeBonePropertyKeyframes,
   setBonePropertyKeyframe,
 } from './keyframeEdits.js';
+import {
+  mirrorCurrentPoseToKeys,
+  mirrorSelectedKeyframes,
+  type KeyframeMirrorResult,
+  type MirrorCurrentPoseOptions,
+} from './keyframeMirroring.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import { keyframeTimesMatch } from './keyframeTargets.js';
 import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
@@ -29,6 +37,7 @@ export interface KeyframeDrag {
 
 interface KeyframeCommandActions {
   select(key: KeyframeSelection): boolean;
+  cancelTimelineDrag(): boolean;
   updateTime(time: Seconds): boolean;
   install(animation: ReadonlyAnimation, retainDraft?: boolean, selectedKeys?: readonly KeyframeSelection[]): boolean;
   notify(): void;
@@ -61,6 +70,58 @@ export class AnimationEditorKeyframeCommands {
   }
   private get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
+  }
+
+  mirrorCurrentPoseToKeys(
+    mapping: BoneSymmetryMapping,
+    direction: MirrorDirection,
+    options: MirrorCurrentPoseOptions = {},
+  ): boolean {
+    const boneIds = options.boneIds ?? (this.selection.boneId ? [this.selection.boneId] : undefined);
+    return this.commitMirror((animation, rig) =>
+      mirrorCurrentPoseToKeys(animation, rig, mapping, toMilliseconds(this.currentTime), direction, {
+        ...options,
+        ...(boneIds ? { boneIds } : {}),
+      }),
+    );
+  }
+
+  mirrorSelectedKeyframes(mapping: BoneSymmetryMapping, direction: MirrorDirection): boolean {
+    const primary = this.selection.key;
+    // Preserve the primary source's counterpart as the destination primary.
+    const sources = primary ? [primary, ...this.selectedKeys.filter((key) => key !== primary)] : this.selectedKeys;
+    return this.commitMirror((animation, rig) =>
+      mirrorSelectedKeyframes(
+        animation,
+        rig,
+        mapping,
+        sources.map((key) => ({ boneId: key.boneId, property: key.property, timeMs: toMilliseconds(key.time) })),
+        direction,
+      ),
+    );
+  }
+
+  /** Build and validate before touching gestures, playback, drafts or selection. One install owns history/dirty. */
+  private commitMirror(
+    build: (animation: ReadonlyAnimation, rig: Rig) => KeyframeMirrorResult<ReadonlyAnimation>,
+  ): boolean {
+    if (!this.working || !this.rig) return false;
+    let result: KeyframeMirrorResult<ReadonlyAnimation>;
+    try {
+      result = build(this.working, this.rig);
+    } catch (error) {
+      this.document.reportError(error);
+      this.actions.notify();
+      return false;
+    }
+    if (!result.keys.length) return false;
+    const time = this.currentTime;
+    this.actions.cancelTimelineDrag();
+    this.playback.pause();
+    this.playback.endScrub();
+    this.actions.updateTime(time);
+    const keys = result.keys.map(({ boneId, property, timeMs }) => ({ boneId, property, time: toSeconds(timeMs) }));
+    return this.actions.install(freezeData(result.animation), false, keys);
   }
 
   get keyframeClipboard(): KeyframeClipboard | null {

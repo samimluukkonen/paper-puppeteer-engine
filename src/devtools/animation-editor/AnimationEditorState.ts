@@ -19,6 +19,7 @@ import {
   validateBoneSymmetryMapping,
 } from '../shared/boneSymmetry.js';
 import { freezeData } from '../shared/editorData.js';
+import type { MirrorDirection } from '../shared/poseMirroring.js';
 import {
   AnimationEditorDocument,
   type AnimationEditorStateOptions,
@@ -55,6 +56,7 @@ import {
   setInterpolationForKeys,
 } from './interpolation.js';
 import type { KeyframeClipboard } from './keyframeClipboard.js';
+import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import {
   keysInMarquee,
@@ -113,6 +115,7 @@ export class AnimationEditorState {
       this.playback,
       {
         select: (key) => this.selectKeyframe(key),
+        cancelTimelineDrag: () => this.cancelTimelineDrag(),
         updateTime: (time) => this.updateTime(time),
         install: (animation, retainDraft, selectedKeys) =>
           this.installWorkingAnimation(animation, retainDraft, selectedKeys),
@@ -694,6 +697,19 @@ export class AnimationEditorState {
     timeSeconds = this.currentTime,
   ): boolean {
     return this.batchNotifications(() => this.keyframes.setBonePropertyKeyframe(boneId, property, value, timeSeconds));
+  }
+
+  /** Explicit authored mirror command; defaults to the selected bone or all mapped sources. */
+  mirrorCurrentPoseToKeys(direction: MirrorDirection, options: MirrorCurrentPoseOptions = {}): boolean {
+    return this.batchNotifications(() =>
+      this.symmetry ? this.keyframes.mirrorCurrentPoseToKeys(this.symmetry, direction, options) : false,
+    );
+  }
+
+  mirrorSelectedKeyframes(direction: MirrorDirection): boolean {
+    return this.batchNotifications(() =>
+      this.symmetry ? this.keyframes.mirrorSelectedKeyframes(this.symmetry, direction) : false,
+    );
   }
 
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {

@@ -6,7 +6,7 @@ Milestone v0.5.4.2, package version `0.5.4-2`, adds pure authored-pose reflectio
 
 ## API and ownership
 
-[poseMirroring.ts](../src/devtools/shared/poseMirroring.ts) exports `MirrorDirection`, `PoseMirrorIssueCode`, `PoseMirrorIssue`, `PoseMirrorResult` and `mirrorPose(pose, rig, mapping, direction)`. It uses existing `AnimationPose` and `JointTransform` types, accepts a readonly map of complete or sparse local transforms and depends on no React, Phaser or DOM runtime. The API stays beside the editor-only mapping; package engine exports and external schemas are unchanged.
+[poseMirroring.ts](../src/devtools/shared/poseMirroring.ts) exports `MirrorDirection`, `PoseMirrorIssueCode`, `PoseMirrorIssue`, `PoseMirrorResult` and `mirrorPose(pose, rig, mapping, direction)`. It uses existing `AnimationPose` and `JointTransform` types, accepts a readonly map of complete or sparse local transforms and depends on no React, Phaser or DOM runtime. The API stays beside the editor-only mapping; package engine exports and external schemas are unchanged. In v0.5.4.3, the optional fifth argument `{ sourceBoneIds }` scopes reflection to specified sources; invalid/unpaired/wrong-side sources produce `invalid-source` errors. Full mapping validation still applies.
 
 ```ts
 import { getEvaluatedAnimationPose } from '../src/devtools/animation-editor/animationValues.js';
@@ -75,7 +75,7 @@ Pass authored poses from `getEvaluatedAnimationPose` or pure clip evaluation bef
 
 Slots remain attached to their normal bones, attachments and skins retain their assignments, and weapons retain their hand ownership. Bone motion does not mirror artwork. Root translation, centerline bones and facing are preserved.
 
-Deferred: keyframe creation, mirrored tracks, timeline commands, React mapping/mirror controls, automatic IK target mirroring, IK baking, sprite flipping, attachment/weapon hand switching and joint position editing.
+[Mirrored keyframe authoring](mirrored-keyframe-authoring.md) now provides explicit current-pose and selected-key commands. React mapping/mirror controls, automatic IK target mirroring, IK baking, sprite flipping, attachment/weapon hand switching and joint position editing remain deferred.
 
 ## Verification
 

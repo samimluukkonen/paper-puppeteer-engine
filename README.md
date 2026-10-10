@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
 
-The v0.5.4.2 [pose mirroring core](docs/pose-mirroring.md) reflects authored poses in either direction or swaps both sides using the established [bone symmetry mapping](docs/bone-symmetry-mapping.md). It respects bind transforms and hierarchy and reports unsupported transforms. Keyframe mirroring and visual controls remain planned for later milestones.
+The v0.5.4.3 [mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) adds explicit current-pose and selected-key commands using the [pose mirroring core](docs/pose-mirroring.md) and [bone symmetry mapping](docs/bone-symmetry-mapping.md). It preserves sparse properties, timing and interpolation metadata, with atomic collision replacement and Undo/Redo. Visual mirror controls remain planned for later milestones.
 
 ## Quick start
 
@@ -50,18 +50,19 @@ scene.load.start();
 
 ## Guides
 
-| Guide                                                  | Contents                                                                                                |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| [Demo controls](docs/demo.md)                          | Keyboard controls, playback examples, facing, skins, and pose authoring                                 |
-| [Rig editor](docs/rig-editor.md)                       | Editing, snapping, undo/redo, validation, imports, exports, and embedding                               |
-| [Animation editor](docs/animation-editor.md)           | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview |
-| [Bone symmetry mapping](docs/bone-symmetry-mapping.md) | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle         |
-| [Pose mirroring core](docs/pose-mirroring.md)          | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures    |
-| [Character assets and rigs](docs/characters.md)        | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
-| [Animation and poses](docs/animation.md)               | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
-| [IK and object attachments](docs/ik.md)                | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |
-| [Development and package usage](docs/development.md)   | Checks, browser tests, architecture, packaging, and Node APIs                                           |
-| [Performance profiling](docs/profiling.md)             | Local CPU/browser profiles, workloads, and historical measurements                                      |
+| Guide                                                              | Contents                                                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| [Demo controls](docs/demo.md)                                      | Keyboard controls, playback examples, facing, skins, and pose authoring                                 |
+| [Rig editor](docs/rig-editor.md)                                   | Editing, snapping, undo/redo, validation, imports, exports, and embedding                               |
+| [Animation editor](docs/animation-editor.md)                       | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview |
+| [Bone symmetry mapping](docs/bone-symmetry-mapping.md)             | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle         |
+| [Pose mirroring core](docs/pose-mirroring.md)                      | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures    |
+| [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection        |
+| [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
+| [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
+| [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |
+| [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                           |
+| [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                      |
 
 ## Development checks
 
