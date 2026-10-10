@@ -4,7 +4,7 @@
 
 ## Checks and profiling
 
-Use Node.js **24 or newer**. [.nvmrc](../.nvmrc) pins **24.19.0** for `nvm use` and CI. The repository enables `engine-strict` so npm dependency installs reject unsupported Node versions.
+Use Node.js **24 or newer**. [.nvmrc](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.nvmrc) pins **24.19.0** for `nvm use` and CI. The repository enables `engine-strict` so npm dependency installs reject unsupported Node versions.
 
 ```bash
 npm run typecheck
@@ -192,7 +192,7 @@ import { Puppet, type RigDefinition, type AnimationClip } from 'paper-puppeteer-
 
 The library includes TypeScript declarations and source maps. Zod is externalized and supplied through the package dependency, so consumers share its validation runtime and error classes. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
 
-The package includes the root Markdown guides and verification notes in `docs/`. Research screenshots, diagrams, and measurement files stay in the repository; the layout report links to those hosted artifacts. `test:package` verifies that the main guides are present and research assets are excluded from the installed tarball.
+The package includes the root Markdown guides and verification notes in `docs/`. Research screenshots, diagrams, and measurement files stay in the repository; the layout report links to those hosted artifacts. `test:package` verifies that the main guides are present, local Markdown links resolve inside the installed package, and research assets are excluded from the installed tarball. Links to repository-only source, tests, configuration, and sample assets use hosted repository URLs.
 
 For Node scripts and asset tooling, import the renderer-independent entry point:
 

@@ -4,7 +4,7 @@
 
 ## Static poses and authoring
 
-A pose file is a version 1 JSON object with a name and sparse local bone transforms. Rotations are radians. Every property is an absolute local value; properties and bones left out preserve their current underlying pose. The sample is [combat-ready.json](../public/characters/demo-puppet/poses/combat-ready.json). List pose paths in the optional `poses` array of `character.json`; `CharacterLoader` loads and validates them against the rig. For programmatic puppets, pass `poses` to the constructor or call `addPose`. Invalid versions, unknown bones, extra fields, and nonfinite values are rejected.
+A pose file is a version 1 JSON object with a name and sparse local bone transforms. Rotations are radians. Every property is an absolute local value; properties and bones left out preserve their current underlying pose. The sample is [combat-ready.json](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/public/characters/demo-puppet/poses/combat-ready.json). List pose paths in the optional `poses` array of `character.json`; `CharacterLoader` loads and validates them against the rig. For programmatic puppets, pass `poses` to the constructor or call `addPose`. Invalid versions, unknown bones, extra fields, and nonfinite values are rejected.
 
 ```json
 { "version": 1, "name": "combat-ready", "bones": { "torso": { "rotation": -0.08 }, "rightForearm": { "rotation": -1.1 } } }

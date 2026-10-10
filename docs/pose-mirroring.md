@@ -6,7 +6,7 @@ Milestone v0.5.4.2, package version `0.5.4-2`, adds pure authored-pose reflectio
 
 ## API and ownership
 
-[poseMirroring.ts](../src/devtools/shared/poseMirroring.ts) exports `MirrorDirection`, `PoseMirrorIssueCode`, `PoseMirrorIssue`, `PoseMirrorResult` and `mirrorPose(pose, rig, mapping, direction)`. It uses existing `AnimationPose` and `JointTransform` types, accepts a readonly map of complete or sparse local transforms and depends on no React, Phaser or DOM runtime. The API stays beside the editor-only mapping; package engine exports and external schemas are unchanged. In v0.5.4.3, the optional fifth argument `{ sourceBoneIds }` scopes reflection to specified sources; invalid/unpaired/wrong-side sources produce `invalid-source` errors. Full mapping validation still applies.
+[poseMirroring.ts](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/shared/poseMirroring.ts) exports `MirrorDirection`, `PoseMirrorIssueCode`, `PoseMirrorIssue`, `PoseMirrorResult` and `mirrorPose(pose, rig, mapping, direction)`. It uses existing `AnimationPose` and `JointTransform` types, accepts a readonly map of complete or sparse local transforms and depends on no React, Phaser or DOM runtime. The API stays beside the editor-only mapping; package engine exports and external schemas are unchanged. In v0.5.4.3, the optional fifth argument `{ sourceBoneIds }` scopes reflection to specified sources; invalid/unpaired/wrong-side sources produce `invalid-source` errors. Full mapping validation still applies.
 
 ```ts
 import { getEvaluatedAnimationPose } from '../src/devtools/animation-editor/animationValues.js';
@@ -79,7 +79,7 @@ Slots remain attached to their normal bones, attachments and skins retain their 
 
 ## Verification
 
-[poseMirroring.test.ts](../tests/poseMirroring.test.ts) covers all three directions, snapshot swap, sparse/bind fallback, shortest-path rotations, rest offsets and rotations, scale ratios and axis exchange, existing signed bind axes, nested world positions and axes, explicit bone lengths, preserved centerline motion, invalid mappings, hierarchy limitations, nonfinite/singular/overflow inputs, unsupported shear/sign changes, input/output ownership, determinism, pair order, round trips and shipped animation sampling before IK. Comparisons use floating-point tolerances.
+[poseMirroring.test.ts](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/tests/poseMirroring.test.ts) covers all three directions, snapshot swap, sparse/bind fallback, shortest-path rotations, rest offsets and rotations, scale ratios and axis exchange, existing signed bind axes, nested world positions and axes, explicit bone lengths, preserved centerline motion, invalid mappings, hierarchy limitations, nonfinite/singular/overflow inputs, unsupported shear/sign changes, input/output ownership, determinism, pair order, round trips and shipped animation sampling before IK. Comparisons use floating-point tolerances.
 
 Verification on October 11, 2026:
 

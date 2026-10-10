@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
+import { checkDocumentationLinks } from './documentationLinks.mjs';
 import { readPackageManifest } from './packageManifest.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -62,6 +63,8 @@ try {
     'rig-editor.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
+
+  await checkDocumentationLinks(packageRoot, ['README.md', 'CHANGELOG.md', ...guides.map((guide) => `docs/${guide}`)]);
 
   const smoke = join(consumer, 'check-core.mjs');
   await writeFile(smoke, await readFile(new URL('./check-core.mjs', import.meta.url)));
@@ -177,7 +180,7 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
     build: { lib: { entry: browserEntry, formats: ['es'] }, rollupOptions: { external: ['phaser', 'zod'] } },
   });
   console.log(
-    'Packed package works in an isolated consumer: Node /core imports, public declarations, and browser bundling.',
+    'Packed package works in an isolated consumer: documentation links, Node /core imports, public declarations, and browser bundling.',
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

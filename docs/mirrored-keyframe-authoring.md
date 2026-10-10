@@ -6,7 +6,7 @@ Milestone v0.5.4.3, package version `0.5.4-3`, adds explicit current-pose and se
 
 ## APIs
 
-[keyframeMirroring.ts](../src/devtools/animation-editor/keyframeMirroring.ts), also exported through the editor's `keyframes.ts` compatibility entry, provides pure proposals:
+[keyframeMirroring.ts](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/animation-editor/keyframeMirroring.ts), also exported through the editor's `keyframes.ts` compatibility entry, provides pure proposals:
 
 ```ts
 mirrorCurrentPoseToKeys(animation, rig, mapping, currentTimeMs, direction, options);
@@ -48,7 +48,7 @@ All mapping, source, transform and destination checks finish before a proposed b
 
 ## Transactions and ownership
 
-[AnimationEditorKeyframeCommands](../src/devtools/animation-editor/AnimationEditorKeyframeCommands.ts) constructs the complete proposal before touching playback, gestures, drafts or selection. One successful command pauses playback, cancels gestures, restores the held clock time and installs one document snapshot. It creates one history entry and one dirty-state invalidation for changed authored data, with one state notification after selection is coherent. An unchanged authored result adds no history entry. Empty operations return false without installing a snapshot.
+[AnimationEditorKeyframeCommands](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/animation-editor/AnimationEditorKeyframeCommands.ts) constructs the complete proposal before touching playback, gestures, drafts or selection. One successful command pauses playback, cancels gestures, restores the held clock time and installs one document snapshot. It creates one history entry and one dirty-state invalidation for changed authored data, with one state notification after selection is coherent. An unchanged authored result adds no history entry. Empty operations return false without installing a snapshot.
 
 Destination keys become selected. Selected-key mirroring follows the original primary key to its counterpart; bone/property selection follows that destination. The playhead does not seek to the primary key. Undo restores the exact previous snapshot, including replaced destination rows, and Redo restores the committed mirror snapshot. Selection follows existing history reconciliation rather than entering authored history. Saved checkpoints retain their normal dirty behavior.
 
@@ -56,7 +56,7 @@ Events, event payloads, slots, attachment assignments, skins, facing and IK targ
 
 ## Verification and deferred features
 
-[keyframeMirroring.test.ts](../tests/keyframeMirroring.test.ts) covers both APIs, all directions, bind-aware single bones, multiple bones/properties/times, evaluated context, sparse defaults, explicit property scopes, stepped sampling, exact collision timing, immutable inputs, atomic errors, one notification/history entry, dirty checkpoints, selection reconciliation, Undo/Redo and shipped pre-IK animation sampling.
+[keyframeMirroring.test.ts](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/tests/keyframeMirroring.test.ts) covers both APIs, all directions, bind-aware single bones, multiple bones/properties/times, evaluated context, sparse defaults, explicit property scopes, stepped sampling, exact collision timing, immutable inputs, atomic errors, one notification/history entry, dirty checkpoints, selection reconciliation, Undo/Redo and shipped pre-IK animation sampling.
 
 Verification on October 11, 2026:
 

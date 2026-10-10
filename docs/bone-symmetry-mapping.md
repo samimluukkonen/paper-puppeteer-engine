@@ -8,7 +8,7 @@ The subsequent [v0.5.4.2 pose mirroring core](pose-mirroring.md) consumes these 
 
 ## Architecture and APIs
 
-The pure [boneSymmetry.ts](../src/devtools/shared/boneSymmetry.ts) module uses the existing renderer-independent `Rig`, immutable editor data helpers and readonly map utility. It requires no React, DOM or Phaser runtime and adds no dependencies or public engine exports.
+The pure [boneSymmetry.ts](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/shared/boneSymmetry.ts) module uses the existing renderer-independent `Rig`, immutable editor data helpers and readonly map utility. It requires no React, DOM or Phaser runtime and adds no dependencies or public engine exports.
 
 - `BoneSymmetryPair` contains `leftBoneId` and `rightBoneId`.
 - `BoneSymmetryMappingData` contains readonly `pairs`, ready for future editor-side persistence.
@@ -83,7 +83,7 @@ Structural errors prevent construction and expose no usable lookup. Hierarchy ch
 
 ## Session lifecycle
 
-[AnimationEditorState](../src/devtools/animation-editor/AnimationEditorState.ts) initializes an empty mapping for its rig and exposes `symmetryMapping`, `symmetryValidationIssues`, `getMirroredBoneId()` and `setSymmetryMapping()`.
+[AnimationEditorState](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/animation-editor/AnimationEditorState.ts) initializes an empty mapping for its rig and exposes `symmetryMapping`, `symmetryValidationIssues`, `getMirroredBoneId()` and `setSymmetryMapping()`.
 
 Assignment validates rig identity and pairs, owns a fresh mapping snapshot and sends one existing state notification. Failure preserves the prior mapping and reports separate symmetry diagnostics. Mapping changes do not alter source/working animations, transforms, time, selection, playback, drafts, animation validation, dirty tracking, Undo/Redo or animation event delivery. Preferences survive clip switching, animation import and export reload in the same rig session.
 

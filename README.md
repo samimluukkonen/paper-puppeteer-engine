@@ -4,11 +4,11 @@ A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cu
 
 **Live demo:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
-Pushes to `master` build and deploy the demo through [the Pages workflow](.github/workflows/deploy-pages.yml). In the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. The workflow publishes `dist/demo` and can also be run from the Actions tab.
+Pushes to `master` build and deploy the demo through [the Pages workflow](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.github/workflows/deploy-pages.yml). In the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. The workflow publishes `dist/demo` and can also be run from the Actions tab.
 
 ## Install and run
 
-Requires Node.js **24 or newer** and npm. Local development and CI use **24.19.0**, pinned in [.nvmrc](.nvmrc). Run `nvm use` if you use nvm.
+Requires Node.js **24 or newer** and npm. Local development and CI use **24.19.0**, pinned in [.nvmrc](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.nvmrc). Run `nvm use` if you use nvm.
 
 ```bash
 npm install

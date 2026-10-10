@@ -52,7 +52,7 @@ At 1440 × 900, the preview begins at y=226 and ends at y=1035. The timeline sta
 
 The header is 202 pixels tall on these desktops. The preview height follows its width through a fixed `760 / 640` aspect ratio, instead of sharing the available screen height with the timeline. The authoring sidebar spans both grid rows and leaves a large blank area beside the timeline. These rules make a scrolling document rather than a workspace for inspecting pose and timing together.
 
-Evidence: [editor layout CSS](../src/devtools/animation-editor/style.css#L20), [stage proportions](../src/devtools/animation-editor/style.css#L84), [sidebar placement](../src/devtools/animation-editor/style.css#L468), [shared shell](../src/ui/viewShell.css#L1).
+Evidence: [editor layout CSS](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/animation-editor/style.css#L20), [stage proportions](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/animation-editor/style.css#L84), [sidebar placement](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/devtools/animation-editor/style.css#L468), [shared shell](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/ui/viewShell.css#L1).
 
 ### 2. Essential session controls are below the editing work
 
