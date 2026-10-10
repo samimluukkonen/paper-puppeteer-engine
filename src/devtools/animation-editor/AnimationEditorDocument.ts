@@ -50,6 +50,7 @@ export class AnimationEditorDocument {
     options: AnimationEditorStateOptions = {},
   ) {
     for (const animation of animations) {
+      if (this.animations.has(animation.name)) throw new Error(`Animation "${animation.name}" is already registered.`);
       const file = this.inspect({ ...animation, version: ANIMATION_FORMAT_VERSION });
       const path =
         options.animationPaths && Object.hasOwn(options.animationPaths, animation.name)

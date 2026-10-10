@@ -22,6 +22,23 @@ const clip = (patch: Partial<AnimationClip> = {}): AnimationClip => ({
 });
 const file = (animation: AnimationClip) => ({ ...animation, version: 1 });
 
+test('initial animation registration rejects duplicate names instead of overwriting clips', () => {
+  assert.throws(
+    () => new AnimationEditorState(rig, [clip(), clip({ duration: 3000 })]),
+    /Animation "move" is already registered/,
+  );
+  const state = new AnimationEditorState(rig, [clip(), clip({ name: 'other', duration: 3000 })]);
+  assert.deepEqual(state.animationIds, ['move', 'other']);
+  assert.isTrue(state.selectAnimation('move'));
+  assert.equal(state.workingAnimation!.duration, 2000);
+  assert.isTrue(state.selectAnimation('other'));
+  assert.equal(state.workingAnimation!.duration, 3000);
+  // Explicit imports deliberately replace a same-name session.
+  assert.isTrue(state.importJson(JSON.stringify(file(clip({ duration: 4000 })))));
+  assert.equal(state.workingAnimation!.duration, 4000);
+  assert.deepEqual(state.animationIds, ['move', 'other']);
+});
+
 test('subscriber failures still publish committed edits to every view and preserve history', () => {
   const state = new AnimationEditorState(rig, [clip()]);
   state.selectAnimation('move');
