@@ -3,6 +3,7 @@ import { afterEach, assert, test, vi } from 'vitest';
 import type { AnimationEditorGhostLayer } from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { createBoneSymmetryMapping, inferBoneSymmetryPairs } from '../src/devtools/shared/boneSymmetry.js';
 import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
@@ -299,5 +300,127 @@ test('mirror overlay is lazy, independent of temporal ghosts, follows facing, an
     assert.deepEqual(error.mock.calls, []);
   } finally {
     if (Reflect.get(scene, 'puppet')) scene.events.emit('shutdown');
+  }
+});
+
+test('mirror commits refresh active/previous/next authored poses while arm and leg IK remain procedural', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn<(state: AnimationEditorState) => void>();
+  const error = vi.fn();
+  const chains = [
+    { name: 'arm', rootBone: 'rightUpperArm', middleBone: 'rightForearm', endBone: 'rightHand' },
+    { name: 'leg', rootBone: 'rightThigh', middleBone: 'rightLowerLeg', endBone: 'rightFoot' },
+  ];
+  const scene = new AnimationEditorScene(ready, error, { ikChains: chains });
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.setBonesVisible(false);
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = ready.mock.calls[0]![0];
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
+    const originalRig = JSON.stringify(puppet.rig);
+    const bones = ['leftUpperArm', 'leftForearm', 'leftThigh', 'leftLowerLeg'];
+    state.replaceWorkingAnimation({
+      ...state.workingAnimation!,
+      duration: 1000,
+      loop: false,
+      playback: { mode: 'smooth' },
+      tracks: Object.fromEntries(
+        bones.map((id) => [
+          id,
+          [
+            { time: 0, rotation: 0.1 },
+            { time: 1000, rotation: 0.9 },
+          ],
+        ]),
+      ),
+      events: [{ time: 500, name: 'unchanged', data: { nested: [1, 2] } }],
+    });
+    const mapping = createBoneSymmetryMapping(puppet.rig, {
+      automaticCandidates: inferBoneSymmetryPairs(puppet.rig).pairs,
+    });
+    assert.isTrue(mapping.success);
+    state.setSymmetryMapping(mapping.mapping);
+    state.setCurrentTime(0.5);
+    scene.setOnionSkinning(true);
+    scene.setIKPreview(true);
+    const constraints = chains.map((chain) => puppet.getIK(chain.name));
+    const targets = constraints.map((constraint) => Reflect.get(constraint, 'provider') as unknown);
+    const original = state.workingAnimation;
+    const events = vi.fn();
+    state.onAnimationEvent(events);
+    const instances = Reflect.get(ghosts, 'instances') as Map<
+      string,
+      import('../src/devtools/animation-editor/AnimationEditorGhostLayer.js').AnimationPoseOverlay
+    >;
+    const before = [...instances.values()].map(
+      (ghost) =>
+        (Reflect.get(ghost, 'bones') as Map<string, import('../src/engine/Bone.js').Bone>).get('rightUpperArm')!.pose
+          .rotation,
+    );
+    state.selectKeyframes(
+      bones.flatMap((boneId) => [0, 1].map((time) => ({ boneId, property: 'rotation' as const, time }))),
+    );
+    assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+    const committed = state.workingAnimation;
+    assert.strictEqual(committed!.events, original!.events);
+    const checkGhosts = () => {
+      const samples = state.sampleGhostPoses();
+      for (const [index, sample] of samples.entries()) {
+        const ghost = instances.get(`${sample.direction}-1`)!;
+        const ghostBones = Reflect.get(ghost, 'bones') as Map<string, import('../src/engine/Bone.js').Bone>;
+        assert.isTrue(ghost.container.visible);
+        assert.closeTo(
+          ghostBones.get('rightUpperArm')!.pose.rotation,
+          sample.pose.get('rightUpperArm')!.rotation!,
+          1e-9,
+        );
+        assert.notEqual(ghostBones.get('rightUpperArm')!.pose.rotation, before[index]);
+      }
+    };
+    checkGhosts();
+    for (const chain of chains) {
+      const authored = state.getEvaluatedBonePropertyValue(chain.rootBone, 'rotation')!;
+      assert.notEqual(
+        puppet.getBone(chain.rootBone).pose.rotation,
+        authored,
+        'fixed-target IK changes only the rendered pose',
+      );
+    }
+    assert.deepEqual(
+      constraints.map((constraint) => Reflect.get(constraint, 'provider') as unknown),
+      targets,
+    );
+    assert.isTrue(constraints.every((constraint) => constraint.enabled));
+    for (let index = 0; index < 4; ++index) {
+      scene.setMirrorPreview(state.sampleGhostPose(0.5)!);
+      scene.setFacing(index % 2 ? 'right' : 'left');
+      scene.setOnionSkinning(false);
+      scene.setMirrorPreview(null);
+      scene.setOnionSkinning(true);
+      checkGhosts();
+      assert.strictEqual(state.workingAnimation, committed);
+      assert.equal(events.mock.calls.length, 0);
+    }
+    scene.setIKPreview(false);
+    for (const chain of chains)
+      assert.closeTo(
+        puppet.getBone(chain.rootBone).pose.rotation,
+        state.getEvaluatedBonePropertyValue(chain.rootBone, 'rotation')!,
+        1e-9,
+      );
+    state.undo();
+    assert.strictEqual(state.workingAnimation, original);
+    state.redo();
+    assert.strictEqual(state.workingAnimation, committed);
+    checkGhosts();
+    assert.equal(JSON.stringify(puppet.rig), originalRig);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
   }
 });

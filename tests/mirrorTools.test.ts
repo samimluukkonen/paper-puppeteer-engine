@@ -307,3 +307,73 @@ test('incompatible inferred hierarchy stays visible across editor clock notifica
   assert.isFalse(controller.commitKeys());
   controller.dispose();
 });
+
+test('unbind clears readiness, preview and all cached session references and supports a fresh binding', () => {
+  const { state, controller, preview } = fixture();
+  controller.togglePreview();
+  const listener = vi.fn();
+  controller.subscribe(listener);
+  controller.unbind();
+  assert.isFalse(controller.getSnapshot().ready);
+  assert.isFalse(controller.getSnapshot().preview);
+  assert.deepEqual(controller.getSnapshot().pairs, []);
+  assert.deepEqual(controller.getSnapshot().boneIds, []);
+  assert.isNull(preview.mock.lastCall![0]);
+  assert.include(controller.getSnapshot().poseReason, 'Load a rig');
+  assert.isFalse(controller.commitPose());
+  assert.isFalse(controller.commitKeys());
+  for (const property of ['state', 'installedMapping']) assert.isUndefined(Reflect.get(controller, property));
+  for (const property of ['poseDependencies', 'keysDependencies']) {
+    const dependencies = Reflect.get(controller, property) as unknown[];
+    assert.isFalse(dependencies.includes(state.workingAnimation));
+    assert.isFalse(dependencies.includes(state.symmetryMapping));
+  }
+  listener.mockClear();
+  state.setCurrentTime(0.5);
+  assert.equal(listener.mock.calls.length, 0);
+  controller.bind(state, 'fresh');
+  assert.isTrue(controller.getSnapshot().ready);
+  assert.equal(controller.getSnapshot().poseReason, '');
+  assert.isFalse(controller.getSnapshot().preview);
+  controller.dispose();
+  controller.dispose();
+  assert.isFalse(controller.getSnapshot().ready);
+});
+
+test('idempotent preview cleanup hides the overlay without changing the authored session', () => {
+  const { state, controller, preview } = fixture();
+  controller.togglePreview();
+  const working = state.workingAnimation;
+  controller.hidePreview();
+  assert.isFalse(controller.getSnapshot().preview);
+  assert.isNull(preview.mock.lastCall![0]);
+  const calls = preview.mock.calls.length;
+  controller.hidePreview();
+  assert.equal(preview.mock.calls.length, calls);
+  assert.strictEqual(state.workingAnimation, working);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.dirty);
+  controller.dispose();
+});
+
+test('rebind to a changed rig rejects saved pairs and hides old preview before new readiness is published', () => {
+  const { state, controller, storage, preview } = fixture();
+  controller.setPairs(controller.getSnapshot().pairs);
+  controller.togglePreview();
+  const changedRig = new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'leftArm', parent: 'root' }] });
+  const changed = new AnimationEditorState(changedRig, [
+    { ...animation, tracks: { leftArm: animation.tracks.leftArm! } },
+  ]);
+  changed.selectAnimation('wave');
+  controller.bind(changed, 'rig');
+  assert.include(controller.getSnapshot().persistence, 'do not match');
+  assert.deepEqual(controller.getSnapshot().pairs, []);
+  assert.isFalse(controller.getSnapshot().preview);
+  assert.isNull(preview.mock.lastCall![0]);
+  assert.isNull(changed.symmetryMapping!.getMirroredBoneId('leftArm'));
+  assert.equal(storage.size, 1);
+  const snapshot = controller.getSnapshot();
+  state.selectBone('leftArm');
+  assert.strictEqual(controller.getSnapshot(), snapshot);
+  controller.dispose();
+});

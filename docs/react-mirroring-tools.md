@@ -29,7 +29,7 @@ The controller preflights the existing pure `mirrorCurrentPoseToKeys` proposal a
 
 `AnimationEditorScene.setMirrorPreview(pose | null)` accepts the detached complete pose. The scene lazily creates one `AnimationPoseOverlay`, sharing the existing temporal-ghost renderer implementation while maintaining a distinct mirror instance and sample. Violet artwork sits above the active puppet at 35% opacity; temporal ghosts keep their original depth and settings. No extra Puppet, animation player, controller, scene, IK solver or event dispatcher is constructed. Appearance synchronization follows skins, frames, slots, visibility, root placement and facing. Unchanged pose samples skip transform projection.
 
-The overlay never applies values to the active puppet or modifies the clock/document. Hiding it releases its sample references, and scene failure/shutdown destroys render resources. Controller rebinding releases the previous editor subscription; view disposal releases it, clears preview, and removes the React shortcut listener.
+The overlay never applies values to the active puppet or modifies the clock/document. Hiding it releases its sample references, and scene failure/shutdown destroys render resources. Controller rebinding releases the previous editor subscription. `unbind()` releases cached mapping/animation/pose dependencies and publishes disabled readiness after a failed load; disposal performs the same cleanup and clears listeners. React panel unmount removes the shortcut listener and hides preview through idempotent `hidePreview()`. See the [v0.5.4.5 hardening regression](mirroring-hardening-verification.md).
 
 ## Verification
 

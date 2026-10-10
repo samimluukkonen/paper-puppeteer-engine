@@ -163,7 +163,7 @@ export function validateBoneSymmetryMapping(
         issue(
           'ancestor-pair',
           'warning',
-          'Paired bones are ancestors of each other; future pose mirroring may be incompatible.',
+          'Paired bones are ancestors of each other; pose mirroring requires separate corresponding branches.',
           pairIds(pair),
           pairIndex,
         ),

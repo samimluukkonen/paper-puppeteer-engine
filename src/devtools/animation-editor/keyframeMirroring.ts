@@ -71,10 +71,12 @@ export function mirrorCurrentPoseToKeys<Animation extends AnimationData>(
   getValidatedEditorAnimation(animation, rig);
   const targets = sourceTargets(mapping, rig, direction);
   const boneIds = [...new Set(options.boneIds ?? targets.keys())];
+  const activeSources: string[] = [];
   const keys: PropertyKeyframeTarget[] = [];
   for (const sourceId of boneIds) {
     const boneId = destination(targets, sourceId, direction);
     const properties = [...new Set(options.properties ?? getAuthoredBoneProperties(animation, sourceId))];
+    if (properties.length) activeSources.push(sourceId);
     for (const property of properties) {
       const timeMs = assertTarget(animation, rig, boneId, property, currentTimeMs);
       keys.push({ boneId, property, timeMs });
@@ -83,7 +85,8 @@ export function mirrorCurrentPoseToKeys<Animation extends AnimationData>(
   // Sampling also validates time for an empty sparse operation.
   const pose = getEvaluatedAnimationPose(animation, rig, currentTimeMs);
   if (!keys.length) return { animation, keys };
-  const mirrored = reflected(pose, rig, mapping, direction, boneIds);
+  // Unanimated pairs contribute no writes. Their transforms must not block an unrelated sparse edit.
+  const mirrored = reflected(pose, rig, mapping, direction, activeSources);
   const edits = keys.map((key) => ({ ...key, value: mirrored.get(key.boneId)![key.property]! }));
   return { animation: setBonePropertyKeyframes(animation, rig, edits, { preserveTiming: true }), keys };
 }

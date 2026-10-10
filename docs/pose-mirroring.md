@@ -75,7 +75,7 @@ Pass authored poses from `getEvaluatedAnimationPose` or pure clip evaluation bef
 
 Slots remain attached to their normal bones, attachments and skins retain their assignments, and weapons retain their hand ownership. Bone motion does not mirror artwork. Root translation, centerline bones and facing are preserved.
 
-[Mirrored keyframe authoring](mirrored-keyframe-authoring.md) now provides explicit current-pose and selected-key commands. React mapping/mirror controls, automatic IK target mirroring, IK baking, sprite flipping, attachment/weapon hand switching and joint position editing remain deferred.
+[Mirrored keyframe authoring](mirrored-keyframe-authoring.md) now provides explicit current-pose and selected-key commands. [React mapping/mirror controls](react-mirroring-tools.md) and the [hardening regression](mirroring-hardening-verification.md) are complete. Automatic IK target mirroring, IK baking, sprite flipping, attachment/weapon hand switching and joint position editing remain deferred.
 
 ## Verification
 

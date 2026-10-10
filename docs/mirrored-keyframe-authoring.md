@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Milestone v0.5.4.3, package version `0.5.4-3`, adds explicit current-pose and selected-key mirroring commands to the animation editor authoring layer. React mirror controls remain deferred. The existing [bone symmetry mapping](bone-symmetry-mapping.md), [bind-relative pose math](pose-mirroring.md), runtime evaluator, batch edits and document history remain authoritative.
+Milestone v0.5.4.3, package version `0.5.4-3`, adds explicit current-pose and selected-key mirroring commands to the animation editor authoring layer. [React mirror controls](react-mirroring-tools.md) and [hardening](mirroring-hardening-verification.md) are now complete. The existing [bone symmetry mapping](bone-symmetry-mapping.md), [bind-relative pose math](pose-mirroring.md), runtime evaluator, batch edits and document history remain authoritative.
 
 ## APIs
 
@@ -30,7 +30,7 @@ State commands return a success boolean and report validation issues on failure.
 
 ## Evaluation and sparse properties
 
-Current-pose mirroring evaluates the held authored pose with existing playback sampling, before temporary transform drafts, presets, IK and render projection. It writes keys at the exact current time, without snapping, duration extension or resampling. By default each source bone contributes only properties authored anywhere on its track. Explicit `properties` intentionally keys those properties, including bind values on otherwise unanimated bones.
+Current-pose mirroring evaluates the held authored pose with existing playback sampling, before temporary transform drafts, presets, IK and render projection. It writes keys at the exact current time, without snapping, duration extension or resampling. By default each source bone contributes only properties authored anywhere on its track. Unanimated bones with no requested properties are excluded from transform reflection, so their unsupported bind transforms do not block unrelated sparse edits; complete mapping/hierarchy validation still applies. Explicit `properties` intentionally keys those properties, including bind values on otherwise unanimated bones.
 
 Selected-key mirroring resolves every reference against the original animation and groups sources by exact authored time. It evaluates each time through the existing runtime clip evaluator and calls `mirrorPose` with those source bones. Evaluated context includes unselected properties: for example, mirrored X can depend on Y in rotated bind frames. Only selected destination properties are written. Unselected properties never become keys merely because they contributed to mirror math.
 
@@ -65,4 +65,4 @@ Verification on October 11, 2026:
 - `npm run build`: passed, including demo/library output, declarations and the plain Node `/core` check.
 - `npm run lint`, `npm run format:check`, `npm run check:version` and `git diff --check`: passed.
 
-Full React mirror toolbars, automatic animation generation, time reversal, cross-animation mirroring, event/IK target mirroring, sprite replacement and rig joint editing remain deferred. Browser tests remain local-only by repository policy.
+Automatic animation generation, time reversal, cross-animation mirroring, event/IK target mirroring, sprite replacement and rig joint editing remain deferred. Browser tests remain local-only by repository policy.

@@ -51,7 +51,10 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
       controller.togglePreview();
     };
     window.addEventListener('keydown', shortcut);
-    return () => window.removeEventListener('keydown', shortcut);
+    return () => {
+      window.removeEventListener('keydown', shortcut);
+      controller.hidePreview();
+    };
   }, [controller]);
   const direction = MIRROR_DIRECTIONS.find((entry) => entry.value === state.direction)!;
   const options = state.boneIds.map((id) => (

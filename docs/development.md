@@ -172,6 +172,8 @@ Timeline playback notifications update time-dependent controls and the playhead.
 
 Saved baselines retain immutable authored snapshots directly. Rig inspector inputs remain mounted for the selected bone or slot across refreshes, history restores and preview-control changes. Authored values update in place while unchanged focused fields retain unfinished text; selecting another object or replacing the session rebuilds the available fields. Rig export serializes its validated file once; delayed clipboard completion retains the captured working snapshot without parsing JSON or marking later edits saved. Animation import and revert reuse validated frozen source snapshots, and subsequent edits replace changed branches while preserving the source.
 
+Mirroring production regression coverage and the supported transform contract are documented in [mirroring hardening](mirroring-hardening-verification.md). Local `animationMirroring.spec.ts` scenarios cover repeated animation/character/route lifecycle, mirrored onion-skin refresh and identical authored exports with IK/facing enabled or disabled. `MirrorToolsController.unbind()` releases cached session references after failures; React panel cleanup hides its preview independently of application disposal.
+
 ## Use as a local package
 
 `new Rig(existingRig)` shares its validated immutable skeleton and indexes. Pass a second skin array to create a rig with independently validated, owned skins: `new Rig(existingRig, skins)`. The rig editor uses this to retain authored skins separately from preview skins, and its working copy stays independent of the shared source skeleton. New JSON imports still receive full rig validation.

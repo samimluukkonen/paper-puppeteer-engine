@@ -91,7 +91,10 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
       releaseRecovery = state.subscribe(synchronizeRecovery);
       synchronizeRecovery();
     },
-    (message) => timeline.showError(message),
+    (message) => {
+      mirrorTools.unbind();
+      timeline.showError(message);
+    },
     {
       characterUrl: `../characters/${selectedCharacterId()}/character.json`,
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,

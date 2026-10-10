@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.4-5
+
+The v0.5.4.5 [mirroring hardening phase](docs/mirroring-hardening-verification.md) completes v0.5.4. Sparse current-pose authoring ignores unanimated incompatible transforms while retaining mapping validation. Mirror controls release cached session data on unbind/disposal, hide previews on panel unmount, and disable actions after failed loads. Expanded humanoid, asymmetric, round-trip, playback/event, clipboard/history, serialization/CharacterLoader and scene IK/onion/facing regressions accompany an artist left-arm walkthrough and explicit transform limitations.
+
 ## 0.5.4-4
 
 The v0.5.4.4 [React mirroring tools](docs/react-mirroring-tools.md) expose bone-pair configuration, all three copy directions, current-pose and selected-key commands, and a violet read-only pose overlay in the Animation Editor. Validated browser preferences restore pairs for the same rig without entering authored JSON. React subscribes to authoritative editor selection, cached readiness reports actionable mapping/transform errors, and existing commands retain atomic history and destination selection. Mirror previews share the render-only artwork projection with onion skins while retaining separate resources and following facing/skin changes. M toggles preview; the Help dialog documents the workflow.

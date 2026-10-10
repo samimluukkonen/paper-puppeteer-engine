@@ -175,6 +175,12 @@ export class MirrorToolsController {
     this.refresh();
   }
 
+  hidePreview(): void {
+    if (!this.preview) return;
+    this.preview = false;
+    this.refresh();
+  }
+
   commitPose(): boolean {
     const state = this.state;
     if (!state || this.snapshot.poseReason) return false;
@@ -312,12 +318,28 @@ export class MirrorToolsController {
     );
   }
 
-  dispose(): void {
+  /** Release a failed or replaced session, including cached snapshots that retain its rig and clip. */
+  unbind(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.showPreview(null);
-    this.listeners.clear();
     this.state = undefined;
+    this.installedMapping = undefined;
+    this.pairs = [];
+    this.preview = false;
     this.pose = null;
+    this.poseDependencies = [];
+    this.keysDependencies = [];
+    this.poseReason = '';
+    this.keysReason = '';
+    this.feedback = '';
+    this.persistence = '';
+    this.storageKey = '';
+    this.rigSource = '';
+    this.refresh();
+  }
+
+  dispose(): void {
+    this.listeners.clear();
+    this.unbind();
   }
 }
