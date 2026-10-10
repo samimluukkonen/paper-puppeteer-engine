@@ -12,6 +12,12 @@ import { dispatchListeners, throwNotificationErrors } from '../../engine/notific
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
+import {
+  type BoneSymmetryIssue,
+  type BoneSymmetryMapping,
+  createBoneSymmetryMapping,
+  validateBoneSymmetryMapping,
+} from '../shared/boneSymmetry.js';
 import { freezeData } from '../shared/editorData.js';
 import {
   AnimationEditorDocument,
@@ -90,12 +96,15 @@ export class AnimationEditorState {
   private notificationPending = false;
   private importedSessions = 0;
   private animationSessions = 0;
+  private symmetry: BoneSymmetryMapping | null;
+  private symmetryIssues: readonly BoneSymmetryIssue[] = Object.freeze([]);
 
   constructor(
     readonly rig?: Rig,
     animations: readonly AnimationClip[] = [],
     options: AnimationEditorStateOptions = {},
   ) {
+    this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
     this.keyframes = new AnimationEditorKeyframeCommands(
@@ -139,6 +148,40 @@ export class AnimationEditorState {
 
   private get working(): ReadonlyAnimation | null {
     return this.document.workingAnimation;
+  }
+
+  /** Rig-session preferences survive animation changes and stay outside authored data and history. */
+  get symmetryMapping(): BoneSymmetryMapping | null {
+    return this.symmetry;
+  }
+  get symmetryValidationIssues(): readonly BoneSymmetryIssue[] {
+    return this.symmetryIssues;
+  }
+  getMirroredBoneId(boneId: string): string | null {
+    return this.symmetry?.getMirroredBoneId(boneId) ?? null;
+  }
+  setSymmetryMapping(mapping: BoneSymmetryMapping): boolean {
+    const issues = this.rig
+      ? validateBoneSymmetryMapping(this.rig, mapping)
+      : freezeData<BoneSymmetryIssue[]>([
+          {
+            code: 'rig-mismatch',
+            severity: 'error',
+            message: 'Load a rig before assigning symmetry pairs.',
+            boneIds: [],
+          },
+        ]);
+    this.symmetryIssues = issues;
+    if (!this.rig || issues.some((entry) => entry.severity === 'error')) {
+      this.notify();
+      return false;
+    }
+    // Rebuild from pairs so the session owns its snapshot and its authoritative reciprocal lookup.
+    const result = createBoneSymmetryMapping(this.rig, { manualPairs: mapping.pairs });
+    this.symmetryIssues = result.issues;
+    if (result.success) this.symmetry = result.mapping;
+    this.notify();
+    return result.success;
   }
 
   get animationIds(): readonly string[] {

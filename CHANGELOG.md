@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.4-1
+
+The v0.5.4.1 [bone symmetry mapping foundation](docs/bone-symmetry-mapping.md) adds immutable editor-only left/right pairs, an indexed bidirectional lookup, optional token-aware automatic candidates, manual overrides, and structured validation. Mappings belong to one rig session and survive animation changes without entering authored JSON, dirty tracking or history. Ambiguous names stay unpaired, and hierarchy compatibility problems produce warnings. Pose/keyframe mirroring, visual mapping tools and persistence remain deferred.
+
 ## 0.5.3-4
 
 The v0.5.3.4 [onion-skin production hardening](docs/animation-editor-onion-skinning-verification.md) completes the v0.5.3 onion-skin milestone. An eight-time runtime pose cache reuses held stepped neighbors, and hidden pool entries release obsolete pose references. Expanded regressions compare ghosts against runtime playback through authoring transactions, import/export, transforms, events and scene cleanup. Artist documentation explains FPS, boundaries, authored-pose IK limitations and an arm-swing workflow; the settings panel identifies ghosts as read-only authored poses.

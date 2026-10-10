@@ -134,6 +134,7 @@ src/devtools/shared/
   editorGame.ts        Shared Phaser rendering and scaling defaults for editor previews
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
   editorData.ts        Readonly data and editor number rounding
+  boneSymmetry.ts      Pure rig-bound bone pairs, automatic candidates, reciprocal lookup and validation
 src/shared/
   characterCatalog.ts  Character identities and picker labels
   characterPreviewSettings.ts  Optional immutable IK settings shared by demo and editors
