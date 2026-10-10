@@ -2,6 +2,43 @@ import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
+test('playback updates time without mutating authored rows, inspectors, or file controls', async ({ page }) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await page.locator('#play-pause').click();
+  await expect(page.locator('#play-pause')).toHaveText('Pause');
+  const result = await page.evaluate(async () => {
+    let mutations = 0;
+    const observer = new MutationObserver((records) => {
+      mutations += records.length;
+    });
+    for (const selector of [
+      '#timeline-track-labels',
+      '#timeline-tracks',
+      '#animation-event-inspector',
+      '#animation-download',
+      '#animation-copy-json',
+      '#animation-revert',
+    ])
+      observer.observe(document.querySelector(selector)!, {
+        subtree: true,
+        attributes: true,
+        childList: true,
+        characterData: true,
+      });
+    const before = document.querySelector('#current-time')!.textContent;
+    for (let frame = 0; frame < 10; ++frame)
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const after = document.querySelector('#current-time')!.textContent;
+    mutations += observer.takeRecords().length;
+    observer.disconnect();
+    return { before, after, mutations };
+  });
+  expect(result.after).not.toBe(result.before);
+  expect(result.mutations).toBe(0);
+  await page.locator('#play-pause').click();
+});
+
 test('edits and selection leave unrelated dense timeline markers untouched', async ({ page }) => {
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();

@@ -36,6 +36,7 @@ export interface AnimationImportOptions {
 /** Owns validated authored snapshots, saved baselines and history independently of editor navigation. */
 export class AnimationEditorDocument {
   private readonly animations = new Map<string, AnimationEntry>();
+  private ids: readonly string[] = Object.freeze([]);
   private source: ReadonlyAnimation | null = null;
   private working: ReadonlyAnimation | null = null;
   private selectedId: string | null = null;
@@ -61,11 +62,12 @@ export class AnimationEditorDocument {
         ...(path === undefined ? {} : { path }),
       });
     }
+    this.ids = Object.freeze([...this.animations.keys()]);
     this.issues = [];
   }
 
   get animationIds(): readonly string[] {
-    return [...this.animations.keys()];
+    return this.ids;
   }
   get selectedAnimationId(): string | null {
     return this.selectedId;
@@ -163,6 +165,7 @@ export class AnimationEditorDocument {
       issues: [],
       ...(path === undefined ? {} : { path }),
     });
+    if (!this.ids.includes(source.name)) this.ids = Object.freeze([...this.animations.keys()]);
     this.source = source;
     this.working = working;
     this.saved = working;

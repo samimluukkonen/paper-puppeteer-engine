@@ -223,3 +223,38 @@ test('revert works after a clean export and rejects empty sessions', async () =>
   assert.isFalse(new AnimationEditorState(rig).revertAnimation());
   dispose();
 });
+
+test('clock-only updates skip file controls while edits, history, and imports refresh them', () => {
+  const { state, query, controller, dispose } = fixture();
+  const app = query('#editor-app') as unknown as HTMLElement;
+  const lookups = vi.spyOn(app, 'querySelector');
+  const ids = state.animationIds;
+  state.selectTimelineProperty('root', 'x');
+  state.play();
+  lookups.mockClear();
+  state.advancePlayback(0.25);
+  state.advancePlayback(0.25);
+  assert.equal(query('#current-time').textContent, '0.500 / 1.000 s');
+  assert.isFalse(query('#timeline-previous-key').disabled);
+  assert.isFalse(query('#timeline-next-key').disabled);
+  assert.equal(lookups.mock.calls.length, 0);
+  assert.strictEqual(state.animationIds, ids);
+  assert.isTrue(Object.isFrozen(ids));
+  state.pause();
+  state.setBonePropertyKeyframe('root', 'x', 12);
+  assert.isTrue(lookups.mock.calls.length > 0);
+  assert.isFalse(query('#animation-undo').disabled);
+  assert.equal(query('#animation-dirty').textContent, 'Unsaved changes');
+  state.markSaved();
+  assert.equal(query('#animation-dirty').textContent, 'No unsaved changes');
+  state.undo();
+  assert.isFalse(query('#animation-redo').disabled);
+  state.importJson(JSON.stringify({ ...clip, version: 1, name: 'imported' }));
+  assert.deepEqual(state.animationIds, ['walk', 'idle', 'imported']);
+  assert.notStrictEqual(state.animationIds, ids);
+  assert.equal(query('#animation-selection').value, 'imported');
+  assert.isTrue(query('#animation-undo').disabled);
+  controller.showError('load failed');
+  assert.equal(query('#animation-status').textContent, 'load failed');
+  dispose();
+});

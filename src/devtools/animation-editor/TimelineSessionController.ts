@@ -32,7 +32,8 @@ export class TimelineSessionController {
   private authoredFPS = '';
   private animation: AnimationEditorState['workingAnimation'] = null;
   private readonly files: AnimationFileController;
-  private animationIdsKey = '';
+  private animationIds: readonly string[] | undefined;
+  private renderedControls: readonly unknown[] | undefined;
 
   constructor(
     private readonly app: HTMLElement,
@@ -90,7 +91,7 @@ export class TimelineSessionController {
         if (this.state.selectAnimation(this.selection.value || null, { discardChanges })) {
           this.files.invalidateSession();
         }
-        this.render();
+        this.render(true);
       },
       options,
     );
@@ -156,9 +157,8 @@ export class TimelineSessionController {
 
   private updateAnimationOptions(state: AnimationEditorState): void {
     const ids = state.animationIds;
-    const key = JSON.stringify(ids);
-    if (key === this.animationIdsKey) return;
-    this.animationIdsKey = key;
+    if (ids === this.animationIds) return;
+    this.animationIds = ids;
     this.selection.replaceChildren(new Option('No animation selected', ''), ...ids.map((id) => new Option(id, id)));
   }
 
@@ -167,37 +167,65 @@ export class TimelineSessionController {
     this.render();
   }
 
-  render(): void {
+  render(force = false): void {
     const state = this.state;
     this.updateAnimationOptions(state);
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
     if (this.snap.value !== state.keyframeSnapMode) this.snap.value = state.keyframeSnapMode;
-    this.snap.disabled = !animation;
     const selectedId = state.selectedAnimationId ?? '';
     if (this.selection.value !== selectedId) this.selection.value = selectedId;
-    const selectionDisabled = !state.animationIds.length;
-    if (this.selection.disabled !== selectionDisabled) this.selection.disabled = selectionDisabled;
-    if (this.reset.disabled !== !animation) this.reset.disabled = !animation;
-    const playDisabled = !animation || !(state.duration > 0);
-    if (this.playPause.disabled !== playDisabled) this.playPause.disabled = playDisabled;
     setText(this.playPause, state.isPlaying ? 'Pause' : 'Play');
-    if (this.loop.disabled !== !animation) this.loop.disabled = !animation;
     setAttribute(this.loop, 'aria-pressed', String(state.previewLoop));
     setText(this.timeDisplay, `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`);
     const playback = animation?.playback;
     const speed = String(state.playbackSpeed);
     if (this.speed.value !== speed) this.speed.value = speed;
-    if (this.speed.disabled !== !animation) this.speed.disabled = !animation;
     const mode = playback?.mode ?? 'smooth';
     if (this.mode.value !== mode) this.mode.value = mode;
-    if (this.mode.disabled !== !animation) this.mode.disabled = !animation;
     const fps = playback?.mode === 'stepped' ? String(playback.fps) : '';
     // Leave an uncommitted numeric edit alone while playback notifications refresh the other controls.
     if ((authoredChanged || fps !== this.authoredFPS || document.activeElement !== this.fps) && this.fps.value !== fps)
       this.fps.value = fps;
     this.authoredFPS = fps;
+    const previousDisabled = !state.getAdjacentKeyframe(-1);
+    const nextDisabled = !state.getAdjacentKeyframe(1);
+    if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
+    if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
+    setText(
+      this.metadata,
+      animation
+        ? `Mode: ${mode} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.previewLoop ? 'loop' : 'once'} · Speed: ${speed}× · ${state.isScrubbing ? 'Scrubbing' : state.isPlaying ? 'Playing' : 'Paused'}`
+        : 'Select an animation to preview its pose.',
+    );
+    // Only time-dependent controls above need work during clock-only notifications.
+    const controls = [
+      state,
+      state.animationIds,
+      animation,
+      selectedId,
+      state.keyframeSnapMode,
+      state.dirty,
+      state.canUndo,
+      state.canRedo,
+      state.selectedKeys,
+      state.selectedEvent,
+      state.timelineClipboard,
+      state.validationIssues,
+      this.externalError,
+    ];
+    if (!force && this.renderedControls && controls.every((value, index) => value === this.renderedControls![index]))
+      return;
+    this.snap.disabled = !animation;
+    const selectionDisabled = !state.animationIds.length;
+    if (this.selection.disabled !== selectionDisabled) this.selection.disabled = selectionDisabled;
+    if (this.reset.disabled !== !animation) this.reset.disabled = !animation;
+    const playDisabled = !animation || !(state.duration > 0);
+    if (this.playPause.disabled !== playDisabled) this.playPause.disabled = playDisabled;
+    if (this.loop.disabled !== !animation) this.loop.disabled = !animation;
+    if (this.speed.disabled !== !animation) this.speed.disabled = !animation;
+    if (this.mode.disabled !== !animation) this.mode.disabled = !animation;
     const fpsDisabled = !animation || mode !== 'stepped';
     if (this.fps.disabled !== fpsDisabled) this.fps.disabled = fpsDisabled;
     if (this.undo.disabled !== !state.canUndo) this.undo.disabled = !state.canUndo;
@@ -205,8 +233,6 @@ export class TimelineSessionController {
     this.files.render();
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = state.selectedKeys.length === 0;
-    const previousDisabled = !state.getAdjacentKeyframe(-1);
-    const nextDisabled = !state.getAdjacentKeyframe(1);
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
     const copyDisabled = deleteDisabled && !state.selectedEvent;
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
@@ -216,14 +242,6 @@ export class TimelineSessionController {
     setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
     const pasteDisabled = !animation || !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
-    if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
-    if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
-    setText(
-      this.metadata,
-      animation
-        ? `Mode: ${mode} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.previewLoop ? 'loop' : 'once'} · Speed: ${speed}× · ${state.isScrubbing ? 'Scrubbing' : state.isPlaying ? 'Playing' : 'Paused'}`
-        : 'Select an animation to preview its pose.',
-    );
     setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
     setText(
       this.sessionStatus,
@@ -242,6 +260,7 @@ export class TimelineSessionController {
                 ? 'This character has no animations.'
                 : 'No animation selected.'),
     );
+    this.renderedControls = controls;
   }
 
   dispose(): void {

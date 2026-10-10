@@ -25,12 +25,17 @@ export class TimelineController {
   private readonly viewAbort = new AbortController();
   private readonly inset: HTMLElement;
   private resizeFrame = 0;
+  private renderedView: readonly unknown[] | undefined;
+  private readonly filter: HTMLSelectElement;
+  private readonly filterStatus: HTMLElement;
 
   constructor(private readonly app: HTMLElement) {
     this.timeline = this.element('#timeline');
     this.inset = this.element('.timeline-inset');
     this.ruler = this.element('#timeline-ruler');
     this.playhead = this.element('#timeline-playhead');
+    this.filter = this.element('#timeline-filter');
+    this.filterStatus = this.element('#timeline-filter-status');
     this.tracks = new TimelineTracksController(
       this.element('#timeline-track-labels'),
       this.element('#timeline-tracks'),
@@ -117,19 +122,35 @@ export class TimelineController {
     const state = this.state;
     const animation = state.workingAnimation;
     const width = this.width;
-    this.tracks.render(state, width);
-    const filter = this.element<HTMLSelectElement>('#timeline-filter').value;
-    this.tracks.filter(filter, state);
-    const filterStatus = this.element('#timeline-filter-status');
-    if (filterStatus.hidden !== (filter === 'all')) filterStatus.hidden = filter === 'all';
-    setText(
-      filterStatus,
-      filter === 'selected'
-        ? 'Showing selected bone tracks · choose All to show every track.'
-        : 'Showing keyed tracks · choose All to author empty properties.',
-    );
-    this.interpolation.render();
-    this.eventInspector.render(state);
+    const filter = this.filter.value;
+    // Clock-only notifications need the playhead and time controls, not row/inspector reconciliation.
+    const view = [
+      state,
+      animation,
+      state.timelineTracks,
+      state.selectedBoneId,
+      state.selectedTimelineProperty,
+      state.selectedKeys,
+      state.selectedEvent,
+      state.keyframeDrag,
+      state.eventDrag,
+      width,
+      filter,
+    ];
+    if (!this.renderedView || view.some((value, index) => value !== this.renderedView![index])) {
+      this.tracks.render(state, width);
+      this.tracks.filter(filter, state);
+      if (this.filterStatus.hidden !== (filter === 'all')) this.filterStatus.hidden = filter === 'all';
+      setText(
+        this.filterStatus,
+        filter === 'selected'
+          ? 'Showing selected bone tracks · choose All to show every track.'
+          : 'Showing keyed tracks · choose All to author empty properties.',
+      );
+      this.interpolation.render();
+      this.eventInspector.render(state);
+      this.renderedView = view;
+    }
     const rulerKey = `${state.duration}:${width}`;
     if (rulerKey !== this.rulerKey) {
       this.rulerKey = rulerKey;

@@ -158,6 +158,8 @@ Keyframe commands and gestures are owned by `AnimationEditorKeyframeCommands`; `
 
 `TimelineInputController` owns pointer capture, scrubbing, dragging, and marquee geometry. It composes `TimelineKeyboardController`, which routes shortcuts and ruler navigation with typing, modifier, IME, repeat, and clipboard-scope guards. Keyboard cancellation uses the pointer owner's gesture lifecycle, and disposing the input controller releases both sets of listeners.
 
+Timeline playback notifications update time-dependent controls and the playhead. Authored rows, filters, inspectors, file controls, and document status refresh when their document, selection, gesture, or layout dependencies change. Animation IDs are immutable cached lists, so clock updates do not rebuild or serialize the selection options.
+
 ## Use as a local package
 
 `new Rig(existingRig)` shares its validated immutable skeleton and indexes. Pass a second skin array to create a rig with independently validated, owned skins: `new Rig(existingRig, skins)`. The rig editor uses this to retain authored skins separately from preview skins, and its working copy stays independent of the shared source skeleton. New JSON imports still receive full rig validation.
