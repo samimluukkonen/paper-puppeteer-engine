@@ -18,12 +18,12 @@ Also exercised selecting `walk`, entering and committing a right forearm rotatio
 
 Evidence:
 
-- [Desktop viewport screenshot](research/animation-editor-layout/current-1440x900.png)
-- [Entire desktop page](research/animation-editor-layout/current-1440-full.png)
-- [1000-pixel-wide viewport](research/animation-editor-layout/current-1000x768.png)
-- [Selected event screenshot](research/animation-editor-layout/event-selected.png)
-- [Raw measurements](research/animation-editor-layout/measurements.json)
-- [Recommended layout diagram](research/animation-editor-layout/recommended-layout.svg)
+- [Desktop viewport screenshot](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/current-1440x900.png)
+- [Entire desktop page](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/current-1440-full.png)
+- [1000-pixel-wide viewport](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/current-1000x768.png)
+- [Selected event screenshot](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/event-selected.png)
+- [Raw measurements](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/measurements.json)
+- [Recommended layout diagram](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/recommended-layout.svg)
 
 All positions below are document coordinates measured from the page's top; widths are CSS pixels. Rounded values can differ by one pixel from calculations using unrounded rectangles.
 
@@ -94,7 +94,7 @@ Markers use 20 × 24-pixel targets. Improve targeting when reorganizing the time
 
 ## Recommended candidate
 
-![Recommended editor arrangement](research/animation-editor-layout/recommended-layout.svg)
+![Recommended editor arrangement](https://raw.githubusercontent.com/samimluukkonen/paper-puppeteer-engine/master/docs/research/animation-editor-layout/recommended-layout.svg)
 
 Use a compact header and persistent command bar. Below them, share the available height between an upper preview/inspector area and a full-width lower timeline. Fit the preview canvas to both dimensions of its host while preserving the puppet's proportions. Add a draggable divider between preview and timeline and an accessible keyboard alternative; retain a reset-layout command. Spine's resizable, tabbed views support the broader principle of allowing workspace adjustment. [Spine Views](https://esotericsoftware.com/spine-views).
 
@@ -141,9 +141,9 @@ At 1440 × 900, the page height falls from 2487 to 900 pixels, the header from 2
 
 Measurements use `demo-puppet`, `idle`, time zero, selected root, All tracks, and Fit zoom. Root selection was triggered programmatically for geometry capture; the drawer was then closed on narrow screens. No page exceptions were recorded. Phone layouts have an 850-pixel minimum height and allow document scrolling on shorter screens. Tracks and inspector content scroll within their panels.
 
-- [Implemented desktop screenshot](research/animation-editor-layout/implemented-1440x900.png)
-- [Implemented phone screenshot](research/animation-editor-layout/implemented-390x844.png)
-- [Implemented measurements](research/animation-editor-layout/implemented-measurements.json)
+- [Implemented desktop screenshot](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/implemented-1440x900.png)
+- [Implemented phone screenshot](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/implemented-390x844.png)
+- [Implemented measurements](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/docs/research/animation-editor-layout/implemented-measurements.json)
 
 Validation passed: 1410 unit tests; formatting, lint, and type checking; and the production demo build. Local Playwright checks passed for 32 development/production workspace and import/export executions, seven additional development authoring/playback/clipboard scenarios, and four development/production preview-authoring and event-deletion executions. The event-inspector unit check was rerun after the deletion fix. Browser checks cover panel resizing, reset, horizontal zoom and key dragging, endpoint targeting, filters, event selection, dialog focus, narrow-screen drawers, rendered-pose round trips, field drafts, history, and unchanged-control playback rendering.
 

@@ -48,6 +48,20 @@ try {
   );
   const packageRoot = await realpath(join(consumer, 'node_modules', manifest.name));
   assert.notEqual(packageRoot, await realpath(root), 'The consumer must load the packed package, not this checkout.');
+  const guides = await readdir(join(packageRoot, 'docs'));
+  assert.ok(
+    guides.every((file) => file.endsWith('.md')),
+    'Only Markdown guides belong in the packaged docs.',
+  );
+  for (const guide of [
+    'animation.md',
+    'characters.md',
+    'development.md',
+    'ik.md',
+    'animation-editor.md',
+    'rig-editor.md',
+  ])
+    assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 
   const smoke = join(consumer, 'check-core.mjs');
   await writeFile(smoke, await readFile(new URL('./check-core.mjs', import.meta.url)));

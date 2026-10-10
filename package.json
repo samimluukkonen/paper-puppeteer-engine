@@ -7,7 +7,7 @@
     "dist/library",
     "src/engine",
     "schemas",
-    "docs",
+    "docs/*.md",
     "README.md",
     "CHANGELOG.md"
   ],

@@ -184,6 +184,8 @@ import { Puppet, type RigDefinition, type AnimationClip } from 'paper-puppeteer-
 
 The library includes TypeScript declarations and source maps. Zod is externalized and supplied through the package dependency, so consumers share its validation runtime and error classes. Phaser is externalized and declared as an exact peer dependency so the consumer provides the same Phaser runtime. No package has been published. Engine rendering APIs are browser-based and should be imported in a browser environment.
 
+The package includes the root Markdown guides and verification notes in `docs/`. Research screenshots, diagrams, and measurement files stay in the repository; the layout report links to those hosted artifacts. `test:package` verifies that the main guides are present and research assets are excluded from the installed tarball.
+
 For Node scripts and asset tooling, import the renderer-independent entry point:
 
 ```ts
