@@ -229,6 +229,60 @@ export class PuppetRenderer {
     this.slotImages.set(id, image);
   }
 
+  /** Copy current sprite artwork and runtime slot layout without reading or applying a pose.
+   * Render-only previews share loaded textures and retain images across skin/frame changes.
+   * Arbitrary host-attached GameObjects are deliberately not cloned.
+   */
+  copyAppearanceFrom(source: PuppetRenderer, tint: number): void {
+    const copyTransform = (
+      target: Phaser.GameObjects.Container | Phaser.GameObjects.Image,
+      original: Phaser.GameObjects.Container | Phaser.GameObjects.Image,
+    ): void => {
+      target
+        .setPosition(original.x, original.y)
+        .setRotation(original.rotation)
+        .setScale(original.scaleX, original.scaleY)
+        .setAlpha(original.alpha)
+        .setVisible(original.visible);
+    };
+    const copyImage = (target: Phaser.GameObjects.Image, original: Phaser.GameObjects.Image): void => {
+      if (target.texture !== original.texture || target.frame !== original.frame)
+        target.setTexture(original.texture.key, original.frame.name);
+      copyTransform(target, original);
+      target.setOrigin(original.originX, original.originY).setDepth(original.depth).setTint(tint);
+    };
+    for (const [id, bone] of this.bones) {
+      const original = source.bones.get(id)!;
+      bone.container.setAlpha(original.container.alpha).setVisible(original.container.visible);
+      if (bone.sprite && original.sprite) copyImage(bone.sprite, original.sprite);
+    }
+    this.setOrder(source.getOrder());
+    let depthsChanged = false;
+    for (const slot of this.rig.slots) {
+      const branch = this.slotBranches.get(slot.id)!;
+      const originalBranch = source.slotBranches.get(slot.id)!;
+      copyTransform(branch.mount, originalBranch.mount);
+      if (branch.root.depth !== originalBranch.root.depth) {
+        branch.root.setDepth(originalBranch.root.depth);
+        depthsChanged = true;
+      }
+      const original = source.slotImages.get(slot.id);
+      let image = this.slotImages.get(slot.id);
+      if (!original) {
+        image?.destroy();
+        this.slotImages.delete(slot.id);
+        continue;
+      }
+      if (!image) {
+        image = this.scene.add.image(0, 0, original.texture.key, original.frame.name);
+        branch.mount.add(image);
+        this.slotImages.set(slot.id, image);
+      }
+      copyImage(image, original);
+    }
+    if (depthsChanged) this.container.sort('depth');
+  }
+
   sync(): void {
     for (const node of this.nodes.values()) {
       this.readNode(node);

@@ -1,5 +1,6 @@
-import { EventEmitter } from 'node:events';
+import { EventEmitter } from 'eventemitter3';
 import { afterEach, assert, test, vi } from 'vitest';
+import type { AnimationEditorGhostLayer } from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import type { Puppet } from '../src/engine/Puppet.js';
@@ -56,11 +57,15 @@ test('preview preferences chosen while loading apply before the ready callback',
     assert.isTrue(puppet.getIK('arm').enabled);
     assert.equal(puppet.getIK('arm').status, 'solved');
     assert.isFalse(state.dirty);
+    const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
+    assert.isTrue(Reflect.get(ghosts, 'enabled'));
+    assert.equal((Reflect.get(ghosts, 'instances') as Map<string, unknown>).size, 1);
   });
   scene.create();
   scene.setFacing('left');
   scene.setBonesVisible(false);
   scene.setIKPreview(true);
+  scene.setOnionSkinning(true);
   finishLoad(demoCharacter);
   await vi.waitFor(() => {
     assert.deepEqual(error.mock.calls, []);
@@ -74,8 +79,12 @@ test('preview preferences chosen while loading apply before the ready callback',
   assert.equal(puppet.facingDirection, 'right');
   assert.isTrue(puppet.isDebug);
   assert.isFalse(puppet.getIK('arm').enabled);
-  (Reflect.get(scene, 'preview') as { dispose(): void }).dispose();
-  puppet.destroy();
+  const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
+  scene.setOnionSkinning(false);
+  assert.isFalse(Reflect.get(ghosts, 'enabled'));
+  scene.events.emit('shutdown');
+  assert.isUndefined(Reflect.get(scene, 'ghosts'));
+  assert.isTrue(Reflect.get(ghosts, 'disposed'));
 });
 
 test('scene converts Phaser milliseconds to seconds and shutdown pauses and releases playback', () => {
@@ -89,7 +98,13 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
   state.selectAnimation('move');
   const dispose = vi.fn();
   const destroy = vi.fn();
-  Object.assign(scene, { state, preview: { dispose }, puppet: { destroy } });
+  const disposeGhosts = vi.fn();
+  Object.assign(scene, {
+    state,
+    preview: { dispose },
+    puppet: { destroy },
+    ghosts: { sync: vi.fn(), dispose: disposeGhosts },
+  });
   state.play();
   scene.update(12345, 250);
   assert.equal(state.currentTime, 0.25);
@@ -103,6 +118,8 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
   assert.isFalse(state.isPlaying);
   assert.isUndefined(Reflect.get(scene, 'state'));
   assert.equal(dispose.mock.calls.length, 1);
+  assert.equal(disposeGhosts.mock.calls.length, 1);
+  assert.isUndefined(Reflect.get(scene, 'ghosts'));
   assert.equal(destroy.mock.calls.length, 1);
   scene.update(100000, 500);
   assert.equal(state.currentTime, 0.375);
@@ -145,7 +162,6 @@ test('scene owns options before loading and retains its IK chains after caller m
     scene.setIKPreview(false);
     assert.isFalse(puppet.getIK('arm').enabled);
   } finally {
-    (Reflect.get(scene, 'preview') as { dispose(): void }).dispose();
-    (Reflect.get(scene, 'puppet') as Puppet).destroy();
+    scene.events.emit('shutdown');
   }
 });

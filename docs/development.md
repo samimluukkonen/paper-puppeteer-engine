@@ -156,6 +156,7 @@ src/devtools/animation-editor/
   AnimationEditorDocument.ts  Validated animation snapshots, saved baselines, history and export
   AnimationEditorPlayback.ts  Sole continuous editor clock, preview speed/loop and scrub playback intent
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
+  AnimationEditorGhostLayer.ts  Render-only neighboring poses sharing engine artwork and affine projection
   TimelineController.ts   Session coordination, responsive ruler, tracks and playhead
   TimelineInputController.ts  Pointer capture, gestures, keyboard navigation and cancellation
   TimelineSessionController.ts  Selection, settings, history, exports and status display

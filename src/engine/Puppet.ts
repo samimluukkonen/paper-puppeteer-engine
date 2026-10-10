@@ -180,6 +180,11 @@ export class Puppet {
     return this.facing;
   }
 
+  /** Share current artwork/layout with a compatible render-only preview; leaves both poses untouched. */
+  copyAppearanceTo(renderer: PuppetRenderer, tint: number): void {
+    renderer.copyAppearanceFrom(this.renderer, tint);
+  }
+
   getBone(id: string): Bone {
     const bone = this.bones.get(id);
     if (!bone) throw new Error(`Unknown bone "${id}".`);

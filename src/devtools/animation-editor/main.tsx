@@ -108,6 +108,11 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
     },
     { signal: previewControls.signal },
   );
+  app
+    .querySelector<HTMLInputElement>('#animation-onion-skinning')!
+    .addEventListener('change', (event) => scene.setOnionSkinning((event.target as HTMLInputElement).checked), {
+      signal: previewControls.signal,
+    });
   app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
     'change',
     (event) => {

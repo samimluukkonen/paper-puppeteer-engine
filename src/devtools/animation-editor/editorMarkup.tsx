@@ -127,6 +127,9 @@ export function AnimationEditorView() {
               <input id="animation-show-bones" type="checkbox" defaultChecked /> Show bones
             </label>
             <label>
+              <input id="animation-onion-skinning" type="checkbox" /> Onion Skinning
+            </label>
+            <label>
               <input id="animation-ik-preview" type="checkbox" /> IK preview (fixed targets)
             </label>
           </div>

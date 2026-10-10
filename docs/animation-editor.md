@@ -226,7 +226,7 @@ Pure queries are `findBonePropertyKeyframe(animation, boneId, property, timeMs)`
 
 `getEvaluatedBonePropertyValue(animation, rig, boneId, property, timeMs)` uses the runtime pose buffer and playback quantization, compiling an event-free, nonlooping preview clip. `getEvaluatedBoneTransform(animation, rig, boneId, timeMs)` reads all five local properties together. Fully frozen animation snapshots cache compilation per rig and reuse pose evaluation within the same sampled frame; mutable or shallow-frozen caller data is validated and compiled afresh. Returned transforms are detached copies. Sampling never advances a clock or stores an evaluated pose as authored data. Smooth interpolation and shortest-path rotation come from the runtime; stepped clips hold at authored FPS boundaries and retain the exact endpoint. Before the first property key and after its last, the runtime holds the nearest value. A wholly unkeyed property falls back to the rig bind pose. Results represent the animation's local transform before optional presets, IK, and facing. Invalid evaluation targets throw.
 
-The v0.5.3.1 [ghost pose sampling foundation](ghost-pose-sampling.md) extends this sampler with `getEvaluatedAnimationPose(animation, rig, timeMs)` for complete detached local poses. `state.sampleGhostPose(timeSeconds)` samples any in-range authored time; `state.sampleGhostPoses(settings?)` returns previous/next frame samples from the current working copy without changing the playhead or preview. No onion-skin rendering or UI controls exist in this phase.
+The v0.5.3.1 [ghost pose sampling foundation](ghost-pose-sampling.md) extends this sampler with `getEvaluatedAnimationPose(animation, rig, timeMs)` for complete detached local poses. `state.sampleGhostPose(timeSeconds)` samples any in-range authored time; `state.sampleGhostPoses(settings?)` returns previous/next frame samples from the current working copy without changing the playhead or preview. The v0.5.3.2 [ghost rendering layer](ghost-pose-rendering.md) displays these samples through the **Onion Skinning** checkbox above the preview. One cool previous pose and one warm next pose appear at 22% opacity behind the current puppet. Spacing follows authored stepped FPS or the 10 FPS fallback; out-of-range neighbors are hidden. The toggle is transient, leaves dirty/history/exports unchanged, and ghosts show authored poses before procedural IK and temporary inspector drafts.
 
 State methods use **seconds**, defaulting to `currentTime`:
 
@@ -298,7 +298,7 @@ The v0.5.2.4.3 movement architecture and verification results are recorded in [K
 
 ## Deferred features
 
-Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, onion skinning, mirrored keyframes, ghost poses, and IK target authoring/baking remain deferred to v0.5.3+. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
+Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, mirrored keyframes, and IK target authoring/baking remain deferred to v0.5.3+. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
 
 The v0.5.2.5.1 selection policies, APIs, files and verification results are recorded in [Multi-key selection verification](animation-editor-multi-selection-verification.md).
 
@@ -316,7 +316,7 @@ Numeric cleanup reuses `roundEditorNumber()` for six-decimal candidates but acce
 
 Clipboard failures offer Download and Log alternatives. Download filenames retain manifest basenames, with a sanitized animation-name fallback and `animation.json` when no name is available. Copy/download/log establish session checkpoints and retain Undo/Redo history; they do not overwrite source files. Saved authored snapshots retain their original precision. A page reload still reads character assets.
 
-See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, onion skinning, ghost poses, mirrored tools, IK target animation and baking remain deferred to v0.5.3+.
+See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, mirrored tools, IK target animation and baking remain deferred to v0.5.3+.
 
 ## Animation import and reload
 

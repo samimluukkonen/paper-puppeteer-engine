@@ -3,6 +3,7 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import { AnimationEditorGhostLayer } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { toSeconds } from './timeUnits.js';
@@ -16,6 +17,8 @@ export interface AnimationEditorSceneOptions {
 export class AnimationEditorScene extends Phaser.Scene {
   private puppet: Puppet | undefined;
   private preview: AnimationEditorPreview | undefined;
+  private ghosts: AnimationEditorGhostLayer | undefined;
+  private onionSkinning = false;
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
   private selectionOverlay: Phaser.GameObjects.Graphics | undefined;
@@ -44,6 +47,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
+      this.ghosts?.dispose();
+      this.ghosts = undefined;
       this.preview?.dispose();
       this.preview = undefined;
       this.puppet?.destroy();
@@ -54,6 +59,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.state?.advancePlayback(toSeconds(delta));
+    this.ghosts?.sync();
     const overlay = this.selectionOverlay;
     overlay?.clear();
     if (overlay && this.puppet && this.state?.selectedBoneId) {
@@ -80,6 +86,12 @@ export class AnimationEditorScene extends Phaser.Scene {
   setFacing(facing: Facing): void {
     this.facing = facing;
     this.puppet?.setFacing(facing);
+    this.ghosts?.sync();
+  }
+
+  setOnionSkinning(enabled: boolean): void {
+    this.onionSkinning = enabled;
+    this.ghosts?.setEnabled(enabled);
   }
 
   setBonesVisible(visible: boolean): void {
@@ -123,6 +135,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   private async loadCharacter(session: number): Promise<void> {
     let puppet: Puppet | undefined;
     let preview: AnimationEditorPreview | undefined;
+    let ghosts: AnimationEditorGhostLayer | undefined;
     try {
       const url = new URL(
         this.options.characterUrl ?? '../characters/demo-puppet/character.json',
@@ -145,6 +158,9 @@ export class AnimationEditorScene extends Phaser.Scene {
         ik: (this.options.ikChains ?? []).map((chain) => ({ ...chain, enabled: false })),
       });
       preview = new AnimationEditorPreview(state, puppet);
+      ghosts = new AnimationEditorGhostLayer(this, state, puppet);
+      ghosts.setEnabled(this.onionSkinning);
+      this.ghosts = ghosts;
       this.puppet = puppet;
       this.preview = preview;
       this.state = state;
@@ -158,6 +174,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
+      ghosts?.dispose();
+      this.ghosts = undefined;
       preview?.dispose();
       puppet?.destroy();
       this.preview = undefined;

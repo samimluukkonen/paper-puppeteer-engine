@@ -22,6 +22,10 @@ class Container {
   visible = true;
   depth = 0;
   isDestroyed = false;
+  name = '';
+  tint = 0xffffff;
+  texture = { key: '' };
+  frame: { name: string | number } = { name: '__BASE' };
   width = 100;
   height = 100;
   originX = 0.5;
@@ -59,7 +63,17 @@ class Container {
     this.depth = depth;
     return this;
   }
-  setName(_name: string) {
+  setName(name: string) {
+    this.name = name;
+    return this;
+  }
+  setTexture(key: string, frame: string | number = '__BASE') {
+    this.texture = { key };
+    this.frame = { name: frame };
+    return this;
+  }
+  setTint(tint: number) {
+    this.tint = tint;
     return this;
   }
   setOrigin(x: number, y: number) {
@@ -106,17 +120,24 @@ class Container {
     return this;
   }
   add(child: Container) {
+    child.parentContainer?.remove(child);
     child.parentContainer = this;
     this.list.push(child);
     return this;
   }
   remove(child: Container) {
     child.parentContainer = null;
-    this.list.splice(this.list.indexOf(child), 1);
+    const index = this.list.indexOf(child);
+    if (index !== -1) this.list.splice(index, 1);
     return this;
   }
   destroy() {
+    if (this.isDestroyed) return;
     this.isDestroyed = true;
+    this.parentContainer?.remove(this);
+    // Destruction removes children from their parent, so iterate a snapshot.
+    for (const child of this.list.slice()) child.destroy();
+    this.list.length = 0;
   }
 
   getWorldTransformMatrix(): Matrix {
@@ -162,7 +183,8 @@ export function puppetScene(): Phaser.Scene {
   const scene = {
     add: {
       container: makeContainer,
-      image: makeContainer,
+      image: (x: number, y: number, texture: string, frame?: string | number) =>
+        makeContainer(x, y).setTexture(texture, frame),
       graphics: makeContainer,
       text: (x = 0, y = 0) => new Container().setPosition(x, y),
     },
