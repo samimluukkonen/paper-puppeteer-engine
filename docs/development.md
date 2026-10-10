@@ -132,8 +132,11 @@ src/devtools/animation-editor/
   TimelineInputController.ts  Pointer capture, gestures, keyboard navigation and cancellation
   TimelineSessionController.ts  Selection, settings, history and status display
   AnimationFileController.ts  Import/export, export reload/source revert and asynchronous request lifetime
+  AnimationDraftRecoveryController.ts  Source-bound drafts, import revisions and recovery subscription lifecycle
   timeline.ts          Pure duration, coordinate conversion, clamping and ruler generation
 src/devtools/shared/
+  DraftRecovery.ts      Browser drafts, compatible restoration and retained incompatible JSON
+  DraftRecoveryControls.ts  Shared recovery feedback and manual retained-draft downloads
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
   editorGame.ts        Shared Phaser rendering and scaling defaults for editor previews
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom

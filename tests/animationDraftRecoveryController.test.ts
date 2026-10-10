@@ -1,0 +1,133 @@
+import { assert, test, vi } from 'vitest';
+import { AnimationDraftRecoveryController } from '../src/devtools/animation-editor/AnimationDraftRecoveryController.js';
+import { AnimationEditorState, type ReadonlyAnimation } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import type { DraftSession } from '../src/devtools/shared/DraftRecovery.js';
+import { draftSource } from '../src/devtools/shared/draftSource.js';
+import { Rig } from '../src/engine/Rig.js';
+
+function fixture() {
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const animations = ['first', 'second'].map((name) => ({
+    name,
+    duration: 1000,
+    loop: false,
+    tracks: { root: [{ time: 0, x: 0 }] },
+  }));
+  const state = new AnimationEditorState(rig, animations);
+  state.selectAnimation('first');
+  const calls: string[] = [];
+  const recovery = {
+    bind: vi.fn((_session: DraftSession<ReadonlyAnimation | null>, _options: { recover?: boolean } = {}) => {
+      calls.push('bind');
+    }),
+    update: vi.fn(() => {
+      calls.push('update');
+    }),
+    unbind: vi.fn(() => {
+      calls.push('unbind');
+    }),
+  };
+  const controller = new AnimationDraftRecoveryController(recovery, '/animation-editor/');
+  const session = () => recovery.bind.mock.lastCall![0];
+  return { rig, animations, state, calls, recovery, controller, session };
+}
+
+test('binds source identity and updates edits/playback without replacing recovery sessions', () => {
+  const { state, recovery, controller, session, rig } = fixture();
+  controller.bind(state, 'character');
+  const bound = session();
+  assert.equal(bound.key, JSON.stringify(['/animation-editor/', 'character', 'first']));
+  assert.equal(bound.source, draftSource({ rig, animation: state.sourceAnimation }));
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: true });
+  assert.isTrue(bound.validate(state.workingAnimation));
+  assert.isFalse(bound.validate({ ...state.workingAnimation, name: 'other' }));
+  assert.isFalse(bound.dirty());
+  state.setCurrentTime(0.25);
+  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  assert.equal(recovery.bind.mock.calls.length, 1);
+  assert.isTrue(bound.dirty());
+  assert.strictEqual(bound.snapshot(), state.workingAnimation);
+  assert.strictEqual(bound.data(bound.snapshot()), state.workingAnimation);
+  assert.isAbove(recovery.update.mock.calls.length, 1);
+  controller.dispose();
+});
+
+test('synchronous restoration cannot recursively rebind and remains one undoable edit', () => {
+  const { state, recovery, controller } = fixture();
+  recovery.bind.mockImplementationOnce((session) => {
+    assert.isTrue(session.restore({ ...state.sourceAnimation, tracks: { root: [{ time: 0, x: 44 }] } }));
+  });
+  controller.bind(state, 'character');
+  assert.equal(recovery.bind.mock.calls.length, 1);
+  assert.isTrue(state.dirty);
+  assert.equal(state.historyLength, 1);
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'x', 0), 44);
+  assert.isTrue(state.undo());
+  assert.isFalse(state.dirty);
+  controller.dispose();
+});
+
+test('animation navigation binds separate keys and deselection releases the current draft', () => {
+  const { state, recovery, controller, session } = fixture();
+  controller.bind(state, 'character');
+  state.selectAnimation('second');
+  assert.equal(session().key, JSON.stringify(['/animation-editor/', 'character', 'second']));
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: true });
+  state.selectAnimation(null);
+  assert.equal(recovery.unbind.mock.calls.length, 2);
+  state.selectAnimation('first');
+  assert.equal(session().key, JSON.stringify(['/animation-editor/', 'character', 'first']));
+  assert.equal(recovery.bind.mock.calls.length, 3);
+  controller.dispose();
+});
+
+test('same-name imports clear the prior draft before binding and skip restoration for the new baseline', () => {
+  const { state, recovery, controller, calls, session } = fixture();
+  controller.bind(state, 'character');
+  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  calls.length = 0;
+  assert.isTrue(state.importJson(JSON.stringify({ ...state.sourceAnimation, duration: 2000 })));
+  assert.deepEqual(calls, ['update', 'bind', 'update']);
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: false });
+  assert.isFalse(session().dirty());
+  assert.equal(session().source, draftSource({ rig: state.rig, animation: state.sourceAnimation }));
+  state.setBonePropertyKeyframe('root', 'x', 99, 0);
+  const bindings = recovery.bind.mock.calls.length;
+  assert.isTrue(state.revertAnimation({ discardChanges: true }));
+  assert.equal(recovery.bind.mock.calls.length, bindings);
+  assert.isFalse(session().dirty());
+  controller.dispose();
+});
+
+test('different-name imports skip restoration while later navigation permits recovery', () => {
+  const { state, recovery, controller, session } = fixture();
+  controller.bind(state, 'character');
+  assert.isTrue(state.importJson(JSON.stringify({ ...state.sourceAnimation, name: 'imported' })));
+  assert.equal(session().key, JSON.stringify(['/animation-editor/', 'character', 'imported']));
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: false });
+  state.selectAnimation('second');
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: true });
+  controller.dispose();
+});
+
+test('character rebinding, unbinding and disposal release old state subscriptions', () => {
+  const { state, rig, animations, recovery, controller, session } = fixture();
+  controller.bind(state, 'character');
+  const next = new AnimationEditorState(rig, animations);
+  next.selectAnimation('first');
+  controller.bind(next, 'other-character');
+  assert.equal(session().key, JSON.stringify(['/animation-editor/', 'other-character', 'first']));
+  const updates = recovery.update.mock.calls.length;
+  state.setCurrentTime(0.5);
+  assert.equal(recovery.update.mock.calls.length, updates);
+  next.setCurrentTime(0.25);
+  assert.equal(recovery.update.mock.calls.length, updates + 1);
+  controller.unbind();
+  next.setCurrentTime(0.5);
+  assert.equal(recovery.update.mock.calls.length, updates + 1);
+  controller.bind(next, 'other-character');
+  controller.dispose();
+  const disposedUpdates = recovery.update.mock.calls.length;
+  next.setCurrentTime(0.75);
+  assert.equal(recovery.update.mock.calls.length, disposedUpdates);
+});

@@ -1,11 +1,10 @@
-import { inspectAnimationDefinition } from '../../engine/externalData.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { mountView } from '../../ui/mountView.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
-import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
+import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { ReadonlyAnimation } from './AnimationEditorState.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
@@ -30,14 +29,12 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
     app.querySelector<HTMLElement>('#animation-draft-status')!,
     app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
   );
-  const recovery = recoveryControls.recovery;
-  let releaseRecovery: (() => void) | undefined;
+  const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
   let releaseWorkspaceSelection: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       editorScene.fitPreview();
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
-      releaseRecovery?.();
       timeline.bind(state, id);
       inspector.bind(state);
       releaseWorkspaceSelection?.();
@@ -55,44 +52,10 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
         selectedEvent = state.selectedEvent;
         selectedKeys = state.selectedKeys;
       });
-      let recoveryAnimation: string | null | undefined;
-      let recoverySource: ReadonlyAnimation | null | undefined;
-      let recoveryImportRevision = state.importRevision;
-      const synchronizeRecovery = (): void => {
-        const animation = state.selectedAnimationId;
-        const source = state.sourceAnimation;
-        const imported = state.importRevision !== recoveryImportRevision;
-        recoveryImportRevision = state.importRevision;
-        if (animation !== recoveryAnimation || source !== recoverySource) {
-          // A same-name import establishes a new baseline and clears this session's previous draft.
-          if (animation === recoveryAnimation) recovery.update();
-          recoveryAnimation = animation;
-          recoverySource = source;
-          if (animation === null) recovery.unbind();
-          else
-            recovery.bind(
-              {
-                key: JSON.stringify([window.location.pathname, id, animation]),
-                source: draftSource({ rig: state.rig, animation: state.sourceAnimation }),
-                label: `animation "${animation}"`,
-                snapshot: () => state.workingAnimation,
-                dirty: () => state.dirty,
-                data: (snapshot) => snapshot,
-                validate: (data) => {
-                  const inspected = inspectAnimationDefinition(data, state.rig);
-                  return inspected.data?.name === animation;
-                },
-                restore: (data) => state.replaceWorkingAnimation(data),
-              },
-              { recover: !imported },
-            );
-        }
-        recovery.update();
-      };
-      releaseRecovery = state.subscribe(synchronizeRecovery);
-      synchronizeRecovery();
+      recovery.bind(state, id);
     },
     (message) => {
+      recovery.unbind();
       mirrorTools.unbind();
       timeline.showError(message);
     },
@@ -133,7 +96,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
   });
 
   return () => {
-    releaseRecovery?.();
+    recovery.dispose();
     releaseWorkspaceSelection?.();
     mirrorTools.dispose();
     workspace.dispose();
