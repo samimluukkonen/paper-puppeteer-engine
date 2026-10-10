@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { Bone } from '../../engine/Bone.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { PuppetRenderer } from '../../engine/PuppetRenderer.js';
+import { transformProperties } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import type { GhostPoseSample } from './ghostPoseSampling.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
@@ -12,6 +13,9 @@ class GhostInstance {
   private readonly bones = new Map<string, Bone>();
   private readonly renderer: PuppetRenderer;
   private sample: GhostPoseSample | undefined;
+  private poseDirty = true;
+  private appearanceRevision: number | undefined;
+  private tint: number | undefined;
 
   constructor(
     scene: Phaser.Scene,
@@ -32,8 +36,11 @@ class GhostInstance {
     if (sample === this.sample) return;
     this.sample = sample;
     for (const [id, bone] of this.bones) {
-      Object.assign(bone.pose, sample.pose.get(id));
+      const pose = sample.pose.get(id)!;
+      if (transformProperties.every((property) => bone.pose[property] === pose[property])) continue;
+      Object.assign(bone.pose, pose);
       bone.syncTransform();
+      this.poseDirty = true;
     }
   }
 
@@ -42,7 +49,7 @@ class GhostInstance {
     this.sample = undefined;
   }
 
-  syncAppearance(puppet: Puppet, settings: OnionSkinSettings): void {
+  syncAppearance(puppet: Puppet, settings: OnionSkinSettings, revision: number): void {
     const source = puppet.container;
     const parentChanged = this.container.parentContainer !== source.parentContainer;
     if (parentChanged) {
@@ -62,8 +69,17 @@ class GhostInstance {
       .setAlpha(source.alpha * opacity)
       .setDepth(depth);
     if (parentChanged || depthChanged) source.parentContainer?.sort('depth');
-    puppet.copyAppearanceTo(this.renderer, tint);
-    this.renderer.sync();
+    const appearanceChanged = this.appearanceRevision !== revision || this.tint !== tint;
+    if (appearanceChanged) {
+      this.poseDirty = true;
+      puppet.copyAppearanceTo(this.renderer, tint);
+      this.appearanceRevision = revision;
+      this.tint = tint;
+    }
+    if (this.poseDirty || appearanceChanged) {
+      this.renderer.sync();
+      this.poseDirty = false;
+    }
   }
 
   destroy(): void {
@@ -135,11 +151,12 @@ export class AnimationEditorGhostLayer {
       this.animation = this.state.workingAnimation;
       this.time = this.state.currentTime;
     }
-    for (const ghost of this.instances.values()) ghost.container.setVisible(false);
     if (!this.puppet.container.visible) {
       for (const ghost of this.instances.values()) ghost.hide();
       return;
     }
+    const appearanceRevision = this.puppet.getAppearanceRevision();
+    const visible = new Set<GhostInstance>();
     for (const direction of ['previous', 'next'] as const) {
       let distance = 0;
       for (const sample of this.samples) {
@@ -152,12 +169,13 @@ export class AnimationEditorGhostLayer {
         }
         // Hidden instances may have skipped earlier frames; always apply the cached current sample.
         ghost.apply(sample);
-        ghost.syncAppearance(this.puppet, this.settings);
+        ghost.syncAppearance(this.puppet, this.settings, appearanceRevision);
         ghost.container.setVisible(true);
+        visible.add(ghost);
       }
     }
     // Retain render objects for reuse, but release obsolete pose references in unused slots.
-    for (const ghost of this.instances.values()) if (!ghost.container.visible) ghost.hide();
+    for (const ghost of this.instances.values()) if (!visible.has(ghost)) ghost.hide();
   }
 
   dispose(): void {

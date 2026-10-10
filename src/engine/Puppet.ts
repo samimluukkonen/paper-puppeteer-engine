@@ -185,6 +185,11 @@ export class Puppet {
     renderer.copyAppearanceFrom(this.renderer, tint);
   }
 
+  /** @internal Detect current artwork changes shared by all render-only previews. */
+  getAppearanceRevision(): number {
+    return this.renderer.getAppearanceRevision();
+  }
+
   getBone(id: string): Bone {
     const bone = this.bones.get(id);
     if (!bone) throw new Error(`Unknown bone "${id}".`);

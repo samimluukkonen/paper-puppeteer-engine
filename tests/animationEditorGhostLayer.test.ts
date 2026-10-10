@@ -103,6 +103,67 @@ function reference(scene: Phaser.Scene, rig: Rig, state: AnimationEditorState, t
   return puppet;
 }
 
+test('unchanged paused and stepped frames skip appearance copies and affine projection', () => {
+  const f = fixture();
+  try {
+    f.state.setAuthoredPlaybackMode('stepped');
+    f.state.setAuthoredFPS(10);
+    f.state.setCurrentTime(0.52);
+    f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
+    const copies = vi.spyOn(f.puppet, 'copyAppearanceTo');
+    const projections = [...f.ghosts.values()].map((ghost) => vi.spyOn(ghost.renderer, 'sync'));
+    for (let frame = 0; frame < 60; ++frame) f.layer.updateFrame(() => {});
+    f.state.play();
+    f.layer.updateFrame(() => f.state.advancePlayback(0.01));
+    assert.equal(copies.mock.calls.length, 0);
+    for (const projection of projections) assert.equal(projection.mock.calls.length, 0);
+    f.layer.updateFrame(() => f.puppet.container.setPosition(33, 44).setAlpha(0.5));
+    for (const ghost of f.ghosts.values()) {
+      assert.equal(ghost.container.x, 33);
+      assert.equal(ghost.container.y, 44);
+      assert.equal(ghost.container.alpha, 0.11);
+    }
+    for (const projection of projections) assert.equal(projection.mock.calls.length, 0);
+    f.layer.updateFrame(() => f.state.advancePlayback(0.1));
+    assert.equal(copies.mock.calls.length, 0);
+    for (const projection of projections) assert.equal(projection.mock.calls.length, 1);
+  } finally {
+    f.dispose();
+  }
+});
+
+test('paused ghosts follow direct host artwork changes without resampling poses', () => {
+  const f = fixture();
+  try {
+    f.layer.setEnabled(true);
+    const sample = vi.spyOn(f.state, 'sampleGhostPoses');
+    const sprite = f.puppet.getBone('arm').sprite!;
+    sprite.setTexture('changed-arm', 'new-frame').setPosition(17, 21).setOrigin(0.7, 0.6).setVisible(false);
+    f.puppet.getBone('hand').container.setAlpha(0.4).setVisible(false);
+    f.puppet.setSlotTransform('glove', { x: 20, rotation: 0.9 });
+    f.puppet.setSlotDepth('glove', 42);
+    f.layer.sync();
+    for (const ghost of f.ghosts.values()) {
+      const copied = ghost.bones.get('arm')!.sprite!;
+      assert.equal(copied.texture.key, 'changed-arm');
+      assert.equal(copied.frame.name, 'new-frame');
+      assert.equal(copied.x, 17);
+      assert.equal(copied.originX, 0.7);
+      assert.isFalse(copied.visible);
+      assert.equal(ghost.bones.get('hand')!.container.alpha, 0.4);
+      assert.isFalse(ghost.bones.get('hand')!.container.visible);
+      assert.equal(ghost.renderer.getSlotMount('glove').x, 20);
+      assert.approximately(ghost.renderer.getSlotMount('glove').rotation, 0.9, 1e-12);
+    }
+    assert.equal(sample.mock.calls.length, 0);
+    const copies = vi.spyOn(f.puppet, 'copyAppearanceTo');
+    f.layer.sync();
+    assert.equal(copies.mock.calls.length, 0);
+  } finally {
+    f.dispose();
+  }
+});
+
 test('six ghosts match sampled affine poses and immediately reuse their pool across counts, spacing, tint and opacity', () => {
   const f = fixture();
   try {

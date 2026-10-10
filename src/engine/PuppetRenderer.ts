@@ -61,6 +61,8 @@ export class PuppetRenderer {
   private readonly pending: ProjectionNode[] = [];
   private readonly factors: AffineFactors = { rotation: 0, scaleX: 1, scaleY: 1, innerRotation: 0, innerScale: 1 };
   private order: readonly string[] = Object.freeze([]);
+  private readonly appearanceValues: unknown[] = [];
+  private appearanceRevision = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -121,6 +123,50 @@ export class PuppetRenderer {
 
   getOrder(): readonly string[] {
     return this.order;
+  }
+
+  /** @internal Detect artwork edits, including direct host mutations, once for all render-only previews. */
+  getAppearanceRevision(): number {
+    let index = 0;
+    let changed = false;
+    const remember = (value: unknown): void => {
+      if (this.appearanceValues[index] !== value) changed = true;
+      this.appearanceValues[index++] = value;
+    };
+    const transform = (object: Phaser.GameObjects.Container | Phaser.GameObjects.Image): void => {
+      remember(object.x);
+      remember(object.y);
+      remember(object.rotation);
+      remember(object.scaleX);
+      remember(object.scaleY);
+      remember(object.alpha);
+      remember(object.visible);
+    };
+    const image = (object: Phaser.GameObjects.Image | undefined): void => {
+      remember(object);
+      if (!object) return;
+      remember(object.texture);
+      remember(object.frame);
+      remember(object.originX);
+      remember(object.originY);
+      remember(object.depth);
+      transform(object);
+    };
+    remember(this.order);
+    for (const bone of this.bones.values()) {
+      remember(bone.container.alpha);
+      remember(bone.container.visible);
+      image(bone.sprite);
+    }
+    for (const [id, branch] of this.slotBranches) {
+      remember(branch.root.depth);
+      transform(branch.mount);
+      image(this.slotImages.get(id));
+    }
+    if (this.appearanceValues.length !== index) changed = true;
+    this.appearanceValues.length = index;
+    if (changed) ++this.appearanceRevision;
+    return this.appearanceRevision;
   }
 
   /** Apply bone order and supplied slot overrides together, then sort once. Undefined restores the rig depth. */
@@ -335,5 +381,6 @@ export class PuppetRenderer {
     this.slotDepthOverrides.clear();
     this.nodes.clear();
     this.pending.length = 0;
+    this.appearanceValues.length = 0;
   }
 }
