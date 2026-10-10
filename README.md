@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
 
-The v0.5.4.1 [bone symmetry mapping foundation](docs/bone-symmetry-mapping.md) provides editor-side automatic candidates, manual overrides and validated rig-bound pairs. Pose/keyframe mirroring and visual mapping controls are planned for later milestones.
+The v0.5.4.2 [pose mirroring core](docs/pose-mirroring.md) reflects authored poses in either direction or swaps both sides using the established [bone symmetry mapping](docs/bone-symmetry-mapping.md). It respects bind transforms and hierarchy and reports unsupported transforms. Keyframe mirroring and visual controls remain planned for later milestones.
 
 ## Quick start
 
@@ -56,6 +56,7 @@ scene.load.start();
 | [Rig editor](docs/rig-editor.md)                       | Editing, snapping, undo/redo, validation, imports, exports, and embedding                               |
 | [Animation editor](docs/animation-editor.md)           | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview |
 | [Bone symmetry mapping](docs/bone-symmetry-mapping.md) | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle         |
+| [Pose mirroring core](docs/pose-mirroring.md)          | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures    |
 | [Character assets and rigs](docs/characters.md)        | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
 | [Animation and poses](docs/animation.md)               | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
 | [IK and object attachments](docs/ik.md)                | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |

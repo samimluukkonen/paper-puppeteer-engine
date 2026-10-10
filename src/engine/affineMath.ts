@@ -1,3 +1,5 @@
+import type { JointTransform } from './types.js';
+
 export interface Point {
   x: number;
   y: number;
@@ -9,6 +11,31 @@ export interface Affine {
   d: number;
   tx: number;
   ty: number;
+}
+
+/** The joint/Phaser convention is T(x, y) R(rotation) diag(scaleX, scaleY). */
+export function transformToAffine(transform: Readonly<JointTransform>, result: Affine): Affine {
+  const cos = Math.cos(transform.rotation);
+  const sin = Math.sin(transform.rotation);
+  result.a = cos * transform.scaleX;
+  result.b = sin * transform.scaleX;
+  result.c = -sin * transform.scaleY;
+  result.d = cos * transform.scaleY;
+  result.tx = transform.x;
+  result.ty = transform.y;
+  return result;
+}
+
+/** Compose parent * local. The result must be distinct from both inputs. */
+export function composeAffine(local: Affine, parent: Affine | undefined, result: Affine): Affine {
+  if (!parent) return Object.assign(result, local);
+  result.a = parent.a * local.a + parent.c * local.b;
+  result.b = parent.b * local.a + parent.d * local.b;
+  result.c = parent.a * local.c + parent.c * local.d;
+  result.d = parent.b * local.c + parent.d * local.d;
+  result.tx = parent.a * local.tx + parent.c * local.ty + parent.tx;
+  result.ty = parent.b * local.tx + parent.d * local.ty + parent.ty;
+  return result;
 }
 
 export function localToWorld(point: Point, matrix: Affine): Point {

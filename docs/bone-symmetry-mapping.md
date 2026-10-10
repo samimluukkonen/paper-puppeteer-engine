@@ -4,6 +4,8 @@
 
 Milestone v0.5.4.1, package version `0.5.4-1`, introduces editor-only bone relationships. It provides automatic pairing candidates, manual overrides, bidirectional lookup and structured validation. It does not calculate mirrored poses or write keyframes.
 
+The subsequent [v0.5.4.2 pose mirroring core](pose-mirroring.md) consumes these mappings to reflect authored transforms and validates their hierarchy compatibility before calculating a pose.
+
 ## Architecture and APIs
 
 The pure [boneSymmetry.ts](../src/devtools/shared/boneSymmetry.ts) module uses the existing renderer-independent `Rig`, immutable editor data helpers and readonly map utility. It requires no React, DOM or Phaser runtime and adds no dependencies or public engine exports.

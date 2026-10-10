@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import type { Affine } from './affineMath.js';
+import { composeAffine, transformToAffine } from './affineMath.js';
 import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
@@ -25,30 +26,6 @@ interface ProjectionNode {
 }
 
 const identity = (): Affine => ({ a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 });
-
-function readLocal(source: Phaser.GameObjects.Container, matrix: Affine): void {
-  const cos = Math.cos(source.rotation);
-  const sin = Math.sin(source.rotation);
-  matrix.a = cos * source.scaleX;
-  matrix.b = sin * source.scaleX;
-  matrix.c = -sin * source.scaleY;
-  matrix.d = cos * source.scaleY;
-  matrix.tx = source.x;
-  matrix.ty = source.y;
-}
-
-function compose(local: Affine, parent: Affine | undefined, result: Affine): void {
-  if (!parent) {
-    Object.assign(result, local);
-    return;
-  }
-  result.a = parent.a * local.a + parent.c * local.b;
-  result.b = parent.b * local.a + parent.d * local.b;
-  result.c = parent.a * local.c + parent.c * local.d;
-  result.d = parent.b * local.c + parent.d * local.d;
-  result.tx = parent.a * local.tx + parent.c * local.ty + parent.tx;
-  result.ty = parent.b * local.tx + parent.d * local.ty + parent.ty;
-}
 
 /** Independent draw slots use two transform factors to retain arbitrary affine shear. */
 export class PuppetRenderer {
@@ -350,13 +327,13 @@ export class PuppetRenderer {
   }
 
   private readNode(node: ProjectionNode): void {
-    readLocal(node.source, node.local);
+    transformToAffine(node.source, node.local);
     node.localAlpha = node.source.alpha;
     node.localVisible = node.source.visible;
   }
 
   private updateNode(node: ProjectionNode): void {
-    compose(node.local, node.parent?.world, node.world);
+    composeAffine(node.local, node.parent?.world, node.world);
     node.alpha = node.localAlpha * (node.parent?.alpha ?? 1);
     node.visible = node.localVisible && (node.parent?.visible ?? true);
     for (const branch of node.branches) this.project(branch, node.world, node.alpha, node.visible);

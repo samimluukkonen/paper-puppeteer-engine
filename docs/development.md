@@ -62,6 +62,7 @@ src/engine/
   externalData.ts      Versioned JSON formats, validation and parsing
   Rig.ts               Validation, immutable rig snapshot, indexed definitions, parent-first ordering
   Joint.ts             Renderer-independent bind pose and mutable local pose
+  affineMath.ts        Shared joint-to-affine conversion, composition and coordinate inversion
   Bone.ts              Joint backed by a Phaser container and optional image
   AnimationClip.ts      Keyframe types, validation and property-track compilation
   AnimationPlayer.ts    Layer clocks, transitions, events and completion
@@ -135,6 +136,7 @@ src/devtools/shared/
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
   editorData.ts        Readonly data and editor number rounding
   boneSymmetry.ts      Pure rig-bound bone pairs, automatic candidates, reciprocal lookup and validation
+  poseMirroring.ts     Pure bind-relative authored-pose reflection and structured compatibility errors
 src/shared/
   characterCatalog.ts  Character identities and picker labels
   characterPreviewSettings.ts  Optional immutable IK settings shared by demo and editors
