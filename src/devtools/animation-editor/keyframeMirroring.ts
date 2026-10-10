@@ -57,17 +57,15 @@ function reflected(
   return result.pose;
 }
 
-/** Explicit authored commit proposal, sampled with preview playback timing before drafts or IK.
- * Sparse source properties stay sparse unless the caller intentionally supplies properties.
- */
-export function mirrorCurrentPoseToKeys<Animation extends AnimationData>(
-  animation: Animation,
+/** Sample and validate mirror values without building or validating an edited animation snapshot. */
+export function sampleCurrentPoseMirror(
+  animation: AnimationData,
   rig: Rig,
   mapping: BoneSymmetryMapping,
   currentTimeMs: Milliseconds,
   direction: MirrorDirection,
   options: MirrorCurrentPoseOptions = {},
-): KeyframeMirrorResult<Animation> {
+): { pose: AnimationPose; edits: readonly PropertyKeyframeEdit[] } {
   getValidatedEditorAnimation(animation, rig);
   const targets = sourceTargets(mapping, rig, direction);
   const boneIds = [...new Set(options.boneIds ?? targets.keys())];
@@ -84,24 +82,37 @@ export function mirrorCurrentPoseToKeys<Animation extends AnimationData>(
   }
   // Sampling also validates time for an empty sparse operation.
   const pose = getEvaluatedAnimationPose(animation, rig, currentTimeMs);
-  if (!keys.length) return { animation, keys };
+  if (!keys.length) return { pose, edits: [] };
   // Unanimated pairs contribute no writes. Their transforms must not block an unrelated sparse edit.
   const mirrored = reflected(pose, rig, mapping, direction, activeSources);
   const edits = keys.map((key) => ({ ...key, value: mirrored.get(key.boneId)![key.property]! }));
-  return { animation: setBonePropertyKeyframes(animation, rig, edits, { preserveTiming: true }), keys };
+  return { pose, edits };
 }
 
-/** Resolve every source key against the original animation. At each exact authored time the runtime
- * evaluator supplies complete sparse context; playback FPS never quantizes a selected key's value.
- * Project only selected properties and install one validated batch with existing group replacement.
- */
-export function mirrorSelectedKeyframes<Animation extends AnimationData>(
+/** Explicit authored commit proposal; sparse source properties stay sparse unless requested. */
+export function mirrorCurrentPoseToKeys<Animation extends AnimationData>(
   animation: Animation,
+  rig: Rig,
+  mapping: BoneSymmetryMapping,
+  currentTimeMs: Milliseconds,
+  direction: MirrorDirection,
+  options: MirrorCurrentPoseOptions = {},
+): KeyframeMirrorResult<Animation> {
+  const { edits } = sampleCurrentPoseMirror(animation, rig, mapping, currentTimeMs, direction, options);
+  return {
+    animation: setBonePropertyKeyframes(animation, rig, edits, { preserveTiming: true }),
+    keys: edits.map(({ boneId, property, timeMs }) => ({ boneId, property, timeMs })),
+  };
+}
+
+/** Resolve and reflect selected keys at their exact authored times without constructing edited tracks. */
+export function sampleSelectedKeyframeMirror(
+  animation: AnimationData,
   rig: Rig,
   mapping: BoneSymmetryMapping,
   selectedKeys: readonly PropertyKeyframeTarget[],
   direction: MirrorDirection,
-): KeyframeMirrorResult<Animation> {
+): readonly PropertyKeyframeEdit[] {
   getValidatedEditorAnimation(animation, rig);
   const targets = sourceTargets(mapping, rig, direction);
   const sources = new Map<string, PropertyKeyframeTarget>();
@@ -114,7 +125,7 @@ export function mirrorSelectedKeyframes<Animation extends AnimationData>(
     const source = { ...ref, timeMs: key.time };
     sources.set(JSON.stringify([ref.boneId, ref.property, key.time]), source);
   }
-  if (!sources.size) return { animation, keys: [] };
+  if (!sources.size) return [];
   const groups = new Map<Milliseconds, Set<string>>();
   for (const source of sources.values()) {
     const bones = groups.get(source.timeMs) ?? new Set<string>();
@@ -134,6 +145,18 @@ export function mirrorSelectedKeyframes<Animation extends AnimationData>(
       value: poses.get(source.timeMs)!.get(boneId)![source.property]!,
     };
   });
+  return edits;
+}
+
+/** Project selected values in one validated batch with existing group collision replacement. */
+export function mirrorSelectedKeyframes<Animation extends AnimationData>(
+  animation: Animation,
+  rig: Rig,
+  mapping: BoneSymmetryMapping,
+  selectedKeys: readonly PropertyKeyframeTarget[],
+  direction: MirrorDirection,
+): KeyframeMirrorResult<Animation> {
+  const edits = sampleSelectedKeyframeMirror(animation, rig, mapping, selectedKeys, direction);
   return {
     animation: setBonePropertyKeyframes(animation, rig, edits, { preserveTiming: true }),
     keys: edits.map(({ boneId, property, timeMs }) => ({ boneId, property, timeMs })),

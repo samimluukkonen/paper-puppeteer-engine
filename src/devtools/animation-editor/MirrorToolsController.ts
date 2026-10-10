@@ -13,9 +13,7 @@ import { draftSource } from '../shared/draftSource.js';
 import { freezeData } from '../shared/editorData.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
-import { getEvaluatedAnimationPose } from './animationValues.js';
-import { mirrorCurrentPoseToKeys, mirrorSelectedKeyframes } from './keyframeMirroring.js';
-import { findBonePropertyKeyframe } from './keyframeQueries.js';
+import { sampleCurrentPoseMirror, sampleSelectedKeyframeMirror } from './keyframeMirroring.js';
 import { toMilliseconds } from './timeUnits.js';
 
 const preferencesSchema = z.strictObject({
@@ -229,6 +227,7 @@ export class MirrorToolsController {
       mapping,
       this.pairs,
       this.direction,
+      this.preview,
     ];
     if (poseDependencies.some((value, index) => value !== this.poseDependencies[index])) {
       this.poseDependencies = poseDependencies;
@@ -236,7 +235,7 @@ export class MirrorToolsController {
       this.poseReason = reason;
       if (!reason && state?.workingAnimation && state.rig && mapping) {
         try {
-          const result = mirrorCurrentPoseToKeys(
+          const result = sampleCurrentPoseMirror(
             state.workingAnimation,
             state.rig,
             mapping,
@@ -244,19 +243,12 @@ export class MirrorToolsController {
             this.direction,
             state.selectedBoneId ? { boneIds: [state.selectedBoneId] } : {},
           );
-          if (!result.keys.length) this.poseReason = 'The source has no authored transform tracks to mirror.';
-          else {
-            this.pose = getEvaluatedAnimationPose(state.workingAnimation, state.rig, toMilliseconds(state.currentTime));
+          if (!result.edits.length) this.poseReason = 'The source has no authored transform tracks to mirror.';
+          else if (this.preview) {
+            this.pose = result.pose;
             // Project the proposed authored values directly. Resampling the proposal would quantize
             // a stepped playhead before its newly inserted key and show an older destination value.
-            for (const key of result.keys) {
-              this.pose.get(key.boneId)![key.property] = findBonePropertyKeyframe(
-                result.animation,
-                key.boneId,
-                key.property,
-                key.timeMs,
-              )!.value;
-            }
+            for (const edit of result.edits) this.pose.get(edit.boneId)![edit.property] = edit.value;
           }
         } catch (error) {
           this.poseReason = errorMessage(error);
@@ -271,7 +263,7 @@ export class MirrorToolsController {
         (!state?.selectedKeys.length ? 'Select source transform keys in the timeline. Events cannot be mirrored.' : '');
       if (!this.keysReason && state?.workingAnimation && state.rig && mapping) {
         try {
-          mirrorSelectedKeyframes(
+          sampleSelectedKeyframeMirror(
             state.workingAnimation,
             state.rig,
             mapping,

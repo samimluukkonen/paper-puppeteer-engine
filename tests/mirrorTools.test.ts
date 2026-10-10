@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import * as keyframeEdits from '../src/devtools/animation-editor/keyframeEdits.js';
 import { MirrorToolsController } from '../src/devtools/animation-editor/MirrorToolsController.js';
 import { MirrorToolsPanel } from '../src/devtools/animation-editor/MirrorToolsPanel.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
@@ -44,6 +45,48 @@ function fixture(storage = new Map<string, string>()) {
 }
 const render = (controller: MirrorToolsController) =>
   renderToStaticMarkup(createElement(MirrorToolsPanel, { controller }));
+
+test('playback, preview and key readiness construct edited tracks only when a mirror command is committed', () => {
+  const edit = vi.spyOn(keyframeEdits, 'setBonePropertyKeyframes');
+  const { state, controller, preview } = fixture();
+  try {
+    const original = state.workingAnimation;
+    state.play();
+    for (let frame = 0; frame < 30; ++frame) state.advancePlayback(1 / 60);
+    assert.isFalse(controller.getSnapshot().preview);
+    assert.isNull(preview.mock.lastCall![0]);
+    controller.togglePreview();
+    for (let frame = 0; frame < 15; ++frame) state.advancePlayback(1 / 60);
+    assert.isNotNull(preview.mock.lastCall![0]);
+    controller.hidePreview();
+    state.selectKeyframe({ boneId: 'leftArm', property: 'rotation', time: 0 });
+    assert.equal(controller.getSnapshot().keysReason, '');
+    assert.equal(edit.mock.calls.length, 0);
+    assert.strictEqual(state.workingAnimation, original);
+    assert.equal(state.historyLength, 0);
+    assert.isFalse(state.dirty);
+    assert.isTrue(controller.commitKeys());
+    assert.equal(edit.mock.calls.length, 1);
+    assert.equal(state.historyLength, 1);
+  } finally {
+    controller.dispose();
+    edit.mockRestore();
+  }
+});
+
+test('clock changes still update unsupported-transform readiness while mirror preview is off', () => {
+  const { state, controller } = fixture();
+  state.setBonePropertyKeyframe('leftArm', 'scaleX', 1, 0);
+  state.setBonePropertyKeyframe('leftArm', 'scaleX', -1, 1);
+  assert.equal(controller.getSnapshot().poseReason, '');
+  state.setCurrentTime(0.75);
+  assert.isFalse(controller.getSnapshot().preview);
+  assert.include(controller.getSnapshot().poseReason, 'axis sign');
+  assert.isFalse(controller.commitPose());
+  state.setCurrentTime(0.25);
+  assert.equal(controller.getSnapshot().poseReason, '');
+  controller.dispose();
+});
 
 test('React panel reflects direction, inferred pairs, readiness and authoritative selection', () => {
   const { state, controller } = fixture();
