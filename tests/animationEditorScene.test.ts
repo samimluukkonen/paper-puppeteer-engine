@@ -251,3 +251,53 @@ test('ready failure destroys ghost artwork and subscriptions; a restarted scene 
     createImage.mockRestore();
   }
 });
+
+test('mirror overlay is lazy, independent of temporal ghosts, follows facing, and releases resources on shutdown', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn<(state: AnimationEditorState, characterId: string) => void>();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = ready.mock.calls[0]![0];
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const ghosts = Reflect.get(scene, 'ghosts') as AnimationEditorGhostLayer;
+    assert.isUndefined(Reflect.get(scene, 'mirrorOverlay'));
+    const source = state.workingAnimation;
+    const pose = state.sampleGhostPose(state.currentTime)!;
+    const activeRotation = puppet.getBone('leftUpperArm').pose.rotation;
+    pose.get('leftUpperArm')!.rotation = activeRotation + 0.7;
+    scene.setMirrorPreview(pose);
+    const overlay = Reflect.get(
+      scene,
+      'mirrorOverlay',
+    ) as import('../src/devtools/animation-editor/AnimationEditorGhostLayer.js').AnimationPoseOverlay;
+    assert.isTrue(overlay.container.visible);
+    assert.equal(overlay.container.depth, puppet.container.depth + 1);
+    assert.closeTo(overlay.container.alpha, 0.35, 1e-9);
+    assert.equal(puppet.getBone('leftUpperArm').pose.rotation, activeRotation);
+    assert.strictEqual(state.workingAnimation, source);
+    assert.equal(state.historyLength, 0);
+    assert.isFalse(state.dirty);
+    scene.setOnionSkinning(true);
+    assert.isAbove((Reflect.get(ghosts, 'instances') as Map<string, unknown>).size, 0);
+    scene.setFacing('left');
+    assert.equal(overlay.container.scaleX, puppet.container.scaleX);
+    scene.setMirrorPreview(null);
+    assert.isFalse(overlay.container.visible);
+    scene.setMirrorPreview(pose);
+    assert.strictEqual(Reflect.get(scene, 'mirrorOverlay'), overlay);
+    const destroy = vi.spyOn(overlay, 'destroy');
+    scene.events.emit('shutdown');
+    assert.equal(destroy.mock.calls.length, 1);
+    assert.isUndefined(Reflect.get(scene, 'mirrorOverlay'));
+    assert.isNull(Reflect.get(scene, 'mirrorPose'));
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    if (Reflect.get(scene, 'puppet')) scene.events.emit('shutdown');
+  }
+});

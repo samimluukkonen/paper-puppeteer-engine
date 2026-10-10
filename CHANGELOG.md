@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.4-4
+
+The v0.5.4.4 [React mirroring tools](docs/react-mirroring-tools.md) expose bone-pair configuration, all three copy directions, current-pose and selected-key commands, and a violet read-only pose overlay in the Animation Editor. Validated browser preferences restore pairs for the same rig without entering authored JSON. React subscribes to authoritative editor selection, cached readiness reports actionable mapping/transform errors, and existing commands retain atomic history and destination selection. Mirror previews share the render-only artwork projection with onion skins while retaining separate resources and following facing/skin changes. M toggles preview; the Help dialog documents the workflow.
+
 ## 0.5.4-3
 
 The v0.5.4.3 [mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) adds explicit current-pose and selected-key commands for left-to-right, right-to-left and snapshot-based swap. Existing runtime evaluation supplies pre-IK context, while sparse property projection preserves selected properties, exact times, duration and clip interpolation/playback metadata. Batch replacement reuses group collision semantics and validation, with one document/history transaction and coherent destination selection. React mirror controls and automated generation remain deferred.

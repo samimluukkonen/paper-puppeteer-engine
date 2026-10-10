@@ -124,6 +124,8 @@ src/devtools/animation-editor/
   AnimationEditorPlaybackCommands.ts  Validated authored playback mode/FPS edits through document history
   AnimationEditorPreview.ts  Runtime sampling of the working copy and puppet synchronization
   AnimationEditorGhostLayer.ts  Render-only neighboring poses sharing engine artwork and affine projection
+  MirrorToolsPanel.tsx  React pair configuration, direction, preview and explicit authored actions
+  MirrorToolsController.ts  Cached readiness, editor subscription, rig-bound browser pair preferences
   onionSkinSettings.ts   Frozen scene-only count, spacing, opacity and tint preferences
   OnionSkinControlsController.ts  Native preference inputs and abortable event listener lifecycle
   TimelineController.ts   Session coordination, responsive ruler, tracks and playhead

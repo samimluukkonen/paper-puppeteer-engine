@@ -315,7 +315,7 @@ The v0.5.2.4.3 movement architecture and verification results are recorded in [K
 
 ## Deferred features
 
-Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, mirrored keyframes, and IK target authoring/baking remain deferred to v0.5.3+. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
+Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, and IK target authoring/baking remain deferred to v0.5.3+. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
 
 The v0.5.2.5.1 selection policies, APIs, files and verification results are recorded in [Multi-key selection verification](animation-editor-multi-selection-verification.md).
 
@@ -333,7 +333,7 @@ Numeric cleanup reuses `roundEditorNumber()` for six-decimal candidates but acce
 
 Clipboard failures offer Download and Log alternatives. Download filenames retain manifest basenames, with a sanitized animation-name fallback and `animation.json` when no name is available. Copy/download/log establish session checkpoints and retain Undo/Redo history; they do not overwrite source files. Saved authored snapshots retain their original precision. A page reload still reads character assets.
 
-See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, mirrored tools, IK target animation and baking remain deferred to v0.5.3+.
+See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, IK target animation and baking remain deferred to v0.5.3+.
 
 ## Animation import and reload
 
@@ -372,3 +372,13 @@ External animation version 1 uses the shared strict file schema: unknown fields 
 Import/export adds no global shortcuts. JSON text areas keep native copy/paste/undo and typing; Ctrl/Cmd+C/V/D affects authored keys/events only with focus in the timeline. Space/Home, modifiers and IME retain their existing typing guards. Use the import/export buttons for documents.
 
 Editor-only APIs added in this hardening pass: `revertAnimation({ discardChanges?: boolean })`, `sessionRevision`, and optional `AnimationImportOptions.confirmDiscard` on `importJson`/`reloadCurrentExport`. The callback runs only for valid dirty replacement. Direct callers without a callback retain the existing explicit replacement behavior and should provide their own confirmation when appropriate. No public engine API, schema, evaluator or dependency changed.
+
+## Mirror tools
+
+Open **Mirror tools** in the command bar. **Configure Bone Pairs** lists inferred left/right IDs, allows adding, editing and removing pairs, and shows unpaired bones. Valid edits persist in browser storage for the same character and rig; mappings stay outside rig/animation JSON and Undo history. Invalid edits block mirror actions until corrected. **Use inferred pairs** replaces manual configuration with the rig's name-based candidates.
+
+Choose **Left → Right**, **Right → Left**, or **Swap** and review the source/destination description before committing. **Preview Mirrored Pose** draws a violet read-only overlay of the proposed authored values, before drafts or IK; it works alongside onion skinning. M toggles preview with workspace focus; Escape in the panel or closing Mirror tools hides it. Preview never writes keys, changes time, dispatches events, marks dirty, or creates history.
+
+**Mirror Current Pose** uses the selected source bone, or all mapped source bones when none is selected, copying only authored properties at the current playhead. **Mirror Selected Keys** uses the authoritative timeline selection and requires every key to be on a compatible source track. Events cannot be mirrored. Each changed commit pauses playback, selects destination keys, refreshes the timeline/inspector and creates one Undo/Redo operation. Destination collisions use the existing property replacement policy. Source data stays unchanged for one-way copying.
+
+See [React mirroring tools](react-mirroring-tools.md) for configuration ownership, preview details, error handling and verification.

@@ -920,3 +920,53 @@ a {
     grid-template-columns: minmax(90px, 1fr) 60px;
   }
 }
+
+.animation-mirror-panel {
+  left: auto;
+  right: 12px;
+  width: min(540px, calc(100vw - 48px));
+  max-height: min(650px, 75vh);
+  overflow: auto;
+}
+
+.animation-mirror-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.animation-mirror-pair {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.animation-mirror-pair label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.animation-mirror-pair select {
+  width: 100%;
+  min-width: 0;
+}
+
+.animation-mirror-directions,
+.animation-mirror-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.animation-mirror-destination {
+  font-weight: 600;
+}
+
+.animation-mirror-directions label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

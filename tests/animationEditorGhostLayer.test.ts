@@ -1,8 +1,12 @@
 import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
-import { AnimationEditorGhostLayer } from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
+import {
+  AnimationEditorGhostLayer,
+  AnimationPoseOverlay,
+} from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { DEFAULT_ONION_SKIN_SETTINGS } from '../src/devtools/animation-editor/onionSkinSettings.js';
 import { getCompiledPreviewClip } from '../src/devtools/animation-editor/previewClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import type { Bone } from '../src/engine/Bone.js';
@@ -794,3 +798,41 @@ test.each(['left', 'right'] as const)(
     }
   },
 );
+
+test('mirror render instance follows skin/facing without reallocation and skips unchanged pose projection', () => {
+  const f = fixture();
+  const overlay = new AnimationPoseOverlay(f.scene, f.puppet, 'mirror', 0);
+  try {
+    const sample = { pose: f.state.sampleGhostPose(0.5)! };
+    const settings = { ...DEFAULT_ONION_SKIN_SETTINGS, nextOpacity: 0.35, nextTint: 0xa875e8 };
+    overlay.apply(sample);
+    overlay.syncAppearance(f.puppet, settings, f.puppet.getAppearanceRevision());
+    const renderer = Reflect.get(overlay, 'renderer') as PuppetRenderer;
+    const image = renderer.getSlotImage('glove')!;
+    const projections = vi.spyOn(renderer, 'sync');
+    const copies = vi.spyOn(f.puppet, 'copyAppearanceTo');
+    for (let frame = 0; frame < 30; ++frame) {
+      overlay.apply(sample);
+      overlay.syncAppearance(f.puppet, settings, f.puppet.getAppearanceRevision());
+    }
+    assert.equal(projections.mock.calls.length, 0);
+    assert.equal(copies.mock.calls.length, 0);
+    const containers = vi.spyOn(f.scene.add, 'container');
+    f.puppet.setSkin('red');
+    f.puppet.setFacing('left');
+    overlay.syncAppearance(f.puppet, settings, f.puppet.getAppearanceRevision());
+    assert.strictEqual(renderer.getSlotImage('glove'), image);
+    assert.equal(image.texture.key, 'glove2');
+    assert.equal(image.frame.name, 'red');
+    assert.equal(Reflect.get(image, 'tint'), 0xa875e8);
+    assert.equal(overlay.container.scaleX, f.puppet.container.scaleX);
+    assert.equal(overlay.container.depth, f.puppet.container.depth + 1);
+    assert.equal(containers.mock.calls.length, 0);
+    assert.equal(projections.mock.calls.length, 1);
+    overlay.hide();
+    assert.isUndefined(Reflect.get(overlay, 'sample'));
+  } finally {
+    overlay.destroy();
+    f.dispose();
+  }
+});

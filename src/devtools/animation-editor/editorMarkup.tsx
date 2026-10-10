@@ -2,9 +2,11 @@ import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { AUTHORED_INTERPOLATION_MODES, interpolationLabel } from './interpolationPresentation.js';
+import type { MirrorToolsController } from './MirrorToolsController.js';
+import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
-export function AnimationEditorView() {
+export function AnimationEditorView({ mirrorTools }: { mirrorTools: MirrorToolsController }) {
   const inspector = useWorkspaceInspector();
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
     <option key={mode} value={mode}>
@@ -74,6 +76,7 @@ export function AnimationEditorView() {
             <p id="animation-session-status"></p>
           </div>
         </details>
+        <MirrorToolsPanel controller={mirrorTools} />
         <button id="animation-tools-open" type="button" aria-haspopup="dialog">
           File tools
         </button>
@@ -443,6 +446,13 @@ export function AnimationEditorView() {
             <button type="submit">Close</button>
           </form>
         </div>
+        <p>
+          Mirror tools in the command bar configure reusable bone pairs and source/destination direction. Preview is
+          read-only. M toggles preview with workspace focus; Escape in Mirror tools hides it. Mirror Current Pose uses
+          the selected bone, or all mapped source bones when no bone is selected. Mirror Selected Keys requires every
+          selected key to be on the chosen source side. Each commit is one Undo/Redo operation (Ctrl/Cmd+Z /
+          Ctrl/Cmd+Shift+Z).
+        </p>
         <p>
           Select a bone in the preview or hierarchy. Scrub to a time, enter a local value, then Set Key. Fields preview
           temporary values; scrubbing, changing selection, Play, settings changes, or Undo/Redo cancel drafts. Rotation

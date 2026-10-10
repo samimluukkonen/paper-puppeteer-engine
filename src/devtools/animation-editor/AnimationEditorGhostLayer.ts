@@ -8,11 +8,11 @@ import type { GhostPoseSample } from './ghostPoseSampling.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
 
 /** Only bones, images and affine projection: no player, events, IK, input or gameplay. */
-class GhostInstance {
+export class AnimationPoseOverlay {
   readonly container: Phaser.GameObjects.Container;
   private readonly bones = new Map<string, Bone>();
   private readonly renderer: PuppetRenderer;
-  private sample: GhostPoseSample | undefined;
+  private sample: Pick<GhostPoseSample, 'pose'> | undefined;
   private poseDirty = true;
   private appearanceRevision: number | undefined;
   private tint: number | undefined;
@@ -20,7 +20,7 @@ class GhostInstance {
   constructor(
     scene: Phaser.Scene,
     puppet: Puppet,
-    readonly direction: GhostPoseSample['direction'],
+    readonly direction: GhostPoseSample['direction'] | 'mirror',
     readonly distance: number,
   ) {
     this.container = scene.add.container(0, 0).setName(`animation-ghost-${direction}-${distance}`).setVisible(false);
@@ -32,7 +32,7 @@ class GhostInstance {
     this.renderer = new PuppetRenderer(scene, this.container, puppet.rig, this.bones);
   }
 
-  apply(sample: GhostPoseSample): void {
+  apply(sample: Pick<GhostPoseSample, 'pose'>): void {
     if (sample === this.sample) return;
     this.sample = sample;
     for (const [id, bone] of this.bones) {
@@ -59,8 +59,9 @@ class GhostInstance {
     const previous = this.direction === 'previous';
     const opacity = previous ? settings.previousOpacity : settings.nextOpacity;
     const tint = previous ? settings.previousTint : settings.nextTint;
-    // Farther poses behind nearer ones; every ghost remains behind the authoritative preview.
-    const depth = source.depth - this.distance * 2 + (previous ? 0 : 1);
+    // Temporal ghosts stay behind the puppet; the proposed mirror pose overlays it.
+    const depth =
+      this.direction === 'mirror' ? source.depth + 1 : source.depth - this.distance * 2 + (previous ? 0 : 1);
     const depthChanged = this.container.depth !== depth;
     this.container
       .setPosition(source.x, source.y)
@@ -92,7 +93,7 @@ class GhostInstance {
 
 /** Transient editor visualization. Samples only when the working snapshot or playhead changes. */
 export class AnimationEditorGhostLayer {
-  private readonly instances = new Map<string, GhostInstance>();
+  private readonly instances = new Map<string, AnimationPoseOverlay>();
   private readonly unsubscribe: () => void;
   private settings = DEFAULT_ONION_SKIN_SETTINGS;
   private disposed = false;
@@ -156,7 +157,7 @@ export class AnimationEditorGhostLayer {
       return;
     }
     const appearanceRevision = this.puppet.getAppearanceRevision();
-    const visible = new Set<GhostInstance>();
+    const visible = new Set<AnimationPoseOverlay>();
     for (const direction of ['previous', 'next'] as const) {
       let distance = 0;
       for (const sample of this.samples) {
@@ -164,7 +165,7 @@ export class AnimationEditorGhostLayer {
         const key = `${direction}-${++distance}`;
         let ghost = this.instances.get(key);
         if (!ghost) {
-          ghost = new GhostInstance(this.scene, this.puppet, direction, distance);
+          ghost = new AnimationPoseOverlay(this.scene, this.puppet, direction, distance);
           this.instances.set(key, ghost);
         }
         // Hidden instances may have skipped earlier frames; always apply the cached current sample.

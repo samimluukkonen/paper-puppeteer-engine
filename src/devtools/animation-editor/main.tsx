@@ -11,6 +11,7 @@ import type { ReadonlyAnimation } from './AnimationEditorState.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { MirrorToolsController } from './MirrorToolsController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { TimelineController } from './TimelineController.js';
 import './style.css';
@@ -18,7 +19,9 @@ import './style.css';
 const app = document.querySelector<HTMLElement>('#animation-editor-app');
 if (!app) throw new Error('Missing animation editor host.');
 app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
-const unmount = mountView(app, <AnimationEditorView />, (app) => {
+let scene: AnimationEditorScene | undefined;
+const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
+const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />, (app) => {
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
@@ -29,9 +32,10 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
   });
   let releaseRecovery: (() => void) | undefined;
   let releaseWorkspaceSelection: (() => void) | undefined;
-  const scene = new AnimationEditorScene(
+  const editorScene = new AnimationEditorScene(
     (state, id) => {
-      scene.fitPreview();
+      editorScene.fitPreview();
+      mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
       releaseRecovery?.();
       timeline.bind(state, id);
       inspector.bind(state);
@@ -93,31 +97,32 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
     },
   );
+  scene = editorScene;
   const previewControls = new AbortController();
   app.querySelector<HTMLSelectElement>('#animation-facing')!.addEventListener(
     'change',
     (event) => {
       const facing = (event.target as HTMLSelectElement).value;
-      if (facing === 'left' || facing === 'right') scene.setFacing(facing);
+      if (facing === 'left' || facing === 'right') editorScene.setFacing(facing);
     },
     { signal: previewControls.signal },
   );
   app.querySelector<HTMLInputElement>('#animation-show-bones')!.addEventListener(
     'change',
     (event) => {
-      scene.setBonesVisible((event.target as HTMLInputElement).checked);
+      editorScene.setBonesVisible((event.target as HTMLInputElement).checked);
     },
     { signal: previewControls.signal },
   );
-  const onionControls = new OnionSkinControlsController(app, scene);
+  const onionControls = new OnionSkinControlsController(app, editorScene);
   app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
     'change',
     (event) => {
-      scene.setIKPreview((event.target as HTMLInputElement).checked);
+      editorScene.setIKPreview((event.target as HTMLInputElement).checked);
     },
     { signal: previewControls.signal },
   );
-  const game = createEditorGame('animation-stage', scene);
+  const game = createEditorGame('animation-stage', editorScene);
   const workspace = new AnimationWorkspaceController(app, () => {
     game.scale.getParentBounds();
     game.scale.refresh();
@@ -126,6 +131,7 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
   return () => {
     releaseRecovery?.();
     releaseWorkspaceSelection?.();
+    mirrorTools.dispose();
     workspace.dispose();
     recovery.dispose();
     releaseNavigationGuard();
@@ -135,6 +141,7 @@ const unmount = mountView(app, <AnimationEditorView />, (app) => {
     previewControls.abort();
     releaseCharacterSelection();
     game.destroy(true);
+    scene = undefined;
   };
 });
 if (import.meta.hot) import.meta.hot.dispose(unmount);

@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
 
-The v0.5.4.3 [mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) adds explicit current-pose and selected-key commands using the [pose mirroring core](docs/pose-mirroring.md) and [bone symmetry mapping](docs/bone-symmetry-mapping.md). It preserves sparse properties, timing and interpolation metadata, with atomic collision replacement and Undo/Redo. Visual mirror controls remain planned for later milestones.
+The v0.5.4.3 [mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) adds explicit current-pose and selected-key commands using the [pose mirroring core](docs/pose-mirroring.md) and [bone symmetry mapping](docs/bone-symmetry-mapping.md). It preserves sparse properties, timing and interpolation metadata, with atomic collision replacement and Undo/Redo. The v0.5.4.4 [React mirror tools](docs/react-mirroring-tools.md) add configurable bone pairs saved per rig in the browser, explicit direction controls, read-only pose overlays, and current-pose/selected-key authoring buttons.
 
 ## Quick start
 
@@ -57,6 +57,7 @@ scene.load.start();
 | [Animation editor](docs/animation-editor.md)                       | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview |
 | [Bone symmetry mapping](docs/bone-symmetry-mapping.md)             | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle         |
 | [Pose mirroring core](docs/pose-mirroring.md)                      | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures    |
+| [React mirroring tools](docs/react-mirroring-tools.md)             | Bone-pair configuration, persistence, preview, directions and React/editor integration                  |
 | [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection        |
 | [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
 | [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |

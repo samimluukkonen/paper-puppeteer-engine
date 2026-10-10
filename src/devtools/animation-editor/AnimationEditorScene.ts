@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
+import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
-import { AnimationEditorGhostLayer } from './AnimationEditorGhostLayer.js';
+import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
@@ -19,6 +20,9 @@ export class AnimationEditorScene extends Phaser.Scene {
   private puppet: Puppet | undefined;
   private preview: AnimationEditorPreview | undefined;
   private ghosts: AnimationEditorGhostLayer | undefined;
+  private mirrorOverlay: AnimationPoseOverlay | undefined;
+  private mirrorPose: AnimationPose | null = null;
+  private mirrorSample: { pose: AnimationPose } | null = null;
   private onionSkinSettings = DEFAULT_ONION_SKIN_SETTINGS;
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
@@ -48,6 +52,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
+      this.clearMirrorPreview();
       this.ghosts?.dispose();
       this.ghosts = undefined;
       this.preview?.dispose();
@@ -62,6 +67,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
+    this.syncMirrorPreview();
     const overlay = this.selectionOverlay;
     overlay?.clear();
     if (overlay && this.puppet && this.state?.selectedBoneId) {
@@ -89,6 +95,40 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.facing = facing;
     this.puppet?.setFacing(facing);
     this.ghosts?.sync();
+    this.syncMirrorPreview();
+  }
+
+  /** Independent render-only layer; never applies its pose to the authoritative puppet. */
+  setMirrorPreview(pose: AnimationPose | null): void {
+    if (this.mirrorPose === pose) return;
+    this.mirrorPose = pose;
+    this.mirrorSample = pose ? { pose } : null;
+    if (!pose) this.mirrorOverlay?.hide();
+    else this.syncMirrorPreview();
+  }
+
+  private syncMirrorPreview(): void {
+    const puppet = this.puppet;
+    if (!puppet || !this.mirrorPose) return;
+    this.mirrorOverlay ??= new AnimationPoseOverlay(this, puppet, 'mirror', 0);
+    this.mirrorOverlay.apply(this.mirrorSample!);
+    this.mirrorOverlay.syncAppearance(
+      puppet,
+      {
+        ...DEFAULT_ONION_SKIN_SETTINGS,
+        nextOpacity: 0.35,
+        nextTint: 0xa875e8,
+      },
+      puppet.getAppearanceRevision(),
+    );
+    this.mirrorOverlay.container.setVisible(puppet.container.visible);
+  }
+
+  private clearMirrorPreview(): void {
+    this.mirrorOverlay?.destroy();
+    this.mirrorOverlay = undefined;
+    this.mirrorPose = null;
+    this.mirrorSample = null;
   }
 
   setOnionSkinning(enabled: boolean): void {
@@ -184,6 +224,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
+      this.clearMirrorPreview();
       ghosts?.dispose();
       this.ghosts = undefined;
       preview?.dispose();
