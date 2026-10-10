@@ -11,6 +11,7 @@ import {
   countAnimationEvents,
 } from './animationTimeline.js';
 import type { Joint } from './Joint.js';
+import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import type { Rig } from './Rig.js';
 import { assertFinite } from './types.js';
 
@@ -395,18 +396,14 @@ export class AnimationPlayer {
   ): void {
     const errors = dispatchAnimationEvents(events, this.eventListeners, () => !this.disposed);
     for (const event of completions) {
-      // oxlint-disable-next-line unicorn/no-useless-spread -- Preserve the listener snapshot during callbacks.
-      for (const listener of [...this.completionListeners]) {
-        if (this.disposed) break;
-        try {
-          listener({ ...event });
-        } catch (error) {
-          errors.push(error);
-        }
-      }
+      for (const error of dispatchListeners(
+        this.completionListeners,
+        (listener) => listener({ ...event }),
+        () => !this.disposed,
+      ))
+        errors.push(error);
     }
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) throw new AggregateError(errors, 'Animation listeners failed.');
+    throwNotificationErrors(errors, 'Animation listeners failed.');
   }
 
   /** Release listeners, clips, layers, and joint references without changing the host's held pose. */

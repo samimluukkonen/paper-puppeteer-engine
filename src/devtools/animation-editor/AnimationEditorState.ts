@@ -8,6 +8,7 @@ import type {
 import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
+import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
@@ -551,18 +552,10 @@ export class AnimationEditorState {
       this.notificationPending = true;
       return;
     }
-    const errors: unknown[] = [];
-    // Keep this notification stable when a subscriber adds or removes listeners.
-    // oxlint-disable-next-line unicorn/no-useless-spread -- Preserve the listener snapshot during callbacks.
-    for (const listener of [...this.listeners]) {
-      try {
-        listener();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) throw new AggregateError(errors, 'Animation editor listeners failed.');
+    throwNotificationErrors(
+      dispatchListeners(this.listeners, (listener) => listener()),
+      'Animation editor listeners failed.',
+    );
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */

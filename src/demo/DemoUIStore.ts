@@ -1,3 +1,4 @@
+import { dispatchListeners, throwNotificationErrors } from '../engine/notifications.js';
 import { createDemoCommands, type DemoCommand } from './demoCommands.js';
 import type { DemoScene, DemoState } from './DemoScene.js';
 
@@ -57,6 +58,10 @@ export class DemoUIStore {
     this.pressed = pressed;
     this.status = status;
     this.stopped = !state.playing;
-    if (changed) for (const listener of this.listeners) listener();
+    if (changed)
+      throwNotificationErrors(
+        dispatchListeners(this.listeners, (listener) => listener()),
+        'Demo UI listeners failed.',
+      );
   };
 }
