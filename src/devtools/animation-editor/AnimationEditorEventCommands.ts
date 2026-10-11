@@ -26,6 +26,8 @@ import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './ti
 export interface EventDrag {
   readonly ref: AnimationEventRef;
   readonly originalTime: Seconds;
+  /** Exact authored timestamp for cancellation; seconds remain the timeline geometry unit. */
+  readonly originalTimeMilliseconds: Milliseconds;
   readonly previewTime: Seconds;
   readonly previewEvent: DeepReadonly<AnimationEvent>;
 }
@@ -190,6 +192,7 @@ export class AnimationEditorEventCommands {
     this.dragEvent = Object.freeze({
       ref,
       originalTime: toSeconds(event.time),
+      originalTimeMilliseconds: event.time,
       previewTime: toSeconds(event.time),
       previewEvent: event,
     });
@@ -224,7 +227,7 @@ export class AnimationEditorEventCommands {
     const drag = this.dragEvent;
     if (!drag) return false;
     this.dragEvent = null;
-    this.actions.updateTime(drag.originalTime);
+    this.actions.updateTimeMilliseconds(drag.originalTimeMilliseconds);
     this.actions.notify();
     return true;
   }

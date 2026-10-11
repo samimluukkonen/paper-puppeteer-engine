@@ -328,6 +328,33 @@ test('authored millisecond clock cannot replay a boundary after fractional secon
   assert.deepEqual(names(), ['right', 'cloth', 'impact']);
 });
 
+test.each([250.03, 3.97])('canceling an event drag restores exact %s ms without replaying its marker', (timestamp) => {
+  const { state, events, names } = session({
+    ...clip,
+    events: [
+      { time: timestamp, name: 'fractional' },
+      { time: 500, name: 'later' },
+    ],
+  });
+  const authored = state.workingAnimation;
+  const ref = state.eventTimelineTrack.markers[0]!.ref;
+  assert.isTrue(state.beginEventDrag(ref));
+  assert.equal(state.currentTimeMilliseconds, timestamp);
+  assert.isTrue(state.previewEventDrag(0.8));
+  assert.isTrue(state.cancelEventDrag());
+  assert.equal(state.currentTimeMilliseconds, timestamp);
+  assert.strictEqual(state.workingAnimation, authored);
+  assert.strictEqual(state.selectedEvent, ref);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.dirty);
+  assert.deepEqual(events, []);
+  state.play();
+  state.advancePlayback(0.1);
+  assert.deepEqual(events, []);
+  state.advancePlayback(1);
+  assert.deepEqual(names(), ['later']);
+});
+
 test('fractional millisecond marker boundaries remain exact across following updates', () => {
   const timestamp = 0.000000123456789;
   const { state, events } = session({ ...clip, events: [{ time: timestamp, name: 'fractional' }] });
