@@ -8,6 +8,7 @@ import { getCompiledPreviewClip } from './previewClip.js';
 
 /** Editor-owned runtime player samples the working copy; the puppet still owns rendering and IK. */
 export class AnimationEditorPreview {
+  private disposed = false;
   private player: AnimationPlayer | undefined;
   private animation: ReadonlyAnimation | null | undefined;
   private sampledTime: number | undefined;
@@ -26,6 +27,7 @@ export class AnimationEditorPreview {
   }
 
   private refresh(): void {
+    if (this.disposed) return;
     const animation = this.state.workingAnimation;
     const time = animation ? this.state.currentTimeMilliseconds : 0;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.
@@ -91,9 +93,16 @@ export class AnimationEditorPreview {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.unsubscribe();
     this.puppet.setIKAnimationSource(undefined);
     this.player?.dispose();
     this.player = undefined;
+    this.animation = undefined;
+    this.draft = undefined;
+    this.ikDraft = undefined;
+    this.ikId = undefined;
+    this.ikSource.ikAnimation = new Map();
   }
 }

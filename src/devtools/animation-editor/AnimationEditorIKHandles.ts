@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { localToWorld, worldToLocal, type Point } from '../../engine/affineMath.js';
+import { IK_EPSILON } from '../../engine/ik/solveTwoBoneIK.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
@@ -22,6 +23,7 @@ export class AnimationEditorIKHandles {
   private pointerId: number | undefined;
   private offset: Point | undefined;
   private pan: Point | undefined;
+  private disposed = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -44,19 +46,30 @@ export class AnimationEditorIKHandles {
   }
 
   setVisible(visible: boolean): void {
+    if (this.disposed) return;
     this.visible = visible;
     if (!visible) this.cancel();
     this.graphics.setVisible(visible);
   }
   setInteractive(interactive: boolean): void {
+    if (this.disposed) return;
     this.interactive = interactive;
     if (!interactive) this.cancel();
   }
 
   refreshAvailability(): void {
+    if (this.disposed) return;
     const matrix = this.puppet.container.getWorldTransformMatrix();
     for (const definition of this.puppet.rig.ik ?? []) {
       const constraint = this.puppet.getIK(definition.name);
+      const root = this.puppet.getBone(constraint.rootBone);
+      const sx = Math.abs(root.pose.scaleX);
+      const sy = Math.abs(root.pose.scaleY);
+      // Inspect current transforms: a held solver status can outlive a host scale edit.
+      const singularChain =
+        sx <= IK_EPSILON ||
+        sy <= IK_EPSILON ||
+        !worldToLocal({ x: 0, y: 0 }, root.container.parentContainer.getWorldTransformMatrix());
       const reason =
         constraint.targetOwnership === 'provider'
           ? 'A target provider owns this constraint (fixed preview or weapon grip). Disable that owner to drag.'
@@ -66,12 +79,17 @@ export class AnimationEditorIKHandles {
               ? 'This IK constraint is disabled.'
               : !worldToLocal({ x: matrix.tx, y: matrix.ty }, matrix)
                 ? 'The puppet transform is singular. Restore a nonzero scale to drag.'
-                : null;
+                : singularChain
+                  ? 'The IK chain transform is singular. Restore nonzero chain and parent scales to drag.'
+                  : Math.abs(sx - sy) > IK_EPSILON * Math.max(sx, sy)
+                    ? 'This solver does not support nonuniform scale inside the IK chain. Use uniform root scale.'
+                    : null;
       this.state.setIKManipulationDisabledReason(definition.name, reason);
     }
   }
 
   getHandles(): readonly IKTargetHandle[] {
+    if (this.disposed) return [];
     this.refreshAvailability();
     const animation = this.state.workingAnimation;
     if (!animation) return [];
@@ -103,6 +121,7 @@ export class AnimationEditorIKHandles {
   }
 
   render(): void {
+    if (this.disposed) return;
     const graphics = this.graphics;
     graphics.setDepth(this.puppet.container.depth + 4);
     graphics.clear();
@@ -136,6 +155,7 @@ export class AnimationEditorIKHandles {
 
   /** Called before bone picking. Even a disabled handle consumes the click and selects its constraint. */
   pointerDown(pointer: Phaser.Input.Pointer): boolean {
+    if (this.disposed) return false;
     if (this.pointerId !== undefined) return true;
     if (pointer.button === 1) {
       this.pointerId = pointer.id;
@@ -214,6 +234,8 @@ export class AnimationEditorIKHandles {
   };
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.cancel();
     this.unsubscribe();
     this.scene.input.off('pointermove', this.pointerMove);

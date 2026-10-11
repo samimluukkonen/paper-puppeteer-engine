@@ -69,9 +69,9 @@ npm run build
 | `npm run check`     | Formatting, lint and typecheck passed.                                                                                                                                                                                           |
 | Local Chrome        | IK authoring/runtime, bone authoring, track alignment and timeline-update checks passed in development and production. The preview-picking test now locates the rendered joint ring instead of assuming a fixed camera position. |
 
-## Deferred to v0.5.5.5 and later
+## Timeline operation limits in v0.5.5
 
-IK multi-selection, marquee/range selection, pointer dragging of key markers, clipboard/paste/duplicate, and previous/next IK key navigation await generic channel-aware batch operations. Bone commands keep their existing implementation; IK selection disables clipboard buttons and prevents stale bone clipboard contents from being pasted through IK commands. Single-key authoring, deletion and snapped keyboard movement are available now.
+IK multi-selection, marquee/range selection, group movement, pointer dragging of key markers, clipboard/paste/duplicate, and previous/next IK key navigation remain unavailable in v0.5.5. The existing batch selection and clipboard types address bone IDs and transform properties; IK uses constraint IDs and x/y/mix references. Enabling those commands requires extending that shared typed infrastructure, which is deferred beyond this hardening milestone. See the [production workflow and operation matrix](ik-animation-authoring.md). Bone commands keep their existing implementation; IK selection disables clipboard buttons and prevents stale bone clipboard contents from being pasted through IK commands. Single-key authoring, deletion and snapped keyboard movement are available now.
 
 Visual IK target handles and pointer dragging are implemented in [v0.5.5.4](visual-ik-targets.md). Mirrored IK authoring, baking, new solvers, target ownership changes, physics and scene choreography remain deferred.
 

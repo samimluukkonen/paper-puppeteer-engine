@@ -422,3 +422,56 @@ test('provider ownership acquired during dragging cancels the gesture, preserves
     f.dispose();
   }
 });
+
+test.each(['unsupported-scale', 'singular-transform'] as const)(
+  '%s chain diagnostics disable dragging and recover after valid transforms return',
+  (status) => {
+    const f = fixture();
+    try {
+      f.state.selectIKConstraint('handIK');
+      const root = f.puppet.getBone('upper');
+      root.pose.scaleX = status === 'unsupported-scale' ? 2 : 0;
+      f.puppet.syncPose();
+      f.handles.refreshAvailability();
+      assert.equal(f.puppet.getIK('handIK').status, status);
+      assert.include(
+        f.inspector.getSnapshot().disabledReason!,
+        status === 'unsupported-scale' ? 'uniform' : 'singular',
+      );
+      assert.isFalse(f.state.beginIKTargetDrag('handIK'));
+      assert.equal(f.state.historyLength, 0);
+      root.pose.scaleX = 1;
+      f.puppet.syncPose();
+      f.handles.refreshAvailability();
+      assert.isNull(f.inspector.getSnapshot().disabledReason);
+      assert.isTrue(f.state.beginIKTargetDrag('handIK'));
+      f.state.cancelIKTargetDrag();
+    } finally {
+      f.dispose();
+    }
+  },
+);
+
+test('handle teardown is idempotent and late input/render calls never touch destroyed graphics', () => {
+  const f = fixture();
+  const graphics = Reflect.get(f.handles, 'graphics') as Phaser.GameObjects.Graphics;
+  const destroy = vi.spyOn(graphics, 'destroy');
+  const clear = vi.spyOn(graphics, 'clear');
+  try {
+    f.handles.pointerDown(f.pointer(f.handles.getHandles()[0]!.world));
+    f.handles.dispose();
+    f.handles.dispose();
+    f.handles.render();
+    f.handles.setVisible(true);
+    f.handles.setInteractive(true);
+    assert.deepEqual(f.handles.getHandles(), []);
+    assert.isFalse(f.handles.pointerDown(f.localPointer({ x: 20, y: 60 })));
+    f.input.emit('pointermove', f.localPointer({ x: 20, y: 60 }));
+    assert.isNull(f.state.ikTargetDrag);
+    assert.equal(destroy.mock.calls.length, 1);
+    assert.equal(clear.mock.calls.length, 0);
+    assert.equal(f.state.historyLength, 0);
+  } finally {
+    f.dispose();
+  }
+});

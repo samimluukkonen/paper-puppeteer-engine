@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.5-5
+
+The v0.5.5.5 [IK authoring hardening](docs/ik-animation-authoring.md) completes v0.5.5. Preview and gizmo teardown are idempotent; stale preview cleanup cannot release a replacement preview. Gizmos report unsupported internal chain scales and singular chain/parent transforms using current transforms. Production regressions cover both authored arm rotations with zero/partial/full influence, loop/event timing, large deltas and speeds, immutable JSON round trips through CharacterLoader/Puppet, failed imports, legacy rigs, bone mirroring, six read-only ghosts, bounded render allocation and subscription cleanup. Artist documentation and editor Help explain reaching, interpolation and influence, coordinates, precedence, and explicit typed timeline limitations. IK baking, direct target mirroring and generic IK batch commands remain deferred.
+
 ## 0.5.5-4
 
 The v0.5.5.4 [visual IK targets](docs/visual-ik-targets.md) add editor-only Phaser crosshairs, live target dragging with explicit puppet-local conversion, and a Set Target Key command which commits X/Y together in one Undo/Redo action. Escape restores the pre-drag preview; release retains temporary values outside authored/exported data. Camera zoom/pan, facing, scale, influence, unreachable targets, ownership-disabled states, and React/Phaser lifecycle are covered by unit and local browser tests. The Demo Puppet exposes its existing right leg chain for foot authoring; Random paperdoll sketch exposes both arm and leg chains. Mirrored IK targets and baking remain deferred.

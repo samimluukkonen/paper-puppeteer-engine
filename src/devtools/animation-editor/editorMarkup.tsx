@@ -477,7 +477,15 @@ export function AnimationEditorView({
         <p>
           Select a bone in the preview or hierarchy. Scrub to a time, enter a local value, then Set Key. Fields preview
           temporary values; scrubbing, changing selection, Play, settings changes, or Undo/Redo cancel drafts. Rotation
-          is shown in degrees. IK and facing affect only the preview.
+          is shown in degrees. Facing affects preview placement.
+        </p>
+        <p>
+          To animate a reach, select an IK constraint, position its hand or foot crosshair at time zero, and choose Set
+          Target Key. Move to 0.5 s, drag toward the object, and set another target key. X/Y use puppet-local
+          coordinates; key Influence from 0 to 1 to blend with bone motion. Disable fixed-target IK preview to see
+          authored targets. Dragging creates temporary values until committed. IK keys support single selection,
+          deletion, arrow movement and Undo/Redo; group selection, clipboard and marker dragging are unavailable. Onion
+          skins and bone mirroring use authored bone poses before IK; they do not mirror or bake IK targets.
         </p>
         <p>
           Space plays or pauses. Home returns to time zero outside typing controls. Drag the ruler to scrub. Moving

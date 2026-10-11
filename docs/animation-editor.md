@@ -407,3 +407,5 @@ The [React IK timeline and inspector](react-ik-authoring.md) select real rig con
 ## Drag IK targets
 
 See [visual IK target manipulation](visual-ik-targets.md) for the hand/foot walkthrough. Crosshairs show requested targets; small limb circles show solved contacts. Dragging pauses and previews X/Y; release keeps temporary values. Set Target Key commits both coordinates as one history operation. Escape during the gesture restores its starting preview. Wheel zoom and middle-drag pan the canvas. Fixed preview or other runtime owners disable direct manipulation with an inspector explanation.
+
+The completed [IK animation authoring workflow](ik-animation-authoring.md) explains reaching, target coordinates, influence, precedence, supported timeline operations, ghost/mirroring semantics and production verification.

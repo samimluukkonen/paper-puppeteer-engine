@@ -222,3 +222,5 @@ const player = new AnimationPlayer(character.rig, joints);
 For stateless pose tooling, import `compileClip` and `evaluateClip` from `/core`: `compileClip(clip, rig)` validates and prepares an authored clip, and `evaluateClip(compiled, timeMilliseconds)` returns its sparse interpolated pose. `CompiledClip`, `CompiledTrack`, and `PropertyKeyframe` are also exported types. This evaluator uses raw interpolation; use `AnimationPlayer.sample(time, { mode: 'playback' })` for playback-aware previews.
 
 Compiled clips own immutable metadata, property maps, keyframes, playback settings, and JSON event payloads, so they can be shared between compatible players. `AnimationPlayer` takes an independent snapshot of externally assembled compiled clips. Non-JSON runtime event payloads retain reference semantics; listener notifications receive independent metadata and copies of JSON payloads.
+
+IK authoring production coverage is documented in the [IK workflow](ik-animation-authoring.md). Preview and gizmo disposal are idempotent; disposed gizmos ignore late render/input calls, and solver-scale restrictions use current transforms rather than a held status.
