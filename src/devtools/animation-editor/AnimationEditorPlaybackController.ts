@@ -67,9 +67,15 @@ export class AnimationEditorPlaybackController {
   }
 
   play(): void {
-    if (this.actions.isDragging() || !this.playback.play()) return;
+    const animation = this.document.workingAnimation;
+    if (this.actions.isDragging() || this.playback.isPlaying || !animation) return;
+    const events = this.prepareStartEvents(
+      !this.playback.isScrubbing &&
+        (this.playback.hasPendingStart || this.playback.currentTimeMilliseconds >= animation.duration),
+    );
+    if (!events || !this.playback.play()) return;
     this.selection.clearDraft();
-    const events = this.startEvents();
+    this.playback.consumeStart();
     this.actions.notify();
     this.dispatchEvents(events);
   }
@@ -84,9 +90,11 @@ export class AnimationEditorPlaybackController {
   }
 
   restart(): void {
+    const events = this.prepareStartEvents(this.playback.isPlaying && !this.playback.isScrubbing);
+    if (!events) return;
     this.playback.requestStart();
     this.actions.navigate(0);
-    this.dispatchEvents(this.startEvents());
+    if (this.playback.consumeStart()) this.dispatchEvents(events);
   }
 
   /** Preflight crossings before advancing; subscribers synchronize the pose before callbacks run. */
@@ -124,12 +132,18 @@ export class AnimationEditorPlaybackController {
     return () => this.eventListeners.delete(listener);
   }
 
-  private startEvents(): FiredAnimationEvent[] {
+  /** Bound start notifications before clocks, drafts, or playback intent change. */
+  private prepareStartEvents(required: boolean): FiredAnimationEvent[] | undefined {
     const animation = this.document.workingAnimation;
     const rig = this.document.rig;
-    return this.playback.consumeStart() && animation && rig
-      ? collectAnimationStartEvents(getEditorEventClip(animation, rig, this.playback.previewLoop), 'base')
-      : [];
+    if (!required || !animation?.events?.length || !rig) return [];
+    try {
+      return collectAnimationStartEvents(getEditorEventClip(animation, rig, this.playback.previewLoop), 'base');
+    } catch (error) {
+      this.document.reportError(error);
+      this.actions.notify();
+      return undefined;
+    }
   }
 
   private dispatchEvents(events: readonly FiredAnimationEvent[]): void {

@@ -32,6 +32,9 @@ export class AnimationEditorPlayback {
   get isScrubbing(): boolean {
     return this.scrubbing;
   }
+  get hasPendingStart(): boolean {
+    return this.startPending && this.time === 0;
+  }
 
   /** New animation sessions retain preview preferences but release clock and pointer state. */
   reset(): void {

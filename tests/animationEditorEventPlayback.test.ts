@@ -160,6 +160,37 @@ test('initial play, endpoint replay and playing restart fire start once; paused 
   assert.deepEqual(names(), ['start', 'early', 'start']);
 });
 
+test('editor start and restart budgets preserve clocks, drafts and authored history on rejection', () => {
+  const { state, events } = session({
+    ...clip,
+    loop: false,
+    events: Array.from({ length: 10001 }, () => ({ time: 0, name: 'start' })),
+  });
+  state.selectBone('root');
+  state.setTemporaryBoneProperty('x', 123);
+  const working = state.workingAnimation;
+  state.play();
+  assert.isFalse(state.isPlaying);
+  assert.equal(state.currentTime, 0);
+  assert.equal(state.boneTransformDraft.x, 123);
+  assert.isEmpty(events);
+  assert.match(state.validationIssues[0]!.message, /exceeds 10000 events/);
+  state.setCurrentTime(0.25);
+  state.play();
+  assert.isTrue(state.isPlaying, 'resuming after zero does not emit start events');
+  state.restart();
+  assert.equal(state.currentTime, 0.25);
+  assert.isTrue(state.isPlaying);
+  assert.isEmpty(events);
+  state.setCurrentTime(2);
+  state.play();
+  assert.equal(state.currentTime, 2);
+  assert.isFalse(state.isPlaying);
+  assert.strictEqual(state.workingAnimation, working);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.dirty);
+});
+
 test.each([10000, 2_000_000.5, Number.MAX_VALUE])(
   'unbounded catch-up %s is rejected atomically using runtime limits',
   (delta) => {

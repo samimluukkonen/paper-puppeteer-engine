@@ -1105,6 +1105,82 @@ test('event catch-up is bounded across layers and preserves ordinary large-delta
   assert.equal(listener.mock.calls.length, 10_000);
 });
 
+test('oversized time-zero event starts fail before changing layers, poses or invoking host callbacks', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'oversized',
+    duration: 1000,
+    loop: false,
+    tracks: {},
+    events: Array.from({ length: 10001 }, () => ({ time: 0, name: 'start' })),
+  });
+  player.play('a');
+  player.update(125);
+  const before = { ...joints.get('arm')!.pose };
+  const prepare = vi.fn();
+  const sync = vi.fn();
+  const listener = vi.fn();
+  player.onAnimationEvent(listener);
+  for (const layer of ['base', 'upper']) {
+    assert.throws(() => player.play('oversized', { layer }, prepare, sync), /start exceeds 10000 events/);
+    assert.equal(player.currentAnimation, 'a');
+    assert.equal(player.elapsedTime, 125);
+    assert.equal(player.getLayerWeight('upper'), 0);
+    assert.deepEqual(joints.get('arm')!.pose, before);
+  }
+  assert.equal(prepare.mock.calls.length, 0);
+  assert.equal(sync.mock.calls.length, 0);
+  assert.equal(listener.mock.calls.length, 0);
+});
+
+test('restart budgets combine selected layers before resetting any clock or held pose', () => {
+  const { player, joints } = fixture();
+  player.addAnimation({
+    name: 'starts',
+    duration: 1000,
+    loop: true,
+    tracks: {},
+    events: Array.from({ length: 6000 }, () => ({ time: 0, name: 'start' })),
+  });
+  player.play('starts');
+  player.play('starts', { layer: 'upper' });
+  player.update(125);
+  joints.get('arm')!.pose.x = 123;
+  player.pause();
+  const prepare = vi.fn();
+  const sync = vi.fn();
+  const listener = vi.fn();
+  player.onAnimationEvent(listener);
+  assert.throws(() => player.restart(prepare, sync), /restart exceeds 10000 events/);
+  assert.equal(player.elapsedTime, 125);
+  assert.isTrue(player.isPaused);
+  assert.equal(joints.get('arm')!.pose.x, 123);
+  assert.equal(prepare.mock.calls.length, 0);
+  assert.equal(sync.mock.calls.length, 0);
+  assert.equal(listener.mock.calls.length, 0);
+  player.clearLayer('upper');
+  player.restart();
+  assert.equal(player.elapsedTime, 0);
+  assert.equal(listener.mock.calls.length, 6000);
+});
+
+test('play and restart accept the exact time-zero event budget', () => {
+  const { player } = fixture();
+  player.addAnimation({
+    name: 'starts',
+    duration: 1000,
+    loop: false,
+    tracks: {},
+    events: Array.from({ length: 10000 }, () => ({ time: 0, name: 'start' })),
+  });
+  const listener = vi.fn();
+  player.onAnimationEvent(listener);
+  player.play('starts');
+  assert.equal(listener.mock.calls.length, 10000);
+  player.restart();
+  assert.equal(listener.mock.calls.length, 20000);
+});
+
 test('zero playback speed does not overflow intermediate multiplication', () => {
   const { player } = fixture();
   player.play('a', { speed: 0 });

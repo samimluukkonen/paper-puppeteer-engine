@@ -9,6 +9,7 @@ import {
   collectAnimationEvents,
   collectAnimationStartEvents,
   countAnimationEvents,
+  countAnimationStartEvents,
 } from './animationTimeline.js';
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
@@ -154,6 +155,7 @@ export class AnimationPlayer {
       synchronizePose?.();
       return;
     }
+    const events = collectAnimationStartEvents(clip, layerName);
     preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
     let source: AnimationState | AnimationPose | undefined;
@@ -179,7 +181,7 @@ export class AnimationPlayer {
     if (layerName === 'base' && !source) this.resetPose();
     this.applyCurrentPose();
     synchronizePose?.();
-    this.fireStartEvents(clip, layerName);
+    this.dispatchNotifications(events, []);
   }
 
   stop(): void {
@@ -195,6 +197,12 @@ export class AnimationPlayer {
     if (![...this.layers.values()].some((layer) => layer.state)) {
       synchronizePose?.();
       return;
+    }
+    // Restart is one notification boundary, including every selected layer.
+    let eventCount = 0;
+    for (const layer of this.layers.values()) {
+      if (layer.state) eventCount += countAnimationStartEvents(layer.state.clip);
+      assertAnimationEventBudget(eventCount, 'restart');
     }
     preparePose?.();
     this.resetPose();
@@ -397,10 +405,6 @@ export class AnimationPlayer {
       state.playing = false;
       if (layer && completions) completions.push({ clip: state.clip.name, layer });
     }
-  }
-
-  private fireStartEvents(clip: CompiledClip, layer: string): void {
-    this.dispatchNotifications(collectAnimationStartEvents(clip, layer), []);
   }
 
   /** Listener failures must not prevent other markers or completion notifications. */

@@ -3,15 +3,20 @@ import { assertFinite } from './types.js';
 
 export const MAXIMUM_ANIMATION_EVENTS_PER_UPDATE = 10_000;
 
+export function countAnimationStartEvents(clip: CompiledClip): number {
+  return clip.events.reduce((count, marker) => count + Number(marker.time === 0), 0);
+}
+
 /** Runtime start/restart convention, separate from the exclusive lower bound used by crossings. */
 export function collectAnimationStartEvents(clip: CompiledClip, layer: string) {
+  assertAnimationEventBudget(countAnimationStartEvents(clip), 'start');
   return clip.events.filter((marker) => marker.time === 0).map((marker) => ({ ...marker, clip: clip.name, layer }));
 }
 
-export function assertAnimationEventBudget(count: number): void {
+export function assertAnimationEventBudget(count: number, operation: 'update' | 'start' | 'restart' = 'update'): void {
   if (count > MAXIMUM_ANIMATION_EVENTS_PER_UPDATE)
     throw new Error(
-      `Animation update exceeds ${MAXIMUM_ANIMATION_EVENTS_PER_UPDATE} events. Reduce the delta or playback speed.`,
+      `Animation ${operation} exceeds ${MAXIMUM_ANIMATION_EVENTS_PER_UPDATE} events. ${operation === 'update' ? 'Reduce the delta or playback speed.' : 'Reduce time-zero markers or selected layers.'}`,
     );
 }
 
