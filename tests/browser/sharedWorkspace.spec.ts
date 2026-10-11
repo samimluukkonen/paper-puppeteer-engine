@@ -71,6 +71,14 @@ for (const view of [
     const help = page.locator(`#${view.prefix}-help-open`);
     await help.click();
     await expect(page.getByRole('dialog')).toBeVisible();
+    if (view.prefix === 'rig') {
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Control+z');
+      await expect(page.locator('#inspector input[data-field="x"]')).toHaveValue('12');
+    } else if (view.prefix === 'demo') {
+      await page.keyboard.press('1');
+      await expect(page.locator('#status-text')).toContainText('Current: walk');
+    }
     await page.keyboard.press('Escape');
     await expect(help).toBeFocused();
     await toggle.click();

@@ -32,7 +32,8 @@ function fixture() {
   );
   controller.enable();
   const key = (values: Partial<KeyboardEvent>, consumed = false) => {
-    const event = Object.assign(new Event('keydown', { cancelable: true }), values);
+    const event = new Event('keydown', { cancelable: true });
+    for (const [name, value] of Object.entries(values)) Object.defineProperty(event, name, { value });
     if (consumed) event.preventDefault();
     browser.dispatchEvent(event);
     return event;
@@ -102,6 +103,28 @@ test('held arrow shortcuts keep nudging on repeat', () => {
     key({ key: 'ArrowRight' });
     key({ key: 'ArrowRight', repeat: true });
     assert.equal(state.getBone('root').x, 12);
+  } finally {
+    controller.disable();
+  }
+});
+
+test('dialog shortcuts preserve rig edits and history without consuming native keys', () => {
+  const { editor, state, key, controller } = fixture();
+  const target = { tagName: 'BUTTON', closest: (selector: string) => (selector === 'dialog' ? {} : null) };
+  try {
+    for (const shortcut of [
+      { key: 'ArrowRight' },
+      { key: '.' },
+      { key: 'z', ctrlKey: true },
+      { key: 'z', metaKey: true, shiftKey: true },
+    ])
+      assert.isFalse(key({ ...shortcut, target: target as unknown as EventTarget }).defaultPrevented);
+    assert.equal(state.getBone('root').x, 10);
+    assert.isUndefined(state.getBone('root').rotation);
+    assert.equal(state.historyLength, 1);
+    for (const handler of [editor.editBone, editor.undo, editor.redo]) assert.equal(handler.mock.calls.length, 0);
+    key({ key: 'ArrowRight' });
+    assert.equal(state.getBone('root').x, 11);
   } finally {
     controller.disable();
   }

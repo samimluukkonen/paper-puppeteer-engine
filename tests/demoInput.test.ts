@@ -142,6 +142,23 @@ test('held rotation does not capture keys or rotate while typing or using browse
   assert.equal(input.katanaTurn(1000), -1);
 });
 
+test('dialog focus blocks demo shortcuts, pose edits, and held weapon rotation', () => {
+  const { scene, authoring, keys, bind, press, document } = fixture();
+  const input = bind();
+  const target = { tagName: 'BUTTON', closest: (selector: string) => (selector === 'dialog' ? {} : null) };
+  authoring.active = true;
+  for (const code of ['Digit1', 'KeyA', 'KeyR', 'ArrowRight']) assert.isFalse(press(code, { target }).defaultPrevented);
+  for (const handler of [scene.play, scene.face, scene.resetBind, scene.adjustSelected])
+    assert.equal(handler.mock.calls.length, 0);
+  keys.Q.isDown = true;
+  document.activeElement = target;
+  assert.equal(input.katanaTurn(1000), 0);
+  document.activeElement = null;
+  assert.equal(input.katanaTurn(1000), -1);
+  press('Digit1');
+  assert.deepEqual(scene.play.mock.lastCall, ['idle']);
+});
+
 test('shutdown removes demo listeners and rebinding triggers each control only once', () => {
   const { scene, keyboard, bind, press } = fixture();
   const unrelated = vi.fn();

@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { Puppet } from '../../engine/Puppet.js';
-import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { isDialogTarget, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { type Point, worldToLocal } from './coordinates.js';
 import type { RigEditor } from './RigEditor.js';
@@ -154,7 +154,7 @@ export class RigEditorInputController {
   }
 
   private keyDown = (event: KeyboardEvent): void => {
-    if (event.defaultPrevented || event.isComposing) return;
+    if (event.defaultPrevented || event.isComposing || isDialogTarget(event.target)) return;
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
       if (isTypingTarget(event.target)) return;
       event.preventDefault();

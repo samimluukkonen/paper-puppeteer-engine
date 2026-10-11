@@ -1,4 +1,4 @@
-import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { isDialogTarget, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 
 interface KeyboardGestureActions {
@@ -23,7 +23,7 @@ export class TimelineKeyboardController {
       (event) => {
         if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
           return;
-        if (event.target instanceof Element && event.target.closest('dialog')) return;
+        if (isDialogTarget(event.target)) return;
         if (event.key === 'Escape' && (this.state.keyframeDrag || this.state.eventDrag)) {
           event.preventDefault();
           this.gestures.cancelGesture();

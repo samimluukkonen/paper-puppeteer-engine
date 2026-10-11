@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { isTypingTarget } from '../shared/keyboardShortcuts.js';
+import { isDialogTarget, isTypingTarget } from '../shared/keyboardShortcuts.js';
 import { createDemoCommands } from './demoCommands.js';
 import type { DemoPoseAuthoring } from './DemoPoseAuthoring.js';
 import type { DemoPresenter } from './DemoPresenter.js';
@@ -30,6 +30,7 @@ export class DemoInput {
           event.isComposing ||
           event.ctrlKey ||
           event.metaKey ||
+          isDialogTarget(event.target) ||
           isTypingTarget(event.target)
         )
           return;
@@ -69,7 +70,7 @@ export class DemoInput {
 
   katanaTurn(delta: number): number {
     if (!this.rotateLeft?.isDown && !this.rotateRight?.isDown) return 0;
-    if (isTypingTarget(document.activeElement)) return 0;
+    if (isTypingTarget(document.activeElement) || isDialogTarget(document.activeElement)) return 0;
     const held = (key: Phaser.Input.Keyboard.Key | undefined): boolean => {
       const event = key?.originalEvent;
       return (
@@ -79,6 +80,7 @@ export class DemoInput {
         !key.metaKey &&
         !event?.isComposing &&
         !event?.defaultPrevented &&
+        !isDialogTarget(event?.target ?? null) &&
         !isTypingTarget(event?.target ?? null)
       );
     };
