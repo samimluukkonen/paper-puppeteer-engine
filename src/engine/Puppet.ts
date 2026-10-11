@@ -15,6 +15,7 @@ import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
+import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetPoseController, type SyncPoseOptions } from './PuppetPoseController.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
@@ -51,7 +52,7 @@ export class Puppet {
   readonly container: Phaser.GameObjects.Container;
   readonly animationPlayer: AnimationPlayer;
   private readonly bones = new Map<string, Bone>();
-  private readonly attachments = new Map<Phaser.GameObjects.GameObject, Phaser.GameObjects.Container>();
+  private readonly attachments: PuppetAttachments;
   private debugView: PuppetDebug | undefined;
   private readonly debugLabelSides = new Map<string, Facing>();
   private readonly renderer: PuppetRenderer;
@@ -139,6 +140,11 @@ export class Puppet {
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
     this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones);
+    this.attachments = new PuppetAttachments(
+      scene,
+      (id) => this.getBone(id).container,
+      (id, slotId) => (slotId === undefined ? this.renderer.getMount(id) : this.renderer.getSlotMount(slotId)),
+    );
     this.animationPlayer = new AnimationPlayer(this.rig, this.bones, compiledAnimations);
     this.renderSlots();
     this.poseController = new PuppetPoseController(
@@ -459,71 +465,19 @@ export class Puppet {
   }
 
   attach(boneId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
-    return this.attachAt(boneId, object, options);
+    this.attachments.attach(boneId, object, options);
+    return this;
   }
 
   /** Attach a prop at a slot's transform and global layer, independently of its sprite. */
   attachToSlot(slotId: string, object: Phaser.GameObjects.GameObject, options: AttachmentOptions = {}): this {
-    return this.attachAt(this.rig.getSlot(slotId).bone, object, options, slotId);
-  }
-
-  private attachAt(
-    boneId: string,
-    object: Phaser.GameObjects.GameObject,
-    options: AttachmentOptions,
-    slotId?: string,
-  ): this {
-    const bone = this.getBone(boneId);
-    if (object.scene !== this.scene) throw new Error('Attachments must belong to the puppet scene.');
-    for (
-      let ancestor: Phaser.GameObjects.Container | null = bone.container;
-      ancestor;
-      ancestor = ancestor.parentContainer
-    ) {
-      if (ancestor === object) throw new Error('Cannot attach an ancestor of the target bone.');
-    }
-    for (const [label, value] of Object.entries(options) as [string, number][])
-      assertFinite(value, `Attachment ${label}`);
-    const renderMount = slotId ? this.renderer.getSlotMount(slotId) : this.renderer.getMount(boneId);
-    for (
-      let ancestor: Phaser.GameObjects.Container | null = renderMount;
-      ancestor;
-      ancestor = ancestor.parentContainer
-    ) {
-      if (ancestor === object) throw new Error('Cannot attach an ancestor of the render mount.');
-    }
-    this.detach(object);
-    // A wrapper permits any Phaser GameObject without changing its own transform.
-    const mount = this.scene.add
-      .container(options.x ?? 0, options.y ?? 0)
-      .setRotation(options.rotation ?? 0)
-      .setDepth(options.depth ?? 1);
-    mount.add(object);
-    renderMount.add(mount).sort('depth');
-    this.attachments.set(object, mount);
-    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
-    object.once(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
+    this.attachments.attach(this.rig.getSlot(slotId).bone, object, options, slotId);
     return this;
-  }
-
-  private onAttachmentDestroyed(object: Phaser.GameObjects.GameObject): void {
-    const mount = this.attachments.get(object);
-    if (!mount) return;
-    this.attachments.delete(object);
-    // Phaser removes the child first. Its wrapper may already be tearing down.
-    if (!this.destroyed && !mount.isDestroyed) mount.destroy();
   }
 
   /** Release to the scene display list; the object's local transform is retained. */
   detach(object: Phaser.GameObjects.GameObject): boolean {
-    const mount = this.attachments.get(object);
-    if (!mount) return false;
-    // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
-    object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
-    mount.remove(object);
-    mount.destroy();
-    this.attachments.delete(object);
-    return true;
+    return this.attachments.detach(object);
   }
 
   setDebug(enabled: boolean): this {
@@ -607,12 +561,9 @@ export class Puppet {
     this.ikDebugView = undefined;
     this.slotDebugView = undefined;
     this.debugLabelSides.clear();
-    for (const object of this.attachments.keys())
-      // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
-      object.off(Phaser.GameObjects.Events.DESTROY, this.onAttachmentDestroyed, this);
+    this.attachments.dispose();
     this.renderer.destroy();
     if (!this.container.isDestroyed) this.container.destroy();
-    this.attachments.clear();
     this.renderedSlotAttachments.clear();
     this.poses.clear();
     this.bones.clear();
