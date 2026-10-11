@@ -10,6 +10,45 @@ import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'root' }] });
+
+test.each(['constructor', 'toString', 'hasOwnProperty'])(
+  'moving all keys recreates the own track for bone %s',
+  (boneId) => {
+    const skeleton = new Rig({ root: boneId, bones: [{ id: boneId }] });
+    const animation: AnimationClip = {
+      name: 'group',
+      duration: 1000,
+      loop: false,
+      tracks: {
+        [boneId]: [
+          { time: 100, x: 1 },
+          { time: 200, x: 2 },
+        ],
+      },
+    };
+    const before = JSON.stringify(animation);
+    const result = moveBonePropertyKeyframes(
+      animation,
+      skeleton,
+      [
+        { boneId, property: 'x', timeMs: 100 },
+        { boneId, property: 'x', timeMs: 200 },
+      ],
+      100,
+    );
+    assert.isTrue(Object.hasOwn(result.animation.tracks, boneId));
+    assert.deepEqual(result.animation.tracks[boneId], [
+      { time: 200, x: 1 },
+      { time: 300, x: 2 },
+    ]);
+    assert.deepEqual(
+      result.keys.map((entry) => entry.timeMs),
+      [200, 300],
+    );
+    assert.equal(JSON.stringify(animation), before);
+  },
+);
+
 const key = (time: number, property: KeyframeSelection['property'] = 'x', boneId = 'root'): KeyframeSelection => ({
   boneId,
   property,

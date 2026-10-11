@@ -323,7 +323,9 @@ export function moveBonePropertyKeyframes<Animation extends AnimationData>(
     groups.set(key.boneId, group);
   }
   const tracks = { ...removed.tracks };
-  for (const [boneId, group] of groups)
-    tracks[boneId] = setTrackPropertyKeyframes(removed.tracks[boneId] ?? [], group, true);
+  for (const [boneId, group] of groups) {
+    const remaining = Object.hasOwn(removed.tracks, boneId) ? removed.tracks[boneId]! : [];
+    tracks[boneId] = setTrackPropertyKeyframes(remaining, group, true);
+  }
   return { animation: validateEditedAnimation({ ...animation, tracks }, animation, rig), keys: destinations };
 }
