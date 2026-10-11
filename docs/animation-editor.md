@@ -1,5 +1,8 @@
 # Visual Animation Editor — v0.5.2.8.3
 
+Animation JSON file and paste imports have a 10 MiB UTF-8 size limit. Oversized files are rejected
+before reading, and failed imports preserve the active session and its undo history.
+
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
 ## Workspace

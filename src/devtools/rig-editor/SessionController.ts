@@ -1,4 +1,5 @@
 import { type RigJsonDefinition, validateRigDefinition } from '../../engine/externalData.js';
+import { readJsonFile } from '../../engine/jsonInput.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { RigEditor } from './RigEditor.js';
@@ -149,7 +150,7 @@ export function createSessionController(
     const sessionEditor = editor;
     const request = requests.beginImport(() => editor === sessionEditor);
     try {
-      const text = await file.text();
+      const text = await readJsonFile(file);
       if (!request.isCurrent()) return;
       const json = JSON.parse(text) as RigJsonDefinition;
       const issues = validateRigDefinition(json);

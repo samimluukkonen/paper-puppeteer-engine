@@ -12,7 +12,7 @@ export class EditorElement {
   disabled = false;
   style = {};
   dataset: Record<string, string> = {};
-  files: { name: string; text: () => Promise<string> }[] = [];
+  files: { name: string; size?: number; text: () => Promise<string> }[] = [];
   children: EditorElement[] = [];
   classList = { add: vi.fn(), toggle: vi.fn() };
   private readonly attributes = new Map<string, string>();

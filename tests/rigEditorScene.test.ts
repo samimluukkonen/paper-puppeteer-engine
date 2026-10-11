@@ -471,6 +471,24 @@ test('an inspector depth edit updates draw order and undo restores the rig and p
   assert.deepEqual(vi.mocked(puppet).setRenderOrder.mock.lastCall![0], editedOrder);
 });
 
+test('an oversized rig file is rejected before reading and preserves the active session', async () => {
+  const { scene, editor, element } = await panelFixture();
+  await editNumber(element, 'root', 'x', [5]);
+  const before = editor.exportJson(false);
+  const text = vi.fn(async () => '{}');
+  const input = element('#load-json');
+  input.files = [{ name: 'large.json', size: 10 * 1024 * 1024 + 1, text }];
+  await input.dispatch('change');
+  assert.match(element('#action-feedback').textContent, /size limit/);
+  assert.equal(text.mock.calls.length, 0);
+  assert.strictEqual(scene.editor, editor);
+  assert.equal(editor.exportJson(false), before);
+  assert.isTrue(editor.state.dirty);
+  await element('#undo').click();
+  assert.isFalse(editor.state.dirty);
+  assert.isFalse(editor.state.canUndo);
+});
+
 test.each(['malformed JSON', 'invalid rig', 'incompatible preview', 'enable failure'])(
   'a failed import (%s) keeps the panel editable and its history usable',
   async (failure) => {

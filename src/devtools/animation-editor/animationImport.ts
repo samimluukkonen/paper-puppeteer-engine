@@ -2,6 +2,7 @@ import { compileClip, type AnimationClip, type CompiledClip } from '../../engine
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { evaluateClip } from '../../engine/AnimationPose.js';
 import { inspectAnimationDefinition, type ValidationIssue } from '../../engine/externalData.js';
+import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import type { Rig } from '../../engine/Rig.js';
 import { transformProperties } from '../../engine/types.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
@@ -14,9 +15,10 @@ export type AnimationImportResult =
 
 /** Shared paste/file boundary: unknown JSON becomes an owned snapshot only after strict file/rig validation. */
 export function importAnimationJson(json: string, rig?: Rig): AnimationImportResult {
-  if (!json.trim()) return { success: false, issues: [{ severity: 'error', message: 'Animation JSON is empty.' }] };
   let input: unknown;
   try {
+    assertJsonInputSize(json);
+    if (!json.trim()) return { success: false, issues: [{ severity: 'error', message: 'Animation JSON is empty.' }] };
     input = JSON.parse(json);
   } catch (error) {
     return {

@@ -1,4 +1,4 @@
-import { assert, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { requestUrl } from './helpers/requestUrl.js';
 
@@ -125,24 +125,95 @@ test.each(['http', 'fetch', 'json'])(
   },
 );
 
-test('cancellation during JSON decoding prevents assembly even if custom I/O ignores the signal', async () => {
+test('cancellation during body reading prevents assembly even if custom I/O ignores the signal', async () => {
   const controller = new AbortController();
-  let finish!: (data: unknown) => void;
-  const response = Response.json(manifest);
-  vi.spyOn(response, 'json').mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-  );
+  const cancel = vi.fn();
+  const response = new Response(new ReadableStream({ cancel }));
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
   const reason = new Error('decode canceled');
   const rejected = CharacterLoader.load(url, fetcher, { signal: controller.signal }).catch((error: unknown) => error);
-  await vi.waitFor(() => assert.isFunction(finish));
+  await vi.waitFor(() => assert.isTrue(response.body!.locked));
   controller.abort(reason);
-  finish(manifest);
   assert.strictEqual(await rejected, reason);
+  assert.deepEqual(cancel.mock.calls, [[reason]]);
   assert.equal(fetcher.mock.calls.length, 1);
+});
+
+test.each([
+  ['maxJsonBytes', 0],
+  ['maxTotalJsonBytes', -1],
+  ['maxResources', Infinity],
+  ['concurrency', 1.5],
+] as const)('invalid %s is rejected before fetching', async (name, value) => {
+  const fetcher = vi.fn<typeof fetch>();
+  await expect(CharacterLoader.load(url, fetcher, { [name]: value })).rejects.toThrow(/positive safe integer/);
+  assert.equal(fetcher.mock.calls.length, 0);
+});
+
+test.each([{}, { body: 'body.png', arm: 'arm.png' }])(
+  'resource limits include metadata and texture entries (%j)',
+  async (textures) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ...manifest, textures }));
+    await expect(
+      CharacterLoader.load(url, fetcher, { maxResources: Object.keys(textures).length ? 5 : 3 }),
+    ).rejects.toThrow(/resource limit/);
+    assert.equal(fetcher.mock.calls.length, 1);
+  },
+);
+
+test('metadata concurrency is bounded and a failure prevents queued requests', async () => {
+  const signals: AbortSignal[] = [];
+  const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+    if (requestUrl(input) === url) return Response.json(manifest);
+    signals.push(init!.signal!);
+    return waitForAbort(init!.signal!);
+  });
+  const controller = new AbortController();
+  const reason = new Error('stop');
+  const rejected = CharacterLoader.load(url, fetcher, { concurrency: 2, signal: controller.signal }).catch(
+    (error: unknown) => error,
+  );
+  await vi.waitFor(() => assert.equal(signals.length, 2));
+  assert.equal(fetcher.mock.calls.length, 3);
+  controller.abort(reason);
+  assert.strictEqual(await rejected, reason);
+  assert.equal(fetcher.mock.calls.length, 3);
+});
+
+test('workers continue after successful requests and stop dispatching after failure', async () => {
+  const fetched: string[] = [];
+  const fetcher: typeof fetch = async (input) => {
+    const path = new URL(requestUrl(input)).pathname.slice(1);
+    fetched.push(path);
+    return Response.json(files[path]);
+  };
+  assert.equal((await CharacterLoader.load(url, fetcher, { concurrency: 1 })).id, 'test');
+  assert.deepEqual(fetched, Object.keys(files));
+  const reason = new Error('rig failed');
+  const failing = vi.fn<typeof fetch>(async (input) => {
+    if (requestUrl(input) === url) return Response.json(manifest);
+    throw reason;
+  });
+  assert.strictEqual(
+    await CharacterLoader.load(url, failing, { concurrency: 1 }).catch((error: unknown) => error),
+    reason,
+  );
+  assert.equal(failing.mock.calls.length, 2);
+});
+
+test('per-response and aggregate JSON limits count actual bytes and can be configured', async () => {
+  const fetcher: typeof fetch = async (input) => Response.json(files[new URL(requestUrl(input)).pathname.slice(1)]);
+  const sizes = Object.values(files).map((data) => new TextEncoder().encode(JSON.stringify(data)).byteLength);
+  const largest = Math.max(...sizes);
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  await expect(CharacterLoader.load(url, fetcher, { maxJsonBytes: largest - 1 })).rejects.toThrow(/size limit/);
+  await expect(
+    CharacterLoader.load(url, fetcher, { maxJsonBytes: largest, maxTotalJsonBytes: total - 1 }),
+  ).rejects.toThrow(/total size limit/);
+  assert.equal(
+    (await CharacterLoader.load(url, fetcher, { maxJsonBytes: largest, maxTotalJsonBytes: total, maxResources: 4 })).id,
+    'test',
+  );
 });
 
 test('successful custom loads share a request signal and detach caller cancellation afterward', async () => {

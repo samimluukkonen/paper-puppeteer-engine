@@ -1,6 +1,7 @@
 import { afterEach, assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { TimelineSessionController } from '../src/devtools/animation-editor/TimelineSessionController.js';
+import { DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
@@ -82,6 +83,24 @@ test('file and paste controls use the same state import path and allow rechoosin
   await query('#animation-import-file').dispatch('change');
   await vi.waitFor(() => assert.equal(imported.mock.calls.length, 2));
   assert.notStrictEqual(state.sourceAnimation, source);
+  controller.dispose();
+});
+
+test('oversized file and paste imports preserve dirty state and history', async () => {
+  const { state, query, controller } = fixture();
+  const before = state.workingAnimation;
+  const text = vi.fn(async () => file());
+  query('#animation-import-file').files = [{ name: 'large.json', size: DEFAULT_MAX_JSON_BYTES + 1, text }];
+  await query('#animation-import-file').dispatch('change');
+  await vi.waitFor(() => assert.match(query('#animation-import-feedback').textContent, /size limit/));
+  assert.equal(text.mock.calls.length, 0);
+  query('#animation-import-text').value = ' '.repeat(DEFAULT_MAX_JSON_BYTES + 1);
+  await query('#animation-import-submit').click();
+  assert.match(query('#animation-import-feedback').textContent, /size limit/);
+  assert.strictEqual(state.workingAnimation, before);
+  assert.isTrue(state.dirty);
+  assert.isTrue(state.canUndo);
+  assert.equal(vi.mocked(window.confirm).mock.calls.length, 0);
   controller.dispose();
 });
 

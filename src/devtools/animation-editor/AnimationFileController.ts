@@ -1,3 +1,4 @@
+import { readJsonFile } from '../../engine/jsonInput.js';
 import { setText } from '../../shared/domUpdates.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
@@ -172,7 +173,7 @@ export class AnimationFileController {
     const revision = state.sessionRevision;
     const request = this.requests.beginImport(() => this.state === state && state.sessionRevision === revision);
     try {
-      const json = await file.text();
+      const json = await readJsonFile(file);
       if (!request.isCurrent()) return;
       if (state.workingAnimation !== animation) {
         this.setImportFeedback('Animation changed while reading the file. Choose the file again to import.');

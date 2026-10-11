@@ -28,7 +28,8 @@ export {
   validateCharacterDefinition,
 } from './CharacterDefinition.js';
 export type { CharacterLoadOptions } from './CharacterLoader.js';
-export { CharacterLoader } from './CharacterLoader.js';
+export { CharacterLoader, DEFAULT_CHARACTER_LOAD_LIMITS } from './CharacterLoader.js';
+export { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError } from './jsonInput.js';
 export type {
   AnimationJsonDefinition,
   AnimationJsonEvent,

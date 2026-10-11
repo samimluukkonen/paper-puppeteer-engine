@@ -2,6 +2,9 @@
 
 [All guides](../README.md#guides)
 
+Local rig JSON imports have a 10 MiB size limit. Oversized files are rejected before reading,
+and failed imports preserve the active session and its undo history.
+
 Open `/rig-editor/` from the header's **Rig Editor** link. The editor loads the sample character with its default skin and shows its canonical bind pose in right facing. Select bones by clicking joints or their parent lines, or use the hierarchy. Select slots by clicking their square markers or hierarchy entries. Hold Alt while clicking when a slot overlaps a joint.
 
 Use the header's **Character** selector to load either the demo puppet or the artist's **Random paperdoll sketch**. The sketch also opens directly at `/rig-editor/?character=random-paperdoll-sketch`. Navigation to the Engine Demo and Animation Editor keeps the selected character. Switching characters uses the same unsaved-edit protection as leaving the editor.
