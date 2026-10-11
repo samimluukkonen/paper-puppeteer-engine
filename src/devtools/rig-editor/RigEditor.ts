@@ -16,15 +16,18 @@ export class RigEditor {
   private appliedRig: RigDefinition | undefined;
   private renderOrder: readonly string[] = [];
   private inputController: RigEditorInputController | undefined;
+  private readonly ikChains: readonly TwoBoneIKDefinition[];
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly puppet: Puppet,
     private readonly onChange: () => void,
     state?: RigEditorState,
-    private readonly ikChains: readonly TwoBoneIKDefinition[] = [],
+    ikChains: readonly TwoBoneIKDefinition[] = [],
   ) {
     this.state = state ?? new RigEditorState(puppet.rig);
+    // Authored definitions own same-name preview chains, including their endpoint offsets.
+    this.ikChains = ikChains.map((chain) => puppet.rig.ik?.find((authored) => authored.name === chain.name) ?? chain);
   }
 
   enable(): void {
@@ -34,7 +37,9 @@ export class RigEditor {
     for (const chain of this.ikChains) {
       let constraint = this.registeredIK.get(chain.name);
       if (!constraint) {
-        constraint = this.puppet.addIK({ ...chain, enabled: false });
+        constraint = this.puppet.rig.ik?.some((authored) => authored.name === chain.name)
+          ? this.puppet.getIK(chain.name)
+          : this.puppet.addIK({ ...chain, enabled: false });
         this.registeredIK.set(chain.name, constraint);
       }
       constraint.enabled = false;

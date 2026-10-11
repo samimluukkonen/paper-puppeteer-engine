@@ -109,7 +109,9 @@ export class RigEditorScene extends Phaser.Scene {
     if (!previewRig.skins.some((skin) => skin.name === definition.defaultSkin))
       throw new Error(`Rig needs the character's default skin "${definition.defaultSkin}" for preview.`);
     // A valid rig can still be incompatible with the editor's preview chains.
-    const ikChains = this.ikChains.map((chain) => parseTwoBoneIKDefinition(chain, rig));
+    const ikChains = this.ikChains.map((chain) =>
+      parseTwoBoneIKDefinition(rig.ik?.find((authored) => authored.name === chain.name) ?? chain, rig),
+    );
     const state = new RigEditorState(rig, file);
     const puppet = new Puppet(this, {
       rig: previewRig,

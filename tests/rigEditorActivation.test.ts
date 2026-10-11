@@ -7,8 +7,14 @@ import type { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.j
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
+import { puppetScene } from './helpers/puppetScene.js';
 
-vi.mock('phaser', () => ({ default: { Scenes: { Events: { UPDATE: 'update' } } } }));
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
 vi.mock('../src/devtools/rig-editor/RigEditorOverlay.js', () => ({
   RigEditorOverlay: class {
     invalidate() {}
@@ -20,6 +26,32 @@ vi.mock('../src/devtools/rig-editor/RigEditorOverlay.js', () => ({
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+test('activation reuses authored IK from the real Puppet without registering it twice', () => {
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const chain = { name: 'armIK', rootBone: 'root', middleBone: 'arm', endBone: 'hand', mix: 0.4 };
+  const rig = new Rig({
+    root: 'root',
+    bones: [{ id: 'root' }, { id: 'arm', parent: 'root', y: 20 }, { id: 'hand', parent: 'arm', y: 20 }],
+    ik: [chain],
+  });
+  const scene = puppetScene();
+  Reflect.set(scene, 'input', { on() {}, off() {} });
+  const puppet = new Puppet(scene, { rig, autoUpdate: false });
+  const constraint = puppet.getIK(chain.name);
+  const add = vi.spyOn(puppet, 'addIK');
+  const editor = new RigEditor(scene, puppet, () => {}, undefined, [{ ...chain, mix: 1 }]);
+  for (let cycle = 0; cycle < 2; ++cycle) {
+    editor.enable();
+    assert.strictEqual(puppet.getIK(chain.name), constraint);
+    assert.equal(constraint.mix, 0.4);
+    assert.isFalse(constraint.enabled);
+    editor.disable();
+  }
+  assert.equal(add.mock.calls.length, 0);
+  assert.deepEqual(editor.exportRig(false).ik, [chain]);
+  puppet.destroy();
 });
 
 test('editor activation reuses IK constraints and balances overlay and listener lifetimes', () => {

@@ -64,6 +64,7 @@ vi.mock('../src/engine/Puppet.js', () => ({
             ),
           ]),
         );
+        for (const chain of this.rig.ik ?? []) this.addIK(chain);
       }
       getBone(id: string) {
         return this.joints.get(id)!;
@@ -85,6 +86,7 @@ vi.mock('../src/engine/Puppet.js', () => ({
         return this;
       }
       addIK(chain: TwoBoneIKDefinition) {
+        if (this.constraints.has(chain.name)) throw new Error(`IK "${chain.name}" is already registered.`);
         const constraint = new TwoBoneIKConstraint(chain, this.rig, this.joints);
         this.constraints.set(constraint.name, constraint);
         return constraint;
@@ -212,6 +214,35 @@ function fixture(sceneOverride?: RigEditorScene) {
   };
   return { scene, file, editor, puppet, onReady, disable, assertPreserved };
 }
+
+test('imported authored IK takes precedence over same-name preview chains and survives reload', () => {
+  const { scene, file } = fixture();
+  const authored = {
+    ...paperDollIK[0]!,
+    endOffset: { x: 7, y: 11 },
+    mix: 0.4,
+    bendDirection: 1 as const,
+    priority: 8,
+  };
+  const imported = { ...file, ik: [authored] };
+  for (let reload = 0; reload < 2; ++reload) {
+    scene.reloadRig(imported, 'authored-ik.json');
+    const puppet = vi.mocked(Puppet).mock.results.at(-1)!.value as Puppet;
+    const constraint = puppet.getIK(authored.name);
+    assert.equal(constraint.mix, authored.mix);
+    assert.equal(constraint.bendDirection, authored.bendDirection);
+    assert.equal(constraint.priority, authored.priority);
+    assert.deepEqual(constraint.endOffset, authored.endOffset);
+    assert.isFalse(constraint.enabled);
+    scene.editor!.setIKPreview(true);
+    assert.isTrue(constraint.enabled);
+    scene.editor!.setIKPreview(false);
+    assert.isFalse(constraint.enabled);
+    assert.deepEqual(scene.editor!.exportRig(false).ik, imported.ik);
+    assert.isFalse(scene.editor!.state.dirty);
+    assert.equal(scene.editor!.state.historyLength, 0);
+  }
+});
 
 test.each(paperDollIK)('rejects a valid rig with a disconnected $name chain before creating a replacement', (chain) => {
   const { scene, file, assertPreserved } = fixture();
