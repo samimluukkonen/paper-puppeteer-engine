@@ -10,12 +10,15 @@ Use Node.js **24 or newer**. [.nvmrc](https://github.com/samimluukkonen/paper-pu
 npm run typecheck
 npm test
 npm run check
+npm run audit
 npm run build
 npm run preview
 npm run test:package
 ```
 
 `check` runs Oxfmt formatting validation, Oxlint linting (including type-aware TypeScript rules), and TypeScript 7's authoritative `tsc --noEmit` check. `npm run check:fix` applies Oxlint's safe fixes, formats with Oxfmt, and checks types. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
+
+`audit` checks all locked dependencies, including development tooling, and fails on advisories of any severity. CI runs it for pull requests and pushes to `master`. A separate workflow runs every Monday at 06:23 UTC and on demand; it audits the lockfile without installing packages or running dependency lifecycle scripts.
 
 ### Local browser checks
 
