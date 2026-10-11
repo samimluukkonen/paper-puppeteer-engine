@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
 import { AnimationValidationError } from '../../engine/externalData.js';
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import type { Rig } from '../../engine/Rig.js';
 import {
   type BoneSymmetryPair,
   type BoneSymmetryMapping,
@@ -45,6 +46,10 @@ function errorMessage(error: unknown): string {
       : String(error);
 }
 
+function sameSnapshot(left: MirrorToolsSnapshot, right: MirrorToolsSnapshot): boolean {
+  return (Object.keys(left) as (keyof MirrorToolsSnapshot)[]).every((key) => left[key] === right[key]);
+}
+
 /** React preferences and cached command readiness; selection and time remain exclusively in editor state. */
 export class MirrorToolsController {
   private state: AnimationEditorState | undefined;
@@ -65,6 +70,15 @@ export class MirrorToolsController {
   private keysDependencies: readonly unknown[] = [];
   private poseReason = '';
   private keysReason = '';
+  private rigData: { rig: Rig | undefined; boneIds: readonly string[] } | undefined;
+  private pairData:
+    | {
+        rig: Rig | undefined;
+        pairs: readonly BoneSymmetryPair[];
+        unpaired: readonly string[];
+        mappingErrors: readonly string[];
+      }
+    | undefined;
 
   constructor(
     private readonly showPreview: (pose: AnimationPose | null) => void,
@@ -205,13 +219,26 @@ export class MirrorToolsController {
 
   private buildSnapshot(): MirrorToolsSnapshot {
     const state = this.state;
-    const boneIds = state?.rig?.bones.map((bone) => bone.id) ?? [];
-    const assigned = new Set(this.pairs.flatMap((pair) => [pair.leftBoneId, pair.rightBoneId]));
-    const mappingErrors = state?.rig
-      ? validateBoneSymmetryMapping(state.rig, { pairs: this.pairs }).map(
-          (issue) => `${issue.path ? `${issue.path}: ` : ''}${issue.message}`,
-        )
-      : ['Load a rig to configure bone pairs.'];
+    const rig = state?.rig;
+    if (!this.rigData || this.rigData.rig !== rig)
+      this.rigData = { rig, boneIds: Object.freeze(rig?.bones.map((bone) => bone.id) ?? []) };
+    const { boneIds } = this.rigData;
+    if (!this.pairData || this.pairData.rig !== rig || this.pairData.pairs !== this.pairs) {
+      const assigned = new Set(this.pairs.flatMap((pair) => [pair.leftBoneId, pair.rightBoneId]));
+      this.pairData = {
+        rig,
+        pairs: this.pairs,
+        unpaired: Object.freeze(boneIds.filter((id) => !assigned.has(id))),
+        mappingErrors: Object.freeze(
+          rig
+            ? validateBoneSymmetryMapping(rig, { pairs: this.pairs }).map(
+                (issue) => `${issue.path ? `${issue.path}: ` : ''}${issue.message}`,
+              )
+            : ['Load a rig to configure bone pairs.'],
+        ),
+      };
+    }
+    const { unpaired, mappingErrors } = this.pairData;
     const reason =
       mappingErrors.join(' ') ||
       (!this.pairs.length
@@ -228,6 +255,7 @@ export class MirrorToolsController {
       this.pairs,
       this.direction,
       this.preview,
+      reason,
     ];
     if (poseDependencies.some((value, index) => value !== this.poseDependencies[index])) {
       this.poseDependencies = poseDependencies;
@@ -255,7 +283,14 @@ export class MirrorToolsController {
         }
       }
     }
-    const keysDependencies = [state?.workingAnimation, state?.selectedKeys, mapping, this.pairs, this.direction];
+    const keysDependencies = [
+      state?.workingAnimation,
+      state?.selectedKeys,
+      mapping,
+      this.pairs,
+      this.direction,
+      reason,
+    ];
     if (keysDependencies.some((value, index) => value !== this.keysDependencies[index])) {
       this.keysDependencies = keysDependencies;
       this.keysReason =
@@ -285,7 +320,7 @@ export class MirrorToolsController {
       direction: this.direction,
       pairs: this.pairs,
       boneIds,
-      unpaired: boneIds.filter((id) => !assigned.has(id)),
+      unpaired,
       mappingErrors,
       poseReason: this.poseReason || reason,
       keysReason: this.keysReason || reason,
@@ -302,7 +337,7 @@ export class MirrorToolsController {
     const next = this.buildSnapshot();
     this.showPreview(next.preview ? this.pose : null);
     // Clock notifications with unchanged readiness never cause React to render again.
-    if (JSON.stringify(next) === JSON.stringify(this.snapshot)) return;
+    if (sameSnapshot(next, this.snapshot)) return;
     this.snapshot = next;
     throwNotificationErrors(
       dispatchListeners(this.listeners, (listener) => listener()),

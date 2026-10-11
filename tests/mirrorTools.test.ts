@@ -5,6 +5,7 @@ import { AnimationEditorState } from '../src/devtools/animation-editor/Animation
 import * as keyframeEdits from '../src/devtools/animation-editor/keyframeEdits.js';
 import { MirrorToolsController } from '../src/devtools/animation-editor/MirrorToolsController.js';
 import { MirrorToolsPanel } from '../src/devtools/animation-editor/MirrorToolsPanel.js';
+import * as boneSymmetry from '../src/devtools/shared/boneSymmetry.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import type { AnimationPose } from '../src/engine/AnimationPose.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -86,6 +87,52 @@ test('clock changes still update unsupported-transform readiness while mirror pr
   state.setCurrentTime(0.25);
   assert.equal(controller.getSnapshot().poseReason, '');
   controller.dispose();
+});
+
+test('playback reuses rig and pair presentation data; changing pairs invalidates only pair data', () => {
+  const { state, controller } = fixture();
+  const validate = vi.spyOn(boneSymmetry, 'validateBoneSymmetryMapping');
+  try {
+    const before = controller.getSnapshot();
+    state.play();
+    for (let frame = 0; frame < 30; ++frame) state.advancePlayback(1 / 60);
+    assert.strictEqual(controller.getSnapshot(), before);
+    assert.equal(validate.mock.calls.filter(([, data]) => data.pairs === before.pairs).length, 0);
+    assert.isTrue(Object.isFrozen(before.boneIds));
+    assert.isTrue(Object.isFrozen(before.unpaired));
+    assert.isTrue(Object.isFrozen(before.mappingErrors));
+
+    controller.setPairs([{ leftBoneId: 'leftArm', rightBoneId: 'missing' }]);
+    const changed = controller.getSnapshot();
+    assert.strictEqual(changed.boneIds, before.boneIds);
+    assert.notStrictEqual(changed.unpaired, before.unpaired);
+    assert.include(changed.mappingErrors.join(' '), 'does not exist');
+    const calls = validate.mock.calls.length;
+    state.setCurrentTime(0.75);
+    assert.strictEqual(controller.getSnapshot(), changed);
+    assert.equal(validate.mock.calls.length, calls);
+
+    controller.unbind();
+    assert.lengthOf(controller.getSnapshot().boneIds, 0);
+    assert.notStrictEqual(controller.getSnapshot().boneIds, before.boneIds);
+  } finally {
+    controller.dispose();
+    validate.mockRestore();
+  }
+});
+
+test('unavailable animation diagnostics refresh even when the document identity remains null', () => {
+  const state = new AnimationEditorState(rig);
+  const controller = new MirrorToolsController(vi.fn(), () => ({ getItem: () => null, setItem: () => {} }));
+  try {
+    controller.bind(state, 'rig');
+    assert.include(controller.getSnapshot().poseReason, 'Load a valid animation');
+    state.selectAnimation('missing');
+    assert.include(controller.getSnapshot().poseReason, 'Animation "missing" is missing');
+    assert.include(controller.getSnapshot().keysReason, 'Animation "missing" is missing');
+  } finally {
+    controller.dispose();
+  }
 });
 
 test('React panel reflects direction, inferred pairs, readiness and authoritative selection', () => {
