@@ -62,8 +62,8 @@ export class IKInspectorController {
   commit(property: IKAnimationProperty): boolean {
     const field = this.snapshot.fields.find((entry) => entry.property === property);
     if (!field?.valid || !this.state) return false;
-    // Install the current text even if its number matches the previous evaluated value.
-    if (!this.state.setTemporaryIKProperty(property, Number(field.text))) return false;
+    // Display rounding must not change an untouched evaluated value or numeric draft.
+    if (this.text.has(property) && !this.state.setTemporaryIKProperty(property, Number(field.text))) return false;
     const result = this.state.commitIKProperty(property);
     if (result) this.text.delete(property);
     this.refresh();

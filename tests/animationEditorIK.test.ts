@@ -368,6 +368,25 @@ test('React adapter caches snapshots, validates text, synchronizes edits and rel
   assert.isFalse(controller.getSnapshot().ready);
 });
 
+test.each(['x', 'y', 'mix'] as const)(
+  'untouched IK %s commits preserve precise and tiny authored values',
+  (property) => {
+    for (const value of [0.123456789, 1e-7]) {
+      const { state } = fixture({ ikTracks: { arm: [{ time: 0, [property]: value }] } });
+      state.selectIKConstraint('arm');
+      const controller = new IKInspectorController();
+      controller.bind(state);
+      const working = state.workingAnimation;
+      assert.isTrue(controller.commit(property));
+      assert.strictEqual(state.workingAnimation, working);
+      assert.equal(state.workingAnimation!.ikTracks!.arm![0]![property], value);
+      assert.isFalse(state.dirty);
+      assert.equal(state.historyLength, 0);
+      controller.dispose();
+    }
+  },
+);
+
 test('committed IK authoring immediately refreshes the existing puppet/solver and supports A/B/C playback', () => {
   const { state, rig, clip, before } = fixture({ ikTracks: {}, tracks: {} });
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
