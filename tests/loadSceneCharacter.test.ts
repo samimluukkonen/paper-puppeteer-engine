@@ -4,53 +4,252 @@ import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
-import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
+import { DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS } from '../src/engine/queueCharacterTextures.js';
+import { loadSceneCharacter, type SceneCharacterLoadOptions } from '../src/shared/loadSceneCharacter.js';
 import { requestUrl } from './helpers/requestUrl.js';
 
 vi.mock('phaser', () => ({
   default: {
     Scenes: { Events: { SHUTDOWN: 'shutdown' } },
-    Loader: { Events: { FILE_LOAD_ERROR: 'loaderror', COMPLETE: 'complete' } },
+    Loader: {
+      FILE_ERRORED: 16,
+      FILE_COMPLETE: 17,
+      FILE_PENDING_DESTROY: 20,
+      Events: { ADD: 'addfile', FILE_LOAD_ERROR: 'loaderror', FILE_COMPLETE: 'filecomplete', COMPLETE: 'complete' },
+    },
   },
 }));
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-const definition = CharacterDefinition.fromData({
-  manifest: {
-    version: 1,
-    id: 'test',
-    rig: 'rig.json',
-    defaultSkin: 'default',
-    skins: { default: 'skin.json' },
-    animations: [],
-    textures: { part: 'part.png' },
-  },
-  rig: { version: 1, root: 'root', bones: [{ id: 'root', sprite: { texture: 'part' } }] },
-  skins: { 'skin.json': { version: 1, name: 'default', slots: {} } },
-});
+function character(texture = 'part.png', extraTextures: Record<string, string> = {}) {
+  return CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'test',
+      rig: 'rig.json',
+      defaultSkin: 'default',
+      skins: { default: 'skin.json' },
+      animations: [],
+      textures: { part: texture, ...extraTextures },
+    },
+    rig: { version: 1, root: 'root', bones: [{ id: 'root', sprite: { texture: 'part' } }] },
+    skins: { 'skin.json': { version: 1, name: 'default', slots: {} } },
+  });
+}
+const definition = character();
 
 function fixture() {
   const load = Object.assign(new EventEmitter(), { image: vi.fn(), start: vi.fn() });
   const events = new EventEmitter();
   const scene = { load, events, textures: { exists: () => false }, sys: { isActive: () => true } };
   const metadata = vi.spyOn(CharacterLoader, 'load').mockResolvedValue(definition);
-  const start = () => loadSceneCharacter(scene as unknown as Phaser.Scene, 'https://example.test/character.json');
+  const start = (options?: SceneCharacterLoadOptions) =>
+    loadSceneCharacter(scene as unknown as Phaser.Scene, 'https://example.test/character.json', options);
   const assertClean = () => {
     assert.equal(events.listenerCount('shutdown'), 0);
     assert.equal(load.listenerCount('complete'), 0);
     assert.equal(load.listenerCount('loaderror'), 0);
+    assert.equal(load.listenerCount('filecomplete'), 0);
+    assert.equal(load.listenerCount('addfile'), 0);
   };
   return { scene, load, events, metadata, start, assertClean };
 }
+
+/** Model Phaser's public file queues and failure path without using its browser renderer. */
+function pendingArtwork(load: ReturnType<typeof fixture>['load'], phase: 'queued' | 'request' | 'decode' | 'image') {
+  class Image {
+    src = 'blob:pending-character-image';
+    onload: (() => void) | null = vi.fn();
+    onerror: (() => void) | null = vi.fn();
+  }
+  vi.stubGlobal('HTMLImageElement', Image);
+  const xhr = { onload: vi.fn(), onerror: vi.fn(), onprogress: vi.fn(), ontimeout: vi.fn(), abort: vi.fn() };
+  const image = phase === 'decode' || phase === 'image' ? new Image() : null;
+  const file = {
+    loader: load,
+    key: 'part',
+    type: 'image',
+    state: 11,
+    xhrLoader: phase === 'request' ? xhr : null,
+    data: image,
+    destroy: vi.fn(),
+  };
+  const list = new Set<typeof file>();
+  const inflight = new Set<typeof file>();
+  const queue = new Set<typeof file>();
+  const nextFile = vi.fn((failed: typeof file, success: boolean) => {
+    assert.isFalse(success);
+    inflight.delete(failed);
+    queue.delete(failed);
+    load.emit('loaderror', failed);
+    if (!list.size && !inflight.size && !queue.size) load.emit('complete');
+  });
+  const isLoading = vi.fn(() => true);
+  Object.assign(load, { list, inflight, queue, nextFile, isLoading });
+  load.image.mockImplementationOnce(() => {
+    (phase === 'queued' ? list : phase === 'decode' ? queue : inflight).add(file);
+    load.emit('addfile', file.key, file.type, load, file);
+  });
+  return { file, xhr, image, list, inflight, queue, nextFile, isLoading };
+}
+
+test('shutdown aborts artwork even after Phaser resets its queues, without restarting the loader', async () => {
+  vi.useFakeTimers();
+  const { load, events, start, assertClean } = fixture();
+  const { file, xhr, inflight, nextFile, isLoading } = pendingArtwork(load, 'request');
+  const pending = start();
+  await vi.advanceTimersByTimeAsync(0);
+  // Phaser's loader handles SHUTDOWN before the scene session's listener.
+  inflight.clear();
+  isLoading.mockReturnValue(false);
+  events.emit('shutdown');
+  assert.isUndefined(await pending);
+  assert.equal(xhr.abort.mock.calls.length, 1);
+  assert.equal(file.destroy.mock.calls.length, 1);
+  assert.equal(nextFile.mock.calls.length, 0);
+  assert.equal(vi.getTimerCount(), 0);
+  assertClean();
+});
+
+test.each([17, 20])('shutdown preserves already cached image data in file state %s', async (state) => {
+  vi.useFakeTimers();
+  const { load, events, start, assertClean } = fixture();
+  const { file, image, queue, nextFile } = pendingArtwork(load, 'decode');
+  const pending = start();
+  await vi.advanceTimersByTimeAsync(0);
+  file.state = state;
+  queue.clear();
+  events.emit('shutdown');
+  assert.isUndefined(await pending);
+  assert.equal(image!.src, 'blob:pending-character-image');
+  assert.isFunction(image!.onload);
+  assert.equal(file.destroy.mock.calls.length, 0);
+  assert.equal(nextFile.mock.calls.length, 0);
+  assert.equal(vi.getTimerCount(), 0);
+  assertClean();
+});
+
+test('a partial image queue failure removes owned files before releasing their texture keys', async () => {
+  const { load, start, assertClean } = fixture();
+  const { file, list, nextFile, isLoading } = pendingArtwork(load, 'queued');
+  isLoading.mockReturnValue(false);
+  load.image.mockReset().mockImplementationOnce(() => {
+    list.add(file);
+    load.emit('addfile', file.key, file.type, load, file);
+    throw new Error('Image queue failed');
+  });
+  await rejects(start(), /Image queue failed/);
+  assert.equal(list.size, 0);
+  assert.equal(file.destroy.mock.calls.length, 1);
+  assert.equal(nextFile.mock.calls.length, 0);
+  assertClean();
+});
+
+test('the default artwork deadline rejects stalled loading and releases reservations for a replacement', async () => {
+  vi.useFakeTimers();
+  const { load, metadata, start, assertClean } = fixture();
+  const pending = start();
+  const rejection = rejects(pending, { name: 'TimeoutError', message: /Character artwork loading timed out/ });
+  await vi.advanceTimersByTimeAsync(0);
+  assert.equal(load.start.mock.calls.length, 1);
+  await vi.advanceTimersByTimeAsync(DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS - 1);
+  assert.equal(load.listenerCount('complete'), 2);
+  await vi.advanceTimersByTimeAsync(1);
+  await rejection;
+  assertClean();
+  assert.equal(vi.getTimerCount(), 0);
+  metadata.mockResolvedValueOnce(character('replacement.png'));
+  const replacement = start();
+  await vi.advanceTimersByTimeAsync(0);
+  assert.equal(load.start.mock.calls.length, 2);
+  load.emit('complete');
+  assert.equal((await replacement)?.textureUrl('part'), 'replacement.png');
+  assertClean();
+  assert.equal(vi.getTimerCount(), 0);
+});
+
+test.each(['queued', 'request', 'decode', 'image'] as const)(
+  'a custom artwork deadline cancels the character %s file while unrelated loading continues',
+  async (phase) => {
+    vi.useFakeTimers();
+    const { load, start, assertClean } = fixture();
+    const { file, xhr, image, list, inflight, queue, nextFile } = pendingArtwork(load, phase);
+    const unrelated = { ...file, key: 'unrelated', xhrLoader: { ...xhr, abort: vi.fn() } };
+    inflight.add(unrelated);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const pending = start({ artworkTimeoutMs: 5000 });
+    const rejection = rejects(pending, { name: 'TimeoutError' });
+    await vi.advanceTimersByTimeAsync(0);
+    assert.deepEqual(load.image.mock.calls, [['part', 'part.png', { responseType: 'blob', timeout: 5000 }]]);
+    await vi.advanceTimersByTimeAsync(5000);
+    await rejection;
+    assertClean();
+    assert.equal(vi.getTimerCount(), 0);
+    assert.isFalse(list.has(file) || inflight.has(file) || queue.has(file));
+    assert.isTrue(inflight.has(unrelated));
+    assert.equal(unrelated.xhrLoader.abort.mock.calls.length, 0);
+    assert.deepEqual(nextFile.mock.calls, [[file, false]]);
+    if (phase === 'request') {
+      assert.equal(xhr.abort.mock.calls.length, 1);
+      assert.isNull(xhr.onload);
+      assert.isNull(xhr.onerror);
+      assert.isNull(xhr.onprogress);
+      assert.isNull(xhr.ontimeout);
+    }
+    if (image) {
+      assert.isNull(image.onload);
+      assert.isNull(image.onerror);
+      assert.equal(image.src, '');
+      assert.deepEqual(revoke.mock.calls, [['blob:pending-character-image']]);
+    }
+    load.emit('complete');
+    assertClean();
+  },
+);
+
+test.each(['complete', 'shutdown', 'error'] as const)(
+  '%s clears the artwork deadline without late effects',
+  async (finish) => {
+    vi.useFakeTimers();
+    const { load, events, start, assertClean } = fixture();
+    const pending = start({ artworkTimeoutMs: 5000 });
+    const result = finish === 'error' ? rejects(pending, /Could not load character images/) : pending;
+    await vi.advanceTimersByTimeAsync(0);
+    assert.equal(vi.getTimerCount(), 1);
+    if (finish === 'shutdown') events.emit('shutdown');
+    else {
+      if (finish === 'error') load.emit('loaderror', { key: 'part', type: 'image' });
+      load.emit('complete');
+    }
+    await result;
+    assertClean();
+    assert.equal(vi.getTimerCount(), 0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    assertClean();
+  },
+);
+
+test.each([0, -1, NaN, Infinity, 1.5, 2_147_483_648])(
+  'invalid artwork timeout %s rejects before loading',
+  async (artworkTimeoutMs) => {
+    const { metadata, start, assertClean } = fixture();
+    await rejects(start({ artworkTimeoutMs }));
+    assert.equal(metadata.mock.calls.length, 0);
+    assertClean();
+  },
+);
 
 test('character loading waits for artwork and cleans up after success', async () => {
   const { load, start, assertClean } = fixture();
   const pending = start();
   await vi.waitFor(() => assert.equal(load.start.mock.calls.length, 1));
-  assert.deepEqual(load.image.mock.calls, [['part', 'part.png']]);
+  assert.deepEqual(load.image.mock.calls, [
+    ['part', 'part.png', { responseType: 'blob', timeout: DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS }],
+  ]);
   load.emit('complete');
   assert.strictEqual(await pending, definition);
   assertClean();
@@ -84,12 +283,57 @@ test('preloaded character keys do not claim failures from new image requests', a
   const { scene, load, start, assertClean } = fixture();
   scene.textures.exists = () => true;
   const pending = start();
-  await vi.waitFor(() => assert.equal(load.start.mock.calls.length, 1));
+  assert.strictEqual(await pending, definition);
+  assert.equal(load.start.mock.calls.length, 0);
   load.emit('loaderror', { key: 'part', type: 'image' });
   load.emit('complete');
-  assert.strictEqual(await pending, definition);
   assert.equal(load.image.mock.calls.length, 0);
   assertClean();
+});
+
+test.each(['loaded', 'failed'] as const)(
+  'character artwork that %s settles without waiting for unrelated scene downloads',
+  async (result) => {
+    vi.useFakeTimers();
+    const { load, start, assertClean } = fixture();
+    const pending = start({ artworkTimeoutMs: 5000 });
+    const outcome = result === 'failed' ? rejects(pending, /Could not load character images/) : pending;
+    await vi.advanceTimersByTimeAsync(0);
+    if (result === 'loaded') load.emit('filecomplete', 'part', 'image');
+    else load.emit('loaderror', { key: 'part', type: 'image' });
+    await vi.advanceTimersByTimeAsync(0);
+    const character = await outcome;
+    if (result === 'loaded') assert.strictEqual(character, definition);
+    assertClean();
+    assert.equal(vi.getTimerCount(), 0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    // An unrelated file can complete the global batch after the character session has already settled.
+    load.emit('complete');
+    assertClean();
+  },
+);
+
+test('file completion waits for every character image and ignores unrelated keys and file types', async () => {
+  vi.useFakeTimers();
+  const { load, metadata, start, assertClean } = fixture();
+  const multiple = character('part.png', { extra: 'extra.png' });
+  metadata.mockResolvedValueOnce(multiple);
+  let settled = false;
+  const pending = start().then((result) => {
+    settled = true;
+    return result;
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  load.emit('filecomplete', 'unrelated', 'image');
+  load.emit('filecomplete', 'part', 'audio');
+  load.emit('filecomplete', 'part', 'image');
+  await vi.advanceTimersByTimeAsync(0);
+  assert.isFalse(settled);
+  load.emit('filecomplete', 'extra', 'image');
+  await vi.advanceTimersByTimeAsync(0);
+  assert.strictEqual(await pending, multiple);
+  assertClean();
+  assert.equal(vi.getTimerCount(), 0);
 });
 
 test('shutdown aborts metadata and prevents a late result from affecting a restarted scene', async () => {

@@ -55,6 +55,15 @@ Each metadata request has a 30-second timeout covering headers and the decoded b
 rejects with a `TimeoutError` and cancels sibling requests. Configure `timeoutMs` as a positive integer
 no greater than `2147483647`; successful, failed, and canceled requests release their timers.
 
+`queueCharacterTextures` also gives each image XHR request a 30-second timeout. Pass
+`queueCharacterTextures(scene, definition, { timeoutMs: 60_000 })` to adjust it; the value must be a positive
+integer no greater than `2147483647`. `DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS` exposes the default. Hosts using
+HTML image element loading or asynchronous decoding should enforce a separate deadline for the artwork phase.
+The demo and editors use a 30-second artwork deadline, reject stalled loading with a `TimeoutError`, and cancel
+the character's pending files while leaving unrelated scene assets loading. Their shared `loadSceneCharacter`
+helper accepts `{ artworkTimeoutMs: 60_000 }` as its third argument and releases timers and listeners on completion,
+failure, or scene shutdown.
+
 For external assets, pass a synchronous `urlPolicy` that explicitly approves resolved destinations:
 
 ```ts
@@ -70,7 +79,7 @@ Related destinations are checked before any related requests start. Supplying a 
 redirect and custom-I/O behavior remains available. Custom fetchers must honor both `signal` and
 `redirect`. A URL policy does not resolve DNS or inspect connected IP addresses; server hosts loading
 untrusted manifests must enforce private-network restrictions in their fetch implementation or
-network environment. The host's image loader must also enforce its own redirect and timeout policy.
+network environment. The host's image loader must also enforce its own redirect policy.
 
 For Phaser `preload`, custom pipelines, generated content, or tests, pass already parsed values to `CharacterDefinition.fromData({ manifest, rig, skins, animations, poses }, optionalManifestUrl)`. The `skins`, `animations`, and `poses` objects are indexed by the paths in the manifest. `queueCharacterTextures` skips texture keys already loaded in the scene, so an app can preload an atlas itself. `definition.textureUrl(key)` resolves a key to a URL when given a manifest URL; without one it returns the authored path. `new Puppet(scene, { rig, animations, poses, skin })` and TypeScript-authored rigs and clips continue to work.
 

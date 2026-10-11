@@ -1,5 +1,13 @@
 import type Phaser from 'phaser';
 import type { CharacterDefinition } from './CharacterDefinition.js';
+import { validateInputLimit } from './jsonInput.js';
+
+export const DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS = 30_000;
+
+export interface CharacterTextureLoadOptions {
+  /** Timeout for each image XHR request. Defaults to 30 seconds. */
+  timeoutMs?: number;
+}
 
 interface TextureReservation {
   url: string;
@@ -10,7 +18,13 @@ interface TextureReservation {
 const characterTextures = new WeakMap<Phaser.Textures.TextureManager, Map<string, TextureReservation>>();
 
 /** Queue images, rejecting conflicting character keys. Returns reservation cleanup for a canceled load. */
-export function queueCharacterTextures(scene: Phaser.Scene, definition: CharacterDefinition): () => void {
+export function queueCharacterTextures(
+  scene: Phaser.Scene,
+  definition: CharacterDefinition,
+  options: CharacterTextureLoadOptions = {},
+): () => void {
+  const timeout = validateInputLimit(options.timeoutMs ?? DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS, 'Texture timeout');
+  if (timeout > 2_147_483_647) throw new Error('Texture timeout must not exceed 2147483647.');
   let registered = characterTextures.get(scene.textures);
   if (!registered) {
     registered = new Map();
@@ -50,7 +64,7 @@ export function queueCharacterTextures(scene: Phaser.Scene, definition: Characte
       registered.set(key, reservation);
       reservation.pending += 1;
       pending.set(key, reservation);
-      scene.load.image(key, url);
+      scene.load.image(key, url, { responseType: 'blob', timeout });
     }
     if (pending.size) {
       scene.load.once('complete', release);

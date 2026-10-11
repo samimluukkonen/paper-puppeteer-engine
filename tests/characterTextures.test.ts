@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
-import { queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
+import { DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS, queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
 
 function character(id: string, textures: Record<string, string> = { body: 'body.png' }) {
   return CharacterDefinition.fromData(
@@ -67,8 +67,34 @@ test('shared character images are reused and different texture managers remain i
   shared.assertClean();
   const independent = fixture();
   queueCharacterTextures(independent.scene, character('second'));
-  assert.deepEqual(independent.load.image.mock.calls, [['body', 'https://example.test/second/body.png']]);
+  assert.deepEqual(independent.load.image.mock.calls, [
+    [
+      'body',
+      'https://example.test/second/body.png',
+      { responseType: 'blob', timeout: DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS },
+    ],
+  ]);
 });
+
+test('custom image timeouts reach Phaser without changing the shared loader settings', () => {
+  const { scene, load } = fixture();
+  queueCharacterTextures(scene, character('custom'), { timeoutMs: 5000 });
+  assert.deepEqual(load.image.mock.calls, [
+    ['body', 'https://example.test/custom/body.png', { responseType: 'blob', timeout: 5000 }],
+  ]);
+});
+
+test.each([0, -1, NaN, Infinity, 1.5, 2_147_483_648])(
+  'invalid image timeout %s cannot acquire reservations',
+  (timeoutMs) => {
+    const { scene, load, assertClean } = fixture();
+    assert.throws(() => queueCharacterTextures(scene, character('first'), { timeoutMs }));
+    assert.equal(load.image.mock.calls.length, 0);
+    assertClean();
+    queueCharacterTextures(scene, character('second'));
+    assert.equal(load.image.mock.calls.length, 1);
+  },
+);
 
 test.each(['complete', 'shutdown', 'release'] as const)(
   'failed or abandoned reservations are released after %s',
