@@ -19,6 +19,9 @@ export function queueCharacterTextures(scene: Phaser.Scene, definition: Characte
   const resources = Object.keys(definition.textures).map((key) => ({ key, url: definition.textureUrl(key) }));
   // Check the complete character before queueing any images or acquiring reservations.
   for (const { key, url } of resources) {
+    // Phaser stores textures in an ordinary object and calls its hasOwnProperty method.
+    if (key === 'hasOwnProperty' || key === '__proto__')
+      throw new Error(`Texture key "${key}" is reserved by Phaser. Use a different texture key.`);
     const previous = registered.get(key);
     if (previous && (previous.pending > 0 || scene.textures.exists(key)) && previous.url !== url)
       throw new Error(

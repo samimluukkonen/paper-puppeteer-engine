@@ -129,3 +129,27 @@ test('queue exceptions release reservations and listeners', () => {
   queueCharacterTextures(scene, character('second'));
   assert.equal(load.image.mock.calls.length, 2);
 });
+
+test('Phaser dictionary method names are rejected before any textures are queued', () => {
+  // Match Phaser's texture dictionary: registering hasOwnProperty would break all later lookups.
+  const list: Record<string, object> = {};
+  const { scene, load, assertClean } = fixture({
+    loaded: new Set<string>(),
+    exists(key: string) {
+      return list.hasOwnProperty(key);
+    },
+  });
+  load.image.mockImplementation((key: string) => {
+    list[key] = { key };
+  });
+  assert.throws(
+    () => queueCharacterTextures(scene, character('unsafe', { body: 'body.png', hasOwnProperty: 'unsafe.png' })),
+    /Texture key "hasOwnProperty" is reserved by Phaser/,
+  );
+  assert.equal(load.image.mock.calls.length, 0);
+  assertClean();
+  queueCharacterTextures(scene, character('safe'));
+  assert.isTrue(scene.textures.exists('body'));
+  load.emit('complete');
+  assertClean();
+});
