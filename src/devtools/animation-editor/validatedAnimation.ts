@@ -7,53 +7,30 @@ import {
 } from '../../engine/externalData.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
+import {
+  getValidatedAnimation,
+  isDataRecord,
+  isValidatedAnimation,
+  rememberValidatedAnimation,
+} from '../../engine/validatedAnimation.js';
 import { freezeData, isFullyFrozen } from '../shared/editorData.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;
 /** Owned versioned editor snapshot; event payloads are validated as JSON before freezing. */
 export type ReadonlyAnimation = AnimationData & { readonly version: typeof ANIMATION_FORMAT_VERSION };
-const validated = new WeakMap<AnimationData, WeakSet<Rig>>();
-
-function rememberValidated(animation: AnimationData, rig: Rig): void {
-  let rigs = validated.get(animation);
-  if (!rigs) {
-    rigs = new WeakSet();
-    validated.set(animation, rigs);
-  }
-  rigs.add(rig);
-}
 
 /** Validate external data and register only the immutable snapshot created by this boundary. */
 export function inspectEditorAnimation(input: unknown, rig: Rig): ValidationResult<ReadonlyAnimation> {
   const { data, ...diagnostics } = inspectAnimationDefinition(input, rig);
   if (!data) return diagnostics;
   const snapshot = freezeData<ReadonlyAnimation>({ ...data, version: ANIMATION_FORMAT_VERSION });
-  rememberValidated(snapshot, rig);
+  rememberValidatedAnimation(snapshot, rig);
   return { ...diagnostics, data: snapshot };
-}
-
-/** Only plain enumerable data records can be projected without losing JSON diagnostics. */
-function isDataRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const prototype: unknown = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Reflect.ownKeys(value).every((key) => {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
-    return typeof key === 'string' && descriptor.enumerable && Object.hasOwn(descriptor, 'value');
-  });
 }
 
 /** Reuse validation only after checking both the file and its deep immutability against this rig. */
 export function getValidatedEditorAnimation(animation: AnimationData, rig: Rig): AnimationData {
-  if (validated.get(animation)?.has(rig)) return animation;
-  // Reject unsafe root descriptors before object spread can invoke or discard them.
-  if (!isDataRecord(animation)) return parseAnimationClip(animation, rig);
-  const parsed = parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...animation }, rig);
-  if (isFullyFrozen(animation)) {
-    rememberValidated(animation, rig);
-    return animation;
-  }
-  return parsed;
+  return getValidatedAnimation(animation, rig);
 }
 
 /** New edit branches are owned; shared branches may only be frozen when the source already is immutable. */
@@ -63,7 +40,7 @@ export function validateEditedAnimation<Animation extends AnimationData>(
   rig: Rig,
 ): Animation {
   if (
-    validated.get(source)?.has(rig) &&
+    isValidatedAnimation(source, rig) &&
     isDataRecord(next) &&
     isDataRecord(next.tracks) &&
     next.duration === source.duration
@@ -87,7 +64,7 @@ export function validateEditedAnimation<Animation extends AnimationData>(
       rig,
     );
     freezeData(next);
-    if (isFullyFrozen(next)) rememberValidated(next, rig);
+    if (isFullyFrozen(next)) rememberValidatedAnimation(next, rig);
   } else {
     getValidatedEditorAnimation(next, rig);
   }

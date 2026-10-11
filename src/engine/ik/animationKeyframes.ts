@@ -1,10 +1,11 @@
 import type { AnimationClip, PropertyKeyframe } from '../AnimationClip.js';
-import { AnimationValidationError, parseAnimationClip, shapeIssues } from '../externalData.js';
-import { matchingRow, normalizeKeyframeTime, replacePropertyAtTime } from '../keyframeAuthoring.js';
-import type { DeepReadonly } from '../readonlyData.js';
+import { AnimationValidationError, shapeIssues } from '../externalData.js';
+import { keyframeTimesMatch, matchingRow, normalizeKeyframeTime, replacePropertyAtTime } from '../keyframeAuthoring.js';
+import { type DeepReadonly, isFullyFrozen } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
-import { ANIMATION_FORMAT_VERSION, ikKeyframeSchema } from '../schemas.js';
+import { ikKeyframeSchema } from '../schemas.js';
 import { assertFinite } from '../types.js';
+import { getValidatedAnimation } from '../validatedAnimation.js';
 
 export const ikAnimationProperties = ['x', 'y', 'mix'] as const;
 export type IKAnimationProperty = (typeof ikAnimationProperties)[number];
@@ -22,7 +23,7 @@ export type IKAnimationTrack = readonly IKKeyframe[];
 type AnimationData = DeepReadonly<AnimationClip>;
 
 function validate(animation: AnimationData, rig: Rig): void {
-  parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...animation }, rig);
+  getValidatedAnimation(animation, rig);
 }
 
 function assertConstraint(rig: Rig, constraintId: string): void {
@@ -39,8 +40,72 @@ function assertProperty(property: IKAnimationProperty): void {
     ]);
 }
 
+const emptyRows: readonly IKKeyframe[] = Object.freeze([]);
+
 function rows(animation: AnimationData, constraintId: string): readonly IKKeyframe[] {
-  return animation.ikTracks && Object.hasOwn(animation.ikTracks, constraintId) ? animation.ikTracks[constraintId]! : [];
+  return animation.ikTracks && Object.hasOwn(animation.ikTracks, constraintId)
+    ? animation.ikTracks[constraintId]!
+    : emptyRows;
+}
+
+const propertyIndexes = new WeakMap<
+  readonly IKKeyframe[],
+  ReadonlyMap<IKAnimationProperty, readonly PropertyKeyframe[]>
+>();
+
+/** Index validated immutable rows once, sharing unchanged tracks across authored snapshots. */
+function indexedProperties(animation: AnimationData, constraintId: string) {
+  if (!isFullyFrozen(animation)) return undefined;
+  const keys = rows(animation, constraintId);
+  let properties = propertyIndexes.get(keys);
+  if (!properties) {
+    properties = new Map(
+      ikAnimationProperties.map((property) => [
+        property,
+        keys.flatMap((key) => (key[property] === undefined ? [] : [{ time: key.time, value: key[property] }])),
+      ]),
+    );
+    propertyIndexes.set(keys, properties);
+  }
+  return properties;
+}
+
+function indexedKeyframe(keys: readonly PropertyKeyframe[], time: number): PropertyKeyframe | undefined {
+  if (!Number.isFinite(time)) return undefined;
+  let low = 0;
+  let high = keys.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (keys[middle]!.time < time) low = middle + 1;
+    else high = middle;
+  }
+  // Earlier rows win equidistant ties, matching the ordinary authored-row query.
+  let match: PropertyKeyframe | undefined;
+  for (const key of [keys[low - 1], keys[low]]) {
+    if (
+      key &&
+      keyframeTimesMatch(key.time, time) &&
+      (!match || Math.abs(key.time - time) < Math.abs(match.time - time))
+    )
+      match = key;
+  }
+  return match;
+}
+
+function queryKeyframe(
+  animation: AnimationData,
+  constraintId: string,
+  property: IKAnimationProperty,
+  timeMs: number,
+): PropertyKeyframe | undefined {
+  const properties = indexedProperties(animation, constraintId);
+  if (properties) {
+    const key = indexedKeyframe(properties.get(property)!, timeMs);
+    return key ? { ...key } : undefined;
+  }
+  const keys = rows(animation, constraintId);
+  const key = keys[matchingRow(keys, timeMs, property)];
+  return key ? { time: key.time, value: key[property]! } : undefined;
 }
 
 function install<Animation extends AnimationData>(
@@ -158,6 +223,8 @@ export function getIKPropertyKeyframes(
   validate(animation, rig);
   assertConstraint(rig, constraintId);
   assertProperty(property);
+  const properties = indexedProperties(animation, constraintId);
+  if (properties) return properties.get(property)!.map((key) => ({ ...key }));
   return rows(animation, constraintId).flatMap((key) =>
     key[property] === undefined ? [] : [{ time: key.time, value: key[property] }],
   );
@@ -173,9 +240,7 @@ export function findIKPropertyKeyframe(
   validate(animation, rig);
   assertConstraint(rig, constraintId);
   assertProperty(property);
-  const keys = rows(animation, constraintId);
-  const key = keys[matchingRow(keys, timeMs, property)];
-  return key ? { time: key.time, value: key[property]! } : undefined;
+  return queryKeyframe(animation, constraintId, property, timeMs);
 }
 
 /** Sparse channel presence at a time; nearby independently keyed rows retain their stored times in queries. */
@@ -187,5 +252,7 @@ export function getIKKeyedPropertiesAtTime(
 ): IKAnimationProperty[] {
   validate(animation, rig);
   assertConstraint(rig, constraintId);
-  return ikAnimationProperties.filter((property) => matchingRow(rows(animation, constraintId), timeMs, property) >= 0);
+  return ikAnimationProperties.filter(
+    (property) => queryKeyframe(animation, constraintId, property, timeMs) !== undefined,
+  );
 }

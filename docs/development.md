@@ -68,6 +68,7 @@ src/engine/
   affineMath.ts        Shared joint-to-affine conversion, composition and coordinate inversion
   Bone.ts              Joint backed by a Phaser container and optional image
   AnimationClip.ts      Keyframe types, validation and property-track compilation
+  validatedAnimation.ts  Shared immutable animation validation for editor previews and IK authoring queries
   AnimationPlayer.ts    Layer clocks, transitions, events and completion
   AnimationLayerEvaluator.ts  Layer sampling, blending, pose buffers and controlled properties
   AnimationPose.ts      Pure clip evaluation and pose blending
