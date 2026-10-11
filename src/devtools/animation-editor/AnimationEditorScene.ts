@@ -4,6 +4,7 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
@@ -181,7 +182,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     camera.centerOn(bounds.centerX, bounds.centerY);
   }
 
-  /** Pin current end joints in canonical puppet space; mirroring only changes their world projection. */
+  /** Pin current solver endpoints in canonical puppet space; mirroring only changes their world projection. */
   setIKPreview(enabled: boolean): void {
     this.state?.cancelIKTargetDrag();
     this.ikPreviewEnabled = enabled;
@@ -191,7 +192,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     for (const chain of this.options.ikChains ?? []) {
       const constraint = puppet.getIK(chain.name);
       if (enabled) {
-        const point = puppet.getBone(chain.endBone).getWorldPosition();
+        const point = ikPreviewTarget(puppet, constraint);
         const local = puppet.container.getWorldTransformMatrix().applyInverse(point.x, point.y);
         constraint.setTargetProvider(() => puppet.container.getWorldTransformMatrix().transformPoint(local.x, local.y));
       } else {

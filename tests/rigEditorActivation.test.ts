@@ -3,6 +3,7 @@ import { afterEach, assert, test, vi } from 'vitest';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
+import { localToWorld } from '../src/engine/affineMath.js';
 import type { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -27,6 +28,59 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+test.each(['right', 'left'] as const)(
+  'IK preview pins transformed offsets without moving the %s-facing pose',
+  (facing) => {
+    vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const chain = {
+      name: 'armIK',
+      rootBone: 'root',
+      middleBone: 'arm',
+      endBone: 'hand',
+      endOffset: { x: 0, y: 10 },
+      bendDirection: 1 as const,
+    };
+    const rig = new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root', rotation: 0.3 },
+        { id: 'arm', parent: 'root', y: 20, rotation: 0.4 },
+        { id: 'hand', parent: 'arm', y: 20, rotation: 0.2, scaleY: 1.2 },
+      ],
+      ik: [chain],
+    });
+    const scene = puppetScene();
+    Reflect.set(scene, 'input', { on() {}, off() {} });
+    const puppet = new Puppet(scene, { rig, x: 10, y: 30, scale: 1.7, autoUpdate: false });
+    const editor = new RigEditor(scene, puppet, () => {}, undefined, [{ ...chain, endOffset: { x: 0, y: 0 } }]);
+    const endpoint = () => localToWorld(chain.endOffset, puppet.getBone('hand').container.getWorldTransformMatrix());
+    try {
+      editor.enable();
+      puppet.setFacing(facing);
+      const before = endpoint();
+      const poses = rig.bones.map(({ id }) => ({ ...puppet.getBone(id).pose }));
+      editor.setIKPreview(true);
+      assert.deepEqual(puppet.getIK(chain.name).target, before);
+      for (const [index, { id }] of rig.bones.entries()) {
+        assert.closeTo(puppet.getBone(id).pose.rotation, poses[index]!.rotation, 1e-8);
+      }
+      assert.closeTo(endpoint().x, before.x, 1e-8);
+      assert.closeTo(endpoint().y, before.y, 1e-8);
+      assert.isFalse(editor.state.dirty);
+      assert.equal(editor.state.historyLength, 0);
+      editor.disable();
+      puppet.getIK(chain.name).target = undefined;
+      editor.enable();
+      const restoredEndpoint = endpoint();
+      assert.closeTo(puppet.getIK(chain.name).target!.x, restoredEndpoint.x, 1e-8);
+      assert.closeTo(puppet.getIK(chain.name).target!.y, restoredEndpoint.y, 1e-8);
+    } finally {
+      editor.disable();
+      puppet.destroy();
+    }
+  },
+);
 
 test('activation reuses authored IK from the real Puppet without registering it twice', () => {
   vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
@@ -142,7 +196,11 @@ test.each([false, true])('activation restores edited state and IK preview (%s) w
   const bones = new Map(
     rig.bones.map((bone) => [
       bone.id,
-      Object.assign(new Joint(bone.id, bone), { getWorldPosition: () => ({ x: bones.get('root')!.pose.x, y: 40 }) }),
+      Object.assign(new Joint(bone.id, bone), {
+        container: {
+          getWorldTransformMatrix: () => ({ a: 1, b: 0, c: 0, d: 1, tx: bones.get('root')!.pose.x, ty: 40 }),
+        },
+      }),
     ]),
   );
   const puppet = {

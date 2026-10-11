@@ -5,6 +5,7 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
 import { createTransform, type RigDefinition } from '../../engine/types.js';
+import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { RigEditorInputController } from './RigEditorInputController.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { type BoneField, RigEditorState, type SlotField, type SpriteField } from './RigEditorState.js';
@@ -61,7 +62,7 @@ export class RigEditor {
     if (this.state.ikPreview) {
       for (const chain of this.ikChains) {
         const constraint = this.puppet.getIK(chain.name);
-        if (!constraint.target) constraint.setTarget(this.puppet.getBone(chain.endBone).getWorldPosition());
+        if (!constraint.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
         constraint.enabled = true;
       }
       this.puppet.syncPose();
@@ -213,7 +214,7 @@ export class RigEditor {
     this.puppet.preparePose();
     for (const chain of this.ikChains) {
       const constraint = this.puppet.getIK(chain.name);
-      if (enabled) constraint.setTarget(this.puppet.getBone(chain.endBone).getWorldPosition());
+      if (enabled) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
       constraint.enabled = enabled;
     }
     this.puppet.syncPose();

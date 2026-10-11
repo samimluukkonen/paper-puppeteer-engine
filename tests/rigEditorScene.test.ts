@@ -47,7 +47,9 @@ vi.mock('../src/engine/Puppet.js', () => ({
             bone.id,
             Object.assign(
               new Joint(bone.id, bone),
-              { getWorldPosition: () => ({ x: 0, y: 40 }) },
+              {
+                container: { getWorldTransformMatrix: () => ({ a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 40 }) },
+              },
               bone.sprite
                 ? {
                     sprite: {

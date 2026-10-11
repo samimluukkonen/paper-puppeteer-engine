@@ -4,6 +4,7 @@ import type { AnimationEditorGhostLayer } from '../src/devtools/animation-editor
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { createBoneSymmetryMapping, inferBoneSymmetryPairs } from '../src/devtools/shared/boneSymmetry.js';
+import { localToWorld } from '../src/engine/affineMath.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -34,6 +35,92 @@ vi.mock('../src/shared/loadSceneCharacter.js', () => ({ loadSceneCharacter: vi.f
 afterEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+});
+
+test('fixed preview uses authored endpoints with offsets while scrubbing, scaling and mirroring', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  const arm = {
+    name: 'arm',
+    rootBone: 'root',
+    middleBone: 'lower',
+    endBone: 'hand',
+    endOffset: { x: 0, y: 10 },
+    bendDirection: 1 as const,
+    enabled: false,
+  };
+  const character = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'offset-test',
+      rig: 'rig.json',
+      textures: {},
+      skins: { basic: 'skin.json' },
+      defaultSkin: 'basic',
+      animations: ['motion.json'],
+    },
+    rig: {
+      version: 1,
+      root: 'root',
+      bones: [
+        { id: 'root', rotation: 0.3 },
+        { id: 'lower', parent: 'root', y: 20, rotation: 0.4 },
+        { id: 'hand', parent: 'lower', y: 20, rotation: 0.2, scaleY: 1.2 },
+        { id: 'other', parent: 'lower', y: 15 },
+      ],
+      ik: [arm],
+    },
+    skins: { 'skin.json': { version: 1, name: 'basic', slots: {} } },
+    animations: {
+      'motion.json': {
+        version: 1,
+        name: 'motion',
+        duration: 1000,
+        loop: false,
+        tracks: {
+          root: [
+            { time: 0, rotation: 0.3 },
+            { time: 1000, rotation: 0.5 },
+          ],
+        },
+      },
+    },
+  });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(character);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error, {
+    ikChains: [{ ...arm, endBone: 'other', endOffset: { x: 0, y: 0 } }],
+  });
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    puppet.container.setScale(1.7);
+    const endpoint = () => localToWorld(arm.endOffset, puppet.getBone('hand').container.getWorldTransformMatrix());
+    const before = endpoint();
+    const local = puppet.container.getWorldTransformMatrix().applyInverse(before.x, before.y);
+    scene.setIKPreview(true);
+    assert.closeTo(puppet.getBone('root').pose.rotation, 0.3, 1e-8);
+    assert.closeTo(puppet.getBone('lower').pose.rotation, 0.4, 1e-8);
+    for (const facing of ['right', 'left'] as const) {
+      scene.setFacing(facing);
+      state.setCurrentTime(1);
+      const expected = puppet.container.getWorldTransformMatrix().transformPoint(local.x, local.y);
+      assert.closeTo(endpoint().x, expected.x, 1e-8);
+      assert.closeTo(endpoint().y, expected.y, 1e-8);
+    }
+    scene.setIKPreview(false);
+    assert.isFalse(puppet.getIK(arm.name).enabled);
+    assert.closeTo(puppet.getBone('root').pose.rotation, 0.5, 1e-8);
+    assert.isFalse(state.dirty);
+    assert.equal(state.historyLength, 0);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
 });
 
 test('loaded authored IK reaches scrubbed targets and survives overlapping preview chains and fixed-preview toggles', async () => {
