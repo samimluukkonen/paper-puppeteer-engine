@@ -4,6 +4,7 @@ import type { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.j
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { createSessionController } from '../src/devtools/rig-editor/SessionController.js';
 import { parseRigDefinition } from '../src/engine/externalData.js';
+import { DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 
 afterEach(() => {
@@ -123,6 +124,25 @@ test('clipboard rejection preserves the previous saved baseline', async () => {
   state.undo();
   assert.isFalse(state.dirty);
 });
+
+test.each(['copy-json', 'download-json', 'log-json'])(
+  'oversized %s exports preserve unsaved edits and the previous export checkpoint',
+  async (action) => {
+    const { state, writeText, feedback, querySelector, scene } = await fixture();
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    querySelector('#log-json').click();
+    state.editBone('root', 'x', 25);
+    const rig = state.exportRig(false);
+    vi.spyOn(state, 'exportRig').mockReturnValue({ ...rig, name: 'x'.repeat(DEFAULT_MAX_JSON_BYTES) });
+    querySelector(`#${action}`).click();
+    await vi.waitFor(() => assert.include(feedback.textContent, 'size limit'));
+    assert.equal(writeText.mock.calls.length, 0);
+    assert.equal(log.mock.calls.length, 1);
+    assert.isTrue(state.dirty);
+    querySelector('#reload-exported').click();
+    assert.equal(scene.reloadRig.mock.calls[0]![0].bones[0]!.x, 0);
+  },
+);
 
 test('a rejected copy cannot overwrite feedback from a replacement session', async () => {
   const { load, copy, reject, feedback } = await fixture();

@@ -18,7 +18,7 @@ import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { inspectRigDraft, type RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
-import { serializeRigData } from './rigSerialization.js';
+import { serializeRigData, serializeRigJson } from './rigSerialization.js';
 
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
@@ -376,7 +376,9 @@ export class RigEditorState {
   }
 
   exportJson(saveBaseline = true): string {
-    return `${JSON.stringify(this.exportRig(saveBaseline), null, 2)}\n`;
+    const json = serializeRigJson(this.exportRig(false));
+    if (saveBaseline) this.markSaved();
+    return json;
   }
 
   getBone(id: string): ReadonlyRigData<BoneDefinition> {

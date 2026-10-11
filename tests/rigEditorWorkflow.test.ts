@@ -1,6 +1,7 @@
 import { assert, test } from 'vitest';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { parseRigDefinition, type RigJsonDefinition, validateRigDefinition } from '../src/engine/externalData.js';
+import { assertJsonInputSize, JsonInputLimitError } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const file: RigJsonDefinition = {
@@ -233,6 +234,34 @@ test('export is stable, data-only, valid, and preserves unedited precision', () 
   assert.isFalse(json.includes('container'));
   assert.deepEqual(validateRigDefinition(result), []);
   assert.equal(parseRigDefinition(result).getBone('arm').rotation, 0.5);
+});
+
+test('a compact rig within the import limit cannot save an oversized formatted export', () => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [{ id: 'root' }],
+      attachments: Array.from({ length: 65_000 }, (_, index) => ({
+        id: `attachment-${index}`,
+        texture: 'texture',
+        x: 10,
+        y: 10,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        originX: 0.5,
+        originY: 0.5,
+      })),
+    }),
+  );
+  state.editBone('root', 'x', 1);
+  assert.doesNotThrow(() => assertJsonInputSize(JSON.stringify(state.recoveryDraft)));
+  const snapshot = state.workingSnapshot;
+  assert.throws(() => state.exportJson(), JsonInputLimitError);
+  assert.isTrue(state.dirty);
+  assert.strictEqual(state.workingSnapshot, snapshot);
+  assert.isTrue(state.undo());
+  assert.isFalse(state.dirty);
 });
 
 test.each([0.0000004, -0.0000004, 0.123456789])(

@@ -1,4 +1,5 @@
 import type { RigJsonDefinition } from '../../engine/externalData.js';
+import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import type { RigDefinition } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 
@@ -63,4 +64,11 @@ export function serializeRigData(candidate: RigJsonDefinition, initial: RigDefin
     attachments: initial.attachments,
     skins: initial.skins,
   }) as RigJsonDefinition;
+}
+
+/** Check the exact downloaded/copied bytes against the rig import limit before saving a baseline. */
+export function serializeRigJson(rig: RigJsonDefinition): string {
+  const json = `${JSON.stringify(rig, null, 2)}\n`;
+  assertJsonInputSize(json);
+  return json;
 }

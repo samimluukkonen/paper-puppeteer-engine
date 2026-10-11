@@ -4,6 +4,7 @@ import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigEditorScene } from './RigEditorScene.js';
+import { serializeRigJson } from './rigSerialization.js';
 
 /** Session status, history actions, validation, export completion, and rig reload/import. */
 export function createSessionController(
@@ -79,7 +80,7 @@ export function createSessionController(
   const prepareExport = () => {
     if (!editor) throw new Error('No rig is loaded.');
     const rig = editor.exportRig(false);
-    const json = `${JSON.stringify(rig, null, 2)}\n`;
+    const json = serializeRigJson(rig);
     const warnings = editor.state.validationIssues().filter((issue) => issue.severity === 'warning');
     feedback.textContent = warnings.length
       ? `Ready with warnings: ${warnings.map((issue) => issue.message).join(' · ')}`
