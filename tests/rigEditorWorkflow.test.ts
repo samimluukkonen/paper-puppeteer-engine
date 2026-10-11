@@ -1,7 +1,7 @@
 import { assert, test } from 'vitest';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { parseRigDefinition, type RigJsonDefinition, validateRigDefinition } from '../src/engine/externalData.js';
-import { assertJsonInputSize, JsonInputLimitError } from '../src/engine/jsonInput.js';
+import { assertJsonInputSize, DEFAULT_MAX_JSON_BYTES, JsonInputLimitError } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const file: RigJsonDefinition = {
@@ -237,23 +237,19 @@ test('export is stable, data-only, valid, and preserves unedited precision', () 
 });
 
 test('a compact rig within the import limit cannot save an oversized formatted export', () => {
-  const state = new RigEditorState(
-    new Rig({
-      root: 'root',
-      bones: [{ id: 'root' }],
-      attachments: Array.from({ length: 65_000 }, (_, index) => ({
-        id: `attachment-${index}`,
-        texture: 'texture',
-        x: 10,
-        y: 10,
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        originX: 0.5,
-        originY: 0.5,
-      })),
-    }),
-  );
+  const file: RigJsonDefinition = {
+    version: 1,
+    name: '',
+    root: 'root',
+    bones: [{ id: 'root', x: 0 }],
+    slots: [],
+    attachments: [],
+    skins: [],
+  };
+  // Keep compact JSON just below the limit without constructing tens of thousands of rig entries.
+  const overhead = new TextEncoder().encode(JSON.stringify(file)).byteLength;
+  file.name = 'x'.repeat(DEFAULT_MAX_JSON_BYTES - overhead - 1);
+  const state = new RigEditorState(parseRigDefinition(file), file);
   state.editBone('root', 'x', 1);
   assert.doesNotThrow(() => assertJsonInputSize(JSON.stringify(state.recoveryDraft)));
   const snapshot = state.workingSnapshot;
