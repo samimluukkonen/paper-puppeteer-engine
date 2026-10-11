@@ -4,28 +4,31 @@ import { interpolateNumber } from '../animationMath.js';
 import { readonlyMap } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
 import { assertFinite } from '../types.js';
-import { ikAnimationProperties, type IKAnimationProperty } from './animationKeyframes.js';
+import { ikAnimationProperties } from './animationKeyframes.js';
 
 /** Value and ownership weight; the unowned fraction resolves against the current procedural fallback. */
 export interface IKAnimationChannel {
   readonly value: number;
   readonly weight: number;
 }
-export type IKAnimationValues = Readonly<Partial<Record<IKAnimationProperty, IKAnimationChannel>>>;
+const evaluationProperties = [...ikAnimationProperties, 'disabled'] as const;
+export type IKAnimationValues = Readonly<Partial<Record<(typeof evaluationProperties)[number], IKAnimationChannel>>>;
 export type IKAnimationPose = ReadonlyMap<string, IKAnimationValues>;
 const emptyPose: IKAnimationPose = readonlyMap([]);
 
 /** Pure sparse interpolation, using the same property sampler as bone tracks. Time is milliseconds. */
 export function evaluateIKClip(clip: CompiledClip, time: number): IKAnimationPose {
   assertFinite(time, 'IK sample time');
-  if (!clip.ikTracks?.length) return emptyPose;
+  if (!clip.ikTracks?.length && !clip.disabledIKConstraints?.length) return emptyPose;
   const pose = new Map<string, IKAnimationValues>();
   for (const track of clip.ikTracks ?? []) {
-    const values: Partial<Record<IKAnimationProperty, IKAnimationChannel>> = {};
+    const values: Partial<Record<(typeof evaluationProperties)[number], IKAnimationChannel>> = {};
     for (const [property, keys] of track.properties)
       values[property] = Object.freeze({ value: sampleProperty(keys, time), weight: 1 });
     if (track.properties.size) pose.set(track.constraint, Object.freeze(values));
   }
+  for (const id of clip.disabledIKConstraints ?? [])
+    pose.set(id, Object.freeze({ disabled: Object.freeze({ value: 1, weight: 1 }) }));
   return pose.size ? readonlyMap(pose) : emptyPose;
 }
 
@@ -90,11 +93,11 @@ function blend(
   if (!source.size && !target.size) return emptyPose;
   const result = new Map<string, IKAnimationValues>();
   for (const id of new Set([...source.keys(), ...target.keys()])) {
-    const values: Partial<Record<IKAnimationProperty, IKAnimationChannel>> = {};
+    const values: Partial<Record<(typeof evaluationProperties)[number], IKAnimationChannel>> = {};
     const from = source.get(id);
     const to = target.get(id);
     const fallback = underlying.get(id);
-    for (const property of ikAnimationProperties) {
+    for (const property of evaluationProperties) {
       if (!from?.[property] && !to?.[property]) continue;
       const channel = blendChannel(
         from?.[property] ?? fallback?.[property],

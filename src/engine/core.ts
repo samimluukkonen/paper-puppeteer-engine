@@ -127,3 +127,6 @@ export type {
   IKBakeTolerances,
 } from './ik/IKBakeGeneration.js';
 export { compareIKBakeFidelity, DEFAULT_IK_BAKE_TOLERANCES, generateBakedBoneKeys } from './ik/IKBakeGeneration.js';
+
+export { commitIKBake } from './ik/IKBakeCommit.js';
+export type { IKBakeCommitResult } from './ik/IKBakeCommit.js';

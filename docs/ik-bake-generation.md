@@ -28,6 +28,8 @@ Use the same authored animation and rig that produced the samples. The generator
 
 `generatedAnimation` uses the existing `AnimationClip` / version-1 `AnimationJsonDefinition` shape: `tracks[boneId]` contains ordinary sparse `{ time, rotation }` rows. It carries source name, duration and loop metadata, explicit `interpolation: 'linear'`, and output playback settings. It contains only generated bone tracks, with no copied IK tracks or events. Existing `compileClip`, bone evaluation, playback and version-1 serialization can consume it. Supply `version: 1` when exporting it as animation JSON. This sparse proposal is not a complete replacement for the source animation.
 
+Successful plans also retain a detached `sourceAnimation` snapshot for [stale-safe atomic commit](ik-bake-commit.md).
+
 Each `affectedBones` entry lists its generated properties, property-key count, replacement count and the exact authored `{ time, value }` rotation keys that would be replaced. Whole-duration replacement includes off-grid authored rotation keys. Sparse sibling translation/scale properties and unrelated tracks are preserved in the private fidelity candidate, and are never modified in the source. Output and report data are detached and deeply frozen; mutable caller data is not frozen.
 
 ## Coordinates and ownership
@@ -44,7 +46,7 @@ All times are **milliseconds**. Sampling settings report FPS, duration, requeste
 
 The default output uses existing stepped playback at the **sampling FPS**, with ordinary linear segments evaluated at quantized times. `{ outputMode: 'smooth' }` uses continuous linear interpolation, including the existing shortest-angle rotation rule. Every smooth proposal includes a warning that interpolation between sampled transforms may differ from continuous IK solving. Fidelity is verified only at the supplied sample instants. Looping source clips are compared over one complete duration, including the endpoint without wrapping.
 
-Sampling density can differ from authored stepped FPS; repeated source evaluated times retain repeated solved rotations at distinct requested times. If changing playback timing makes preserved translation or scale properties differ at a sample instant, generation rejects the candidate as inaccurate. It does not compensate by inventing unrelated property keys. Future application must consider the proposed clip-level playback settings and preserve ungenerated source properties.
+Sampling density can differ from authored stepped FPS; repeated source evaluated times retain repeated solved rotations at distinct requested times. If changing playback timing makes preserved translation or scale properties differ at a sample instant, generation rejects the candidate as inaccurate. It does not compensate by inventing unrelated property keys. [Commit](ik-bake-commit.md) preserves authored playback/FPS and verifies the complete output under those settings.
 
 ## Measure fidelity
 
@@ -68,4 +70,4 @@ Generation tests cover arm and leg chains, multiple driven bones, sorted times, 
 
 Required verification is `npm run typecheck`, `npm run test` and `npm run build`, with repository formatting and lint checks. Browser smoke tests remain local-only.
 
-Installing keys into `workingAnimation`, removing/disabling IK, React Bake UI, Bake Undo/Redo, partial ranges, key simplification, adaptive sampling and runtime layer-stack baking remain deferred.
+[Atomic commit, clip-local IK deactivation and Undo/Redo](ik-bake-commit.md) are available in v0.5.6.3. React Bake UI, partial ranges, key simplification, adaptive sampling and runtime layer-stack baking remain deferred.

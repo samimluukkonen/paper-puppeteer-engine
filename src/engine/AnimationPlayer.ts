@@ -75,6 +75,10 @@ export class AnimationPlayer {
         if (!rig.ik?.some((constraint) => constraint.name === track.constraint))
           throw new Error(`Animation "${clip.name}" references unknown IK "${track.constraint}".`);
       }
+      for (const name of clip.disabledIKConstraints ?? []) {
+        if (!rig.ik?.some((constraint) => constraint.name === name))
+          throw new Error(`Animation "${clip.name}" references unknown IK "${name}".`);
+      }
       this.clips.set(clip.name, ownCompiledClip(clip));
     }
     this.poseEvaluator = new AnimationLayerEvaluator(rig, joints);

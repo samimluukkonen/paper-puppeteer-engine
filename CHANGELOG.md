@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.6-3
+
+The v0.5.6.3 [atomic IK bake commit](docs/ik-bake-commit.md) adds public `commitIKBake` and the editor state command. Whole-clip transactions validate current source/rig fidelity, replace only generated bone properties, remove selected IK tracks and serialize clip-local `disabledIKConstraints`. Runtime suppression follows existing masks, weights and fades and skips selected constraints even with runtime target/mix ownership. Unrelated animation data, playback/FPS and rig constraints remain intact. One history entry restores exact original/baked snapshots through Undo/Redo and saved-checkpoint dirty semantics. React Bake UI, partial ranges and key reduction remain deferred.
+
 ## 0.5.6-2
 
 The v0.5.6.2 [IK bone-key generation](docs/ik-bake-generation.md) adds pure `generateBakedBoneKeys` proposals using ordinary local-radian rotation tracks, with affected-property counts and authored replacement details. Existing frame grids, linear interpolation and stepped/smooth playback remain authoritative. `compareIKBakeFidelity` measures complete selected local poses at sample times with explicit translation, rotation and scale tolerances; invalid values, conflicting ownership and inaccurate proposals fail. Generation preserves source/working data, IK and history. Commit, IK deactivation, Bake UI and simplification remain deferred.

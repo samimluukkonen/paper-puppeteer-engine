@@ -40,6 +40,8 @@ export class AnimationEditorIKCommands {
     return this.selectedIKConstraintId ? this.getIKManipulationDisabledReason(this.selectedIKConstraintId) : null;
   }
   getIKManipulationDisabledReason(id: string): string | null {
+    if (this.document.workingAnimation?.disabledIKConstraints?.includes(id))
+      return 'This IK constraint is disabled for the baked animation.';
     return this.unavailable.get(id) ?? null;
   }
   setIKManipulationDisabledReason(id: string, reason: string | null): void {
@@ -50,7 +52,8 @@ export class AnimationEditorIKCommands {
     this.actions.notify();
   }
   beginIKTargetDrag(id: string): boolean {
-    if (!this.working || this.unavailable.has(id) || !this.rig?.ik?.some((entry) => entry.name === id)) return false;
+    if (!this.working || this.getIKManipulationDisabledReason(id) || !this.rig?.ik?.some((entry) => entry.name === id))
+      return false;
     this.actions.cancelTimelineDrag();
     if (id !== this.selectedIKConstraintId) this.selection.selectIK(id);
     this.actions.pause();

@@ -179,6 +179,14 @@ export function checkAnimationReferences(
     );
   }
   const constraints = rig ? new Set((rig.ik ?? []).map((constraint) => constraint.name)) : undefined;
+  const disabled = new Set<string>();
+  for (const [index, name] of (clip.disabledIKConstraints ?? []).entries()) {
+    const path = `disabledIKConstraints[${index}]`;
+    if (disabled.has(name)) report({ severity: 'error', path, message: `Duplicate disabled IK constraint "${name}".` });
+    if (constraints && !constraints.has(name))
+      report({ severity: 'error', path, message: `Unknown IK constraint "${name}".` });
+    disabled.add(name);
+  }
   for (const [name, keys] of Object.entries(clip.ikTracks ?? {})) {
     const path = `ikTracks.${name}`;
     if (constraints && !constraints.has(name))

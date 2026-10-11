@@ -137,6 +137,7 @@ export const animationClipSchema = z.object({
   interpolation: z.literal('linear').exactOptional(),
   tracks: identifierRecord(z.array(keyframeSchema)),
   ikTracks: identifierRecord(z.array(ikKeyframeSchema)).exactOptional(),
+  disabledIKConstraints: z.array(identifierSchema).exactOptional(),
   events: z.array(animationEventSchema).exactOptional(),
   playback: z.discriminatedUnion('mode', [smoothPlaybackSchema, steppedPlaybackSchema]).exactOptional(),
 });

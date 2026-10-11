@@ -124,8 +124,14 @@ export function sampleIKBake(
     boneIds.add(definition.rootBone);
     boneIds.add(definition.middleBone);
   }
+  let validated: DeepReadonly<AnimationClip>;
+  try {
+    validated = getValidatedAnimation(animation, rig);
+  } catch (error) {
+    return failure([{ code: 'invalid-animation', severity: 'error', message: messageFor(error) }]);
+  }
   for (const [id, definition] of definitions) {
-    if (definition.enabled === false) continue;
+    if (definition.enabled === false || validated.disabledIKConstraints?.includes(id)) continue;
     for (const selectedId of constraintIds) {
       const selected = definitions.get(selectedId);
       if (!selected || selected.name === id) continue;
@@ -167,12 +173,6 @@ export function sampleIKBake(
   }
   if (issues.length) return failure(issues);
 
-  let validated: DeepReadonly<AnimationClip>;
-  try {
-    validated = getValidatedAnimation(animation, rig);
-  } catch (error) {
-    return failure([{ code: 'invalid-animation', severity: 'error', message: messageFor(error) }]);
-  }
   const fps = options.fps ?? (validated.playback?.mode === 'stepped' ? validated.playback.fps : DEFAULT_ANIMATION_FPS);
   let times: readonly number[];
   try {

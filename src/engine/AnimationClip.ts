@@ -25,6 +25,8 @@ export interface AnimationClip {
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
   /** Constraint-name keyed sparse rows. Positions are puppet-local, before placement/facing/scale. */
   ikTracks?: Readonly<Record<string, readonly IKKeyframe[]>>;
+  /** Clip-local suppression, including runtime targets/providers; absent means ordinary rig IK. */
+  disabledIKConstraints?: readonly string[];
   events?: readonly AnimationEvent[];
   playback?: AnimationPlaybackMode;
 }
@@ -65,6 +67,7 @@ export interface CompiledClip {
   readonly loop: boolean;
   readonly tracks: readonly CompiledTrack[];
   readonly ikTracks?: readonly CompiledIKTrack[];
+  readonly disabledIKConstraints?: readonly string[];
   readonly events: readonly Readonly<AnimationEvent>[];
   readonly playback?: Readonly<AnimationPlaybackMode>;
 }
@@ -109,7 +112,7 @@ function ownCompiledIKTrack(track: CompiledIKTrack): CompiledIKTrack {
 export function ownCompiledClip(clip: CompiledClip): CompiledClip {
   if (ownedClips.has(clip)) return clip;
   const metadata = animationClipSchema.parse({ ...clip, tracks: {}, ikTracks: {} });
-  checkAnimationReferences(metadata, { bones: [] }, throwValidationIssue);
+  checkAnimationReferences(metadata, undefined, throwValidationIssue);
   const bones = new Set<string>();
   for (const track of clip.tracks) {
     identifierSchema.parse(track.bone);
@@ -124,7 +127,7 @@ export function ownCompiledClip(clip: CompiledClip): CompiledClip {
       });
       // Reuse authored timeline rules for each independently compiled property.
       checkAnimationReferences(
-        { ...metadata, tracks: { [track.bone]: authoredKeys }, events: [] },
+        { ...metadata, disabledIKConstraints: [], tracks: { [track.bone]: authoredKeys }, events: [] },
         { bones: [{ id: track.bone }] },
         throwValidationIssue,
       );
@@ -158,6 +161,7 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
     loop: clip.loop,
     tracks: Object.freeze(clip.tracks.map(ownCompiledTrack)),
     ...(clip.ikTracks ? { ikTracks: Object.freeze(clip.ikTracks.map(ownCompiledIKTrack)) } : {}),
+    ...(clip.disabledIKConstraints ? { disabledIKConstraints: Object.freeze([...clip.disabledIKConstraints]) } : {}),
     events: Object.freeze(
       clip.events.map((event) => {
         const copy = copyAnimationEvent(event);
@@ -227,6 +231,7 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
     loop: clip.loop,
     tracks,
     ...(clip.ikTracks ? { ikTracks } : {}),
+    ...(clip.disabledIKConstraints ? { disabledIKConstraints: clip.disabledIKConstraints } : {}),
     events,
     ...(clip.playback ? { playback: { ...clip.playback } } : {}),
   });

@@ -1,7 +1,7 @@
 import { type AnimationClip, type AnimationPlaybackMode, compileClip, type Keyframe } from '../AnimationClip.js';
 import { quantizePlaybackTime, shortestRotationDelta } from '../animationMath.js';
 import { evaluateClip } from '../AnimationPose.js';
-import type { ValidationIssue } from '../externalData.js';
+import { ANIMATION_FORMAT_VERSION, parseAnimationClip, type ValidationIssue } from '../externalData.js';
 import { keyframeTimesMatch, normalizeKeyframeTime } from '../keyframeAuthoring.js';
 import { type DeepReadonly, freezeData } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
@@ -76,6 +76,8 @@ export type IKBakePlan =
       readonly success: true;
       /** Ordinary sparse bone keys only; not installed or merged into the authored source. */
       readonly generatedAnimation: DeepReadonly<AnimationClip>;
+      /** Detached authored snapshot used to reject stale commits. */
+      readonly sourceAnimation: DeepReadonly<AnimationClip>;
       readonly affectedBones: readonly IKBakeAffectedBone[];
       /** Property-key count, rather than the number of combined sparse rows. */
       readonly generatedKeyCount: number;
@@ -237,7 +239,12 @@ export function generateBakedBoneKeys(
       }
     }
     for (const definition of rig.ik ?? []) {
-      if (selected.has(definition.name) || definition.enabled === false) continue;
+      if (
+        selected.has(definition.name) ||
+        definition.enabled === false ||
+        source.disabledIKConstraints?.includes(definition.name)
+      )
+        continue;
       const shared = [definition.rootBone, definition.middleBone].filter((id) => driven.has(id));
       if (shared.length)
         return freezeData({
@@ -362,6 +369,7 @@ export function generateBakedBoneKeys(
     return freezeData({
       success: true,
       generatedAnimation,
+      sourceAnimation: parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...source }, rig),
       affectedBones,
       generatedKeyCount: result.samples.length * driven.size,
       replacedKeyCount: affectedBones.reduce((count, bone) => count + bone.properties[0]!.replacedKeyCount, 0),

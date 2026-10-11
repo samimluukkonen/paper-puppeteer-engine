@@ -88,6 +88,14 @@
         }
       }
     },
+    "disabledIKConstraints": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!__proto__$)[\\s\\S]+$"
+      }
+    },
     "events": {
       "type": "array",
       "items": {

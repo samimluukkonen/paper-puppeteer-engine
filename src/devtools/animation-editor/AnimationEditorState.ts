@@ -10,6 +10,8 @@ import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
 import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
+import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
+import type { IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -853,6 +855,27 @@ export class AnimationEditorState {
         return false;
       }
       return this.installWorkingAnimation(next);
+    });
+  }
+
+  /** Commit a validated full-clip IK proposal as one authored history operation. */
+  commitIKBake(plan: IKBakePlan): boolean {
+    return this.batchNotifications(() => {
+      if (!this.working || !this.rig) return false;
+      const result = commitIKBake(this.working, plan, this.rig);
+      if (!result.success) {
+        this.document.reportIssues(result.issues);
+        this.notify();
+        return false;
+      }
+      const next = this.document.inspect({ ...result.animation, version: this.working.version });
+      if (!next) {
+        this.notify();
+        return false;
+      }
+      const installed = this.installWorkingAnimation(next);
+      if (installed) this.document.reportIssues(result.issues);
+      return installed;
     });
   }
 

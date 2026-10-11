@@ -77,6 +77,9 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
               ? { mode: 'stepped', fps: normalizeNumber(animation.playback.fps) }
               : { mode: 'smooth' },
         }),
+    ...(animation.disabledIKConstraints === undefined
+      ? {}
+      : { disabledIKConstraints: [...animation.disabledIKConstraints].sort() }),
     tracks: Object.fromEntries(
       Object.keys(animation.tracks)
         .sort()

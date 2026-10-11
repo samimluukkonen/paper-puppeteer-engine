@@ -151,10 +151,11 @@ export class TwoBoneIKConstraint {
   apply(context: IKTransformContext, animation?: IKAnimationValues): void {
     this.status = 'inactive';
     this.resolvedTarget = undefined;
-    if (!this.enabled) return;
+    if (!this.enabled || (animation?.disabled?.value ?? 0) * (animation?.disabled?.weight ?? 0) >= 1) return;
     let mix = this.mix;
     if (!this.provider && !this.mixOverride && animation?.mix)
       mix = interpolateNumber(mix, animation.mix.value, animation.mix.weight);
+    mix *= 1 - (animation?.disabled?.value ?? 0) * (animation?.disabled?.weight ?? 0);
     if (mix === 0) return;
     let target: Readonly<IKTarget> | undefined;
     if (this.provider || this.point) {
