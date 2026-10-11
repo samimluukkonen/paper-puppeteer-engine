@@ -71,7 +71,7 @@ For example, at **0.5 s**, select `rightForearm`, enter **35** in Rotation, and 
 
 **Delete Key** removes only that property's key at the playhead, discards its draft, and immediately re-evaluates interpolation or bind fallback. Other properties and other times remain intact. A property commit clears only that property's draft; other pending fields remain temporary until individually keyed or cancelled. Empty/nonfinite input cannot be committed. **Cancel edits** or **Escape** restores all evaluated values and does not resume playback. Changing time, bone, or animation, pressing Play, changing authored settings, and undo/redo discard pending drafts. Preview preferences do not clear drafts. Undo/redo applies to authored keys through the existing snapshot history; navigation and drafts do not enter history. Creating/updating/deleting changed data marks the working animation dirty; no-op edits remain clean, and deleting newly created keys can restore the baseline.
 
-**Facing** mirrors only the outer puppet container. **IK preview (fixed targets)** pins the configured character preview chains' current solver endpoints, including authored end offsets, in canonical puppet coordinates; targets project with facing and remain fixed while scrubbing/playing. The render pose can differ from the pre-IK inspector while IK is enabled. Neither preview preference edits authored values or dirty state, and Set Key never reads rendered joints, screen/world coordinates, or IK output. The Rig Editor's bind pose remains unchanged. Numeric editing is the authoring interface for this milestone; transform drag handles remain deferred.
+**Facing** mirrors only the outer puppet container. **IK preview (fixed targets)** pins the configured character preview chains' current solver endpoints, including authored end offsets, in canonical puppet coordinates; targets project with facing and remain fixed while scrubbing/playing. The render pose can differ from the pre-IK inspector while IK is enabled. Neither preview preference edits authored values or dirty state, and Set Key never reads rendered joints, screen/world coordinates, or IK output. The Rig Editor's bind pose remains unchanged. Bone transforms use numeric editing; transform drag handles remain deferred.
 
 Explicit time navigation and starting a scrub cancel drafts even when the playhead stays at the same time or clamps to its current endpoint. Restart at zero also cancels drafts. Undo/Redo cancel drafts even when their history stack is empty; cancelled fields refresh immediately, including focused fields. Other preview preferences retain drafts. Uncommitted FPS text is replaced by the held authored value when the working snapshot changes, so it cannot carry into another animation or a restored history snapshot.
 
@@ -318,7 +318,7 @@ The v0.5.2.4.3 movement architecture and verification results are recorded in [K
 
 ## Deferred features
 
-Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, and IK target handles/baking remain deferred. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
+Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, and IK baking remain deferred. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
 
 The v0.5.2.5.1 selection policies, APIs, files and verification results are recorded in [Multi-key selection verification](animation-editor-multi-selection-verification.md).
 
@@ -336,7 +336,7 @@ Numeric cleanup reuses `roundEditorNumber()` for six-decimal candidates but acce
 
 Clipboard failures offer Download and Log alternatives. Download filenames retain manifest basenames, with a sanitized animation-name fallback and `animation.json` when no name is available. Copy/download/log establish session checkpoints and retain Undo/Redo history; they do not overwrite source files. Saved authored snapshots retain their original precision. A page reload still reads character assets.
 
-See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, IK target handles and baking remain deferred.
+See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping and IK baking remain deferred.
 
 ## Animation import and reload
 
@@ -402,7 +402,7 @@ Mirroring authors bone motion. **Facing** flips the outer preview container: it 
 
 ## IK target authoring
 
-The [React IK timeline and inspector](react-ik-authoring.md) select real rig constraints and key puppet-local X/Y and solver influence independently. The demo rig includes `rightArmIK`. Expand its timeline row, select it, edit a numeric field, and use Set Key. Focus pauses playback; committed changes refresh the existing puppet and enter working-copy history. Delete Key restores sparse fallback without affecting bone keys or events. Single IK markers support selection, Delete and snapped arrow-key movement. Group selection, marker dragging, clipboard/duplicate commands and target handles remain deferred.
+The [React IK timeline and inspector](react-ik-authoring.md) select real rig constraints and key puppet-local X/Y and solver influence independently. The demo rig includes `rightArmIK`. Expand its timeline row, select it, edit a numeric field, and use Set Key. Focus pauses playback; committed changes refresh the existing puppet and enter working-copy history. Delete Key restores sparse fallback without affecting bone keys or events. Single IK markers support selection, Delete and snapped arrow-key movement. Group selection, marker dragging and clipboard/duplicate commands for IK markers remain deferred; use [visual target handles](visual-ik-targets.md) to manipulate targets in the canvas.
 
 ## Drag IK targets
 

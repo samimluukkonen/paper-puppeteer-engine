@@ -101,4 +101,4 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 - Transform drag handles.
 - Character editing tools and richer asset pipeline integration.
 
-See the [IK animation data model](docs/ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. See [runtime IK evaluation](docs/ik-animation-runtime.md) for playback, scrubbing, precedence, and layer blending. See [React IK authoring](docs/react-ik-authoring.md) for timeline constraint selection and numeric property keying. Draggable IK handles remain deferred.
+See the [IK animation data model](docs/ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. See [runtime IK evaluation](docs/ik-animation-runtime.md) for playback, scrubbing, precedence, and layer blending. See [React IK authoring](docs/react-ik-authoring.md) for timeline constraint selection and numeric property keying. See [visual IK targets](docs/visual-ik-targets.md) for draggable target handles and explicit target-key commits.
