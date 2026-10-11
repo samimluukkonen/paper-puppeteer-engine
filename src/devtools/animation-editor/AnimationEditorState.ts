@@ -217,7 +217,7 @@ export class AnimationEditorState {
     const id = this.selectedIKConstraintId;
     const values =
       id && this.working && this.rig
-        ? evaluateIKTarget(this.working, this.rig, id, toMilliseconds(this.currentTime))
+        ? evaluateIKTarget(this.working, this.rig, id, this.playback.currentTimeMilliseconds)
         : undefined;
     return values ? Object.freeze({ ...values, ...this.selection.ikDraft }) : undefined;
   }
@@ -251,7 +251,7 @@ export class AnimationEditorState {
     time = this.currentTime,
   ): PropertyKeyframe | undefined {
     return this.working && this.rig
-      ? findIKPropertyKeyframe(this.working, this.rig, id, property, toMilliseconds(time))
+      ? findIKPropertyKeyframe(this.working, this.rig, id, property, this.playback.resolveTimeMilliseconds(time))
       : undefined;
   }
   selectIKKeyframe(ref: IKKeyframeSelection): boolean {
@@ -307,7 +307,8 @@ export class AnimationEditorState {
   }
   setIKPropertyKeyframe(id: string, property: IKAnimationProperty, value: number, time = this.currentTime): boolean {
     return this.editIKKeys(
-      (animation, rig) => setIKPropertyKeyframe(animation, rig, id, property, toMilliseconds(time), value),
+      (animation, rig) =>
+        setIKPropertyKeyframe(animation, rig, id, property, this.playback.resolveTimeMilliseconds(time), value),
       () => {
         if (id === this.selectedIKConstraintId && time === this.currentTime)
           this.selection.clearIKDraftProperty(property);
@@ -327,7 +328,8 @@ export class AnimationEditorState {
       return false;
     }
     return this.editIKKeys(
-      (animation, rig) => removeIKPropertyKeyframe(animation, rig, id, property, toMilliseconds(time)),
+      (animation, rig) =>
+        removeIKPropertyKeyframe(animation, rig, id, property, this.playback.resolveTimeMilliseconds(time)),
       () => {
         const selected = this.selectedIKKeyframe;
         if (
@@ -666,6 +668,9 @@ export class AnimationEditorState {
   get workingAnimation(): ReadonlyAnimation | null {
     return this.working;
   }
+  get currentTimeMilliseconds(): Milliseconds {
+    return this.playback.currentTimeMilliseconds;
+  }
   get currentTime(): Seconds {
     return this.playback.currentTime;
   }
@@ -853,16 +858,20 @@ export class AnimationEditorState {
     timeSeconds = this.currentTime,
   ): PropertyKeyframe | undefined {
     return this.working
-      ? findBonePropertyKeyframe(this.working, boneId, property, toMilliseconds(timeSeconds))
+      ? findBonePropertyKeyframe(this.working, boneId, property, this.playback.resolveTimeMilliseconds(timeSeconds))
       : undefined;
   }
 
   hasKeyframeAtTime(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
-    return this.working ? hasKeyframeAtTime(this.working, boneId, property, toMilliseconds(timeSeconds)) : false;
+    return this.working
+      ? hasKeyframeAtTime(this.working, boneId, property, this.playback.resolveTimeMilliseconds(timeSeconds))
+      : false;
   }
 
   getKeyedPropertiesAtTime(boneId: string, timeSeconds = this.currentTime): TransformProperty[] {
-    return this.working ? getKeyedPropertiesAtTime(this.working, boneId, toMilliseconds(timeSeconds)) : [];
+    return this.working
+      ? getKeyedPropertiesAtTime(this.working, boneId, this.playback.resolveTimeMilliseconds(timeSeconds))
+      : [];
   }
 
   getEvaluatedBonePropertyValue(
@@ -871,13 +880,19 @@ export class AnimationEditorState {
     timeSeconds = this.currentTime,
   ): number | undefined {
     return this.working && this.rig
-      ? getEvaluatedBonePropertyValue(this.working, this.rig, boneId, property, toMilliseconds(timeSeconds))
+      ? getEvaluatedBonePropertyValue(
+          this.working,
+          this.rig,
+          boneId,
+          property,
+          this.playback.resolveTimeMilliseconds(timeSeconds),
+        )
       : undefined;
   }
 
   getEvaluatedBoneTransform(boneId: string, timeSeconds = this.currentTime): JointTransform | undefined {
     return this.working && this.rig
-      ? getEvaluatedBoneTransform(this.working, this.rig, boneId, toMilliseconds(timeSeconds))
+      ? getEvaluatedBoneTransform(this.working, this.rig, boneId, this.playback.resolveTimeMilliseconds(timeSeconds))
       : undefined;
   }
 

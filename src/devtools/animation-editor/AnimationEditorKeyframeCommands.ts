@@ -79,7 +79,7 @@ export class AnimationEditorKeyframeCommands {
   ): boolean {
     const boneIds = options.boneIds ?? (this.selection.boneId ? [this.selection.boneId] : undefined);
     return this.commitMirror((animation, rig) =>
-      mirrorCurrentPoseToKeys(animation, rig, mapping, toMilliseconds(this.currentTime), direction, {
+      mirrorCurrentPoseToKeys(animation, rig, mapping, this.playback.currentTimeMilliseconds, direction, {
         ...options,
         ...(boneIds ? { boneIds } : {}),
       }),
@@ -315,7 +315,15 @@ export class AnimationEditorKeyframeCommands {
     timeSeconds = this.currentTime,
   ): boolean {
     return this.editKeyframes(
-      (animation, rig) => setBonePropertyKeyframe(animation, rig, boneId, property, toMilliseconds(timeSeconds), value),
+      (animation, rig) =>
+        setBonePropertyKeyframe(
+          animation,
+          rig,
+          boneId,
+          property,
+          this.playback.resolveTimeMilliseconds(timeSeconds),
+          value,
+        ),
       { boneId, property, time: timeSeconds },
     );
   }
@@ -323,8 +331,19 @@ export class AnimationEditorKeyframeCommands {
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
     return this.editKeyframes(
       (animation, rig) => {
-        const key = findBonePropertyKeyframe(animation, boneId, property, toMilliseconds(timeSeconds));
-        const next = removeBonePropertyKeyframe(animation, rig, boneId, property, toMilliseconds(timeSeconds));
+        const key = findBonePropertyKeyframe(
+          animation,
+          boneId,
+          property,
+          this.playback.resolveTimeMilliseconds(timeSeconds),
+        );
+        const next = removeBonePropertyKeyframe(
+          animation,
+          rig,
+          boneId,
+          property,
+          this.playback.resolveTimeMilliseconds(timeSeconds),
+        );
         // Remove exact authored identity before nearby keys can be resolved through tolerance.
         if (next !== animation && key) this.selection.removeKey({ boneId, property, time: toSeconds(key.time) });
         return next;
@@ -351,7 +370,7 @@ export class AnimationEditorKeyframeCommands {
     // The mutation helper validated the result and shares only the document's owned frozen branches.
     if (
       draftTarget?.boneId === this.selection.boneId &&
-      keyframeTimesMatch(toMilliseconds(draftTarget.time), toMilliseconds(this.currentTime)) &&
+      keyframeTimesMatch(toMilliseconds(draftTarget.time), this.playback.currentTimeMilliseconds) &&
       this.selection.draft[draftTarget.property] !== undefined
     ) {
       this.selection.clearDraftProperty(draftTarget.property);

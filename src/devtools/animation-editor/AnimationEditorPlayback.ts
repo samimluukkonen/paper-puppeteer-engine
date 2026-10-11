@@ -42,12 +42,15 @@ export class AnimationEditorPlayback {
   }
 
   /** Seconds remain the navigation API. Preserve an unchanged held millisecond timestamp exactly. */
+  resolveTimeMilliseconds(time: Seconds): Milliseconds {
+    const duration = this.duration();
+    return time === this.currentTime ? this.time : time === toSeconds(duration) ? duration : toMilliseconds(time);
+  }
+
   setCurrentTime(time: Seconds): boolean {
     const duration = this.duration();
     const next = clampTime(time, toSeconds(duration));
-    return this.setCurrentTimeMilliseconds(
-      next === this.currentTime ? this.time : next === toSeconds(duration) ? duration : toMilliseconds(next),
-    );
+    return this.setCurrentTimeMilliseconds(this.resolveTimeMilliseconds(next));
   }
 
   setCurrentTimeMilliseconds(time: Milliseconds): boolean {

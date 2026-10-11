@@ -132,6 +132,44 @@ test('inspector evaluation shares sparse IK interpolation, stepped timing, endpo
   assert.deepEqual(state.selectedIKTargetValues, { x: 15, y: 115, mix: 0.2 });
 });
 
+test.each([1001, 1003, 1001.123456789])('inspectors and canvas retain the exact %s ms stepped endpoint', (duration) => {
+  const { state, rig } = fixture({
+    duration,
+    playback: { mode: 'stepped', fps: 10 },
+    tracks: {
+      root: [
+        { time: 0, x: 10 },
+        { time: duration, x: 20 },
+      ],
+    },
+    ikTracks: {
+      arm: [
+        { time: 0, x: 30 },
+        { time: duration, x: 80 },
+      ],
+    },
+  });
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const preview = new AnimationEditorPreview(state, puppet);
+  state.selectIKConstraint('arm');
+  state.setCurrentTime(state.duration);
+  assert.equal(state.currentTimeMilliseconds, duration);
+  assert.equal(state.selectedIKTargetValues!.x, 80);
+  assert.equal(puppet.getIK('arm').resolvedTarget!.x, 80);
+  assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 20);
+  assert.equal(state.getEvaluatedBoneTransform('root')!.x, 20);
+  assert.equal(puppet.getBone('root').pose.x, 20);
+  const working = state.workingAnimation;
+  assert.isTrue(state.commitIKProperty('x'));
+  assert.strictEqual(state.workingAnimation, working);
+  assert.isTrue(state.setIKPropertyKeyframe('arm', 'y', 75));
+  assert.equal(state.workingAnimation!.ikTracks!.arm!.at(-1)!.time, duration);
+  assert.isTrue(state.setBonePropertyKeyframe('root', 'y', 12));
+  assert.equal(state.workingAnimation!.tracks.root!.at(-1)!.time, duration);
+  preview.dispose();
+  puppet.destroy();
+});
+
 test('numeric edits hold playback; commits create/update independent channels with one history entry each', () => {
   const { state, clip, before } = fixture();
   const source = state.sourceAnimation;

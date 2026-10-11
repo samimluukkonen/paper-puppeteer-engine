@@ -4,7 +4,6 @@ import type { Puppet } from '../../engine/Puppet.js';
 import type { JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { getCompiledPreviewClip } from './previewClip.js';
-import { toMilliseconds } from './timeUnits.js';
 
 /** Editor-owned runtime player samples the working copy; the puppet still owns rendering and IK. */
 export class AnimationEditorPreview {
@@ -24,11 +23,7 @@ export class AnimationEditorPreview {
 
   private refresh(): void {
     const animation = this.state.workingAnimation;
-    const time = animation
-      ? this.state.currentTime === this.state.duration
-        ? animation.duration
-        : Math.min(toMilliseconds(this.state.currentTime), animation.duration)
-      : 0;
+    const time = animation ? this.state.currentTimeMilliseconds : 0;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.
     const sampledTime =
       animation && time !== animation.duration
