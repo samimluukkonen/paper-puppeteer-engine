@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.5-3
+
+The v0.5.5.3 [React IK timeline and inspector](docs/react-ik-authoring.md) expose real rig constraint tracks and independent puppet-local X/Y and mix keys through the existing timeline. Typed constraint selection isolates bone editing; explicit numeric commits pause playback, update the existing preview solver and record one working-copy history entry. Sparse deletion, single-key selection, snapped keyboard movement, source immutability and React subscription lifecycle are tested. The demo rig includes `rightArmIK`. IK group selection, marker dragging, clipboard/duplicate commands, visual target handles, mirroring and baking remain deferred.
+
 ## 0.5.5-2
 
 The v0.5.5.2 [runtime IK evaluation](docs/ik-animation-runtime.md) compiles sparse puppet-local target and mix channels through the existing interpolation system. Playback and editor scrubbing share target sampling, stepped timing, crossfades, interrupted fades, layer weights and root-bone masks. Runtime world targets, explicit mix overrides and late-bound weapon providers retain deterministic ownership. The existing analytical solver, priority order and pre-IK pose restoration remain authoritative; source animations and bind poses stay immutable. Visual authoring, gizmos, mirroring UI and baking remain deferred.

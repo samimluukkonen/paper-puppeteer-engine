@@ -87,4 +87,4 @@ Verification on 2026-10-11:
 - A dedicated real Phaser scene was visually inspected at 0, 500, and 1,000 ms. With placement `(320, 200)` and scale 2, local A `(60, 60)`, B `(30, 80)`, and C `(-40, 70)` reached world `(440, 320)`, `(380, 360)`, and `(240, 340)`. All were solved with bend direction 1. Normal scene playback advanced, full influence reached the target, zero influence restored authored rotation, facing reflected the target, and source data remained unchanged.
 - The existing demo walkthrough checked foot planting on/off, mirrored feet, and weapon hand IK controls. Controller regressions also verified procedural foot targets and mandatory secondary grip ownership against conflicting generic animation keys.
 
-React IK timeline controls, draggable target gizmos, target mirroring UI, IK baking (v0.5.6), new solvers, and physics remain deferred.
+See [React IK authoring](react-ik-authoring.md) for the implemented timeline and inspector. Draggable target gizmos, target mirroring UI, IK baking (v0.5.6), new solvers, and physics remain deferred.

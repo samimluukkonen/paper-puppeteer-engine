@@ -43,11 +43,11 @@ function session() {
 test('bone rows follow parent-first depth-first rig order, including unanimated bones', () => {
   const rows = buildTimelineTracks(rig, clip(), new Set());
   assert.deepEqual(
-    rows.map(({ boneId, depth }) => ({ id: boneId, depth })),
+    rows.filter((row) => 'boneId' in row).map(({ boneId, depth }) => ({ id: boneId, depth })),
     boneHierarchy(rig),
   );
   assert.deepEqual(
-    rows.map((row) => row.boneId),
+    rows.map((row) => ('boneId' in row ? row.boneId : undefined)),
     ['root', 'zArm', 'hand', 'aLeg', 'foot'],
   );
   assert.isTrue(rows.every((row) => row.kind === 'bone' && !row.expanded));
@@ -191,7 +191,7 @@ test('authored edits and undo/redo refresh key presence while keeping track navi
   const { state } = session();
   state.setTimelineBoneExpanded('hand', true);
   state.selectTimelineProperty('hand', 'y');
-  const hasKeys = () => state.timelineTracks.some((row) => row.boneId === 'hand' && row.hasKeys);
+  const hasKeys = () => state.timelineTracks.some((row) => 'boneId' in row && row.boneId === 'hand' && row.hasKeys);
   assert.isFalse(hasKeys());
   state.setBonePropertyKeyframe('hand', 'y', 4);
   assert.isTrue(hasKeys());
@@ -239,28 +239,36 @@ test('demo timeline includes every expected bone in the same order as the hierar
   const state = new AnimationEditorState(demoRig, demoAnimations);
   state.selectAnimation('idle');
   assert.deepEqual(
-    state.timelineTracks.map((row) => row.boneId),
+    state.timelineTracks.filter((row) => row.kind === 'bone').map((row) => row.boneId),
     boneHierarchy(demoRig).map((row) => row.id),
   );
-  assert.lengthOf(state.timelineTracks, demoRig.bones.length);
+  assert.lengthOf(
+    state.timelineTracks.filter((row) => row.kind === 'bone'),
+    demoRig.bones.length,
+  );
   for (const bone of demoRig.bones) state.setTimelineBoneExpanded(bone.id, true);
-  assert.lengthOf(state.timelineTracks, demoRig.bones.length * (1 + transformProperties.length));
+  assert.lengthOf(
+    state.timelineTracks.filter((row) => 'boneId' in row),
+    demoRig.bones.length * (1 + transformProperties.length),
+  );
 });
 
 test('editing one bone retains unrelated row identity through history and expansion changes', () => {
   const { state } = session();
   for (const id of ['root', 'zArm']) state.setTimelineBoneExpanded(id, true);
   const before = state.timelineTracks;
-  const armRows = before.filter((row) => row.boneId === 'zArm');
+  const armRows = before.filter((row) => 'boneId' in row && row.boneId === 'zArm');
   state.setBonePropertyKeyframe('root', 'x', 42, 0);
   for (const read of [() => {}, () => state.undo(), () => state.redo()]) {
     read();
-    const rows = state.timelineTracks.filter((row) => row.boneId === 'zArm');
+    const rows = state.timelineTracks.filter((row) => 'boneId' in row && row.boneId === 'zArm');
     assert.isTrue(rows.every((row, index) => row === armRows[index]));
   }
   state.setTimelineBoneExpanded('hand', true);
   assert.isTrue(
-    state.timelineTracks.filter((row) => row.boneId === 'zArm').every((row, index) => row === armRows[index]),
+    state.timelineTracks
+      .filter((row) => 'boneId' in row && row.boneId === 'zArm')
+      .every((row, index) => row === armRows[index]),
   );
   assert.notStrictEqual(
     state.timelineTracks.find((row) => row.kind === 'property' && row.boneId === 'root' && row.property === 'x'),

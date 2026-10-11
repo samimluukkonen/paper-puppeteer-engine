@@ -1,5 +1,6 @@
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef } from './animationEvents.js';
+import type { IKKeyframeSelection } from './ikTimeline.js';
 import { timelineXToTime, timeToTimelineX } from './timeline.js';
 import { TimelineKeyboardController } from './TimelineKeyboardController.js';
 import type { KeyframeSelection } from './timelineTracks.js';
@@ -167,12 +168,16 @@ export class TimelineInputController {
     this.state.setCurrentTime(timelineXToTime(clientX - bounds.left, this.state.duration, bounds.width));
   }
 
-  beginKeyDrag(event: PointerEvent, key: KeyframeSelection, marker: HTMLButtonElement): void {
+  beginKeyDrag(event: PointerEvent, key: KeyframeSelection | IKKeyframeSelection, marker: HTMLButtonElement): void {
     event.stopPropagation();
     if (event.button !== 0 || this.gesture) return;
     event.preventDefault();
     // Commit the previous inspector field before selection changes or a drag acquires state.
     marker.focus({ preventScroll: true });
+    if ('kind' in key) {
+      this.state.selectIKKeyframe(key);
+      return;
+    }
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       this.state.selectKeyframe(key, { additive: event.ctrlKey || event.metaKey, range: event.shiftKey });
       return;

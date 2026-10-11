@@ -61,6 +61,7 @@ scene.load.start();
 | [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection        |
 | [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
 | [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
+| [React IK authoring](docs/react-ik-authoring.md)                   | IK timeline tracks, numeric target/influence keys, selection, history, and local verification           |
 | [Runtime IK animation](docs/ik-animation-runtime.md)               | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                    |
 | [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |
 | [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                           |
@@ -97,4 +98,4 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 - Transform drag handles.
 - Character editing tools and richer asset pipeline integration.
 
-See the [IK animation data model](docs/ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. See [runtime IK evaluation](docs/ik-animation-runtime.md) for playback, scrubbing, precedence, and layer blending. Visual IK authoring remains deferred.
+See the [IK animation data model](docs/ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. See [runtime IK evaluation](docs/ik-animation-runtime.md) for playback, scrubbing, precedence, and layer blending. See [React IK authoring](docs/react-ik-authoring.md) for timeline constraint selection and numeric property keying. Draggable IK handles remain deferred.

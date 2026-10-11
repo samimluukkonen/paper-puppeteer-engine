@@ -1,12 +1,20 @@
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
+import type { IKInspectorController } from './IKInspectorController.js';
+import { IKInspectorPanel } from './IKInspectorPanel.js';
 import { AUTHORED_INTERPOLATION_MODES, interpolationLabel } from './interpolationPresentation.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
-export function AnimationEditorView({ mirrorTools }: { mirrorTools: MirrorToolsController }) {
+export function AnimationEditorView({
+  mirrorTools,
+  ikInspector,
+}: {
+  mirrorTools: MirrorToolsController;
+  ikInspector: IKInspectorController;
+}) {
   const inspector = useWorkspaceInspector();
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
     <option key={mode} value={mode}>
@@ -180,6 +188,7 @@ export function AnimationEditorView({ mirrorTools }: { mirrorTools: MirrorToolsC
             <summary>Bones</summary>
             <div id="animation-bones" aria-label="Bone hierarchy"></div>
           </details>
+          <IKInspectorPanel controller={ikInspector} />
           <section id="animation-bone-inspector" aria-label="Bone keyframing">
             <h2 id="animation-bone-title">Select a bone</h2>
             <fieldset id="animation-bone-fields" aria-label="Animated local transform"></fieldset>

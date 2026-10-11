@@ -210,6 +210,8 @@ export class TimelineSessionController {
       state.canUndo,
       state.canRedo,
       state.selectedKeys,
+      state.selectedTarget,
+      state.selectedIKKeyframe,
       state.selectedEvent,
       state.timelineClipboard,
       state.validationIssues,
@@ -232,15 +234,15 @@ export class TimelineSessionController {
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
     this.files.render();
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
-    const deleteDisabled = state.selectedKeys.length === 0;
+    const deleteDisabled = state.selectedKeys.length === 0 && !state.selectedIKKeyframe;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
-    const copyDisabled = deleteDisabled && !state.selectedEvent;
+    const copyDisabled = !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
     if (this.duplicateKeys.disabled !== copyDisabled) this.duplicateKeys.disabled = copyDisabled;
     setText(this.copyKeys, state.selectedEvent ? 'Copy Event' : 'Copy Keys');
     setText(this.duplicateKeys, state.selectedEvent ? 'Duplicate Event' : 'Duplicate Keys');
     setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
-    const pasteDisabled = !animation || !state.timelineClipboard;
+    const pasteDisabled = !!state.selectedIKConstraintId || !animation || !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
     setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
     setText(

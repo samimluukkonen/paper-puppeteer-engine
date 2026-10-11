@@ -1,8 +1,10 @@
 import type { Keyframe } from '../../engine/AnimationClip.js';
+import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef } from './animationEvents.js';
 import { EventTrackController } from './EventTrackController.js';
+import { ikTrackKey, type IKKeyframeSelection } from './ikTimeline.js';
 import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
 import { timeToTimelineX } from './timeline.js';
@@ -24,8 +26,23 @@ interface TrackElements {
 
 const emptyKeys: readonly Keyframe[] = Object.freeze([]);
 
+type TimelineKey = KeyframeSelection | IKKeyframeSelection;
+function isIKKey(key: TimelineKey): key is IKKeyframeSelection {
+  return 'kind' in key;
+}
+function keyOwner(key: TimelineKey): string {
+  return isIKKey(key) ? key.constraintId : key.boneId;
+}
+function trackOwner(track: TimelineTrack): string {
+  return 'constraintId' in track ? track.constraintId : track.boneId;
+}
+function isProperty(track: TimelineTrack): track is Extract<TimelineTrack, { kind: 'property' | 'ik-property' }> {
+  return track.kind === 'property' || track.kind === 'ik-property';
+}
 function trackKey(track: TimelineTrack): string {
-  return timelineTrackKey(track.boneId, track.kind === 'property' ? track.property : null);
+  return 'constraintId' in track
+    ? ikTrackKey(track.constraintId, track.kind === 'ik-property' ? track.property : null)
+    : timelineTrackKey(track.boneId, track.kind === 'property' ? track.property : null);
 }
 
 /** Reconcile only structural changes, preserving surviving buttons, focus and scroll during playback. */
@@ -43,6 +60,8 @@ export class TimelineTracksController {
   private tracks: readonly TimelineTrack[] | undefined;
   private interpolation: AnimationEditorState['authoredInterpolation'];
   private readonly rows = new Map<string, TrackElements>();
+  private selectedIK: AnimationEditorState['selectedTarget'] | undefined;
+  private selectedIKKey: IKKeyframeSelection | null | undefined;
   private selectedBone: string | null | undefined;
   private selectedProperty: AnimationEditorState['selectedTimelineProperty'] | undefined;
   private selectedKey: KeyframeSelection | null | undefined;
@@ -55,7 +74,7 @@ export class TimelineTracksController {
   constructor(
     private readonly labels: HTMLElement,
     private readonly lanes: HTMLElement,
-    private readonly onKeyPointerDown: (event: PointerEvent, key: KeyframeSelection, marker: HTMLButtonElement) => void,
+    private readonly onKeyPointerDown: (event: PointerEvent, key: TimelineKey, marker: HTMLButtonElement) => void,
     onEventPointerDown?: (event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement) => void,
   ) {
     this.events = new EventTrackController(onEventPointerDown);
@@ -64,41 +83,65 @@ export class TimelineTracksController {
   private createRow(track: TimelineTrack): TrackElements {
     const label = document.createElement('div');
     label.className = `timeline-track-label timeline-${track.kind}-track`;
-    label.dataset.boneId = track.boneId;
+    if ('constraintId' in track) label.dataset.constraintId = track.constraintId;
+    else label.dataset.boneId = track.boneId;
     const lane = document.createElement('div');
     lane.className = `timeline-track-lane timeline-${track.kind}-track`;
-    lane.dataset.boneId = track.boneId;
-    if (track.kind === 'property') {
+    if ('constraintId' in track) lane.dataset.constraintId = track.constraintId;
+    else lane.dataset.boneId = track.boneId;
+    if (isProperty(track)) {
       label.dataset.property = track.property;
       lane.dataset.property = track.property;
     }
     let expand: HTMLButtonElement | undefined;
-    if (track.kind === 'bone') {
+    if (track.kind === 'bone' || track.kind === 'ik') {
       expand = document.createElement('button');
       expand.type = 'button';
       expand.className = 'timeline-expand';
       expand.addEventListener('click', () => {
         const state = this.state;
-        if (state) state.setTimelineBoneExpanded(track.boneId, !state.isTimelineBoneExpanded(track.boneId));
+        if (state) {
+          if (track.kind === 'ik')
+            state.setTimelineIKExpanded(track.constraintId, !state.isTimelineIKExpanded(track.constraintId));
+          else state.setTimelineBoneExpanded(track.boneId, !state.isTimelineBoneExpanded(track.boneId));
+        }
       });
       label.append(expand);
     }
     const select = document.createElement('button');
     select.type = 'button';
     select.className = 'timeline-track-select';
-    select.textContent = track.kind === 'bone' ? track.boneId : track.property;
+    select.textContent =
+      track.kind === 'ik'
+        ? `IK: ${track.constraintId}`
+        : track.kind === 'bone'
+          ? track.boneId
+          : track.property === 'mix'
+            ? 'mix (influence)'
+            : track.property;
     select.setAttribute(
       'aria-label',
-      track.kind === 'bone' ? `Select bone ${track.boneId}` : `Select ${track.boneId} ${track.property} track`,
+      track.kind === 'ik'
+        ? `Select IK target ${track.constraintId}`
+        : track.kind === 'bone'
+          ? `Select bone ${track.boneId}`
+          : `Select ${trackOwner(track)} ${track.property} track`,
     );
     select.addEventListener('click', () => {
-      if (track.kind === 'bone') this.state?.selectBone(track.boneId);
+      if ('constraintId' in track)
+        this.state?.selectIKConstraint(track.constraintId, track.kind === 'ik-property' ? track.property : null);
+      else if (track.kind === 'bone') this.state?.selectBone(track.boneId);
       else this.state?.selectTimelineProperty(track.boneId, track.property);
     });
     const indicator = document.createElement('span');
     indicator.className = 'timeline-key-presence';
     label.append(select, indicator);
     return { label, select, expand, indicator, lane, markers: new Map(), summaries: new Map() };
+  }
+
+  private selectMarker(key: TimelineKey, modifiers: { additive: boolean; range: boolean }): void {
+    if (isIKKey(key)) this.state?.selectIKKeyframe(key);
+    else this.state?.selectKeyframe(key, modifiers);
   }
 
   render(state: AnimationEditorState, width: number): void {
@@ -135,16 +178,16 @@ export class TimelineTracksController {
         row.indicator.textContent = track.hasKeys ? '●' : '○';
         row.indicator.title = track.hasKeys ? 'Contains authored keys' : 'No authored keys';
         row.indicator.setAttribute('aria-label', row.indicator.title);
-        if (row.expand && track.kind === 'bone') {
+        if (row.expand && (track.kind === 'bone' || track.kind === 'ik')) {
           row.expand.textContent = track.expanded ? '▼' : '▶';
           setAttribute(row.expand, 'aria-expanded', String(track.expanded));
           setAttribute(
             row.expand,
             'aria-label',
-            `${track.expanded ? 'Collapse' : 'Expand'} ${track.boneId} properties`,
+            `${track.expanded ? 'Collapse' : 'Expand'} ${trackOwner(track)} properties`,
           );
         }
-        if (track.kind === 'property') {
+        if (isProperty(track)) {
           const times = new Set(track.keyframes.map((key) => key.time));
           for (const [time, marker] of row.markers) {
             if (times.has(time)) continue;
@@ -167,14 +210,14 @@ export class TimelineTracksController {
               marker.addEventListener('pointerdown', (event) => this.onKeyPointerDown(event, keyframe, button));
               marker.addEventListener('click', (event) => {
                 if (event.detail === 0)
-                  this.state?.selectKeyframe(keyframe, {
+                  this.selectMarker(keyframe, {
                     additive: event.ctrlKey || event.metaKey,
                     range: event.shiftKey,
                   });
               });
               row.markers.set(keyframe.time, marker);
             }
-            const description = `Select ${keyframe.boneId} ${keyframe.property} key at ${keyframe.time} s`;
+            const description = `Select ${keyOwner(keyframe)} ${keyframe.property} key at ${keyframe.time} s`;
             setAttribute(marker, 'aria-label', description);
           }
           reconcileRows(
@@ -196,18 +239,20 @@ export class TimelineTracksController {
     if (changed || interpolationChanged) {
       for (const row of this.rows.values()) {
         const track = row.track;
-        if (track?.kind !== 'property' || (!interpolationChanged && !changedRows.has(row))) continue;
+        if (!track || !isProperty(track) || (!interpolationChanged && !changedRows.has(row))) continue;
         for (const key of track.keyframes) {
           const marker = row.markers.get(key.time)!;
-          const segment = state.getSegmentInterpolation(key);
+          const segment = isIKKey(key) ? undefined : state.getSegmentInterpolation(key);
           setAttribute(marker, 'data-interpolation', segment?.mode ?? 'unavailable');
-          const interpolation = segment
-            ? `${interpolationLabel(segment.mode)} (inherited from clip)`
-            : 'Unavailable (no outgoing segment)';
+          const interpolation = isIKKey(key)
+            ? `${interpolationLabel(state.authoredInterpolation ?? 'linear')} (inherited from clip)`
+            : segment
+              ? `${interpolationLabel(segment.mode)} (inherited from clip)`
+              : 'Unavailable (no outgoing segment)';
           setAttribute(
             marker,
             'title',
-            `${key.boneId}.${key.property}\nTime: ${key.time.toFixed(3)} s (value ${key.value})\nInterpolation: ${interpolation}`,
+            `${keyOwner(key)}.${key.property}\nTime: ${key.time.toFixed(3)} s (value ${key.value})\nInterpolation: ${interpolation}`,
           );
         }
       }
@@ -216,9 +261,10 @@ export class TimelineTracksController {
     if (summariesChanged || resized) {
       for (const row of this.rows.values()) {
         const track = row.track;
-        if (track?.kind !== 'bone') continue;
-        const authored = state.workingAnimation?.tracks;
-        const keys = authored && Object.hasOwn(authored, track.boneId) ? authored[track.boneId]! : emptyKeys;
+        if (!track || (track.kind !== 'bone' && track.kind !== 'ik')) continue;
+        const authored = track.kind === 'ik' ? state.workingAnimation?.ikTracks : state.workingAnimation?.tracks;
+        const id = trackOwner(track);
+        const keys = authored && Object.hasOwn(authored, id) ? authored[id]! : emptyKeys;
         const summary = row.summary;
         if (
           summary?.keys === keys &&
@@ -228,7 +274,14 @@ export class TimelineTracksController {
         )
           continue;
         row.summary = { keys, expanded: track.expanded, duration: state.duration, width };
-        const times = track.expanded ? new Set<number>() : summarizeKeyframeTimes(keys, state.duration, width);
+        const times = track.expanded
+          ? new Set<number>()
+          : summarizeKeyframeTimes(
+              keys,
+              state.duration,
+              width,
+              track.kind === 'ik' ? ikAnimationProperties : undefined,
+            );
         for (const [time, marker] of row.summaries) {
           if (times.has(time)) continue;
           marker.remove();
@@ -254,18 +307,16 @@ export class TimelineTracksController {
     this.drag = state.keyframeDrag;
     if (changed || resized || previousDrag !== this.drag) {
       const moving = keyframeSelectionIndex(this.drag?.originalKeys ?? []);
-      const position = (ref: KeyframeSelection, marker: HTMLButtonElement): void => {
-        const dragging = moving.has(keyIdentity(ref));
+      const position = (ref: TimelineKey, marker: HTMLButtonElement): void => {
+        const dragging = !isIKKey(ref) && moving.has(keyIdentity(ref));
         marker.style.left = `${timeToTimelineX(dragging ? ref.time + this.drag!.previewDelta : ref.time, this.duration, width)}px`;
         setAttribute(marker, 'data-dragging', String(dragging));
       };
       const positionedRows = resized ? new Set(this.rows.values()) : changedRows;
       for (const row of positionedRows) {
         const track = row.track;
-        if (track?.kind !== 'property') continue;
-        for (const [time, marker] of row.markers) {
-          position({ boneId: track.boneId, property: track.property, time }, marker);
-        }
+        if (!track || !isProperty(track)) continue;
+        for (const key of track.keyframes) position(key, row.markers.get(key.time)!);
       }
       if (previousDrag !== this.drag) {
         const affected = keyframeSelectionIndex([
@@ -281,6 +332,8 @@ export class TimelineTracksController {
     }
     if (
       !changed &&
+      this.selectedIK === state.selectedTarget &&
+      this.selectedIKKey === state.selectedIKKeyframe &&
       this.selectedBone === state.selectedBoneId &&
       this.selectedProperty === state.selectedTimelineProperty &&
       this.selectedKey === state.primaryKey &&
@@ -289,6 +342,8 @@ export class TimelineTracksController {
       return;
     const previousKeys = this.selectedKeys ?? [];
     const previousPrimary = this.selectedKey;
+    this.selectedIK = state.selectedTarget;
+    this.selectedIKKey = state.selectedIKKeyframe;
     this.selectedBone = state.selectedBoneId;
     this.selectedProperty = state.selectedTimelineProperty;
     this.selectedKey = state.primaryKey;
@@ -297,7 +352,20 @@ export class TimelineTracksController {
     for (const track of tracks) {
       const row = this.rows.get(trackKey(track))!;
       const selected =
-        track.boneId === this.selectedBone && (track.kind === 'bone' || track.property === this.selectedProperty);
+        'constraintId' in track
+          ? track.constraintId === state.selectedIKConstraintId &&
+            (track.kind === 'ik' || track.property === state.selectedIKProperty)
+          : track.boneId === this.selectedBone && (track.kind === 'bone' || track.property === this.selectedProperty);
+      if (track.kind === 'ik-property')
+        for (const key of track.keyframes) {
+          const marker = row.markers.get(key.time)!;
+          const active =
+            this.selectedIKKey?.constraintId === key.constraintId &&
+            this.selectedIKKey.property === key.property &&
+            this.selectedIKKey.time === key.time;
+          setAttribute(marker, 'aria-pressed', String(active));
+          setAttribute(marker, 'data-primary', String(active));
+        }
       for (const element of [row.label, row.lane]) setAttribute(element, 'data-selected', String(selected));
       setAttribute(row.select, 'aria-pressed', String(selected));
     }
@@ -326,7 +394,13 @@ export class TimelineTracksController {
     for (const row of this.rows.values()) {
       const track = row.track!;
       const hidden =
-        mode === 'keyed' ? !track.hasKeys : mode === 'selected' ? track.boneId !== state.selectedBoneId : false;
+        mode === 'keyed'
+          ? !track.hasKeys
+          : mode === 'selected'
+            ? 'constraintId' in track
+              ? track.constraintId !== state.selectedIKConstraintId
+              : track.boneId !== state.selectedBoneId
+            : false;
       if (
         hidden &&
         !row.label.hidden &&

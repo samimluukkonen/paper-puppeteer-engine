@@ -59,9 +59,44 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
 
   await timeline.press('Home');
   const canvas = page.locator('#animation-stage canvas');
-  const bounds = await canvas.boundingBox();
-  if (!bounds) throw new Error('Missing preview bounds.');
-  await canvas.click({ position: { x: bounds.width / 2, y: (bounds.height * 435) / 640 } });
+  // Camera fitting changes the projected root position. Locate its rendered selection ring,
+  // switch selection away, then pick that same point through the actual canvas input path.
+  await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
+  let rootPoint: { x: number; y: number } | null = null;
+  await expect
+    .poll(async () => {
+      const screenshot = await canvas.screenshot();
+      rootPoint = await page.evaluate(
+        async (url) => {
+          const image = new Image();
+          image.src = url;
+          await image.decode();
+          const bitmap = document.createElement('canvas');
+          bitmap.width = image.width;
+          bitmap.height = image.height;
+          const context = bitmap.getContext('2d')!;
+          context.drawImage(image, 0, 0);
+          const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+          let x = 0;
+          let y = 0;
+          let count = 0;
+          for (let index = 0; index < data.length; index += 4) {
+            if (data[index] !== 0xb7 || data[index + 1] !== 0x54 || data[index + 2] !== 0x3a) continue;
+            const pixel = index / 4;
+            x += pixel % bitmap.width;
+            y += Math.floor(pixel / bitmap.width);
+            count++;
+          }
+          return count ? { x: x / count, y: y / count } : null;
+        },
+        `data:image/png;base64,${screenshot.toString('base64')}`,
+      );
+      return rootPoint !== null;
+    })
+    .toBe(true);
+  if (!rootPoint) throw new Error('Missing rendered root selection ring.');
+  await labels.getByRole('button', { name: 'Select bone torso', exact: true }).click();
+  await canvas.click({ position: rootPoint });
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: root');
   await expect(labels.getByRole('button', { name: 'Select bone root', exact: true })).toHaveAttribute(
     'aria-pressed',

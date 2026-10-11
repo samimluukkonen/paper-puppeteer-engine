@@ -356,7 +356,7 @@ a {
   grid-row: 3;
   display: flex;
   flex-direction: column;
-  padding: 10px 12px;
+  padding: 10px 12px 16px;
   overflow: hidden;
 }
 .timeline-toolbar {
@@ -513,7 +513,8 @@ a {
   white-space: nowrap;
   padding: 0 2px;
 }
-.timeline-property-track .timeline-track-select {
+.timeline-property-track .timeline-track-select,
+.timeline-ik-property-track .timeline-track-select {
   padding-left: 24px;
 }
 .timeline-key-presence {
@@ -534,7 +535,7 @@ a {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0;
+  margin: 0 0 8px;
   font-size: 12px;
 }
 .timeline-instructions {
@@ -908,7 +909,7 @@ a {
     grid-template-rows: minmax(180px, var(--preview-share)) 12px minmax(260px, 1fr);
   }
   .timeline-panel {
-    padding: 8px;
+    padding: 8px 8px 14px;
   }
   .timeline-toolbar {
     gap: 6px;
@@ -969,4 +970,9 @@ a {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.timeline-ik-track {
+  background: #e6ede8;
+  font-weight: 600;
 }

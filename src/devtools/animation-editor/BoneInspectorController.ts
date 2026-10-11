@@ -160,6 +160,8 @@ export class BoneInspectorController {
   private render(force = false): void {
     const state = this.state;
     const transform = state?.selectedBoneTransform;
+    const section = this.title.closest<HTMLElement>('#animation-bone-inspector');
+    if (section) section.hidden = !!state?.selectedIKConstraintId;
     const navigated =
       force ||
       this.bone !== state?.selectedBoneId ||

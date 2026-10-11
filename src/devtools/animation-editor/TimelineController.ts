@@ -128,6 +128,8 @@ export class TimelineController {
       state,
       animation,
       state.timelineTracks,
+      state.selectedTarget,
+      state.selectedIKKeyframe,
       state.selectedBoneId,
       state.selectedTimelineProperty,
       state.selectedKeys,
@@ -144,7 +146,7 @@ export class TimelineController {
       setText(
         this.filterStatus,
         filter === 'selected'
-          ? 'Showing selected bone tracks · choose All to show every track.'
+          ? 'Showing selected target tracks · choose All to show every track.'
           : 'Showing keyed tracks · choose All to author empty properties.',
       );
       this.interpolation.render();

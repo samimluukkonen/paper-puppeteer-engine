@@ -10,6 +10,7 @@ import type { ReadonlyAnimation } from './AnimationEditorState.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { IKInspectorController } from './IKInspectorController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { TimelineController } from './TimelineController.js';
@@ -19,8 +20,9 @@ const app = document.querySelector<HTMLElement>('#animation-editor-app');
 if (!app) throw new Error('Missing animation editor host.');
 app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
+const ikInspector = new IKInspectorController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
-const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />, (app) => {
+const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ikInspector={ikInspector} />, (app) => {
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
@@ -37,17 +39,21 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
       timeline.bind(state, id);
       inspector.bind(state);
+      ikInspector.bind(state);
       releaseWorkspaceSelection?.();
+      let selectedIK = state.selectedIKConstraintId;
       let selectedBone = state.selectedBoneId;
       let selectedEvent = state.selectedEvent;
       let selectedKeys = state.selectedKeys;
       releaseWorkspaceSelection = state.subscribe(() => {
         if (
+          (state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK) ||
           (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
           (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
           (state.selectedKeys.length && state.selectedKeys !== selectedKeys)
         )
           workspace.revealInspector();
+        selectedIK = state.selectedIKConstraintId;
         selectedBone = state.selectedBoneId;
         selectedEvent = state.selectedEvent;
         selectedKeys = state.selectedKeys;
@@ -57,6 +63,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
     (message) => {
       recovery.unbind();
       mirrorTools.unbind();
+      ikInspector.unbind();
       timeline.showError(message);
     },
     {
@@ -104,6 +111,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} />
     releaseNavigationGuard();
     timeline.dispose();
     inspector.dispose();
+    ikInspector.dispose();
     onionControls.dispose();
     previewControls.abort();
     releaseCharacterSelection();

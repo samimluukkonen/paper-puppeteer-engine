@@ -318,7 +318,7 @@ The v0.5.2.4.3 movement architecture and verification results are recorded in [K
 
 ## Deferred features
 
-Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, and IK target authoring/baking remain deferred to v0.5.3+. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
+Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, and IK target handles/baking remain deferred. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
 
 The v0.5.2.5.1 selection policies, APIs, files and verification results are recorded in [Multi-key selection verification](animation-editor-multi-selection-verification.md).
 
@@ -336,7 +336,7 @@ Numeric cleanup reuses `roundEditorNumber()` for six-decimal candidates but acce
 
 Clipboard failures offer Download and Log alternatives. Download filenames retain manifest basenames, with a sanitized animation-name fallback and `animation.json` when no name is available. Copy/download/log establish session checkpoints and retain Undo/Redo history; they do not overwrite source files. Saved authored snapshots retain their original precision. A page reload still reads character assets.
 
-See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, IK target animation and baking remain deferred to v0.5.3+.
+See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping, IK target handles and baking remain deferred.
 
 ## Animation import and reload
 
@@ -399,3 +399,7 @@ See [React mirroring tools](react-mirroring-tools.md) for configuration ownershi
 Different lengths, rest angles, offsets, and artwork sizes keep each side's own rest pose and appearance; the result need not be pixel-perfect. Nonuniform scales work when the reflected local axes remain representable by rotation and two scales. Zero scales, animated scale-sign changes, singular parent frames, hierarchy mismatches and transforms requiring shear show an explanation and block the whole operation. An unanimated pair contributes no current-pose keys and does not block unrelated sparse authoring because of its transform. Unpaired source selections still require a valid pair.
 
 Mirroring authors bone motion. **Facing** flips the outer preview container: it changes the view of both sides without changing pairs, keys, interpolation, attachments or skins. Neither tool switches artwork or weapon ownership, and neither authors mirrored IK targets. See [mirroring hardening and verification](mirroring-hardening-verification.md) for the supported transform contract and regression coverage.
+
+## IK target authoring
+
+The [React IK timeline and inspector](react-ik-authoring.md) select real rig constraints and key puppet-local X/Y and solver influence independently. The demo rig includes `rightArmIK`. Expand its timeline row, select it, edit a numeric field, and use Set Key. Focus pauses playback; committed changes refresh the existing puppet and enter working-copy history. Delete Key restores sparse fallback without affecting bone keys or events. Single IK markers support selection, Delete and snapped arrow-key movement. Group selection, marker dragging, clipboard/duplicate commands and target handles remain deferred.

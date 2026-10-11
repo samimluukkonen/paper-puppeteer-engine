@@ -4,6 +4,7 @@ import { isFullyFrozen } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
+import { buildIKTimelineTracks, type IKTimelineRow } from './ikTimeline.js';
 import { getAuthoredBoneProperties } from './keyframeQueries.js';
 import { type Seconds, toSeconds } from './timeUnits.js';
 
@@ -35,7 +36,7 @@ export interface PropertyTimelineTrack extends TimelineTrackBase {
   readonly keyframes: readonly TimelineKeyframe[];
 }
 
-export type TimelineTrack = BoneTimelineTrack | PropertyTimelineTrack;
+export type TimelineTrack = BoneTimelineTrack | PropertyTimelineTrack | IKTimelineRow;
 
 export function timelineTrackKey(boneId: string, property: TransformProperty | null = null): string {
   return JSON.stringify([boneId, property]);
@@ -81,10 +82,13 @@ export function buildTimelineTracks(
   animation: DeepReadonly<AnimationClip> | null,
   expandedBones: ReadonlySet<string>,
   previous: readonly TimelineTrack[] = [],
+  expandedIK: ReadonlySet<string> = new Set(),
 ): readonly TimelineTrack[] {
   const rows: TimelineTrack[] = [];
   const previousRows = new Map(
-    previous.map((row) => [timelineTrackKey(row.boneId, row.kind === 'property' ? row.property : null), row]),
+    previous
+      .filter((row) => row.kind === 'bone' || row.kind === 'property')
+      .map((row) => [timelineTrackKey(row.boneId, row.kind === 'property' ? row.property : null), row]),
   );
   if (rig)
     for (const { id: boneId, depth } of boneHierarchy(rig)) {
@@ -116,5 +120,13 @@ export function buildTimelineTracks(
           );
         }
     }
+  rows.push(
+    ...buildIKTimelineTracks(
+      rig,
+      animation,
+      expandedIK,
+      previous.filter((row): row is IKTimelineRow => row.kind === 'ik' || row.kind === 'ik-property'),
+    ),
+  );
   return Object.freeze(rows);
 }

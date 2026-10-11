@@ -75,6 +75,7 @@ export class TimelineKeyboardController {
           event.preventDefault();
           if (!event.repeat) {
             if (this.state.selectedEvent) this.state.deleteSelectedEvent();
+            else if (this.state.selectedIKKeyframe) this.state.deleteSelectedIKKeyframe();
             else this.state.deleteSelectedKeyframes();
           }
           return;
@@ -167,7 +168,7 @@ export class TimelineKeyboardController {
     const state = this.state;
     if (
       (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
-      (!state.selectedKeyframe && !state.selectedEvent) ||
+      (!state.selectedKeyframe && !state.selectedEvent && !state.selectedIKKeyframe) ||
       event.altKey ||
       event.ctrlKey ||
       event.metaKey
@@ -176,6 +177,7 @@ export class TimelineKeyboardController {
     event.preventDefault();
     const direction = event.key === 'ArrowLeft' ? -1 : 1;
     if (state.selectedEvent) state.nudgeSelectedEvent(direction, event.shiftKey);
+    else if (state.selectedIKKeyframe) state.nudgeSelectedIKKeyframe(direction, event.shiftKey);
     else state.nudgeSelectedKeyframe(direction, event.shiftKey);
     return true;
   }

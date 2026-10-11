@@ -2,6 +2,15 @@
   "version": 1,
   "name": "paper-puppet",
   "root": "root",
+  "ik": [
+    {
+      "name": "rightArmIK",
+      "rootBone": "rightUpperArm",
+      "middleBone": "rightForearm",
+      "endBone": "rightHand",
+      "bendDirection": -1
+    }
+  ],
   "bones": [
     {
       "id": "root"
