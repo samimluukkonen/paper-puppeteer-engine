@@ -21,6 +21,8 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The completed v0.5.5 [IK authoring workflow](docs/ik-animation-authoring.md) covers reaching, influence, supported timeline operations, serialization, compatibility and production verification.
 
+The v0.5.6.1 [IK bake sampling foundation](docs/ik-bake-sampling.md) provides isolated whole-animation solved local transforms and structured validation for future bone-key generation.
+
 The v0.5.5.4 [visual IK target controls](docs/visual-ik-targets.md) let artists drag hand and foot targets in the preview, cancel with Escape, and commit both coordinates with Set Target Key. Temporary previews stay outside exported JSON and document history.
 
 The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
@@ -69,6 +71,7 @@ scene.load.start();
 | [IK production authoring](docs/ik-animation-authoring.md)          | Reaching workflow, operation limits, compatibility, lifecycle and regression coverage                      |
 | [Visual IK targets](docs/visual-ik-targets.md)                     | Phaser crosshairs, dragging, explicit target commitment, coordinate conversion, ownership and verification |
 | [Runtime IK animation](docs/ik-animation-runtime.md)               | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                       |
+| [IK bake sampling](docs/ik-bake-sampling.md)                       | Read-only whole-animation samples, frame times, local transforms and supported constraint scope            |
 | [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
 | [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                              |
 | [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                         |

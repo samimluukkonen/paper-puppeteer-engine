@@ -94,6 +94,11 @@ export class TwoBoneIKConstraint {
     return this;
   }
 
+  /** Explicit runtime influence ownership, even when its numeric value equals the rig default. */
+  get hasMixOverride(): boolean {
+    return this.mixOverride;
+  }
+
   get bendDirection(): BendDirection {
     return this.bend;
   }

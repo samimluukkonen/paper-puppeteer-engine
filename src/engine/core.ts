@@ -109,3 +109,11 @@ export { ikKeyframeSchema, ikMixSchema } from './schemas.js';
 
 export type { IKAnimationChannel, IKAnimationValues, IKAnimationPose } from './ik/AnimationIKPose.js';
 export { evaluateIKClip } from './ik/AnimationIKPose.js';
+export type {
+  IKBakeIssue,
+  IKBakeIssueCode,
+  IKBakeSample,
+  IKBakeSampleResult,
+  IKBakeSamplingOptions,
+} from './ik/IKBakeSampling.js';
+export { getIKBakeSampleTimes, sampleIKBake } from './ik/IKBakeSampling.js';

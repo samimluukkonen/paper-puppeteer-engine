@@ -1,5 +1,8 @@
 import type { AnimationPlaybackMode } from './AnimationClip.js';
 
+/** Frame spacing fallback for authoring tools when smooth playback has no authored FPS. */
+export const DEFAULT_ANIMATION_FPS = 10;
+
 /** Preserve ordinary angle differences; reduce finite extremes before their subtraction can overflow. */
 export function rotationDifference(from: number, to: number): number {
   const difference = to - from;

@@ -1,3 +1,4 @@
+import { DEFAULT_ANIMATION_FPS } from '../../engine/animationMath.js';
 import { type Milliseconds, type Seconds, toSeconds } from './timeUnits.js';
 
 /** Editor coordinates use continuous seconds; external clips and the runtime use milliseconds. */
@@ -21,7 +22,7 @@ export function timelineXToTime(x: number, duration: Seconds, width: number): Se
 }
 
 export type KeyframeSnapMode = 'none' | 'frame';
-export const DEFAULT_KEYFRAME_FPS = 10;
+export const DEFAULT_KEYFRAME_FPS = DEFAULT_ANIMATION_FPS;
 
 /** Editor-only nearest-frame snapping in seconds, clamped again for off-frame endpoints. */
 export function snapKeyframeTime(time: Seconds, duration: Seconds, mode: KeyframeSnapMode, fps?: number): Seconds {

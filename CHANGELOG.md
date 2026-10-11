@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.6-1
+
+The v0.5.6.1 [IK bake sampling foundation](docs/ik-bake-sampling.md) adds isolated whole-animation sampling through the existing bone/IK evaluators and two-bone solver. Samples preserve complete solved bone-local transforms, exact endpoints, authored FPS and stepped playback. Structured atomic failures report competing bone ownership, unsupported transforms and runtime dependencies. Inspector sampling shares the isolated context; deterministic runtime comparisons and editor regressions verify source/working data, clocks, events, history and live poses remain unchanged. Key generation, IK deactivation, Bake UI and partial ranges remain deferred.
+
 ## 0.5.5-5
 
 The v0.5.5.5 [IK authoring hardening](docs/ik-animation-authoring.md) completes v0.5.5. Preview and gizmo teardown are idempotent; stale preview cleanup cannot release a replacement preview. Gizmos report unsupported internal chain scales and singular chain/parent transforms using current transforms. Production regressions cover both authored arm rotations with zero/partial/full influence, loop/event timing, large deltas and speeds, immutable JSON round trips through CharacterLoader/Puppet, failed imports, legacy rigs, bone mirroring, six read-only ghosts, bounded render allocation and subscription cleanup. Artist documentation and editor Help explain reaching, interpolation and influence, coordinates, precedence, and explicit typed timeline limitations. IK baking, direct target mirroring and generic IK batch commands remain deferred.
