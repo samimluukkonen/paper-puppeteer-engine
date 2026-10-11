@@ -51,4 +51,4 @@ The bake sampling tests compare arm/leg and nested-chain samples with runtime Pu
 
 Required checks are `npm run typecheck`, `npm run test` and `npm run build`; formatting and lint checks also apply. No browser test or browser installation step is added to CI.
 
-Key generation, authored mutations, IK deactivation, React Bake controls, partial ranges, live layer-stack baking and gameplay target capture remain deferred. No new IK algorithm is introduced.
+[Bone-key generation](ik-bake-generation.md) is available in v0.5.6.2 as a separate pure proposal API consuming these samples. Authored mutations, IK deactivation, React Bake controls, partial ranges, live layer-stack baking and gameplay target capture remain deferred. No new IK algorithm is introduced.

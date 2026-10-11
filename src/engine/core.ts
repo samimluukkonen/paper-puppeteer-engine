@@ -117,3 +117,13 @@ export type {
   IKBakeSamplingOptions,
 } from './ik/IKBakeSampling.js';
 export { getIKBakeSampleTimes, sampleIKBake } from './ik/IKBakeSampling.js';
+export type {
+  IKBakeAffectedBone,
+  IKBakeFidelityResult,
+  IKBakeGenerationIssue,
+  IKBakeGenerationOptions,
+  IKBakePlan,
+  IKBakePoseDifference,
+  IKBakeTolerances,
+} from './ik/IKBakeGeneration.js';
+export { compareIKBakeFidelity, DEFAULT_IK_BAKE_TOLERANCES, generateBakedBoneKeys } from './ik/IKBakeGeneration.js';

@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.6-2
+
+The v0.5.6.2 [IK bone-key generation](docs/ik-bake-generation.md) adds pure `generateBakedBoneKeys` proposals using ordinary local-radian rotation tracks, with affected-property counts and authored replacement details. Existing frame grids, linear interpolation and stepped/smooth playback remain authoritative. `compareIKBakeFidelity` measures complete selected local poses at sample times with explicit translation, rotation and scale tolerances; invalid values, conflicting ownership and inaccurate proposals fail. Generation preserves source/working data, IK and history. Commit, IK deactivation, Bake UI and simplification remain deferred.
+
 ## 0.5.6-1
 
 The v0.5.6.1 [IK bake sampling foundation](docs/ik-bake-sampling.md) adds isolated whole-animation sampling through the existing bone/IK evaluators and two-bone solver. Samples preserve complete solved bone-local transforms, exact endpoints, authored FPS and stepped playback. Structured atomic failures report competing bone ownership, unsupported transforms and runtime dependencies. Inspector sampling shares the isolated context; deterministic runtime comparisons and editor regressions verify source/working data, clocks, events, history and live poses remain unchanged. Key generation, IK deactivation, Bake UI and partial ranges remain deferred.

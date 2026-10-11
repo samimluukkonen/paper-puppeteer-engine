@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The completed v0.5.5 [IK authoring workflow](docs/ik-animation-authoring.md) covers reaching, influence, supported timeline operations, serialization, compatibility and production verification.
 
-The v0.5.6.1 [IK bake sampling foundation](docs/ik-bake-sampling.md) provides isolated whole-animation solved local transforms and structured validation for future bone-key generation.
+The v0.5.6.2 [IK bone-key generation](docs/ik-bake-generation.md) converts [isolated IK samples](docs/ik-bake-sampling.md) into inspectable ordinary bone-key proposals with sample-time fidelity measurements, without changing authored animations.
 
 The v0.5.5.4 [visual IK target controls](docs/visual-ik-targets.md) let artists drag hand and foot targets in the preview, cancel with Escape, and commit both coordinates with Set Target Key. Temporary previews stay outside exported JSON and document history.
 
@@ -72,6 +72,7 @@ scene.load.start();
 | [Visual IK targets](docs/visual-ik-targets.md)                     | Phaser crosshairs, dragging, explicit target commitment, coordinate conversion, ownership and verification |
 | [Runtime IK animation](docs/ik-animation-runtime.md)               | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                       |
 | [IK bake sampling](docs/ik-bake-sampling.md)                       | Read-only whole-animation samples, frame times, local transforms and supported constraint scope            |
+| [IK bone-key generation](docs/ik-bake-generation.md)               | Pure key proposals, replacement reporting, playback policy and local-pose fidelity tolerances              |
 | [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
 | [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                              |
 | [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                         |
