@@ -319,6 +319,102 @@ test('stepped positions and fade weights hold while rendering continues, with ex
   puppet.destroy();
 });
 
+test('held stepped IK samples reuse immutable poses and changing frames preserve earlier snapshots', () => {
+  const puppet = fixture([{ ...clip(), playback: { mode: 'stepped', fps: 10 } }]);
+  const first = puppet.animationPlayer.ikAnimation;
+  for (const delta of [20, 20, 59]) {
+    puppet.update(delta);
+    assert.strictEqual(puppet.animationPlayer.ikAnimation, first);
+    reaches(puppet, { x: 60, y: 60 });
+  }
+  puppet.update(1);
+  const second = puppet.animationPlayer.ikAnimation;
+  assert.notStrictEqual(second, first);
+  assert.equal(first.get('arm')!.x!.value, 60);
+  assert.equal(second.get('arm')!.x!.value, 54);
+  assert.isTrue(Object.isFrozen(first.get('arm')));
+  assert.isTrue(Object.isFrozen(first.get('arm')!.x));
+  assert.isFalse('set' in first);
+  puppet.sampleAnimation(175, { mode: 'playback' });
+  const sampled = puppet.animationPlayer.ikAnimation;
+  puppet.sampleAnimation(199, { mode: 'playback' });
+  assert.strictEqual(puppet.animationPlayer.ikAnimation, sampled);
+  puppet.sampleAnimation(175, { mode: 'raw' });
+  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 49.5);
+  assert.equal(sampled.get('arm')!.x!.value, 54);
+  puppet.destroy();
+});
+
+test('held layered IK poses invalidate on weight and root-mask changes while retaining sparse channels', () => {
+  const animations = [clip('base', [{ time: 0, x: 40, y: 70 }]), clip('overlay', [{ time: 0, x: 80, mix: 0.5 }])].map(
+    (animation) => ({ ...animation, playback: { mode: 'stepped' as const, fps: 10 } }),
+  );
+  const puppet = fixture(animations);
+  puppet.setLayerMask('overlay', ['upper']);
+  puppet.setLayerWeight('overlay', 0.5);
+  puppet.play('overlay', { layer: 'overlay' });
+  const first = puppet.animationPlayer.ikAnimation;
+  puppet.update(49);
+  assert.strictEqual(puppet.animationPlayer.ikAnimation, first);
+  puppet.setLayerWeight('overlay', 0.25);
+  const weighted = puppet.animationPlayer.ikAnimation;
+  assert.notStrictEqual(weighted, first);
+  assert.equal(weighted.get('arm')!.x!.value, 50);
+  assert.equal(weighted.get('arm')!.y!.value, 70);
+  assert.equal(weighted.get('arm')!.mix!.weight, 0.25);
+  puppet.animationPlayer.applyCurrentPose();
+  assert.strictEqual(puppet.animationPlayer.ikAnimation, weighted);
+  puppet.setLayerMask('overlay', ['hand']);
+  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 40);
+  puppet.setLayerMask('overlay', ['upper']);
+  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 50);
+  assert.equal(first.get('arm')!.x!.value, 60);
+  assert.equal(first.get('arm')!.mix!.weight, 0.5);
+  puppet.destroy();
+});
+
+test('stepped fade caches hold frames and recompute when the fade progresses or is interrupted', () => {
+  const puppet = fixture([
+    { ...clip('a'), playback: { mode: 'stepped', fps: 10 } },
+    { ...clip('b', [{ time: 0, x: 0, y: 90 }]), playback: { mode: 'stepped', fps: 10 } },
+    { ...clip('c', [{ time: 0, x: -20, y: 70 }]), playback: { mode: 'stepped', fps: 10 } },
+  ]);
+  puppet.play('b', { fadeDuration: 1000 });
+  const first = puppet.animationPlayer.ikAnimation;
+  puppet.update(50);
+  assert.strictEqual(puppet.animationPlayer.ikAnimation, first);
+  puppet.update(50);
+  const blended = puppet.animationPlayer.ikAnimation;
+  assert.equal(blended.get('arm')!.x!.value, 48.6);
+  puppet.update(49);
+  assert.strictEqual(puppet.animationPlayer.ikAnimation, blended);
+  puppet.play('c', { fadeDuration: 1000 });
+  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 48.6);
+  puppet.update(100);
+  assert.approximately(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 41.74, 1e-12);
+  assert.equal(blended.get('arm')!.x!.value, 48.6);
+  puppet.destroy();
+});
+
+test('a held stepped overlay fade recomputes sparse fallback when the smooth layer below changes', () => {
+  const puppet = fixture([
+    clip('base', [
+      { time: 0, x: 40, y: 70 },
+      { time: 1000, x: 60 },
+    ]),
+    { ...clip('overlay', [{ time: 0, x: 80 }]), playback: { mode: 'stepped', fps: 10 } },
+  ]);
+  puppet.play('overlay', { layer: 'overlay', fadeDuration: 1000 });
+  puppet.update(100);
+  const first = puppet.animationPlayer.ikAnimation;
+  assert.approximately(first.get('arm')!.x!.value, 45.8, 1e-12);
+  puppet.update(50);
+  assert.approximately(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 46.7, 1e-12);
+  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.y!.value, 70);
+  assert.approximately(first.get('arm')!.x!.value, 45.8, 1e-12);
+  puppet.destroy();
+});
+
 test('unreachable animated targets retain clamping and singular transforms retain the solver diagnostic', () => {
   const puppet = fixture([clip('far', [{ time: 0, x: 1000, y: 1000 }])]);
   assert.equal(puppet.getIK('arm').status, 'clamped');

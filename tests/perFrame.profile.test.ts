@@ -79,6 +79,60 @@ const base = player(1),
 profile('32 tracked bones, base animation', () => base.update(16));
 profile('32 tracked bones, three layers with fades', () => layered.update(16));
 
+const ikRig = new Rig({
+  root: 'root',
+  bones: [
+    { id: 'root' },
+    ...Array.from({ length: 8 }, (_, index) => [
+      { id: `upper${index}`, parent: 'root' },
+      { id: `lower${index}`, parent: `upper${index}`, x: 60 },
+      { id: `hand${index}`, parent: `lower${index}`, x: 50 },
+    ]).flat(),
+  ],
+  ik: Array.from({ length: 8 }, (_, index) => ({
+    name: `arm${index}`,
+    rootBone: `upper${index}`,
+    middleBone: `lower${index}`,
+    endBone: `hand${index}`,
+  })),
+});
+for (const mode of ['smooth', 'stepped'] as const) {
+  for (const layers of [1, 3]) {
+    const ikPlayer = new AnimationPlayer(
+      ikRig,
+      new Map(ikRig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)])),
+    );
+    ikPlayer.setPlaybackMode(mode === 'stepped' ? { mode, fps: 10 } : { mode });
+    for (let layer = 0; layer < layers; layer++) {
+      ikPlayer.addAnimation({
+        name: `reach${layer}`,
+        duration: 1000,
+        loop: true,
+        tracks: {},
+        ikTracks: Object.fromEntries(
+          ikRig.ik!.map(({ name }) => [
+            name,
+            [
+              { time: 0, x: 40 + layer * 10, y: 70, mix: 0.5 },
+              { time: 1000, x: 80, y: 30 + layer * 10, mix: 1 },
+            ],
+          ]),
+        ),
+      });
+      const name = layer ? `overlay${layer}` : 'base';
+      if (layer) {
+        ikPlayer.setLayerMask(
+          name,
+          ikRig.ik!.map(({ rootBone }) => rootBone),
+        );
+        ikPlayer.setLayerWeight(name, 0.5);
+      }
+      ikPlayer.play(`reach${layer}`, { layer: name, fadeDuration: layer ? 1e9 : 0 });
+    }
+    profile(`8 IK channel tracks, ${layers} ${mode} layers`, () => ikPlayer.update(16));
+  }
+}
+
 for (const keyCount of [128, 512]) {
   const denseBase = player(1, keyCount);
   const denseLayers = player(3, keyCount);

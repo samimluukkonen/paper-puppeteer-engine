@@ -10,6 +10,12 @@ Milestone **v0.5.5.2** (package `0.5.5-2`) evaluates the [IK animation data mode
 
 `AnimationPlayer.ikAnimation` exposes the most recently evaluated target state, including `x`, `y`, and `mix` channel values and ownership weights. Fully authored channels have weight 1. A fade or partial layer can leave a fraction unowned; the constraint resolves that fraction against its current fallback. Evaluated state stays outside the animation definition and never changes keyframes, static constraint targets, rig settings, bind poses, or pose export.
 
+The player reuses immutable IK samples and layer results while their sampled times, fade weights,
+underlying channels, masks, and layer weights stay unchanged. Each layer retains only its latest
+source/target samples and blend results, so stepped playback avoids repeated pose allocations without
+building a cache of the whole timeline. Previously returned poses remain unchanged when playback advances.
+Procedural endpoint fallback and the constraint solver still run each presentation pass.
+
 The target evaluator reads the player's existing layer states and transition clocks. It has no independent clock, playback state machine, or event dispatch. `Puppet` supplies its player's channels to the pose controller. `Puppet.setIKAnimationSource(player | undefined)` lets the Animation Editor supply its separate working-copy preview player; passing `undefined` restores the puppet's normal player. The editor releases this override on disposal, and facing or repeated IK passes use the held preview state. The scene retains authored rig constraints and their enabled defaults; optional fixed-target preview chains are merged only when their names are absent from the rig. The existing fixed-target toggle is an explicit provider override, and switching it off restores authored constraint defaults.
 
 ## Constraint update order

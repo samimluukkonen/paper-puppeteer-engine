@@ -8,6 +8,12 @@ Measurements below record earlier implementation comparisons on individual machi
 
 ## Animation, layers, IK, and demo presentation
 
+To isolate animated IK channel evaluation, run
+`VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts -t '8 IK channel tracks' --reporter=verbose`.
+Four workloads compare smooth and 10 FPS stepped sampling, with one layer or three masked layers
+including partial weights and fades. They measure channel composition through `AnimationPlayer`,
+excluding constraint solving and presentation.
+
 Run the optional CPU frame profile with `VITE_PROFILE=1 npx vitest run tests/perFrame.profile.test.ts --reporter=verbose`. It reports warmed medians for base animation, layered fades, active/inactive IK, and the full demo presentation loop with walk, steady sword grip, out-of-reach targets, head crossings, and upper-body grip in both facings. Demo cases use shipped PNG dimensions and real affine transforms, animation, IK, and render projection. They report mean/maximum `syncPose()` and `syncIK()` calls and the percentage of frames requiring katana corrections. The lightweight scene excludes browser rendering and GPU costs; timings vary by machine and are not test thresholds. Normal test runs skip these measurements. Add `VITE_PROFILE_UNCACHED=1` to recreate unconditional render-order application, or `VITE_PROFILE_FULL_IK_SYNC=1` to compare corrections using the previous full-puppet synchronization path.
 
 ### Historical frame measurements
