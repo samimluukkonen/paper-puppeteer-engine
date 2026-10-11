@@ -73,7 +73,7 @@ npm run build
 
 IK multi-selection, marquee/range selection, pointer dragging of key markers, clipboard/paste/duplicate, and previous/next IK key navigation await generic channel-aware batch operations. Bone commands keep their existing implementation; IK selection disables clipboard buttons and prevents stale bone clipboard contents from being pasted through IK commands. Single-key authoring, deletion and snapped keyboard movement are available now.
 
-Visual IK target handles, pointer dragging of targets, mirrored IK authoring, baking, new solvers, target ownership changes, physics and scene choreography remain outside this milestone.
+Visual IK target handles and pointer dragging are implemented in [v0.5.5.4](visual-ik-targets.md). Mirrored IK authoring, baking, new solvers, target ownership changes, physics and scene choreography remain deferred.
 
 ## Changed files and APIs
 

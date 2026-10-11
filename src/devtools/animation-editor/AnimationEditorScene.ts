@@ -5,6 +5,7 @@ import { Puppet } from '../../engine/Puppet.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
+import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
@@ -18,6 +19,9 @@ export interface AnimationEditorSceneOptions {
 
 export class AnimationEditorScene extends Phaser.Scene {
   private puppet: Puppet | undefined;
+  private ikHandles: AnimationEditorIKHandles | undefined;
+  private ikHandlesVisible = true;
+  private ikHandlesInteractive = true;
   private preview: AnimationEditorPreview | undefined;
   private ghosts: AnimationEditorGhostLayer | undefined;
   private mirrorOverlay: AnimationPoseOverlay | undefined;
@@ -47,6 +51,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       ++this.loadSession;
       this.state?.pause();
       this.state?.endScrub();
+      this.ikHandles?.dispose();
+      this.ikHandles = undefined;
       this.state = undefined;
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
@@ -68,6 +74,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
     this.syncMirrorPreview();
+    this.ikHandles?.render();
     const overlay = this.selectionOverlay;
     overlay?.clear();
     if (overlay && this.puppet && this.state?.selectedBoneId) {
@@ -77,12 +84,14 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
+    if (this.ikHandles?.pointerDown(pointer)) return;
     if (!this.puppet || !this.state || pointer.button !== 0) return;
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     let nearest: string | undefined;
-    let distance = 12;
+    let distance = 12 / this.cameras.main.zoom;
     for (const bone of this.puppet.rig.bones) {
       const point = this.puppet.getBone(bone.id).getWorldPosition();
-      const next = Math.hypot(point.x - pointer.worldX, point.y - pointer.worldY);
+      const next = Math.hypot(point.x - world.x, point.y - world.y);
       if (next < distance) {
         distance = next;
         nearest = bone.id;
@@ -91,6 +100,14 @@ export class AnimationEditorScene extends Phaser.Scene {
     if (nearest) this.state.selectBone(nearest);
   }
 
+  setIKHandlesVisible(visible: boolean): void {
+    this.ikHandlesVisible = visible;
+    this.ikHandles?.setVisible(visible);
+  }
+  setIKHandlesInteractive(interactive: boolean): void {
+    this.ikHandlesInteractive = interactive;
+    this.ikHandles?.setInteractive(interactive);
+  }
   setFacing(facing: Facing): void {
     this.facing = facing;
     this.puppet?.setFacing(facing);
@@ -166,6 +183,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   /** Pin current end joints in canonical puppet space; mirroring only changes their world projection. */
   setIKPreview(enabled: boolean): void {
+    this.state?.cancelIKTargetDrag();
     this.ikPreviewEnabled = enabled;
     const puppet = this.puppet;
     if (!puppet) return;
@@ -183,6 +201,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       constraint.enabled = enabled || (authored ? (authored.enabled ?? true) : false);
     }
     puppet.syncPose();
+    this.ikHandles?.refreshAvailability();
   }
 
   private async loadCharacter(session: number): Promise<void> {
@@ -223,7 +242,10 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.preview = preview;
       this.state = state;
       if (this.ikPreviewEnabled) this.setIKPreview(true);
-      this.selectionOverlay = this.add.graphics();
+      this.ikHandles = new AnimationEditorIKHandles(this, state, puppet);
+      this.ikHandles.setVisible(this.ikHandlesVisible);
+      this.ikHandles.setInteractive(this.ikHandlesInteractive);
+      this.selectionOverlay = this.add.graphics().setDepth(puppet.container.depth + 5);
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
@@ -233,6 +255,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
       this.clearMirrorPreview();
+      this.ikHandles?.dispose();
+      this.ikHandles = undefined;
       ghosts?.dispose();
       this.ghosts = undefined;
       preview?.dispose();

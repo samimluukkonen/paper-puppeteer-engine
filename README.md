@@ -19,6 +19,8 @@ Open the local URL printed by Vite. The demo starts in idle. The control panel a
 
 The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` supports playback preview, property keyframing, multi-key selection, dragging, clipboard commands, undo/redo, and [configurable multi-pose onion skinning](docs/onion-skin-controls.md). See [onion-skin production verification](docs/animation-editor-onion-skinning-verification.md) for v0.5.3 completion checks. Use the [Rig Editor](docs/rig-editor.md) at `/rig-editor/` to edit bind poses. Both editors offer recovery of unsaved edits from browser drafts; download JSON to save your work in the project.
 
+The v0.5.5.4 [visual IK target controls](docs/visual-ik-targets.md) let artists drag hand and foot targets in the preview, cancel with Escape, and commit both coordinates with Set Target Key. Temporary previews stay outside exported JSON and document history.
+
 The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
 
 The v0.5.4 [mirrored animation tools](docs/mirroring-hardening-verification.md) combine [bone pairing](docs/bone-symmetry-mapping.md), [bind-relative pose reflection](docs/pose-mirroring.md), [sparse keyframe authoring](docs/mirrored-keyframe-authoring.md), and [React controls](docs/react-mirroring-tools.md). Browser-local pair preferences and a read-only overlay support artist review before atomic, undoable commits. The completed hardening phase covers asymmetric rigs, lifecycle cleanup, runtime/serialization regressions and an [artist walkthrough](docs/animation-editor.md#mirror-a-left-arm-movement).
@@ -50,22 +52,23 @@ scene.load.start();
 
 ## Guides
 
-| Guide                                                              | Contents                                                                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| [Demo controls](docs/demo.md)                                      | Keyboard controls, playback examples, facing, skins, and pose authoring                                 |
-| [Rig editor](docs/rig-editor.md)                                   | Editing, snapping, undo/redo, validation, imports, exports, and embedding                               |
-| [Animation editor](docs/animation-editor.md)                       | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview |
-| [Bone symmetry mapping](docs/bone-symmetry-mapping.md)             | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle         |
-| [Pose mirroring core](docs/pose-mirroring.md)                      | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures    |
-| [React mirroring tools](docs/react-mirroring-tools.md)             | Bone-pair configuration, persistence, preview, directions and React/editor integration                  |
-| [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection        |
-| [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                  |
-| [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                       |
-| [React IK authoring](docs/react-ik-authoring.md)                   | IK timeline tracks, numeric target/influence keys, selection, history, and local verification           |
-| [Runtime IK animation](docs/ik-animation-runtime.md)               | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                    |
-| [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                           |
-| [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                           |
-| [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                      |
+| Guide                                                              | Contents                                                                                                   |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| [Demo controls](docs/demo.md)                                      | Keyboard controls, playback examples, facing, skins, and pose authoring                                    |
+| [Rig editor](docs/rig-editor.md)                                   | Editing, snapping, undo/redo, validation, imports, exports, and embedding                                  |
+| [Animation editor](docs/animation-editor.md)                       | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview    |
+| [Bone symmetry mapping](docs/bone-symmetry-mapping.md)             | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle            |
+| [Pose mirroring core](docs/pose-mirroring.md)                      | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures       |
+| [React mirroring tools](docs/react-mirroring-tools.md)             | Bone-pair configuration, persistence, preview, directions and React/editor integration                     |
+| [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection           |
+| [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                     |
+| [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |
+| [React IK authoring](docs/react-ik-authoring.md)                   | IK timeline tracks, numeric target/influence keys, selection, history, and local verification              |
+| [Visual IK targets](docs/visual-ik-targets.md)                     | Phaser crosshairs, dragging, explicit target commitment, coordinate conversion, ownership and verification |
+| [Runtime IK animation](docs/ik-animation-runtime.md)               | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                       |
+| [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
+| [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                              |
+| [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                         |
 
 ## Development checks
 

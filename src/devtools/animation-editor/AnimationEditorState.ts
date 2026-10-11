@@ -1,3 +1,4 @@
+import type { Point } from '../../engine/affineMath.js';
 import type {
   AnimationClip,
   AnimationEvent,
@@ -143,7 +144,7 @@ export class AnimationEditorState {
     this.playbackController = new AnimationEditorPlaybackController(this.document, this.selection, this.playback, {
       notify: () => this.notify(),
       navigate: (time) => this.setCurrentTime(time),
-      isDragging: () => !!(this.keyframeDrag || this.eventDrag),
+      isDragging: () => !!(this.keyframeDrag || this.eventDrag || this.ikTargetDrag),
     });
     this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, {
       install: (animation) => this.installWorkingAnimation(animation),
@@ -268,6 +269,33 @@ export class AnimationEditorState {
   nudgeSelectedIKKeyframe(direction: -1 | 1, large = false): boolean {
     return this.batchNotifications(() => this.ik.nudgeSelectedIKKeyframe(direction, large));
   }
+  get ikTargetDrag() {
+    return this.ik.ikTargetDrag;
+  }
+  get ikManipulationDisabledReason() {
+    return this.ik.ikManipulationDisabledReason;
+  }
+  getIKManipulationDisabledReason(id: string): string | null {
+    return this.ik.getIKManipulationDisabledReason(id);
+  }
+  setIKManipulationDisabledReason(id: string, reason: string | null): void {
+    this.batchNotifications(() => this.ik.setIKManipulationDisabledReason(id, reason));
+  }
+  beginIKTargetDrag(id: string): boolean {
+    return this.batchNotifications(() => this.ik.beginIKTargetDrag(id));
+  }
+  previewIKTargetDrag(point: Point): boolean {
+    return this.batchNotifications(() => this.ik.previewIKTargetDrag(point));
+  }
+  endIKTargetDrag(): boolean {
+    return this.batchNotifications(() => this.ik.endIKTargetDrag());
+  }
+  cancelIKTargetDrag(): boolean {
+    return this.batchNotifications(() => this.ik.cancelIKTargetDrag());
+  }
+  commitIKTarget(): boolean {
+    return this.batchNotifications(() => this.ik.commitIKTarget());
+  }
   get selectedBoneId(): string | null {
     return this.selection.boneId;
   }
@@ -366,8 +394,9 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
+    const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event;
+    return this.cancelKeyframeDrag() || event || ik;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -854,6 +883,7 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.cancelIKTargetDrag();
     ++this.animationSessions;
     this.keyframes.resetSession();
     this.events.resetSession();

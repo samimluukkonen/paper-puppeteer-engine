@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.5-4
+
+The v0.5.5.4 [visual IK targets](docs/visual-ik-targets.md) add editor-only Phaser crosshairs, live target dragging with explicit puppet-local conversion, and a Set Target Key command which commits X/Y together in one Undo/Redo action. Escape restores the pre-drag preview; release retains temporary values outside authored/exported data. Camera zoom/pan, facing, scale, influence, unreachable targets, ownership-disabled states, and React/Phaser lifecycle are covered by unit and local browser tests. The Demo Puppet exposes its existing right leg chain for foot authoring; Random paperdoll sketch exposes both arm and leg chains. Mirrored IK targets and baking remain deferred.
+
 ## 0.5.5-3
 
 The v0.5.5.3 [React IK timeline and inspector](docs/react-ik-authoring.md) expose real rig constraint tracks and independent puppet-local X/Y and mix keys through the existing timeline. Typed constraint selection isolates bone editing; explicit numeric commits pause playback, update the existing preview solver and record one working-copy history entry. Sparse deletion, single-key selection, snapped keyboard movement, source immutability and React subscription lifecycle are tested. The demo rig includes `rightArmIK`. IK group selection, marker dragging, clipboard/duplicate commands, visual target handles, mirroring and baking remain deferred.

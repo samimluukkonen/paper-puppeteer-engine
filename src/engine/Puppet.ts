@@ -61,7 +61,7 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
-  private ikAnimationSource: AnimationPlayer | undefined;
+  private ikAnimationSource: Pick<AnimationPlayer, 'ikAnimation'> | undefined;
   private readonly prepareAnimationPose = (): void => this.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.syncPose();
   private readonly ikContext: IKTransformContext = {
@@ -590,7 +590,7 @@ export class Puppet {
   }
 
   /** Use an external pose player's IK channels (for editor previews); undefined restores the runtime player. */
-  setIKAnimationSource(player: AnimationPlayer | undefined): void {
+  setIKAnimationSource(player: Pick<AnimationPlayer, 'ikAnimation'> | undefined): void {
     this.ikAnimationSource = player;
   }
 

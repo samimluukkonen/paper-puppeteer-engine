@@ -2,6 +2,41 @@
   "version": 1,
   "name": "random-paperdoll-sketch",
   "root": "root",
+  "ik": [
+    {
+      "name": "rightArmIK",
+      "rootBone": "rightUpperArm",
+      "middleBone": "rightForearm",
+      "endBone": "rightHand",
+      "bendDirection": -1,
+      "priority": 0
+    },
+    {
+      "name": "leftArmIK",
+      "rootBone": "leftUpperArm",
+      "middleBone": "leftForearm",
+      "endBone": "leftHand",
+      "endOffset": { "x": 0, "y": 20 },
+      "bendDirection": 1,
+      "priority": 1
+    },
+    {
+      "name": "leftLegIK",
+      "rootBone": "leftThigh",
+      "middleBone": "leftLowerLeg",
+      "endBone": "leftFoot",
+      "bendDirection": 1,
+      "priority": 2
+    },
+    {
+      "name": "rightLegIK",
+      "rootBone": "rightThigh",
+      "middleBone": "rightLowerLeg",
+      "endBone": "rightFoot",
+      "bendDirection": 1,
+      "priority": 2
+    }
+  ],
   "bones": [
     {
       "id": "root",

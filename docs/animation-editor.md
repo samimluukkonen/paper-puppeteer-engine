@@ -403,3 +403,7 @@ Mirroring authors bone motion. **Facing** flips the outer preview container: it 
 ## IK target authoring
 
 The [React IK timeline and inspector](react-ik-authoring.md) select real rig constraints and key puppet-local X/Y and solver influence independently. The demo rig includes `rightArmIK`. Expand its timeline row, select it, edit a numeric field, and use Set Key. Focus pauses playback; committed changes refresh the existing puppet and enter working-copy history. Delete Key restores sparse fallback without affecting bone keys or events. Single IK markers support selection, Delete and snapped arrow-key movement. Group selection, marker dragging, clipboard/duplicate commands and target handles remain deferred.
+
+## Drag IK targets
+
+See [visual IK target manipulation](visual-ik-targets.md) for the hand/foot walkthrough. Crosshairs show requested targets; small limb circles show solved contacts. Dragging pauses and previews X/Y; release keeps temporary values. Set Target Key commits both coordinates as one history operation. Escape during the gesture restores its starting preview. Wheel zoom and middle-drag pan the canvas. Fixed preview or other runtime owners disable direct manipulation with an inspector explanation.

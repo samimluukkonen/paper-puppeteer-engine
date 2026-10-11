@@ -112,6 +112,11 @@ export class TwoBoneIKConstraint {
     return this;
   }
 
+  /** Read-only position ownership, including providers which currently return no target. */
+  get targetOwnership(): 'provider' | 'runtime' | 'animation' {
+    return this.provider ? 'provider' : this.point ? 'runtime' : 'animation';
+  }
+
   get target(): Readonly<IKTarget> | undefined {
     return this.point;
   }

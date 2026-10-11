@@ -11,6 +11,8 @@ export interface IKInspectorField {
 export interface IKInspectorSnapshot {
   readonly constraintId: string | null;
   readonly ready: boolean;
+  readonly disabledReason: string | null;
+  readonly dragging: boolean;
   readonly fields: readonly IKInspectorField[];
 }
 
@@ -20,11 +22,14 @@ export class IKInspectorController {
   private unsubscribe: (() => void) | undefined;
   private readonly listeners = new Set<() => void>();
   private readonly text = new Map<IKAnimationProperty, string>();
+  private editing = false;
   private previousDraft: Readonly<Partial<Record<IKAnimationProperty, number>>> = {};
   private context: readonly unknown[] = [];
   private snapshot: IKInspectorSnapshot = Object.freeze({
     constraintId: null,
     ready: false,
+    disabledReason: null,
+    dragging: false,
     fields: Object.freeze([]),
   });
 
@@ -56,7 +61,12 @@ export class IKInspectorController {
   edit(property: IKAnimationProperty, text: string): void {
     this.text.set(property, text);
     const value = this.valid(property, text) ? Number(text) : this.state?.selectedIKTargetValues?.[property];
-    if (value !== undefined) this.state?.setTemporaryIKProperty(property, value);
+    this.editing = true;
+    try {
+      if (value !== undefined) this.state?.setTemporaryIKProperty(property, value);
+    } finally {
+      this.editing = false;
+    }
     this.refresh();
   }
   commit(property: IKAnimationProperty): boolean {
@@ -66,6 +76,16 @@ export class IKInspectorController {
     if (this.text.has(property) && !this.state.setTemporaryIKProperty(property, Number(field.text))) return false;
     const result = this.state.commitIKProperty(property);
     if (result) this.text.delete(property);
+    this.refresh();
+    return result;
+  }
+  commitTarget(): boolean {
+    if (this.snapshot.fields.some((field) => !field.valid)) return false;
+    const result = this.state?.commitIKTarget() ?? false;
+    if (result) {
+      this.text.delete('x');
+      this.text.delete('y');
+    }
     this.refresh();
     return result;
   }
@@ -89,8 +109,7 @@ export class IKInspectorController {
     const context = [state, state?.selectedTarget, state?.currentTime, state?.workingAnimation, state?.sessionRevision];
     if (context.some((value, index) => value !== this.context[index])) this.text.clear();
     for (const property of ikAnimationProperties) {
-      if (this.previousDraft[property] !== undefined && state?.ikTargetDraft[property] === undefined)
-        this.text.delete(property);
+      if (!this.editing && this.previousDraft[property] !== state?.ikTargetDraft[property]) this.text.delete(property);
     }
     this.previousDraft = state?.ikTargetDraft ?? {};
     this.context = context;
@@ -99,6 +118,8 @@ export class IKInspectorController {
     const snapshot: IKInspectorSnapshot = Object.freeze({
       constraintId: id,
       ready: !!values,
+      disabledReason: state?.ikManipulationDisabledReason ?? null,
+      dragging: !!state?.ikTargetDrag,
       fields: Object.freeze(
         values
           ? ikAnimationProperties.map((property) => {

@@ -1,3 +1,4 @@
+import type { Point } from '../../engine/affineMath.js';
 import type { PropertyKeyframe } from '../../engine/AnimationClip.js';
 import {
   findIKPropertyKeyframe,
@@ -29,6 +30,86 @@ interface IKCommandActions {
 
 /** Owns IK selection, drafts and key edits using the session's existing clock and document history. */
 export class AnimationEditorIKCommands {
+  private drag: { readonly constraintId: string; readonly draft: AnimationEditorSelection['ikDraft'] } | null = null;
+  private readonly unavailable = new Map<string, string>();
+
+  get ikTargetDrag() {
+    return this.drag;
+  }
+  get ikManipulationDisabledReason(): string | null {
+    return this.selectedIKConstraintId ? this.getIKManipulationDisabledReason(this.selectedIKConstraintId) : null;
+  }
+  getIKManipulationDisabledReason(id: string): string | null {
+    return this.unavailable.get(id) ?? null;
+  }
+  setIKManipulationDisabledReason(id: string, reason: string | null): void {
+    if ((this.unavailable.get(id) ?? null) === reason) return;
+    if (this.drag?.constraintId === id) this.cancelIKTargetDrag();
+    if (reason) this.unavailable.set(id, reason);
+    else this.unavailable.delete(id);
+    this.actions.notify();
+  }
+  beginIKTargetDrag(id: string): boolean {
+    if (!this.working || this.unavailable.has(id) || !this.rig?.ik?.some((entry) => entry.name === id)) return false;
+    this.actions.cancelTimelineDrag();
+    if (id !== this.selectedIKConstraintId) this.selection.selectIK(id);
+    this.actions.pause();
+    this.actions.endScrub();
+    this.drag = Object.freeze({ constraintId: id, draft: this.selection.ikDraft });
+    this.selection.setIKExpanded(id, true);
+    this.actions.notify();
+    return true;
+  }
+  previewIKTargetDrag(point: Point): boolean {
+    if (!this.drag || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+    this.selection.setIKDraft('x', point.x);
+    this.selection.setIKDraft('y', point.y);
+    this.actions.notify();
+    return true;
+  }
+  endIKTargetDrag(): boolean {
+    if (!this.drag) return false;
+    this.drag = null;
+    this.actions.notify();
+    return true;
+  }
+  cancelIKTargetDrag(): boolean {
+    const drag = this.drag;
+    if (!drag) return false;
+    this.drag = null;
+    this.selection.clearIKDraft();
+    for (const property of ikAnimationProperties) {
+      const value = drag.draft[property];
+      if (value !== undefined) this.selection.setIKDraft(property, value);
+    }
+    this.actions.notify();
+    return true;
+  }
+  /** Explicitly commit both target coordinates in one document/history installation. */
+  commitIKTarget(): boolean {
+    const id = this.selectedIKConstraintId;
+    const values = this.selectedIKTargetValues;
+    if (!id || !values || this.drag || this.ikManipulationDisabledReason) return false;
+    return this.editIKKeys(
+      (animation, rig) => {
+        const time = this.playback.currentTimeMilliseconds;
+        return setIKPropertyKeyframe(
+          setIKPropertyKeyframe(animation, rig, id, 'x', time, values.x),
+          rig,
+          id,
+          'y',
+          time,
+          values.y,
+        );
+      },
+      () => {
+        this.selection.clearIKDraftProperty('x');
+        this.selection.clearIKDraftProperty('y');
+      },
+      true,
+    );
+  }
+
   constructor(
     private readonly document: AnimationEditorDocument,
     private readonly selection: AnimationEditorSelection,
@@ -117,6 +198,7 @@ export class AnimationEditorIKCommands {
     return true;
   }
   cancelIKEdit(): void {
+    this.cancelIKTargetDrag();
     if (this.selection.clearIKDraft()) this.actions.notify();
   }
   beginIKEdit(): void {

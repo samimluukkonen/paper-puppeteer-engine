@@ -169,6 +169,15 @@ export function AnimationEditorView({
               <input id="animation-ik-preview" type="checkbox" /> IK preview (fixed targets)
             </label>
           </div>
+          <div className="animation-preview-options">
+            <label>
+              <input id="animation-ik-handles" type="checkbox" defaultChecked /> Show IK targets
+            </label>
+            <label>
+              <input id="animation-ik-drag" type="checkbox" defaultChecked /> Drag IK targets
+            </label>
+            <span>Wheel: zoom · Middle drag: pan · Crosshair: requested target</span>
+          </div>
           <div id="animation-stage" aria-label="Puppet preview"></div>
         </section>
         <aside

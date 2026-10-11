@@ -88,6 +88,18 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ik
     },
     { signal: previewControls.signal },
   );
+  for (const [id, apply] of [
+    ['#animation-ik-handles', (value: boolean) => editorScene.setIKHandlesVisible(value)],
+    ['#animation-ik-drag', (value: boolean) => editorScene.setIKHandlesInteractive(value)],
+  ] as const) {
+    app.querySelector<HTMLInputElement>(id)!.addEventListener(
+      'change',
+      (event) => {
+        apply((event.target as HTMLInputElement).checked);
+      },
+      { signal: previewControls.signal },
+    );
+  }
   const onionControls = new OnionSkinControlsController(app, editorScene);
   app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
     'change',

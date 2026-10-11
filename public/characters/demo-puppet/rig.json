@@ -9,6 +9,14 @@
       "middleBone": "rightForearm",
       "endBone": "rightHand",
       "bendDirection": -1
+    },
+    {
+      "name": "rightLegIK",
+      "rootBone": "rightThigh",
+      "middleBone": "rightLowerLeg",
+      "endBone": "rightFoot",
+      "bendDirection": 1,
+      "priority": 2
     }
   ],
   "bones": [
