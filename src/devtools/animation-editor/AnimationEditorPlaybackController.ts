@@ -76,8 +76,10 @@ export class AnimationEditorPlaybackController {
     if (!events || !this.playback.play()) return;
     this.selection.clearDraft();
     this.playback.consumeStart();
-    this.actions.notify();
-    this.dispatchEvents(events);
+    this.notifyAndDispatchEvents(
+      () => this.actions.notify(),
+      () => events,
+    );
   }
 
   pause(): void {
@@ -93,8 +95,10 @@ export class AnimationEditorPlaybackController {
     const events = this.prepareStartEvents(this.playback.isPlaying && !this.playback.isScrubbing);
     if (!events) return;
     this.playback.requestStart();
-    this.actions.navigate(0);
-    if (this.playback.consumeStart()) this.dispatchEvents(events);
+    this.notifyAndDispatchEvents(
+      () => this.actions.navigate(0),
+      () => (this.playback.consumeStart() ? events : []),
+    );
   }
 
   /** Preflight crossings before advancing; subscribers synchronize the pose before callbacks run. */
@@ -123,8 +127,12 @@ export class AnimationEditorPlaybackController {
         return;
       }
     }
-    this.notifyChange(this.playback.currentTime, this.playback.advance(deltaSeconds));
-    this.dispatchEvents(events);
+    const previous = this.playback.currentTime;
+    const changed = this.playback.advance(deltaSeconds);
+    this.notifyAndDispatchEvents(
+      () => this.notifyChange(previous, changed),
+      () => events,
+    );
   }
 
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
@@ -146,8 +154,15 @@ export class AnimationEditorPlaybackController {
     }
   }
 
-  private dispatchEvents(events: readonly FiredAnimationEvent[]): void {
-    const errors = dispatchAnimationEvents(events, this.eventListeners);
-    throwNotificationErrors(errors, 'Animation editor event listeners failed.');
+  /** Committed clocks own their events even if a preview/UI subscriber fails. Finish both notification phases. */
+  private notifyAndDispatchEvents(notify: () => void, events: () => readonly FiredAnimationEvent[]): void {
+    const errors: unknown[] = [];
+    try {
+      notify();
+    } catch (error) {
+      errors.push(error);
+    }
+    errors.push(...dispatchAnimationEvents(events(), this.eventListeners));
+    throwNotificationErrors(errors, 'Animation editor playback notifications failed.');
   }
 }

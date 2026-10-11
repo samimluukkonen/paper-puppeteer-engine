@@ -255,6 +255,60 @@ test('dispatch uses runtime payload ownership, listener snapshots and failure is
   assert.equal(healthy.mock.calls.length, 5);
 });
 
+test('failing state subscribers cannot consume start, crossing or restart events without delivering them', () => {
+  const { state, events, names } = session();
+  const failure = new Error('UI subscriber failed');
+  const release = state.subscribe(() => {
+    throw failure;
+  });
+  const synchronizedTimes: number[] = [];
+  state.subscribe(() => synchronizedTimes.push(state.currentTimeMilliseconds));
+  state.onAnimationEvent(() => {
+    assert.equal(synchronizedTimes.at(-1), state.currentTimeMilliseconds);
+  });
+
+  assert.throws(() => state.play(), failure);
+  assert.isTrue(state.isPlaying);
+  assert.deepEqual(names(), ['start']);
+  events.length = 0;
+  assert.throws(() => state.advancePlayback(1), failure);
+  assert.equal(state.currentTimeMilliseconds, 1000);
+  assert.deepEqual(names(), ['early', 'left', 'right', 'cloth', 'impact']);
+  events.length = 0;
+  assert.throws(() => state.restart(), failure);
+  assert.equal(state.currentTimeMilliseconds, 0);
+  assert.deepEqual(names(), ['start']);
+  release();
+  state.advancePlayback(0.1);
+  assert.deepEqual(names(), ['start', 'early']);
+});
+
+test('playback retains subscriber and event failures after delivering every committed marker', () => {
+  const { state, names } = session();
+  state.play();
+  const subscriberFailure = new Error('UI failed');
+  const eventFailure = new Error('event listener failed');
+  state.subscribe(() => {
+    throw subscriberFailure;
+  });
+  state.onAnimationEvent(() => {
+    throw eventFailure;
+  });
+  const healthy = vi.fn();
+  state.onAnimationEvent(healthy);
+  let caught: unknown;
+  try {
+    state.advancePlayback(0.5);
+  } catch (error) {
+    caught = error;
+  }
+  assert.instanceOf(caught, AggregateError);
+  assert.deepEqual(caught.errors, [subscriberFailure, eventFailure, eventFailure, eventFailure, eventFailure]);
+  assert.equal(healthy.mock.calls.length, 4);
+  assert.deepEqual(names(), ['start', 'early', 'left', 'right', 'cloth']);
+  assert.equal(state.currentTimeMilliseconds, 500);
+});
+
 test('stepped pose sampling never quantizes event crossings', () => {
   const { state, names } = session({ ...clip, playback: { mode: 'stepped', fps: 1 } });
   state.play();
