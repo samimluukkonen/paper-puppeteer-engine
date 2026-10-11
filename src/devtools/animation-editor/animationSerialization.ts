@@ -6,6 +6,7 @@ import {
   type ValidationIssue,
 } from '../../engine/externalData.js';
 import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
+import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput.js';
 import type { Rig } from '../../engine/Rig.js';
 import { transformProperties } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
@@ -125,5 +126,12 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
   };
   const output = inspectAnimationDefinition(data, rig);
   if (!output.data) return { success: false, issues: output.issues };
-  return { success: true, data, json: `${JSON.stringify(data, null, 2)}\n`, issues: inspected.issues };
+  const json = `${JSON.stringify(data, null, 2)}\n`;
+  try {
+    assertJsonInputSize(json);
+  } catch (error) {
+    if (!(error instanceof JsonInputLimitError)) throw error;
+    return { success: false, issues: [{ severity: 'error', message: error.message }] };
+  }
+  return { success: true, data, json, issues: inspected.issues };
 }

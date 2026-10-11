@@ -1,8 +1,10 @@
 import { assert, test } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { findAnimationEvent, getAnimationEventReferences } from '../src/devtools/animation-editor/animationEvents.js';
+import { importAnimationJson } from '../src/devtools/animation-editor/animationImport.js';
 import { snapKeyframeTime } from '../src/devtools/animation-editor/timeline.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
+import { DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 
 function session() {
@@ -125,6 +127,43 @@ test('invalid authored values fail atomically, including unsupported and non-JSO
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
   assert.isTrue(state.validationIssues.length > 0);
+});
+
+test('oversized event JSON is rejected without changing the document, selection or history', () => {
+  const { state } = session();
+  const ref = getAnimationEventReferences(state.workingAnimation)[0]!;
+  state.selectAnimationEvent(ref);
+  const original = state.workingAnimation;
+  assert.isFalse(state.setSelectedEventDataJson(JSON.stringify('a'.repeat(DEFAULT_MAX_JSON_BYTES))));
+  assert.strictEqual(state.workingAnimation, original);
+  assert.strictEqual(state.selectedEvent, ref);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.dirty);
+  assert.match(state.validationIssues[0]!.message, /byte size limit/);
+});
+
+test('event edits include all payloads and UTF-8 bytes in the document budget', () => {
+  const { state } = session();
+  const [first, second] = getAnimationEventReferences(state.workingAnimation);
+  state.selectAnimationEvent(first!);
+  const payload = JSON.stringify('é'.repeat(DEFAULT_MAX_JSON_BYTES / 4));
+  assert.isTrue(state.setSelectedEventDataJson(payload));
+  const original = state.workingAnimation;
+  const history = state.historyLength;
+  state.selectAnimationEvent(second!);
+  assert.isFalse(state.setSelectedEventDataJson(payload));
+  assert.strictEqual(state.workingAnimation, original);
+  assert.strictEqual(state.selectedEvent, second);
+  assert.equal(state.historyLength, history);
+  assert.match(state.validationIssues[0]!.message, /byte size limit/);
+  const exported = state.exportAnimation();
+  assert.isTrue(exported.success);
+  if (exported.success) assert.isTrue(importAnimationJson(exported.json, state.rig).success);
+  state.selectAnimationEvent(first!);
+  state.copySelectedEvent();
+  assert.isFalse(state.pasteEvent());
+  assert.strictEqual(state.workingAnimation, original);
+  assert.equal(state.historyLength, history);
 });
 
 test('delete removes only selected event and Undo/Redo restores exact data without restoring transient selection', () => {

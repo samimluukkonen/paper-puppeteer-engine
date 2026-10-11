@@ -5,6 +5,7 @@ import { serializeAnimation } from '../src/devtools/animation-editor/animationSe
 import { freezeData } from '../src/devtools/shared/editorData.js';
 import { compileClip } from '../src/engine/AnimationClip.js';
 import { parseAnimationClip, type AnimationJsonDefinition } from '../src/engine/externalData.js';
+import { DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'arm', parent: 'root' }] });
@@ -73,6 +74,25 @@ test('canonical JSON is stable across repeated exports and object insertion orde
   const loaded = parseAnimationClip(JSON.parse(first.json), rig);
   assert.deepEqual(loaded.tracks, animation.tracks);
   assert.deepEqual(compileClip(loaded, rig).events, compileClip(animation, rig).events);
+});
+
+test('exports reject documents that would exceed the importer byte limit', () => {
+  const state = new AnimationEditorState(rig, [
+    {
+      name: 'large',
+      duration: 1000,
+      loop: false,
+      tracks: {},
+      events: [{ time: 0, name: 'event', data: 'a'.repeat(DEFAULT_MAX_JSON_BYTES) }],
+    },
+  ]);
+  state.selectAnimation('large');
+  const working = state.workingAnimation;
+  const result = state.exportAnimation();
+  assert.isFalse(result.success);
+  assert.match(result.issues[0]!.message, /byte size limit/);
+  assert.strictEqual(state.workingAnimation, working);
+  assert.equal(state.historyLength, 0);
 });
 
 test('partial tracks, event payloads, duplicate same-time events and interpolation remain authored data', () => {

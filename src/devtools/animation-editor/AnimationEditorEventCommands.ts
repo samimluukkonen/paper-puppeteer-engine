@@ -1,4 +1,5 @@
 import type { AnimationEvent } from '../../engine/AnimationClip.js';
+import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
@@ -84,6 +85,8 @@ export class AnimationEditorEventCommands {
     let next: ReadonlyAnimation;
     try {
       next = edit(this.working, this.rig);
+      // Bound the complete document, including other payloads and pretty-printed JSON overhead.
+      assertJsonInputSize(`${JSON.stringify(next, null, 2)}\n`);
     } catch (error) {
       this.document.reportError(error);
       this.actions.notify();
@@ -163,10 +166,15 @@ export class AnimationEditorEventCommands {
     if (!event || !ref) return false;
     let next: DeepReadonly<AnimationEvent>;
     try {
+      assertJsonInputSize(text);
       next = text.trim() ? { ...event, data: JSON.parse(text) as unknown } : { time: event.time, name: event.name };
-    } catch {
+    } catch (error) {
       this.document.reportIssues([
-        { severity: 'error', path: 'events.data', message: 'Event data must be valid JSON.' },
+        {
+          severity: 'error',
+          path: 'events.data',
+          message: error instanceof JsonInputLimitError ? error.message : 'Event data must be valid JSON.',
+        },
       ]);
       this.actions.notify();
       return false;
