@@ -1,7 +1,4 @@
-import { z } from 'zod';
 import {
-  checkJson,
-  inspectRigDefinition,
   RIG_FORMAT_VERSION,
   type RigJsonDefinition,
   type ValidationIssue,
@@ -19,6 +16,7 @@ import type {
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { inspectRigDraft, type RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
 import { serializeRigData } from './rigSerialization.js';
 
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
@@ -35,17 +33,8 @@ export interface RigEditorStateOptions {
   historyLimit?: number;
 }
 
-export type RigEditorRecoverySnapshot = ReadonlyEditorData<{
-  rig: RigDefinition;
-  directions: [string, { x: number; y: number }][];
-}>;
+export type { RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
 type HistoryEntry = RigEditorRecoverySnapshot;
-
-const recoveryDraftSchema = z.strictObject({
-  version: z.literal(1),
-  rig: z.unknown(),
-  directions: z.array(z.tuple([z.string(), z.strictObject({ x: z.number(), y: z.number() })])),
-});
 
 export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
@@ -345,74 +334,13 @@ export class RigEditorState {
     return { version: 1, rig: this.exportCandidate(snapshot.rig), directions: snapshot.directions };
   }
 
-  private inspectDraft(input: unknown): HistoryEntry | undefined {
-    const issues: ValidationIssue[] = [];
-    if (!checkJson(input, '', issues) || issues.length) return undefined;
-    const recovery = recoveryDraftSchema.safeParse(input);
-    // Earlier browser drafts stored only the rig file; they remain recoverable.
-    const { data } = inspectRigDefinition(recovery.success ? recovery.data.rig : input);
-    if (!data) return undefined;
-    const initial = this.initialCopy;
-    // A bind editor retains its original topology and artwork identities during authoring.
-    if (
-      data.root !== initial.root ||
-      data.bones.length !== initial.bones.length ||
-      data.bones.some((bone, index) => {
-        const before = initial.bones[index]!;
-        return (
-          bone.id !== before.id ||
-          bone.parent !== before.parent ||
-          Boolean(bone.sprite) !== Boolean(before.sprite) ||
-          bone.sprite?.texture !== before.sprite?.texture ||
-          bone.sprite?.frame !== before.sprite?.frame
-        );
-      }) ||
-      (data.slots ?? []).length !== (initial.slots ?? []).length ||
-      (data.slots ?? []).some(
-        (slot, index) => slot.id !== initial.slots![index]!.id || slot.bone !== initial.slots![index]!.bone,
-      ) ||
-      (data.attachments ?? []).length !== (initial.attachments ?? []).length ||
-      (data.attachments ?? []).some((attachment, index) => {
-        const before = initial.attachments![index]!;
-        return (
-          attachment.id !== before.id || attachment.texture !== before.texture || attachment.frame !== before.frame
-        );
-      }) ||
-      !equalEditorData(data.skins ?? [], initial.skins ?? [])
-    )
-      return undefined;
-    const directions = recovery.success
-      ? recovery.data.directions
-      : initial.bones.flatMap((bone): [string, { x: number; y: number }][] => {
-          const distance = Math.hypot(bone.x ?? 0, bone.y ?? 0);
-          return bone.parent !== undefined && distance > 0
-            ? [[bone.id, { x: (bone.x ?? 0) / distance, y: (bone.y ?? 0) / distance }]]
-            : [];
-        });
-    const seen = new Set<string>();
-    for (const [id, direction] of directions) {
-      if (
-        seen.has(id) ||
-        !this.rig.hasBone(id) ||
-        this.rig.getBone(id).parent === undefined ||
-        Math.abs(Math.hypot(direction.x, direction.y) - 1) > 1e-12
-      )
-        return undefined;
-      seen.add(id);
-    }
-    return freezeData({
-      rig: { ...data, slots: data.slots ?? [], attachments: data.attachments ?? [], skins: data.skins ?? [] },
-      directions,
-    });
-  }
-
   canRestoreDraft(input: unknown): boolean {
-    return this.inspectDraft(input) !== undefined;
+    return inspectRigDraft(input, this.initialCopy, this.rig) !== undefined;
   }
 
   /** Restored authored changes stay dirty and form one undoable operation. */
   restoreDraft(input: unknown): boolean {
-    const data = this.inspectDraft(input);
+    const data = inspectRigDraft(input, this.initialCopy, this.rig);
     if (!data) return false;
     this.endOperation();
     this.change(() => {

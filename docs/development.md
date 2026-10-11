@@ -107,6 +107,7 @@ src/devtools/rig-editor/
   RigEditor.ts         Editor activation and working-rig preview synchronization
   RigEditorInputController.ts  Dragging, keyboard commands, and input listener lifecycle
   RigEditorState.ts    Working rig, validation, bounded history, and serialization
+  rigDraftRecovery.ts  Pure legacy/current draft parsing, compatibility and direction validation
 src/devtools/animation-editor/
   main.tsx             React animation editor and Phaser lifetime
   AnimationEditorScene.ts  Sample/custom character loading and preview lifecycle
