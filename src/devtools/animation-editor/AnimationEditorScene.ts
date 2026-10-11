@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
+import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { Facing } from '../../engine/types.js';
@@ -28,6 +29,8 @@ export class AnimationEditorScene extends Phaser.Scene {
   private mirrorOverlay: AnimationPoseOverlay | undefined;
   private mirrorPose: AnimationPose | null = null;
   private mirrorSample: { pose: AnimationPose } | null = null;
+  private bakeOverlay: AnimationPoseOverlay | undefined;
+  private bakeSample: { pose: AnimationPose } | null = null;
   private onionSkinSettings = DEFAULT_ONION_SKIN_SETTINGS;
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
@@ -60,6 +63,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
       this.clearMirrorPreview();
+      this.clearBakePreview();
       this.ghosts?.dispose();
       this.ghosts = undefined;
       this.preview?.dispose();
@@ -75,6 +79,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
     this.syncMirrorPreview();
+    this.syncBakePreview();
     this.ikHandles?.render();
     const overlay = this.selectionOverlay;
     overlay?.clear();
@@ -114,6 +119,45 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.puppet?.setFacing(facing);
     this.ghosts?.sync();
     this.syncMirrorPreview();
+    this.syncBakePreview();
+  }
+
+  /** Exclude inactive editor-only chains; all active runtime ownership must pass bake validation. */
+  getBakeRuntimeConstraints(): readonly TwoBoneIKConstraint[] {
+    const puppet = this.puppet;
+    if (!puppet) return [];
+    const names = new Set([...(puppet.rig.ik ?? []), ...(this.options.ikChains ?? [])].map((entry) => entry.name));
+    return [...names]
+      .map((id) => puppet.getIK(id))
+      .filter((entry) => entry.enabled || puppet.rig.ik?.some((definition) => definition.name === entry.name));
+  }
+
+  setBakePreview(pose: AnimationPose | null): void {
+    if (!pose) {
+      this.clearBakePreview();
+      return;
+    }
+    this.bakeSample = { pose };
+    this.syncBakePreview();
+  }
+
+  private syncBakePreview(): void {
+    const puppet = this.puppet;
+    if (!puppet || !this.bakeSample) return;
+    this.bakeOverlay ??= new AnimationPoseOverlay(this, puppet, 'bake', 0);
+    this.bakeOverlay.apply(this.bakeSample);
+    this.bakeOverlay.syncAppearance(
+      puppet,
+      { ...DEFAULT_ONION_SKIN_SETTINGS, nextOpacity: 0.55, nextTint: 0xa875e8 },
+      puppet.getAppearanceRevision(),
+    );
+    this.bakeOverlay.container.setVisible(puppet.container.visible);
+  }
+
+  private clearBakePreview(): void {
+    this.bakeOverlay?.destroy();
+    this.bakeOverlay = undefined;
+    this.bakeSample = null;
   }
 
   /** Independent render-only layer; never applies its pose to the authoritative puppet. */
@@ -256,6 +300,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
       this.clearMirrorPreview();
+      this.clearBakePreview();
       this.ikHandles?.dispose();
       this.ikHandles = undefined;
       ghosts?.dispose();

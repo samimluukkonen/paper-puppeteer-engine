@@ -1,6 +1,8 @@
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
+import type { IKBakeController } from './IKBakeController.js';
+import { IKBakePanel } from './IKBakePanel.js';
 import type { IKInspectorController } from './IKInspectorController.js';
 import { IKInspectorPanel } from './IKInspectorPanel.js';
 import { AUTHORED_INTERPOLATION_MODES, interpolationLabel } from './interpolationPresentation.js';
@@ -11,9 +13,11 @@ import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 export function AnimationEditorView({
   mirrorTools,
   ikInspector,
+  ikBake,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
+  ikBake: IKBakeController;
 }) {
   const inspector = useWorkspaceInspector();
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
@@ -85,6 +89,7 @@ export function AnimationEditorView({
           </div>
         </details>
         <MirrorToolsPanel controller={mirrorTools} />
+        <IKBakePanel controller={ikBake} />
         <button id="animation-tools-open" type="button" aria-haspopup="dialog">
           File tools
         </button>
@@ -485,7 +490,9 @@ export function AnimationEditorView({
           coordinates; key Influence from 0 to 1 to blend with bone motion. Disable fixed-target IK preview to see
           authored targets. Dragging creates temporary values until committed. IK keys support single selection,
           deletion, arrow movement and Undo/Redo; group selection, clipboard and marker dragging are unavailable. Onion
-          skins and bone mirroring use authored bone poses before IK; they do not mirror or bake IK targets.
+          skins and bone mirroring use authored bone poses before IK. To bake an authored reach, open IK Baking, select
+          constraints and sampling FPS, preview while scrubbing, then review the key summary and Bake IK. Baking creates
+          one Undo operation. Turn off fixed-target IK preview before baking.
         </p>
         <p>
           Space plays or pauses. Home returns to time zero outside typing controls. Drag the ruler to scrub. Moving

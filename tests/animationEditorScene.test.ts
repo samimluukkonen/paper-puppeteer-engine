@@ -471,6 +471,51 @@ test('mirror overlay is lazy, independent of temporal ghosts, follows facing, an
   }
 });
 
+test('bake overlay follows facing and frees artwork on hide and scene shutdown without changing the puppet', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn<(state: AnimationEditorState, characterId: string) => void>();
+  const scene = new AnimationEditorScene(ready, vi.fn());
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = ready.mock.calls[0]![0];
+    const original = state.workingAnimation;
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const rotation = puppet.getBone('leftUpperArm').pose.rotation;
+    const pose = state.sampleGhostPose(0)!;
+    pose.get('leftUpperArm')!.rotation = rotation + 0.7;
+    scene.setBakePreview(pose);
+    const overlay = Reflect.get(
+      scene,
+      'bakeOverlay',
+    ) as import('../src/devtools/animation-editor/AnimationEditorGhostLayer.js').AnimationPoseOverlay;
+    assert.isTrue(overlay.container.visible);
+    assert.equal(overlay.container.depth, puppet.container.depth + 1);
+    assert.closeTo(overlay.container.alpha, 0.55, 1e-9);
+    scene.setFacing('left');
+    assert.equal(overlay.container.scaleX, puppet.container.scaleX);
+    assert.equal(puppet.getBone('leftUpperArm').pose.rotation, rotation);
+    assert.strictEqual(state.workingAnimation, original);
+    const destroy = vi.spyOn(overlay, 'destroy');
+    scene.setBakePreview(null);
+    assert.equal(destroy.mock.calls.length, 1);
+    assert.isUndefined(Reflect.get(scene, 'bakeOverlay'));
+    assert.isNull(Reflect.get(scene, 'bakeSample'));
+    scene.setBakePreview(pose);
+    const next = Reflect.get(scene, 'bakeOverlay') as typeof overlay;
+    assert.notStrictEqual(next, overlay);
+    const nextDestroy = vi.spyOn(next, 'destroy');
+    scene.events.emit('shutdown');
+    assert.equal(nextDestroy.mock.calls.length, 1);
+    assert.isUndefined(Reflect.get(scene, 'bakeOverlay'));
+  } finally {
+    if (Reflect.get(scene, 'puppet')) scene.events.emit('shutdown');
+  }
+});
+
 test('mirror commits refresh active/previous/next authored poses while arm and leg IK remain procedural', async () => {
   vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
   vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);

@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.6-4
+
+The v0.5.6.4 [React IK Baking workflow](docs/react-ik-baking.md) adds explicit rig constraint selection, sampling FPS, linear output, actual affected-bone/generated/replaced-key summaries, and validation feedback before commit. A detached baked-pose overlay follows the existing playhead and retains unselected IK and authored playback settings. Baking uses the existing atomic state command, pauses playback and creates one Undo/Redo operation. Options, document/session changes, panel unmount and scene shutdown clear previews; runtime providers/overrides and overlapping driven chains block baking. Partial ranges, reduction, solver configuration, mirrored baking and retargeting remain deferred.
+
 ## 0.5.6-3
 
 The v0.5.6.3 [atomic IK bake commit](docs/ik-bake-commit.md) adds public `commitIKBake` and the editor state command. Whole-clip transactions validate current source/rig fidelity, replace only generated bone properties, remove selected IK tracks and serialize clip-local `disabledIKConstraints`. Runtime suppression follows existing masks, weights and fades and skips selected constraints even with runtime target/mix ownership. Unrelated animation data, playback/FPS and rig constraints remain intact. One history entry restores exact original/baked snapshots through Undo/Redo and saved-checkpoint dirty semantics. React Bake UI, partial ranges and key reduction remain deferred.

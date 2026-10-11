@@ -20,7 +20,7 @@ export class AnimationPoseOverlay {
   constructor(
     scene: Phaser.Scene,
     puppet: Puppet,
-    readonly direction: GhostPoseSample['direction'] | 'mirror',
+    readonly direction: GhostPoseSample['direction'] | 'mirror' | 'bake',
     readonly distance: number,
   ) {
     this.container = scene.add.container(0, 0).setName(`animation-ghost-${direction}-${distance}`).setVisible(false);
@@ -59,9 +59,11 @@ export class AnimationPoseOverlay {
     const previous = this.direction === 'previous';
     const opacity = previous ? settings.previousOpacity : settings.nextOpacity;
     const tint = previous ? settings.previousTint : settings.nextTint;
-    // Temporal ghosts stay behind the puppet; the proposed mirror pose overlays it.
+    // Temporal ghosts stay behind the puppet; proposed authored poses overlay it.
     const depth =
-      this.direction === 'mirror' ? source.depth + 1 : source.depth - this.distance * 2 + (previous ? 0 : 1);
+      this.direction === 'mirror' || this.direction === 'bake'
+        ? source.depth + 1
+        : source.depth - this.distance * 2 + (previous ? 0 : 1);
     const depthChanged = this.container.depth !== depth;
     this.container
       .setPosition(source.x, source.y)

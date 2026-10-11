@@ -318,7 +318,7 @@ The v0.5.2.4.3 movement architecture and verification results are recorded in [K
 
 ## Deferred features
 
-Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, track remapping, and IK baking remain deferred. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above.
+Transform drag handles, time stretching, auto-key, per-keyframe interpolation mutation and mixed modes (requiring a schema/runtime extension), event multi-selection/group movement/batch copying, and track remapping remain deferred. Advanced curve editing, Bézier curves, custom easing, and tangent handles are also deferred. Property create/update/delete remains available through the inspector and data APIs above. Whole-animation IK baking is available through the [IK Baking panel](react-ik-baking.md).
 
 The v0.5.2.5.1 selection policies, APIs, files and verification results are recorded in [Multi-key selection verification](animation-editor-multi-selection-verification.md).
 
@@ -336,7 +336,7 @@ Numeric cleanup reuses `roundEditorNumber()` for six-decimal candidates but acce
 
 Clipboard failures offer Download and Log alternatives. Download filenames retain manifest basenames, with a sanitized animation-name fallback and `animation.json` when no name is available. Copy/download/log establish session checkpoints and retain Undo/Redo history; they do not overwrite source files. Saved authored snapshots retain their original precision. A page reload still reads character assets.
 
-See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping and IK baking remain deferred.
+See [export verification](animation-editor-export-verification.md) for automated coverage and human checks. File dropping remains deferred.
 
 ## Animation import and reload
 
@@ -375,6 +375,10 @@ External animation version 1 uses the shared strict file schema: unknown fields 
 Import/export adds no global shortcuts. JSON text areas keep native copy/paste/undo and typing; Ctrl/Cmd+C/V/D affects authored keys/events only with focus in the timeline. Space/Home, modifiers and IME retain their existing typing guards. Use the import/export buttons for documents.
 
 Editor-only APIs added in this hardening pass: `revertAnimation({ discardChanges?: boolean })`, `sessionRevision`, and optional `AnimationImportOptions.confirmDiscard` on `importJson`/`reloadCurrentExport`. The callback runs only for valid dirty replacement. Direct callers without a callback retain the existing explicit replacement behavior and should provide their own confirmation when appropriate. No public engine API, schema, evaluator or dependency changed.
+
+## IK Baking
+
+Open **IK Baking** in the command bar, explicitly select hand or foot constraints, and choose sampling FPS. The panel shows affected bones, generated keys, existing rotation keys to replace and constraints that will be deactivated for this animation. **Preview Bake** pauses playback and draws the proposed baked animation as a violet overlay while the original IK puppet stays visible. Scrub the existing timeline to compare; preview never changes authored keys, dirty state or history. **Bake IK** commits once through the existing history boundary. Undo restores the original IK animation. Fixed runtime targets/providers and unsupported overlapping chains block baking. See the [IK Baking workflow](react-ik-baking.md) for the walkthrough and validation details.
 
 ## Mirror tools
 

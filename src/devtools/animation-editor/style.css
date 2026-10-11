@@ -922,7 +922,8 @@ a {
   }
 }
 
-.animation-mirror-panel {
+.animation-mirror-panel,
+.animation-bake-panel {
   left: auto;
   right: 12px;
   width: min(540px, calc(100vw - 48px));
@@ -930,7 +931,8 @@ a {
   overflow: auto;
 }
 
-.animation-mirror-panel h2 {
+.animation-mirror-panel h2,
+.animation-bake-panel h2 {
   margin: 0 0 8px;
   font-size: 1rem;
 }
@@ -955,11 +957,19 @@ a {
 }
 
 .animation-mirror-directions,
-.animation-mirror-actions {
+.animation-mirror-actions,
+.animation-bake-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin: 10px 0;
+}
+
+.animation-bake-panel .animation-bake-constraint {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0;
 }
 
 .animation-mirror-destination {

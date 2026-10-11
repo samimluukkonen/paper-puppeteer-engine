@@ -10,6 +10,7 @@ import type { ReadonlyAnimation } from './AnimationEditorState.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { IKBakeController } from './IKBakeController.js';
 import { IKInspectorController } from './IKInspectorController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
@@ -22,7 +23,12 @@ app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
-const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ikInspector={ikInspector} />, (app) => {
+const ikBake = new IKBakeController(
+  (pose) => scene?.setBakePreview(pose),
+  () => scene?.getBakeRuntimeConstraints() ?? [],
+);
+const editorView = <AnimationEditorView mirrorTools={mirrorTools} ikInspector={ikInspector} ikBake={ikBake} />;
+const unmount = mountView(app, editorView, (app) => {
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
@@ -37,6 +43,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ik
     (state, id) => {
       editorScene.fitPreview();
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
+      ikBake.bind(state);
       timeline.bind(state, id);
       inspector.bind(state);
       ikInspector.bind(state);
@@ -63,6 +70,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ik
     (message) => {
       recovery.unbind();
       mirrorTools.unbind();
+      ikBake.unbind();
       ikInspector.unbind();
       timeline.showError(message);
     },
@@ -105,6 +113,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ik
     'change',
     (event) => {
       editorScene.setIKPreview((event.target as HTMLInputElement).checked);
+      ikBake.refreshRuntime();
     },
     { signal: previewControls.signal },
   );
@@ -118,6 +127,7 @@ const unmount = mountView(app, <AnimationEditorView mirrorTools={mirrorTools} ik
     recovery.dispose();
     releaseWorkspaceSelection?.();
     mirrorTools.dispose();
+    ikBake.dispose();
     workspace.dispose();
     recoveryControls.dispose();
     releaseNavigationGuard();

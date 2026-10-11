@@ -133,6 +133,8 @@ src/devtools/animation-editor/
   AnimationEditorGhostLayer.ts  Render-only neighboring poses sharing engine artwork and affine projection
   MirrorToolsPanel.tsx  React pair configuration, direction, preview and explicit authored actions
   MirrorToolsController.ts  Cached readiness, editor subscription, rig-bound browser pair preferences
+  IKBakePanel.tsx       React constraint selection, FPS, bake summary and preview/commit actions
+  IKBakeController.ts   Cached validated plans, detached candidate sampling and editor history command adapter
   onionSkinSettings.ts   Frozen scene-only count, spacing, opacity and tint preferences
   OnionSkinControlsController.ts  Native preference inputs and abortable event listener lifecycle
   TimelineController.ts   Session coordination, responsive ruler, tracks and playhead
