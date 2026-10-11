@@ -1,0 +1,162 @@
+import { type TransformProperty, transformProperties } from '../../engine/types.js';
+import type { AnimationEditorDocument } from './AnimationEditorDocument.js';
+import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
+import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import { findAnimationEvent, type AnimationEventRef } from './animationEvents.js';
+import { findBonePropertyKeyframe } from './keyframeQueries.js';
+import {
+  keysInMarquee,
+  resolveKey,
+  sameKey,
+  type KeyframeMarquee,
+  type KeyframeSelectionModifiers,
+} from './keyframeSelection.js';
+import type { KeyframeSelection } from './timelineTracks.js';
+import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
+
+interface SelectionCommandActions {
+  cancelTimelineDrag(): boolean;
+  cancelEventDrag(): boolean;
+  updateTime(time: Seconds): boolean;
+  updateTimeMilliseconds(time: Milliseconds): boolean;
+  notify(): void;
+}
+
+/** Selection transitions coordinate gestures and playback inside the session's notification boundary. */
+export class AnimationEditorSelectionCommands {
+  constructor(
+    private readonly document: AnimationEditorDocument,
+    private readonly selection: AnimationEditorSelection,
+    private readonly playback: AnimationEditorPlayback,
+    private readonly actions: SelectionCommandActions,
+  ) {}
+
+  private prepareSelection(): void {
+    this.actions.cancelTimelineDrag();
+    this.playback.pause();
+    this.playback.endScrub();
+  }
+
+  /** Transient navigation only: preview sampling never dispatches authored events. */
+  selectAnimationEvent(ref: AnimationEventRef): boolean {
+    const event = findAnimationEvent(this.document.workingAnimation, ref);
+    if (!event) return false;
+    this.prepareSelection();
+    this.selection.selectEvent(ref);
+    this.actions.updateTimeMilliseconds(event.time);
+    this.actions.notify();
+    return true;
+  }
+
+  clearEventSelection(): void {
+    this.actions.cancelEventDrag();
+    if (this.selection.clearEvent()) this.actions.notify();
+  }
+
+  clearTimelineSelection(): void {
+    this.actions.cancelTimelineDrag();
+    const keys = this.selection.clearKey();
+    const event = this.selection.clearEvent();
+    if (keys || event) this.actions.notify();
+  }
+
+  /** Resolve identity through the central tolerance policy, then select and seek together. */
+  selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
+    const { boneId, property, time } = selection;
+    const animation = this.document.workingAnimation;
+    if (!this.document.rig?.hasBone(boneId) || !animation) return false;
+    const key = findBonePropertyKeyframe(animation, boneId, property, toMilliseconds(time));
+    if (!key) return false;
+    this.prepareSelection();
+    const clicked = Object.freeze({ boneId, property, time: toSeconds(key.time) });
+    const anchor = this.selection.anchor;
+    if (modifiers.range && anchor) {
+      // Range stays anchored across repeated Shift-clicks. Cross-track Shift adds and makes the clicked key primary.
+      const track = this.selection
+        .tracks(this.document.workingAnimation)
+        .find((row) => row.kind === 'property' && row.boneId === boneId && row.property === property);
+      const range =
+        anchor.boneId === boneId && anchor.property === property && track?.kind === 'property'
+          ? track.keyframes.filter(
+              (entry) =>
+                entry.time >= Math.min(anchor.time, clicked.time) && entry.time <= Math.max(anchor.time, clicked.time),
+            )
+          : [...this.selection.keys, clicked];
+      this.selection.setKeys(modifiers.additive ? [...this.selection.keys, ...range] : range, clicked);
+      this.actions.updateTimeMilliseconds(key.time);
+    } else if (modifiers.additive) {
+      const exists = this.selection.hasKey(clicked);
+      this.selection.setKeys(
+        exists ? this.selection.keys.filter((entry) => !sameKey(entry, clicked)) : [...this.selection.keys, clicked],
+        this.selection.key,
+      );
+      // Add/toggle retains primary where possible; fallback primary never seeks.
+    } else {
+      this.selection.selectKey(clicked);
+      this.actions.updateTimeMilliseconds(key.time);
+    }
+    this.actions.notify();
+    return true;
+  }
+
+  clearKeyframeSelection(): void {
+    this.actions.cancelTimelineDrag();
+    if (this.selection.clearKey()) this.actions.notify();
+  }
+
+  /** Resolve externally supplied references before installing transient box selection. */
+  selectKeyframes(keys: readonly KeyframeSelection[], additive = false): void {
+    this.prepareSelection();
+    const resolved = keys.flatMap((key) => {
+      const ref = resolveKey(this.document.workingAnimation, key);
+      return ref ? [ref] : [];
+    });
+    const previous = this.selection.key;
+    this.selection.setKeys(additive ? [...this.selection.keys, ...resolved] : resolved, previous);
+    if (!additive && this.selection.key && (!previous || !sameKey(previous, this.selection.key)))
+      this.actions.updateTime(this.selection.key.time);
+    this.actions.notify();
+  }
+
+  selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
+    this.selectKeyframes(keysInMarquee(this.selection.tracks(this.document.workingAnimation), box), additive);
+  }
+
+  /** Previous/next authored key on the selected property, relative to the current playhead. */
+  getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
+    return this.selection.adjacentKey(this.document.workingAnimation, this.playback.currentTime, direction);
+  }
+
+  selectAdjacentKeyframe(direction: -1 | 1): boolean {
+    const key = this.getAdjacentKeyframe(direction);
+    return key ? this.selectKeyframe(key) : false;
+  }
+
+  /** Authored snapshots are authoritative; history never restores transient selection. */
+  reconcile(): void {
+    this.selection.validateKey(this.document.workingAnimation);
+    this.selection.validateEvent(this.document.workingAnimation);
+  }
+
+  setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
+    if (!this.document.rig?.hasBone(boneId)) return false;
+    this.actions.cancelTimelineDrag();
+    if (this.selection.setExpanded(boneId, expanded)) this.actions.notify();
+    return true;
+  }
+
+  /** Bone + property selection uses the same bone owner as hierarchy and preview picking. */
+  selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
+    if (!this.document.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
+    this.actions.cancelTimelineDrag();
+    if (this.selection.selectProperty(boneId, property)) this.actions.notify();
+    return true;
+  }
+
+  selectBone(id: string | null): boolean {
+    if (id !== null && !this.document.rig?.hasBone(id)) return false;
+    this.actions.cancelTimelineDrag();
+    if (this.selection.selectBone(id)) this.actions.notify();
+    return true;
+  }
+}

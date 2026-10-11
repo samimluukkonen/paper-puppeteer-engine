@@ -32,12 +32,8 @@ import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
 import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
-import {
-  buildEventTimelineTrack,
-  findAnimationEvent,
-  type AnimationEventRef,
-  type EventTimelineTrack,
-} from './animationEvents.js';
+import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
+import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
 import type { AnimationExportResult } from './animationSerialization.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
 import {
@@ -58,17 +54,11 @@ import {
 import type { KeyframeClipboard } from './keyframeClipboard.js';
 import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
-import {
-  keysInMarquee,
-  resolveKey,
-  sameKey,
-  type KeyframeMarquee,
-  type KeyframeSelectionModifiers,
-} from './keyframeSelection.js';
+import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
-import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
+import { type Milliseconds, type Seconds, toMilliseconds } from './timeUnits.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
@@ -90,6 +80,7 @@ export class AnimationEditorState {
   private readonly clipboard = new TimelineClipboard();
   private readonly playback = new AnimationEditorPlayback(() => this.working?.duration ?? 0);
   private readonly selection: AnimationEditorSelection;
+  private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly keyframes: AnimationEditorKeyframeCommands;
   private readonly events: AnimationEditorEventCommands;
   private readonly playbackController: AnimationEditorPlaybackController;
@@ -109,6 +100,13 @@ export class AnimationEditorState {
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
+    this.selectionCommands = new AnimationEditorSelectionCommands(this.document, this.selection, this.playback, {
+      cancelTimelineDrag: () => this.cancelTimelineDrag(),
+      cancelEventDrag: () => this.cancelEventDrag(),
+      updateTime: (time) => this.updateTime(time),
+      updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
+      notify: () => this.notify(),
+    });
     this.keyframes = new AnimationEditorKeyframeCommands(
       this.document,
       this.selection,
@@ -210,31 +208,13 @@ export class AnimationEditorState {
   }
   /** Transient navigation only: preview sampling never dispatches authored events. */
   selectAnimationEvent(ref: AnimationEventRef): boolean {
-    return this.batchNotifications(() => {
-      const event = findAnimationEvent(this.working, ref);
-      if (!event) return false;
-      this.cancelTimelineDrag();
-      this.playback.pause();
-      this.playback.endScrub();
-      this.selection.selectEvent(ref);
-      this.updateTimeMilliseconds(event.time);
-      this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.selectionCommands.selectAnimationEvent(ref));
   }
   clearEventSelection(): void {
-    return this.batchNotifications(() => {
-      this.cancelEventDrag();
-      if (this.selection.clearEvent()) this.notify();
-    });
+    return this.batchNotifications(() => this.selectionCommands.clearEventSelection());
   }
   clearTimelineSelection(): void {
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      const keys = this.selection.clearKey();
-      const event = this.selection.clearEvent();
-      if (keys || event) this.notify();
-    });
+    return this.batchNotifications(() => this.selectionCommands.clearTimelineSelection());
   }
   addAnimationEvent(event: DeepReadonly<AnimationEvent>): boolean {
     return this.batchNotifications(() => this.events.addAnimationEvent(event));
@@ -356,71 +336,17 @@ export class AnimationEditorState {
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
-    return this.batchNotifications(() => {
-      const { boneId, property, time } = selection;
-      if (!this.rig?.hasBone(boneId)) return false;
-      const key = this.findBonePropertyKeyframe(boneId, property, time);
-      if (!key) return false;
-      this.cancelTimelineDrag();
-      this.playback.pause();
-      this.playback.endScrub();
-      const clicked = Object.freeze({ boneId, property, time: toSeconds(key.time) });
-      const anchor = this.selection.anchor;
-      if (modifiers.range && anchor) {
-        // Range stays anchored across repeated Shift-clicks. Cross-track Shift adds and makes the clicked key primary.
-        const track = this.timelineTracks.find(
-          (row) => row.kind === 'property' && row.boneId === boneId && row.property === property,
-        );
-        const range =
-          anchor.boneId === boneId && anchor.property === property && track?.kind === 'property'
-            ? track.keyframes.filter(
-                (entry) =>
-                  entry.time >= Math.min(anchor.time, clicked.time) &&
-                  entry.time <= Math.max(anchor.time, clicked.time),
-              )
-            : [...this.selectedKeys, clicked];
-        this.selection.setKeys(modifiers.additive ? [...this.selectedKeys, ...range] : range, clicked);
-        this.updateTimeMilliseconds(key.time);
-      } else if (modifiers.additive) {
-        const exists = this.selection.hasKey(clicked);
-        this.selection.setKeys(
-          exists ? this.selectedKeys.filter((entry) => !sameKey(entry, clicked)) : [...this.selectedKeys, clicked],
-          this.primaryKey,
-        );
-        // Add/toggle retains primary where possible; fallback primary never seeks.
-      } else {
-        this.selection.selectKey(clicked);
-        this.updateTimeMilliseconds(key.time);
-      }
-      this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.selectionCommands.selectKeyframe(selection, modifiers));
   }
   clearKeyframeSelection(): void {
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      if (this.selection.clearKey()) this.notify();
-    });
+    return this.batchNotifications(() => this.selectionCommands.clearKeyframeSelection());
   }
   /** Resolve externally supplied references before installing transient box selection. */
   selectKeyframes(keys: readonly KeyframeSelection[], additive = false): void {
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.playback.pause();
-      this.playback.endScrub();
-      const resolved = keys.flatMap((key) => {
-        const ref = resolveKey(this.working, key);
-        return ref ? [ref] : [];
-      });
-      const previous = this.primaryKey;
-      this.selection.setKeys(additive ? [...this.selectedKeys, ...resolved] : resolved, previous);
-      if (!additive && this.primaryKey && (!previous || !sameKey(previous, this.primaryKey)))
-        this.updateTime(this.primaryKey.time);
-      this.notify();
-    });
+    return this.batchNotifications(() => this.selectionCommands.selectKeyframes(keys, additive));
   }
   selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
-    this.selectKeyframes(keysInMarquee(this.timelineTracks, box), additive);
+    return this.batchNotifications(() => this.selectionCommands.selectKeyframeMarquee(box, additive));
   }
   deleteSelectedKeyframes(): boolean {
     return this.batchNotifications(() => this.keyframes.deleteSelectedKeyframes());
@@ -431,16 +357,10 @@ export class AnimationEditorState {
   }
   /** Previous/next authored key on the selected property, relative to the current playhead. */
   getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
-    return this.selection.adjacentKey(this.working, this.currentTime, direction);
+    return this.selectionCommands.getAdjacentKeyframe(direction);
   }
   selectAdjacentKeyframe(direction: -1 | 1): boolean {
-    const key = this.getAdjacentKeyframe(direction);
-    return key ? this.selectKeyframe(key) : false;
-  }
-  /** Authored snapshots are authoritative; history never restores transient selection. */
-  private validateKeyframeSelection(): void {
-    this.selection.validateKey(this.working);
-    this.selection.validateEvent(this.working);
+    return this.batchNotifications(() => this.selectionCommands.selectAdjacentKeyframe(direction));
   }
   /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
   get timelineTracks(): readonly TimelineTrack[] {
@@ -450,21 +370,11 @@ export class AnimationEditorState {
     return this.selection.isExpanded(boneId);
   }
   setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
-    return this.batchNotifications(() => {
-      if (!this.rig?.hasBone(boneId)) return false;
-      this.cancelTimelineDrag();
-      if (this.selection.setExpanded(boneId, expanded)) this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.selectionCommands.setTimelineBoneExpanded(boneId, expanded));
   }
   /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
-    return this.batchNotifications(() => {
-      if (!this.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
-      this.cancelTimelineDrag();
-      if (this.selection.selectProperty(boneId, property)) this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.selectionCommands.selectTimelineProperty(boneId, property));
   }
   /** Editor-only prospective local values, never serialized or recorded in history. */
   get boneTransformDraft(): Readonly<Partial<JointTransform>> {
@@ -478,12 +388,7 @@ export class AnimationEditorState {
     return evaluated ? { ...evaluated, ...this.selection.draft } : undefined;
   }
   selectBone(id: string | null): boolean {
-    return this.batchNotifications(() => {
-      if (id !== null && !this.rig?.hasBone(id)) return false;
-      this.cancelTimelineDrag();
-      if (this.selection.selectBone(id)) this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.selectionCommands.selectBone(id));
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
@@ -828,7 +733,7 @@ export class AnimationEditorState {
     if (!retainDraft) this.clearTransformDraft();
     this.updateTime(this.currentTime);
     if (selectedKeys) this.selection.setKeys(selectedKeys, selectedKeys[0] ?? null);
-    this.validateKeyframeSelection();
+    this.selectionCommands.reconcile();
     this.notify();
     return true;
   }
@@ -911,7 +816,7 @@ export class AnimationEditorState {
     const changed = restore();
     if (changed) {
       this.updateTime(this.currentTime);
-      this.validateKeyframeSelection();
+      this.selectionCommands.reconcile();
     }
     if (changed || cancelled) this.notify();
     return changed;
