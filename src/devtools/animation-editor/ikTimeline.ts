@@ -126,11 +126,20 @@ class IKInspectorSampler {
     const matrixFor = (id: string): Affine => {
       const cached = matrices.get(id);
       if (cached) return cached;
-      const bone = this.rig.getBone(id);
-      const local = transformToAffine(this.joints.get(id)!.pose, {} as Affine);
-      const matrix = composeAffine(local, bone.parent ? matrixFor(bone.parent) : undefined, {} as Affine);
-      matrices.set(id, matrix);
-      return matrix;
+      const ancestors: string[] = [];
+      let current: string | undefined = id;
+      while (current !== undefined && !matrices.has(current)) {
+        ancestors.push(current);
+        current = this.rig.getBone(current).parent;
+      }
+      let parent = current === undefined ? undefined : matrices.get(current);
+      for (let index = ancestors.length - 1; index >= 0; --index) {
+        const boneId = ancestors[index]!;
+        const local = transformToAffine(this.joints.get(boneId)!.pose, {} as Affine);
+        parent = composeAffine(local, parent, {} as Affine);
+        matrices.set(boneId, parent);
+      }
+      return matrices.get(id)!;
     };
     const context = {
       puppetToWorld: (point: { x: number; y: number }) => point,

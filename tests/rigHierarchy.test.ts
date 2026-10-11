@@ -1,4 +1,5 @@
 import { assert, test } from 'vitest';
+import { evaluateIKTarget } from '../src/devtools/animation-editor/ikTimeline.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { validateRigDefinition } from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -42,6 +43,17 @@ test('a deep cycle reports validation errors without overflowing the call stack'
   assert.equal(issues[0]!.severity, 'error');
   assert.match(issues[0]!.message, /Circular hierarchy/);
   assert.throws(() => new Rig(definition), /cycle/);
+});
+
+test('IK inspection handles a deep valid hierarchy without recursive ancestor transforms', () => {
+  const bones = chain(12_000).map((bone, index) => ({ ...bone, x: index === 0 ? 0 : 1 }));
+  const rig = new Rig({
+    root: 'bone-0',
+    bones,
+    ik: [{ name: 'tip', rootBone: 'bone-11997', middleBone: 'bone-11998', endBone: 'bone-11999' }],
+  });
+  const animation = { name: 'deep', duration: 1000, loop: false, tracks: {} };
+  assert.deepEqual(evaluateIKTarget(animation, rig, 'tip', 0), { x: 11999, y: 0, mix: 1 });
 });
 
 test('iterative traversal preserves stable sibling order, nested sprite depths, and hierarchy depths', () => {
