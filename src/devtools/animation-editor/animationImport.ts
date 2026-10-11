@@ -1,16 +1,12 @@
 import { compileClip, type AnimationClip, type CompiledClip } from '../../engine/AnimationClip.js';
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { evaluateClip } from '../../engine/AnimationPose.js';
-import {
-  ANIMATION_FORMAT_VERSION,
-  inspectAnimationDefinition,
-  type ValidationIssue,
-} from '../../engine/externalData.js';
+import { inspectAnimationDefinition, type ValidationIssue } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { transformProperties } from '../../engine/types.js';
-import { freezeData } from '../shared/editorData.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import { serializeAnimation } from './animationSerialization.js';
+import { inspectEditorAnimation } from './validatedAnimation.js';
 
 export type AnimationImportResult =
   | { success: true; data: ReadonlyAnimation; issues: readonly ValidationIssue[] }
@@ -35,11 +31,11 @@ export function importAnimationJson(json: string, rig?: Rig): AnimationImportRes
       success: false,
       issues: [{ severity: 'error', message: 'Load a character before importing an animation.' }],
     };
-  const result = inspectAnimationDefinition(input, rig);
+  const result = inspectEditorAnimation(input, rig);
   if (!result.data) return { success: false, issues: result.issues };
   return {
     success: true,
-    data: freezeData({ ...result.data, version: ANIMATION_FORMAT_VERSION }),
+    data: result.data,
     issues: result.issues,
   };
 }

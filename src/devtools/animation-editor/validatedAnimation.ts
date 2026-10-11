@@ -1,10 +1,17 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
-import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/externalData.js';
+import {
+  ANIMATION_FORMAT_VERSION,
+  inspectAnimationDefinition,
+  parseAnimationClip,
+  type ValidationResult,
+} from '../../engine/externalData.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { freezeData, isFullyFrozen } from '../shared/editorData.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;
+/** Owned versioned editor snapshot; event payloads are validated as JSON before freezing. */
+export type ReadonlyAnimation = AnimationData & { readonly version: typeof ANIMATION_FORMAT_VERSION };
 const validated = new WeakMap<AnimationData, WeakSet<Rig>>();
 
 function rememberValidated(animation: AnimationData, rig: Rig): void {
@@ -14,6 +21,15 @@ function rememberValidated(animation: AnimationData, rig: Rig): void {
     validated.set(animation, rigs);
   }
   rigs.add(rig);
+}
+
+/** Validate external data and register only the immutable snapshot created by this boundary. */
+export function inspectEditorAnimation(input: unknown, rig: Rig): ValidationResult<ReadonlyAnimation> {
+  const { data, ...diagnostics } = inspectAnimationDefinition(input, rig);
+  if (!data) return diagnostics;
+  const snapshot = freezeData<ReadonlyAnimation>({ ...data, version: ANIMATION_FORMAT_VERSION });
+  rememberValidated(snapshot, rig);
+  return { ...diagnostics, data: snapshot };
 }
 
 /** Only plain enumerable data records can be projected without losing JSON diagnostics. */

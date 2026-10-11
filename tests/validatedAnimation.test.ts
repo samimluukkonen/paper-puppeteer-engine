@@ -1,4 +1,5 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
+import { AnimationEditorDocument } from '../src/devtools/animation-editor/AnimationEditorDocument.js';
 import { setBonePropertyKeyframe } from '../src/devtools/animation-editor/keyframes.js';
 import { getCompiledPreviewClip } from '../src/devtools/animation-editor/previewClip.js';
 import {
@@ -7,6 +8,7 @@ import {
 } from '../src/devtools/animation-editor/validatedAnimation.js';
 import { freezeData, isFullyFrozen } from '../src/devtools/shared/editorData.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
+import * as externalData from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
 
 const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
@@ -27,6 +29,41 @@ test('deeply frozen files share immutable validation results only for the same r
     /unknown bone/i,
   );
 });
+
+test.each(['loaded', 'imported', 'replaced'])(
+  '%s snapshots reuse boundary validation on first sample and edit',
+  (kind) => {
+    const skeleton = new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'child', parent: 'root' }] });
+    const input = { ...clip(), version: 1, tracks: { ...clip().tracks, child: [{ time: 0, x: 3 }] } };
+    const document = new AnimationEditorDocument(skeleton, kind === 'loaded' ? [input] : [clip()]);
+    document.selectAnimation('move');
+    if (kind === 'imported') assert.isTrue(document.importJson(JSON.stringify(input)));
+    if (kind === 'replaced') {
+      const next = document.inspect(input);
+      assert.isNotNull(next);
+      assert.isTrue(document.install(next));
+    }
+    const snapshot = document.workingAnimation!;
+    const parse = vi.spyOn(externalData, 'parseAnimationClip');
+    try {
+      assert.strictEqual(getValidatedEditorAnimation(snapshot, skeleton), snapshot);
+      getCompiledPreviewClip(snapshot, skeleton);
+      assert.equal(parse.mock.calls.length, 0);
+      const next = setBonePropertyKeyframe(snapshot, skeleton, 'root', 'x', 0, 8);
+      assert.equal(parse.mock.calls.length, 1);
+      const changedInput = parse.mock.calls[0]![0] as { tracks: Record<string, unknown> };
+      assert.deepEqual(Object.keys(changedInput.tracks), ['root']);
+      assert.strictEqual(next.tracks.child, snapshot.tracks.child);
+      assert.equal(snapshot.tracks.root![0]!.x, 1);
+      assert.throws(
+        () => getValidatedEditorAnimation(snapshot, new Rig({ root: 'other', bones: [{ id: 'other' }] })),
+        /unknown bone/i,
+      );
+    } finally {
+      parse.mockRestore();
+    }
+  },
+);
 
 test.each([false, true])('mutable nested files remain validated after every change, shallow freeze=%s', (shallow) => {
   const animation = clip();

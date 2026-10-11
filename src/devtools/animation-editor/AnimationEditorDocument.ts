@@ -1,21 +1,14 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
-import {
-  ANIMATION_FORMAT_VERSION,
-  AnimationValidationError,
-  inspectAnimationDefinition,
-  type ValidationIssue,
-} from '../../engine/externalData.js';
+import { ANIMATION_FORMAT_VERSION, AnimationValidationError, type ValidationIssue } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assetFilename } from '../shared/assetFilename.js';
-import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
+import { equalEditorData, freezeData } from '../shared/editorData.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { importAnimationJson } from './animationImport.js';
 import { serializeAnimation, type AnimationExportResult } from './animationSerialization.js';
+import { inspectEditorAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 
-/** Same external file fields; event data remains unknown to callers and is validated as JSON before ownership. */
-export type ReadonlyAnimation = ReadonlyEditorData<AnimationClip> & {
-  readonly version: typeof ANIMATION_FORMAT_VERSION;
-};
+export type { ReadonlyAnimation } from './validatedAnimation.js';
 type AnimationEntry = {
   source: ReadonlyAnimation | null;
   saved: ReadonlyAnimation | null;
@@ -118,11 +111,10 @@ export class AnimationEditorDocument {
       this.issues = [{ severity: 'error', message: 'Load a character before selecting an animation.' }];
       return null;
     }
-    const result = inspectAnimationDefinition(input, this.rig);
+    const result = inspectEditorAnimation(input, this.rig);
     this.issues = freezeData(result.issues);
     if (!result.data) return null;
-    // The shared validator checks JSON compatibility and rig references before any clone is installed.
-    return freezeData({ ...result.data, version: ANIMATION_FORMAT_VERSION });
+    return result.data;
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
