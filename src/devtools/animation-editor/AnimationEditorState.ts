@@ -82,7 +82,10 @@ export class AnimationEditorState {
   private readonly document: AnimationEditorDocument;
   private readonly listeners = new Set<() => void>();
   private readonly clipboard = new TimelineClipboard();
-  private readonly playback = new AnimationEditorPlayback(() => this.working?.duration ?? 0);
+  private readonly playback = new AnimationEditorPlayback(
+    () => this.working?.duration ?? 0,
+    () => this.working?.events ?? [],
+  );
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly keyframes: AnimationEditorKeyframeCommands;

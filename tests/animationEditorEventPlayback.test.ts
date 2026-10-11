@@ -285,6 +285,53 @@ test('fractional millisecond marker boundaries remain exact across following upd
   assert.equal(count, 1);
 });
 
+test('editor and runtime preserve fractional loop crossings and close, distinct markers', () => {
+  const input = {
+    ...clip,
+    duration: 1000,
+    events: [
+      { time: 100.1, name: 'early' },
+      { time: 100.100000000001, name: 'later' },
+    ],
+  };
+  const { state, events } = session(input);
+  state.setPreviewLoop(true);
+  const player = new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [compileClip(input, rig)]);
+  const runtime: FiredAnimationEvent[] = [];
+  player.onAnimationEvent((event) => runtime.push(event));
+  state.play();
+  player.play(input.name);
+  for (const delta of [1.1001, 0.001, 0.999]) {
+    state.advancePlayback(delta);
+    player.update(delta * 1000);
+    assert.deepEqual(events, runtime);
+    assert.equal(state.currentTime * 1000, player.elapsedTime);
+  }
+  assert.deepEqual(
+    runtime.map(({ name }) => name),
+    ['early', 'later', 'early', 'later', 'early'],
+  );
+});
+
+test('editor wrap distinguishes tail markers from tiny markers in the new cycle', () => {
+  const { state, events } = session({
+    ...clip,
+    duration: 1000,
+    events: [
+      { time: 0, name: 'start' },
+      { time: 1e-14, name: 'tiny' },
+      { time: 999.9999999999999, name: 'tail' },
+      { time: 1000, name: 'end' },
+    ],
+  });
+  state.setPreviewLoop(true);
+  state.play();
+  state.advancePlayback(2);
+  events.length = 0;
+  state.advancePlayback(0.001);
+  assert.isEmpty(events);
+});
+
 test('selection seeks to exact fractional authored time and excludes it on the next playback update', () => {
   const timestamp = 0.031101767270538955;
   const { state, events } = session({ ...clip, events: [{ time: timestamp, name: 'fractional' }] });

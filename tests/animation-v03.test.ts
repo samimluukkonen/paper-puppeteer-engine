@@ -1181,6 +1181,55 @@ test('play and restart accept the exact time-zero event budget', () => {
   assert.equal(listener.mock.calls.length, 20000);
 });
 
+test('fractional loop events fire at the exact crossing and cannot replay after wrapping', () => {
+  const { player } = fixture();
+  player.addAnimation({
+    name: 'fractional',
+    duration: 1000,
+    loop: true,
+    tracks: {},
+    events: [
+      { time: 100.1, name: 'early' },
+      { time: 100.100000000001, name: 'later' },
+    ],
+  });
+  const events: string[] = [];
+  player.onAnimationEvent((event) => events.push(event.name));
+  player.play('fractional');
+  player.update(1100.1);
+  assert.deepEqual(events, ['early', 'later', 'early']);
+  assert.equal(player.elapsedTime, 100.1);
+  player.update(1);
+  assert.deepEqual(events, ['early', 'later', 'early', 'later']);
+  player.update(999);
+  assert.deepEqual(events, ['early', 'later', 'early', 'later', 'early']);
+  assert.equal(player.elapsedTime, 100.1);
+});
+
+test('rounded tail and zero boundaries wrap into the current cycle without replaying events', () => {
+  const { player } = fixture();
+  player.addAnimation({
+    name: 'boundary',
+    duration: 1000,
+    loop: true,
+    tracks: {},
+    events: [
+      { time: 0, name: 'start' },
+      { time: 1e-14, name: 'tiny' },
+      { time: 999.9999999999999, name: 'tail' },
+      { time: 1000, name: 'end' },
+    ],
+  });
+  const events: string[] = [];
+  player.onAnimationEvent((event) => events.push(event.name));
+  player.play('boundary');
+  player.update(2000);
+  assert.equal(player.elapsedTime, 1e-14);
+  events.length = 0;
+  player.update(1);
+  assert.isEmpty(events);
+});
+
 test('zero playback speed does not overflow intermediate multiplication', () => {
   const { player } = fixture();
   player.play('a', { speed: 0 });

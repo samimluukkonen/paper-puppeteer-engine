@@ -36,13 +36,48 @@ export function advanceAnimationTime(state: AnimationClock, delta: number, playb
   return state.clip.loop ? end : Math.min(end, state.clip.duration);
 }
 
+function assertSafeCycle(cycle: number): void {
+  if (!Number.isSafeInteger(cycle))
+    throw new Error('Animation event cycle bounds must be safe integers. Reduce the delta or playback speed.');
+}
+
+/** Correct the division estimate against the same representable crossing used for delivery. */
+function lastEventCycle(duration: number, boundary: number, time: number): number {
+  let cycle = Math.floor((boundary - time) / duration);
+  assertSafeCycle(cycle);
+  while (cycle >= 0 && cycle * duration + time > boundary) --cycle;
+  while ((cycle + 1) * duration + time <= boundary) {
+    ++cycle;
+    assertSafeCycle(cycle);
+  }
+  return cycle;
+}
+
 function eventCycles(clip: CompiledClip, previous: number, end: number, time: number): [number, number] {
   if (!clip.loop) return time > previous && time <= end ? [0, 0] : [1, 0];
-  const first = Math.max(0, Math.floor((previous - time) / clip.duration) + 1);
-  const last = Math.floor((end - time) / clip.duration);
-  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last))
-    throw new Error('Animation event cycle bounds must be safe integers. Reduce the delta or playback speed.');
+  const first = Math.max(0, lastEventCycle(clip.duration, previous, time) + 1);
+  const last = lastEventCycle(clip.duration, end, time);
+  assertSafeCycle(first);
   return [first, last];
+}
+
+/** Retain an exact authored boundary after wrapping so the next update cannot replay it. */
+export function wrapAnimationTime(clip: Pick<CompiledClip, 'duration' | 'events'>, end: number): number {
+  if (end < clip.duration) return end;
+  const wrapped = end % clip.duration;
+  let cycle = Math.floor(end / clip.duration);
+  if (!Number.isSafeInteger(cycle)) return wrapped;
+  while (cycle * clip.duration > end) --cycle;
+  while (Number.isSafeInteger(cycle + 1) && (cycle + 1) * clip.duration <= end) ++cycle;
+  const start = cycle * clip.duration;
+  let boundaryTime: number | undefined = start === end ? 0 : undefined;
+  for (const marker of clip.events) {
+    // A tail marker from the previous cycle may round to the same absolute time as zero.
+    // Only current-cycle markers may advance the wrapped phase beyond that boundary.
+    if (marker.time < clip.duration && start + marker.time === end)
+      boundaryTime = Math.max(boundaryTime ?? 0, marker.time);
+  }
+  return boundaryTime ?? wrapped;
 }
 
 /** Count catch-up work before allocating events or changing any layer clocks. */

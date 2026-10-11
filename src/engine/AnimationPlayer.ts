@@ -10,6 +10,7 @@ import {
   collectAnimationStartEvents,
   countAnimationEvents,
   countAnimationStartEvents,
+  wrapAnimationTime,
 } from './animationTimeline.js';
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
@@ -400,7 +401,7 @@ export class AnimationPlayer {
     if (layer && events) {
       for (const event of collectAnimationEvents(state.clip, previous, end, layer)) events.push(event);
     }
-    state.time = state.clip.loop ? end % state.clip.duration : end;
+    state.time = state.clip.loop ? wrapAnimationTime(state.clip, end) : end;
     if (!state.clip.loop && end >= state.clip.duration) {
       state.playing = false;
       if (layer && completions) completions.push({ clip: state.clip.name, layer });

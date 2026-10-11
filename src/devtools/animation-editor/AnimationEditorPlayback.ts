@@ -1,3 +1,5 @@
+import type { AnimationEvent } from '../../engine/AnimationClip.js';
+import { wrapAnimationTime } from '../../engine/animationTimeline.js';
 import { clampTime } from './timeline.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
@@ -12,7 +14,10 @@ export class AnimationEditorPlayback {
   private scrubbing = false;
   private startPending = true;
 
-  constructor(private readonly duration: () => Milliseconds) {}
+  constructor(
+    private readonly duration: () => Milliseconds,
+    private readonly events: () => readonly AnimationEvent[] = () => [],
+  ) {}
 
   get currentTime(): Seconds {
     return toSeconds(this.time);
@@ -132,7 +137,7 @@ export class AnimationEditorPlayback {
     const end = this.time + distance;
     let next = end;
     if (this.loop) {
-      if (Number.isFinite(end)) next = end % duration;
+      if (Number.isFinite(end)) next = wrapAnimationTime({ duration, events: this.events() }, end);
       else {
         // Event-free clocks retain finite wrapping even when scaling/addition overflows.
         const period = toSeconds(duration) / this.speed;
