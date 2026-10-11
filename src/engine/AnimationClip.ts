@@ -1,9 +1,9 @@
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
-import type { IKKeyframe } from './ik/animationKeyframes.js';
+import { ikAnimationProperties, type IKAnimationProperty, type IKKeyframe } from './ik/animationKeyframes.js';
 import { copyJsonData } from './jsonData.js';
 import { freezeData, isFullyFrozen, readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
-import { animationClipSchema, identifierSchema, keyframeSchema } from './schemas.js';
+import { animationClipSchema, identifierSchema, ikKeyframeSchema, keyframeSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { assertFinite, transformProperties } from './types.js';
 import { checkAnimationReferences, throwValidationIssue } from './validation.js';
@@ -54,17 +54,25 @@ export interface CompiledTrack {
   readonly properties: ReadonlyMap<TransformProperty, readonly PropertyKeyframe[]>;
 }
 
+export interface CompiledIKTrack {
+  readonly constraint: string;
+  readonly properties: ReadonlyMap<IKAnimationProperty, readonly PropertyKeyframe[]>;
+}
+
 export interface CompiledClip {
   readonly name: string;
   readonly duration: number;
   readonly loop: boolean;
   readonly tracks: readonly CompiledTrack[];
+  readonly ikTracks?: readonly CompiledIKTrack[];
   readonly events: readonly Readonly<AnimationEvent>[];
   readonly playback?: Readonly<AnimationPlaybackMode>;
 }
 
 const ownedClips = new WeakSet<CompiledClip>();
 const ownedTracks = new WeakSet<CompiledTrack>();
+const ownedIKTracks = new WeakSet<CompiledIKTrack>();
+const compiledIKProperties = new WeakMap<readonly IKKeyframe[], CompiledIKTrack['properties']>();
 const compiledProperties = new WeakMap<readonly Keyframe[], CompiledTrack['properties']>();
 
 function ownCompiledTrack(track: CompiledTrack): CompiledTrack {
@@ -82,10 +90,25 @@ function ownCompiledTrack(track: CompiledTrack): CompiledTrack {
   return owned;
 }
 
+function ownCompiledIKTrack(track: CompiledIKTrack): CompiledIKTrack {
+  if (ownedIKTracks.has(track)) return track;
+  const owned = Object.freeze({
+    constraint: track.constraint,
+    properties: readonlyMap(
+      [...track.properties].map(
+        ([property, keys]) =>
+          [property, Object.freeze(keys.map((key) => Object.freeze({ time: key.time, value: key.value })))] as const,
+      ),
+    ),
+  });
+  ownedIKTracks.add(owned);
+  return owned;
+}
+
 /** @internal Share compiler-owned immutable clips; snapshot externally assembled compiled data. */
 export function ownCompiledClip(clip: CompiledClip): CompiledClip {
   if (ownedClips.has(clip)) return clip;
-  const metadata = animationClipSchema.parse({ ...clip, tracks: {} });
+  const metadata = animationClipSchema.parse({ ...clip, tracks: {}, ikTracks: {} });
   checkAnimationReferences(metadata, { bones: [] }, throwValidationIssue);
   const bones = new Set<string>();
   for (const track of clip.tracks) {
@@ -107,6 +130,23 @@ export function ownCompiledClip(clip: CompiledClip): CompiledClip {
       );
     }
   }
+  const constraints = new Set<string>();
+  for (const track of clip.ikTracks ?? []) {
+    identifierSchema.parse(track.constraint);
+    if (constraints.has(track.constraint)) throw new Error(`Duplicate compiled IK track "${track.constraint}".`);
+    constraints.add(track.constraint);
+    for (const [property, keys] of track.properties) {
+      if (!ikAnimationProperties.includes(property)) throw new Error(`Unknown compiled IK property "${property}".`);
+      if (!keys.length)
+        throw new Error(`Compiled IK property "${track.constraint}.${property}" needs at least one key.`);
+      const authoredKeys = keys.map((key) => ikKeyframeSchema.parse({ time: key.time, [property]: key.value }));
+      checkAnimationReferences(
+        { ...metadata, ikTracks: { [track.constraint]: authoredKeys }, events: [] },
+        undefined,
+        throwValidationIssue,
+      );
+    }
+  }
   return snapshotCompiledClip(clip);
 }
 
@@ -117,6 +157,7 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
     duration: clip.duration,
     loop: clip.loop,
     tracks: Object.freeze(clip.tracks.map(ownCompiledTrack)),
+    ...(clip.ikTracks ? { ikTracks: Object.freeze(clip.ikTracks.map(ownCompiledIKTrack)) } : {}),
     events: Object.freeze(
       clip.events.map((event) => {
         const copy = copyAnimationEvent(event);
@@ -164,11 +205,28 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
     if (isFullyFrozen(keys)) compiledProperties.set(keys, track.properties);
     tracks.push(track);
   }
+  const ikTracks: CompiledIKTrack[] = [];
+  for (const [constraint, keys] of Object.entries(clip.ikTracks ?? {})) {
+    const cached = compiledIKProperties.get(keys);
+    const properties = new Map<IKAnimationProperty, readonly PropertyKeyframe[]>();
+    if (!cached) {
+      for (const property of ikAnimationProperties) {
+        const samples = keys.flatMap((key) =>
+          key[property] === undefined ? [] : [{ time: key.time, value: key[property] }],
+        );
+        if (samples.length) properties.set(property, samples);
+      }
+    }
+    const track = ownCompiledIKTrack({ constraint, properties: cached ?? properties });
+    if (isFullyFrozen(keys)) compiledIKProperties.set(keys, track.properties);
+    ikTracks.push(track);
+  }
   return snapshotCompiledClip({
     name: clip.name,
     duration: clip.duration,
     loop: clip.loop,
     tracks,
+    ...(clip.ikTracks ? { ikTracks } : {}),
     events,
     ...(clip.playback ? { playback: { ...clip.playback } } : {}),
   });

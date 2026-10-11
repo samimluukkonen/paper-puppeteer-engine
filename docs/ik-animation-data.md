@@ -2,11 +2,11 @@
 
 [All guides](../README.md#guides)
 
-Milestone v0.5.5.1 adds serializable IK target and influence channels, rig references, validation, and pure keyframe operations. Animated IK evaluation and visual authoring are deferred. The existing bone evaluator and procedural IK solver continue to behave as before; authored IK channels currently have no playback effect.
+Milestone v0.5.5.1 adds serializable IK target and influence channels, rig references, validation, and pure keyframe operations. Milestone v0.5.5.2 adds [runtime IK evaluation](ik-animation-runtime.md): authored channels now drive the existing solver during playback and editor scrubbing. Visual authoring remains deferred.
 
 ## Rig and animation formats
 
-Both file formats remain **version 1**. These optional fields extend version 1 without changing existing fields, time units, interpolation, or defaults. Existing files need no migration or empty IK field. Earlier engine releases with strict file validators cannot read files containing the new fields. Package milestone `0.5.5-1` is independent of file-format version.
+Both file formats remain **version 1**. These optional fields extend version 1 without changing existing fields, time units, interpolation, or defaults. Existing files need no migration or empty IK field. Earlier engine releases with strict file validators cannot read files containing the new fields. Package milestone `0.5.5-2` is independent of file-format version.
 
 Rig files may include an `ik` array of existing `TwoBoneIKDefinition` objects:
 
@@ -54,7 +54,7 @@ Positions are absolute **puppet-local coordinates**: the coordinate frame of the
 
 Moving a character does not rewrite keys. Facing reflects local X through the puppet container's existing facing transform; character scaling scales the target with the character. Root-bone offsets and animated transforms do not change this authored coordinate frame. Procedural `setIKTarget` still accepts world positions.
 
-A future runtime adapter can transform an authored point with the puppet container's full world matrix using the existing `localToWorld` affine utility, then pass the world point through the existing IK `worldToParent` adapter. Authoring tools can use `worldToLocal` with that same outer matrix to recover local points; singular transforms return `undefined`. This milestone stores positions only and performs no automatic coordinate conversion or runtime sampling.
+The runtime transforms an authored point with the puppet container's full world matrix using the existing `localToWorld` affine utility, then passes the world point through the existing IK `worldToParent` adapter. Authoring tools can use `worldToLocal` with that same outer matrix to recover local points; singular transforms return `undefined`. Runtime conversion is transient and never writes scene coordinates into authored keys.
 
 ## Pure keyframe APIs
 
@@ -84,4 +84,4 @@ Animation import/export retains all IK channels and existing metadata. Determini
 
 Tests in `tests/ikAnimationData.test.ts` cover creation, sparse insertion/update/deletion, tolerant moves and collisions, coordinates/facing/scaling, mix and timeline failures, strict references, empty tracks, deterministic round trips, old files, source ownership, rig editor preservation, and unchanged bone evaluation.
 
-Animated runtime evaluation, React timeline controls, draggable handles, copy/paste UI, mirroring, baking, solvers, and physics remain deferred.
+React IK timeline controls, draggable handles, copy/paste UI, mirroring, baking, new solvers, and physics remain deferred.

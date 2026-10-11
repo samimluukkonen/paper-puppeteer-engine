@@ -24,6 +24,10 @@ export interface TwoBoneIKDefinition {
 
 /** Renderer adapter; a singular parent transform returns undefined. */
 export interface IKTransformContext {
+  /** Optional animated-target adapter; omitted adapters retain static runtime behavior. */
+  puppetToWorld?(target: IKTarget): IKTarget;
+  worldToPuppet?(target: IKTarget): IKTarget | undefined;
+  endToWorld?(boneId: string, offset: IKTarget): IKTarget;
   worldToParent(boneId: string, target: IKTarget): IKTarget | undefined;
 }
 

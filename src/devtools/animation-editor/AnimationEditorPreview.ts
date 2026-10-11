@@ -16,7 +16,7 @@ export class AnimationEditorPreview {
 
   constructor(
     private readonly state: AnimationEditorState,
-    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose'>,
+    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'setIKAnimationSource'>,
   ) {
     this.refresh();
     this.unsubscribe = state.subscribe(() => this.refresh());
@@ -52,6 +52,7 @@ export class AnimationEditorPreview {
       this.puppet.preparePose();
       for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
       this.player = next;
+      this.puppet.setIKAnimationSource(next);
       this.animation = animation;
       if (next && animation) {
         next.play(animation.name);
@@ -70,6 +71,7 @@ export class AnimationEditorPreview {
 
   dispose(): void {
     this.unsubscribe();
+    this.puppet.setIKAnimationSource(undefined);
     this.player?.dispose();
     this.player = undefined;
   }

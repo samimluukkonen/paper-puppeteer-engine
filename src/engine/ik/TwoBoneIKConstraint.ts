@@ -1,7 +1,9 @@
+import { interpolateNumber } from '../animationMath.js';
 import type { Joint } from '../Joint.js';
 import type { Rig } from '../Rig.js';
 import { twoBoneIKDefinitionSchema } from '../schemas.js';
 import { assertFinite } from '../types.js';
+import type { IKAnimationValues } from './AnimationIKPose.js';
 import { assertBendDirection, blendIKRotation, IK_EPSILON, solveTwoBoneIK } from './solveTwoBoneIK.js';
 import type {
   BendDirection,
@@ -38,6 +40,7 @@ export class TwoBoneIKConstraint {
   lengthA = 0;
   lengthB = 0;
   private influence: number;
+  private mixOverride = false;
   private bend: BendDirection;
   private point: Readonly<IKTarget> | undefined;
   private provider: IKTargetProvider | undefined;
@@ -60,8 +63,7 @@ export class TwoBoneIKConstraint {
     this.root = getJoint(this.rootBone);
     this.middle = getJoint(this.middleBone);
     this.end = getJoint(this.endBone);
-    this.influence = 1;
-    this.mix = definition.mix ?? 1;
+    this.influence = definition.mix ?? 1;
     this.bend = 1;
     this.bendDirection = definition.bendDirection ?? 1;
     this.enabled = definition.enabled ?? true;
@@ -83,6 +85,13 @@ export class TwoBoneIKConstraint {
     assertFinite(value, 'IK mix');
     if (value < 0 || value > 1) throw new Error('IK mix must be between 0 and 1.');
     this.influence = value;
+    this.mixOverride = true;
+  }
+
+  /** Return influence ownership to animation while retaining the current static fallback mix. */
+  clearMixOverride(): this {
+    this.mixOverride = false;
+    return this;
   }
 
   get bendDirection(): BendDirection {
@@ -129,12 +138,39 @@ export class TwoBoneIKConstraint {
     return this;
   }
 
-  apply(context: IKTransformContext): void {
+  apply(context: IKTransformContext, animation?: IKAnimationValues): void {
     this.status = 'inactive';
     this.resolvedTarget = undefined;
-    if (!this.enabled || this.mix === 0) return;
-    const target = this.provider ? this.provider() : this.point;
-    if (!target) return;
+    if (!this.enabled) return;
+    let mix = this.mix;
+    if (!this.provider && !this.mixOverride && animation?.mix)
+      mix = interpolateNumber(mix, animation.mix.value, animation.mix.weight);
+    if (mix === 0) return;
+    let target: Readonly<IKTarget> | undefined;
+    if (this.provider || this.point) {
+      // Explicit world targets own position; late-bound specialized providers also own influence.
+      target = this.provider ? this.provider() : this.point;
+    } else if (
+      animation &&
+      (animation.x || animation.y) &&
+      context.puppetToWorld &&
+      context.worldToPuppet &&
+      context.endToWorld
+    ) {
+      const endpoint = context.endToWorld(this.endBone, this.endOffset);
+      const fallback = context.worldToPuppet(endpoint);
+      if (!fallback) {
+        this.status = 'singular-transform';
+        return;
+      }
+      target = context.puppetToWorld({
+        x: animation.x ? interpolateNumber(fallback.x, animation.x.value, animation.x.weight) : fallback.x,
+        y: animation.y ? interpolateNumber(fallback.y, animation.y.value, animation.y.weight) : fallback.y,
+      });
+      // When a sparse target fades away, restore ordinary authored bone control.
+      mix *= Math.max(animation.x?.weight ?? 0, animation.y?.weight ?? 0);
+    }
+    if (!target || mix === 0) return;
     assertFinite(target.x, 'IK target.x');
     assertFinite(target.y, 'IK target.y');
     this.resolvedTarget = { ...target };
@@ -183,8 +219,8 @@ export class TwoBoneIKConstraint {
     });
     const rootRotation = solved.rootRotation - axisA;
     const middleRotation = reflection * (axisA + solved.middleRotation - axisB);
-    root.rotation = blendIKRotation(root.rotation, rootRotation, this.mix);
-    middle.rotation = blendIKRotation(middle.rotation, middleRotation, this.mix);
+    root.rotation = blendIKRotation(root.rotation, rootRotation, mix);
+    middle.rotation = blendIKRotation(middle.rotation, middleRotation, mix);
     this.status = solved.reachable ? 'solved' : 'clamped';
   }
 }

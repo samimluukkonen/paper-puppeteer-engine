@@ -1,4 +1,5 @@
 import type { Bone } from './Bone.js';
+import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import { IKPoseState } from './ik/IKPoseState.js';
 import type { TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTransformContext } from './ik/types.js';
@@ -28,6 +29,7 @@ export class PuppetPoseController {
     private readonly ikContext: IKTransformContext,
     private readonly renderer: PoseProjection,
     private readonly updateDebugViews: (constraints: readonly TwoBoneIKConstraint[]) => void,
+    private readonly getIKAnimation?: () => IKAnimationPose,
   ) {}
 
   private getBone(id: string): Bone {
@@ -117,6 +119,7 @@ export class PuppetPoseController {
 
   private solveIK(options: SyncPoseOptions): void {
     const constraints = this.getOrderedConstraints(true);
+    const animation = this.getIKAnimation?.();
     for (const constraint of constraints) {
       this.ikPose.captureJoint(this.getBone(constraint.rootBone));
       this.ikPose.captureJoint(this.getBone(constraint.middleBone));
@@ -127,7 +130,7 @@ export class PuppetPoseController {
         const middle = this.getBone(constraint.middleBone);
         const rootRotation = root.pose.rotation;
         const middleRotation = middle.pose.rotation;
-        constraint.apply(this.ikContext);
+        constraint.apply(this.ikContext, animation?.get(constraint.name));
         // Later providers may read attachments in any descendant render mount.
         // Recompose render branches beneath each changed local transform.
         this.syncIKBone(root, rootRotation);

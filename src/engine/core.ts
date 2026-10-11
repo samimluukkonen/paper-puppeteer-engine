@@ -3,6 +3,7 @@ export type {
   AnimationEvent,
   AnimationPlaybackMode,
   CompiledClip,
+  CompiledIKTrack,
   CompiledTrack,
   Interpolation,
   Keyframe,
@@ -104,3 +105,6 @@ export {
   ikAnimationProperties,
 } from './ik/animationKeyframes.js';
 export { ikKeyframeSchema, ikMixSchema } from './schemas.js';
+
+export type { IKAnimationChannel, IKAnimationValues, IKAnimationPose } from './ik/AnimationIKPose.js';
+export { evaluateIKClip } from './ik/AnimationIKPose.js';

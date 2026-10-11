@@ -113,4 +113,4 @@ Attached props inherit all ancestor transforms and facing, and draw in their bon
 
 Use `puppet.attachToSlot('weaponHilt', prop)` to inherit a rig slot's transform and global depth instead. The prop and the slot's sprite can coexist; clearing or changing the sprite preserves the prop. The same attachment offsets and lifecycle apply, with `depth` sorting within that slot. `setSlotDepth` can move the entire slot behind another body part without changing the prop's bone assignment.
 
-See the [IK animation data model](ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. Animated IK playback and visual authoring are deferred.
+See the [IK animation data model](ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. See [runtime IK evaluation](ik-animation-runtime.md) for playback, scrubbing, precedence, and layer blending. Visual IK authoring remains deferred.

@@ -1,6 +1,7 @@
 import type { AnimationPlaybackMode, CompiledClip } from './AnimationClip.js';
 import { quantizePlaybackTime } from './animationMath.js';
 import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer } from './AnimationPose.js';
+import { AnimationIKEvaluator, type IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
 import type { Rig } from './Rig.js';
 import { type TransformProperty, transformProperties } from './types.js';
@@ -16,6 +17,7 @@ export interface AnimationTransition {
   source: AnimationState | AnimationPose;
   elapsed: number;
   duration: number;
+  ikSource?: IKAnimationPose;
 }
 
 export interface AnimationLayer {
@@ -39,12 +41,19 @@ export class AnimationLayerEvaluator {
   private readonly controlled = new Map<string, Set<TransformProperty>>();
   private controlDirty = true;
   private readonly layerBuffers = new WeakMap<AnimationLayer, LayerBuffers>();
+  readonly ikEvaluator: AnimationIKEvaluator;
+  private ikPlayback: AnimationPlaybackMode = { mode: 'smooth' };
   private sampleBuffer: ClipPoseBuffer | undefined;
 
   constructor(
     private readonly rig: Rig,
     private joints: ReadonlyMap<string, Joint>,
   ) {
+    this.ikEvaluator = new AnimationIKEvaluator(
+      rig,
+      (clip, time) => this.sampleTime(clip, time, this.ikPlayback),
+      (state, transition) => this.transitionWeight(state, transition, this.ikPlayback),
+    );
     for (const bone of rig.bones) {
       if (!joints.has(bone.id)) throw new Error(`Missing joint "${bone.id}".`);
       this.workingPose.set(bone.id, { ...joints.get(bone.id)!.bindPose });
@@ -69,6 +78,7 @@ export class AnimationLayerEvaluator {
       state.clip,
       usePlayback ? this.sampleTime(state.clip, clampedTime, playback) : clampedTime,
     );
+    this.ikEvaluator.sample(state.clip, usePlayback ? this.sampleTime(state.clip, clampedTime, playback) : clampedTime);
     this.updateControlledProperties(layers);
     for (const [id, properties] of this.controlled) {
       const joint = this.joints.get(id)!;
@@ -79,6 +89,7 @@ export class AnimationLayerEvaluator {
 
   /** Reapply layers while retaining manual edits outside their controlled properties. */
   applyCurrentPose(layers: ReadonlyMap<string, AnimationLayer>, playback: AnimationPlaybackMode): void {
+    this.ikPlayback = playback;
     const base = layers.get('base');
     const pose = this.workingPose;
     for (const [id, values] of pose) {
@@ -99,6 +110,7 @@ export class AnimationLayerEvaluator {
       }
     }
     for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
+    this.ikEvaluator.apply(layers);
   }
 
   private updateControlledProperties(layers: ReadonlyMap<string, AnimationLayer>): void {
@@ -219,6 +231,7 @@ export class AnimationLayerEvaluator {
   }
 
   dispose(): void {
+    this.ikEvaluator.clear();
     this.sampleBuffer = undefined;
     this.workingPose.clear();
     this.emptyPose.clear();

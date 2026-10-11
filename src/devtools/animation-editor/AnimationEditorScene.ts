@@ -176,8 +176,11 @@ export class AnimationEditorScene extends Phaser.Scene {
         const point = puppet.getBone(chain.endBone).getWorldPosition();
         const local = puppet.container.getWorldTransformMatrix().applyInverse(point.x, point.y);
         constraint.setTargetProvider(() => puppet.container.getWorldTransformMatrix().transformPoint(local.x, local.y));
+      } else {
+        constraint.setTargetProvider(undefined);
       }
-      constraint.enabled = enabled;
+      const authored = puppet.rig.ik?.find((definition) => definition.name === chain.name);
+      constraint.enabled = enabled || (authored ? (authored.enabled ?? true) : false);
     }
     puppet.syncPose();
   }
@@ -205,7 +208,12 @@ export class AnimationEditorScene extends Phaser.Scene {
         autoUpdate: false,
         facing: this.facing,
         debug: this.bonesVisible,
-        ik: (this.options.ikChains ?? []).map((chain) => ({ ...chain, enabled: false })),
+        ik: [
+          ...(definition.rig.ik ?? []),
+          ...(this.options.ikChains ?? [])
+            .filter((chain) => !definition.rig.ik?.some((authored) => authored.name === chain.name))
+            .map((chain) => ({ ...chain, enabled: false })),
+        ],
       });
       preview = new AnimationEditorPreview(state, puppet);
       ghosts = new AnimationEditorGhostLayer(this, state, puppet);

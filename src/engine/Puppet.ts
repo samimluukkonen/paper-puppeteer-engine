@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { worldToLocal } from './affineMath.js';
+import { localToWorld, worldToLocal } from './affineMath.js';
 import { type AnimationClip, type AnimationPlaybackMode, type CompiledClip, compileClip } from './AnimationClip.js';
 import {
   type AnimationCompletion,
@@ -61,9 +61,13 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
+  private ikAnimationSource: AnimationPlayer | undefined;
   private readonly prepareAnimationPose = (): void => this.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.syncPose();
   private readonly ikContext: IKTransformContext = {
+    puppetToWorld: (target) => localToWorld(target, this.container.getWorldTransformMatrix()),
+    worldToPuppet: (target) => worldToLocal(target, this.container.getWorldTransformMatrix(), 0),
+    endToWorld: (id, offset) => localToWorld(offset, this.getBone(id).container.getWorldTransformMatrix()),
     worldToParent: (id, target) => {
       const parent = this.getBone(id).container.parentContainer;
       // IK accepts nonsingular ancestors; editor gestures use the helper's default tolerance.
@@ -155,6 +159,7 @@ export class Puppet {
       this.ikContext,
       this.renderer,
       (constraints) => this.updateDebugViews(constraints),
+      () => (this.ikAnimationSource ?? this.animationPlayer).ikAnimation,
     );
     for (const definition of ikDefinitions) this.addIK(definition);
     this.setFacing(this.facing);
@@ -550,6 +555,7 @@ export class Puppet {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.ikAnimationSource = undefined;
     this.animationPlayer.dispose();
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
@@ -581,6 +587,11 @@ export class Puppet {
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
   preparePose(): void {
     this.poseController.preparePose();
+  }
+
+  /** Use an external pose player's IK channels (for editor previews); undefined restores the runtime player. */
+  setIKAnimationSource(player: AnimationPlayer | undefined): void {
+    this.ikAnimationSource = player;
   }
 
   /** Apply the evaluated pose, solve IK in priority order, then project rendering. */

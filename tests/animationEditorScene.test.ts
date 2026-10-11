@@ -4,6 +4,7 @@ import type { AnimationEditorGhostLayer } from '../src/devtools/animation-editor
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { createBoneSymmetryMapping, inferBoneSymmetryPairs } from '../src/devtools/shared/boneSymmetry.js';
+import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
@@ -33,6 +34,86 @@ vi.mock('../src/shared/loadSceneCharacter.js', () => ({ loadSceneCharacter: vi.f
 afterEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
+});
+
+test('loaded authored IK reaches scrubbed targets and survives overlapping preview chains and fixed-preview toggles', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  const arm = { name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand' };
+  const character = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'ik-test',
+      rig: 'rig.json',
+      textures: {},
+      skins: { basic: 'skin.json' },
+      defaultSkin: 'basic',
+      animations: ['reach.json'],
+    },
+    rig: {
+      version: 1,
+      root: 'root',
+      bones: [
+        { id: 'root' },
+        { id: 'upper', parent: 'root' },
+        { id: 'lower', parent: 'upper', y: 60 },
+        { id: 'hand', parent: 'lower', y: 50 },
+      ],
+      ik: [arm],
+    },
+    skins: { 'skin.json': { version: 1, name: 'basic', slots: {} } },
+    animations: {
+      'reach.json': {
+        version: 1,
+        name: 'reach',
+        duration: 1000,
+        loop: false,
+        tracks: {},
+        ikTracks: {
+          arm: [
+            { time: 0, x: 60, y: 60 },
+            { time: 500, x: 30, y: 80 },
+            { time: 1000, x: -40, y: 70 },
+          ],
+        },
+      },
+    },
+  });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(character);
+  const ready = vi.fn();
+  const error = vi.fn();
+  // A preview definition with the same name must not disable or replace the authored chain.
+  const scene = new AnimationEditorScene(ready, error, { ikChains: [{ ...arm, mix: 0 }] });
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const reaches = (x: number, y: number) => {
+      const point = puppet.getBone('hand').getWorldPosition();
+      const expected = puppet.container.getWorldTransformMatrix().transformPoint(x, y);
+      assert.approximately(point.x, expected.x, 1e-8);
+      assert.approximately(point.y, expected.y, 1e-8);
+    };
+    reaches(60, 60);
+    state.setCurrentTime(0.5);
+    reaches(30, 80);
+    scene.setIKPreview(true);
+    state.setCurrentTime(1);
+    reaches(30, 80);
+    scene.setIKPreview(false);
+    reaches(-40, 70);
+    assert.isTrue(puppet.getIK('arm').enabled);
+    state.setCurrentTime(0);
+    reaches(60, 60);
+    scene.setFacing('left');
+    reaches(60, 60);
+    assert.isFalse(state.dirty);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
 });
 
 test('preview preferences chosen while loading apply before the ready callback', async () => {

@@ -10,6 +10,7 @@ import {
   collectAnimationStartEvents,
   countAnimationEvents,
 } from './animationTimeline.js';
+import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import type { Rig } from './Rig.js';
@@ -68,9 +69,18 @@ export class AnimationPlayer {
         if (!rig.hasBone(track.bone))
           throw new Error(`Animation "${clip.name}" references unknown bone "${track.bone}".`);
       }
+      for (const track of clip.ikTracks ?? []) {
+        if (!rig.ik?.some((constraint) => constraint.name === track.constraint))
+          throw new Error(`Animation "${clip.name}" references unknown IK "${track.constraint}".`);
+      }
       this.clips.set(clip.name, ownCompiledClip(clip));
     }
     this.poseEvaluator = new AnimationLayerEvaluator(rig, joints);
+  }
+
+  /** Immutable puppet-local target channels, including layer/fade ownership weights. */
+  get ikAnimation(): IKAnimationPose {
+    return this.poseEvaluator.ikEvaluator.current;
   }
 
   get currentAnimation(): string | undefined {
@@ -147,6 +157,8 @@ export class AnimationPlayer {
     preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
     let source: AnimationState | AnimationPose | undefined;
+    const ikSource =
+      fade > 0 && layer.transition ? this.poseEvaluator.ikEvaluator.snapshotLayer(layerName, this.layers) : undefined;
     if (fade > 0) {
       if (layer.state)
         source = layer.transition
@@ -161,7 +173,7 @@ export class AnimationPlayer {
     }
     if (layerName !== 'base' && !source) this.poseEvaluator.resetLayerProperties(layer);
     layer.state = { clip, time: 0, speed, playing: true };
-    layer.transition = source ? { source, elapsed: 0, duration: fade } : undefined;
+    layer.transition = source ? { source, elapsed: 0, duration: fade, ...(ikSource ? { ikSource } : {}) } : undefined;
     layer.stopped = false;
     this.poseEvaluator.invalidate();
     if (layerName === 'base' && !source) this.resetPose();
@@ -268,6 +280,7 @@ export class AnimationPlayer {
     this.assertActive();
     this.layers.clear();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
+    this.poseEvaluator.ikEvaluator.clear();
     this.poseEvaluator.invalidate();
   }
 
@@ -286,6 +299,7 @@ export class AnimationPlayer {
   resetPose(): void {
     this.assertActive();
     for (const joint of this.joints.values()) joint.reset();
+    this.poseEvaluator.ikEvaluator.clear();
   }
 
   /** Advance playback and return whether this call evaluated the authored pose.
