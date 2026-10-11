@@ -279,7 +279,9 @@ test('legacy fingerprints restore equivalent reordered sources but still reject 
   assert.equal(confirm.mock.calls.length, 1);
   assert.isTrue(session.dirty());
   recovery.flush();
-  assert.include([...values.values()].at(-1)!, '\\"child\\"');
+  const replacement = z.object({ source: z.string(), data: schema }).parse(JSON.parse([...values.values()].at(-1)!));
+  assert.equal(replacement.source, current);
+  assert.deepEqual(replacement.data, { value: 8 });
   recovery.unbind();
   values.clear();
   values.set('paper-puppeteer:draft:a', stored);
@@ -287,6 +289,28 @@ test('legacy fingerprints restore equivalent reordered sources but still reject 
   recovery.bind({ ...session, source: draftSource({ tracks: {} }), dirty: () => false });
   assert.equal(confirm.mock.calls.length, 0);
   assert.equal(values.get('paper-puppeteer:draft:a'), stored);
+});
+
+test('compact source identities migrate legacy drafts under a small storage quota', () => {
+  const source = { animation: { payload: 'x'.repeat(100_000) } };
+  const legacy = JSON.stringify({ version: 1, source: JSON.stringify(source), data: { value: 8 } });
+  const { recovery, session, values, storage, status } = fixture(legacy);
+  storage.setItem.mockImplementation((key, text) => {
+    if (text.length > 1024) throw new Error('Quota exceeded');
+    values.set(key, text);
+  });
+  const fingerprint = draftSource(source);
+  recovery.bind({ ...session, source: fingerprint });
+  assert.equal(session.snapshot().value, 8);
+  recovery.flush();
+  assert.equal(values.size, 1);
+  assert.isFalse(values.has('paper-puppeteer:draft:a'));
+  const stored = [...values.values()][0]!;
+  assert.isBelow(stored.length, 1024);
+  const draft = z.object({ source: z.string(), data: schema }).parse(JSON.parse(stored));
+  assert.equal(draft.source, fingerprint);
+  assert.deepEqual(draft.data, { value: 8 });
+  assert.notInclude(status.mock.calls.at(-1)![0], 'Could not save');
 });
 
 test.each(['broken JSON', JSON.stringify({ version: 2, source: 'original', data: { value: 8 } })])(
