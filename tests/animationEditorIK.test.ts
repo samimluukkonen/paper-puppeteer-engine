@@ -2,7 +2,8 @@ import { assert, test, vi } from 'vitest';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { IKInspectorController } from '../src/devtools/animation-editor/IKInspectorController.js';
-import { evaluateIKTarget, ikTrackKey } from '../src/devtools/animation-editor/ikTimeline.js';
+import { evaluateIKTarget } from '../src/devtools/animation-editor/ikInspectorSampling.js';
+import { ikTrackKey } from '../src/devtools/animation-editor/ikTimeline.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -289,6 +290,28 @@ test('navigation, playback, animation changes and history cancel IK numeric draf
     assert.isFalse(state.dirty);
   }
   assert.isNull(state.selectedIKConstraintId);
+});
+
+test('IK commands notify once after coordinating playback, selection and history', () => {
+  const { state } = fixture({ ikTracks: {} });
+  state.play();
+  const observations: { playing: boolean; selected: string | null; x: number | undefined; history: number }[] = [];
+  state.subscribe(() =>
+    observations.push({
+      playing: state.isPlaying,
+      selected: state.selectedIKConstraintId,
+      x: state.workingAnimation?.ikTracks?.arm?.[0]?.x,
+      history: state.historyLength,
+    }),
+  );
+  state.selectIKConstraint('arm');
+  assert.lengthOf(observations, 1);
+  observations.length = 0;
+  assert.isTrue(state.setTemporaryIKProperty('x', 70));
+  assert.deepEqual(observations, [{ playing: false, selected: 'arm', x: undefined, history: 0 }]);
+  observations.length = 0;
+  assert.isTrue(state.commitIKProperty('x'));
+  assert.deepEqual(observations, [{ playing: false, selected: 'arm', x: 70, history: 1 }]);
 });
 
 test('history reconciliation removes missing IK markers and retains unrelated constraint selection', () => {

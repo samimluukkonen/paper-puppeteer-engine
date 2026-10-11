@@ -8,14 +8,7 @@ import type {
 import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
-import {
-  findIKPropertyKeyframe,
-  setIKPropertyKeyframe,
-  removeIKPropertyKeyframe,
-  moveIKPropertyKeyframe,
-  ikAnimationProperties,
-  type IKAnimationProperty,
-} from '../../engine/ik/animationKeyframes.js';
+import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -35,6 +28,7 @@ import {
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
 import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
+import { AnimationEditorIKCommands } from './AnimationEditorIKCommands.js';
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
@@ -50,7 +44,7 @@ import {
   sampleGhostPose,
   sampleGhostPoses,
 } from './ghostPoseSampling.js';
-import { evaluateIKTarget, type IKKeyframeSelection } from './ikTimeline.js';
+import type { IKKeyframeSelection } from './ikTimeline.js';
 import {
   getAnimationInterpolation,
   getInterpolationForKeys,
@@ -64,10 +58,10 @@ import type { KeyframeClipboard } from './keyframeClipboard.js';
 import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
-import { animationDurationSeconds, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
+import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
-import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
+import type { Milliseconds, Seconds } from './timeUnits.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
@@ -91,6 +85,7 @@ export class AnimationEditorState {
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly keyframes: AnimationEditorKeyframeCommands;
+  private readonly ik: AnimationEditorIKCommands;
   private readonly events: AnimationEditorEventCommands;
   private readonly playbackController: AnimationEditorPlaybackController;
   private readonly playbackCommands: AnimationEditorPlaybackCommands;
@@ -154,6 +149,14 @@ export class AnimationEditorState {
       install: (animation) => this.installWorkingAnimation(animation),
       notify: () => this.notify(),
     });
+    this.ik = new AnimationEditorIKCommands(this.document, this.selection, this.playback, this.keyframes, {
+      cancelTimelineDrag: () => this.cancelTimelineDrag(),
+      pause: () => this.pause(),
+      endScrub: () => this.endScrub(),
+      updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
+      install: (animation, retainDraft) => this.installWorkingAnimation(animation, retainDraft),
+      notify: () => this.notify(),
+    });
   }
 
   private get working(): ReadonlyAnimation | null {
@@ -202,204 +205,68 @@ export class AnimationEditorState {
     return this.selection.target;
   }
   get selectedIKConstraintId(): string | null {
-    return this.selection.ikTarget?.constraintId ?? null;
+    return this.ik.selectedIKConstraintId;
   }
   get selectedIKProperty(): IKAnimationProperty | null {
-    return this.selection.ikTarget?.property ?? null;
+    return this.ik.selectedIKProperty;
   }
   get selectedIKKeyframe(): IKKeyframeSelection | null {
-    return this.selection.ikKeyframe;
+    return this.ik.selectedIKKeyframe;
   }
   get ikTargetDraft() {
-    return this.selection.ikDraft;
+    return this.ik.ikTargetDraft;
   }
   get selectedIKTargetValues() {
-    const id = this.selectedIKConstraintId;
-    const values =
-      id && this.working && this.rig
-        ? evaluateIKTarget(this.working, this.rig, id, this.playback.currentTimeMilliseconds)
-        : undefined;
-    return values ? Object.freeze({ ...values, ...this.selection.ikDraft }) : undefined;
+    return this.ik.selectedIKTargetValues;
   }
   selectIKConstraint(id: string, property: IKAnimationProperty | null = null): boolean {
-    return this.batchNotifications(() => {
-      if (
-        !this.rig?.ik?.some((entry) => entry.name === id) ||
-        (property !== null && !ikAnimationProperties.includes(property))
-      )
-        return false;
-      this.cancelTimelineDrag();
-      this.selection.selectIK(id, property);
-      this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.ik.selectIKConstraint(id, property));
   }
   setTimelineIKExpanded(id: string, expanded: boolean): boolean {
-    return this.batchNotifications(() => {
-      if (!this.rig?.ik?.some((entry) => entry.name === id)) return false;
-      this.cancelTimelineDrag();
-      if (this.selection.setIKExpanded(id, expanded)) this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.ik.setTimelineIKExpanded(id, expanded));
   }
   isTimelineIKExpanded(id: string): boolean {
-    return this.selection.isIKExpanded(id);
+    return this.ik.isTimelineIKExpanded(id);
   }
   findIKPropertyKeyframe(
     id: string,
     property: IKAnimationProperty,
     time = this.currentTime,
   ): PropertyKeyframe | undefined {
-    return this.working && this.rig
-      ? findIKPropertyKeyframe(this.working, this.rig, id, property, this.playback.resolveTimeMilliseconds(time))
-      : undefined;
+    return this.ik.findIKPropertyKeyframe(id, property, time);
   }
   selectIKKeyframe(ref: IKKeyframeSelection): boolean {
-    return this.batchNotifications(() => {
-      if (ref.kind !== 'ik') return false;
-      let key: PropertyKeyframe | undefined;
-      try {
-        key = this.findIKPropertyKeyframe(ref.constraintId, ref.property, ref.time);
-      } catch {
-        return false;
-      }
-      if (!key) return false;
-      this.cancelTimelineDrag();
-      this.pause();
-      this.endScrub();
-      this.selection.selectIK(ref.constraintId, ref.property, Object.freeze({ ...ref, time: toSeconds(key.time) }));
-      this.updateTimeMilliseconds(key.time);
-      this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.ik.selectIKKeyframe(ref));
   }
   cancelIKEdit(): void {
-    if (this.selection.clearIKDraft()) this.notify();
+    return this.batchNotifications(() => this.ik.cancelIKEdit());
   }
   beginIKEdit(): void {
-    this.batchNotifications(() => {
-      if (!this.selectedIKConstraintId || !this.working) return;
-      this.cancelTimelineDrag();
-      this.pause();
-      this.endScrub();
-    });
+    return this.batchNotifications(() => this.ik.beginIKEdit());
   }
   setTemporaryIKProperty(property: IKAnimationProperty, value: number): boolean {
-    return this.batchNotifications(() => {
-      if (
-        !this.selectedIKConstraintId ||
-        !this.working ||
-        !ikAnimationProperties.includes(property) ||
-        !Number.isFinite(value) ||
-        (property === 'mix' && (value < 0 || value > 1))
-      )
-        return false;
-      this.beginIKEdit();
-      this.selection.setIKDraft(property, value);
-      this.notify();
-      return true;
-    });
+    return this.batchNotifications(() => this.ik.setTemporaryIKProperty(property, value));
   }
   commitIKProperty(property: IKAnimationProperty): boolean {
-    const id = this.selectedIKConstraintId;
-    const value = this.selectedIKTargetValues?.[property];
-    return id !== null && value !== undefined && this.setIKPropertyKeyframe(id, property, value);
+    return this.batchNotifications(() => this.ik.commitIKProperty(property));
   }
   setIKPropertyKeyframe(id: string, property: IKAnimationProperty, value: number, time = this.currentTime): boolean {
-    return this.editIKKeys(
-      (animation, rig) =>
-        setIKPropertyKeyframe(animation, rig, id, property, this.playback.resolveTimeMilliseconds(time), value),
-      () => {
-        if (id === this.selectedIKConstraintId && time === this.currentTime)
-          this.selection.clearIKDraftProperty(property);
-      },
-      true,
-    );
+    return this.batchNotifications(() => this.ik.setIKPropertyKeyframe(id, property, value, time));
   }
   deleteIKPropertyKey(property: IKAnimationProperty): boolean {
-    const id = this.selectedIKConstraintId;
-    return id !== null && this.removeIKPropertyKeyframe(id, property);
+    return this.batchNotifications(() => this.ik.deleteIKPropertyKey(property));
   }
   removeIKPropertyKeyframe(id: string, property: IKAnimationProperty, time = this.currentTime): boolean {
-    let key: PropertyKeyframe | undefined;
-    try {
-      key = this.findIKPropertyKeyframe(id, property, time);
-    } catch {
-      return false;
-    }
-    return this.editIKKeys(
-      (animation, rig) =>
-        removeIKPropertyKeyframe(animation, rig, id, property, this.playback.resolveTimeMilliseconds(time)),
-      () => {
-        const selected = this.selectedIKKeyframe;
-        if (
-          selected?.constraintId === id &&
-          selected.property === property &&
-          key &&
-          selected.time === toSeconds(key.time)
-        )
-          this.selection.clearIKKey();
-        if (id === this.selectedIKConstraintId) this.selection.clearIKDraftProperty(property);
-      },
-      true,
-    );
+    return this.batchNotifications(() => this.ik.removeIKPropertyKeyframe(id, property, time));
   }
   deleteSelectedIKKeyframe(): boolean {
-    const key = this.selectedIKKeyframe;
-    return !!key && this.removeIKPropertyKeyframe(key.constraintId, key.property, key.time);
+    return this.batchNotifications(() => this.ik.deleteSelectedIKKeyframe());
   }
   moveSelectedIKKeyframe(time: Seconds): boolean {
-    const key = this.selectedIKKeyframe;
-    if (!key || !Number.isFinite(time)) return false;
-    const destination = snapKeyframeTime(time, this.duration, this.keyframeSnapMode, this.keyframeFPS);
-    return this.editIKKeys(
-      (animation, rig) =>
-        moveIKPropertyKeyframe(
-          animation,
-          rig,
-          key.constraintId,
-          key.property,
-          toMilliseconds(key.time),
-          toMilliseconds(destination),
-        ),
-      (next) => {
-        const moved =
-          this.rig &&
-          findIKPropertyKeyframe(next, this.rig, key.constraintId, key.property, toMilliseconds(destination));
-        if (moved) {
-          this.selection.setIKKey(Object.freeze({ ...key, time: toSeconds(moved.time) }));
-          this.updateTimeMilliseconds(moved.time);
-        }
-      },
-    );
+    return this.batchNotifications(() => this.ik.moveSelectedIKKeyframe(time));
   }
   nudgeSelectedIKKeyframe(direction: -1 | 1, large = false): boolean {
-    const key = this.selectedIKKeyframe;
-    const step = this.keyframeSnapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
-    return !!key && this.moveSelectedIKKeyframe(key.time + direction * step * (large ? 10 : 1));
-  }
-  /** Existing pure IK mutations install through the sole document/history boundary. */
-  private editIKKeys(
-    edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation,
-    after: (next: ReadonlyAnimation) => void,
-    retainDraft = false,
-  ): boolean {
-    return this.batchNotifications(() => {
-      if (!this.working || !this.rig) return false;
-      let next: ReadonlyAnimation;
-      try {
-        next = edit(this.working, this.rig);
-      } catch (error) {
-        this.document.reportError(error);
-        this.notify();
-        return false;
-      }
-      this.cancelTimelineDrag();
-      this.pause();
-      this.endScrub();
-      after(next);
-      return this.installWorkingAnimation(freezeData(next), retainDraft);
-    });
+    return this.batchNotifications(() => this.ik.nudgeSelectedIKKeyframe(direction, large));
   }
   get selectedBoneId(): string | null {
     return this.selection.boneId;

@@ -1,5 +1,5 @@
 import { assert, test } from 'vitest';
-import { evaluateIKTarget } from '../src/devtools/animation-editor/ikTimeline.js';
+import { evaluateIKTarget } from '../src/devtools/animation-editor/ikInspectorSampling.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { validateRigDefinition } from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';
