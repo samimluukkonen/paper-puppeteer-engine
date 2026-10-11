@@ -251,10 +251,14 @@ test('event drag uses shared snap policy, follows playhead, nudges, cancels and 
   async function dragTo(target: number, commit = true, bypass = false) {
     const bounds = (await page.locator('#timeline').boundingBox())!;
     const box = (await marker.boundingBox())!;
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    // Endpoint marker centers lie on clipped lane edges; start in the visible hit area.
+    const startX = Math.max(bounds.x + 2, Math.min(bounds.x + bounds.width - 2, box.x + box.width / 2));
+    // Overshoot the lane within the viewport so Chrome still delivers pointer events.
+    const targetX = Math.max(1, Math.min(page.viewportSize()!.width - 1, bounds.x + (bounds.width * target) / 2));
+    await page.mouse.move(startX, box.y + box.height / 2);
     await page.mouse.down();
     if (bypass) await page.keyboard.down('Shift');
-    await page.mouse.move(bounds.x + (bounds.width * target) / 2, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.move(targetX, box.y + box.height / 2, { steps: 5 });
     if (commit) await page.mouse.up();
     if (bypass) await page.keyboard.up('Shift');
   }
