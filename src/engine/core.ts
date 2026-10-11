@@ -91,3 +91,16 @@ export type {
   SpriteDefinition,
   TransformProperty,
 } from './types.js';
+
+export type { IKKeyframe, IKAnimationTrack, IKAnimationProperty } from './ik/animationKeyframes.js';
+export {
+  createIKAnimationTrack,
+  setIKPropertyKeyframe,
+  removeIKPropertyKeyframe,
+  moveIKPropertyKeyframe,
+  getIKPropertyKeyframes,
+  findIKPropertyKeyframe,
+  getIKKeyedPropertiesAtTime,
+  ikAnimationProperties,
+} from './ik/animationKeyframes.js';
+export { ikKeyframeSchema, ikMixSchema } from './schemas.js';

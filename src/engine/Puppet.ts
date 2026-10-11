@@ -118,7 +118,9 @@ export class Puppet {
     this.slotState = new SlotState(this.rig);
     const skin = options.skin ?? options.definition?.defaultSkin;
     if (skin) this.slotState.setSkin(skin);
-    const ikDefinitions = (options.ik ?? []).map((definition) => parseTwoBoneIKDefinition(definition, this.rig));
+    const ikDefinitions = (options.ik ?? this.rig.ik ?? []).map((definition) =>
+      parseTwoBoneIKDefinition(definition, this.rig),
+    );
     const ikNames = new Set<string>();
     for (const definition of ikDefinitions) {
       if (ikNames.has(definition.name)) throw new Error(`IK "${definition.name}" is already registered.`);
@@ -255,6 +257,7 @@ export class Puppet {
       JSON.stringify({
         version: RIG_FORMAT_VERSION,
         root: this.rig.root,
+        ...(this.rig.ik === undefined ? {} : { ik: this.rig.ik }),
         bones: this.rig.bones,
         slots: this.rig.slots,
         attachments: this.rig.attachments,

@@ -7,6 +7,7 @@ export type BendDirection = 1 | -1;
 export type IKTargetProvider = () => IKTarget | undefined;
 
 export interface TwoBoneIKDefinition {
+  /** Stable rig constraint identifier, also used by authored animation IK tracks. */
   name: string;
   rootBone: string;
   middleBone: string;

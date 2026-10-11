@@ -5,6 +5,7 @@ import {
   type JsonValue,
   type ValidationIssue,
 } from '../../engine/externalData.js';
+import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
 import type { Rig } from '../../engine/Rig.js';
 import { transformProperties } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
@@ -45,6 +46,7 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
       0,
       animation.duration,
       ...Object.values(animation.tracks).flatMap((keys) => keys.map((key) => key.time)),
+      ...Object.values(animation.ikTracks ?? {}).flatMap((keys) => keys.map((key) => key.time)),
       ...(animation.events ?? []).map((event) => event.time),
     ]),
   ].sort((a, b) => a - b);
@@ -89,6 +91,25 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
           })),
         ]),
     ),
+    ...(animation.ikTracks === undefined
+      ? {}
+      : {
+          ikTracks: Object.fromEntries(
+            Object.keys(animation.ikTracks)
+              .sort()
+              .map((name) => [
+                name,
+                animation.ikTracks![name]!.map((key) => ({
+                  time: timeValue(key.time),
+                  ...Object.fromEntries(
+                    ikAnimationProperties
+                      .filter((property) => key[property] !== undefined)
+                      .map((property) => [property, normalizeNumber(key[property]!)]),
+                  ),
+                })),
+              ]),
+          ),
+        }),
     ...(animation.events === undefined
       ? {}
       : {

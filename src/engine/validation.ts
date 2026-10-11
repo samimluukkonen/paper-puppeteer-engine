@@ -101,6 +101,25 @@ export function checkRigReferences(definition: RigDefinition, report: ReportVali
     attachmentIds.add(attachment.id);
   }
   checkSkinReferences(definition.skins ?? [], definition, report);
+  const constraintNames = new Set<string>();
+  for (const [index, constraint] of (definition.ik ?? []).entries()) {
+    const path = `ik[${index}]`;
+    if (constraintNames.has(constraint.name))
+      report({
+        severity: 'error',
+        path: `${path}.name`,
+        message: `Duplicate IK constraint name "${constraint.name}".`,
+      });
+    constraintNames.add(constraint.name);
+    for (const field of ['rootBone', 'middleBone', 'endBone'] as const) {
+      if (!ids.has(constraint[field]))
+        report({ severity: 'error', path: `${path}.${field}`, message: `Unknown IK bone "${constraint[field]}".` });
+    }
+    const middle = bones[ids.get(constraint.middleBone) ?? -1];
+    const end = bones[ids.get(constraint.endBone) ?? -1];
+    if (middle && end && (middle.parent !== constraint.rootBone || end.parent !== constraint.middleBone))
+      report({ severity: 'error', path, message: 'IK must name three directly connected bones.' });
+  }
 }
 
 export function checkSkinReferences(
@@ -136,7 +155,7 @@ export function checkSkinReferences(
 
 export function checkAnimationReferences(
   clip: AnimationClip,
-  rig: Pick<RigDefinition, 'bones'> | undefined,
+  rig: Pick<RigDefinition, 'bones' | 'ik'> | undefined,
   report: ReportValidationIssue,
 ): void {
   // Timeline rules remain checkable even when character assembly has no valid skeleton.
@@ -151,19 +170,25 @@ export function checkAnimationReferences(
         },
         `Unknown bone "${bone}".`,
       );
-    let previousTime = -1;
+    checkKeyframeTimeline(
+      keys,
+      clip.duration,
+      `tracks.${bone}`,
+      report,
+      `Keys for "${bone}" must have strictly increasing times within the clip.`,
+    );
+  }
+  const constraints = rig ? new Set((rig.ik ?? []).map((constraint) => constraint.name)) : undefined;
+  for (const [name, keys] of Object.entries(clip.ikTracks ?? {})) {
+    const path = `ikTracks.${name}`;
+    if (constraints && !constraints.has(name))
+      report({ severity: 'error', path, message: `Unknown IK constraint "${name}".` });
+    // Empty timelines are valid placeholders. A row must author at least one channel.
     for (const [index, key] of keys.entries()) {
-      if (key.time < 0 || key.time > clip.duration || key.time <= previousTime)
-        report(
-          {
-            severity: 'error',
-            path: `tracks.${bone}[${index}].time`,
-            message: 'Keyframe time must increase strictly and stay within the animation duration.',
-          },
-          `Keys for "${bone}" must have strictly increasing times within the clip.`,
-        );
-      previousTime = key.time;
+      if (key.x === undefined && key.y === undefined && key.mix === undefined)
+        report({ severity: 'error', path: `${path}[${index}]`, message: 'IK keyframe needs x, y or mix.' });
     }
+    checkKeyframeTimeline(keys, clip.duration, path, report);
   }
   for (const [index, event] of (clip.events ?? []).entries()) {
     if (event.time < 0 || event.time > clip.duration)
@@ -175,5 +200,28 @@ export function checkAnimationReferences(
         },
         `Invalid event in animation "${clip.name}".`,
       );
+  }
+}
+
+/** Shared strict authored timeline rules; tolerant matching belongs to editing operations only. */
+function checkKeyframeTimeline(
+  keys: readonly { time: number }[],
+  duration: number,
+  path: string,
+  report: ReportValidationIssue,
+  runtimeMessage?: string,
+): void {
+  let previousTime = -1;
+  for (const [index, key] of keys.entries()) {
+    if (key.time < 0 || key.time > duration || key.time <= previousTime)
+      report(
+        {
+          severity: 'error',
+          path: `${path}[${index}].time`,
+          message: 'Keyframe time must increase strictly and stay within the animation duration.',
+        },
+        runtimeMessage,
+      );
+    previousTime = key.time;
   }
 }

@@ -1,4 +1,5 @@
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
+import type { IKKeyframe } from './ik/animationKeyframes.js';
 import { copyJsonData } from './jsonData.js';
 import { freezeData, isFullyFrozen, readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
@@ -22,6 +23,8 @@ export interface AnimationClip {
   /** Optional clip-level declaration; omitting it also uses linear interpolation. No per-key/track overrides. */
   interpolation?: Interpolation;
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
+  /** Constraint-name keyed sparse rows. Positions are puppet-local, before placement/facing/scale. */
+  ikTracks?: Readonly<Record<string, readonly IKKeyframe[]>>;
   events?: readonly AnimationEvent[];
   playback?: AnimationPlaybackMode;
 }

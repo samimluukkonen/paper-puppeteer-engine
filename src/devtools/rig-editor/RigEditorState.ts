@@ -4,6 +4,7 @@ import {
   type ValidationIssue,
   validateRigDefinition,
 } from '../../engine/externalData.js';
+import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Rig } from '../../engine/Rig.js';
 import type {
   BoneDefinition,
@@ -38,6 +39,7 @@ type HistoryEntry = RigEditorRecoverySnapshot;
 
 export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
+  ik?: readonly TwoBoneIKDefinition[];
   root: string;
   bones: BoneDefinition[];
   slots?: SlotDefinition[];
@@ -111,6 +113,7 @@ export class RigEditorState {
       slots: [...source.slots],
       attachments: [...source.attachments],
       skins: [...source.skins],
+      ...(source.ik === undefined ? {} : { ik: [...source.ik] }),
     });
     this.freezeEntries();
     this.rig = source;
@@ -145,7 +148,7 @@ export class RigEditorState {
   }
 
   private freezeEntries(): void {
-    for (const entries of [this.data.bones, this.data.slots, this.data.attachments, this.data.skins])
+    for (const entries of [this.data.bones, this.data.slots, this.data.attachments, this.data.skins, this.data.ik])
       for (const entry of entries ?? []) freezeData(entry);
   }
 
@@ -217,7 +220,8 @@ export class RigEditorState {
       ...(copy.attachments === undefined ? {} : { attachments: [...copy.attachments] }),
       ...(copy.skins === undefined ? {} : { skins: [...copy.skins] }),
     });
-    for (const key of ['slots', 'attachments', 'skins'] as const) if (copy[key] === undefined) delete this.data[key];
+    for (const key of ['slots', 'attachments', 'skins', 'ik'] as const)
+      if (copy[key] === undefined) delete this.data[key];
     this.invalidate();
     this.cachedWorkingCopy = copy;
     this.rebuildIndexes();
@@ -313,6 +317,7 @@ export class RigEditorState {
       version: RIG_FORMAT_VERSION,
       ...(this.name === undefined ? {} : { name: this.name }),
       root: copy.root,
+      ...(copy.ik === undefined ? {} : { ik: copy.ik }),
       bones: copy.bones,
       ...(copy.slots === undefined ? {} : { slots: copy.slots }),
       ...(copy.attachments === undefined ? {} : { attachments: copy.attachments }),

@@ -27,7 +27,7 @@ function authoredSource(data: unknown): unknown {
   return {
     ...source,
     rig: Object.fromEntries(
-      ['root', 'bones', 'slots', 'attachments', 'skins']
+      ['root', 'bones', 'slots', 'attachments', 'skins', 'ik']
         .filter((field) => Object.hasOwn(record, field))
         .map((field) => [field, record[field]]),
     ),

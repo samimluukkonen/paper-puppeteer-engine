@@ -1,3 +1,5 @@
+import type { TwoBoneIKDefinition } from './ik/types.js';
+
 export const transformProperties = ['x', 'y', 'rotation', 'scaleX', 'scaleY'] as const;
 
 export type TransformProperty = (typeof transformProperties)[number];
@@ -62,6 +64,8 @@ export interface SkinDefinition {
 }
 
 export interface RigDefinition {
+  /** Stable constraint names are animation IK track identifiers. */
+  ik?: readonly TwoBoneIKDefinition[];
   root: string;
   bones: readonly BoneDefinition[];
   slots?: readonly SlotDefinition[];

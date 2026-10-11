@@ -1,4 +1,5 @@
 import type { Keyframe } from '../../engine/AnimationClip.js';
+import { replacePropertyAtTime } from '../../engine/keyframeAuthoring.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assertFinite, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
@@ -58,32 +59,6 @@ export interface PropertyKeyframeTarget {
 
 export interface PropertyKeyframeEdit extends PropertyKeyframeTarget {
   readonly value: number;
-}
-
-/** Shared move/paste replacement: remove all tolerant property matches, retaining sparse siblings. */
-function replacePropertyAtTime(
-  keys: readonly Keyframe[],
-  property: TransformProperty,
-  time: number,
-  value: number,
-  source = -1,
-): Keyframe[] {
-  const nextKeys: Keyframe[] = [];
-  for (const [index, key] of keys.entries()) {
-    if (index !== source && !(key[property] !== undefined && keyframeTimesMatch(key.time, time))) {
-      nextKeys.push(key);
-      continue;
-    }
-    const row = { ...key };
-    delete row[property];
-    if (transformProperties.some((entry) => row[entry] !== undefined)) nextKeys.push(row);
-  }
-  // Nearby sibling properties must not shift the inserted property's time.
-  const row = nextKeys.findIndex((key) => key.time === time);
-  if (row >= 0) nextKeys[row] = { ...nextKeys[row]!, [property]: value };
-  else nextKeys.push({ time, [property]: value });
-  nextKeys.sort((a, b) => a.time - b.time);
-  return nextKeys;
 }
 
 /** Index nearby rows while editing one track; publish and sort its array only once. */
@@ -264,7 +239,7 @@ export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   const value = keys[source]![property]!;
   // Retain the existing canonical row time on collision, like the setter's tolerance policy.
   const destinationTime = destination >= 0 ? keys[destination]!.time : toTime;
-  const nextKeys = replacePropertyAtTime(keys, property, destinationTime, value, source);
+  const nextKeys = replacePropertyAtTime(keys, property, destinationTime, value, source, transformProperties);
   const next = { ...animation, tracks: { ...animation.tracks, [boneId]: nextKeys } };
   return validateEditedAnimation(next, animation, rig);
 }

@@ -49,7 +49,8 @@ export function inspectRigDraft(
       const before = initial.attachments![index]!;
       return attachment.id !== before.id || attachment.texture !== before.texture || attachment.frame !== before.frame;
     }) ||
-    !equalEditorData(data.skins ?? [], initial.skins ?? [])
+    !equalEditorData(data.skins ?? [], initial.skins ?? []) ||
+    !equalEditorData(data.ik ?? [], initial.ik ?? [])
   )
     return undefined;
   const directions = recovery.success

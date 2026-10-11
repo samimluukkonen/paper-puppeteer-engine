@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.5-1
+
+The v0.5.5.1 [IK animation data model](docs/ik-animation-data.md) adds optional rig IK definitions and constraint-name keyed sparse puppet-local target x/y and solver mix channels. Pure authoring APIs reuse bone-key time matching and movement collision rules. Strict validation, generated JSON schemas, deterministic animation serialization, rig editor preservation, draft identity, and compatibility/immutability tests cover the additive version-1 fields. Animated IK evaluation and visual authoring remain deferred.
+
 ## 0.5.4-5
 
 The v0.5.4.5 [mirroring hardening phase](docs/mirroring-hardening-verification.md) completes v0.5.4. Sparse current-pose authoring ignores unanimated incompatible transforms while retaining mapping validation. Mirror controls release cached session data on unbind/disposal, hide previews on panel unmount, and disable actions after failed loads. Expanded humanoid, asymmetric, round-trip, playback/event, clipboard/history, serialization/CharacterLoader and scene IK/onion/facing regressions accompany an artist left-arm walkthrough and explicit transform limitations.

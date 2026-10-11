@@ -95,3 +95,5 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 - More advanced animation state orchestration and editor tooling.
 - Transform drag handles.
 - Character editing tools and richer asset pipeline integration.
+
+See the [IK animation data model](docs/ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. Animated IK playback and visual authoring are deferred.

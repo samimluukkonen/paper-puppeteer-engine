@@ -83,6 +83,23 @@ export const boneDefinitionSchema = z.object({
   ...transformFields,
 });
 
+export const ikMixSchema = finiteNumber
+  .min(0, 'IK mix must be between 0 and 1.')
+  .max(1, 'IK mix must be between 0 and 1.');
+
+/** Shape and scalar validation for an IK chain definition. */
+export const twoBoneIKDefinitionSchema = z.object({
+  name: identifierSchema,
+  rootBone: identifierSchema,
+  middleBone: identifierSchema,
+  endBone: identifierSchema,
+  endOffset: z.object({ x: finiteNumber, y: finiteNumber }).exactOptional(),
+  bendDirection: z.union([z.literal(1), z.literal(-1)]).exactOptional(),
+  mix: ikMixSchema.exactOptional(),
+  enabled: z.boolean().exactOptional(),
+  priority: finiteNumber.exactOptional(),
+});
+
 /** Shape and scalar validation for plain rig data, including data loaded from JSON. */
 export const rigDefinitionSchema = z.object({
   root: identifierSchema,
@@ -90,9 +107,17 @@ export const rigDefinitionSchema = z.object({
   slots: z.array(slotDefinitionSchema).exactOptional(),
   attachments: z.array(spriteAttachmentSchema).exactOptional(),
   skins: z.array(skinDefinitionSchema).exactOptional(),
+  ik: z.array(twoBoneIKDefinitionSchema).exactOptional(),
 });
 
 export const keyframeSchema = z.object({ time: finiteNumber, ...transformFields });
+/** Sparse target position and solver influence, using ordinary authored row times. */
+export const ikKeyframeSchema = z.object({
+  time: finiteNumber,
+  x: finiteNumber.exactOptional(),
+  y: finiteNumber.exactOptional(),
+  mix: ikMixSchema.exactOptional(),
+});
 export const animationEventSchema = z.object({
   time: finiteNumber,
   name: identifierSchema,
@@ -111,6 +136,7 @@ export const animationClipSchema = z.object({
   loop: z.boolean(),
   interpolation: z.literal('linear').exactOptional(),
   tracks: identifierRecord(z.array(keyframeSchema)),
+  ikTracks: identifierRecord(z.array(ikKeyframeSchema)).exactOptional(),
   events: z.array(animationEventSchema).exactOptional(),
   playback: z.discriminatedUnion('mode', [smoothPlaybackSchema, steppedPlaybackSchema]).exactOptional(),
 });
@@ -125,6 +151,13 @@ export const rigFileSchema = rigDefinitionSchema
     slots: z.array(slotDefinitionSchema.strict()).exactOptional(),
     attachments: z.array(spriteAttachmentSchema.strict()).exactOptional(),
     skins: z.array(skinFileSchema).exactOptional(),
+    ik: z
+      .array(
+        twoBoneIKDefinitionSchema
+          .extend({ endOffset: twoBoneIKDefinitionSchema.shape.endOffset.unwrap().strict().exactOptional() })
+          .strict(),
+      )
+      .exactOptional(),
   })
   .strict();
 
@@ -134,6 +167,9 @@ export const animationFileSchema = animationClipSchema
     tracks: identifierRecord(
       z.array(keyframeSchema.extend({ time: keyframeSchema.shape.time.nonnegative() }).strict()),
     ),
+    ikTracks: identifierRecord(
+      z.array(ikKeyframeSchema.extend({ time: ikKeyframeSchema.shape.time.nonnegative() }).strict()),
+    ).exactOptional(),
     events: z
       .array(animationEventSchema.extend({ time: animationEventSchema.shape.time.nonnegative() }).strict())
       .exactOptional(),
@@ -159,17 +195,4 @@ export const characterManifestSchema = z.strictObject({
   poses: z.array(z.string().min(1)).optional(),
   /** Phaser texture key -> image path, relative to character.json. */
   textures: identifierRecord(z.string().min(1)),
-});
-
-/** Shape and scalar validation for an IK chain definition. */
-export const twoBoneIKDefinitionSchema = z.object({
-  name: identifierSchema,
-  rootBone: identifierSchema,
-  middleBone: identifierSchema,
-  endBone: identifierSchema,
-  endOffset: z.object({ x: finiteNumber, y: finiteNumber }).exactOptional(),
-  bendDirection: z.union([z.literal(1), z.literal(-1)]).exactOptional(),
-  mix: finiteNumber.min(0, 'IK mix must be between 0 and 1.').max(1, 'IK mix must be between 0 and 1.').exactOptional(),
-  enabled: z.boolean().exactOptional(),
-  priority: finiteNumber.exactOptional(),
 });
