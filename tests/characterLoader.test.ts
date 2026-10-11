@@ -144,6 +144,8 @@ test.each([
   ['maxTotalJsonBytes', -1],
   ['maxResources', Infinity],
   ['concurrency', 1.5],
+  ['timeoutMs', 0],
+  ['timeoutMs', Infinity],
 ] as const)('invalid %s is rejected before fetching', async (name, value) => {
   const fetcher = vi.fn<typeof fetch>();
   await expect(CharacterLoader.load(url, fetcher, { [name]: value })).rejects.toThrow(/positive safe integer/);
@@ -230,4 +232,90 @@ test('successful custom loads share a request signal and detach caller cancellat
   assert.isTrue(signals.every((signal) => signal === signals[0]));
   controller.abort();
   assert.isFalse(signals[0]!.aborted);
+});
+
+test.each(['manifest', 'metadata', 'artwork'])(
+  'URL policy rejects disallowed %s URLs before requesting related files',
+  async (stage) => {
+    const resource = 'http://127.0.0.1/private.json';
+    const data = {
+      ...manifest,
+      ...(stage === 'metadata' ? { rig: resource } : {}),
+      ...(stage === 'artwork' ? { textures: { private: resource } } : {}),
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(data));
+    const urlPolicy = (candidate: URL): boolean =>
+      candidate.protocol === 'https:' && candidate.origin === new URL(url).origin;
+    await expect(CharacterLoader.load(stage === 'manifest' ? resource : url, fetcher, { urlPolicy })).rejects.toThrow(
+      /rejected by policy/,
+    );
+    assert.equal(fetcher.mock.calls.length, stage === 'manifest' ? 0 : 1);
+  },
+);
+
+test('approved loads enforce redirect rejection and check resolved response URLs', async () => {
+  const urlPolicy = (candidate: URL): boolean => candidate.origin === new URL(url).origin;
+  const fetcher = vi.fn<typeof fetch>(async (input) =>
+    Response.json(files[new URL(requestUrl(input)).pathname.slice(1)]),
+  );
+  assert.equal((await CharacterLoader.load(url, fetcher, { urlPolicy })).id, 'test');
+  assert.isTrue(fetcher.mock.calls.every(([, init]) => init?.redirect === 'error'));
+  for (const redirected of [true, false]) {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ cancel }));
+    Object.defineProperties(response, {
+      url: { value: 'http://127.0.0.1/private.json' },
+      redirected: { value: redirected },
+    });
+    const rejectedFetch = vi.fn<typeof fetch>().mockResolvedValue(response);
+    await expect(CharacterLoader.load(url, rejectedFetch, { urlPolicy })).rejects.toThrow(
+      /redirects are disabled|rejected by policy/,
+    );
+    assert.equal(rejectedFetch.mock.calls.length, 1);
+    assert.equal(cancel.mock.calls.length, 1);
+  }
+});
+
+test.each(['manifest', 'related files', 'body'])(
+  'request timeout cancels pending %s and cleans up timers',
+  async (stage) => {
+    vi.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      const cancel = vi.fn();
+      const fetcher: typeof fetch = async (input, init) => {
+        const signal = init!.signal!;
+        signals.push(signal);
+        if (stage !== 'manifest' && requestUrl(input) === url) return Response.json(manifest);
+        if (stage === 'body') return new Response(new ReadableStream({ cancel }));
+        return waitForAbort(signal);
+      };
+      const rejected = CharacterLoader.load(url, fetcher, { timeoutMs: 10 }).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10);
+      const error = await rejected;
+      assert.instanceOf(error, DOMException);
+      assert.equal(error.name, 'TimeoutError');
+      assert.isTrue(signals.every((signal) => signal.aborted && signal.reason === error));
+      if (stage === 'body') assert.equal(cancel.mock.calls.length, 3);
+      assert.equal(vi.getTimerCount(), 0);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
+
+test('successful requests clear timeout timers and oversized timer intervals reject before fetching', async () => {
+  vi.useFakeTimers();
+  try {
+    const fetcher = vi.fn<typeof fetch>(async (input) =>
+      Response.json(files[new URL(requestUrl(input)).pathname.slice(1)]),
+    );
+    assert.equal((await CharacterLoader.load(url, fetcher, { timeoutMs: 100 })).id, 'test');
+    assert.equal(vi.getTimerCount(), 0);
+    const count = fetcher.mock.calls.length;
+    await expect(CharacterLoader.load(url, fetcher, { timeoutMs: 2_147_483_648 })).rejects.toThrow(/must not exceed/);
+    assert.equal(fetcher.mock.calls.length, count);
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -6,6 +6,7 @@ export const DEFAULT_CHARACTER_LOAD_LIMITS = Object.freeze({
   maxTotalJsonBytes: 50 * 1024 * 1024,
   maxResources: 256,
   concurrency: 6,
+  timeoutMs: 30_000,
 });
 
 export interface CharacterLoadOptions {
@@ -19,6 +20,12 @@ export interface CharacterLoadOptions {
   maxResources?: number;
   /** Maximum simultaneous metadata requests. Defaults to 6. */
   concurrency?: number;
+  /** Timeout for each metadata request, including its body. Defaults to 30 seconds. */
+  timeoutMs?: number;
+  /** Approve every resolved metadata/artwork URL. When supplied, metadata redirects are disabled.
+   * Custom fetchers must honor RequestInit.redirect; DNS/network restrictions belong to the host.
+   */
+  urlPolicy?: (url: URL) => boolean;
 }
 
 /** Fetches only JSON metadata. Image decoding/loading belongs to Phaser or the host. */
@@ -51,6 +58,12 @@ export const CharacterLoader = {
           options.concurrency ?? DEFAULT_CHARACTER_LOAD_LIMITS.concurrency,
           'concurrency',
         ),
+        timeoutMs: validateInputLimit(options.timeoutMs ?? DEFAULT_CHARACTER_LOAD_LIMITS.timeoutMs, 'timeoutMs'),
+      };
+      if (limits.timeoutMs > 2_147_483_647) throw new Error('timeoutMs must not exceed 2147483647.');
+      const checkUrl = (resourceUrl: string): void => {
+        if (options.urlPolicy && options.urlPolicy(new URL(resourceUrl)) !== true)
+          throw new Error(`Character URL rejected by policy: "${resourceUrl}".`);
       };
       let totalBytes = 0;
       const countBytes = (bytes: number): void => {
@@ -63,16 +76,34 @@ export const CharacterLoader = {
       const requestedUrl = new URL(url, globalThis.location?.href).href;
       const read = async (resourceUrl: string): Promise<{ data: unknown; url: string }> => {
         controller.signal.throwIfAborted();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let response: Response | undefined;
         try {
-          const response = await fetcher(resourceUrl, { signal: controller.signal });
+          checkUrl(resourceUrl);
+          timer = setTimeout(
+            () =>
+              controller.abort(new DOMException(`Character JSON request timed out: "${resourceUrl}".`, 'TimeoutError')),
+            limits.timeoutMs,
+          );
+          response = await fetcher(resourceUrl, {
+            signal: controller.signal,
+            ...(options.urlPolicy ? { redirect: 'error' } : {}),
+          });
           controller.signal.throwIfAborted();
+          if (options.urlPolicy && response.redirected)
+            throw new Error('Character metadata redirects are disabled by URL policy.');
+          if (response.url) checkUrl(response.url);
           if (!response.ok) throw new Error(`Could not load character JSON "${resourceUrl}" (${response.status}).`);
           const data = await readJsonResponse(response, limits.maxJsonBytes, controller.signal, countBytes);
           return { data, url: response.url || resourceUrl };
         } catch (error) {
           // Stop workers before they acquire another resource after a sibling fails.
-          controller.abort(error);
-          throw error;
+          const failure: unknown = controller.signal.aborted ? controller.signal.reason : error;
+          controller.abort(failure);
+          if (response && !response.bodyUsed) await response.body?.cancel(failure).catch(() => {});
+          throw failure;
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
         }
       };
       const { data: manifestData, url: manifestUrl } = await read(requestedUrl);
@@ -82,6 +113,10 @@ export const CharacterLoader = {
       ];
       if (1 + paths.length + Object.keys(manifest.textures).length > limits.maxResources)
         throw new JsonInputLimitError(`Character exceeds the ${limits.maxResources}-resource limit.`);
+      // Approve the complete resource list before starting sibling requests or handing artwork to the host.
+      if (options.urlPolicy) {
+        for (const path of [...paths, ...Object.values(manifest.textures)]) checkUrl(new URL(path, manifestUrl).href);
+      }
       const entries: (readonly [string, unknown])[] = [];
       let next = 0;
       await Promise.all(

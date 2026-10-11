@@ -51,6 +51,27 @@ requests. Adjust these positive integer limits for larger trusted characters, fo
 `DEFAULT_CHARACTER_LOAD_LIMITS` exposes the defaults. Image byte limits belong to the host's texture loader;
 already parsed values passed to `CharacterDefinition.fromData` bypass these I/O limits.
 
+Each metadata request has a 30-second timeout covering headers and the decoded body. A timeout
+rejects with a `TimeoutError` and cancels sibling requests. Configure `timeoutMs` as a positive integer
+no greater than `2147483647`; successful, failed, and canceled requests release their timers.
+
+For external assets, pass a synchronous `urlPolicy` that explicitly approves resolved destinations:
+
+```ts
+const definition = await CharacterLoader.load('https://assets.example.com/hero/character.json', fetch, {
+  timeoutMs: 10_000,
+  urlPolicy: (url) => url.protocol === 'https:' && url.origin === 'https://assets.example.com',
+});
+```
+
+The policy checks the manifest, all metadata paths, texture paths, and reported response URLs.
+Related destinations are checked before any related requests start. Supplying a policy sets
+`RequestInit.redirect` to `'error'` so redirects cannot bypass approval. Without a policy, existing
+redirect and custom-I/O behavior remains available. Custom fetchers must honor both `signal` and
+`redirect`. A URL policy does not resolve DNS or inspect connected IP addresses; server hosts loading
+untrusted manifests must enforce private-network restrictions in their fetch implementation or
+network environment. The host's image loader must also enforce its own redirect and timeout policy.
+
 For Phaser `preload`, custom pipelines, generated content, or tests, pass already parsed values to `CharacterDefinition.fromData({ manifest, rig, skins, animations, poses }, optionalManifestUrl)`. The `skins`, `animations`, and `poses` objects are indexed by the paths in the manifest. `queueCharacterTextures` skips texture keys already loaded in the scene, so an app can preload an atlas itself. `definition.textureUrl(key)` resolves a key to a URL when given a manifest URL; without one it returns the authored path. `new Puppet(scene, { rig, animations, poses, skin })` and TypeScript-authored rigs and clips continue to work.
 
 Character assembly preserves skins embedded in the rig. A standalone skin declared in the manifest replaces an embedded skin with the same name; embedded skins with other names remain available at runtime. `definition.standaloneSkins` exposes immutable manifest-owned skins separately from `definition.rig.skins`, which contains the merged runtime selection. The original rig file retains its authored skin definitions for editor reloads and exports, and editor previews use the same precedence as runtime.
