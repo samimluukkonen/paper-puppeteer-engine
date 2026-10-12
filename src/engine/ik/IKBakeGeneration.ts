@@ -1,6 +1,7 @@
 import { type AnimationClip, type AnimationPlaybackMode, compileClip, type Keyframe } from '../AnimationClip.js';
 import { quantizePlaybackTime, shortestRotationDelta } from '../animationMath.js';
 import { evaluateClip } from '../AnimationPose.js';
+import { getBoneTrack } from '../animationTracks.js';
 import { ANIMATION_FORMAT_VERSION, parseAnimationClip, type ValidationIssue } from '../externalData.js';
 import { keyframeTimesMatch, normalizeKeyframeTime } from '../keyframeAuthoring.js';
 import { type DeepReadonly, freezeData } from '../readonlyData.js';
@@ -321,7 +322,8 @@ export function generateBakedBoneKeys(
         rotation: sample.pose.get(boneId)!.rotation,
       }));
       tracks.set(boneId, keys);
-      const existingKeys = (source.tracks[boneId] ?? []).flatMap((key) =>
+      const sourceKeys = getBoneTrack(source, boneId);
+      const existingKeys = sourceKeys.flatMap((key) =>
         key.rotation === undefined ? [] : [{ time: key.time, value: key.rotation }],
       );
       affectedBones.push({
@@ -331,7 +333,7 @@ export function generateBakedBoneKeys(
         ],
       });
       const byTime = new Map<number, Keyframe>();
-      for (const key of source.tracks[boneId] ?? []) {
+      for (const key of sourceKeys) {
         const { rotation: _rotation, ...siblings } = key;
         if (['x', 'y', 'scaleX', 'scaleY'].some((property) => Object.hasOwn(siblings, property)))
           byTime.set(key.time, siblings);

@@ -1,6 +1,7 @@
 import { type Affine, composeAffine, localToWorld, transformToAffine } from '../affineMath.js';
 import { type AnimationClip, compileClip } from '../AnimationClip.js';
 import { shortestRotationDelta } from '../animationMath.js';
+import { getBoneTrack } from '../animationTracks.js';
 import type { ValidationIssue } from '../externalData.js';
 import { type DeepReadonly, freezeData } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
@@ -90,7 +91,7 @@ export function compareIKBakeMotion(
     const times = new Set(getIKBakeSampleTimes(source.duration, fps));
     for (const constraint of constraints)
       for (const id of [constraint.rootBone, constraint.middleBone])
-        for (const key of baked.tracks[id] ?? []) if (key.rotation !== undefined) times.add(key.time);
+        for (const key of getBoneTrack(baked, id)) if (key.rotation !== undefined) times.add(key.time);
     const keys = [...times].sort((a, b) => a - b);
     const phases = new Map<number, 'key' | 'between'>(keys.map((time) => [time, 'key']));
     for (let index = 1; index < keys.length; ++index) {

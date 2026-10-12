@@ -5,6 +5,7 @@ import {
   type AnimationClip,
   AnimationPlayer,
   commitIKBake,
+  compareIKBakeMotion,
   compileClip,
   generateBakedBoneKeys,
   type IKBakePlan,
@@ -87,6 +88,41 @@ function planFor(source: AnimationClip, rig: Rig, ids = ['arm'], fps?: number) {
   if (!plan.success) throw new Error('Generation failed.');
   return plan;
 }
+
+test.each(
+  ['constructor', 'toString', 'hasOwnProperty'].flatMap((boneId) => [false, true].map((keyed) => ({ boneId, keyed }))),
+)('bakes prototype-named bones with sparse or authored tracks ($boneId, keyed: $keyed)', ({ boneId, keyed }) => {
+  const rig = new Rig({
+    root: 'body',
+    bones: [
+      { id: 'body' },
+      { id: boneId, parent: 'body' },
+      { id: 'middle', parent: boneId, x: 10 },
+      { id: 'end', parent: 'middle', x: 10 },
+    ],
+    ik: [{ name: 'arm', rootBone: boneId, middleBone: 'middle', endBone: 'end' }],
+  });
+  const source: AnimationClip = {
+    name: 'reach',
+    duration: 1000,
+    loop: false,
+    tracks: keyed ? { [boneId]: [{ time: 0, x: 2 }] } : {},
+    ikTracks: { arm: [{ time: 0, x: 12, y: 8 }] },
+  };
+  const before = structuredClone(source);
+  const plan = planFor(source, rig);
+  const result = commitIKBake(source, plan, rig);
+  assert.isTrue(result.success, JSON.stringify(result.issues));
+  if (!result.success) return;
+  assert.isTrue(result.motionFidelity.success);
+  assert.isTrue(Object.hasOwn(result.animation.tracks, boneId));
+  assert.equal(result.animation.tracks[boneId]![0]!.x, keyed ? 2 : undefined);
+  assert.deepEqual(source, before);
+  // Motion comparisons also accept absent tracks when a constraint has no authored target.
+  const inactive = { ...source, tracks: {}, ikTracks: {} };
+  const motion = compareIKBakeMotion(inactive, { ...inactive, disabledIKConstraints: ['arm'] }, rig, ['arm'], 10);
+  assert.isTrue(motion.success, JSON.stringify(motion.issues));
+});
 
 test.each([undefined, { mode: 'smooth' } as const, { mode: 'stepped', fps: 12 } as const])(
   'atomically replaces only generated properties while preserving clip metadata (%j)',
