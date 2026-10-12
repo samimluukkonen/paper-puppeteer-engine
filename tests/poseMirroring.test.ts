@@ -1,4 +1,4 @@
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { getEvaluatedAnimationPose } from '../src/devtools/animation-editor/animationValues.js';
 import {
   type BoneSymmetryMapping,
@@ -8,6 +8,7 @@ import {
 } from '../src/devtools/shared/boneSymmetry.js';
 import { freezeData } from '../src/devtools/shared/editorData.js';
 import { type MirrorDirection, mirrorPose } from '../src/devtools/shared/poseMirroring.js';
+import * as affineMath from '../src/engine/affineMath.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import type { AnimationPose } from '../src/engine/AnimationPose.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
@@ -91,6 +92,35 @@ test('sparse poses resolve absent bones and properties from bind, including over
   assert.isFalse(output.has('leftArm'));
   const rotated = mirrored(new Map([['leftArm', { rotation: 0.9 }]]), rig);
   near(rotated.get('rightArm')!, { x: -12, y: 5, rotation: -0.6, scaleX: 1, scaleY: 1 });
+});
+
+test('repeated samples reuse bind hierarchy calculations while poses and reloaded rigs stay independent', () => {
+  const rig = simpleRig();
+  const mapping = mappingFor(rig);
+  const pose: AnimationPose = new Map([['leftArm', { x: 14 }]]);
+  const compose = vi.spyOn(affineMath, 'composeAffine');
+  try {
+    const first = mirrored(pose, rig, 'left-to-right', mapping);
+    const initialCalls = compose.mock.calls.length;
+    near(first.get('rightArm')!, { x: -16 });
+    pose.set('leftArm', { x: 21 });
+    const second = mirrored(pose, rig, 'left-to-right', mapping);
+    const repeatedCalls = compose.mock.calls.length - initialCalls;
+    assert.equal(initialCalls - repeatedCalls, rig.bones.length, 'repeat samples skip the bind hierarchy pass');
+    near(second.get('rightArm')!, { x: -23 });
+    near(first.get('rightArm')!, { x: -16 });
+    // Returned poses never expose cached bind transforms to callers.
+    second.get('rightArm')!.x = -999;
+    near(mirrored(new Map(), rig).get('rightArm')!, { x: -12 });
+    const shared = new Rig(rig, []);
+    const beforeShared = compose.mock.calls.length;
+    near(mirrored(pose, shared).get('rightArm')!, { x: -23 });
+    assert.equal(compose.mock.calls.length - beforeShared, repeatedCalls, 'skin-only rigs share bind calculations');
+    const reloaded = simpleRig({ x: 3 }, { x: -5 });
+    near(mirrored(new Map([['leftArm', { x: 4 }]]), reloaded).get('rightArm')!, { x: -6 });
+  } finally {
+    compose.mockRestore();
+  }
 });
 
 test('unpaired/root values and sparse shape are preserved in detached output entries', () => {

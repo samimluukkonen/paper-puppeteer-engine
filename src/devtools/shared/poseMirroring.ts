@@ -33,6 +33,32 @@ const identity = (): Affine => ({ a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 });
 const multiply = (parent: Affine, local: Affine): Affine => composeAffine(local, parent, identity());
 const linear = (matrix: Affine): Affine => ({ ...matrix, tx: 0, ty: 0 });
 
+interface BindFrames {
+  readonly bind: ReadonlyMap<string, JointTransform>;
+  readonly world: ReadonlyMap<string, Affine>;
+}
+
+// Validated skeleton arrays are immutable and shared by skin-only rig copies.
+// Weak ownership releases these calculations when the skeleton is no longer used.
+const bindFrames = new WeakMap<Rig['bones'], BindFrames>();
+
+function getBindFrames(rig: Rig): BindFrames {
+  const cached = bindFrames.get(rig.bones);
+  if (cached) return cached;
+  const bind = new Map(rig.bones.map((bone) => [bone.id, createTransform(bone)]));
+  const world = new Map<string, Affine>();
+  for (const bone of rig.bones) {
+    const local = transformToAffine(bind.get(bone.id)!, identity());
+    world.set(
+      bone.id,
+      composeAffine(local, bone.parent === undefined ? undefined : world.get(bone.parent), identity()),
+    );
+  }
+  const frames = { bind, world };
+  bindFrames.set(rig.bones, frames);
+  return frames;
+}
+
 function inverseLinear(matrix: Affine): Affine | undefined {
   const x = worldToLocal({ x: 1, y: 0 }, matrix);
   const y = worldToLocal({ x: 0, y: 1 }, matrix);
@@ -81,15 +107,7 @@ export function mirrorPose(
   }
   if (issues.length) return failure(issues);
 
-  const bind = new Map(rig.bones.map((bone) => [bone.id, createTransform(bone)]));
-  const bindWorld = new Map<string, Affine>();
-  for (const bone of rig.bones) {
-    const local = transformToAffine(bind.get(bone.id)!, identity());
-    bindWorld.set(
-      bone.id,
-      composeAffine(local, bone.parent === undefined ? undefined : bindWorld.get(bone.parent), identity()),
-    );
-  }
+  const { bind, world: bindWorld } = getBindFrames(rig);
   const parentFrame = (id: string): Affine => {
     const parent = rig.getBone(id).parent;
     return parent === undefined ? identity() : linear(bindWorld.get(parent)!);
