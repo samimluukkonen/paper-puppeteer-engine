@@ -4,18 +4,18 @@ import type { IKBakeController } from './IKBakeController.js';
 /** React renders controller proposals; no animation mutation or separate clock lives here. */
 export function IKBakePanel({ controller }: { controller: IKBakeController }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  useEffect(() => () => controller.hidePreview(), [controller]);
+  useEffect(() => () => controller.setPanelOpen(false), [controller]);
   const plan = state.plan?.success ? state.plan : null;
   return (
     <details
       className="animation-popover animation-ik-baking"
       onToggle={(event) => {
-        if (!event.currentTarget.open) controller.hidePreview();
+        controller.setPanelOpen(event.currentTarget.open);
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
-          controller.hidePreview();
+          controller.setPanelOpen(false);
           event.currentTarget.open = false;
           event.currentTarget.querySelector('summary')?.focus();
         }
@@ -113,7 +113,7 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
           Violet overlay: proposed baked animation. Original IK animation stays visible underneath. Scrub the timeline
           to compare; hide preview to inspect the original. Close this panel to clear the preview.
         </p>
-        <p role="status">{state.feedback}</p>
+        <p role="status">{state.pending ? 'Preparing bake…' : state.feedback}</p>
       </section>
     </details>
   );

@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { AnimationEditorState } from '../../src/devtools/animation-editor/AnimationEditorState.js';
 import { IKBakeController } from '../../src/devtools/animation-editor/IKBakeController.js';
+import { planIKBake } from '../../src/devtools/animation-editor/ikBakePlanning.js';
 import type { AnimationClip } from '../../src/engine/AnimationClip.js';
 import type { AnimationPose } from '../../src/engine/AnimationPose.js';
 import type { TwoBoneIKConstraint } from '../../src/engine/ik/TwoBoneIKConstraint.js';
@@ -43,7 +44,18 @@ export function ikBakeEditor(runtime: () => readonly TwoBoneIKConstraint[] = () 
   const state = new AnimationEditorState(rig, [source, { ...source, name: 'other' }]);
   state.selectAnimation('reach');
   const show = vi.fn<(pose: AnimationPose | null) => void>();
-  const controller = new IKBakeController(show, runtime);
+  const controller = new IKBakeController(show, runtime, (request) => ({
+    result: Promise.resolve().then(() => planIKBake(structuredClone(request))),
+    cancel() {},
+  }));
   controller.bind(state);
+  controller.setPanelOpen(true);
   return { rig, source, state, show, controller };
+}
+
+/** Wait for debounced planning without using timing thresholds for solver speed. */
+export async function waitForIKBake(controller: IKBakeController): Promise<void> {
+  await vi.waitFor(() => {
+    if (controller.getSnapshot().pending) throw new Error('Bake is still being prepared.');
+  });
 }

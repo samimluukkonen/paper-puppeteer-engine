@@ -1,8 +1,58 @@
 import { expect } from '@playwright/test';
-import { animationFileSchema } from '../../src/engine/schemas.js';
+import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
 test.describe.configure({ timeout: 60000 });
+
+test('dense bake planning keeps timeline navigation responsive and closing terminates its worker', async ({ page }) => {
+  await page.route('**/demo-puppet/rig.json', async (route) => {
+    const response = await route.fetch();
+    const rig = rigFileSchema.parse(await response.json());
+    await route.fulfill({
+      json: {
+        ...rig,
+        bones: [
+          ...rig.bones,
+          ...Array.from({ length: 64 }, (_, index) => ({ id: `extra-${index}`, parent: rig.root })),
+        ],
+      },
+    });
+  });
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      json: {
+        ...animationFileSchema.parse(await response.json()),
+        duration: 60000,
+        loop: false,
+        playback: { mode: 'smooth' },
+        events: [],
+        tracks: {},
+        ikTracks: { rightArmIK: [{ time: 0, x: 22, y: -42 }] },
+      },
+    });
+  });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  const disclosure = page.locator('.animation-ik-baking > summary');
+  await disclosure.click();
+  const panel = page.getByRole('region', { name: 'IK Baking', exact: true });
+  await panel.getByRole('spinbutton', { name: 'Sampling FPS', exact: true }).fill('600');
+  const started = page.waitForEvent('worker');
+  await panel.getByRole('checkbox', { name: /^rightArmIK/ }).check();
+  const worker = await started;
+  await expect(panel.getByRole('status')).toHaveText('Preparing bake…');
+  await expect(panel.getByRole('button', { name: 'Bake IK', exact: true })).toBeDisabled();
+  const ruler = page.locator('#timeline-ruler');
+  await ruler.press('ArrowRight');
+  await expect(ruler).toHaveAttribute('aria-valuenow', '0.01');
+  await expect(panel.getByRole('status')).toHaveText('Preparing bake…');
+  const closed = worker.waitForEvent('close');
+  await disclosure.click();
+  await closed;
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+});
 
 for (const chain of [
   { id: 'rightArmIK', root: 'rightUpperArm', middle: 'rightForearm', target: { x: 22, y: -42 } },

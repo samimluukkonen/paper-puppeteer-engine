@@ -6,9 +6,9 @@ import { IsolatedIKSampler } from '../src/engine/ik/IsolatedIKSampler.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
-import { ikBakeEditor } from './helpers/ikBakeEditor.js';
+import { ikBakeEditor, waitForIKBake } from './helpers/ikBakeEditor.js';
 
-test('explicit constraint selection and FPS produce an accurate whole-animation summary', () => {
+test('explicit constraint selection and FPS produce an accurate whole-animation summary', async () => {
   const { state, controller } = ikBakeEditor();
   assert.deepEqual(
     controller.getSnapshot().constraints.map((entry) => entry.id),
@@ -17,6 +17,7 @@ test('explicit constraint selection and FPS produce an accurate whole-animation 
   assert.deepEqual(controller.getSnapshot().selectedIds, []);
   assert.isNull(controller.getSnapshot().plan);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   let plan = controller.getSnapshot().plan;
   assert.isTrue(plan?.success);
   if (!plan?.success) throw new Error('Missing plan');
@@ -29,17 +30,20 @@ test('explicit constraint selection and FPS produce an accurate whole-animation 
   assert.equal(plan.replacedKeyCount, 2);
   assert.equal(plan.sampling.fps, 10);
   controller.setFPS('5');
+  await waitForIKBake(controller);
   plan = controller.getSnapshot().plan;
   assert.isTrue(plan?.success);
   if (!plan?.success) throw new Error('Missing plan');
   assert.equal(plan.generatedKeyCount, 12);
   controller.setConstraint('leg', true);
+  await waitForIKBake(controller);
   plan = controller.getSnapshot().plan;
   assert.isTrue(plan?.success);
   if (!plan?.success) throw new Error('Missing plan');
   assert.equal(plan.generatedKeyCount, 24);
   assert.equal(plan.affectedBones.length, 4);
   controller.setConstraint('arm', false);
+  await waitForIKBake(controller);
   assert.deepEqual(controller.getSnapshot().selectedIds, ['leg']);
   assert.equal(state.historyLength, 0);
   controller.dispose();
@@ -47,10 +51,12 @@ test('explicit constraint selection and FPS produce an accurate whole-animation 
 
 test.each(['', '0', '-1', 'NaN', 'Infinity', '1000000000'])(
   'invalid FPS %j blocks preview/commit with feedback',
-  (fps) => {
+  async (fps) => {
     const { state, controller } = ikBakeEditor();
     controller.setConstraint('arm', true);
+    await waitForIKBake(controller);
     controller.setFPS(fps);
+    await waitForIKBake(controller);
     assert.isNull(controller.getSnapshot().plan);
     assert.isTrue(controller.getSnapshot().issues.some((issue) => issue.severity === 'error'));
     controller.togglePreview();
@@ -58,38 +64,43 @@ test.each(['', '0', '-1', 'NaN', 'Infinity', '1000000000'])(
     assert.isFalse(controller.commit());
     assert.equal(state.historyLength, 0);
     controller.setFPS('10');
+    await waitForIKBake(controller);
     assert.isTrue(controller.getSnapshot().plan?.success);
     controller.dispose();
   },
 );
 
-test('unknown selection reports missing constraint and never substitutes another chain', () => {
+test('unknown selection reports missing constraint and never substitutes another chain', async () => {
   const { controller } = ikBakeEditor();
   controller.setConstraint('missing', true);
+  await waitForIKBake(controller);
   assert.isNull(controller.getSnapshot().plan);
   assert.include(controller.getSnapshot().issues[0]!.message, 'Unknown IK constraint');
   assert.deepEqual(controller.getSnapshot().selectedIds, ['missing']);
   controller.dispose();
 });
 
-test('invalid animation feedback retains missing-bone validation diagnostics', () => {
+test('invalid animation feedback retains missing-bone validation diagnostics', async () => {
   const { rig, source, controller } = ikBakeEditor();
   const state = new AnimationEditorState(rig, [{ ...source, tracks: { missing: [{ time: 0, rotation: 1 }] } }]);
   state.selectAnimation('reach');
   controller.bind(state);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   assert.isNull(controller.getSnapshot().plan);
   assert.isTrue(controller.getSnapshot().issues.some((issue) => issue.message.includes('missing')));
   controller.dispose();
 });
 
-test('stepped playback and its FPS stay authored when sampling at a compatible different FPS', () => {
+test('stepped playback and its FPS stay authored when sampling at a compatible different FPS', async () => {
   const { rig, source, controller } = ikBakeEditor();
   const state = new AnimationEditorState(rig, [{ ...source, playback: { mode: 'stepped', fps: 10 } }]);
   state.selectAnimation('reach');
   controller.bind(state);
   controller.setFPS('20');
+  await waitForIKBake(controller);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   assert.isTrue(controller.getSnapshot().plan?.success);
   assert.isTrue(controller.commit());
   assert.deepEqual(state.workingAnimation!.playback, { mode: 'stepped', fps: 10 });
@@ -97,16 +108,20 @@ test('stepped playback and its FPS stay authored when sampling at a compatible d
   controller.dispose();
 });
 
-test('option changes publish an atomic selection/plan snapshot and drafts hide previews', () => {
+test('option changes publish an atomic selection/plan snapshot and drafts hide previews', async () => {
   const { state, controller } = ikBakeEditor();
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   const snapshots: ReturnType<typeof controller.getSnapshot>[] = [];
   controller.subscribe(() => snapshots.push(controller.getSnapshot()));
   controller.setConstraint('leg', true);
-  assert.equal(snapshots.length, 1);
-  const plan = snapshots[0]!.plan;
+  await waitForIKBake(controller);
+  assert.equal(snapshots.length, 2);
+  assert.isTrue(snapshots[0]!.pending);
+  assert.isNull(snapshots[0]!.plan);
+  const plan = snapshots[1]!.plan;
   if (!plan?.success) throw new Error('Missing plan');
-  assert.deepEqual(plan.sampling.constraintIds, snapshots[0]!.selectedIds);
+  assert.deepEqual(plan.sampling.constraintIds, snapshots[1]!.selectedIds);
   controller.togglePreview();
   state.selectBone('upper');
   state.setTemporaryBoneProperty('rotation', 0.9);
@@ -115,13 +130,14 @@ test('option changes publish an atomic selection/plan snapshot and drafts hide p
   controller.dispose();
 });
 
-test('preview samples the actual commit result at the shared playhead without authored mutations or events', () => {
+test('preview samples the actual commit result at the shared playhead without authored mutations or events', async () => {
   const { source, rig, state, controller, show } = ikBakeEditor();
   const sourceBefore = structuredClone(source);
   const original = state.workingAnimation!;
   const events = vi.fn();
   state.onAnimationEvent(events);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   const plan = controller.getSnapshot().plan;
   if (!plan?.success) throw new Error('Missing plan');
   const candidate = commitIKBake(original, plan, rig);
@@ -149,18 +165,20 @@ test('preview samples the actual commit result at the shared playhead without au
   controller.dispose();
 });
 
-test('commit invokes the existing command once, pauses, installs bone tracks and restores exact IK with Undo/Redo', () => {
+test('commit invokes the existing command once, pauses, installs bone tracks and restores exact IK with Undo/Redo', async () => {
   const { source, state, controller } = ikBakeEditor();
   const original = state.workingAnimation;
   const before = structuredClone(source);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   const plan = controller.getSnapshot().plan;
-  const commit = vi.spyOn(state, 'commitIKBake');
+  const commit = vi.spyOn(state, 'replaceWorkingAnimation');
   state.setCurrentTime(0.4);
   state.play();
   assert.isTrue(controller.commit());
   assert.equal(commit.mock.calls.length, 1);
-  assert.strictEqual(commit.mock.calls[0]![0], plan);
+  if (!plan?.success) throw new Error('Missing plan');
+  assert.isTrue(Object.hasOwn(commit.mock.calls[0]![0] as object, 'tracks'));
   assert.isFalse(state.isPlaying);
   assert.equal(state.historyLength, 1);
   assert.isTrue(state.dirty);
@@ -175,20 +193,24 @@ test('commit invokes the existing command once, pauses, installs bone tracks and
   assert.strictEqual(state.workingAnimation, original);
   assert.isFalse(state.dirty);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   assert.isTrue(controller.getSnapshot().plan?.success);
   state.redo();
+  await waitForIKBake(controller);
   assert.strictEqual(state.workingAnimation, baked);
   assert.isNull(controller.getSnapshot().plan);
   assert.deepEqual(source, before);
   controller.dispose();
 });
 
-test('a successful bake clears consumed selection so another disjoint constraint can be baked next', () => {
+test('a successful bake clears consumed selection so another disjoint constraint can be baked next', async () => {
   const { state, controller } = ikBakeEditor();
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   assert.isTrue(controller.commit());
   assert.deepEqual(controller.getSnapshot().selectedIds, []);
   controller.setConstraint('leg', true);
+  await waitForIKBake(controller);
   assert.isTrue(controller.getSnapshot().plan?.success);
   assert.isTrue(controller.commit());
   assert.deepEqual(state.workingAnimation!.disabledIKConstraints, ['arm', 'leg']);
@@ -198,15 +220,18 @@ test('a successful bake clears consumed selection so another disjoint constraint
   controller.dispose();
 });
 
-test('document/options/session changes clear previews and subscriptions do not retain replaced editors', () => {
+test('document/options/session changes clear previews and subscriptions do not retain replaced editors', async () => {
   const { source, rig, state, controller, show } = ikBakeEditor();
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   controller.togglePreview();
   controller.setFPS('5');
+  await waitForIKBake(controller);
   assert.isFalse(controller.getSnapshot().preview);
   assert.isNull(show.mock.lastCall![0]);
   controller.togglePreview();
   state.setAuthoredInterpolation('linear');
+  await waitForIKBake(controller);
   assert.isFalse(controller.getSnapshot().preview);
   controller.togglePreview();
   state.selectAnimation('other', { discardChanges: true });
@@ -229,7 +254,7 @@ test('document/options/session changes clear previews and subscriptions do not r
   controller.dispose();
 });
 
-test('measured low-FPS warnings and stepped-grid errors reach the panel and clear on option changes', () => {
+test('measured low-FPS warnings and stepped-grid errors reach the panel and clear on option changes', async () => {
   const { state, source, controller, rig } = ikBakeEditor();
   const rapid = {
     ...source,
@@ -245,11 +270,13 @@ test('measured low-FPS warnings and stepped-grid errors reach the panel and clea
   };
   assert.isTrue(state.replaceWorkingAnimation({ version: 1, ...rapid }));
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   const low = controller.getSnapshot();
   assert.isTrue(low.plan?.success);
   assert.isFalse(low.motionFidelity!.withinBetweenKeyTolerance);
   assert.isTrue(low.issues.some((issue) => issue.message.includes('Increase sampling FPS')));
   controller.setFPS('60');
+  await waitForIKBake(controller);
   assert.isBelow(
     controller.getSnapshot().motionFidelity!.betweenKeys.endEffector,
     low.motionFidelity!.betweenKeys.endEffector,
@@ -258,16 +285,19 @@ test('measured low-FPS warnings and stepped-grid errors reach the panel and clea
   stepped.selectAnimation('reach');
   controller.bind(stepped);
   controller.setFPS('10');
+  await waitForIKBake(controller);
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   assert.isNull(controller.getSnapshot().plan);
   assert.isNull(controller.getSnapshot().motionFidelity);
   assert.isTrue(controller.getSnapshot().issues.some((issue) => issue.message.includes('Use the authored FPS')));
   controller.setFPS('12');
+  await waitForIKBake(controller);
   assert.isTrue(controller.getSnapshot().motionFidelity?.success);
   controller.dispose();
 });
 
-test('runtime providers, target/mix ownership and configuration block baking without evaluating external input', () => {
+test('runtime providers, target/mix ownership and configuration block baking without evaluating external input', async () => {
   let runtime: TwoBoneIKConstraint[] = [];
   const { rig, controller } = ikBakeEditor(() => runtime);
   runtime = rig.ik!.map(
@@ -275,26 +305,30 @@ test('runtime providers, target/mix ownership and configuration block baking wit
       new TwoBoneIKConstraint(definition, rig, new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]))),
   );
   controller.setConstraint('arm', true);
+  await waitForIKBake(controller);
   assert.isTrue(controller.getSnapshot().plan?.success);
   const provider = vi.fn(() => ({ x: 5, y: 5 }));
   runtime[0]!.setTargetProvider(provider);
   controller.refreshRuntime();
+  await waitForIKBake(controller);
   assert.isNull(controller.getSnapshot().plan);
   assert.include(controller.getSnapshot().issues[0]!.message, 'runtime state');
   assert.equal(provider.mock.calls.length, 0);
   runtime[0]!.setTargetProvider(undefined);
   controller.refreshRuntime();
+  await waitForIKBake(controller);
   assert.isTrue(controller.getSnapshot().plan?.success);
   runtime[0]!.mix = 1;
   assert.isFalse(controller.commit(), 'commit rechecks ownership even without a notification');
   runtime[0]!.clearMixOverride();
   runtime[0]!.setTarget(10, 10);
   controller.refreshRuntime();
+  await waitForIKBake(controller);
   assert.isNull(controller.getSnapshot().plan);
   controller.dispose();
 });
 
-test('overlapping active constraints and unsupported scales display real sampler validation', () => {
+test('overlapping active constraints and unsupported scales display real sampler validation', async () => {
   const fixture = ikBakeEditor();
   const rig = new Rig({
     root: fixture.rig.root,
@@ -305,6 +339,7 @@ test('overlapping active constraints and unsupported scales display real sampler
   state.selectAnimation('reach');
   fixture.controller.bind(state);
   fixture.controller.setConstraint('arm', true);
+  await waitForIKBake(fixture.controller);
   assert.isNull(fixture.controller.getSnapshot().plan);
   assert.include(fixture.controller.getSnapshot().issues[0]!.message, 'Shared driven bones');
   const invalid = new AnimationEditorState(fixture.rig, [
@@ -316,6 +351,7 @@ test('overlapping active constraints and unsupported scales display real sampler
   invalid.selectAnimation('reach');
   fixture.controller.bind(invalid);
   fixture.controller.setConstraint('arm', true);
+  await waitForIKBake(fixture.controller);
   assert.isNull(fixture.controller.getSnapshot().plan);
   assert.include(fixture.controller.getSnapshot().issues[0]!.message, 'unsupported-scale');
   fixture.controller.dispose();

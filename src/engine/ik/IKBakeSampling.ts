@@ -95,6 +95,35 @@ function messageFor(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** @internal Read runtime ownership without evaluating providers or sampling the animation. */
+export function getIKBakeRuntimeIssues(rig: Rig, runtimeConstraints: readonly TwoBoneIKConstraint[]): IKBakeIssue[] {
+  const issues: IKBakeIssue[] = [];
+  for (const runtime of runtimeConstraints) {
+    const definition = rig.ik?.find((entry) => entry.name === runtime.name);
+    if (
+      !definition ||
+      runtime.targetOwnership !== 'animation' ||
+      runtime.rootBone !== definition.rootBone ||
+      runtime.middleBone !== definition.middleBone ||
+      runtime.endBone !== definition.endBone ||
+      runtime.enabled !== (definition.enabled ?? true) ||
+      runtime.priority !== (definition.priority ?? 0) ||
+      runtime.mix !== (definition.mix ?? 1) ||
+      runtime.hasMixOverride ||
+      runtime.bendDirection !== (definition.bendDirection ?? 1) ||
+      runtime.endOffset.x !== (definition.endOffset?.x ?? 0) ||
+      runtime.endOffset.y !== (definition.endOffset?.y ?? 0)
+    )
+      issues.push({
+        code: 'external-state',
+        severity: 'error',
+        constraintIds: [runtime.name],
+        message: `IK "${runtime.name}" depends on runtime state. Bake authored animation with rig-defined constraints.`,
+      });
+  }
+  return issues;
+}
+
 /** Read-only single-clip IK bake foundation. All rig constraints execute in runtime priority order,
  * but only selected driven joints are captured. No layers, gameplay providers, presets or drafts are consumed.
  * Every failure is atomic: no partial samples escape and no authored/editor/runtime state is changed.
@@ -148,29 +177,7 @@ export function sampleIKBake(
         });
     }
   }
-  for (const runtime of options.runtimeConstraints ?? []) {
-    const definition = definitions.get(runtime.name);
-    if (
-      !definition ||
-      runtime.targetOwnership !== 'animation' ||
-      runtime.rootBone !== definition.rootBone ||
-      runtime.middleBone !== definition.middleBone ||
-      runtime.endBone !== definition.endBone ||
-      runtime.enabled !== (definition.enabled ?? true) ||
-      runtime.priority !== (definition.priority ?? 0) ||
-      runtime.mix !== (definition.mix ?? 1) ||
-      runtime.hasMixOverride ||
-      runtime.bendDirection !== (definition.bendDirection ?? 1) ||
-      runtime.endOffset.x !== (definition.endOffset?.x ?? 0) ||
-      runtime.endOffset.y !== (definition.endOffset?.y ?? 0)
-    )
-      issues.push({
-        code: 'external-state',
-        severity: 'error',
-        constraintIds: [runtime.name],
-        message: `IK "${runtime.name}" depends on runtime state. Bake authored animation with rig-defined constraints.`,
-      });
-  }
+  issues.push(...getIKBakeRuntimeIssues(rig, options.runtimeConstraints ?? []));
   if (issues.length) return failure(issues);
 
   const fps = options.fps ?? (validated.playback?.mode === 'stepped' ? validated.playback.fps : DEFAULT_ANIMATION_FPS);
