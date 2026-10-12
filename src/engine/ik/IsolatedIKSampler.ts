@@ -34,7 +34,9 @@ export class IsolatedIKSampler {
       endToWorld: (id, offset) => localToWorld(offset, this.matrixFor(id)),
       worldToParent: (id, point) => {
         const parent = this.rig.getBone(id).parent;
-        return parent === undefined ? point : worldToLocal(point, this.matrixFor(parent));
+        // Match Puppet's solver adapter: finite nonsingular ancestors remain solvable,
+        // even when their axes fall below the editor gesture inversion tolerance.
+        return parent === undefined ? point : worldToLocal(point, this.matrixFor(parent), 0);
       },
     };
   }

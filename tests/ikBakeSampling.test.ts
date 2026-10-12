@@ -111,6 +111,43 @@ function endpoint(skeleton: Rig, pose: ReadonlyMap<string, Readonly<JointTransfo
   return localToWorld({ x: 0, y: 0 }, matrices.get(end)!);
 }
 
+test('nonsingular compressed ancestors match runtime IK and inspector sampling', () => {
+  const skeleton = new Rig({
+    root: 'body',
+    bones: [
+      { id: 'body', scaleY: 1e-14 },
+      { id: 'parent', parent: 'body', rotation: Math.PI / 4 },
+      { id: 'upper', parent: 'parent' },
+      { id: 'lower', parent: 'upper', x: 50 },
+      { id: 'hand', parent: 'lower', x: 50 },
+    ],
+    ik: [{ name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand' }],
+  });
+  const puppet = new Puppet(puppetScene(), { rig: skeleton, autoUpdate: false });
+  try {
+    const target = localToWorld({ x: 60, y: 30 }, puppet.getBone('parent').container.getWorldTransformMatrix());
+    const source: AnimationClip = {
+      name: 'reach',
+      duration: 1000,
+      loop: false,
+      tracks: {},
+      ikTracks: { arm: [{ time: 0, ...target }] },
+    };
+    puppet.addAnimation(source).play(source.name);
+    assert.equal(puppet.getIK('arm').status, 'solved');
+    const result = sampleIKBake(source, skeleton, ['arm']);
+    success(result);
+    for (const sample of result.samples) {
+      assert.equal(sample.constraints.get('arm')!.status, 'solved');
+      for (const [id, values] of sample.pose)
+        assert.approximately(values.rotation, puppet.getBone(id).pose.rotation, 1e-10);
+    }
+    assert.deepEqual(evaluateIKTarget(source, skeleton, 'arm', 0), { ...target, mix: 1 });
+  } finally {
+    puppet.destroy();
+  }
+});
+
 test('entire-duration grids include zero and the exact endpoint once without cumulative drift', () => {
   assert.deepEqual(getIKBakeSampleTimes(1050, 10), [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1050]);
   assert.deepEqual(getIKBakeSampleTimes(1000, 3), [0, 1000 / 3, 2000 / 3, 1000]);
