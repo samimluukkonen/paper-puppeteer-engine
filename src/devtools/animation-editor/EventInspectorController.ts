@@ -97,9 +97,7 @@ export class EventInspectorController {
   render(state: AnimationEditorState): void {
     const event = state.selectedEventData;
     const eventPanel = this.app.querySelector<HTMLElement>('#animation-event-inspector')!;
-    const bonePanel = this.app.querySelector<HTMLElement>('#animation-bone-inspector')!;
     if (eventPanel.hidden !== !event) eventPanel.hidden = !event;
-    if (bonePanel.hidden !== !!event) bonePanel.hidden = !!event;
     this.add.disabled = !state.workingAnimation;
     this.remove.disabled = !event;
     this.time.max = String(state.duration);

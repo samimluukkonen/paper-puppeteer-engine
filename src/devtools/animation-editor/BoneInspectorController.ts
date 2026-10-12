@@ -161,7 +161,8 @@ export class BoneInspectorController {
     const state = this.state;
     const transform = state?.selectedBoneTransform;
     const section = this.title.closest<HTMLElement>('#animation-bone-inspector');
-    if (section) section.hidden = !!state?.selectedIKConstraintId;
+    // This controller owns bone-panel visibility for every selection kind.
+    if (section) section.hidden = !!state?.selectedIKConstraintId || !!state?.selectedEvent;
     const navigated =
       force ||
       this.bone !== state?.selectedBoneId ||

@@ -147,15 +147,18 @@ test('event/key selection stays exclusive; scrubbing, playback, key editing and 
   await expect(key(page)).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#timeline-delete-key')).toBeDisabled();
   await expect(page.locator('#animation-event-inspector')).toBeVisible();
+  await expect(page.locator('#animation-bone-inspector')).toBeHidden();
   const ruler = page.locator('#timeline-ruler');
   await ruler.focus();
   await page.keyboard.press('End');
   await expect(ruler).toHaveAttribute('aria-valuenow', '2');
   await expect(event(page, 'step-left')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#animation-event-time')).toHaveValue('0.5');
+  await expect(page.locator('#animation-bone-inspector')).toBeHidden();
   await key(page).click();
   await expect(event(page, 'step-left')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#animation-event-inspector')).toBeHidden();
+  await expect(page.locator('#animation-bone-inspector')).toBeVisible();
   const field = page.locator('#animation-bone-fields input[data-property="x"]');
   await field.fill('44');
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
