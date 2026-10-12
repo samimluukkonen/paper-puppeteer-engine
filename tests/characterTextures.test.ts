@@ -3,7 +3,11 @@ import { createRequire } from 'node:module';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
-import { DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS, queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
+import {
+  DEFAULT_CHARACTER_TEXTURE_LIMITS,
+  DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS,
+  queueCharacterTextures,
+} from '../src/engine/queueCharacterTextures.js';
 
 function character(id: string, textures: Record<string, string> = { body: 'body.png' }) {
   return CharacterDefinition.fromData(
@@ -32,7 +36,7 @@ function fixture(
     },
   },
 ) {
-  const load = Object.assign(new EventEmitter(), { image: vi.fn(), prefix: '' });
+  const load = Object.assign(new EventEmitter(), { image: vi.fn(), prefix: '', imageLoadType: 'HTMLImageElement' });
   const events = new EventEmitter();
   const scene = { textures, load, events } as unknown as Phaser.Scene;
   const assertClean = () => {
@@ -110,6 +114,44 @@ test('manifest keys survive a host loader prefix in actual Phaser files', () => 
   assert.equal(files.length, 1);
 });
 
+test('character files use guarded XHR even when the host prefers image-element loading', () => {
+  const ImageFile = createRequire(import.meta.url)(
+    '../node_modules/phaser/src/loader/filetypes/ImageFile.js',
+  ) as typeof Phaser.Loader.FileTypes.ImageFile;
+  const { scene, load } = fixture();
+  let file: Phaser.Loader.FileTypes.ImageFile | undefined;
+  load.image.mockImplementation((key: string, url: string) => {
+    file = new ImageFile(scene.load, key, url);
+    load.emit('addfile', file.key, file.type, load, file);
+  });
+  const release = queueCharacterTextures(scene, character('guarded'));
+  assert.ok(file);
+  assert.equal(Reflect.get(file, 'useImageElementLoad'), false);
+  assert.equal(load.imageLoadType, 'HTMLImageElement');
+  release();
+});
+
+for (const name of Object.keys(DEFAULT_CHARACTER_TEXTURE_LIMITS) as (keyof typeof DEFAULT_CHARACTER_TEXTURE_LIMITS)[]) {
+  test.each([0, -1, NaN, Infinity, 1.5])(`invalid ${name} %s fails before queueing`, (value) => {
+    const { scene, load, assertClean } = fixture();
+    assert.throws(() => queueCharacterTextures(scene, character('first'), { [name]: value }), /positive safe integer/);
+    assert.equal(load.image.mock.calls.length, 0);
+    assertClean();
+    queueCharacterTextures(scene, character('second'));
+    assert.equal(load.image.mock.calls.length, 1);
+  });
+}
+
+test('inline image limits fail before queueing files or reserving their keys', () => {
+  const { scene, load, assertClean } = fixture();
+  const oversized = character('first', { body: 'data:image/png;base64,YWJjZA==' });
+  assert.throws(() => queueCharacterTextures(scene, oversized, { maxImageBytes: 3 }), /3-byte limit/);
+  assert.equal(load.image.mock.calls.length, 0);
+  assertClean();
+  queueCharacterTextures(scene, character('second'));
+  assert.equal(load.image.mock.calls.length, 1);
+});
+
 test.each([0, -1, NaN, Infinity, 1.5, 2_147_483_648])(
   'invalid image timeout %s cannot acquire reservations',
   (timeoutMs) => {
@@ -179,9 +221,11 @@ test('queue exceptions release reservations and listeners', () => {
   });
   assert.throws(() => queueCharacterTextures(scene, character('first')), /Queue failed/);
   assert.equal(load.prefix, 'host.');
+  assert.equal(load.imageLoadType, 'HTMLImageElement');
   assertClean();
   queueCharacterTextures(scene, character('second'));
   assert.equal(load.prefix, 'host.');
+  assert.equal(load.imageLoadType, 'HTMLImageElement');
   assert.equal(load.image.mock.calls.length, 2);
 });
 

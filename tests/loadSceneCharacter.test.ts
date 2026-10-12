@@ -76,6 +76,13 @@ function pendingArtwork(load: ReturnType<typeof fixture>['load'], phase: 'queued
     state: 11,
     xhrLoader: phase === 'request' ? xhr : null,
     data: image,
+    onProgress: vi.fn(),
+    onLoad: vi.fn(),
+    onError: vi.fn(),
+    onProcess: vi.fn(),
+    onProcessComplete: vi.fn(),
+    onProcessError: vi.fn(),
+    resetXHR: vi.fn(),
     destroy: vi.fn(),
   };
   const list = new Set<typeof file>();
@@ -96,6 +103,25 @@ function pendingArtwork(load: ReturnType<typeof fixture>['load'], phase: 'queued
   });
   return { file, xhr, image, list, inflight, queue, nextFile, isLoading };
 }
+
+test('artwork byte limits reject promptly without waiting for unrelated requests or the deadline', async () => {
+  vi.useFakeTimers();
+  const { load, metadata, start, assertClean } = fixture();
+  metadata.mockResolvedValue(character('part.png', { other: 'other.png' }));
+  const { file, xhr, inflight } = pendingArtwork(load, 'request');
+  const unrelated = { ...file, key: 'unrelated', xhrLoader: { ...xhr, abort: vi.fn() } };
+  inflight.add(unrelated);
+  const pending = start({ maxImageBytes: 1 });
+  const rejection = rejects(pending, { name: 'CharacterTextureLimitError', message: /1-byte limit/ });
+  await vi.advanceTimersByTimeAsync(0);
+  file.onProgress({ loaded: 2, lengthComputable: false });
+  await rejection;
+  assert.equal(xhr.abort.mock.calls.length, 1);
+  assert.isTrue(inflight.has(unrelated));
+  assert.equal(unrelated.xhrLoader.abort.mock.calls.length, 0);
+  assert.equal(vi.getTimerCount(), 0);
+  assertClean();
+});
 
 test('shutdown aborts artwork even after Phaser resets its queues, without restarting the loader', async () => {
   vi.useFakeTimers();

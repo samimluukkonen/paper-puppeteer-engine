@@ -1,10 +1,13 @@
 import type Phaser from 'phaser';
 import type { CharacterDefinition } from './CharacterDefinition.js';
+import { CharacterTextureBudget, type CharacterTextureLimitOptions } from './characterTextureLimits.js';
 import { validateInputLimit } from './jsonInput.js';
 
 export const DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS = 30_000;
 
-export interface CharacterTextureLoadOptions {
+export { CharacterTextureLimitError, DEFAULT_CHARACTER_TEXTURE_LIMITS } from './characterTextureLimits.js';
+
+export interface CharacterTextureLoadOptions extends CharacterTextureLimitOptions {
   /** Timeout for each image XHR request. Defaults to 30 seconds. */
   timeoutMs?: number;
 }
@@ -25,6 +28,7 @@ export function queueCharacterTextures(
 ): () => void {
   const timeout = validateInputLimit(options.timeoutMs ?? DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS, 'Texture timeout');
   if (timeout > 2_147_483_647) throw new Error('Texture timeout must not exceed 2147483647.');
+  const budget = new CharacterTextureBudget(options);
   let registered = characterTextures.get(scene.textures);
   if (!registered) {
     registered = new Map();
@@ -41,9 +45,14 @@ export function queueCharacterTextures(
       throw new Error(
         `Texture key "${key}" is already assigned to "${previous.url}"; character "${definition.id}" requests "${url}". Use unique texture keys for different images.`,
       );
+    if (!scene.textures.exists(key)) budget.checkInlineImage(key, url);
   }
   const pending = new Map<string, TextureReservation>();
   let settled = false;
+  let queueingKey: string | undefined;
+  const onAdd = (key: string, type: string, _loader: Phaser.Loader.LoaderPlugin, file: Phaser.Loader.File): void => {
+    if (type === 'image' && key === queueingKey) budget.guard(file, () => !settled);
+  };
   const release = (): void => {
     if (settled) return;
     settled = true;
@@ -56,6 +65,7 @@ export function queueCharacterTextures(
     }
     pending.clear();
   };
+  scene.load.on('addfile', onAdd);
   try {
     for (const { key, url } of resources) {
       if (scene.textures.exists(key)) continue;
@@ -67,11 +77,18 @@ export function queueCharacterTextures(
       // Manifest keys identify rig artwork exactly; a host's loader prefix must
       // not rename them. Phaser applies the prefix synchronously when queueing.
       const prefix = scene.load.prefix;
+      const imageLoadType = scene.load.imageLoadType;
       try {
         scene.load.prefix = '';
+        // Byte guards need the XHR response and progress events. Keep the host's
+        // image-element preference for its own assets after constructing this file.
+        scene.load.imageLoadType = 'XHR';
+        queueingKey = key;
         scene.load.image(key, url, { responseType: 'blob', timeout });
       } finally {
+        queueingKey = undefined;
         scene.load.prefix = prefix;
+        scene.load.imageLoadType = imageLoadType;
       }
     }
     if (pending.size) {
@@ -81,6 +98,8 @@ export function queueCharacterTextures(
   } catch (error) {
     release();
     throw error;
+  } finally {
+    scene.load.off('addfile', onAdd);
   }
   return release;
 }

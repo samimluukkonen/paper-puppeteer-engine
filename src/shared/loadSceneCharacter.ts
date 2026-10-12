@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
 import type { CharacterDefinition } from '../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../engine/CharacterLoader.js';
+import { getCharacterTextureLimitError } from '../engine/characterTextureLimits.js';
 import { validateInputLimit } from '../engine/jsonInput.js';
-import { DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS, queueCharacterTextures } from '../engine/queueCharacterTextures.js';
+import {
+  type CharacterTextureLoadOptions,
+  DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS,
+  queueCharacterTextures,
+} from '../engine/queueCharacterTextures.js';
 
-export interface SceneCharacterLoadOptions {
+export interface SceneCharacterLoadOptions extends Omit<CharacterTextureLoadOptions, 'timeoutMs'> {
   /** Deadline for the entire artwork phase, including queueing and image decoding. Defaults to 30 seconds. */
   artworkTimeoutMs?: number;
 }
@@ -63,6 +68,7 @@ export function loadSceneCharacter(
     let settled = false;
     const characterImages = new Map<string, string>();
     const failedImages = new Set<string>();
+    let artworkFailure: Error | undefined;
     const remainingImages = new Set<string>();
     const imageFiles = new Set<Phaser.Loader.File>();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -101,6 +107,11 @@ export function loadSceneCharacter(
     const onError = (file: Phaser.Loader.File): void => {
       if (file.type === 'image' && characterImages.has(file.key)) {
         failedImages.add(file.key);
+        const limitError = getCharacterTextureLimitError(file);
+        artworkFailure ??= limitError;
+        // Wait for Phaser to finish the failing file callback, then cancel this
+        // character's siblings without waiting for unrelated downloads.
+        if (limitError) queueMicrotask(() => fail(limitError));
         finishImage(file.key);
       }
     };
@@ -121,11 +132,12 @@ export function loadSceneCharacter(
       if (!scene.sys.isActive()) succeed();
       else if (failedImages.size)
         fail(
-          new Error(
-            `Could not load character images: ${[...failedImages]
-              .map((key) => `"${key}" (${characterImages.get(key)})`)
-              .join(', ')}.`,
-          ),
+          artworkFailure ??
+            new Error(
+              `Could not load character images: ${[...failedImages]
+                .map((key) => `"${key}" (${characterImages.get(key)})`)
+                .join(', ')}.`,
+            ),
         );
       else succeed(definition);
     };
@@ -149,7 +161,7 @@ export function loadSceneCharacter(
       scene.load.once(Phaser.Loader.Events.COMPLETE, onComplete);
       scene.load.on(Phaser.Loader.Events.ADD, onAdd);
       try {
-        releaseTextures = queueCharacterTextures(scene, definition, { timeoutMs });
+        releaseTextures = queueCharacterTextures(scene, definition, { ...options, timeoutMs });
       } finally {
         scene.load.off(Phaser.Loader.Events.ADD, onAdd);
       }

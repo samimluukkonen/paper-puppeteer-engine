@@ -48,8 +48,9 @@ metadata requests. Streaming byte checks also cover responses with missing or mi
 `Content-Length` headers. Exceeding a limit rejects with `JsonInputLimitError` and cancels pending
 requests. Adjust these positive integer limits for larger trusted characters, for example
 `CharacterLoader.load(url, fetch, { maxJsonBytes: 20 * 1024 * 1024, maxResources: 512, concurrency: 4 })`.
-`DEFAULT_CHARACTER_LOAD_LIMITS` exposes the defaults. Image byte limits belong to the host's texture loader;
-already parsed values passed to `CharacterDefinition.fromData` bypass these I/O limits.
+`DEFAULT_CHARACTER_LOAD_LIMITS` exposes the defaults. Already parsed values passed to
+`CharacterDefinition.fromData` bypass these metadata I/O limits; artwork queued through
+`queueCharacterTextures` still receives its separate image limits.
 
 Each metadata request has a 30-second timeout covering headers and the decoded body. A timeout
 rejects with a `TimeoutError` and cancels sibling requests. Configure `timeoutMs` as a positive integer
@@ -58,11 +59,38 @@ no greater than `2147483647`; successful, failed, and canceled requests release 
 `queueCharacterTextures` also gives each image XHR request a 30-second timeout. Pass
 `queueCharacterTextures(scene, definition, { timeoutMs: 60_000 })` to adjust it; the value must be a positive
 integer no greater than `2147483647`. `DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS` exposes the default. Hosts using
-HTML image element loading or asynchronous decoding should enforce a separate deadline for the artwork phase.
+asynchronous decoding should enforce a separate deadline for the artwork phase.
 The demo and editors use a 30-second artwork deadline, reject stalled loading with a `TimeoutError`, and cancel
 the character's pending files while leaving unrelated scene assets loading. Their shared `loadSceneCharacter`
 helper accepts `{ artworkTimeoutMs: 60_000 }` as its third argument and releases timers and listeners on completion,
 failure, or scene shutdown.
+
+Character artwork defaults to 10 MiB per image, 50 MiB in total, at most 8192 pixels on either axis,
+16 million (`16 * 1024 * 1024`) pixels per image, and 64 million (`64 * 1024 * 1024`) pixels in total.
+`DEFAULT_CHARACTER_TEXTURE_LIMITS` exposes these defaults. Adjust the positive safe integer limits for
+trusted larger artwork:
+
+```ts
+queueCharacterTextures(scene, definition, {
+  maxImageBytes: 20 * 1024 * 1024,
+  maxTotalImageBytes: 100 * 1024 * 1024,
+  maxImageDimension: 8192,
+  maxImagePixels: 32 * 1024 * 1024,
+  maxTotalImagePixels: 128 * 1024 * 1024,
+});
+```
+
+XHR progress and completed blob checks enforce byte limits without relying on `Content-Length`.
+Character image files use XHR even when the host prefers HTML image element loading; the host setting
+is restored immediately for other assets. Inline data URLs receive byte checks before queueing.
+PNG headers, including inline PNGs, receive dimension checks before browser decoding. Every decoded
+image receives dimension and cumulative pixel checks before entering Phaser's texture cache. For other
+formats, the browser can allocate decoding memory before those pixel checks run. Already loaded host
+textures and atlases remain trusted overrides and do not consume this queue's budget.
+
+Limit failures emit Phaser's `loaderror` event. The demo and editors report a `CharacterTextureLimitError`
+with the exceeded limit and cancel the remaining character files. `loadSceneCharacter` accepts the same
+image limit options alongside `artworkTimeoutMs`; unrelated scene downloads keep their own settings.
 
 For external assets, pass a synchronous `urlPolicy` that explicitly approves resolved destinations:
 
