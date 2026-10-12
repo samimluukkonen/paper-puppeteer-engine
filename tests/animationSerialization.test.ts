@@ -76,22 +76,28 @@ test('canonical JSON is stable across repeated exports and object insertion orde
   assert.deepEqual(compileClip(loaded, rig).events, compileClip(animation, rig).events);
 });
 
-test('exports reject documents that would exceed the importer byte limit', () => {
-  const state = new AnimationEditorState(rig, [
-    {
-      name: 'large',
-      duration: 1000,
-      loop: false,
-      tracks: {},
-      events: [{ time: 0, name: 'event', data: 'a'.repeat(DEFAULT_MAX_JSON_BYTES) }],
-    },
-  ]);
-  state.selectAnimation('large');
-  const working = state.workingAnimation;
-  const result = state.exportAnimation();
+test('loading and exports reject documents that would exceed the importer byte limit', () => {
+  const animation: AnimationJsonDefinition = {
+    version: 1,
+    name: 'large',
+    duration: 1000,
+    loop: false,
+    tracks: {},
+    events: [{ time: 0, name: 'event', data: 'a'.repeat(DEFAULT_MAX_JSON_BYTES) }],
+  };
+  const stringify = vi.spyOn(JSON, 'stringify');
+  const result = serializeAnimation(animation, rig);
+  assert.isFalse(
+    stringify.mock.calls.some((args) => args[2] === 2),
+    'Reject before formatting the entire document.',
+  );
+  stringify.mockRestore();
   assert.isFalse(result.success);
   assert.match(result.issues[0]!.message, /byte size limit/);
-  assert.strictEqual(state.workingAnimation, working);
+  const state = new AnimationEditorState(rig, [animation]);
+  assert.isFalse(state.selectAnimation('large'));
+  assert.match(state.validationIssues[0]!.message, /byte size limit/);
+  assert.isNull(state.workingAnimation);
   assert.equal(state.historyLength, 0);
 });
 

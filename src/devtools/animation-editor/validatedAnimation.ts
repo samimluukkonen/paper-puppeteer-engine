@@ -5,6 +5,7 @@ import {
   parseAnimationClip,
   type ValidationResult,
 } from '../../engine/externalData.js';
+import { JsonInputLimitError } from '../../engine/jsonInput.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import {
@@ -25,6 +26,12 @@ export function inspectEditorAnimation(input: unknown, rig: Rig): ValidationResu
   const { data, ...diagnostics } = inspectAnimationDefinition(input, rig);
   if (!data) return diagnostics;
   const snapshot = freezeData<ReadonlyAnimation>({ ...data, version: ANIMATION_FORMAT_VERSION });
+  try {
+    assertJsonExportSize(snapshot);
+  } catch (error) {
+    if (!(error instanceof JsonInputLimitError)) throw error;
+    return { ...diagnostics, issues: [...diagnostics.issues, { severity: 'error', message: error.message }] };
+  }
   rememberValidatedAnimation(snapshot, rig);
   return { ...diagnostics, data: snapshot };
 }

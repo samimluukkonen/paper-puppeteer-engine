@@ -7,7 +7,7 @@ import { serializeAnimation } from '../src/devtools/animation-editor/animationSe
 import { isFullyFrozen } from '../src/devtools/shared/editorData.js';
 import { compileClip } from '../src/engine/AnimationClip.js';
 import { evaluateClip } from '../src/engine/AnimationPose.js';
-import type { AnimationJsonDefinition } from '../src/engine/externalData.js';
+import type { AnimationJsonDefinition, JsonValue } from '../src/engine/externalData.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
@@ -93,6 +93,27 @@ test('central import validates unknown input and returns a deeply frozen owned s
   animation.tracks.root![0]!.x = 99;
   assert.equal(result.data.tracks.root![0]!.x, 3);
   assert.isFalse(importAnimationJson(JSON.stringify(file())).success);
+});
+
+test('compact imports exceeding formatted export capacity retain the active session', () => {
+  let data: JsonValue = Array.from({ length: 30_000 }, () => 0);
+  for (let depth = 0; depth < 200; depth++) data = { nested: data };
+  const animation = { ...file(), events: [{ time: 0, name: 'payload', data }] };
+  const json = JSON.stringify(animation);
+  assert.isBelow(json.length, 100_000);
+  const state = session();
+  state.setBonePropertyKeyframe('root', 'x', 99);
+  state.play();
+  const before = snapshot(state);
+  const confirmDiscard = vi.fn(() => true);
+  assert.isFalse(state.importJson(json, { confirmDiscard }));
+  assert.deepEqual(snapshot(state), before);
+  assert.equal(confirmDiscard.mock.calls.length, 0);
+  assert.match(state.validationIssues[0]!.message, /size limit/);
+  const exported = serializeAnimation(animation, rig);
+  assert.isFalse(exported.success);
+  if (!exported.success) assert.match(exported.issues[0]!.message, /size limit/);
+  assert.isTrue(state.exportAnimation().success);
 });
 
 const invalid: [string, () => string, RegExp][] = [

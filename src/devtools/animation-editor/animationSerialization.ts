@@ -10,6 +10,7 @@ import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput
 import type { Rig } from '../../engine/Rig.js';
 import { transformProperties } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
+import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 
 export type AnimationExportResult =
   | { success: true; data: AnimationJsonDefinition; json: string; issues: readonly ValidationIssue[] }
@@ -129,8 +130,11 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
   };
   const output = inspectAnimationDefinition(data, rig);
   if (!output.data) return { success: false, issues: output.issues };
-  const json = `${JSON.stringify(data, null, 2)}\n`;
+  let json: string;
   try {
+    // Count formatting overhead before allocating a potentially much larger string.
+    assertJsonExportSize(data);
+    json = `${JSON.stringify(data, null, 2)}\n`;
     assertJsonInputSize(json);
   } catch (error) {
     if (!(error instanceof JsonInputLimitError)) throw error;
