@@ -95,6 +95,49 @@ test('exports reject documents that would exceed the importer byte limit', () =>
   assert.equal(state.historyLength, 0);
 });
 
+test('key edits cannot push an exportable document past the shared export budget', () => {
+  const input: AnimationJsonDefinition = {
+    version: 1,
+    name: 'large',
+    duration: 1000,
+    loop: false,
+    tracks: {},
+    events: [{ time: 0, name: 'data', data: '' }],
+  };
+  const overhead = new TextEncoder().encode(`${JSON.stringify(input, null, 2)}\n`).byteLength;
+  input.events![0]!.data = 'x'.repeat(DEFAULT_MAX_JSON_BYTES - overhead - 100);
+  const state = new AnimationEditorState(rig);
+  assert.isTrue(state.importJson(JSON.stringify(input)));
+  assert.isTrue(state.exportAnimation().success);
+  assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 1, 0));
+  const working = state.workingAnimation;
+  const history = state.historyLength;
+  assert.isFalse(state.setBonePropertyKeyframe('root', 'x', 2, 0.1));
+  assert.strictEqual(state.workingAnimation, working);
+  assert.equal(state.historyLength, history);
+  assert.match(state.validationIssues[0]!.message, /byte size limit/);
+  assert.isTrue(state.exportAnimation().success);
+  assert.isTrue(state.undo());
+  assert.isTrue(state.redo());
+  assert.strictEqual(state.workingAnimation, working);
+});
+
+test('direct replacement cannot bypass the document export budget or change history', () => {
+  const state = new AnimationEditorState(rig, [file()]);
+  state.selectAnimation('move');
+  const working = state.workingAnimation;
+  assert.isFalse(
+    state.replaceWorkingAnimation({
+      ...working,
+      events: [{ time: 0, name: 'data', data: 'é'.repeat(DEFAULT_MAX_JSON_BYTES / 2) }],
+    }),
+  );
+  assert.strictEqual(state.workingAnimation, working);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.dirty);
+  assert.match(state.validationIssues[0]!.message, /byte size limit/);
+});
+
 test('partial tracks, event payloads, duplicate same-time events and interpolation remain authored data', () => {
   const animation = file();
   const data = exported(animation).data;

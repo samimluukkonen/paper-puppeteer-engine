@@ -14,6 +14,7 @@ import {
   rememberValidatedAnimation,
 } from '../../engine/validatedAnimation.js';
 import { freezeData, isFullyFrozen } from '../shared/editorData.js';
+import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;
 /** Owned versioned editor snapshot; event payloads are validated as JSON before freezing. */
@@ -68,5 +69,6 @@ export function validateEditedAnimation<Animation extends AnimationData>(
   } else {
     getValidatedEditorAnimation(next, rig);
   }
+  assertJsonExportSize(next);
   return next;
 }

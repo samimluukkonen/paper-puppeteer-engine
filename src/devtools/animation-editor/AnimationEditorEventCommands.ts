@@ -2,6 +2,7 @@ import type { AnimationEvent } from '../../engine/AnimationClip.js';
 import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
+import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorKeyframeCommands } from './AnimationEditorKeyframeCommands.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
@@ -88,7 +89,7 @@ export class AnimationEditorEventCommands {
     try {
       next = edit(this.working, this.rig);
       // Bound the complete document, including other payloads and pretty-printed JSON overhead.
-      assertJsonInputSize(`${JSON.stringify(next, null, 2)}\n`);
+      assertJsonExportSize(next);
     } catch (error) {
       this.document.reportError(error);
       this.actions.notify();

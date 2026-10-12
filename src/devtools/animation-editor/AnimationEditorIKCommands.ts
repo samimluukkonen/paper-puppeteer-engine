@@ -10,6 +10,7 @@ import {
 } from '../../engine/ik/animationKeyframes.js';
 import type { Rig } from '../../engine/Rig.js';
 import { freezeData } from '../shared/editorData.js';
+import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorKeyframeCommands } from './AnimationEditorKeyframeCommands.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
@@ -317,6 +318,7 @@ export class AnimationEditorIKCommands {
     let next: ReadonlyAnimation;
     try {
       next = edit(this.working, this.rig);
+      assertJsonExportSize(next);
     } catch (error) {
       this.document.reportError(error);
       this.actions.notify();

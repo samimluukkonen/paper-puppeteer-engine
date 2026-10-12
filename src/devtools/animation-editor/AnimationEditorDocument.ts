@@ -3,6 +3,7 @@ import { ANIMATION_FORMAT_VERSION, AnimationValidationError, type ValidationIssu
 import type { Rig } from '../../engine/Rig.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData } from '../shared/editorData.js';
+import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { importAnimationJson } from './animationImport.js';
 import { serializeAnimation, type AnimationExportResult } from './animationSerialization.js';
@@ -190,6 +191,12 @@ export class AnimationEditorDocument {
           message: `Animation name must remain "${this.selectedId}"; renaming is not supported.`,
         },
       ];
+      return false;
+    }
+    try {
+      assertJsonExportSize(next);
+    } catch (error) {
+      this.reportError(error);
       return false;
     }
     if (!equalEditorData(this.working, next)) {
