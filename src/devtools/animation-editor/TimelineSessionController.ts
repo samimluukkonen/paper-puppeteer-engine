@@ -214,6 +214,7 @@ export class TimelineSessionController {
       state.selectedIKKeyframe,
       state.selectedEvent,
       state.timelineClipboard,
+      state.timelineVisibility,
       state.validationIssues,
       this.externalError,
     ];
@@ -236,6 +237,14 @@ export class TimelineSessionController {
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = state.selectedKeys.length === 0 && !state.selectedIKKeyframe;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
+    const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
+    const hidden = state.timelineVisibility.hiddenKeyCount;
+    setText(
+      this.deleteKey,
+      count
+        ? `Delete ${count} Selected Key${count === 1 ? '' : 's'}${hidden ? ` (${hidden} hidden)` : ''}`
+        : 'Delete Selected Keys',
+    );
     const copyDisabled = !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
     if (this.duplicateKeys.disabled !== copyDisabled) this.duplicateKeys.disabled = copyDisabled;

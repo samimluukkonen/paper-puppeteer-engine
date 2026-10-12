@@ -119,7 +119,8 @@ export class AnimationEditorSelectionCommands {
   }
 
   selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
-    this.selectKeyframes(keysInMarquee(this.selection.tracks(this.document.workingAnimation), box), additive);
+    const visible = this.selection.visibility(this.document.workingAnimation).rows;
+    this.selectKeyframes(keysInMarquee(this.selection.tracks(this.document.workingAnimation), box, visible), additive);
   }
 
   /** Previous/next authored key on the selected property, relative to the current playhead. */

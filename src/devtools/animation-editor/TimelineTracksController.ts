@@ -390,25 +390,19 @@ export class TimelineTracksController {
   }
 
   /** Keep original row indices for marquee selection while changing only visibility. */
-  filter(mode: string, state: AnimationEditorState): void {
+  filter(state: AnimationEditorState): void {
+    const visibility = state.timelineVisibility;
+    const setHidden = (label: HTMLElement, lane: HTMLElement, hidden: boolean): void => {
+      if (hidden && !label.hidden && (label.contains(document.activeElement) || lane.contains(document.activeElement)))
+        this.lanes.parentElement?.focus({ preventScroll: true });
+      if (label.hidden !== hidden) label.hidden = hidden;
+      if (lane.hidden !== hidden) lane.hidden = hidden;
+    };
+    setHidden(this.events.label, this.events.lane, !visibility.eventVisible);
     for (const row of this.rows.values()) {
       const track = row.track!;
-      const hidden =
-        mode === 'keyed'
-          ? !track.hasKeys
-          : mode === 'selected'
-            ? 'constraintId' in track
-              ? track.constraintId !== state.selectedIKConstraintId
-              : track.boneId !== state.selectedBoneId
-            : false;
-      if (
-        hidden &&
-        !row.label.hidden &&
-        (row.label.contains(document.activeElement) || row.lane.contains(document.activeElement))
-      )
-        this.lanes.parentElement?.focus({ preventScroll: true });
-      if (row.label.hidden !== hidden) row.label.hidden = hidden;
-      if (row.lane.hidden !== hidden) row.lane.hidden = hidden;
+      setHidden(row.label, row.lane, !visibility.rows.has(track));
+      setAttribute(row.label, 'data-filter-context', String(visibility.context.has(track)));
     }
   }
 

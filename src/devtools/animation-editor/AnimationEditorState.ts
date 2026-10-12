@@ -63,6 +63,7 @@ import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime }
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
+import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
 
@@ -491,6 +492,35 @@ export class AnimationEditorState {
   /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
   get timelineTracks(): readonly TimelineTrack[] {
     return this.selection.tracks(this.working);
+  }
+  get timelineFilters(): TimelineFilters {
+    return this.selection.timelineFilters;
+  }
+  get timelineVisibility(): TimelineVisibility {
+    return this.selection.visibility(this.working);
+  }
+  setTimelineFilters(patch: Partial<TimelineFilters>): void {
+    this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.cancelEventDrag();
+      if (this.selection.setTimelineFilters(patch)) this.notify();
+    });
+  }
+  expandTimeline(mode: 'all' | 'none' | 'selected'): void {
+    this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.cancelEventDrag();
+      this.selection.expandTimeline(mode);
+      this.notify();
+    });
+  }
+  revealTimelineSelection(): void {
+    this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.cancelEventDrag();
+      this.selection.revealTimelineSelection();
+      this.notify();
+    });
   }
   isTimelineBoneExpanded(boneId: string): boolean {
     return this.selection.isExpanded(boneId);

@@ -46,7 +46,7 @@ export class AnimationWorkspaceController {
     const inset = app.querySelector<HTMLElement>('.timeline-inset')!;
     const limits = (): { min: number; max: number } => {
       const height = layout.clientHeight;
-      const timelineMinimum = window.matchMedia('(max-width: 600px)').matches ? 260 : 180;
+      const timelineMinimum = window.matchMedia('(max-width: 600px)').matches ? 320 : 180;
       return {
         min: Math.max(25, (180 / height) * 100),
         max: Math.min(70, ((height - timelineMinimum - 12) / height) * 100),
@@ -104,11 +104,10 @@ export class AnimationWorkspaceController {
         );
         app.style.removeProperty('--timeline-label-width');
         horizontal.setAttribute('aria-valuenow', String(Math.round(inset.clientWidth <= 600 ? 150 : 240)));
-        for (const id of ['filter', 'zoom']) {
-          const control = app.querySelector<HTMLSelectElement>(`#timeline-${id}`)!;
-          control.value = id === 'filter' ? 'all' : '1';
-          control.dispatchEvent(new Event('change'));
-        }
+        app.querySelector<HTMLButtonElement>('#timeline-clear-filters')!.click();
+        const zoom = app.querySelector<HTMLSelectElement>('#timeline-zoom')!;
+        zoom.value = '1';
+        zoom.dispatchEvent(new Event('change'));
         inset.scrollLeft = 0;
         app.dispatchEvent(new Event('workspace:reset-inspector'));
       },

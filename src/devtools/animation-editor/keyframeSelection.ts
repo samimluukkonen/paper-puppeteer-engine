@@ -83,13 +83,17 @@ export interface KeyframeMarquee {
 }
 
 /** Marker centers inside inclusive time/visible-row bounds. Bone rows contain no property keys. */
-export function keysInMarquee(tracks: readonly TimelineTrack[], box: KeyframeMarquee): readonly KeyframeSelection[] {
+export function keysInMarquee(
+  tracks: readonly TimelineTrack[],
+  box: KeyframeMarquee,
+  visible?: ReadonlySet<TimelineTrack>,
+): readonly KeyframeSelection[] {
   const minTime = Math.min(box.startTime, box.endTime);
   const maxTime = Math.max(box.startTime, box.endTime);
   const first = Math.min(box.firstRow, box.lastRow);
   const last = Math.max(box.firstRow, box.lastRow);
   return tracks.flatMap((track, index) =>
-    track.kind === 'property' && index >= first && index <= last
+    track.kind === 'property' && (!visible || visible.has(track)) && index >= first && index <= last
       ? track.keyframes.filter((key) => key.time >= minTime && key.time <= maxTime)
       : [],
   );

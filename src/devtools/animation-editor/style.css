@@ -59,7 +59,8 @@ a {
 }
 .animation-command-bar > label,
 .timeline-toolbar label,
-.timeline-key-commands label {
+.timeline-key-commands label,
+.timeline-track-controls label {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -411,7 +412,8 @@ a {
 #timeline-label-divider:focus-visible {
   background: #39574b26;
 }
-#timeline-filter-status {
+#timeline-filter-status,
+#timeline-selection-status {
   margin: 0 0 6px;
   font-size: 11px;
 }
@@ -530,13 +532,36 @@ a {
 .timeline-track-lane {
   position: relative;
 }
-.timeline-key-commands {
+.timeline-key-commands,
+.timeline-track-controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 8px;
   font-size: 12px;
+}
+.timeline-track-controls {
+  flex-shrink: 0;
+  gap: 6px 8px;
+}
+.timeline-expansion-controls > div {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+@media (min-width: 901px) {
+  .timeline-expansion-controls > summary {
+    display: none;
+  }
+}
+#timeline-search {
+  width: 200px;
+  max-width: 100%;
+}
+.timeline-track-label[data-filter-context="true"] .timeline-track-select {
+  color: #626c63;
+  font-style: italic;
 }
 .timeline-instructions {
   margin: 0;
@@ -905,8 +930,8 @@ a {
     margin-left: 0;
   }
   .animation-layout.view-content {
-    --preview-share: 42%;
-    grid-template-rows: minmax(180px, var(--preview-share)) 12px minmax(260px, 1fr);
+    --preview-share: 33%;
+    grid-template-rows: minmax(180px, var(--preview-share)) 12px minmax(320px, 1fr);
   }
   .timeline-panel {
     padding: 8px 8px 14px;

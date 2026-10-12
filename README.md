@@ -23,6 +23,8 @@ The completed v0.5.5 [IK authoring workflow](docs/ik-animation-authoring.md) cov
 
 The completed v0.5.6 [IK Baking workflow](docs/react-ik-baking.md) selects rig constraints, controls sampling FPS, previews the proposed baked animation while scrubbing, and reports actual key counts before a single undoable bake. [Production fidelity checks](docs/ik-bake-hardening.md) compare key-time and between-key runtime motion, including endpoint positions, with measured low-FPS feedback. It reuses [atomic IK bake commit](docs/ik-bake-commit.md), [bone-key generation](docs/ik-bake-generation.md), and [isolated sampling](docs/ik-bake-sampling.md).
 
+The v0.5.7.1 [timeline track search and filtering](docs/timeline-track-filtering.md) finds bones, properties, IK targets and events, preserves ancestor context, and reveals hidden selections. Visibility and expansion controls preserve authored data, history and exports.
+
 The v0.5.5.4 [visual IK target controls](docs/visual-ik-targets.md) let artists drag hand and foot targets in the preview, cancel with Escape, and commit both coordinates with Set Target Key. Temporary previews stay outside exported JSON and document history.
 
 The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.

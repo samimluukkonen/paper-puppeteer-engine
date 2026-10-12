@@ -14,6 +14,14 @@ import {
   sameKey,
   type KeyframeSelectionState,
 } from './keyframeSelection.js';
+import {
+  defaultTimelineFilters,
+  filterTimelineTracks,
+  normalizedTrackSearch,
+  searchExpansion,
+  type TimelineFilters,
+  type TimelineVisibility,
+} from './timelineFiltering.js';
 import { buildTimelineTracks, type KeyframeSelection, type TimelineTrack } from './timelineTracks.js';
 import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
@@ -75,6 +83,101 @@ export class AnimationEditorSelection {
   private rows: readonly TimelineTrack[] | undefined;
   private rowsDirty = true;
   private rowAnimation: AnimationData | undefined;
+  private filters: TimelineFilters = defaultTimelineFilters;
+  private readonly searchBones = new Map<string, boolean>();
+  private readonly searchIK = new Map<string, boolean>();
+  private searchGroups = searchExpansion(undefined, '');
+  private visibilityInputs: readonly unknown[] | undefined;
+  private visibilityResult: TimelineVisibility | undefined;
+
+  get timelineFilters(): TimelineFilters {
+    return this.filters;
+  }
+
+  setTimelineFilters(patch: Partial<TimelineFilters>): boolean {
+    const next = Object.freeze({ ...this.filters, ...patch });
+    if (
+      next.search === this.filters.search &&
+      next.mode === this.filters.mode &&
+      next.showIK === this.filters.showIK &&
+      next.showEvents === this.filters.showEvents
+    )
+      return false;
+    if (normalizedTrackSearch(next.search) !== normalizedTrackSearch(this.filters.search)) {
+      const groups = searchExpansion(this.rig, next.search);
+      const expansionChanged =
+        (this.rig?.bones ?? []).some(
+          (bone) => this.isExpanded(bone.id) !== (this.expandedBones.has(bone.id) || groups.bones.has(bone.id)),
+        ) ||
+        (this.rig?.ik ?? []).some(
+          (constraint) =>
+            this.isIKExpanded(constraint.name) !==
+            (this.expandedIK.has(constraint.name) || groups.ik.has(constraint.name)),
+        );
+      this.searchBones.clear();
+      this.searchIK.clear();
+      this.searchGroups = groups;
+      this.rowsDirty ||= expansionChanged;
+    }
+    this.filters = next;
+    return true;
+  }
+
+  visibility(animation: AnimationData): TimelineVisibility {
+    const tracks = this.tracks(animation);
+    const inputs = [
+      tracks,
+      this.filters,
+      this.bone,
+      this.property,
+      this.keys,
+      this.ik,
+      this.ikKey,
+      this.event,
+      animation?.events,
+    ];
+    if (
+      !this.visibilityResult ||
+      !this.visibilityInputs ||
+      inputs.some((input, index) => input !== this.visibilityInputs![index])
+    ) {
+      this.visibilityResult = filterTimelineTracks(
+        this.rig,
+        tracks,
+        this.filters,
+        {
+          boneId: this.bone,
+          property: this.property,
+          keys: this.keys,
+          ikId: this.ik?.constraintId ?? null,
+          ikProperty: this.ik?.property ?? null,
+          ikKey: this.ikKey,
+          eventSelected: !!this.event,
+        },
+        animation,
+      );
+      this.visibilityInputs = inputs;
+    }
+    return this.visibilityResult;
+  }
+
+  expandTimeline(mode: 'all' | 'none' | 'selected'): void {
+    const selectedBones = new Set(this.keys.map((key) => key.boneId));
+    if (this.bone) selectedBones.add(this.bone);
+    for (const bone of this.rig?.bones ?? []) {
+      if (mode === 'selected' && !selectedBones.has(bone.id)) continue;
+      this.setExpanded(bone.id, mode !== 'none');
+    }
+    for (const constraint of this.rig?.ik ?? []) {
+      if (mode === 'selected' && constraint.name !== this.ik?.constraintId) continue;
+      this.setIKExpanded(constraint.name, mode !== 'none');
+    }
+  }
+
+  revealTimelineSelection(): void {
+    this.setTimelineFilters(defaultTimelineFilters);
+    this.expandTimeline('selected');
+  }
 
   constructor(private readonly rig: Rig | undefined) {}
 
@@ -261,7 +364,13 @@ export class AnimationEditorSelection {
 
   tracks(animation: AnimationData): readonly TimelineTrack[] {
     if (!this.rows || this.rowsDirty || this.rowAnimation !== animation) {
-      this.rows = buildTimelineTracks(this.rig, animation, this.expandedBones, this.rows, this.expandedIK);
+      const bones = new Set((this.rig?.bones ?? []).filter((bone) => this.isExpanded(bone.id)).map((bone) => bone.id));
+      const ik = new Set(
+        (this.rig?.ik ?? [])
+          .filter((constraint) => this.isIKExpanded(constraint.name))
+          .map((constraint) => constraint.name),
+      );
+      this.rows = buildTimelineTracks(this.rig, animation, bones, this.rows, ik);
       this.rowAnimation = animation;
       this.rowsDirty = false;
     }
@@ -269,20 +378,30 @@ export class AnimationEditorSelection {
   }
 
   isIKExpanded(id: string): boolean {
-    return this.expandedIK.has(id);
+    return this.searchIK.get(id) ?? (this.expandedIK.has(id) || this.searchGroups.ik.has(id));
   }
   setIKExpanded(id: string, expanded: boolean): boolean {
-    if (this.expandedIK.has(id) === expanded) return false;
+    if (this.isIKExpanded(id) === expanded) return false;
+    if (normalizedTrackSearch(this.filters.search)) {
+      this.searchIK.set(id, expanded);
+      this.rowsDirty = true;
+      return true;
+    }
     if (expanded) this.expandedIK.add(id);
     else this.expandedIK.delete(id);
     this.rowsDirty = true;
     return true;
   }
   isExpanded(boneId: string): boolean {
-    return this.expandedBones.has(boneId);
+    return this.searchBones.get(boneId) ?? (this.expandedBones.has(boneId) || this.searchGroups.bones.has(boneId));
   }
   setExpanded(boneId: string, expanded: boolean): boolean {
-    if (this.expandedBones.has(boneId) === expanded) return false;
+    if (this.isExpanded(boneId) === expanded) return false;
+    if (normalizedTrackSearch(this.filters.search)) {
+      this.searchBones.set(boneId, expanded);
+      this.rowsDirty = true;
+      return true;
+    }
     if (expanded) this.expandedBones.add(boneId);
     else this.expandedBones.delete(boneId);
     this.rowsDirty = true;

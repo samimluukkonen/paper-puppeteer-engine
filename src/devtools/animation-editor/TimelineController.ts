@@ -3,6 +3,7 @@ import { AnimationEditorState } from './AnimationEditorState.js';
 import { EventInspectorController } from './EventInspectorController.js';
 import { InterpolationController } from './InterpolationController.js';
 import { generateRulerTicks, timeToTimelineX } from './timeline.js';
+import { defaultTimelineFilters, normalizedTrackSearch, type TimelineFilters } from './timelineFiltering.js';
 import { TimelineInputController } from './TimelineInputController.js';
 import { TimelineSessionController } from './TimelineSessionController.js';
 import { TimelineTracksController } from './TimelineTracksController.js';
@@ -28,6 +29,9 @@ export class TimelineController {
   private renderedView: readonly unknown[] | undefined;
   private readonly filter: HTMLSelectElement;
   private readonly filterStatus: HTMLElement;
+  private readonly search: HTMLInputElement;
+  private readonly showIK: HTMLInputElement;
+  private readonly showEvents: HTMLInputElement;
 
   constructor(private readonly app: HTMLElement) {
     this.timeline = this.element('#timeline');
@@ -36,6 +40,9 @@ export class TimelineController {
     this.playhead = this.element('#timeline-playhead');
     this.filter = this.element('#timeline-filter');
     this.filterStatus = this.element('#timeline-filter-status');
+    this.search = this.element('#timeline-search');
+    this.showIK = this.element('#timeline-show-ik');
+    this.showEvents = this.element('#timeline-show-events');
     this.tracks = new TimelineTracksController(
       this.element('#timeline-track-labels'),
       this.element('#timeline-tracks'),
@@ -63,17 +70,73 @@ export class TimelineController {
     this.resize.observe(this.timeline);
     this.resize.observe(this.inset);
     this.resize.observe(this.element('.timeline-label-column'));
-    for (const id of ['timeline-filter', 'timeline-zoom'])
-      this.element(id === 'timeline-filter' ? '#timeline-filter' : '#timeline-zoom').addEventListener(
-        'change',
+    const options = { signal: this.viewAbort.signal };
+    const updateFilters = (): void => {
+      const mode = this.filter.value;
+      const patch: TimelineFilters = {
+        search: this.search.value,
+        mode: mode === 'keyed' || mode === 'selected' ? mode : 'all',
+        showIK: this.showIK.checked,
+        showEvents: this.showEvents.checked,
+      };
+      this.input.cancelGesture();
+      this.state.setTimelineFilters(patch);
+    };
+    this.search.addEventListener('input', updateFilters, options);
+    for (const control of [this.filter, this.showIK, this.showEvents])
+      control.addEventListener('change', updateFilters, options);
+    this.element('#timeline-clear-filters').addEventListener(
+      'click',
+      () => {
+        this.input.cancelGesture();
+        this.state.setTimelineFilters(defaultTimelineFilters);
+      },
+      options,
+    );
+    for (const [id, mode] of [
+      ['timeline-expand-all', 'all'],
+      ['timeline-collapse-all', 'none'],
+      ['timeline-expand-selected', 'selected'],
+    ] as const)
+      this.element(`#${id}`).addEventListener(
+        'click',
         () => {
           this.input.cancelGesture();
-          this.updateTimelineWidth();
-          this.width = this.timeline.getBoundingClientRect().width;
-          this.render();
+          this.state.expandTimeline(mode);
         },
-        { signal: this.viewAbort.signal },
+        options,
       );
+    this.element('#timeline-reveal-selection').addEventListener(
+      'click',
+      () => {
+        this.input.cancelGesture();
+        this.state.revealTimelineSelection();
+        const selected =
+          this.element('#timeline-tracks').querySelector<HTMLElement>(
+            '[data-primary="true"], .timeline-event[aria-pressed="true"]',
+          ) ??
+          this.element('#timeline-track-labels').querySelector<HTMLElement>(
+            '.timeline-property-track[data-selected="true"] .timeline-track-select, ' +
+              '.timeline-ik-property-track[data-selected="true"] .timeline-track-select',
+          ) ??
+          this.element('#timeline-track-labels').querySelector<HTMLElement>(
+            '[data-selected="true"] .timeline-track-select',
+          );
+        selected?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        selected?.focus({ preventScroll: true });
+      },
+      options,
+    );
+    this.element('#timeline-zoom').addEventListener(
+      'change',
+      () => {
+        this.input.cancelGesture();
+        this.updateTimelineWidth();
+        this.width = this.timeline.getBoundingClientRect().width;
+        this.render();
+      },
+      { signal: this.viewAbort.signal },
+    );
     this.bind(this.state);
   }
 
@@ -122,7 +185,8 @@ export class TimelineController {
     const state = this.state;
     const animation = state.workingAnimation;
     const width = this.width;
-    const filter = this.filter.value;
+    const filters = state.timelineFilters;
+    const visibility = state.timelineVisibility;
     // Clock-only notifications need the playhead and time controls, not row/inspector reconciliation.
     const view = [
       state,
@@ -137,17 +201,38 @@ export class TimelineController {
       state.keyframeDrag,
       state.eventDrag,
       width,
-      filter,
+      filters,
+      visibility,
     ];
     if (!this.renderedView || view.some((value, index) => value !== this.renderedView![index])) {
       this.tracks.render(state, width);
-      this.tracks.filter(filter, state);
-      if (this.filterStatus.hidden !== (filter === 'all')) this.filterStatus.hidden = filter === 'all';
+      this.tracks.filter(state);
+      if (this.search.value !== filters.search) this.search.value = filters.search;
+      if (this.filter.value !== filters.mode) this.filter.value = filters.mode;
+      this.showIK.checked = filters.showIK;
+      this.showEvents.checked = filters.showEvents;
+      const active =
+        !!normalizedTrackSearch(filters.search) || filters.mode !== 'all' || !filters.showIK || !filters.showEvents;
+      this.filterStatus.hidden = !active;
       setText(
         this.filterStatus,
-        filter === 'selected'
-          ? 'Showing selected target tracks · choose All to show every track.'
-          : 'Showing keyed tracks · choose All to author empty properties.',
+        `${visibility.rows.size + (visibility.eventVisible ? 1 : 0)} visible rows · Ancestors are kept for context. Clear Filters to show every track.`,
+      );
+      this.element('#timeline-filter-empty').hidden = !active || visibility.rows.size > 0 || visibility.eventVisible;
+      this.element<HTMLButtonElement>('#timeline-clear-filters').disabled = !active;
+      this.element<HTMLButtonElement>('#timeline-expand-selected').disabled =
+        !state.selectedTarget && !state.selectedKeys.length;
+      this.element('#timeline-reveal-selection').hidden = !visibility.selectionHidden;
+      const selectionStatus = this.element('#timeline-selection-status');
+      selectionStatus.hidden = !visibility.selectionHidden;
+      const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
+      setText(
+        selectionStatus,
+        visibility.hiddenKeyCount
+          ? `${count} selected key${count === 1 ? '' : 's'} (${visibility.hiddenKeyCount} hidden). Commands affect all selected keys, including hidden keys.`
+          : state.selectedEvent
+            ? '1 selected event (hidden). Delete Event affects this event. Reveal Selection to show it.'
+            : 'The selected track is hidden. Reveal Selection to show it.',
       );
       this.interpolation.render();
       this.eventInspector.render(state);

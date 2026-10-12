@@ -96,8 +96,12 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
     .toBe(true);
   if (!rootPoint) throw new Error('Missing rendered root selection ring.');
   await labels.getByRole('button', { name: 'Select bone torso', exact: true }).click();
+  await page.locator('#timeline-search').fill('IK:');
   await canvas.click({ position: rootPoint });
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: root');
+  await expect(page.locator('#timeline-selection-status')).toContainText('The selected track is hidden');
+  await page.locator('#timeline-reveal-selection').click();
+  await expect(page.locator('#timeline-search')).toHaveValue('');
   await expect(labels.getByRole('button', { name: 'Select bone root', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',

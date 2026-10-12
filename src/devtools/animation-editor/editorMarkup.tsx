@@ -336,14 +336,6 @@ export function AnimationEditorView({
               </select>
             </label>
             <label>
-              Tracks{' '}
-              <select id="timeline-filter">
-                <option value="all">All</option>
-                <option value="keyed">Keyed</option>
-                <option value="selected">Selected</option>
-              </select>
-            </label>
-            <label>
               Zoom{' '}
               <select id="timeline-zoom">
                 <option value="1">Fit</option>
@@ -353,8 +345,56 @@ export function AnimationEditorView({
               </select>
             </label>
           </div>
-
+          <div className="timeline-track-controls" aria-label="Track navigation">
+            <label>
+              Search tracks{' '}
+              <input
+                id="timeline-search"
+                type="search"
+                placeholder="Bone, property, IK, events"
+                aria-describedby="timeline-filter-status"
+              />
+            </label>
+            <label>
+              Tracks{' '}
+              <select id="timeline-filter">
+                <option value="all">Show All Tracks</option>
+                <option value="keyed">Keyed Tracks Only</option>
+                <option value="selected">Selected Target Only</option>
+              </select>
+            </label>
+            <label>
+              <input id="timeline-show-ik" type="checkbox" defaultChecked /> IK tracks
+            </label>
+            <label>
+              <input id="timeline-show-events" type="checkbox" defaultChecked /> Event track
+            </label>
+            <button id="timeline-clear-filters" type="button">
+              Clear Filters
+            </button>
+            <details className="timeline-expansion-controls" open={!inspector.narrow}>
+              <summary>Expand / collapse</summary>
+              <div>
+                <button id="timeline-expand-all" type="button">
+                  Expand All
+                </button>
+                <button id="timeline-collapse-all" type="button">
+                  Collapse All
+                </button>
+                <button id="timeline-expand-selected" type="button">
+                  Expand Selected
+                </button>
+              </div>
+            </details>
+            <button id="timeline-reveal-selection" type="button" hidden>
+              Reveal Selection
+            </button>
+          </div>
           <p id="timeline-filter-status" role="status" hidden></p>
+          <p id="timeline-selection-status" role="status" hidden></p>
+          <p id="timeline-filter-empty" className="timeline-empty" hidden>
+            No matching tracks. Clear Filters to show every track.
+          </p>
           <div className="timeline-inset">
             <div className="timeline-label-column">
               <div
@@ -499,9 +539,10 @@ export function AnimationEditorView({
           selected keys or events pauses playback. Use the timeline arrow keys to nudge; Shift moves ten steps.
         </p>
         <p>
-          Collapsed bone diamonds summarize timing; expand the bone to edit individual keys. Tracks filters preserve
-          selection and edits. Zoom reveals a horizontal scrollbar. Reset layout restores panel sizes, all tracks, and
-          Fit zoom.
+          Collapsed bone diamonds summarize timing; expand the bone to edit individual keys. Search finds bone IDs,
+          properties, IK targets and Events, keeping ancestors for context. Clear Filters restores your layout; Reveal
+          Selection also opens selected tracks. Commands affect all selected keys, including hidden keys. Zoom reveals a
+          horizontal scrollbar. Reset layout restores panel sizes, all tracks, and Fit zoom.
         </p>
         <details className="timeline-instructions">
           <summary>Timeline controls</summary>

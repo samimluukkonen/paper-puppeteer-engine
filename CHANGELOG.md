@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.7-1
+
+The v0.5.7.1 [timeline track search and filtering](docs/timeline-track-filtering.md) adds case-insensitive bone/property/IK/Events search, keyed/selected-target filters, independent IK/event visibility, ancestor context, and Expand All/Collapse All/Expand Selected. Search expansion restores manual preferences when cleared. Hidden bone, property, key, IK and event selections persist; Reveal Selection restores visibility and deletion shows total/hidden key counts. Cached pure visibility derivation reuses existing rows and clock updates; additive marquee selection excludes hidden rows while clipboard, deletion and group commands retain their complete selected scope. Unit and local browser regressions cover filtering, playback, preview picking, history and immutable exports. Package version is `0.5.7-1`.
+
 ## 0.5.6-5
 
 The v0.5.6.5 [IK baking production hardening](docs/ik-bake-hardening.md) completes v0.5.6. Public `compareIKBakeMotion` and successful commit reports distinguish generated-key agreement from midpoint/near-end interpolation drift, including complete selected joint transforms and end-effector world distances. The React panel displays measured errors and low-FPS feedback; incompatible stepped sample grids report the authored FPS. Regressions add 8/10/12/60 FPS, influence/target edge cases, facing/nonuniform placement, ordinary baked-key editing/history, onion skins, bone mirroring, events and canonical JSON/CharacterLoader compatibility. Artist guidance documents reaching, tolerances and mixed baked/IK transition limits. Package version is `0.5.6-5`.
