@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { createRequire } from 'node:module';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
@@ -31,7 +32,7 @@ function fixture(
     },
   },
 ) {
-  const load = Object.assign(new EventEmitter(), { image: vi.fn() });
+  const load = Object.assign(new EventEmitter(), { image: vi.fn(), prefix: '' });
   const events = new EventEmitter();
   const scene = { textures, load, events } as unknown as Phaser.Scene;
   const assertClean = () => {
@@ -82,6 +83,31 @@ test('custom image timeouts reach Phaser without changing the shared loader sett
   assert.deepEqual(load.image.mock.calls, [
     ['body', 'https://example.test/custom/body.png', { responseType: 'blob', timeout: 5000 }],
   ]);
+});
+
+test('manifest keys survive a host loader prefix in actual Phaser files', () => {
+  // File is renderer-independent; loading Phaser's browser entry is unnecessary.
+  const PhaserFile = createRequire(import.meta.url)(
+    '../node_modules/phaser/src/loader/File.js',
+  ) as typeof Phaser.Loader.File;
+  const { scene, load, textures } = fixture();
+  load.prefix = 'host.';
+  const files: Phaser.Loader.File[] = [];
+  load.image.mockImplementation((key: string, url: string) => {
+    const file = new PhaserFile(scene.load, { type: 'image', key, url, cache: false });
+    files.push(file);
+    textures.loaded.add(file.key);
+  });
+  queueCharacterTextures(scene, character('first'));
+  assert.deepEqual(
+    files.map((file) => file.key),
+    ['body'],
+  );
+  assert.isTrue(scene.textures.exists('body'));
+  assert.equal(load.prefix, 'host.');
+  load.emit('complete');
+  assert.throws(() => queueCharacterTextures(scene, character('second')), /Texture key "body"/);
+  assert.equal(files.length, 1);
 });
 
 test.each([0, -1, NaN, Infinity, 1.5, 2_147_483_648])(
@@ -147,12 +173,15 @@ test('removed textures can be replaced with a different character image', () => 
 
 test('queue exceptions release reservations and listeners', () => {
   const { scene, load, assertClean } = fixture();
+  load.prefix = 'host.';
   load.image.mockImplementationOnce(() => {
     throw new Error('Queue failed');
   });
   assert.throws(() => queueCharacterTextures(scene, character('first')), /Queue failed/);
+  assert.equal(load.prefix, 'host.');
   assertClean();
   queueCharacterTextures(scene, character('second'));
+  assert.equal(load.prefix, 'host.');
   assert.equal(load.image.mock.calls.length, 2);
 });
 

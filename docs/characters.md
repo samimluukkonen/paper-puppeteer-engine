@@ -87,6 +87,9 @@ Character assembly preserves skins embedded in the rig. A standalone skin declar
 
 Texture keys are shared across every scene in a Phaser game. Use unique keys such as `hero-body` and `enemy-body` for different artwork, updating the manifest and rig texture references together. `queueCharacterTextures` tracks queued and loaded character image URLs and rejects a conflicting key before queueing any files. Identical URLs can share a key, and host-preloaded atlas keys retain their intentional override. Failed loads and scene shutdown release pending reservations. The helper returns a cleanup callback for hosts that cancel a load themselves; call it after canceling the loader to release reservations and listeners.
 
+Character artwork always uses the exact manifest keys, even when the host configures a Phaser loader prefix.
+Queueing restores the host's prefix immediately, including when it fails.
+
 Character definitions own independent, deeply frozen JSON data. Their animation, pose, texture, and original rig-file views use readonly types; clone them with `structuredClone` into an authored definition type before editing. The runtime rig remains immutable too.
 
 `rig.getBone(id)`, `rig.getSlot(id)`, and `rig.getAttachment(id)` provide indexed access to immutable definitions and throw when an ID is unknown. `rig.getAttachment(id)` returns an artwork definition; `puppet.getAttachment(slotId)` returns the attachment ID currently assigned to a slot.

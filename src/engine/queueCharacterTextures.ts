@@ -64,7 +64,15 @@ export function queueCharacterTextures(
       registered.set(key, reservation);
       reservation.pending += 1;
       pending.set(key, reservation);
-      scene.load.image(key, url, { responseType: 'blob', timeout });
+      // Manifest keys identify rig artwork exactly; a host's loader prefix must
+      // not rename them. Phaser applies the prefix synchronously when queueing.
+      const prefix = scene.load.prefix;
+      try {
+        scene.load.prefix = '';
+        scene.load.image(key, url, { responseType: 'blob', timeout });
+      } finally {
+        scene.load.prefix = prefix;
+      }
     }
     if (pending.size) {
       scene.load.once('complete', release);
