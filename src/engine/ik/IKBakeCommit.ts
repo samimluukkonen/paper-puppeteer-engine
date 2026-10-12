@@ -1,5 +1,6 @@
 import type { AnimationClip, Keyframe } from '../AnimationClip.js';
 import { getBoneTrack } from '../animationTracks.js';
+import { equalJsonData } from '../equalJsonData.js';
 import { ANIMATION_FORMAT_VERSION, parseAnimationClip, type ValidationIssue } from '../externalData.js';
 import { checkJson } from '../jsonData.js';
 import { normalizeKeyframeTime } from '../keyframeAuthoring.js';
@@ -19,21 +20,6 @@ export type IKBakeCommitResult =
     }
   | { readonly success: false; readonly issues: readonly ValidationIssue[] };
 
-/** JSON inputs have been checked before comparison; object field order is immaterial. */
-function equalData(left: unknown, right: unknown): boolean {
-  if (left === right) return true;
-  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') return false;
-  if (Array.isArray(left))
-    return Array.isArray(right) && left.length === right.length && left.every((value, i) => equalData(value, right[i]));
-  if (Array.isArray(right)) return false;
-  const a = left as Record<string, unknown>;
-  const b = right as Record<string, unknown>;
-  const keys = Object.keys(a);
-  return (
-    keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && equalData(a[key], b[key]))
-  );
-}
-
 /** Pure full-clip transaction. Validate source, plan and final playback before returning any authored change.
  * The editor installs this single immutable result through its ordinary document/history boundary.
  * Preserve authored playback/FPS, even when the proposal used a different preview playback mode.
@@ -48,7 +34,7 @@ export function commitIKBake(
     if (!checkJson(bakePlan, 'bakePlan', issues) || issues.length) return freezeData({ success: false, issues });
     if (!bakePlan.success) return freezeData({ success: false, issues: structuredClone(bakePlan.issues) });
     const source = parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...workingAnimation }, rig);
-    if (!equalData(source, bakePlan.sourceAnimation))
+    if (!equalJsonData(source, bakePlan.sourceAnimation))
       throw new Error('Bake plan is stale; regenerate it for the working animation.');
     // Re-sample authored IK to verify ownership, full-clip coverage, values, counts and reported fidelity.
     // A caller-assembled or modified plan cannot bypass generation validation.
@@ -59,7 +45,7 @@ export function commitIKBake(
       tolerances: bakePlan.fidelity.tolerances,
     });
     if (!expected.success) return freezeData({ success: false, issues: structuredClone(expected.issues) });
-    if (!equalData(expected, bakePlan))
+    if (!equalJsonData(expected, bakePlan))
       throw new Error('Bake plan does not match validated whole-animation generation.');
 
     const tracks = { ...source.tracks };
