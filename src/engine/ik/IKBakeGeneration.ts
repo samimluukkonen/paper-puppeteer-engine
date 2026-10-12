@@ -364,7 +364,7 @@ export function generateBakedBoneKeys(
         code: 'between-sample-interpolation',
         severity: 'warning',
         message:
-          'Linear bone interpolation between sampled poses may differ from continuous IK solving. Fidelity is checked only at sample times.',
+          'Linear bone interpolation between sampled poses may differ from continuous IK solving. Generation checks sample times; commit also measures midpoint and near-end motion.',
       });
     return freezeData({
       success: true,

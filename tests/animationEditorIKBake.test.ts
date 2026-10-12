@@ -212,6 +212,7 @@ test('document/options/session changes clear previews and subscriptions do not r
   state.selectAnimation('other', { discardChanges: true });
   assert.isFalse(controller.getSnapshot().preview);
   assert.deepEqual(controller.getSnapshot().selectedIds, []);
+  assert.isNull(controller.getSnapshot().motionFidelity);
   const replacement = new AnimationEditorState(rig, [source]);
   replacement.selectAnimation('reach');
   controller.bind(replacement);
@@ -220,10 +221,49 @@ test('document/options/session changes clear previews and subscriptions do not r
   assert.strictEqual(controller.getSnapshot(), snapshot);
   controller.unbind();
   assert.deepEqual(controller.getSnapshot().constraints, []);
+  assert.isNull(controller.getSnapshot().motionFidelity);
   const calls = show.mock.calls.length;
   replacement.setCurrentTime(0.5);
   assert.equal(show.mock.calls.length, calls);
   controller.dispose();
+  controller.dispose();
+});
+
+test('measured low-FPS warnings and stepped-grid errors reach the panel and clear on option changes', () => {
+  const { state, source, controller, rig } = ikBakeEditor();
+  const rapid = {
+    ...source,
+    ikTracks: {
+      ...source.ikTracks,
+      arm: [
+        { time: 0, x: 60, y: 60 },
+        { time: 50, x: -60, y: 60 },
+        { time: 100, x: 60, y: 60 },
+        { time: 1000, x: 60, y: 60 },
+      ],
+    },
+  };
+  assert.isTrue(state.replaceWorkingAnimation({ version: 1, ...rapid }));
+  controller.setConstraint('arm', true);
+  const low = controller.getSnapshot();
+  assert.isTrue(low.plan?.success);
+  assert.isFalse(low.motionFidelity!.withinBetweenKeyTolerance);
+  assert.isTrue(low.issues.some((issue) => issue.message.includes('Increase sampling FPS')));
+  controller.setFPS('60');
+  assert.isBelow(
+    controller.getSnapshot().motionFidelity!.betweenKeys.endEffector,
+    low.motionFidelity!.betweenKeys.endEffector,
+  );
+  const stepped = new AnimationEditorState(rig, [{ ...source, playback: { mode: 'stepped', fps: 12 } }]);
+  stepped.selectAnimation('reach');
+  controller.bind(stepped);
+  controller.setFPS('10');
+  controller.setConstraint('arm', true);
+  assert.isNull(controller.getSnapshot().plan);
+  assert.isNull(controller.getSnapshot().motionFidelity);
+  assert.isTrue(controller.getSnapshot().issues.some((issue) => issue.message.includes('Use the authored FPS')));
+  controller.setFPS('12');
+  assert.isTrue(controller.getSnapshot().motionFidelity?.success);
   controller.dispose();
 });
 

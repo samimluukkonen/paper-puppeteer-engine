@@ -43,6 +43,8 @@ for (const chain of [
     await constraint.check();
     await expect(panel.getByLabel('Bake summary')).toContainText('Generated keys: 22');
     await expect(panel.getByLabel('Bake summary')).toContainText('Existing keys to replace: 2');
+    await expect(panel.getByLabel('Bake fidelity')).toContainText('At keys: maximum joint error');
+    await expect(panel.getByLabel('Bake fidelity')).toContainText('Between keys: maximum joint error');
     const fps = panel.getByRole('spinbutton', { name: 'Sampling FPS', exact: true });
     await fps.fill('0');
     await expect(bake).toBeDisabled();

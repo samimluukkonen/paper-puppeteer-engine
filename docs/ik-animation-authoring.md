@@ -31,7 +31,7 @@ At each runtime presentation pass, the previous IK rotations are restored, bone 
 
 Missing X/Y use the current end contact point, including endpoint offsets and preceding constraints. A track containing only influence keys can affect an existing runtime target, but cannot invent a target position. No tracks, empty placeholders and no constraints preserve ordinary bone playback.
 
-IK authoring stores the requested target for runtime solving. [IK baking](ik-bake-commit.md) explicitly creates bone rotation keys from solved poses and deactivates selected constraints for that clip through a programmatic command. React Bake controls are deferred; baking never occurs implicitly during playback, export, mirroring or onion-skin sampling.
+IK authoring stores the requested target for runtime solving. [IK baking](react-ik-baking.md) explicitly creates ordinary bone rotation keys from solved poses and deactivates selected constraints for that clip through the React panel or [programmatic commit](ik-bake-commit.md). [Fidelity reports](ik-bake-hardening.md) compare key-time and between-key motion. Baking never occurs implicitly during playback, export, mirroring or onion-skin sampling.
 
 ## Ownership, blending and developer diagnostics
 

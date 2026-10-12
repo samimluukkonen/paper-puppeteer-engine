@@ -6,12 +6,14 @@ import { type DeepReadonly, freezeData } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
 import { transformProperties } from '../types.js';
 import { compareIKBakeFidelity, generateBakedBoneKeys, type IKBakePlan } from './IKBakeGeneration.js';
+import { compareIKBakeMotion, type IKBakeMotionFidelity } from './IKBakeMotionFidelity.js';
 import { sampleIKBake } from './IKBakeSampling.js';
 
 export type IKBakeCommitResult =
   | {
       readonly success: true;
       readonly animation: DeepReadonly<AnimationClip>;
+      readonly motionFidelity: IKBakeMotionFidelity;
       readonly issues: readonly ValidationIssue[];
     }
   | { readonly success: false; readonly issues: readonly ValidationIssue[] };
@@ -86,7 +88,29 @@ export function commitIKBake(
     const animation = parseAnimationClip({ version: ANIMATION_FORMAT_VERSION, ...next }, rig);
     if (!samples.success) throw new Error('Bake sampling failed.');
     const fidelity = compareIKBakeFidelity(samples.samples, animation, rig, expected.fidelity.tolerances);
-    if (!fidelity.success) return freezeData({ success: false, issues: structuredClone(fidelity.issues) });
+    if (!fidelity.success)
+      return freezeData({
+        success: false,
+        issues: [
+          ...structuredClone(fidelity.issues),
+          ...(source.playback?.mode === 'stepped'
+            ? [
+                {
+                  severity: 'error' as const,
+                  message: `Sampling at ${expected.sampling.fps} FPS does not preserve authored ${source.playback.fps} FPS stepped playback. Use the authored FPS or an integer multiple and preview again.`,
+                },
+              ]
+            : []),
+        ],
+      });
+    const motionFidelity = compareIKBakeMotion(
+      source,
+      animation,
+      rig,
+      expected.sampling.constraintIds,
+      expected.sampling.fps,
+    );
+    if (!motionFidelity.success) return freezeData({ success: false, issues: structuredClone(motionFidelity.issues) });
     const warnings: ValidationIssue[] = expected.issues.filter((issue) => issue.severity === 'warning');
     if (
       (source.playback?.mode ?? 'smooth') === 'smooth' &&
@@ -94,9 +118,10 @@ export function commitIKBake(
     )
       warnings.push({
         severity: 'warning',
-        message: 'Smooth playback interpolates between baked samples; fidelity is checked only at sample times.',
+        message:
+          'Smooth playback interpolates between baked samples. Measured midpoint fidelity does not bound error at every time.',
       });
-    return freezeData({ success: true, animation, issues: warnings });
+    return freezeData({ success: true, animation, motionFidelity, issues: [...warnings, ...motionFidelity.issues] });
   } catch (error) {
     return freezeData({
       success: false,

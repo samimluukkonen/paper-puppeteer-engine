@@ -70,4 +70,4 @@ Generation tests cover arm and leg chains, multiple driven bones, sorted times, 
 
 Required verification is `npm run typecheck`, `npm run test` and `npm run build`, with repository formatting and lint checks. Browser smoke tests remain local-only.
 
-[Atomic commit, clip-local IK deactivation and Undo/Redo](ik-bake-commit.md) are available in v0.5.6.3. React Bake UI, partial ranges, key simplification, adaptive sampling and runtime layer-stack baking remain deferred.
+[Atomic commit, clip-local IK deactivation and Undo/Redo](ik-bake-commit.md), the [React panel](react-ik-baking.md) and [runtime motion fidelity reports](ik-bake-hardening.md) complete the workflow. Partial ranges, simplification, adaptive sampling and runtime layer-stack baking remain deferred.

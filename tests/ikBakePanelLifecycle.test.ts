@@ -26,10 +26,14 @@ test('panel reflects constraint selection, validation, FPS and real plan summary
   assert.include(markup, 'Generated keys: 12');
   assert.include(markup, 'Existing keys to replace: 2');
   assert.include(markup, 'Constraints deactivated for this animation: arm');
+  assert.include(markup, 'aria-label="Bake fidelity"');
+  assert.include(markup, 'At keys: maximum joint error');
+  assert.include(markup, 'Between keys: maximum joint error');
   controller.setFPS('0');
   markup = renderToStaticMarkup(IKBakePanel({ controller }));
   assert.include(markup, 'role="alert"');
   assert.notInclude(markup, 'aria-label="Bake summary"');
+  assert.notInclude(markup, 'aria-label="Bake fidelity"');
   controller.dispose();
 });
 

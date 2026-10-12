@@ -73,7 +73,7 @@ npm run build
 
 IK multi-selection, marquee/range selection, group movement, pointer dragging of key markers, clipboard/paste/duplicate, and previous/next IK key navigation remain unavailable in v0.5.5. The existing batch selection and clipboard types address bone IDs and transform properties; IK uses constraint IDs and x/y/mix references. Enabling those commands requires extending that shared typed infrastructure, which is deferred beyond this hardening milestone. See the [production workflow and operation matrix](ik-animation-authoring.md). Bone commands keep their existing implementation; IK selection disables clipboard buttons and prevents stale bone clipboard contents from being pasted through IK commands. Single-key authoring, deletion and snapped keyboard movement are available now.
 
-Visual IK target handles and pointer dragging are implemented in [v0.5.5.4](visual-ik-targets.md). Mirrored IK authoring, baking, new solvers, target ownership changes, physics and scene choreography remain deferred.
+Visual IK target handles and pointer dragging are implemented in [v0.5.5.4](visual-ik-targets.md). [Whole-animation IK baking](react-ik-baking.md) converts selected reaches into editable bone rotations, with [production fidelity checks](ik-bake-hardening.md). Mirrored IK target authoring, new solvers, target ownership changes, physics and scene choreography remain deferred.
 
 ## Changed files and APIs
 

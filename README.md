@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The completed v0.5.5 [IK authoring workflow](docs/ik-animation-authoring.md) covers reaching, influence, supported timeline operations, serialization, compatibility and production verification.
 
-The v0.5.6.4 [React IK Baking panel](docs/react-ik-baking.md) selects rig constraints, controls sampling FPS, previews the proposed baked animation while scrubbing, and reports actual key counts before a single undoable bake. It reuses [atomic IK bake commit](docs/ik-bake-commit.md), [bone-key generation](docs/ik-bake-generation.md), and [isolated sampling](docs/ik-bake-sampling.md).
+The completed v0.5.6 [IK Baking workflow](docs/react-ik-baking.md) selects rig constraints, controls sampling FPS, previews the proposed baked animation while scrubbing, and reports actual key counts before a single undoable bake. [Production fidelity checks](docs/ik-bake-hardening.md) compare key-time and between-key runtime motion, including endpoint positions, with measured low-FPS feedback. It reuses [atomic IK bake commit](docs/ik-bake-commit.md), [bone-key generation](docs/ik-bake-generation.md), and [isolated sampling](docs/ik-bake-sampling.md).
 
 The v0.5.5.4 [visual IK target controls](docs/visual-ik-targets.md) let artists drag hand and foot targets in the preview, cancel with Escape, and commit both coordinates with Set Target Key. Temporary previews stay outside exported JSON and document history.
 
@@ -74,6 +74,7 @@ scene.load.start();
 | [IK bake sampling](docs/ik-bake-sampling.md)                       | Read-only whole-animation samples, frame times, local transforms and supported constraint scope            |
 | [IK bone-key generation](docs/ik-bake-generation.md)               | Pure key proposals, replacement reporting, playback policy and local-pose fidelity tolerances              |
 | [Atomic IK bake commit](docs/ik-bake-commit.md)                    | Whole-clip key replacement, runtime constraint deactivation, validation and exact Undo/Redo                |
+| [IK bake production fidelity](docs/ik-bake-hardening.md)           | Key/midpoint/endpoint tolerances, sampling quality, runtime transitions, editing and loader regressions    |
 | [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
 | [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                              |
 | [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                         |

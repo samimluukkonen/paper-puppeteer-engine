@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Milestone v0.5.6.3 adds a complete authored bake transaction after [sampling](ik-bake-sampling.md) and [key generation](ik-bake-generation.md). It replaces selected bone rotations over the entire clip and deactivates the selected constraints for that animation. Rig definitions and other animations retain their ordinary IK behavior. React Bake controls are deferred.
+Milestone v0.5.6.3 adds a complete authored bake transaction after [sampling](ik-bake-sampling.md) and [key generation](ik-bake-generation.md). It replaces selected bone rotations over the entire clip and deactivates selected constraints for that animation. Rig definitions and other animations retain IK. The [React panel](react-ik-baking.md) and [production motion fidelity checks](ik-bake-hardening.md) complete this workflow.
 
 ## Commit API
 
@@ -24,7 +24,7 @@ if (result.success) {
 
 A successful plan includes a detached `sourceAnimation` snapshot. Commit validates JSON and the working animation, rejects stale snapshots, and repeats isolated sampling/generation to verify the plan against the supplied rig. Constraint ownership, complete frame coverage, generated values, counts and fidelity reports must agree. Modified plans and changes to the rig that affect the bake fail. Nothing is installed on failure.
 
-Commit builds the complete output privately, validates it, and checks sample-time fidelity with its actual playback settings before returning success. It preserves source duration, loop, interpolation declaration, playback mode and FPS. The generation proposal's output playback describes proposal evaluation; it does not change the committed clip's playback metadata. Prefer the sampler's default authored FPS for stepped clips. A custom grid that cannot preserve fidelity under authored playback fails atomically. Smooth playback retains continuous linear interpolation and reports the existing sample-time accuracy limitation.
+Commit builds the complete output privately, validates it, and checks sample-time fidelity with actual playback settings. It also returns `motionFidelity`, comparing runtime poses/endpoints at keys, midpoints and near/exact end. Key disagreement blocks commit; between-key drift produces warnings. Source duration, loop, interpolation declaration, playback mode and FPS are preserved. The generation proposal's playback describes proposal evaluation, without changing committed metadata. Prefer authored FPS for stepped clips; incompatible grids fail atomically with an FPS diagnostic. Finite probes cannot bound every interpolation error.
 
 ## Key replacement and constraint deactivation
 
@@ -48,4 +48,4 @@ Undo restores the exact original snapshot, including replaced bone keys, authore
 
 Required checks are `npm run typecheck`, `npm run test` and `npm run build`, plus repository formatting/lint checks. Browser smoke tests remain local-only.
 
-Deferred work includes React Bake UI, partial ranges, key reduction, adaptive sampling, runtime layer-stack capture, rig-constraint editing, new solvers and physics. Smooth motion between sample times can differ from continuously solved IK; sample-time fidelity does not guarantee world-space endpoint accuracy between samples.
+Deferred work includes partial ranges, key reduction, adaptive sampling, runtime layer-stack capture, rig-constraint editing, new solvers and physics. Smooth motion can differ from continuous IK; measured probes do not guarantee endpoint accuracy at every instant.

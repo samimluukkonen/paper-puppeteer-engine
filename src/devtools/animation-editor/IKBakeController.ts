@@ -3,6 +3,7 @@ import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
 import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
 import { generateBakedBoneKeys, type IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
+import type { IKBakeMotionFidelity } from '../../engine/ik/IKBakeMotionFidelity.js';
 import { sampleIKBake } from '../../engine/ik/IKBakeSampling.js';
 import { IsolatedIKSampler } from '../../engine/ik/IsolatedIKSampler.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
@@ -14,6 +15,7 @@ export interface IKBakeSnapshot {
   readonly selectedIds: readonly string[];
   readonly fps: string;
   readonly plan: IKBakePlan | null;
+  readonly motionFidelity: IKBakeMotionFidelity | null;
   readonly issues: readonly ValidationIssue[];
   readonly preview: boolean;
   readonly feedback: string;
@@ -32,6 +34,7 @@ export class IKBakeController {
   private dependencies: readonly unknown[] = [];
   private constraints: IKBakeSnapshot['constraints'] = Object.freeze([]);
   private plan: IKBakePlan | null = null;
+  private motionFidelity: IKBakeMotionFidelity | null = null;
   private issues: readonly ValidationIssue[] = Object.freeze([]);
   private clip: CompiledClip | undefined;
   private sampler: IsolatedIKSampler | undefined;
@@ -158,6 +161,7 @@ export class IKBakeController {
       this.clip = undefined;
       this.sampler = undefined;
       this.plan = null;
+      this.motionFidelity = null;
       this.constraints = Object.freeze(
         (rig?.ik ?? []).map((entry) =>
           Object.freeze({
@@ -196,6 +200,7 @@ export class IKBakeController {
           const proposed = commitIKBake(animation, this.plan, rig);
           this.issues = proposed.issues;
           if (proposed.success) {
+            this.motionFidelity = proposed.motionFidelity;
             this.clip = compileClip(proposed.animation, rig);
             this.sampler = new IsolatedIKSampler(rig);
           }
@@ -220,6 +225,7 @@ export class IKBakeController {
       selectedIds: this.selectedIds,
       fps: this.fps,
       plan: this.clip ? this.plan : null,
+      motionFidelity: this.motionFidelity,
       issues: this.issues,
       preview: this.preview,
       feedback: this.feedback,
@@ -245,6 +251,7 @@ export class IKBakeController {
     this.selectedIds = Object.freeze([]);
     this.constraints = Object.freeze([]);
     this.plan = null;
+    this.motionFidelity = null;
     this.clip = undefined;
     this.sampler = undefined;
     this.issues = Object.freeze([]);

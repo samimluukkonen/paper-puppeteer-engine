@@ -73,6 +73,21 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
             <p>Existing keys to replace: {plan.replacedKeyCount}</p>
             <p>Sampling FPS: {plan.sampling.fps}</p>
             <p>Constraints deactivated for this animation: {plan.sampling.constraintIds.join(', ')}</p>
+            {state.motionFidelity && (
+              <div aria-label="Bake fidelity">
+                <p>Runtime comparison: {state.motionFidelity.probes.length} key and between-key probes.</p>
+                <p>
+                  At keys: maximum joint error {((state.motionFidelity.atKeys.rotation * 180) / Math.PI).toFixed(6)}°;
+                  endpoint error {state.motionFidelity.atKeys.endEffector.toFixed(6)} rig units.
+                </p>
+                <p>
+                  Between keys: maximum joint error{' '}
+                  {((state.motionFidelity.betweenKeys.rotation * 180) / Math.PI).toFixed(3)}°; endpoint error{' '}
+                  {state.motionFidelity.betweenKeys.endEffector.toFixed(3)} rig units. Target: ≤2° and ≤1 rig unit.
+                  Preview the reach before committing.
+                </p>
+              </div>
+            )}
           </div>
         )}
         {state.issues.map((issue, index) => (

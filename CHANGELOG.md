@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.6-5
+
+The v0.5.6.5 [IK baking production hardening](docs/ik-bake-hardening.md) completes v0.5.6. Public `compareIKBakeMotion` and successful commit reports distinguish generated-key agreement from midpoint/near-end interpolation drift, including complete selected joint transforms and end-effector world distances. The React panel displays measured errors and low-FPS feedback; incompatible stepped sample grids report the authored FPS. Regressions add 8/10/12/60 FPS, influence/target edge cases, facing/nonuniform placement, ordinary baked-key editing/history, onion skins, bone mirroring, events and canonical JSON/CharacterLoader compatibility. Artist guidance documents reaching, tolerances and mixed baked/IK transition limits. Package version is `0.5.6-5`.
+
 ## 0.5.6-4
 
 The v0.5.6.4 [React IK Baking workflow](docs/react-ik-baking.md) adds explicit rig constraint selection, sampling FPS, linear output, actual affected-bone/generated/replaced-key summaries, and validation feedback before commit. A detached baked-pose overlay follows the existing playhead and retains unselected IK and authored playback settings. Baking uses the existing atomic state command, pauses playback and creates one Undo/Redo operation. Options, document/session changes, panel unmount and scene shutdown clear previews; runtime providers/overrides and overlapping driven chains block baking. Partial ranges, reduction, solver configuration, mirrored baking and retargeting remain deferred.
