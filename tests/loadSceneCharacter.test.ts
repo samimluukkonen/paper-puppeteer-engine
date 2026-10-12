@@ -4,7 +4,7 @@ import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
-import { DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS } from '../src/engine/queueCharacterTextures.js';
+import { DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS, queueCharacterTextures } from '../src/engine/queueCharacterTextures.js';
 import { loadSceneCharacter, type SceneCharacterLoadOptions } from '../src/shared/loadSceneCharacter.js';
 import { requestUrl } from './helpers/requestUrl.js';
 
@@ -288,6 +288,24 @@ test('preloaded character keys do not claim failures from new image requests', a
   load.emit('loaderror', { key: 'part', type: 'image' });
   load.emit('complete');
   assert.equal(load.image.mock.calls.length, 0);
+  assertClean();
+});
+
+test.each(['part.png', 'replacement.png'])('cached character images validate the requested URL %s', async (texture) => {
+  const { scene, load, metadata, start, assertClean } = fixture();
+  let loaded = false;
+  scene.textures.exists = () => loaded;
+  queueCharacterTextures(scene as unknown as Phaser.Scene, definition);
+  loaded = true;
+  load.emit('complete');
+  assertClean();
+  const replacement = character(texture);
+  metadata.mockResolvedValueOnce(replacement);
+  if (texture === 'part.png') assert.strictEqual(await start(), replacement);
+  else await rejects(start(), /Texture key "part".*already assigned.*part\.png.*replacement\.png/);
+  // Only the initial load queues artwork; reuse and rejection leave no listeners or new batch.
+  assert.equal(load.image.mock.calls.length, 1);
+  assert.equal(load.start.mock.calls.length, 0);
   assertClean();
 });
 

@@ -143,10 +143,6 @@ export function loadSceneCharacter(
       }
       for (const key of Object.keys(definition.textures))
         if (!scene.textures.exists(key)) characterImages.set(key, definition.textureUrl(key));
-      if (!characterImages.size) {
-        succeed(definition);
-        return;
-      }
       for (const key of characterImages.keys()) remainingImages.add(key);
       scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
       scene.load.on(Phaser.Loader.Events.FILE_COMPLETE, onFileComplete);
@@ -156,6 +152,11 @@ export function loadSceneCharacter(
         releaseTextures = queueCharacterTextures(scene, definition, { timeoutMs });
       } finally {
         scene.load.off(Phaser.Loader.Events.ADD, onAdd);
+      }
+      // Cached images still need the shared texture-key conflict checks.
+      if (!characterImages.size) {
+        succeed(definition);
+        return;
       }
       timer = setTimeout(
         () => fail(new DOMException(`Character artwork loading timed out: "${url}".`, 'TimeoutError')),
