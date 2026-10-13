@@ -4,18 +4,20 @@ import type { RigDefinition } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 
 // Rounding these fields can collapse transforms, reorder artwork, or change a frame id.
-const exactNumberFields = new Set(['scaleX', 'scaleY', 'length', 'depth', 'frame']);
+const exactNumberFields = new Set(['scaleX', 'scaleY', 'length', 'depth', 'frame', 'originX', 'originY']);
 
 /** Order authoring fields consistently without changing array order or untouched numbers. */
-function stable(value: unknown, original: unknown, field?: string): unknown {
+function stable(value: unknown, original: unknown, field?: string, artwork = false): unknown {
   if (typeof value === 'number') {
-    if (value === original || (field !== undefined && exactNumberFields.has(field))) return value;
+    if (artwork || value === original || (field !== undefined && exactNumberFields.has(field))) return value;
     const rounded = roundEditorNumber(value);
     // A small authored offset or angle must not silently become exactly zero either.
     return rounded === 0 && value !== 0 ? value : rounded;
   }
   if (Array.isArray(value))
-    return value.map((entry, index) => stable(entry, Array.isArray(original) ? original[index] : undefined));
+    return value.map((entry, index) =>
+      stable(entry, Array.isArray(original) ? original[index] : undefined, undefined, artwork),
+    );
   if (value && typeof value === 'object') {
     const source = value as Record<string, unknown>;
     const baseline = original && typeof original === 'object' ? (original as Record<string, unknown>) : {};
@@ -50,7 +52,10 @@ function stable(value: unknown, original: unknown, field?: string): unknown {
             bi = order.indexOf(b);
           return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b);
         })
-        .map((key) => [key, stable(source[key], baseline[key], key)]),
+        .map((key) => [
+          key,
+          stable(source[key], baseline[key], key, artwork || key === 'sprite' || key === 'attachments'),
+        ]),
     );
   }
   return value;

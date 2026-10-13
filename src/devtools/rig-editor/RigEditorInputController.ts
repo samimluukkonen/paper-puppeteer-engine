@@ -2,7 +2,8 @@ import type Phaser from 'phaser';
 import type { Puppet } from '../../engine/Puppet.js';
 import { isDialogTarget, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
-import { type Point, worldToLocal } from './coordinates.js';
+import { textureOriginAt } from './artworkAlignment.js';
+import { type Affine, type Point, worldToLocal } from './coordinates.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigEditorOverlay } from './RigEditorOverlay.js';
 import type { RigEditorSelection } from './RigEditorState.js';
@@ -16,12 +17,18 @@ export class RigEditorInputController {
   private downY = 0;
   private characterDrag: { start: Point; value: Point } | undefined;
   private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
+  private originDrag: { id: string; attachment: boolean; matrix: Affine; origin: Point; size: Point } | undefined;
+  private artworkFrame: Phaser.GameObjects.Container | undefined;
   private enabled = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly puppet: Puppet,
-    private readonly editor: Pick<RigEditor, 'state' | 'editBone' | 'undo' | 'redo' | 'refresh' | 'moveCharacter'>,
+    private readonly editor: Pick<
+      RigEditor,
+      'state' | 'editBone' | 'undo' | 'redo' | 'refresh' | 'moveCharacter' | 'previewArtwork' | 'finishArtworkGesture'
+    > &
+      Partial<Pick<RigEditor, 'previewName'>>,
     private readonly overlay: RigEditorOverlay,
     private readonly onChange: () => void,
     private readonly redraw: () => void,
@@ -54,7 +61,7 @@ export class RigEditorInputController {
   disable(): void {
     if (!this.enabled) return;
     this.enabled = false;
-    this.endGesture();
+    this.endGesture(false);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.input.off('pointerdown', this.pointerDown, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
@@ -72,18 +79,24 @@ export class RigEditorInputController {
   }
 
   /** Commit authored changes once and release pointer ownership after any gesture ending. */
-  endGesture(): void {
+  endGesture(commit = true): void {
+    const hadDrag = !!this.drag || !!this.originDrag;
+    this.editor.finishArtworkGesture(commit);
+    if (!commit && (this.drag || this.originDrag)) this.state.cancelOperation();
     this.panning = false;
     this.activePointerId = undefined;
     this.drag = undefined;
+    this.originDrag = undefined;
+    this.artworkFrame = undefined;
     this.characterDrag = undefined;
     this.moved = false;
     this.state.endOperation();
+    if (!commit && hadDrag) this.editor.refresh(false);
   }
 
   private interruptGesture = (): void => {
     if (this.activePointerId === undefined) return;
-    this.endGesture();
+    this.endGesture(false);
     this.onChange();
     this.redraw();
   };
@@ -164,9 +177,49 @@ export class RigEditorInputController {
       }
       return;
     }
+    if (event.key === 'Escape' && this.activePointerId !== undefined) {
+      event.preventDefault();
+      this.endGesture(false);
+      this.editor.refresh();
+      return;
+    }
     if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
     const selection = this.state.selection;
-    if (selection?.type !== 'bone') return;
+    if (!selection) return;
+    const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+    if (this.state.editMode !== 'joint') {
+      if (!delta) return;
+      const amount = (this.state.gridSnap || 1) * (event.shiftKey ? 10 : 1);
+      if (this.state.editMode === 'slot') {
+        if (selection.type !== 'slot') return;
+        if (this.editor.previewName) return;
+        const slot = this.state.getSlot(selection.id);
+        this.state.editSlotFields(selection.id, {
+          x: this.state.snapTranslation((slot.x ?? 0) + delta[0]! * amount),
+          y: this.state.snapTranslation((slot.y ?? 0) + delta[1]! * amount),
+        });
+      } else {
+        // Origin keyboard precision uses the inspector's normalized/pixel fields.
+        if (this.state.editMode === 'origin') return;
+        const attachment = selection.type === 'slot';
+        const id = attachment ? this.puppet.getAttachment(selection.id) : selection.id;
+        const sprite = id ? (attachment ? this.state.getAttachment(id) : this.state.getBone(id).sprite) : undefined;
+        if (!id || !sprite) return;
+        this.state.editSpriteFields(
+          id,
+          {
+            x: this.state.snapTranslation((sprite.x ?? 0) + delta[0]! * amount),
+            y: this.state.snapTranslation((sprite.y ?? 0) + delta[1]! * amount),
+          },
+          attachment,
+        );
+      }
+      this.editor.refresh();
+      event.preventDefault();
+      return;
+    }
+    if (selection.type !== 'bone') return;
+    if (this.editor.previewName) return;
     const amount = event.shiftKey ? 10 : 1;
     const bone = this.state.getBone(selection.id);
     const gridAmount = this.state.gridSnap ? this.state.gridSnap * (event.shiftKey ? 10 : 1) : amount;
@@ -220,48 +273,55 @@ export class RigEditorInputController {
     if (this.panning || !pointer.leftButtonDown()) return;
     const selected = this.state.selection;
     const picked = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false);
-    const artwork =
-      this.state.editMode === 'sprite' && picked?.type !== 'slot' ? this.pickArtwork(pointer, selected) : null;
-    const target = artwork ?? picked ?? selected;
-    if (!picked && !artwork) {
+    const aligning = this.state.editMode === 'sprite' || this.state.editMode === 'origin';
+    const artwork = aligning
+      ? (this.overlay.pickArtworkPivot?.(pointer.x, pointer.y) ?? this.pickArtwork(pointer, selected))
+      : null;
+    const target = artwork ?? picked;
+    if (!target) {
       const start = this.characterPoint(pointer);
       if (start) this.characterDrag = { start, value: { x: this.puppet.container.x, y: this.puppet.container.y } };
       return;
     }
-    if (!target) return;
-    if (artwork || picked) this.state.selection = target;
-    const parent =
-      target.type === 'slot'
-        ? this.puppet.getBone(this.state.getSlot(target.id).bone).container
-        : this.puppet.getBone(target.id).container.parentContainer;
-    const local = this.local(pointer, parent);
-    if (!local) return;
-    if (target.type === 'slot' && artwork) {
-      const attachmentId = this.puppet.getAttachment(target.id);
-      const attachment = attachmentId ? this.state.getAttachment(attachmentId) : undefined;
-      const mount = this.puppet.getSlotImage(target.id)?.parentContainer;
-      const inMount = mount ? this.local(pointer, mount) : undefined;
-      if (attachment && inMount)
-        this.drag = {
-          type: 'attachment',
-          id: attachmentId!,
-          start: inMount,
-          value: { x: attachment.x ?? 0, y: attachment.y ?? 0 },
-        };
-    } else if (target.type === 'slot') {
+    this.state.selection = target;
+    if (aligning) {
+      const attachment = target.type === 'slot';
+      const id = attachment ? this.puppet.getAttachment(target.id) : target.id;
+      const image = attachment ? this.puppet.getSlotImage(target.id) : this.puppet.getBone(target.id).sprite;
+      const sprite = id ? (attachment ? this.state.getAttachment(id) : this.state.getBone(id).sprite) : undefined;
+      if (id && image && sprite) {
+        if (this.state.editMode === 'origin') {
+          const m = image.getWorldTransformMatrix();
+          this.originDrag = {
+            id,
+            attachment,
+            matrix: { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty },
+            origin: { x: sprite.originX ?? 0.5, y: sprite.originY ?? 0.5 },
+            size: { x: image.width, y: image.height },
+          };
+        } else {
+          this.artworkFrame = image.parentContainer;
+          const local = this.local(pointer, image.parentContainer);
+          if (local)
+            this.drag = {
+              type: attachment ? 'attachment' : 'sprite',
+              id,
+              start: local,
+              value: { x: sprite.x ?? 0, y: sprite.y ?? 0 },
+            };
+        }
+      }
+    } else if (!this.editor.previewName && this.state.editMode === 'slot' && target.type === 'slot') {
       const slot = this.state.getSlot(target.id);
-      this.drag = { type: 'slot', id: target.id, start: local, value: { x: slot.x ?? 0, y: slot.y ?? 0 } };
-    } else if (this.state.editMode === 'sprite' && this.state.getBone(target.id).sprite) {
-      const sprite = this.state.getBone(target.id).sprite!;
-      const inBone = this.local(pointer, this.puppet.getBone(target.id).container);
-      if (inBone)
-        this.drag = { type: 'sprite', id: target.id, start: inBone, value: { x: sprite.x ?? 0, y: sprite.y ?? 0 } };
-    } else if (this.state.editMode === 'joint') {
+      const local = this.local(pointer, this.puppet.getBone(slot.bone).container);
+      if (local) this.drag = { type: 'slot', id: target.id, start: local, value: { x: slot.x ?? 0, y: slot.y ?? 0 } };
+    } else if (!this.editor.previewName && this.state.editMode === 'joint' && target.type === 'bone') {
       const bone = this.state.getBone(target.id);
-      this.drag = { type: 'bone', id: target.id, start: local, value: { x: bone.x ?? 0, y: bone.y ?? 0 } };
+      const local = this.local(pointer, this.puppet.getBone(target.id).container.parentContainer);
+      if (local) this.drag = { type: 'bone', id: target.id, start: local, value: { x: bone.x ?? 0, y: bone.y ?? 0 } };
     }
-    if (this.drag) this.state.beginOperation();
-    this.onChange();
+    if (this.drag?.type === 'bone' || this.drag?.type === 'slot') this.state.beginOperation();
+    this.editor.refresh();
   }
 
   private pointerMove(pointer: Phaser.Input.Pointer): void {
@@ -276,16 +336,22 @@ export class RigEditorInputController {
       return;
     }
     if (!this.panning) {
+      if (this.originDrag) {
+        if (!this.moved) return;
+        const { id, attachment, matrix, origin, size } = this.originDrag;
+        const point = textureOriginAt(this.world(pointer), matrix, origin, size);
+        if (point) this.editor.previewArtwork(id, { originX: point.x, originY: point.y }, attachment);
+        return;
+      }
       if (!this.drag) return;
+      if (!this.moved) return;
       const { type, id, start, value } = this.drag;
       const parent =
         type === 'slot'
           ? this.puppet.getBone(this.state.getSlot(id).bone).container
-          : type === 'sprite'
-            ? this.puppet.getBone(id).container
-            : type === 'attachment'
-              ? this.puppet.getSlotImage(this.state.selection!.id)!.parentContainer
-              : this.puppet.getBone(id).container.parentContainer;
+          : type === 'sprite' || type === 'attachment'
+            ? this.artworkFrame!
+            : this.puppet.getBone(id).container.parentContainer;
       const local = this.local(pointer, parent);
       if (!local) return;
       const x = this.state.snapTranslation(value.x + local.x - start.x);
@@ -295,7 +361,8 @@ export class RigEditorInputController {
       } else if (type === 'slot') {
         this.state.editSlotFields(id, { x, y });
       } else {
-        this.state.editSpriteFields(id, { x, y }, type === 'attachment');
+        this.editor.previewArtwork(id, { x, y }, type === 'attachment');
+        return;
       }
       this.editor.refresh();
       return;
@@ -307,7 +374,7 @@ export class RigEditorInputController {
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
     if (pointer.id !== this.activePointerId) return;
-    if (!this.panning && !this.moved && !this.drag) {
+    if (!this.panning && !this.moved && !this.drag && !this.originDrag) {
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();
       this.redraw();

@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.8-2
+
+The v0.5.8.2 [visual artwork alignment](docs/visual-artwork-alignment.md) separates joint, artwork offset, sprite origin and slot transform canvas operations and keyboard nudges. The React inspector shows current image dimensions, pixel/normalized pivots, joint references and artwork transform settings, with undoable offset/origin reset and origin centering. Phaser draws selected bounds and joint/pivot guides; artwork drag proposals remain render-only until one release commit. Escape and lifecycle interruptions cancel gestures while preserving redo. Facing and existing animation bone pose/time previews stay outside authored data; animation keys, IK keys, events and timing are untouched. Artwork offsets/origins serialize at full precision. Unit and local Chrome regressions cover transforms, replacement dimensions, history and export/reload. Package version is `0.5.8-2`.
+
 ## 0.5.8-1
 
 The v0.5.8.1 [sprite import and replacement foundation](docs/sprite-replacement.md) adds a shared React artwork panel to both editors. Local static PNG/WebP imports validate headers, dimensions, size and browser decoding before private Phaser textures are installed. Original/temporary/preview/applied artwork stays separate from rig and animation documents, history, drafts and JSON exports. Cancel restores the previous working artwork; Revert restores original textures. Pending asset changes independently protect navigation. Texture ownership, decode cancellation, rig reloads, attachment changes and hidden preview cleanup are covered by regressions. Source-file writes, dimension migration, atlas replacement and production asset packaging remain deferred. Package version is `0.5.8-1`.

@@ -230,7 +230,7 @@ test('export is stable, data-only, valid, and preserves unedited precision', () 
   assert.equal(result.bones[1]?.rotation, 0.5);
   assert.equal(result.bones[1]?.sprite?.x, 0.123456789);
   assert.equal(result.attachments?.[0]?.originX, 0.13333333333333333);
-  assert.equal(result.attachments?.[0]?.x, 3.123457);
+  assert.equal(result.attachments?.[0]?.x, 3.123456789);
   assert.isFalse(json.includes('container'));
   assert.deepEqual(validateRigDefinition(result), []);
   assert.equal(parseRigDefinition(result).getBone('arm').rotation, 0.5);

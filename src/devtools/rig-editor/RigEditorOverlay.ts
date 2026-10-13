@@ -34,14 +34,16 @@ export class RigEditorOverlay {
     const selected = this.state.selection;
     if (!selected) return this.puppet.container;
     if (selected.type === 'slot') {
-      if (this.state.editMode === 'sprite') {
+      if (this.state.editMode === 'sprite' || this.state.editMode === 'origin') {
         const mount = this.puppet.getSlotImage(selected.id)?.parentContainer;
         if (mount) return mount;
       }
       return this.puppet.getBone(this.state.getSlot(selected.id).bone).container;
     }
     const bone = this.puppet.getBone(selected.id).container;
-    return this.state.editMode === 'sprite' ? bone : (bone.parentContainer ?? this.puppet.container);
+    return this.state.editMode === 'sprite' || this.state.editMode === 'origin'
+      ? bone
+      : (bone.parentContainer ?? this.puppet.container);
   }
 
   private drawGrid(originX: number, originY: number, zoom: number): void {
@@ -134,6 +136,20 @@ export class RigEditorOverlay {
       return a.distance - b.distance || a.order - b.order;
     });
     return candidates[0]?.selection ?? null;
+  }
+
+  pickArtworkPivot(x: number, y: number): RigEditorSelection {
+    const selected = this.state.selection;
+    const image =
+      selected?.type === 'bone'
+        ? this.puppet.getBone(selected.id).sprite
+        : selected
+          ? this.puppet.getSlotImage(selected.id)
+          : undefined;
+    if (!image) return null;
+    const matrix = image.getWorldTransformMatrix();
+    const pivot = this.screen({ x: matrix.tx, y: matrix.ty });
+    return Math.hypot(x - pivot.x, y - pivot.y) <= 13 ? selected : null;
   }
 
   /** Preview transforms/artwork can change without changing the authored working copy. */
@@ -245,7 +261,7 @@ export class RigEditorOverlay {
           );
       }
     }
-    if (this.state.visibility.spriteOrigins || this.state.editMode === 'sprite') {
+    if (this.state.visibility.spriteOrigins || this.state.editMode === 'sprite' || this.state.editMode === 'origin') {
       const mark = (point: Point, selected: boolean): void => {
         const p = this.screen(point);
         g.lineStyle(selected ? 3 : 2, selected ? 0xe45f35 : 0xbd682c)
@@ -266,6 +282,34 @@ export class RigEditorOverlay {
         if (image && (this.state.visibility.spriteOrigins || selected)) {
           const matrix = image.getWorldTransformMatrix();
           mark({ x: matrix.tx, y: matrix.ty }, selected);
+        }
+      }
+    }
+    if (this.state.editMode === 'sprite' || this.state.editMode === 'origin') {
+      const selected = this.state.selection;
+      if (selected) {
+        const id = selected.type === 'bone' ? selected.id : this.state.getSlot(selected.id).bone;
+        const joint = this.bonePoint(id);
+        // Always show the selected joint reference, even when neighboring bones are hidden.
+        g.lineStyle(2, 0x217c87).strokeCircle(joint.x, joint.y, 9);
+        label('Joint reference', joint.x + 12, joint.y - 22, '#155c65');
+        const image = selected.type === 'bone' ? this.puppet.getBone(id).sprite : this.puppet.getSlotImage(selected.id);
+        if (image) {
+          const matrix = image.getWorldTransformMatrix();
+          const corners = [
+            [-image.width * image.originX, -image.height * image.originY],
+            [image.width * (1 - image.originX), -image.height * image.originY],
+            [image.width * (1 - image.originX), image.height * (1 - image.originY)],
+            [-image.width * image.originX, image.height * (1 - image.originY)],
+          ].map(([x, y]) => this.screen(matrix.transformPoint(x!, y!)));
+          for (let i = 0; i < 4; i++) {
+            const a = corners[i]!,
+              b = corners[(i + 1) % 4]!;
+            g.lineStyle(1, 0xbd682c, 0.8).lineBetween(a.x, a.y, b.x, b.y);
+          }
+          const pivot = this.screen({ x: matrix.tx, y: matrix.ty });
+          g.lineStyle(1, 0xbd682c, 0.7).lineBetween(joint.x, joint.y, pivot.x, pivot.y);
+          label('Sprite pivot', pivot.x + 12, pivot.y + 8, '#a53d21');
         }
       }
     }

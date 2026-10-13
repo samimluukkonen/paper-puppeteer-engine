@@ -13,8 +13,10 @@ export function RigEditorView({ artwork }: { artwork?: ArtworkController } = {})
         <label>
           Edit{' '}
           <select id="edit-mode">
-            <option value="joint">Joint</option>
-            <option value="sprite">Sprite</option>
+            <option value="joint">Joint Editing</option>
+            <option value="sprite">Artwork Offset Editing</option>
+            <option value="origin">Sprite Origin Editing</option>
+            <option value="slot">Slot Transform Editing</option>
           </select>
         </label>
         <label>
@@ -91,7 +93,22 @@ export function RigEditorView({ artwork }: { artwork?: ArtworkController } = {})
       <main className={`workspace-layout view-content ${inspector.open ? 'inspector-open' : ''}`}>
         <section className="workspace-preview" aria-label="Rig preview">
           <div className="workspace-preview-options">
-            <span>Right facing · Bind pose</span>
+            <label>
+              Facing{' '}
+              <select id="rig-facing">
+                <option value="right">Right</option>
+                <option value="left">Left</option>
+              </select>
+            </label>
+            <label>
+              Pose{' '}
+              <select id="rig-preview-pose">
+                <option value="">Bind pose</option>
+              </select>
+            </label>
+            <label>
+              Time (ms) <input id="rig-preview-time" type="number" step="any" min="0" defaultValue="0" />
+            </label>
             <label>
               <input id="dim-selection" type="checkbox" /> Dim unselected artwork
             </label>
@@ -100,7 +117,9 @@ export function RigEditorView({ artwork }: { artwork?: ArtworkController } = {})
             </label>
           </div>
           <div id="editor-stage" aria-label="Rig canvas" />
-          <div className="workspace-caption">Select a joint to edit · Wheel to zoom · Middle drag to pan</div>
+          <div id="rig-mode-hint" className="workspace-caption">
+            Joint Editing · Wheel to zoom · Middle drag to pan
+          </div>
         </section>
         <aside
           ref={inspector.panel}

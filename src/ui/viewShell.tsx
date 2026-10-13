@@ -7,7 +7,7 @@ import './workspace.css';
 
 const views = {
   demo: { title: 'Engine Demo', path: '', description: 'Explore animation, playback, and inverse kinematics.' },
-  rig: { title: 'Rig Editor', path: 'rig-editor/', description: 'Edit local rig values · right facing' },
+  rig: { title: 'Rig Editor', path: 'rig-editor/', description: 'Edit local rig values · align artwork' },
   animation: { title: 'Animation Editor', path: 'animation-editor/', description: 'Loading character…' },
 } as const;
 

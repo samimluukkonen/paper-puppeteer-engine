@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import type { CompiledClip } from '../../engine/AnimationClip.js';
+import { evaluateClip } from '../../engine/AnimationPose.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
@@ -18,6 +20,9 @@ export class RigEditor {
   private renderOrder: readonly string[] = [];
   private inputController: RigEditorInputController | undefined;
   private readonly ikChains: readonly TwoBoneIKDefinition[];
+  private artworkDraft: { id: string; attachment: boolean; values: Partial<Record<SpriteField, number>> } | undefined;
+  private previewClip: CompiledClip | undefined;
+  previewTime = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -25,6 +30,7 @@ export class RigEditor {
     private readonly onChange: () => void,
     state?: RigEditorState,
     ikChains: readonly TwoBoneIKDefinition[] = [],
+    readonly previewClips: readonly CompiledClip[] = [],
   ) {
     this.state = state ?? new RigEditorState(puppet.rig);
     // Authored definitions own same-name preview chains, including their endpoint offsets.
@@ -33,7 +39,7 @@ export class RigEditor {
 
   enable(): void {
     if (this.overlay) return;
-    this.puppet.resetToBindPose().setFacing('right');
+    this.puppet.resetToBindPose().setFacing(this.state.facing);
     this.appliedRig = undefined;
     for (const chain of this.ikChains) {
       let constraint = this.registeredIK.get(chain.name);
@@ -87,6 +93,7 @@ export class RigEditor {
       this.applyRig(rig);
       this.appliedRig = rig;
     }
+    this.applyArtworkGeometry();
     this.updateArtwork();
     this.overlay?.invalidate();
     this.update();
@@ -107,6 +114,12 @@ export class RigEditor {
         runtime.sprite
           .setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0)
           .setOrigin(edited.sprite.originX ?? 0.5, edited.sprite.originY ?? 0.5);
+    }
+    if (this.previewClip) {
+      const pose = evaluateClip(this.previewClip, this.previewTime);
+      for (const [id, transform] of pose) {
+        if (definitions.has(id)) Object.assign(this.puppet.getBone(id).pose, transform);
+      }
     }
     for (const slot of rig.slots ?? []) {
       this.puppet.setSlotTransform(slot.id, createTransform(slot), false);
@@ -153,6 +166,93 @@ export class RigEditor {
     return this.puppet.getAttachment(id);
   }
 
+  getSelectedImage(): Phaser.GameObjects.Image | undefined {
+    const selected = this.state.selection;
+    return selected?.type === 'bone'
+      ? this.puppet.getBone(selected.id).sprite
+      : selected
+        ? this.puppet.getSlotImage(selected.id)
+        : undefined;
+  }
+
+  getJointReference(): { x: number; y: number } | undefined {
+    const selected = this.state.selection;
+    if (!selected) return undefined;
+    const id = selected.type === 'bone' ? selected.id : this.state.getSlot(selected.id).bone;
+    const matrix = this.puppet.getBone(id).container.getWorldTransformMatrix();
+    return { x: matrix.tx, y: matrix.ty };
+  }
+
+  private applyArtworkGeometry(): void {
+    const apply = (image: Phaser.GameObjects.Image | undefined, id: string, attachment: boolean): void => {
+      const authored = attachment ? this.state.getAttachment(id) : this.state.getBone(id).sprite;
+      if (!image || !authored) return;
+      const draft = this.artworkDraft;
+      const sprite = draft?.id === id && draft.attachment === attachment ? { ...authored, ...draft.values } : authored;
+      image.setPosition(sprite.x ?? 0, sprite.y ?? 0).setOrigin(sprite.originX ?? 0.5, sprite.originY ?? 0.5);
+    };
+    for (const bone of this.state.rig.bones) apply(this.puppet.getBone(bone.id).sprite, bone.id, false);
+    for (const slot of this.state.rig.slots) {
+      const id = this.getAttachment(slot.id);
+      if (id) apply(this.puppet.getSlotImage(slot.id), id, true);
+    }
+  }
+
+  /** Render-only drag proposal; authored rig, serialization and history remain unchanged. */
+  previewArtwork(id: string, values: Partial<Record<SpriteField, number>>, attachment = false): void {
+    for (const [field, value] of Object.entries(values)) {
+      if (!Number.isFinite(value)) throw new Error(`${field} must be finite.`);
+      if ((field === 'originX' || field === 'originY') && (value < 0 || value > 1))
+        throw new Error('Origin must be between 0 and 1.');
+    }
+    this.artworkDraft = { id, values, attachment };
+    this.refresh();
+  }
+
+  finishArtworkGesture(commit: boolean): void {
+    const draft = this.artworkDraft;
+    this.artworkDraft = undefined;
+    try {
+      if (commit && draft) {
+        const sprite = draft.attachment ? this.state.getAttachment(draft.id) : this.state.getBone(draft.id).sprite!;
+        const changed = Object.fromEntries(
+          Object.entries(draft.values).filter(
+            ([field, value]) => value !== (sprite[field as SpriteField] ?? (field.startsWith('origin') ? 0.5 : 0)),
+          ),
+        );
+        if (Object.keys(changed).length) this.state.editSpriteFields(draft.id, changed, draft.attachment);
+      }
+    } finally {
+      if (draft) this.refresh(false);
+    }
+  }
+
+  cancelGesture(): void {
+    this.inputController?.endGesture(false);
+  }
+
+  setFacing(facing: 'left' | 'right'): void {
+    this.cancelGesture();
+    this.state.facing = facing;
+    this.puppet.setFacing(facing);
+    this.refresh();
+  }
+
+  setPreviewPose(name: string, time = 0): void {
+    if (!Number.isFinite(time)) throw new Error('Preview time must be finite.');
+    const clip = this.previewClips.find((entry) => entry.name === name);
+    if (name && !clip) throw new Error(`Unknown preview animation "${name}".`);
+    this.cancelGesture();
+    this.previewClip = clip;
+    this.previewTime = this.previewClip ? Math.max(0, Math.min(this.previewClip.duration, time)) : 0;
+    this.appliedRig = undefined;
+    this.refresh();
+  }
+
+  get previewName(): string {
+    return this.previewClip?.name ?? '';
+  }
+
   /** Reposition the preview and its pinned IK targets without authoring rig transforms. */
   moveCharacter(x: number, y: number): void {
     const container = this.puppet.container;
@@ -167,6 +267,7 @@ export class RigEditor {
     }
     this.overlay?.invalidate();
     this.update();
+    this.onChange();
   }
 
   editBone(id: string, field: BoneField, value: number | undefined, notify = true): void {

@@ -1,3 +1,5 @@
+import { mountAlignmentInspector } from './AlignmentInspector.js';
+import { normalizedOrigin, originPixels } from './artworkAlignment.js';
 import type { RigEditor } from './RigEditor.js';
 import type { BoneField, SlotField, SpriteField } from './RigEditorState.js';
 
@@ -71,6 +73,7 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
   let editor: RigEditor | undefined;
   let renderedState: RigEditor['state'] | undefined;
   let renderedKey = '';
+  let releaseAlignment: (() => void) | undefined;
   const authoredValues = new WeakMap<HTMLInputElement, number | undefined>();
 
   function updateInspectorValues(current: RigEditor, editedInput?: HTMLInputElement): void {
@@ -88,9 +91,17 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     for (const input of inspector.querySelectorAll<HTMLInputElement>('input[type="number"]')) {
       const { scope, field } = input.dataset;
       if (scope !== 'bone' && scope !== 'slot' && scope !== 'sprite' && scope !== 'attachment') continue;
+      input.disabled = !!current.previewName && (scope === 'bone' || scope === 'slot');
       const definition = fieldsByScope[scope].find((entry) => entry.field === field);
       if (!definition) continue;
-      const value = valuesByScope[scope]?.[definition.field];
+      const candidate = current.getSelectedImage?.();
+      const image = candidate && candidate.width > 0 && candidate.height > 0 ? candidate : undefined;
+      const raw = valuesByScope[scope]?.[definition.field];
+      const value =
+        input.dataset.pixels && image
+          ? originPixels(raw ?? 0.5, field === 'originX' ? image.width : image.height)
+          : raw;
+      if (input.dataset.pixels && image) input.max = String(field === 'originX' ? image.width : image.height);
       // Keep partially typed text during unrelated refreshes. External edits and
       // history restores still replace a focused field when its authored value changes.
       if (input !== editedInput && (document.activeElement !== input || authoredValues.get(input) !== value)) {
@@ -101,6 +112,17 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     }
     for (const label of inspector.querySelectorAll<HTMLElement>('[data-derived="rotation-degrees"]'))
       label.textContent = `${format(((selected.rotation ?? 0) * 180) / Math.PI)}°`;
+    const candidate = current.getSelectedImage?.();
+    const image = candidate && candidate.width > 0 && candidate.height > 0 ? candidate : undefined;
+    const joint = current.getJointReference?.();
+    for (const label of inspector.querySelectorAll<HTMLElement>('[data-alignment]')) {
+      if (label.dataset.alignment === 'dimensions')
+        label.textContent = image ? `${image.width} × ${image.height}` : '—';
+      if (label.dataset.alignment === 'appearance')
+        label.textContent = image ? `${image.scaleX}, ${image.scaleY} / ${format(image.rotation)}` : '—';
+      if (label.dataset.alignment === 'joint')
+        label.textContent = joint ? `${format(joint.x)}, ${format(joint.y)}` : '—';
+    }
   }
 
   function renderInspector(current: RigEditor): void {
@@ -108,6 +130,8 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     const selection = state.selection;
     if (!selection) {
       if (renderedState !== state || renderedKey !== 'empty') {
+        releaseAlignment?.();
+        releaseAlignment = undefined;
         renderedState = state;
         renderedKey = 'empty';
         inspector.textContent = 'Select a bone or slot to edit its bind values.';
@@ -115,11 +139,14 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       return;
     }
     const attachmentId = selection.type === 'slot' ? current.getAttachment(selection.id) : undefined;
+    const candidate = current.getSelectedImage?.();
+    const image = candidate && candidate.width > 0 && candidate.height > 0 ? candidate : undefined;
     const key = JSON.stringify([
       selection.type,
       selection.id,
       attachmentId,
       selection.type === 'bone' && !!state.getBone(selection.id).sprite,
+      !!image,
     ]);
     if (renderedState === state && renderedKey === key) {
       updateInspectorValues(current);
@@ -128,14 +155,20 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
     // Rebuild only when selection, session, or the available artwork fields change.
     renderedState = state;
     renderedKey = key;
+    releaseAlignment?.();
+    releaseAlignment = undefined;
     if (selection.type === 'bone') {
       const bone = state.getBone(selection.id);
       const sprite = bone.sprite;
       inspector.innerHTML = [
         `<h3>Bone: ${escapeHtml(bone.id)}</h3>`,
         row('Parent', bone.parent ?? 'none'),
+        '<h4>Joint Editing · bind transform</h4>',
         numberRows('bone', bone, boneFields),
-        sprite ? numberRows('sprite', sprite, fieldsByScope.sprite) : '',
+        sprite
+          ? '<h4>Artwork Offset Editing / normalized origin</h4>' + numberRows('sprite', sprite, fieldsByScope.sprite)
+          : '',
+        sprite && image ? '<div data-alignment-host></div>' : '',
         numberRows('bone', bone, [depthField]),
       ].join('');
     } else {
@@ -145,11 +178,34 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
         `<h3>Slot: ${escapeHtml(slot.id)}</h3>`,
         row('Parent bone', slot.bone),
         row('Attachment', attachmentId ?? 'empty'),
+        '<h4>Slot Transform Editing</h4>',
         numberRows('slot', slot, fieldsByScope.slot),
         row('texture', attachment?.texture),
-        attachment ? numberRows('attachment', attachment, fieldsByScope.attachment) : '',
+        attachment
+          ? '<h4>Artwork Offset Editing / normalized origin</h4>' +
+            numberRows('attachment', attachment, fieldsByScope.attachment)
+          : '',
+        attachment && image ? '<div data-alignment-host></div>' : '',
       ].join('');
     }
+    const host = inspector.querySelector<HTMLElement>('[data-alignment-host]');
+    const sprite =
+      selection.type === 'bone'
+        ? state.getBone(selection.id).sprite
+        : attachmentId
+          ? state.getAttachment(attachmentId)
+          : undefined;
+    if (host && sprite && image)
+      releaseAlignment = mountAlignmentInspector(host, {
+        scope: selection.type === 'bone' ? 'sprite' : 'attachment',
+        width: image.width,
+        height: image.height,
+        originX: sprite.originX ?? 0.5,
+        originY: sprite.originY ?? 0.5,
+        scaleX: image.scaleX,
+        scaleY: image.scaleY,
+        rotation: image.rotation,
+      });
     updateInspectorValues(current);
   }
 
@@ -178,6 +234,11 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
         if (!definition) throw new Error(`Unknown artwork field "${field}".`);
         const spriteId = scope === 'attachment' ? editor.getAttachment(id) : id;
         if (!spriteId) throw new Error(`No active attachment for "${id}".`);
+        if (input.dataset.pixels && value !== undefined) {
+          const image = editor.getSelectedImage();
+          if (!image) throw new Error('Select visible artwork to edit pixel origins.');
+          value = normalizedOrigin(value, field === 'originX' ? image.width : image.height);
+        }
         editor.editSprite(spriteId, definition.field, value, scope === 'attachment', false);
       } else throw new Error(`Unknown inspector scope "${scope}".`);
       input.setCustomValidity('');
@@ -188,6 +249,31 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       input.reportValidity();
     }
   };
+  inspector.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target as HTMLElement;
+      const action = target.dataset.alignmentAction;
+      const selection = editor?.state.selection;
+      if (!editor || !selection || !action) return;
+      const attachment = selection.type === 'slot';
+      const id = attachment ? editor.getAttachment(selection.id) : selection.id;
+      if (!id) return;
+      editor.state.endOperation();
+      editor.cancelGesture();
+      editor.state.editSpriteFields(
+        id,
+        action === 'offset'
+          ? { x: undefined, y: undefined }
+          : action === 'center'
+            ? { originX: 0.5, originY: 0.5 }
+            : { originX: undefined, originY: undefined },
+        attachment,
+      );
+      editor.refresh();
+    },
+    { signal: lifetime.signal },
+  );
   inspector.addEventListener(
     'input',
     (event) => {
@@ -239,11 +325,15 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       if (lifetime.signal.aborted) return;
       renderedState = undefined;
       renderedKey = '';
+      releaseAlignment?.();
+      releaseAlignment = undefined;
       inspector.textContent = `Character load failed: ${message}`;
     },
     dispose(): void {
       if (lifetime.signal.aborted) return;
       lifetime.abort();
+      releaseAlignment?.();
+      releaseAlignment = undefined;
       editor?.state.endOperation();
       editor = undefined;
     },

@@ -18,17 +18,18 @@ export function RigHelp() {
               </td>
             </tr>
             <tr>
-              <td>Move a joint or slot</td>
-              <td>Drag its canvas marker</td>
+              <td>Move a joint / slot transform</td>
+              <td>Choose Joint Editing / Slot Transform Editing and drag its marker</td>
             </tr>
             <tr>
               <td>Edit artwork offset</td>
-              <td>Choose Sprite mode, then click and drag artwork; selecting its bone also works</td>
+              <td>Choose Artwork Offset Editing, then drag artwork or its pivot</td>
             </tr>
             <tr>
-              <td>Nudge a joint</td>
+              <td>Nudge the current operation</td>
               <td>
-                Arrow keys; hold <kbd>Shift</kbd> for larger steps
+                Arrow keys move joints, artwork offsets, or slot transforms in their explicit modes; hold{' '}
+                <kbd>Shift</kbd> for larger steps
               </td>
             </tr>
             <tr>
@@ -36,6 +37,23 @@ export function RigHelp() {
               <td>
                 <kbd>,</kbd> / <kbd>.</kbd>; hold <kbd>Shift</kbd> for larger steps
               </td>
+            </tr>
+            <tr>
+              <td>Edit sprite pivot</td>
+              <td>
+                Choose Sprite Origin Editing and drag across artwork, or enter normalized / pixel origins. Offset stays
+                fixed.
+              </td>
+            </tr>
+            <tr>
+              <td>Cancel gesture</td>
+              <td>
+                <kbd>Escape</kbd>; leaving the window also cancels
+              </td>
+            </tr>
+            <tr>
+              <td>Inspect animation poses</td>
+              <td>Choose a clip and time in preview options. Bone tracks only; joint/slot edits require Bind pose.</td>
             </tr>
             <tr>
               <td>Undo / redo</td>

@@ -75,6 +75,10 @@ export class EditorElement {
     ]);
   }
 
+  querySelector(selector: string): EditorElement | null {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
   matches(selector: string): boolean {
     return selector === 'input[type="number"]' && this.type === 'number';
   }

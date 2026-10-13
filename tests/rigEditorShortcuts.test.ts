@@ -21,6 +21,8 @@ function fixture() {
     redo: vi.fn(() => state.redo()),
     refresh: vi.fn(),
     moveCharacter: vi.fn(),
+    previewArtwork: vi.fn(),
+    finishArtworkGesture: vi.fn(),
   };
   const controller = new RigEditorInputController(
     { input: { on() {}, off() {} } } as unknown as Phaser.Scene,

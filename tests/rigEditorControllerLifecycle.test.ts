@@ -206,3 +206,49 @@ test.each(['resolve', 'reject'] as const)(
     second.dispose();
   },
 );
+
+test('pixel-origin inspector edits use current image dimensions and share focus-based history', async () => {
+  const query = stubRigEditorDom();
+  const host = query('#inspector');
+  const state = new RigEditorState(new Rig({ root: 'root', bones: [{ id: 'root', sprite: { texture: 'part' } }] }));
+  state.selectBone('root');
+  const image = { width: 137, height: 251, scaleX: 1, scaleY: 1, rotation: 0 };
+  const current = {
+    state,
+    getSelectedImage: () => image,
+    getJointReference: () => ({ x: 10, y: 20 }),
+    editSprite: (id: string, field: 'originX', value: number | undefined) => state.editSprite(id, field, value),
+  } as unknown as RigEditor;
+  const input = new EditorElement();
+  input.type = 'number';
+  input.dataset = { scope: 'sprite', field: 'originX', pixels: 'true' };
+  vi.spyOn(host, 'querySelectorAll').mockImplementation((selector) =>
+    selector === 'input[type="number"]' ? [input] : [],
+  );
+  const controller = createInspectorController(host as unknown as HTMLElement, vi.fn());
+  controller.render(current);
+  assert.equal(Number(input.value), 68.5);
+  await host.dispatch('focusin', input);
+  input.value = '13.123456789';
+  await host.dispatch('input', input);
+  input.value = '14.987654321';
+  await host.dispatch('input', input);
+  assert.closeTo(state.getBone('root').sprite!.originX!, 14.987654321 / 137, 1e-15);
+  assert.isFalse(state.canUndo);
+  await host.dispatch('focusout', input);
+  assert.equal(state.historyLength, 1);
+  state.undo();
+  controller.render(current);
+  assert.equal(Number(input.value), 68.5);
+  state.redo();
+  controller.render(current);
+  assert.equal(Number(input.value), 14.987654321);
+  image.width = 333;
+  controller.render(current);
+  assert.closeTo(Number(input.value), (14.987654321 / 137) * 333, 1e-12);
+  input.value = '1000';
+  await host.dispatch('input', input);
+  assert.closeTo(state.getBone('root').sprite!.originX!, 14.987654321 / 137, 1e-15);
+  assert.equal(input.reportValidity.mock.calls.length, 1);
+  controller.dispose();
+});

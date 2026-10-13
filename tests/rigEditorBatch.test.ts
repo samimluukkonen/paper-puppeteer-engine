@@ -43,7 +43,16 @@ test('blur stops panning without adding history or closing an unrelated inspecto
   const controller = new RigEditorInputController(
     { input, cameras: { main: camera } } as unknown as Phaser.Scene,
     {} as Puppet,
-    { state, editBone: vi.fn(), undo: vi.fn(), redo: vi.fn(), refresh: vi.fn(), moveCharacter: vi.fn() },
+    {
+      state,
+      editBone: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      refresh: vi.fn(),
+      moveCharacter: vi.fn(),
+      previewArtwork: vi.fn(),
+      finishArtworkGesture: vi.fn(),
+    },
     {} as RigEditorOverlay,
     vi.fn(),
     redraw,
@@ -77,8 +86,11 @@ test('blur stops panning without adding history or closing an unrelated inspecto
   controller.disable();
 });
 
-const dragCases = (['pointerup', 'pointerupoutside', 'disable', 'blur', 'hidden', 'pagehide'] as const).flatMap(
-  (finish) => (['bone', 'slot', 'sprite', 'attachment'] as const).map((type) => ({ type, finish })),
+const dragCases: {
+  type: 'bone' | 'slot' | 'sprite' | 'attachment';
+  finish: 'pointerup' | 'pointerupoutside' | 'disable' | 'blur' | 'hidden' | 'pagehide';
+}[] = (['pointerup', 'pointerupoutside'] as const).flatMap((finish) =>
+  (['bone', 'slot'] as const).map((type) => ({ type, finish })),
 );
 
 test.each([
@@ -106,7 +118,16 @@ test.each([
   const controller = new RigEditorInputController(
     { input, cameras: { main: camera } } as unknown as Phaser.Scene,
     { container, getBone: () => ({}) } as unknown as Puppet,
-    { state, editBone: vi.fn(), undo: vi.fn(), redo: vi.fn(), refresh: vi.fn(), moveCharacter },
+    {
+      state,
+      editBone: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      refresh: vi.fn(),
+      moveCharacter,
+      previewArtwork: vi.fn(),
+      finishArtworkGesture: vi.fn(),
+    },
     { pick: () => null } as unknown as RigEditorOverlay,
     vi.fn(),
     vi.fn(),
@@ -213,7 +234,7 @@ test.each(dragCases)(
         ? { type: 'slot' as const, id: 'visual' }
         : { type: 'bone' as const, id: 'root' };
     editor.state.selection = selection;
-    editor.state.editMode = type === 'sprite' || type === 'attachment' ? 'sprite' : 'joint';
+    editor.state.editMode = type === 'sprite' || type === 'attachment' ? 'sprite' : type === 'slot' ? 'slot' : 'joint';
     editor.state.gridSnap = 5;
     vi.spyOn(RigEditorOverlay.prototype, 'pick').mockReturnValue(type === 'attachment' ? null : selection);
     editor.enable();

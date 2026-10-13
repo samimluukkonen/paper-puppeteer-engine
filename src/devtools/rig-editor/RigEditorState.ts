@@ -24,7 +24,7 @@ import { serializeRigData, serializeRigJson } from './rigSerialization.js';
 
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
-export type EditMode = 'joint' | 'sprite';
+export type EditMode = 'joint' | 'sprite' | 'origin' | 'slot';
 export type BoneField = TransformProperty | 'length' | 'depth';
 export type SlotField = TransformProperty | 'depth';
 export type SpriteField = 'x' | 'y' | 'originX' | 'originY';
@@ -72,6 +72,7 @@ export class RigEditorState {
   editMode: EditMode = 'joint';
   dimUnselected = false;
   ikPreview = false;
+  facing: 'left' | 'right' = 'right';
   warnings: string[] = [];
   readonly visibility: Record<VisibilityKey, boolean> = {
     artwork: true,
@@ -202,6 +203,10 @@ export class RigEditorState {
 
   endOperation(): void {
     if (this.history.endOperation()) this.updateWarnings();
+  }
+
+  cancelOperation(): void {
+    if (this.history.cancelOperation()) this.updateWarnings();
   }
 
   private historyEntry(): HistoryEntry {

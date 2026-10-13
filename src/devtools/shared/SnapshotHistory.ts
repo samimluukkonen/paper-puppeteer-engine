@@ -39,6 +39,15 @@ export class SnapshotHistory<Entry> {
     return true;
   }
 
+  /** Discard a gesture without consuming history or clearing its redo branch. */
+  cancelOperation(): boolean {
+    if (!this.operation) return false;
+    const { before } = this.operation;
+    this.operation = undefined;
+    this.restore(before);
+    return true;
+  }
+
   /** Failed edits roll back the whole operation, preserving existing undo/redo entries. */
   change(edit: () => void): void {
     const before = this.operation ? this.operation.before : this.capture();

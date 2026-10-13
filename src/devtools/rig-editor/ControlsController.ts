@@ -1,10 +1,11 @@
 import type { RigEditor } from './RigEditor.js';
-import type { GridSnap, RotationSnap } from './RigEditorState.js';
+import type { EditMode, GridSnap, RotationSnap } from './RigEditorState.js';
 
 /** Editing, snapping, visibility, opacity, and preview controls. */
 export function createControlsController(app: HTMLElement, updateStatus: (editor: RigEditor) => void) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
+  let clipsEditor: RigEditor | undefined;
   const visibility = app.querySelector<HTMLElement>('#visibility')!;
   function render(current: RigEditor): void {
     if (lifetime.signal.aborted) return;
@@ -39,6 +40,35 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
         visibility.append(label);
       }
     }
+    if (clipsEditor !== current) {
+      clipsEditor = current;
+      const poses = app.querySelector<HTMLSelectElement>('#rig-preview-pose')!;
+      poses.replaceChildren();
+      for (const [name, title] of [
+        ['', 'Bind pose'],
+        ...(current.previewClips ?? []).map((clip) => [clip.name, clip.name]),
+      ]) {
+        const option = document.createElement('option');
+        option.value = name!;
+        option.textContent = title!;
+        poses.append(option);
+      }
+    }
+    app.querySelector<HTMLSelectElement>('#rig-facing')!.value = state.facing;
+    app.querySelector<HTMLSelectElement>('#rig-preview-pose')!.value = current.previewName ?? '';
+    const time = app.querySelector<HTMLInputElement>('#rig-preview-time')!;
+    time.value = String(current.previewTime ?? 0);
+    time.disabled = !current.previewName;
+    time.max = String(current.previewClips?.find((clip) => clip.name === current.previewName)?.duration ?? 0);
+    app.querySelector<HTMLElement>('#rig-mode-hint')!.textContent =
+      {
+        joint: 'Joint Editing: move bones · Arrow keys nudge joints',
+        sprite: 'Artwork Offset Editing: drag artwork or its pivot · Arrow keys nudge offsets',
+        origin: 'Sprite Origin Editing: drag to choose a texture-local pivot; offset stays fixed',
+        slot: 'Slot Transform Editing: drag slot markers · Arrow keys nudge slots',
+      }[state.editMode] +
+      (current.previewName ? ' · Bone pose preview; switch to Bind pose for joint/slot editing' : '') +
+      ' · Wheel to zoom · Middle drag to pan · Escape cancels';
     app.querySelector<HTMLInputElement>('#ik-preview')!.checked = state.ikPreview;
     app.querySelector<HTMLSelectElement>('#edit-mode')!.value = state.editMode;
     app.querySelector<HTMLSelectElement>('#grid-snap')!.value = String(state.gridSnap);
@@ -61,7 +91,8 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     'change',
     (event) => {
       if (!editor) return;
-      editor.state.editMode = (event.target as HTMLSelectElement).value as 'joint' | 'sprite';
+      editor.cancelGesture();
+      editor.state.editMode = (event.target as HTMLSelectElement).value as EditMode;
       editor.refresh();
     },
     { signal: lifetime.signal },
@@ -98,6 +129,29 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     'change',
     (event) => {
       editor?.setIKPreview((event.target as HTMLInputElement).checked);
+    },
+    { signal: lifetime.signal },
+  );
+
+  app.querySelector<HTMLSelectElement>('#rig-facing')!.addEventListener(
+    'change',
+    (event) => {
+      editor?.setFacing((event.target as HTMLSelectElement).value as 'left' | 'right');
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLSelectElement>('#rig-preview-pose')!.addEventListener(
+    'change',
+    (event) => {
+      editor?.setPreviewPose((event.target as HTMLSelectElement).value);
+    },
+    { signal: lifetime.signal },
+  );
+  app.querySelector<HTMLInputElement>('#rig-preview-time')!.addEventListener(
+    'input',
+    (event) => {
+      const time = Number((event.target as HTMLInputElement).value);
+      if (editor && Number.isFinite(time)) editor.setPreviewPose(editor.previewName, time);
     },
     { signal: lifetime.signal },
   );
