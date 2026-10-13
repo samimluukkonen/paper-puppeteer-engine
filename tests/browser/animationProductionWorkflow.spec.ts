@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { animationControl, animationFileAction, test } from './fixtures.js';
+import { animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
 
 async function editRoot(page: Page, value: string) {
   await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
@@ -115,7 +115,7 @@ for (const mode of ['smooth', 'stepped']) {
     await animationFileAction(page, '#animation-import-submit', (control) => control.click());
     await page.locator('#animation-show-bones').uncheck();
     await page.locator('#animation-facing').selectOption('left');
-    await page.locator('#animation-ik-preview').check();
+    await (await animationMenuControl(page, '#animation-ik-preview')).check();
     const canvas = page.locator('#animation-stage canvas');
     const ruler = page.locator('#timeline-ruler');
     const times = [0, 0.04, 0.08, 0.2, 0.4, 0.8, 1.032, 1.033];

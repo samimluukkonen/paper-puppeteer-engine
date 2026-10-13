@@ -249,7 +249,7 @@ test('invalid FPS restores the authored value and typing while playing retains t
   }
   await page.locator('#preview-loop').click();
   await page.locator('#play-pause').click();
-  await fps.fill('12.5');
+  await (await animationControl(page, '#animation-fps')).fill('12.5');
   await page.waitForTimeout(200);
   await expect(fps).toHaveValue('12.5');
   await expect(page.locator('#animation-metadata')).toContainText('FPS: 10');

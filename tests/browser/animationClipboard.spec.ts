@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationControl, test } from './fixtures.js';
+import { animationMenuControl, animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page, stepped = false) {
   await page.route(/\/animations\/(idle|walk)\.json$/, async (route) => {
@@ -98,13 +98,13 @@ test('five keys copy/paste across bones and properties, extend duration, refresh
 test('copy/paste buttons retain the clipboard across a compatible animation switch', async ({ page }) => {
   await openEditor(page);
   await selectGroup(page);
-  await page.locator('#timeline-copy-keys').click();
+  await (await animationMenuControl(page, '#timeline-copy-keys')).click();
   await page.locator('#timeline').press('Escape');
   await expect(page.locator('#timeline-copy-keys')).toBeDisabled();
   await page.locator('#animation-selection').selectOption('walk');
   await expect(selected(page)).toHaveCount(0);
   await expect(page.locator('#timeline-paste-keys')).toBeEnabled();
-  await page.locator('#timeline-paste-keys').click();
+  await (await animationMenuControl(page, '#timeline-paste-keys')).click();
   await verifyGroup(page, 0);
   expect(await clock(page)).toBe(0);
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
@@ -126,7 +126,7 @@ test('duplicate shortcut uses one authored frame and selects the group; button w
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await (await animationControl(page, '#animation-mode')).selectOption('smooth');
   await selectGroup(page);
-  await page.locator('#timeline-duplicate-keys').click();
+  await (await animationMenuControl(page, '#timeline-duplicate-keys')).click();
   await verifyGroup(page, 0.51);
   expect(await clock(page)).toBe(0.5);
   await page.locator('#animation-undo').click();
@@ -159,7 +159,7 @@ test('clipboard shortcuts preserve native input behavior and bookmarks outside t
 }) => {
   await openEditor(page);
   await selectGroup(page);
-  await page.locator('#timeline-copy-keys').click();
+  await (await animationMenuControl(page, '#timeline-copy-keys')).click();
   const input = page.locator('#animation-bone-fields input[data-property="x"]');
   await input.fill('123');
   await input.press('Control+c');

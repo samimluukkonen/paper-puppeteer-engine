@@ -208,6 +208,10 @@ export class TimelineTracksController {
               // Markers own clicks; they must not begin a scrub or resume playback on release.
               const button = marker;
               marker.addEventListener('pointerdown', (event) => this.onKeyPointerDown(event, keyframe, button));
+              marker.addEventListener('contextmenu', () => {
+                if (button.getAttribute('aria-pressed') !== 'true')
+                  this.selectMarker(keyframe, { additive: false, range: false });
+              });
               marker.addEventListener('click', (event) => {
                 if (event.detail === 0)
                   this.selectMarker(keyframe, {

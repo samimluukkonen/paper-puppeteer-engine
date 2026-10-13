@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { EditorMenu } from './EditorMenu.js';
 import type { IKInspectorController } from './IKInspectorController.js';
 
 const labels = { x: 'Target X', y: 'Target Y', mix: 'Influence (mix)' };
@@ -48,25 +49,32 @@ export function IKInspectorPanel({ controller }: { controller: IKInspectorContro
                 onChange={(event) => controller.edit(field.property, event.target.value)}
               />
             </label>
-            <span className="key-indicator" data-keyed={String(field.keyed)}>
+            <span className="key-indicator editor-sr-only" data-keyed={String(field.keyed)}>
               {field.keyed ? '● keyed' : '○ no key'}
             </span>
             <button
               type="button"
               disabled={!field.valid}
+              className="animation-key-button"
+              data-keyed={String(field.keyed)}
+              title={`${field.keyed ? 'Update' : 'Set'} ${labels[field.property]} key at the playhead`}
               aria-label={`Set IK ${field.property} key`}
               onClick={() => controller.commit(field.property)}
             >
-              Set Key
+              {field.keyed ? '◆' : '◇'}
             </button>
-            <button
-              type="button"
-              disabled={!field.keyed}
-              aria-label={`Delete IK ${field.property} key`}
-              onClick={() => controller.remove(field.property)}
-            >
-              Delete Key
-            </button>
+            <div className="animation-property-actions">
+              <EditorMenu id={`ik-${field.property}-actions`} label={`${labels[field.property]} key actions`} compact>
+                <button
+                  type="button"
+                  disabled={!field.keyed}
+                  aria-label={`Delete IK ${field.property} key`}
+                  onClick={() => controller.remove(field.property)}
+                >
+                  Delete Key
+                </button>
+              </EditorMenu>
+            </div>
           </div>
         ))}
       </fieldset>

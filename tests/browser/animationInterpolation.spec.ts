@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationControl, test } from './fixtures.js';
+import { animationMenuControl, animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -180,17 +180,17 @@ test('multi-track interpolation inspection stays coherent through the complete k
   await expect(hardeningKey(page, 0.01)).toHaveAttribute('data-interpolation', 'linear');
   await expect(hardeningKey(page, 0.51)).toHaveAttribute('aria-pressed', 'true');
   await expect(hardeningKey(page, 0.21, 'x', 'torso')).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('#timeline-copy-keys').click();
+  await (await animationMenuControl(page, '#timeline-copy-keys')).click();
   await page.locator('#timeline-ruler').press('End');
-  await page.locator('#timeline-paste-keys').click();
+  await (await animationMenuControl(page, '#timeline-paste-keys')).click();
   await expect(hardeningKey(page, 1)).toHaveAttribute('title', /value 0/);
   await expect(hardeningKey(page, 1.5)).toHaveAttribute('data-interpolation', 'unavailable');
   await expect(inspector).toHaveValue('');
-  await page.locator('#timeline-duplicate-keys').click();
+  await (await animationMenuControl(page, '#timeline-duplicate-keys')).click();
   await expect(hardeningKey(page, 1.51)).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#timeline').press('ArrowLeft');
   await expect(hardeningKey(page, 1.5)).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('#timeline-delete-key').click();
+  await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(inspector).toHaveAttribute('data-unavailable-reason', 'empty-selection');
   for (let index = 0; index < 6; index++) await page.locator('#animation-undo').click();
   await expect(page.locator('#animation-undo')).toBeDisabled();
@@ -217,10 +217,10 @@ test('multi-track interpolation inspection stays coherent through the complete k
     .toBeGreaterThan(0.1);
   await page.locator('#play-pause').click();
   for (const facing of ['left', 'right', 'left', 'right']) await page.locator('#animation-facing').selectOption(facing);
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await page.locator('#timeline-ruler').press('Home');
   await page.locator('#timeline-ruler').press('Shift+ArrowRight');
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   expect(await downloadAnimation(page)).toEqual(beforePreview);
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await page.locator('.timeline-panel').screenshot({ path: test.info().outputPath('interpolation-hardening.png') });
@@ -234,7 +234,7 @@ test('terminal, singleton and empty property markers refresh after deleting succ
   const empty = page.locator('.timeline-track-lane[data-bone-id="root"][data-property="scaleX"]');
   await expect(empty.locator('.timeline-keyframe')).toHaveCount(0);
   await hardeningKey(page, 1).click();
-  await page.locator('#timeline-delete-key').click();
+  await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(hardeningKey(page, 0.5)).toHaveAttribute('data-interpolation', 'unavailable');
   await hardeningKey(page, 0.5).click();
   await expect(page.locator('#timeline-interpolation')).toHaveValue('');
@@ -248,7 +248,7 @@ test('terminal, singleton and empty property markers refresh after deleting succ
   await page.locator('#animation-redo').click();
   await expect(hardeningKey(page, 0.5)).toHaveAttribute('title', /no outgoing segment/);
   await expect(page.locator('#timeline-interpolation')).toHaveValue('');
-  await page.locator('#timeline-delete-key').click();
+  await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(page.locator('#timeline-interpolation')).toHaveAttribute('data-unavailable-reason', 'empty-selection');
   await expect(hardeningKey(page, 0)).toHaveAttribute('data-interpolation', 'unavailable');
 });

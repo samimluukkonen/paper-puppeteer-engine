@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationFileAction, test } from './fixtures.js';
+import { animationMenuControl, animationFileAction, test } from './fixtures.js';
 
 /** Locate the selected Phaser crosshair from its rendered pixels, without runtime test hooks. */
 async function targetPoint(page: Page) {
@@ -155,15 +155,15 @@ test('hand and foot handles preview, cancel, commit two keys, animate and retain
   await page.mouse.move(bounds.x + bounds.width / 2 + 20, bounds.y + bounds.height / 2 + 20);
   await page.mouse.up({ button: 'middle' });
   await page.screenshot({ path: info.outputPath('ik-handles-facing-onion.png'), fullPage: true });
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await expect(inspector.getByRole('status')).toContainText('target provider');
   await expect(inspector.getByRole('button', { name: 'Set Target Key', exact: true })).toBeDisabled();
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   await expect(inspector.getByRole('button', { name: 'Set Target Key', exact: true })).toBeEnabled();
-  await page.locator('#animation-ik-drag').uncheck();
-  await page.locator('#animation-ik-handles').uncheck();
-  await page.locator('#animation-ik-handles').check();
-  await page.locator('#animation-ik-drag').check();
+  await (await animationMenuControl(page, '#animation-ik-drag')).uncheck();
+  await (await animationMenuControl(page, '#animation-ik-handles')).uncheck();
+  await (await animationMenuControl(page, '#animation-ik-handles')).check();
+  await (await animationMenuControl(page, '#animation-ik-drag')).check();
   await animationFileAction(page, '#animation-reload-export', (control) => control.click());
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await page.reload();
@@ -216,8 +216,8 @@ test('random paperdoll sketch exposes and authors both hand and foot targets', a
   }
   await page.locator('#animation-onion-skinning').check();
   await page.screenshot({ path: info.outputPath('sketch-ik-targets.png'), fullPage: true });
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await expect(inspector.getByRole('status')).toContainText('target provider');
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   await expect(inspector.getByRole('button', { name: 'Set Target Key', exact: true })).toBeEnabled();
 });

@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { test } from './fixtures.js';
+import { animationMenuControl, test } from './fixtures.js';
 
 async function openEditor(page: Page) {
   await page.goto('animation-editor/');
@@ -22,13 +22,13 @@ test('search, keyed/IK/event filters, expansion and playback preserve the author
   await page.locator('#timeline-filter').selectOption('keyed');
   expect(await labels.locator('.timeline-property-track:visible').count()).toBeGreaterThan(0);
   await expect(labels.locator('.timeline-property-track[data-has-keys="false"]:visible')).toHaveCount(0);
-  await page.locator('#timeline-show-ik').uncheck();
+  await (await animationMenuControl(page, '#timeline-show-ik')).uncheck();
   await expect(labels.locator('.timeline-ik-track:visible')).toHaveCount(0);
-  await page.locator('#timeline-collapse-all').click();
+  await (await animationMenuControl(page, '#timeline-collapse-all')).click();
   await expect(labels.locator('.timeline-property-track:visible')).toHaveCount(0);
-  await page.locator('#timeline-expand-all').click();
+  await (await animationMenuControl(page, '#timeline-expand-all')).click();
   expect(await labels.locator('.timeline-property-track:visible').count()).toBeGreaterThan(0);
-  await page.locator('#timeline-show-events').uncheck();
+  await (await animationMenuControl(page, '#timeline-show-events')).uncheck();
   await expect(labels.locator('.timeline-event-track')).toBeHidden();
   await page.locator('#timeline-ruler').press('End');
   await page.locator('#reset-time').click();
@@ -57,7 +57,7 @@ test('search, keyed/IK/event filters, expansion and playback preserve the author
   await page.locator('#timeline-search').fill('missing-track-name');
   await expect(page.locator('#timeline-filter-empty')).toBeVisible();
   await expect(labels.locator('.timeline-track-label:visible')).toHaveCount(0);
-  await page.locator('#timeline-clear-filters').click();
+  await (await animationMenuControl(page, '#timeline-clear-filters')).click();
   await expect(labels.locator('.timeline-bone-track:visible')).toHaveCount(allBones);
   await expect(labels.locator('.timeline-property-track[data-bone-id="torso"]')).toHaveCount(5);
   await expect(labels.locator('.timeline-property-track[data-bone-id="rightForearm"]')).toHaveCount(0);
@@ -89,19 +89,19 @@ test('hidden selected keys retain their count, deletion scope and reveal behavio
   await page.locator('#timeline-search').fill('forearm');
   await expect(page.locator('#timeline-delete-key')).toHaveText('Delete 2 Selected Keys (1 hidden)');
   await expect(page.locator('#timeline-selection-status')).toContainText('Commands affect all selected keys');
-  await page.locator('#timeline-copy-keys').click();
+  await (await animationMenuControl(page, '#timeline-copy-keys')).click();
   await page.locator('#timeline-reveal-selection').click();
   await expect(page.locator('#timeline-search')).toHaveValue('');
   await expect(page.locator('.timeline-keyframe[aria-pressed="true"]:visible')).toHaveCount(2);
   await page.locator('#timeline-search').fill('forearm');
-  await page.locator('#timeline-delete-key').click();
+  await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(page.locator('.timeline-keyframe[data-time="0"]')).toHaveCount(0);
   await page.locator('#animation-undo').click();
-  await page.locator('#timeline-clear-filters').click();
+  await (await animationMenuControl(page, '#timeline-clear-filters')).click();
   await expect(page.locator('.timeline-keyframe[data-time="0"]')).toHaveCount(2);
   await page.getByRole('button', { name: 'Expand rightArmIK properties', exact: true }).click();
   await page.getByRole('button', { name: 'Select rightArmIK mix key at 0 s', exact: true }).click();
-  await page.locator('#timeline-show-ik').uncheck();
+  await (await animationMenuControl(page, '#timeline-show-ik')).uncheck();
   await expect(page.locator('#timeline-delete-key')).toHaveText('Delete 1 Selected Key (1 hidden)');
   await page.locator('#timeline-reveal-selection').click();
   await expect(page.getByRole('button', { name: 'Select rightArmIK mix key at 0 s', exact: true })).toHaveAttribute(
@@ -109,7 +109,7 @@ test('hidden selected keys retain their count, deletion scope and reveal behavio
     'true',
   );
   await page.getByRole('button', { name: 'Select event step at 0.5 s', exact: true }).click();
-  await page.locator('#timeline-show-events').uncheck();
+  await (await animationMenuControl(page, '#timeline-show-events')).uncheck();
   await expect(page.locator('#timeline-selection-status')).toContainText('1 selected event (hidden)');
   await page.locator('#timeline-reveal-selection').click();
   await expect(page.getByRole('button', { name: 'Select event step at 0.5 s', exact: true })).toHaveAttribute(

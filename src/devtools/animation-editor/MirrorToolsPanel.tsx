@@ -64,12 +64,18 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
   ));
   return (
     <details
+      id="animation-mirror-panel"
+      data-tool-panel
       ref={panel}
       className="animation-popover animation-mirror-tools"
       onKeyDown={(event) => {
         if (event.key === 'Escape' && controller.getSnapshot().preview) {
           event.preventDefault();
           controller.togglePreview();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          event.currentTarget.open = false;
+          document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
         }
       }}
       onToggle={(event) => {
@@ -78,7 +84,12 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
     >
       <summary>Mirror tools</summary>
       <section className="animation-popover-content animation-mirror-panel" aria-label="Mirror tools">
-        <h2>Mirror tools</h2>
+        <div className="animation-tool-heading">
+          <h2>Mirror tools</h2>
+          <button type="button" data-close-panel aria-label="Close Mirror tools">
+            Close
+          </button>
+        </div>
         <details>
           <summary>Configure Bone Pairs</summary>
           <p>Left and right use rig bone IDs, independently of preview facing. Changes are editor preferences.</p>

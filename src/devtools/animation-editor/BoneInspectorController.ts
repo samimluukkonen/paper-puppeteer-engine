@@ -63,11 +63,12 @@ export class BoneInspectorController {
       input.dataset.property = property;
       label.append(input);
       const indicator = document.createElement('span');
-      indicator.className = 'key-indicator';
+      indicator.className = 'key-indicator editor-sr-only';
       indicator.dataset.keyedProperty = property;
       const set = document.createElement('button');
       set.type = 'button';
-      set.textContent = 'Set Key';
+      set.textContent = '◇';
+      set.className = 'animation-key-button';
       set.setAttribute('aria-label', `Set ${labels[property]} key`);
       const remove = document.createElement('button');
       remove.type = 'button';
@@ -101,7 +102,19 @@ export class BoneInspectorController {
         },
         options,
       );
-      row.append(label, indicator, set, remove);
+      const actions = document.createElement('details');
+      actions.id = `animation-${property}-actions`;
+      actions.className = 'animation-menu animation-property-actions';
+      actions.setAttribute('data-workspace-menu', '');
+      const summary = document.createElement('summary');
+      summary.textContent = '⋯';
+      summary.setAttribute('aria-label', `${labels[property]} key actions`);
+      summary.title = `${labels[property]} key actions`;
+      const content = document.createElement('div');
+      content.className = 'animation-menu-content';
+      content.append(remove);
+      actions.append(summary, content);
+      row.append(label, indicator, set, actions);
       this.fields.append(row);
       this.rows.set(property, { input, indicator, set, remove });
     }
@@ -177,6 +190,12 @@ export class BoneInspectorController {
     this.animation = state?.workingAnimation;
     setText(this.title, this.bone ? `Bone: ${this.bone}` : 'Select a bone');
     if (this.fields.disabled !== !transform) this.fields.disabled = !transform;
+    this.fields.hidden = !transform;
+    this.cancel.hidden = !transform;
+    const empty = section?.querySelector<HTMLElement>('#animation-bone-empty');
+    if (empty) empty.hidden = !!transform;
+    const help = section?.querySelector<HTMLElement>('.animation-field-help');
+    if (help) help.hidden = !transform;
     const selected = this.bone ? this.buttons.get(this.bone) : undefined;
     if (selected !== this.selectedButton) {
       if (this.selectedButton) setAttribute(this.selectedButton, 'aria-pressed', 'false');
@@ -193,6 +212,9 @@ export class BoneInspectorController {
         if (input.value !== value) input.value = value;
       }
       const keyed = !!this.bone && !!state?.hasKeyframeAtTime(this.bone, property);
+      setText(set, keyed ? '◆' : '◇');
+      setAttribute(set, 'data-keyed', String(keyed));
+      setAttribute(set, 'title', `${keyed ? 'Update' : 'Set'} ${labels[property]} key at the playhead`);
       setText(indicator, keyed ? '● keyed' : '○ no key');
       setAttribute(indicator, 'data-keyed', String(keyed));
       setAttribute(input, 'data-temporary', String(state?.boneTransformDraft[property] !== undefined));

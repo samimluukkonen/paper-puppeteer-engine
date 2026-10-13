@@ -1,8 +1,11 @@
+import { EditorMenuController } from './EditorMenuController.js';
+
 /** Workspace preferences are transient and never author animation data. */
 export class AnimationWorkspaceController {
   private readonly abort = new AbortController();
   private readonly previewResize: ResizeObserver;
   private resizeFrame = 0;
+  private readonly menus: EditorMenuController;
 
   constructor(
     private readonly app: HTMLElement,
@@ -14,31 +17,7 @@ export class AnimationWorkspaceController {
       const dialog = app.querySelector<HTMLDialogElement>(`#animation-${name}-dialog`)!;
       app.querySelector(`#animation-${name}-open`)!.addEventListener('click', () => dialog.showModal(), options);
     }
-    const settings = app.querySelector<HTMLDetailsElement>('#animation-clip-settings')!;
-    document.addEventListener(
-      'pointerdown',
-      (event) => {
-        if (event.target instanceof Node && !settings.contains(event.target)) settings.open = false;
-      },
-      options,
-    );
-    app.addEventListener(
-      'keydown',
-      (event) => {
-        if (
-          event.defaultPrevented ||
-          event.key !== 'Escape' ||
-          (event.target instanceof Element && event.target.closest('dialog'))
-        )
-          return;
-        if (settings.open) {
-          settings.open = false;
-          settings.querySelector('summary')!.focus();
-          event.preventDefault();
-        }
-      },
-      options,
-    );
+    this.menus = new EditorMenuController(app);
 
     const layout = app.querySelector<HTMLElement>('.animation-layout')!;
     const vertical = app.querySelector<HTMLElement>('#animation-workspace-divider')!;
@@ -46,9 +25,9 @@ export class AnimationWorkspaceController {
     const inset = app.querySelector<HTMLElement>('.timeline-inset')!;
     const limits = (): { min: number; max: number } => {
       const height = layout.clientHeight;
-      const timelineMinimum = window.matchMedia('(max-width: 600px)').matches ? 320 : 180;
+      const timelineMinimum = 320;
       return {
-        min: Math.max(25, (180 / height) * 100),
+        min: Math.max(25, (240 / height) * 100),
         max: Math.min(70, ((height - timelineMinimum - 12) / height) * 100),
       };
     };
@@ -203,6 +182,7 @@ export class AnimationWorkspaceController {
   }
 
   dispose(): void {
+    this.menus.dispose();
     this.abort.abort();
     this.previewResize.disconnect();
     cancelAnimationFrame(this.resizeFrame);

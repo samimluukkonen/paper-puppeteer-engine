@@ -66,6 +66,7 @@ export class EventTrackController {
             this.state?.selectAnimationEvent(model.ref);
             marker!.focus({ preventScroll: true });
           });
+          marker.addEventListener('contextmenu', () => this.state?.selectAnimationEvent(model.ref));
           marker.addEventListener('click', (event) => {
             event.stopPropagation();
             if (event.detail === 0) this.state?.selectAnimationEvent(model.ref);

@@ -59,7 +59,6 @@ a {
 }
 .animation-command-bar > label,
 .timeline-toolbar label,
-.timeline-key-commands label,
 .timeline-track-controls label {
   display: flex;
   align-items: center;
@@ -144,12 +143,12 @@ a {
   min-width: 0;
 }
 .animation-layout.view-content {
-  --preview-share: 58%;
+  --preview-share: 52%;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  grid-template-rows: minmax(180px, var(--preview-share)) 12px minmax(180px, 1fr);
+  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-rows: minmax(240px, min(var(--preview-share), calc(100% - 332px))) 12px minmax(320px, 1fr);
   column-gap: 12px;
   padding: 0;
 }
@@ -280,7 +279,7 @@ a {
 }
 .animation-property {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) 60px 70px 82px;
+  grid-template-columns: minmax(90px, 1fr) 32px 32px;
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
@@ -376,11 +375,6 @@ a {
 #current-time {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
-}
-.timeline-key-commands,
-.timeline-navigation {
-  flex-shrink: 0;
-  margin-bottom: 8px;
 }
 .timeline-inset {
   flex: 1;
@@ -533,9 +527,7 @@ a {
 .timeline-track-lane {
   position: relative;
 }
-.timeline-key-commands,
-.timeline-track-controls,
-.timeline-navigation {
+.timeline-track-controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -546,16 +538,6 @@ a {
 .timeline-track-controls {
   flex-shrink: 0;
   gap: 6px 8px;
-}
-.timeline-expansion-controls > div {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-@media (min-width: 901px) {
-  .timeline-expansion-controls > summary {
-    display: none;
-  }
 }
 #timeline-search {
   width: 200px;
@@ -941,9 +923,6 @@ a {
   .timeline-toolbar {
     gap: 6px;
   }
-  .timeline-key-commands {
-    gap: 4px;
-  }
   .animation-property {
     grid-template-columns: minmax(90px, 1fr) 60px;
   }
@@ -1028,25 +1007,206 @@ a {
   font-size: 12px;
 }
 
-.timeline-navigation-tools {
+/* Desktop authoring: prioritize the canvas and tracks over persistent commands. */
+.animation-workspace.view-shell {
+  min-height: 740px;
+}
+.editor-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.animation-workspace .editor-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  min-height: 32px;
+  padding: 5px;
+}
+.editor-icon {
+  display: block;
   flex-shrink: 0;
 }
-.timeline-navigation-tools[open] {
-  flex-basis: 100%;
+#play-pause .editor-icon-pause,
+#play-pause[aria-label="Pause"] .editor-icon-play {
+  display: none;
 }
-.timeline-navigation-tools > summary {
+#play-pause[aria-label="Pause"] .editor-icon-pause {
+  display: block;
+}
+.animation-workspace button[aria-pressed="true"] {
+  background: #dce7d7;
+  border-color: #39574b;
+  color: #243e31;
+}
+.timeline-toolbar {
+  gap: 8px;
+}
+.timeline-control-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  border-right: 1px solid #d6d7c8;
+}
+.timeline-zoom-controls {
+  border-right: 0;
+  padding-right: 0;
+}
+.timeline-track-controls {
+  gap: 8px;
+}
+.timeline-time-control input {
+  width: 68px;
+}
+#timeline-frame-input {
+  width: 58px;
+}
+#current-time {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.animation-menu > summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #cbd1c1;
+  border-radius: 4px;
+  background: #fff;
   cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.animation-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.animation-menu > summary::after {
+  content: "▾";
+  color: #6d786a;
+}
+.animation-menu[open] > summary {
+  background: #dce7d7;
+  border-color: #39574b;
+}
+.animation-menu-content {
+  position: fixed;
+  z-index: 40;
+  width: max-content;
+  min-width: 200px;
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: min(500px, calc(100dvh - 16px));
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #b7c0ac;
+  border-radius: 6px;
+  background: #f8f5ec;
+  box-shadow: 0 8px 24px #34473e26;
   font-size: 12px;
-  margin-bottom: 6px;
 }
-.timeline-navigation-tools .timeline-navigation {
-  margin-bottom: 0;
+.animation-menu-content > button {
+  text-align: left;
+  min-height: 32px;
 }
-@media (min-width: 901px) {
-  .timeline-navigation-tools {
-    flex-basis: 100%;
-  }
-  .timeline-navigation-tools > summary {
-    display: none;
-  }
+.animation-menu-content label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.animation-clip-panel {
+  width: 360px;
+  line-height: 1.5;
+}
+.animation-clip-panel label {
+  display: grid;
+}
+.animation-menu-content .animation-onion-panel {
+  position: static;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  max-height: none;
+  overflow: visible;
+  padding: 8px 0 0;
+}
+.animation-onion-settings summary {
+  min-height: 32px;
+}
+[data-tool-panel] {
+  display: contents;
+}
+[data-tool-panel] > summary {
+  display: none;
+}
+[data-tool-panel] > section {
+  top: calc(100% + 4px);
+}
+.animation-tool-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.animation-tool-heading h2 {
+  margin: 0;
+}
+.animation-property-actions > summary,
+.animation-property-actions .animation-menu > summary {
+  width: 32px;
+  padding: 3px;
+  font-size: 18px;
+}
+.animation-property-actions > summary::after,
+.animation-property-actions .animation-menu > summary::after {
+  display: none;
+}
+.animation-property .animation-key-button {
+  width: 32px;
+  min-height: 32px;
+  font-size: 20px;
+  line-height: 1;
+}
+.animation-key-button[data-keyed="true"] {
+  color: #243e31;
+  background: #dce7d7;
+  border-color: #39574b;
+}
+
+.editor-icon-button[title],
+.animation-key-button[title] {
+  position: relative;
+}
+.editor-icon-button[title]:hover:not(:disabled)::after,
+.editor-icon-button[title]:focus-visible::after,
+.animation-key-button[title]:hover:not(:disabled)::after,
+.animation-key-button[title]:focus-visible::after {
+  content: attr(title);
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #243e31;
+  color: #f8f5ec;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
 }

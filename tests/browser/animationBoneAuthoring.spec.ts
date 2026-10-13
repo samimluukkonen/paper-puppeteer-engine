@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { animationControl, test } from './fixtures.js';
+import { animationMenuControl, animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -17,6 +17,44 @@ async function time(page: Page, seconds: number): Promise<void> {
 const input = (page: Page, property: string) =>
   page.locator(`#animation-bone-fields input[data-property="${property}"]`);
 const keyed = (page: Page, property: string) => page.locator(`[data-keyed-property="${property}"]`);
+
+/** Use the rendered selection ring so preview picking survives panel/camera size changes. */
+async function selectedBonePoint(page: Page): Promise<{ x: number; y: number }> {
+  const canvas = page.locator('#animation-stage canvas');
+  const screenshot = await canvas.screenshot();
+  const point = await page.evaluate(
+    async (url) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const surface = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = surface.getContext('2d')!;
+      context.drawImage(bitmap, 0, 0);
+      const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      let x = 0,
+        y = 0,
+        count = 0;
+      for (let index = 0; index < data.length; index += 4) {
+        if (
+          Math.abs(data[index]! - 183) <= 2 &&
+          Math.abs(data[index + 1]! - 84) <= 2 &&
+          Math.abs(data[index + 2]! - 58) <= 2
+        ) {
+          const pixel = index / 4;
+          x += pixel % bitmap.width;
+          y += Math.floor(pixel / bitmap.width);
+          count++;
+        }
+      }
+      return count ? { x: x / count, y: y / count, width: bitmap.width, height: bitmap.height } : null;
+    },
+    `data:image/png;base64,${screenshot.toString('base64')}`,
+  );
+  if (!point) throw new Error('Selected bone ring was not rendered.');
+  const bounds = (await canvas.boundingBox())!;
+  return {
+    x: bounds.x + (point.x * bounds.width) / point.width,
+    y: bounds.y + (point.y * bounds.height) / point.height,
+  };
+}
 
 test('bone hierarchy keyboard navigation keeps one tab stop without authoring or seeking', async ({ page }) => {
   await openEditor(page);
@@ -82,6 +120,7 @@ test('three-key authoring, exact history, interpolation, parent-local editing an
   await expect(input(page, 'rotation')).toHaveValue('35');
   await page.locator('#animation-redo').click();
   await expect(input(page, 'rotation')).toHaveValue('45');
+  await page.getByLabel('Rotation (°) key actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Delete Rotation (°) key', exact: true }).click();
   await expect(keyed(page, 'rotation')).toHaveAttribute('data-keyed', 'false');
   await page.locator('#animation-undo').click();
@@ -120,10 +159,10 @@ test('three-key authoring, exact history, interpolation, parent-local editing an
   await time(page, 0.5);
   await expect(input(page, 'rotation')).toHaveValue('45');
   await page.locator('#animation-facing').selectOption('left');
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await expect(input(page, 'rotation')).toHaveValue('45');
   await page.locator('#animation-facing').selectOption('right');
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   await expect(input(page, 'rotation')).toHaveValue('45');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await page.screenshot({ path: test.info().outputPath('history-authoring.png'), fullPage: true });
@@ -205,12 +244,10 @@ test('demo bone hierarchy, temporary preview, sparse create/update/delete, and p
     await expect(page.locator('#animation-bone-title')).toHaveText(`Bone: ${bone}`);
   }
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  const previewBounds = await page.locator('#animation-stage canvas').boundingBox();
-  if (!previewBounds) throw new Error('Missing puppet preview.');
-  await page.locator('#animation-stage canvas').click({
-    // The framed artwork places the torso joint at the canvas center.
-    position: { x: previewBounds.width / 2, y: previewBounds.height / 2 },
-  });
+  await page.locator('#animation-bones').getByRole('button', { name: 'torso', exact: true }).click();
+  const torsoPoint = await selectedBonePoint(page);
+  await page.locator('#animation-bones').getByRole('button', { name: 'rightHand', exact: true }).click();
+  await page.mouse.click(torsoPoint.x, torsoPoint.y);
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: torso');
   await time(page, 0.5);
   await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
@@ -238,6 +275,7 @@ test('demo bone hierarchy, temporary preview, sparse create/update/delete, and p
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
   await input(page, 'y').fill('65');
   await page.getByRole('button', { name: 'Set Y key', exact: true }).click();
+  await page.getByLabel('Rotation (°) key actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Delete Rotation (°) key', exact: true }).click();
   await expect(keyed(page, 'rotation')).toHaveAttribute('data-keyed', 'false');
   await expect(input(page, 'rotation')).not.toHaveValue('45');
@@ -285,7 +323,7 @@ test('draft cancel, navigation, invalid fields, and preview-only IK/facing', asy
   await page.locator('#animation-cancel-transform').click();
   await expect(input(page, 'rotation')).not.toHaveValue('');
   await page.locator('#animation-facing').selectOption('left');
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await time(page, 0.5);
   await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
@@ -293,7 +331,7 @@ test('draft cancel, navigation, invalid fields, and preview-only IK/facing', asy
   await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
   await expect(input(page, 'rotation')).toHaveValue('35');
   await page.locator('#animation-facing').selectOption('right');
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   await expect(input(page, 'rotation')).toHaveValue('35');
   await expect(keyed(page, 'rotation')).toHaveAttribute('data-keyed', 'true');
   await page.locator('#animation-undo').click();

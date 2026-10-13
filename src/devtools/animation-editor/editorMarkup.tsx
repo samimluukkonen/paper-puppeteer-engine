@@ -1,6 +1,8 @@
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
+import { EditorIcon } from './EditorIcon.js';
+import { EditorMenu } from './EditorMenu.js';
 import type { IKBakeController } from './IKBakeController.js';
 import { IKBakePanel } from './IKBakePanel.js';
 import type { IKInspectorController } from './IKInspectorController.js';
@@ -34,21 +36,32 @@ export function AnimationEditorView({
           Animation <select id="animation-selection"></select>
         </label>
         <div className="animation-history">
-          <button id="animation-undo" type="button" aria-keyshortcuts="Control+Z Meta+Z" title="Undo (Ctrl/Cmd+Z)">
-            Undo
+          <button
+            id="animation-undo"
+            className="editor-icon-button"
+            aria-label="Undo"
+            type="button"
+            aria-keyshortcuts="Control+Z Meta+Z"
+            title="Undo (Ctrl/Cmd+Z)"
+          >
+            <EditorIcon name="undo" />
+            <span className="editor-sr-only">Undo</span>
           </button>
           <button
             id="animation-redo"
+            className="editor-icon-button"
+            aria-label="Redo"
             type="button"
             aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
             title="Redo (Ctrl/Cmd+Shift+Z)"
           >
-            Redo
+            <EditorIcon name="redo" />
+            <span className="editor-sr-only">Redo</span>
           </button>
         </div>
-        <details id="animation-clip-settings" className="animation-popover">
+        <details id="animation-clip-settings" className="animation-menu" data-workspace-menu>
           <summary>Clip settings</summary>
-          <div className="animation-popover-content">
+          <div className="animation-menu-content animation-clip-panel">
             <div className="animation-settings" aria-label="Authored animation settings">
               <label>
                 Mode{' '}
@@ -88,16 +101,24 @@ export function AnimationEditorView({
             <p id="animation-session-status"></p>
           </div>
         </details>
-        <MirrorToolsPanel controller={mirrorTools} />
-        <IKBakePanel controller={ikBake} />
+        <EditorMenu id="animation-authoring-tools" label="Tools">
+          <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
+            Mirror tools…
+          </button>
+          <button id="animation-bake-open" type="button" data-open-panel="animation-bake-panel">
+            Bake IK…
+          </button>
+        </EditorMenu>
+        <EditorMenu id="animation-view-menu" label="View">
+          <button id="animation-reset-layout" type="button">
+            Reset layout
+          </button>
+          <button id="animation-help-open" type="button" aria-haspopup="dialog">
+            Editor help…
+          </button>
+        </EditorMenu>
         <button id="animation-tools-open" type="button" aria-haspopup="dialog">
           File tools
-        </button>
-        <button id="animation-help-open" type="button" aria-haspopup="dialog">
-          Help
-        </button>
-        <button id="animation-reset-layout" type="button">
-          Reset layout
         </button>
         <button
           ref={inspector.toggle}
@@ -109,6 +130,8 @@ export function AnimationEditorView({
         >
           Inspector
         </button>
+        <MirrorToolsPanel controller={mirrorTools} />
+        <IKBakePanel controller={ikBake} />
         <div className="animation-save">
           <span id="animation-dirty" role="status"></span>
           <button
@@ -148,40 +171,39 @@ export function AnimationEditorView({
             <label>
               <input id="animation-onion-skinning" type="checkbox" /> Onion Skinning
             </label>
-            <details className="animation-onion-settings">
-              <summary>Onion settings</summary>
-              <section className="animation-onion-panel" aria-label="Onion Skinning settings">
-                <h2>Onion Skinning</h2>
-                <label htmlFor="animation-onion-previous-count">Previous poses</label>
-                <input id="animation-onion-previous-count" type="number" min="0" max="3" step="1" />
-                <label htmlFor="animation-onion-next-count">Next poses</label>
-                <input id="animation-onion-next-count" type="number" min="0" max="3" step="1" />
-                <label htmlFor="animation-onion-spacing">Frame spacing</label>
-                <input id="animation-onion-spacing" type="number" min="1" max="5" step="1" />
-                <label htmlFor="animation-onion-previous-opacity">Previous opacity</label>
-                <input id="animation-onion-previous-opacity" type="range" min="0.05" max="0.6" step="0.01" />
-                <label htmlFor="animation-onion-next-opacity">Next opacity</label>
-                <input id="animation-onion-next-opacity" type="range" min="0.05" max="0.6" step="0.01" />
-                <label htmlFor="animation-onion-previous-color">Previous color</label>
-                <input id="animation-onion-previous-color" type="color" />
-                <label htmlFor="animation-onion-next-color">Next color</label>
-                <input id="animation-onion-next-color" type="color" />
-                <p>Set a pose count to zero to hide that direction. Spacing uses authored frames.</p>
-                <p>Ghosts show authored poses before IK preview. They are read-only and never exported.</p>
-              </section>
-            </details>
-            <label>
-              <input id="animation-ik-preview" type="checkbox" /> IK preview (fixed targets)
-            </label>
-          </div>
-          <div className="animation-preview-options">
-            <label>
-              <input id="animation-ik-handles" type="checkbox" defaultChecked /> Show IK targets
-            </label>
-            <label>
-              <input id="animation-ik-drag" type="checkbox" defaultChecked /> Drag IK targets
-            </label>
-            <span>Wheel: zoom · Middle drag: pan · Crosshair: requested target</span>
+            <EditorMenu id="animation-preview-menu" label="Preview options">
+              <label>
+                <input id="animation-ik-preview" type="checkbox" /> IK preview (fixed targets)
+              </label>
+              <label>
+                <input id="animation-ik-handles" type="checkbox" defaultChecked /> Show IK targets
+              </label>
+              <label>
+                <input id="animation-ik-drag" type="checkbox" defaultChecked /> Drag IK targets
+              </label>
+              <details className="animation-onion-settings">
+                <summary>Onion settings</summary>
+                <section className="animation-onion-panel" aria-label="Onion Skinning settings">
+                  <h2>Onion Skinning</h2>
+                  <label htmlFor="animation-onion-previous-count">Previous poses</label>
+                  <input id="animation-onion-previous-count" type="number" min="0" max="3" step="1" />
+                  <label htmlFor="animation-onion-next-count">Next poses</label>
+                  <input id="animation-onion-next-count" type="number" min="0" max="3" step="1" />
+                  <label htmlFor="animation-onion-spacing">Frame spacing</label>
+                  <input id="animation-onion-spacing" type="number" min="1" max="5" step="1" />
+                  <label htmlFor="animation-onion-previous-opacity">Previous opacity</label>
+                  <input id="animation-onion-previous-opacity" type="range" min="0.05" max="0.6" step="0.01" />
+                  <label htmlFor="animation-onion-next-opacity">Next opacity</label>
+                  <input id="animation-onion-next-opacity" type="range" min="0.05" max="0.6" step="0.01" />
+                  <label htmlFor="animation-onion-previous-color">Previous color</label>
+                  <input id="animation-onion-previous-color" type="color" />
+                  <label htmlFor="animation-onion-next-color">Next color</label>
+                  <input id="animation-onion-next-color" type="color" />
+                  <p>Set a pose count to zero to hide that direction. Spacing uses authored frames.</p>
+                  <p>Ghosts show authored poses before IK preview. They are read-only and never exported.</p>
+                </section>
+              </details>
+            </EditorMenu>
           </div>
           <div id="animation-stage" aria-label="Puppet preview"></div>
         </section>
@@ -205,12 +227,13 @@ export function AnimationEditorView({
           <IKInspectorPanel controller={ikInspector} />
           <section id="animation-bone-inspector" aria-label="Bone keyframing">
             <h2 id="animation-bone-title">Select a bone</h2>
+            <p id="animation-bone-empty">Select a bone in the preview or hierarchy to edit its properties.</p>
             <fieldset id="animation-bone-fields" aria-label="Animated local transform"></fieldset>
             <button id="animation-cancel-transform" type="button">
               Cancel edits
             </button>
             <p className="animation-field-help">
-              Yellow fields are temporary. Set Key commits that property at the playhead.
+              Yellow fields are temporary. Click ◇ to set a key; ◆ updates an existing key. Use ⋯ to delete a key.
             </p>
           </section>
           <section id="animation-event-inspector" aria-label="Selected animation event" hidden>
@@ -264,16 +287,74 @@ export function AnimationEditorView({
           aria-orientation="horizontal"
           aria-valuemin={25}
           aria-valuemax={70}
-          aria-valuenow={58}
+          aria-valuenow={52}
           title="Drag to resize. Up/Down adjusts; Home/End selects the limits."
         ></div>
         <section className="timeline-panel" aria-label="Animation timeline">
-          <div className="timeline-toolbar">
+          <div className="timeline-toolbar" aria-label="Playback and timing">
             <h2>Timeline</h2>
-            <button id="timeline-add-event" type="button">
-              + Event
-            </button>
-            <output id="current-time" aria-label="Current time"></output>
+            <div className="timeline-control-group" role="group" aria-label="Playback">
+              <button
+                id="reset-time"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Restart"
+                title="Restart (Home)"
+                aria-keyshortcuts="Home"
+              >
+                <EditorIcon name="restart" />
+                <span className="editor-sr-only">Restart</span>
+              </button>
+              <button
+                id="play-pause"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Play"
+                title="Play (Space)"
+                aria-keyshortcuts="Space"
+              >
+                <EditorIcon name="play" />
+                <EditorIcon name="pause" />
+                <span className="editor-sr-only" data-control-label>
+                  Play
+                </span>
+              </button>
+              <button
+                id="preview-loop"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Loop preview"
+                title="Loop preview"
+                aria-pressed="false"
+              >
+                <EditorIcon name="loop" />
+                <span className="editor-sr-only">Loop preview</span>
+              </button>
+            </div>
+            <div className="timeline-control-group" role="group" aria-label="Key navigation">
+              <button
+                id="timeline-previous-key"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Previous Key"
+                title="Previous key ([)"
+                aria-keyshortcuts="["
+              >
+                <EditorIcon name="previousKey" />
+                <span className="editor-sr-only">Previous Key</span>
+              </button>
+              <button
+                id="timeline-next-key"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Next Key"
+                title="Next key (])"
+                aria-keyshortcuts="]"
+              >
+                <EditorIcon name="nextKey" />
+                <span className="editor-sr-only">Next Key</span>
+              </button>
+            </div>
             <label className="timeline-time-control">
               Time (s){' '}
               <input id="timeline-time-input" type="number" min="0" step="any" aria-label="Current time in seconds" />
@@ -281,15 +362,6 @@ export function AnimationEditorView({
             <label id="timeline-frame-control" className="timeline-time-control" hidden>
               Frame <input id="timeline-frame-input" type="number" min="0" step="1" aria-label="Current frame" />
             </label>
-            <button id="play-pause" type="button" aria-keyshortcuts="Space">
-              Play
-            </button>
-            <button id="reset-time" type="button" aria-keyshortcuts="Home">
-              Restart
-            </button>
-            <button id="preview-loop" type="button" aria-pressed="false">
-              Loop preview
-            </button>
             <label>
               Speed{' '}
               <select id="playback-speed" defaultValue="1">
@@ -300,41 +372,6 @@ export function AnimationEditorView({
                 ))}
               </select>
             </label>
-          </div>
-          <div className="timeline-key-commands" aria-label="Timeline commands">
-            <button id="timeline-previous-key" type="button">
-              Previous Key
-            </button>
-            <button id="timeline-next-key" type="button">
-              Next Key
-            </button>
-            <button id="timeline-delete-key" type="button" aria-keyshortcuts="Delete Backspace">
-              Delete Selected Keys
-            </button>
-            <button
-              id="timeline-copy-keys"
-              type="button"
-              aria-keyshortcuts="Control+C Meta+C"
-              title="Copy selected event or keys (Ctrl/Cmd+C in timeline)"
-            >
-              Copy Keys
-            </button>
-            <button
-              id="timeline-paste-keys"
-              type="button"
-              aria-keyshortcuts="Control+V Meta+V"
-              title="Paste at playhead (Ctrl/Cmd+V in timeline)"
-            >
-              Paste Keys
-            </button>
-            <button
-              id="timeline-duplicate-keys"
-              type="button"
-              aria-keyshortcuts="Control+D Meta+D"
-              title="Duplicate selected event or keys (Ctrl/Cmd+D in timeline)"
-            >
-              Duplicate Keys
-            </button>
             <label>
               Snap{' '}
               <select id="timeline-snap">
@@ -342,45 +379,45 @@ export function AnimationEditorView({
                 <option value="frame">Frame</option>
               </select>
             </label>
-            <label>
-              Zoom{' '}
-              <select id="timeline-zoom">
-                <option value="1">Fit</option>
-                <option value="2">2×</option>
-                <option value="4">4×</option>
-                <option value="8">8×</option>
-                <option value="16">16×</option>
-                <option value="32">32×</option>
-                <option value="64">64×</option>
-                <option value="128">128×</option>
-                <option id="timeline-custom-zoom" value="custom" hidden>
-                  Custom
-                </option>
-              </select>
-            </label>
-            <details className="timeline-navigation-tools" open={!inspector.narrow}>
-              <summary>Navigation</summary>
-              <div className="timeline-navigation" aria-label="Timeline navigation">
-                <button id="timeline-zoom-out" type="button" aria-label="Zoom out" aria-keyshortcuts="-">
-                  −
-                </button>
-                <button id="timeline-zoom-in" type="button" aria-label="Zoom in" aria-keyshortcuts="+">
-                  +
-                </button>
-                <button id="timeline-fit-animation" type="button" aria-keyshortcuts="F">
-                  Fit Entire Animation
-                </button>
-                <button id="timeline-fit-selection" type="button">
-                  Fit Selected Keyframes
-                </button>
-                <button id="timeline-center-playhead" type="button">
-                  Center Playhead
-                </button>
-                <label>
-                  <input id="timeline-follow" type="checkbox" defaultChecked /> Follow playhead
-                </label>
-              </div>
-            </details>
+            <div className="timeline-control-group timeline-zoom-controls" role="group" aria-label="Timeline zoom">
+              <button
+                id="timeline-zoom-out"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Zoom out"
+                title="Zoom out (−)"
+                aria-keyshortcuts="-"
+              >
+                <EditorIcon name="minus" />
+              </button>
+              <label>
+                Zoom{' '}
+                <select id="timeline-zoom">
+                  <option value="1">Fit</option>
+                  <option value="2">2×</option>
+                  <option value="4">4×</option>
+                  <option value="8">8×</option>
+                  <option value="16">16×</option>
+                  <option value="32">32×</option>
+                  <option value="64">64×</option>
+                  <option value="128">128×</option>
+                  <option id="timeline-custom-zoom" value="custom" hidden>
+                    Custom
+                  </option>
+                </select>
+              </label>
+              <button
+                id="timeline-zoom-in"
+                className="editor-icon-button"
+                type="button"
+                aria-label="Zoom in"
+                title="Zoom in (+)"
+                aria-keyshortcuts="+"
+              >
+                <EditorIcon name="plus" />
+              </button>
+            </div>
+            <output id="current-time" aria-label="Current time"></output>
           </div>
           <div className="timeline-track-controls" aria-label="Track navigation">
             <label>
@@ -400,29 +437,72 @@ export function AnimationEditorView({
                 <option value="selected">Selected Target Only</option>
               </select>
             </label>
-            <label>
-              <input id="timeline-show-ik" type="checkbox" defaultChecked /> IK tracks
-            </label>
-            <label>
-              <input id="timeline-show-events" type="checkbox" defaultChecked /> Event track
-            </label>
-            <button id="timeline-clear-filters" type="button">
-              Clear Filters
+            <button id="timeline-add-event" type="button">
+              + Event
             </button>
-            <details className="timeline-expansion-controls" open={!inspector.narrow}>
-              <summary>Expand / collapse</summary>
-              <div>
-                <button id="timeline-expand-all" type="button">
-                  Expand All
-                </button>
-                <button id="timeline-collapse-all" type="button">
-                  Collapse All
-                </button>
-                <button id="timeline-expand-selected" type="button">
-                  Expand Selected
-                </button>
-              </div>
-            </details>
+            <EditorMenu id="timeline-edit-menu" label="Edit">
+              <button
+                id="timeline-copy-keys"
+                type="button"
+                aria-keyshortcuts="Control+C Meta+C"
+                title="Copy selected event or keys (Ctrl/Cmd+C in timeline)"
+              >
+                Copy Keys
+              </button>
+              <button
+                id="timeline-paste-keys"
+                type="button"
+                aria-keyshortcuts="Control+V Meta+V"
+                title="Paste at playhead (Ctrl/Cmd+V in timeline)"
+              >
+                Paste Keys
+              </button>
+              <button
+                id="timeline-duplicate-keys"
+                type="button"
+                aria-keyshortcuts="Control+D Meta+D"
+                title="Duplicate selected event or keys (Ctrl/Cmd+D in timeline)"
+              >
+                Duplicate Keys
+              </button>
+              <button id="timeline-delete-key" type="button" aria-keyshortcuts="Delete Backspace">
+                Delete Selected Keys
+              </button>
+            </EditorMenu>
+            <EditorMenu id="timeline-tracks-menu" label="Tracks">
+              <label>
+                <input id="timeline-show-ik" type="checkbox" defaultChecked /> IK tracks
+              </label>
+              <label>
+                <input id="timeline-show-events" type="checkbox" defaultChecked /> Event track
+              </label>
+              <button id="timeline-clear-filters" type="button">
+                Clear Filters
+              </button>
+              <button id="timeline-expand-all" type="button">
+                Expand All
+              </button>
+              <button id="timeline-collapse-all" type="button">
+                Collapse All
+              </button>
+              <button id="timeline-expand-selected" type="button">
+                Expand Selected
+              </button>
+            </EditorMenu>
+            <EditorMenu id="timeline-view-menu" label="View">
+              <button id="timeline-fit-animation" type="button" aria-keyshortcuts="F">
+                Fit Entire Animation
+              </button>
+              <button id="timeline-fit-selection" type="button">
+                Fit Selected Keyframes
+              </button>
+              <button id="timeline-center-playhead" type="button">
+                Center Playhead
+              </button>
+              <label>
+                <input id="timeline-follow" type="checkbox" defaultChecked /> Follow playhead
+              </label>
+            </EditorMenu>
             <button id="timeline-reveal-selection" type="button" hidden>
               Reveal Selection
             </button>
@@ -550,16 +630,15 @@ export function AnimationEditorView({
           </form>
         </div>
         <p>
-          Mirror tools in the command bar configure reusable bone pairs and source/destination direction. Preview is
-          read-only. M toggles preview with workspace focus; Escape in Mirror tools hides it. Mirror Current Pose uses
-          the selected bone, or all mapped source bones when no bone is selected. Mirror Selected Keys requires every
-          selected key to be on the chosen source side. Each commit is one Undo/Redo operation (Ctrl/Cmd+Z /
-          Ctrl/Cmd+Shift+Z).
+          Tools → Mirror tools configures reusable bone pairs and source/destination direction. Preview is read-only. M
+          toggles preview with workspace focus; Escape in Mirror tools hides it. Mirror Current Pose uses the selected
+          bone, or all mapped source bones when no bone is selected. Mirror Selected Keys requires every selected key to
+          be on the chosen source side. Each commit is one Undo/Redo operation (Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z).
         </p>
         <p>
-          Select a bone in the preview or hierarchy. Scrub to a time, enter a local value, then Set Key. Fields preview
-          temporary values; scrubbing, changing selection, Play, settings changes, or Undo/Redo cancel drafts. Rotation
-          is shown in degrees. Facing affects preview placement.
+          Select a bone in the preview or hierarchy. Scrub to a time, enter a local value, then click the diamond beside
+          the property to set a key. Fields preview temporary values; scrubbing, changing selection, Play, settings
+          changes, or Undo/Redo cancel drafts. Rotation is shown in degrees. Facing affects preview placement.
         </p>
         <p>
           To animate a reach, select an IK constraint, position its hand or foot crosshair at time zero, and choose Set
@@ -571,6 +650,7 @@ export function AnimationEditorView({
           constraints and sampling FPS, preview while scrubbing, then review the key summary and Bake IK. Baking creates
           one Undo operation. Turn off fixed-target IK preview before baking.
         </p>
+        <p>Wheel zooms the preview; middle drag pans. Crosshairs show requested IK targets.</p>
         <p>
           Space plays or pauses. Home/End jumps to the start/end outside typing controls. Drag the ruler to scrub.
           Moving selected keys or events pauses playback. Use the timeline arrow keys to nudge; Shift moves ten steps.

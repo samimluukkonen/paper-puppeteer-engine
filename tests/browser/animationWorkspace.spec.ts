@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationMenuControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -9,6 +9,7 @@ async function openEditor(page: Page): Promise<void> {
 
 test('desktop authoring fits the viewport and event selection leaves the ruler in place', async ({ page }) => {
   for (const [width, height] of [
+    [1000, 768],
     [1280, 800],
     [1440, 900],
     [1920, 1080],
@@ -26,7 +27,10 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
     expect(canvas.y).toBeGreaterThanOrEqual(stage.y);
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
     expect(canvas.y + canvas.height).toBeLessThanOrEqual(stage.y + stage.height + 1);
-    expect((await page.locator('#timeline-ruler').boundingBox())!.width).toBeGreaterThan(900);
+    expect((await page.locator('#timeline-ruler').boundingBox())!.width).toBeGreaterThan(width! - 350);
+    const tracks = (await page.locator('.timeline-inset').boundingBox())!;
+    const rulerHeight = (await page.locator('#timeline-ruler').boundingBox())!.height;
+    expect(tracks.height - rulerHeight).toBeGreaterThanOrEqual(150);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
     const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
     await page.locator('#timeline-add-event').click();
@@ -43,27 +47,97 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
   }
 });
 
+test('compact property actions preserve drafts, keyed state and history', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openEditor(page);
+  await expect(page.locator('#animation-bone-empty')).toBeVisible();
+  await expect(page.locator('#animation-bone-fields')).toBeHidden();
+  await page.locator('#animation-bones .tree-entry').first().click();
+  const input = page.locator('#animation-bone-fields input[data-property="x"]');
+  const diamond = page.getByRole('button', { name: 'Set X key', exact: true });
+  await expect(diamond).toHaveText('◇');
+  await input.fill('12');
+  await expect(input).toHaveAttribute('data-temporary', 'true');
+  await diamond.click();
+  await expect(diamond).toHaveText('◆');
+  await expect(input).toHaveAttribute('data-temporary', 'false');
+  await page.getByLabel('X key actions', { exact: true }).click();
+  await page.getByRole('button', { name: 'Delete X key', exact: true }).click();
+  await expect(diamond).toHaveText('◇');
+  await expect(page.getByLabel('X key actions', { exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(diamond).toHaveText('◆');
+  await expect(input).toHaveValue('12');
+});
+
+test('timeline context actions retain selected groups and Escape returns focus without clearing selection', async ({
+  page,
+}) => {
+  await page.route('**/animations/idle.json', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      json: {
+        ...animationFileSchema.parse(await response.json()),
+        duration: 1000,
+        tracks: {
+          root: [
+            { time: 0, x: 0 },
+            { time: 1000, x: 10 },
+          ],
+        },
+      },
+    });
+  });
+  await openEditor(page);
+  await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
+  const first = page.getByRole('button', { name: 'Select root x key at 0 s', exact: true });
+  const last = page.getByRole('button', { name: 'Select root x key at 1 s', exact: true });
+  await first.click();
+  await last.click({ modifiers: ['Control'] });
+  await last.click({ button: 'right' });
+  await expect(page.locator('#timeline-edit-menu')).toHaveAttribute('open', '');
+  await expect(page.locator('#timeline-delete-key')).toHaveText('Delete 2 Selected Keys');
+  await page.keyboard.press('Escape');
+  await expect(last).toBeFocused();
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await expect(last).toHaveAttribute('aria-pressed', 'true');
+  await first.click({ button: 'right' });
+  await page.locator('#timeline-copy-keys').click();
+  await expect(first).toBeFocused();
+  await page.locator('#timeline-time-input').fill('0.5');
+  await page.locator('#timeline-time-input').press('Enter');
+  await (await animationMenuControl(page, '#timeline-paste-keys')).click();
+  await expect(page.getByRole('button', { name: 'Select root x key at 0.5 s', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select root x key at 1.5 s', exact: true })).toBeVisible();
+  await page.locator('#timeline-add-event').click();
+  await page.locator('.timeline-event').click({ button: 'right' });
+  await expect(page.locator('#timeline-delete-key')).toHaveText('Delete Event');
+  await page.locator('#timeline-delete-key').click();
+  await expect(page.locator('.timeline-event')).toHaveCount(0);
+  await expect(page.locator('#timeline-edit-menu > summary')).toBeFocused();
+});
+
 test('panel dividers support keyboard and pointer resizing and reset without authoring', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openEditor(page);
   const divider = page.locator('#animation-workspace-divider');
   const before = (await page.locator('.animation-preview').boundingBox())!.height;
   await divider.press('ArrowUp');
-  await expect(divider).toHaveAttribute('aria-valuenow', '55');
+  await expect(divider).toHaveAttribute('aria-valuenow', '49');
   expect((await page.locator('.animation-preview').boundingBox())!.height).toBeLessThan(before);
   const box = (await divider.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2, box.y - 50, { steps: 5 });
   await page.mouse.up();
-  expect(Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(55);
+  expect(Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(49);
   const labels = page.locator('#timeline-label-divider');
   await labels.press('ArrowRight');
   await expect(labels).toHaveAttribute('aria-valuenow', '250');
   await page.locator('#timeline-zoom').selectOption('4');
   await page.locator('#timeline-filter').selectOption('keyed');
-  await page.locator('#animation-reset-layout').click();
-  await expect(divider).toHaveAttribute('aria-valuenow', '58');
+  await (await animationMenuControl(page, '#animation-reset-layout')).click();
+  await expect(divider).toHaveAttribute('aria-valuenow', '52');
   await expect(labels).toHaveAttribute('aria-valuenow', '240');
   await expect(page.locator('#timeline-zoom')).toHaveValue('1');
   await expect(page.locator('#timeline-filter')).toHaveValue('all');
@@ -166,7 +240,7 @@ test('narrow screens keep timing visible and open the inspector as a dismissible
 
 test('file tools and help dialogs contain focus and suppress playback shortcuts', async ({ page }) => {
   await openEditor(page);
-  await page.locator('#animation-help-open').click();
+  await (await animationMenuControl(page, '#animation-help-open')).click();
   const help = page.locator('#animation-help-dialog');
   await expect(help).toBeVisible();
   await help.locator('summary').press('Space');

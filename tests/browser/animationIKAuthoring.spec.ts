@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationMenuControl, test } from './fixtures.js';
 
 test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview and preserves bone authoring', async ({
   page,
@@ -62,8 +62,10 @@ test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview 
   await mix.fill('0');
   await inspector.getByRole('button', { name: 'Set IK mix key', exact: true }).click();
   expect((await canvas.screenshot()).equals(c)).toBe(false);
+  await inspector.getByLabel('Influence (mix) key actions', { exact: true }).click();
   await inspector.getByRole('button', { name: 'Delete IK mix key', exact: true }).click();
   expect((await canvas.screenshot()).equals(c)).toBe(true);
+  await inspector.getByLabel('Target X key actions', { exact: true }).click();
   await inspector.getByRole('button', { name: 'Delete IK x key', exact: true }).click();
   await expect(x).toHaveValue('-8');
   await page.locator('#animation-undo').click();
@@ -90,7 +92,7 @@ test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview 
     'aria-pressed',
     'true',
   );
-  await page.locator('#timeline-delete-key').click();
+  await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(page.getByRole('button', { name: 'Select rightArmIK x key at 0.1 s', exact: true })).toHaveCount(0);
   await page.locator('#animation-undo').click();
   await page.locator('#animation-bones').getByRole('button', { name: 'rightUpperArm', exact: true }).click();

@@ -172,7 +172,8 @@ export class TimelineController {
     this.input.synchronize();
     const state = this.state;
     this.navigation.render();
-    this.width = this.timeline.getBoundingClientRect().width;
+    // Navigation measures and sets lane width during resize/zoom; clock ticks reuse that width.
+    this.width = this.navigation.view.contentWidth;
     const animation = state.workingAnimation;
     const width = this.width;
     const filters = state.timelineFilters;

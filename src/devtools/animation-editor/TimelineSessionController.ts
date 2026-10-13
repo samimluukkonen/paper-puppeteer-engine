@@ -129,7 +129,14 @@ export class TimelineSessionController {
       },
       options,
     );
-    this.deleteKey.addEventListener('click', () => this.state.deleteSelectedKeyframes(), options);
+    this.deleteKey.addEventListener(
+      'click',
+      () => {
+        if (this.state.selectedEvent) this.state.deleteSelectedEvent();
+        else this.state.deleteSelectedKeyframes();
+      },
+      options,
+    );
     this.copyKeys.addEventListener('click', () => this.state.copyTimelineSelection(), options);
     this.pasteKeys.addEventListener('click', () => this.state.pasteTimelineClipboard(), options);
     this.duplicateKeys.addEventListener('click', () => this.state.duplicateTimelineSelection(), options);
@@ -176,7 +183,10 @@ export class TimelineSessionController {
     if (this.snap.value !== state.keyframeSnapMode) this.snap.value = state.keyframeSnapMode;
     const selectedId = state.selectedAnimationId ?? '';
     if (this.selection.value !== selectedId) this.selection.value = selectedId;
-    setText(this.playPause, state.isPlaying ? 'Pause' : 'Play');
+    const playbackLabel = state.isPlaying ? 'Pause' : 'Play';
+    setText(this.playPause.querySelector?.<HTMLElement>('[data-control-label]') ?? this.playPause, playbackLabel);
+    setAttribute(this.playPause, 'aria-label', playbackLabel);
+    setAttribute(this.playPause, 'title', `${playbackLabel} (Space)`);
     setAttribute(this.loop, 'aria-pressed', String(state.previewLoop));
     setText(this.timeDisplay, `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`);
     const playback = animation?.playback;
@@ -235,15 +245,17 @@ export class TimelineSessionController {
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
     this.files.render();
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
-    const deleteDisabled = state.selectedKeys.length === 0 && !state.selectedIKKeyframe;
+    const deleteDisabled = state.selectedKeys.length === 0 && !state.selectedIKKeyframe && !state.selectedEvent;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
     const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
     setText(
       this.deleteKey,
-      count
-        ? `Delete ${count} Selected Key${count === 1 ? '' : 's'}${hidden ? ` (${hidden} hidden)` : ''}`
-        : 'Delete Selected Keys',
+      state.selectedEvent
+        ? 'Delete Event'
+        : count
+          ? `Delete ${count} Selected Key${count === 1 ? '' : 's'}${hidden ? ` (${hidden} hidden)` : ''}`
+          : 'Delete Selected Keys',
     );
     const copyDisabled = !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;

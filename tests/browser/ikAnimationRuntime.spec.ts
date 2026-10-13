@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationMenuControl, test } from './fixtures.js';
 
 test('authored rig IK drives editor scrubbing and playback while fixed preview remains an explicit override', async ({
   page,
@@ -57,11 +57,13 @@ test('authored rig IK drives editor scrubbing and playback while fixed preview r
   expect(c.equals(b)).toBe(false);
   await ruler.press('Home');
   expect((await canvas.screenshot()).equals(a)).toBe(true);
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
+  await page.locator('#animation-preview-menu > summary').click();
   const fixed = await canvas.screenshot();
   await ruler.press('End');
   expect((await canvas.screenshot()).equals(fixed)).toBe(true);
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
+  await page.locator('#animation-preview-menu > summary').click();
   expect((await canvas.screenshot()).equals(c)).toBe(true);
   await page.locator('#animation-facing').selectOption('left');
   expect((await canvas.screenshot()).equals(c)).toBe(false);

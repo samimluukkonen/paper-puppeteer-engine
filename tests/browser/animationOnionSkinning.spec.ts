@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationControl, animationFileAction, test } from './fixtures.js';
+import { animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
 
 test('onion skins render through scrubbing, facing, playback and boundaries without blocking editing or dirtying', async ({
   page,
@@ -86,11 +86,11 @@ test('artist controls render multiple directions, spacing, opacity and tint whil
   await page.locator('#animation-onion-skinning').check();
   const oneEach = await canvas.screenshot();
   expect(oneEach.equals(normal)).toBe(false);
-  const panel = page.locator('.animation-onion-settings');
   const setNumber = async (name: string, value: string) => {
-    await panel.locator('summary').click();
+    await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
     await page.locator(`#animation-onion-${name}`).fill(value);
-    await panel.locator('summary').click();
+    await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
+    await page.locator('#animation-preview-menu > summary').click();
   };
   await setNumber('previous-count', '3');
   await setNumber('next-count', '3');
@@ -109,7 +109,7 @@ test('artist controls render multiple directions, spacing, opacity and tint whil
     await setNumber('spacing', spacing);
     await canvas.screenshot({ path: test.info().outputPath(`onion-spacing-${spacing}.png`) });
   }
-  await panel.locator('summary').click();
+  await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
   await page.locator('#animation-onion-previous-opacity').press('Home');
   await page.locator('#animation-onion-next-opacity').press('End');
   await expect(page.locator('#animation-onion-previous-opacity')).toHaveValue('0.05');
@@ -123,7 +123,8 @@ test('artist controls render multiple directions, spacing, opacity and tint whil
       element.dispatchEvent(new Event('input', { bubbles: true }));
     }, color);
   }
-  await panel.locator('summary').click();
+  await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
+  await page.locator('#animation-preview-menu > summary').click();
   await canvas.screenshot({ path: test.info().outputPath('onion-custom-style.png') });
   await expect(ruler).toHaveAttribute('aria-valuenow', clock!);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -155,12 +156,13 @@ test('artist controls render multiple directions, spacing, opacity and tint whil
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(page.locator('#animation-onion-skinning')).toBeChecked();
   await page.locator('#animation-selection').selectOption('walk');
-  await panel.locator('summary').click();
+  await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
   await expect(page.locator('#animation-onion-previous-count')).toHaveValue('3');
   await expect(page.locator('#animation-onion-spacing')).toHaveValue('5');
-  await page.setViewportSize({ width: 620, height: 1400 });
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await (await animationMenuControl(page, '#animation-onion-next-color')).scrollIntoViewIfNeeded();
   await expect(page.getByLabel('Next color', { exact: true })).toBeInViewport();
-  await page.locator('.animation-preview').screenshot({ path: test.info().outputPath('onion-controls-mobile.png') });
+  await page.locator('.animation-preview').screenshot({ path: test.info().outputPath('onion-controls-desktop.png') });
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
 
@@ -180,16 +182,16 @@ test('six ghosts survive JSON round trips and IK preview; route changes keep oni
   const original = await downloadJson();
   await page.locator('#animation-onion-skinning').check();
   const panel = page.locator('.animation-onion-settings');
-  await panel.locator('summary').click();
+  await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
   await expect(panel).toContainText('Ghosts show authored poses before IK preview');
   await page.locator('#animation-onion-previous-count').fill('3');
   await page.locator('#animation-onion-next-count').fill('3');
-  await panel.locator('summary').click();
+  await (await animationMenuControl(page, '.animation-onion-settings > summary')).click();
   const ruler = page.getByRole('slider', { name: 'Animation time' });
   await ruler.focus();
   await ruler.press('ArrowRight');
   const time = await ruler.getAttribute('aria-valuenow');
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await expect(ruler).toHaveAttribute('aria-valuenow', time!);
   expect(await downloadJson()).toBe(original);
   await animationFileAction(page, '#animation-import-paste', (control) => control.click());
@@ -198,7 +200,7 @@ test('six ghosts survive JSON round trips and IK preview; route changes keep oni
   await expect(ruler).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('#animation-onion-skinning')).toBeChecked();
   expect(await downloadJson()).toBe(original);
-  await page.locator('#animation-ik-preview').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await expect(page.locator('#animation-onion-skinning')).toHaveCount(0);

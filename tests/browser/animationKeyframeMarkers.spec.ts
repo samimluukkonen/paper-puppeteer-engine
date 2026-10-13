@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationMenuControl, test } from './fixtures.js';
 
 async function openEditor(page: Page, empty = false) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -152,7 +152,7 @@ test('selected deletion uses one history operation after scrubbing and typing/co
   await expect(key(page, 0.5)).toHaveCount(0);
   await page.locator('#animation-undo').click();
   await key(page, 0.5).click();
-  await page.locator('#timeline-delete-key').click();
+  await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(key(page, 0.5)).toHaveCount(0);
 });
 
@@ -182,6 +182,7 @@ test('inspector authoring immediately creates, updates and removes markers at st
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
   await expect(key(page, 0.5)).toHaveAttribute('title', /value 44/);
   await expect(key(page, 0.5)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel('X key actions', { exact: true }).click();
   await page.getByRole('button', { name: 'Delete X key', exact: true }).click();
   await expect(key(page, 0.5)).toHaveCount(0);
   await expect(page.locator('#timeline-delete-key')).toBeDisabled();

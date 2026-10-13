@@ -1,5 +1,31 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
+/** Follow the visible disclosure before interacting with a secondary animation command. */
+export async function animationMenuControl(page: Page, selector: string): Promise<Locator> {
+  const control = page.locator(selector);
+  const menuIds = await control.evaluate((element) => {
+    const ids: string[] = [];
+    for (let parent = element.parentElement; parent; parent = parent.parentElement)
+      if (parent.matches('details[data-workspace-menu]')) ids.unshift(parent.id);
+    return ids;
+  });
+  for (const id of menuIds) {
+    const menu = page.locator(`#${id}`);
+    if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open)))
+      await menu.locator(':scope > summary').click();
+  }
+  return control;
+}
+
+export async function toggleAnimationToolPanel(page: Page, tool: 'mirror' | 'bake'): Promise<void> {
+  const panel = page.locator(`#animation-${tool}-panel`);
+  if (await panel.evaluate((element) => (element as HTMLDetailsElement).open)) {
+    await panel.locator('[data-close-panel]').click();
+  } else {
+    await (await animationMenuControl(page, `#animation-${tool}-open`)).click();
+  }
+}
+
 /** Follow the rig workspace's File tools dialog, then return focus to the editor. */
 export async function rigFileAction<T>(
   page: Page,

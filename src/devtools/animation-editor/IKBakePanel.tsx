@@ -8,6 +8,8 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
   const plan = state.plan?.success ? state.plan : null;
   return (
     <details
+      id="animation-bake-panel"
+      data-tool-panel
       className="animation-popover animation-ik-baking"
       onToggle={(event) => {
         controller.setPanelOpen(event.currentTarget.open);
@@ -17,13 +19,18 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
           event.preventDefault();
           controller.setPanelOpen(false);
           event.currentTarget.open = false;
-          event.currentTarget.querySelector('summary')?.focus();
+          document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
         }
       }}
     >
       <summary>IK Baking</summary>
       <section className="animation-popover-content animation-bake-panel" aria-label="IK Baking">
-        <h2>IK Baking</h2>
+        <div className="animation-tool-heading">
+          <h2>IK Baking</h2>
+          <button type="button" data-close-panel aria-label="Close IK Baking">
+            Close
+          </button>
+        </div>
         <fieldset>
           <legend>Constraints to bake</legend>
           {!state.constraints.length && <p>No IK constraints in the loaded rig.</p>}

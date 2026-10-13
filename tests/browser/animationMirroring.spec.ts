@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationMenuControl, toggleAnimationToolPanel, test } from './fixtures.js';
 
 test.describe.configure({ timeout: 60000 });
 
@@ -31,7 +31,7 @@ async function openEditor(page: Page) {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK', { timeout: 15000 });
   await page.locator('#animation-show-bones').uncheck();
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
 }
 const panel = (page: Page) => page.getByRole('region', { name: 'Mirror tools', exact: true });
 const poseButton = (page: Page) => panel(page).getByRole('button', { name: 'Mirror Current Pose', exact: true });
@@ -73,7 +73,7 @@ test('React pair editing validates, persists overrides per rig, and keeps author
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await page.reload();
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK', { timeout: 15000 });
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await panel(page).getByText('Configure Bone Pairs', { exact: true }).click();
   await expect(firstLeft).toHaveValue(rightId);
   await expect(firstRight).toHaveValue(leftId);
@@ -87,11 +87,11 @@ test('preview directions, shortcut guards, onion skin and facing preserve time, 
 }) => {
   test.setTimeout(60000);
   await openEditor(page);
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await page.locator('#animation-onion-skinning').check();
   const canvas = page.locator('#animation-stage canvas');
   const closedPanel = await canvas.screenshot();
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   const normal = await canvas.screenshot();
   const clock = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
   await panel(page).getByRole('button', { name: 'Preview Mirrored Pose', exact: true }).click();
@@ -124,7 +124,7 @@ test('preview directions, shortcut guards, onion skin and facing preserve time, 
   await expect(panel(page).getByRole('button', { name: 'Preview Mirrored Pose', exact: true })).toBeVisible();
   await page.locator('#timeline-ruler').focus();
   await page.keyboard.press('m');
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await expect.poll(async () => (await canvas.screenshot()).equals(closedPanel)).toBe(true);
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', clock!);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -135,9 +135,9 @@ test('current pose and selected keys refresh inspector and timeline with one Und
   page,
 }) => {
   await openEditor(page);
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await page.locator('#animation-bones').getByRole('button', { name: 'leftUpperArm', exact: true }).click();
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await poseButton(page).click();
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: rightUpperArm');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
@@ -181,7 +181,7 @@ test('mirrored commits refresh temporal ghosts and export identical authored val
   page,
 }) => {
   await openEditor(page);
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await page.getByRole('button', { name: 'Expand leftUpperArm properties', exact: true }).click();
   await key(page, 'leftUpperArm', '0').click();
   await key(page, 'leftUpperArm', '1').click({ modifiers: ['Control'] });
@@ -195,18 +195,18 @@ test('mirrored commits refresh temporal ghosts and export identical authored val
   await page.locator('#animation-onion-skinning').check();
   const canvas = page.locator('#animation-stage canvas');
   const originalGhosts = await canvas.screenshot();
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   for (let index = 0; index < 3; ++index) {
     await panel(page).getByRole('button', { name: 'Preview Mirrored Pose', exact: true }).click();
     await page.locator('#animation-onion-skinning').uncheck();
     await page.locator('#animation-onion-skinning').check();
     await panel(page).getByRole('button', { name: 'Hide Mirrored Preview', exact: true }).click();
   }
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await expect.poll(async () => (await canvas.screenshot()).equals(originalGhosts)).toBe(true);
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await keysButton(page).click();
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await expect.poll(async () => (await canvas.screenshot()).equals(originalGhosts)).toBe(false);
   await canvas.screenshot({ path: test.info().outputPath('mirror-committed-onion-skins.png') });
   const download = async () => {
@@ -218,13 +218,13 @@ test('mirrored commits refresh temporal ghosts and export identical authored val
   };
   const withoutIK = await download();
   await page.locator('#animation-undo').click();
-  await page.locator('#animation-ik-preview').check();
+  await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await page.locator('#animation-facing').selectOption('left');
   await key(page, 'leftUpperArm', '0').click();
   await key(page, 'leftUpperArm', '1').click({ modifiers: ['Control'] });
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await keysButton(page).click();
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   expect(await download()).toEqual(withoutIK);
 });
 
@@ -239,7 +239,7 @@ test('repeated animation/character/route changes release previews and restore va
   await panel(page).getByRole('button', { name: 'Preview Mirrored Pose', exact: true }).click();
   await page.locator('#character-selection').selectOption('random-paperdoll-sketch');
   await expect(page.locator('#character-status')).toHaveText('Character: random-paperdoll-sketch', { timeout: 15000 });
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await expect(poseButton(page)).toBeEnabled();
   await expect(panel(page).getByRole('button', { name: 'Preview Mirrored Pose', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -250,7 +250,7 @@ test('repeated animation/character/route changes release previews and restore va
   await expect(page.locator('#validation')).toHaveText('Validation: OK', { timeout: 15000 });
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK', { timeout: 15000 });
-  await page.locator('.animation-mirror-tools > summary').click();
+  await toggleAnimationToolPanel(page, 'mirror');
   await expect(panel(page).getByRole('button', { name: 'Preview Mirrored Pose', exact: true })).toHaveAttribute(
     'aria-pressed',
     'false',

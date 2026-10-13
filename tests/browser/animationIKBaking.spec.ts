@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationMenuControl, toggleAnimationToolPanel, test } from './fixtures.js';
 
 test.describe.configure({ timeout: 60000 });
 
@@ -34,8 +34,8 @@ test('dense bake planning keeps timeline navigation responsive and closing termi
   });
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  const disclosure = page.locator('.animation-ik-baking > summary');
-  await disclosure.click();
+  const toggleDisclosure = () => toggleAnimationToolPanel(page, 'bake');
+  await toggleDisclosure();
   const panel = page.getByRole('region', { name: 'IK Baking', exact: true });
   await panel.getByRole('spinbutton', { name: 'Sampling FPS', exact: true }).fill('600');
   const started = page.waitForEvent('worker');
@@ -48,7 +48,7 @@ test('dense bake planning keeps timeline navigation responsive and closing termi
   await expect(ruler).toHaveAttribute('aria-valuenow', '0.01');
   await expect(panel.getByRole('status')).toHaveText('Preparing bake…');
   const closed = worker.waitForEvent('close');
-  await disclosure.click();
+  await toggleDisclosure();
   await closed;
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(page.locator('#animation-undo')).toBeDisabled();
@@ -85,7 +85,7 @@ for (const chain of [
     await page.goto('animation-editor/');
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
     await page.locator('#animation-show-bones').uncheck();
-    await page.locator('.animation-ik-baking > summary').click();
+    await toggleAnimationToolPanel(page, 'bake');
     const panel = page.getByRole('region', { name: 'IK Baking', exact: true });
     const bake = panel.getByRole('button', { name: 'Bake IK', exact: true });
     const constraint = panel.getByRole('checkbox', { name: new RegExp(`^${chain.id}`) });
@@ -114,21 +114,21 @@ for (const chain of [
     const preview = await canvas.screenshot();
     await panel.getByRole('button', { name: 'Hide Bake Preview', exact: true }).click();
     await expect.poll(async () => (await canvas.screenshot()).equals(preview)).toBe(false);
-    await page.locator('.animation-ik-baking > summary').click();
+    await toggleAnimationToolPanel(page, 'bake');
     const originalMiddle = await canvas.screenshot();
-    await page.locator('.animation-ik-baking > summary').click();
+    await toggleAnimationToolPanel(page, 'bake');
     // Runtime fixed targets must be rejected instead of baking a different authored pose.
-    await page.locator('#animation-ik-preview').check();
+    await (await animationMenuControl(page, '#animation-ik-preview')).check();
     await expect(bake).toBeDisabled();
     await expect(panel.getByRole('alert').first()).toContainText('runtime state');
-    await page.locator('#animation-ik-preview').uncheck();
+    await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
     await expect(bake).toBeEnabled();
     await bake.click();
     await expect(page.locator('#play-pause')).toHaveText('Play');
     await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
     await expect(constraint).toBeDisabled();
     await expect(panel.getByRole('status')).toContainText('IK baked');
-    await page.locator('.animation-ik-baking > summary').click();
+    await toggleAnimationToolPanel(page, 'bake');
     await page.getByRole('button', { name: `Expand ${chain.root} properties`, exact: true }).click();
     const keys = page.locator(
       `.timeline-track-lane[data-bone-id="${chain.root}"][data-property="rotation"] .timeline-keyframe`,
@@ -151,7 +151,7 @@ for (const chain of [
     await ruler.press('Home');
     for (let i = 0; i < 5; i++) await ruler.press('Shift+ArrowRight');
     await expect.poll(async () => (await canvas.screenshot()).equals(originalMiddle)).toBe(true);
-    await page.locator('.animation-ik-baking > summary').click();
+    await toggleAnimationToolPanel(page, 'bake');
     await expect(constraint).toBeEnabled();
     await constraint.check();
     await panel.getByRole('button', { name: 'Preview Bake', exact: true }).click();
