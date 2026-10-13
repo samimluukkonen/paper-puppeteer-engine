@@ -21,6 +21,13 @@ export {
 } from './keyframeEdits.js';
 export { getEvaluatedBoneTransform, getEvaluatedBonePropertyValue } from './animationValues.js';
 export {
+  retimeSelectedKeys,
+  type RetimeOptions,
+  type RetimeResult,
+  type RetimeKeySelection,
+  type RetimeChange,
+} from './keyframeRetiming.js';
+export {
   mirrorCurrentPoseToKeys,
   mirrorSelectedKeyframes,
   type MirrorCurrentPoseOptions,

@@ -21,6 +21,7 @@ import {
   type MirrorCurrentPoseOptions,
 } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
+import { retimeSelectedKeys, type RetimeOptions, type RetimeResult } from './keyframeRetiming.js';
 import { keyframeTimesMatch } from './keyframeTargets.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import type { TimelineClipboard } from './TimelineClipboard.js';
@@ -75,6 +76,44 @@ export class AnimationEditorKeyframeCommands {
   }
   private get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
+  }
+
+  /** Detached proposal: no document, selection, playback, draft or history changes. */
+  previewKeyframeRetiming(options: RetimeOptions): RetimeResult<ReadonlyAnimation> {
+    if (!this.working || !this.rig) throw new Error('Load a valid animation first.');
+    const selected = this.selection.ikKeyframe ? [this.selection.ikKeyframe] : this.selectedKeys;
+    if (!selected.length) throw new Error('Select keyframes to retime.');
+    return retimeSelectedKeys(this.working, this.rig, selected, {
+      ...options,
+      playheadTimeMs: this.playback.currentTimeMilliseconds,
+    });
+  }
+
+  /** Validate the complete candidate before changing transient editor state; install once for Undo/Redo. */
+  retimeSelectedKeyframes(options: RetimeOptions): boolean {
+    let result: RetimeResult<ReadonlyAnimation>;
+    try {
+      result = this.previewKeyframeRetiming(options);
+    } catch (error) {
+      this.document.reportError(error);
+      this.actions.notify();
+      return false;
+    }
+    if (result.animation === this.working) return false;
+    const primaryIndex = this.selection.key ? this.selectedKeys.indexOf(this.selection.key) : 0;
+    const time = this.currentTime;
+    this.actions.cancelTimelineDrag();
+    this.playback.pause();
+    this.playback.endScrub();
+    this.actions.updateTime(time);
+    // Set destination identities before the existing installation reconciliation resolves them.
+    const first = result.keys[0]!;
+    if ('kind' in first) this.selection.setIKKey(first);
+    else {
+      const keys = result.keys.filter((key): key is KeyframeSelection => !('kind' in key));
+      this.selection.setKeys(keys, keys[primaryIndex] ?? null);
+    }
+    return this.actions.install(freezeData(result.animation));
   }
 
   mirrorCurrentPoseToKeys(

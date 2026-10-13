@@ -121,6 +121,9 @@ src/devtools/animation-editor/
   keyframeQueries.ts   Authored-property presence, indexed key lookup and adjacent navigation
   keyframeEdits.ts     Immutable single/batch edits, group movement and collision replacement
   keyframeMirroring.ts  Authored current-pose/selected-key mirror proposals using runtime sampling and batch edits
+  keyframeRetiming.ts  Pure typed bone/IK proportional retiming and atomic candidate validation
+  KeyframeRetimingPanel.tsx  React numerical before/after preview, scale and anchor controls
+  KeyframeRetimingController.ts  Cached transient proposals and session/selection invalidation
   keyframeTargets.ts   Shared time tolerance, row matching and target validation
   animationValues.ts   Cached runtime pose sampling for evaluated transform values
   keyframes.ts         Compatibility exports for the keyframe data APIs

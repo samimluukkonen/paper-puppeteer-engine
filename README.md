@@ -66,6 +66,7 @@ scene.load.start();
 | [Rig editor](docs/rig-editor.md)                                   | Editing, snapping, undo/redo, validation, imports, exports, and embedding                                  |
 | [Animation editor](docs/animation-editor.md)                       | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview    |
 | [Timeline snapping](docs/timeline-snapping.md)                     | Frame/key/event/playhead alignment, zoom-aware tolerance, temporary guides and group timing                |
+| [Keyframe retiming](docs/keyframe-retiming.md)                     | Proportional selected-key timing, anchors, numerical preview and atomic Undo/Redo                          |
 | [Bone symmetry mapping](docs/bone-symmetry-mapping.md)             | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle            |
 | [Pose mirroring core](docs/pose-mirroring.md)                      | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures       |
 | [React mirroring tools](docs/react-mirroring-tools.md)             | Bone-pair configuration, persistence, preview, directions and React/editor integration                     |

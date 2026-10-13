@@ -12,6 +12,7 @@ import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
 import { IKBakeController } from './IKBakeController.js';
 import { IKInspectorController } from './IKInspectorController.js';
+import { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { TimelineController } from './TimelineController.js';
@@ -22,12 +23,15 @@ if (!app) throw new Error('Missing animation editor host.');
 app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
+const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const ikBake = new IKBakeController(
   (pose) => scene?.setBakePreview(pose),
   () => scene?.getBakeRuntimeConstraints() ?? [],
 );
-const editorView = <AnimationEditorView mirrorTools={mirrorTools} ikInspector={ikInspector} ikBake={ikBake} />;
+const editorView = (
+  <AnimationEditorView mirrorTools={mirrorTools} ikInspector={ikInspector} ikBake={ikBake} retiming={retiming} />
+);
 const unmount = mountView(app, editorView, (app) => {
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
@@ -44,6 +48,7 @@ const unmount = mountView(app, editorView, (app) => {
       editorScene.fitPreview();
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
       ikBake.bind(state);
+      retiming.bind(state);
       timeline.bind(state, id);
       inspector.bind(state);
       ikInspector.bind(state);
@@ -71,6 +76,7 @@ const unmount = mountView(app, editorView, (app) => {
       recovery.unbind();
       mirrorTools.unbind();
       ikBake.unbind();
+      retiming.unbind();
       ikInspector.unbind();
       timeline.showError(message);
     },
@@ -128,6 +134,7 @@ const unmount = mountView(app, editorView, (app) => {
     releaseWorkspaceSelection?.();
     mirrorTools.dispose();
     ikBake.dispose();
+    retiming.dispose();
     workspace.dispose();
     recoveryControls.dispose();
     releaseNavigationGuard();

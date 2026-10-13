@@ -8,6 +8,8 @@ import { IKBakePanel } from './IKBakePanel.js';
 import type { IKInspectorController } from './IKInspectorController.js';
 import { IKInspectorPanel } from './IKInspectorPanel.js';
 import { AUTHORED_INTERPOLATION_MODES, interpolationLabel } from './interpolationPresentation.js';
+import type { KeyframeRetimingController } from './KeyframeRetimingController.js';
+import { KeyframeRetimingPanel } from './KeyframeRetimingPanel.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 
@@ -16,10 +18,12 @@ export function AnimationEditorView({
   mirrorTools,
   ikInspector,
   ikBake,
+  retiming,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
+  retiming: KeyframeRetimingController;
 }) {
   const inspector = useWorkspaceInspector();
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
@@ -102,6 +106,9 @@ export function AnimationEditorView({
           </div>
         </details>
         <EditorMenu id="animation-authoring-tools" label="Tools">
+          <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
+            Retime selected keys…
+          </button>
           <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
             Mirror tools…
           </button>
@@ -132,6 +139,7 @@ export function AnimationEditorView({
         </button>
         <MirrorToolsPanel controller={mirrorTools} />
         <IKBakePanel controller={ikBake} />
+        <KeyframeRetimingPanel controller={retiming} />
         <div className="animation-save">
           <span id="animation-dirty" role="status"></span>
           <button
@@ -642,6 +650,10 @@ export function AnimationEditorView({
             <button type="submit">Close</button>
           </form>
         </div>
+        <p>
+          Tools → Retime selected keys scales selected bone keys or an IK channel key around the first selected time or
+          playhead. Preview shows numerical before/after times. Apply uses one Undo; duration and events stay unchanged.
+        </p>
         <p>
           Tools → Mirror tools configures reusable bone pairs and source/destination direction. Preview is read-only. M
           toggles preview with workspace focus; Escape in Mirror tools hides it. Mirror Current Pose uses the selected

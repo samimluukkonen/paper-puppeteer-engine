@@ -396,63 +396,69 @@ test.each([
   ['right', false],
   ['left', true],
   ['right', true],
-] as const)('sketch two-handed rear grip clears torso and legs facing %s, walking %s', (facing, walking) => {
-  const { scene, puppet } = fixture();
-  const presenter = new DemoPresenter(scene, puppet, sketchProfile);
-  puppet.setFacing(facing).play(walking ? 'walk' : 'sword');
-  if (walking) {
-    puppet.setLayerMask('upperBody', [
-      'torso',
-      'leftUpperArm',
-      'leftForearm',
-      'leftHand',
-      'rightUpperArm',
-      'rightForearm',
-      'rightHand',
-    ]);
-    puppet.play('guardUpperBody', { layer: 'upperBody' });
-  }
-  presenter.katana.resetRearPalm(facing);
-  const options = { handIK: true, footIK: walking, upperBody: walking };
-  const body = ['torso', 'leftThigh', 'rightThigh', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot'];
-  for (const angleDelta of [0, 0.65, -1.3]) {
-    presenter.katana.rotate(angleDelta);
-    for (const y of [260, 320, 360, 400, 480]) {
-      for (const offset of [90, 0, -90]) {
-        presenter.handTarget = { x: 380 + (facing === 'right' ? offset : -offset), y };
-        for (let frame = 0; frame < 30; frame++) {
-          if (walking) {
-            puppet.preparePose();
-            puppet.animationPlayer.update(16);
-            presenter.feet.advance(16);
+] as const)(
+  'sketch two-handed rear grip clears torso and legs facing %s, walking %s',
+  (facing, walking) => {
+    const { scene, puppet } = fixture();
+    const presenter = new DemoPresenter(scene, puppet, sketchProfile);
+    puppet.setFacing(facing).play(walking ? 'walk' : 'sword');
+    if (walking) {
+      puppet.setLayerMask('upperBody', [
+        'torso',
+        'leftUpperArm',
+        'leftForearm',
+        'leftHand',
+        'rightUpperArm',
+        'rightForearm',
+        'rightHand',
+      ]);
+      puppet.play('guardUpperBody', { layer: 'upperBody' });
+    }
+    presenter.katana.resetRearPalm(facing);
+    const options = { handIK: true, footIK: walking, upperBody: walking };
+    const body = ['torso', 'leftThigh', 'rightThigh', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot'];
+    for (const angleDelta of [0, 0.65, -1.3]) {
+      presenter.katana.rotate(angleDelta);
+      for (const y of [260, 320, 360, 400, 480]) {
+        for (const offset of [90, 0, -90]) {
+          presenter.handTarget = { x: 380 + (facing === 'right' ? offset : -offset), y };
+          for (let frame = 0; frame < 30; frame++) {
+            if (walking) {
+              puppet.preparePose();
+              puppet.animationPlayer.update(16);
+              presenter.feet.advance(16);
+            }
+            presenter.update(options);
+            const palm = puppet.getBone('leftHand').container.getWorldTransformMatrix().transformPoint(0, 18);
+            for (const id of body) {
+              const image = puppet.getSlotImage(`${id}Visual`)!;
+              const matrix = image.getWorldTransformMatrix();
+              const x = -image.originX * image.width;
+              const y = -image.originY * image.height;
+              const corners = [
+                matrix.transformPoint(x, y),
+                matrix.transformPoint(x + image.width, y),
+                matrix.transformPoint(x + image.width, y + image.height),
+                matrix.transformPoint(x, y + image.height),
+              ];
+              const edges = horizontalEdgesAtY(corners, palm.y);
+              if (!edges) continue;
+              const clearance = facing === 'right' ? palm.x - edges.right : edges.left - palm.x;
+              assert.isAtLeast(
+                clearance,
+                -4.02,
+                `${id} at cursor ${JSON.stringify(presenter.handTarget)}, frame ${frame}`,
+              );
+            }
+            const grip = presenter.katana.getSecondaryTarget()!;
+            assert.approximately(palm.x, grip.x, 1e-4);
+            assert.approximately(palm.y, grip.y, 1e-4);
           }
-          presenter.update(options);
-          const palm = puppet.getBone('leftHand').container.getWorldTransformMatrix().transformPoint(0, 18);
-          for (const id of body) {
-            const image = puppet.getSlotImage(`${id}Visual`)!;
-            const matrix = image.getWorldTransformMatrix();
-            const x = -image.originX * image.width;
-            const y = -image.originY * image.height;
-            const corners = [
-              matrix.transformPoint(x, y),
-              matrix.transformPoint(x + image.width, y),
-              matrix.transformPoint(x + image.width, y + image.height),
-              matrix.transformPoint(x, y + image.height),
-            ];
-            const edges = horizontalEdgesAtY(corners, palm.y);
-            if (!edges) continue;
-            const clearance = facing === 'right' ? palm.x - edges.right : edges.left - palm.x;
-            assert.isAtLeast(
-              clearance,
-              -4.02,
-              `${id} at cursor ${JSON.stringify(presenter.handTarget)}, frame ${frame}`,
-            );
-          }
-          const grip = presenter.katana.getSecondaryTarget()!;
-          assert.approximately(palm.x, grip.x, 1e-4);
-          assert.approximately(palm.y, grip.y, 1e-4);
         }
       }
     }
-  }
-});
+
+    // Each case evaluates 45 target/angle combinations across 30 frames, including walking IK.
+  },
+  15000,
+);

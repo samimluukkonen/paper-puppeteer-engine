@@ -60,6 +60,7 @@ import {
 import type { KeyframeClipboard } from './keyframeClipboard.js';
 import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
+import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
@@ -809,6 +810,14 @@ export class AnimationEditorState {
     return this.batchNotifications(() =>
       this.symmetry ? this.keyframes.mirrorSelectedKeyframes(this.symmetry, direction) : false,
     );
+  }
+
+  previewKeyframeRetiming(options: RetimeOptions): RetimeResult<ReadonlyAnimation> {
+    return this.keyframes.previewKeyframeRetiming(options);
+  }
+
+  retimeSelectedKeyframes(options: RetimeOptions): boolean {
+    return this.batchNotifications(() => this.keyframes.retimeSelectedKeyframes(options));
   }
 
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {

@@ -1,15 +1,8 @@
-import type { Keyframe } from '../../engine/AnimationClip.js';
-import { replacePropertyAtTime } from '../../engine/keyframeAuthoring.js';
+import { replacePropertyAtTime, setTrackPropertyKeyframes } from '../../engine/keyframeAuthoring.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assertFinite, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
-import {
-  type AnimationData,
-  assertTarget,
-  KEYFRAME_TIME_TOLERANCE_MS,
-  keyframeTimesMatch,
-  matchingRow,
-} from './keyframeTargets.js';
+import { type AnimationData, assertTarget, matchingRow } from './keyframeTargets.js';
 import { type Milliseconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 
@@ -61,73 +54,6 @@ export interface PropertyKeyframeEdit extends PropertyKeyframeTarget {
   readonly value: number;
 }
 
-/** Index nearby rows while editing one track; publish and sort its array only once. */
-function setTrackPropertyKeyframes(
-  keys: readonly Keyframe[],
-  edits: readonly PropertyKeyframeEdit[],
-  preserveTiming = false,
-): Keyframe[] {
-  const rows = new Map<number, Keyframe>();
-  const buckets = new Map<number, Set<number>>();
-  const bucketOf = (time: number): number => Math.floor(time / (2 * KEYFRAME_TIME_TOLERANCE_MS));
-  const add = (key: Keyframe): void => {
-    rows.set(key.time, key);
-    const bucket = bucketOf(key.time);
-    let times = buckets.get(bucket);
-    if (!times) {
-      times = new Set();
-      buckets.set(bucket, times);
-    }
-    times.add(key.time);
-  };
-  const remove = (time: number): void => {
-    rows.delete(time);
-    const bucket = bucketOf(time);
-    const times = buckets.get(bucket)!;
-    times.delete(time);
-    if (!times.size) buckets.delete(bucket);
-  };
-  for (const key of keys) add(key);
-  const matches = (time: number, property: TransformProperty): Keyframe[] => {
-    const bucket = bucketOf(time);
-    const found: Keyframe[] = [];
-    // Deduplicate neighboring buckets when large timestamps round to the same number.
-    for (const nearby of new Set([bucket - 1, bucket, bucket + 1])) {
-      for (const candidate of buckets.get(nearby) ?? []) {
-        const row = rows.get(candidate)!;
-        if (row[property] !== undefined && keyframeTimesMatch(candidate, time)) found.push(row);
-      }
-    }
-    return found;
-  };
-  const insertions: Pick<PropertyKeyframeEdit, 'property' | 'timeMs' | 'value'>[] = [];
-  for (const { property, timeMs, value } of edits) {
-    let time = timeMs;
-    let distance = Infinity;
-    for (const row of preserveTiming ? [] : matches(timeMs, property)) {
-      const nextDistance = Math.abs(row.time - timeMs);
-      if (nextDistance < distance || (nextDistance === distance && row.time < time)) {
-        time = row.time;
-        distance = nextDistance;
-      }
-    }
-    // Collision removal is centered on the canonical destination, including matches
-    // outside the original query's tolerance. Other properties retain their times.
-    for (const key of matches(time, property)) {
-      const row = { ...key };
-      delete row[property];
-      if (transformProperties.some((entry) => row[entry] !== undefined)) rows.set(row.time, row);
-      else remove(row.time);
-    }
-    if (preserveTiming) insertions.push({ property, timeMs: time, value });
-    else add({ ...rows.get(time), time, [property]: value });
-  }
-  // Group members never collide with each other. Replace external matches first,
-  // then insert every translated time exactly, including distinct nearby keys.
-  for (const { property, timeMs: time, value } of insertions) add({ ...rows.get(time), time, [property]: value });
-  return [...rows.values()].sort((a, b) => a.time - b.time);
-}
-
 /** Atomically validate a group and optionally extend authored duration. By default each edit canonicalizes
  * tolerant collisions sequentially. preserveTiming replaces external collisions before inserting all
  * group members at their exact times, matching group moves and rejecting duplicate destinations.
@@ -168,7 +94,7 @@ export function setBonePropertyKeyframes<Animation extends AnimationData>(
   }
   for (const [boneId, group] of groups) {
     const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
-    tracks[boneId] = setTrackPropertyKeyframes(keys, group, options.preserveTiming);
+    tracks[boneId] = setTrackPropertyKeyframes(keys, group, transformProperties, options.preserveTiming);
   }
   return validateEditedAnimation({ ...animation, duration, tracks }, animation, rig);
 }
@@ -325,7 +251,7 @@ export function moveBonePropertyKeyframes<Animation extends AnimationData>(
   const tracks = { ...removed.tracks };
   for (const [boneId, group] of groups) {
     const remaining = Object.hasOwn(removed.tracks, boneId) ? removed.tracks[boneId]! : [];
-    tracks[boneId] = setTrackPropertyKeyframes(remaining, group, true);
+    tracks[boneId] = setTrackPropertyKeyframes(remaining, group, transformProperties, true);
   }
   return { animation: validateEditedAnimation({ ...animation, tracks }, animation, rig), keys: destinations };
 }

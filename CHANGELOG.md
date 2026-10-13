@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.7-4
+
+The v0.5.7.4 [bulk keyframe retiming](docs/keyframe-retiming.md) adds proportional compression/expansion around the earliest selected time or current playhead. Tools → Retime selected keys shows actual selection counts and a read-only numerical proposal before one atomic Undo/Redo commit. Typed bone groups and IK channels preserve authored values, interpolation, FPS, duration and events. Bounds overflow and unrepresentable destinations reject the whole operation; external property collisions reuse group-move replacement. Unit and local browser regressions cover timing, selection, immutable sources, failure atomicity and exported playback. Package version is `0.5.7-4`.
+
 ## 0.5.7-3
 
 The v0.5.7.3 [advanced timeline snapping and guides](docs/timeline-snapping.md) adds independent editor-only frame, keyframe, event and captured-playhead targets through one shared resolver. An 8-pixel zoom-aware threshold and documented nearest-first tie priorities keep alignment deterministic. Bone/event drags show a temporary guide, exclude moving source identities, preserve group spacing and retain transactional collision/history behavior. Shift bypasses snapping even with a stationary pointer; supported IK key movements share the resolver. Unit and local browser regressions cover target modes, geometry, clean preferences, cancellation, source immutability and Undo/Redo. Package version is `0.5.7-3`.
