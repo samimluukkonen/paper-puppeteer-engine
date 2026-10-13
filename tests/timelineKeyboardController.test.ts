@@ -30,7 +30,11 @@ function fixture() {
   const app = new KeyboardElement();
   const timeline = new KeyboardElement();
   const ruler = new KeyboardElement();
-  const gestures = { cancelGesture: vi.fn(), hasMarquee: vi.fn(() => false) };
+  const gestures = {
+    cancelGesture: vi.fn(),
+    hasMarquee: vi.fn(() => false),
+    navigation: { zoomBy: vi.fn(), fitAnimation: vi.fn(), centerPlayhead: vi.fn() },
+  };
   let state = createState();
   vi.stubGlobal('window', browser);
   vi.stubGlobal('Element', KeyboardElement);
@@ -148,4 +152,53 @@ test('navigation follows replacement sessions and disposal releases global, trac
   assert.isFalse(current.isPlaying);
   assert.equal(current.currentTime, 1);
   assert.isFalse(global.defaultPrevented || track.defaultPrevented || slider.defaultPrevented);
+});
+
+test('zoom, fit and adjacent shortcuts stay in the timeline with typing, modifier, repeat and IME guards', () => {
+  const { browser, app, state, gestures, keyboard } = fixture();
+  const animation = state.workingAnimation;
+  state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
+  const selected = state.selectedKeys;
+  browser.dispatchEvent(key('+', {}, app));
+  assert.equal(gestures.navigation.zoomBy.mock.calls.length, 0);
+  app.panel = true;
+  for (const guard of [{ isComposing: true }, { altKey: true }, { ctrlKey: true }, { metaKey: true }]) {
+    const ignored = key('+', guard, app);
+    browser.dispatchEvent(ignored);
+    assert.isFalse(ignored.defaultPrevented);
+  }
+  app.tagName = 'INPUT';
+  for (const name of ['+', '-', 'f', '[', ']', 'Home', 'End']) {
+    const ignored = key(name, {}, app);
+    browser.dispatchEvent(ignored);
+    assert.isFalse(ignored.defaultPrevented);
+  }
+  app.tagName = 'DIV';
+  for (const [name, factor] of [
+    ['+', 2],
+    ['=', 2],
+    ['-', 0.5],
+  ] as const) {
+    const accepted = key(name, {}, app);
+    browser.dispatchEvent(accepted);
+    assert.isTrue(accepted.defaultPrevented);
+    assert.deepEqual(gestures.navigation.zoomBy.mock.lastCall, [factor]);
+  }
+  browser.dispatchEvent(key('f', {}, app));
+  browser.dispatchEvent(key('f', { repeat: true }, app));
+  assert.equal(gestures.navigation.fitAnimation.mock.calls.length, 1);
+  const previous = vi.spyOn(state, 'selectAdjacentKeyframe');
+  browser.dispatchEvent(key('[', {}, app));
+  assert.deepEqual(previous.mock.lastCall, [-1]);
+  browser.dispatchEvent(key(']', {}, app));
+  assert.deepEqual(previous.mock.lastCall, [1]);
+  browser.dispatchEvent(key('End', {}, app));
+  assert.equal(state.currentTime, 1);
+  browser.dispatchEvent(key('Home', {}, app));
+  assert.equal(state.currentTime, 0);
+  assert.strictEqual(state.workingAnimation, animation);
+  assert.strictEqual(state.selectedKeys, selected);
+  assert.equal(state.historyLength, 0);
+  assert.isFalse(state.dirty);
+  keyboard.dispose();
 });

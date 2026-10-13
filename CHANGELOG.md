@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.7-2
+
+The v0.5.7.2 [timeline navigation and zoom](docs/timeline-navigation.md) extends the existing shared timeline coordinates with bounded 1×–128× zoom, pointer-anchored Ctrl/Cmd-wheel zoom, native/Shift-wheel horizontal panning, fit animation/selection and center-playhead commands, continuous time input, zero-based authored frame input, optional playback edge-follow and guarded keyboard navigation. Hidden selected keys participate in fitting. Resize preserves the center time; visible-range ruler ticks keep long clips readable without rebuilding offscreen ticks. Unit/controller and local browser regressions cover navigation, editing alignment, selection preservation and immutable authored snapshots/history/exports. Package version is `0.5.7-2`.
+
 ## 0.5.7-1
 
 The v0.5.7.1 [timeline track search and filtering](docs/timeline-track-filtering.md) adds case-insensitive bone/property/IK/Events search, keyed/selected-target filters, independent IK/event visibility, ancestor context, and Expand All/Collapse All/Expand Selected. Search expansion restores manual preferences when cleared. Hidden bone, property, key, IK and event selections persist; Reveal Selection restores visibility and deletion shows total/hidden key counts. Cached pure visibility derivation reuses existing rows and clock updates; additive marquee selection excludes hidden rows while clipboard, deletion and group commands retain their complete selected scope. Unit and local browser regressions cover filtering, playback, preview picking, history and immutable exports. Package version is `0.5.7-1`.

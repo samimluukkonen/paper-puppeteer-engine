@@ -5,6 +5,12 @@ import { timelineXToTime, timeToTimelineX } from './timeline.js';
 import { TimelineKeyboardController } from './TimelineKeyboardController.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 
+export interface TimelineNavigationActions {
+  zoomBy(factor: number): void;
+  fitAnimation(): void;
+  centerPlayhead(): void;
+}
+
 interface ScrubGesture {
   kind: 'scrub';
   id: number;
@@ -52,11 +58,13 @@ export class TimelineInputController {
     private readonly timeline: HTMLElement,
     private readonly getState: () => AnimationEditorState,
     private readonly scrubber: HTMLElement,
+    navigation?: TimelineNavigationActions,
   ) {
     const options = { signal: this.abort.signal };
     this.keyboard = new TimelineKeyboardController(app, timeline, getState, scrubber, {
       cancelGesture: () => this.cancelGesture(),
       hasMarquee: () => this.gesture?.kind === 'marquee',
+      navigation,
     });
     this.timeline.addEventListener(
       'pointerdown',

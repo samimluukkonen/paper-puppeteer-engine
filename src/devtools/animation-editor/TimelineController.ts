@@ -5,6 +5,8 @@ import { InterpolationController } from './InterpolationController.js';
 import { generateRulerTicks, timeToTimelineX } from './timeline.js';
 import { defaultTimelineFilters, normalizedTrackSearch, type TimelineFilters } from './timelineFiltering.js';
 import { TimelineInputController } from './TimelineInputController.js';
+import { viewportXToTime } from './timelineNavigation.js';
+import { TimelineNavigationController } from './TimelineNavigationController.js';
 import { TimelineSessionController } from './TimelineSessionController.js';
 import { TimelineTracksController } from './TimelineTracksController.js';
 
@@ -25,6 +27,7 @@ export class TimelineController {
   private rulerKey = '';
   private readonly viewAbort = new AbortController();
   private readonly inset: HTMLElement;
+  private readonly navigation: TimelineNavigationController;
   private resizeFrame = 0;
   private renderedView: readonly unknown[] | undefined;
   private readonly filter: HTMLSelectElement;
@@ -54,13 +57,24 @@ export class TimelineController {
     });
     this.interpolation = new InterpolationController(app, () => this.state);
     this.eventInspector = new EventInspectorController(app, () => this.state);
-    this.input = new TimelineInputController(app, this.timeline, () => this.state, this.ruler);
+    this.navigation = new TimelineNavigationController(
+      app,
+      () => this.state,
+      () => {
+        this.width = this.timeline.getBoundingClientRect().width;
+        this.input.previewKeyDrag();
+        this.input.previewMarquee();
+        this.render();
+      },
+      () => this.input.cancelGesture(),
+    );
+    this.input = new TimelineInputController(app, this.timeline, () => this.state, this.ruler, this.navigation);
     this.width = this.timeline.getBoundingClientRect().width;
     this.resize = new ResizeObserver(() => {
       if (this.resizeFrame) return;
       this.resizeFrame = requestAnimationFrame(() => {
         this.resizeFrame = 0;
-        this.updateTimelineWidth();
+        this.navigation.resize();
         this.width = this.timeline.getBoundingClientRect().width;
         this.input.previewKeyDrag();
         this.input.previewMarquee();
@@ -127,33 +141,7 @@ export class TimelineController {
       },
       options,
     );
-    this.element('#timeline-zoom').addEventListener(
-      'change',
-      () => {
-        this.input.cancelGesture();
-        this.updateTimelineWidth();
-        this.width = this.timeline.getBoundingClientRect().width;
-        this.render();
-      },
-      { signal: this.viewAbort.signal },
-    );
     this.bind(this.state);
-  }
-
-  private updateTimelineWidth(): void {
-    const control = this.element<HTMLSelectElement>('#timeline-zoom');
-    const requested = Number(control.value);
-    const zoom = [1, 2, 4, 8].includes(requested) ? requested : 1;
-    if (control.value !== String(zoom)) control.value = String(zoom);
-    const labels = this.element('.timeline-label-column').getBoundingClientRect().width;
-    const width = Math.max(60, this.inset.clientWidth - labels);
-    this.inset.style.gridTemplateColumns = `min(var(--timeline-label-width), 50%) ${width * zoom}px`;
-    setAttribute(this.element('#timeline-label-divider'), 'aria-valuenow', String(Math.round(labels)));
-    setAttribute(
-      this.element('#timeline-label-divider'),
-      'aria-valuemax',
-      String(Math.floor(Math.min(400, this.inset.clientWidth / 2))),
-    );
   }
 
   get hasUnsavedChanges(): boolean {
@@ -183,6 +171,8 @@ export class TimelineController {
   private render(): void {
     this.input.synchronize();
     const state = this.state;
+    this.navigation.render();
+    this.width = this.timeline.getBoundingClientRect().width;
     const animation = state.workingAnimation;
     const width = this.width;
     const filters = state.timelineFilters;
@@ -238,11 +228,14 @@ export class TimelineController {
       this.eventInspector.render(state);
       this.renderedView = view;
     }
-    const rulerKey = `${state.duration}:${width}`;
+    const viewport = this.navigation.view;
+    const visibleStart = viewportXToTime(0, viewport);
+    const visibleEnd = viewportXToTime(viewport.viewportWidth, viewport);
+    const rulerKey = `${state.duration}:${width}:${visibleStart}:${visibleEnd}`;
     if (rulerKey !== this.rulerKey) {
       this.rulerKey = rulerKey;
       this.ruler.replaceChildren(
-        ...generateRulerTicks(state.duration, width).map((tick) => {
+        ...generateRulerTicks(state.duration, width, visibleStart, visibleEnd).map((tick) => {
           const element = document.createElement('span');
           element.className = `timeline-tick${tick.major ? ' major' : ''}${tick.time === state.duration ? ' end' : ''}`;
           element.style.left = `${timeToTimelineX(tick.time, state.duration, width)}px`;
@@ -275,6 +268,7 @@ export class TimelineController {
     this.state.pause();
     this.input.dispose();
     this.session.dispose();
+    this.navigation.dispose();
     this.interpolation.dispose();
     this.eventInspector.dispose();
     this.resize.disconnect();

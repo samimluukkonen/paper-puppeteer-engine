@@ -1,9 +1,11 @@
 import { isDialogTarget, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import type { TimelineNavigationActions } from './TimelineInputController.js';
 
 interface KeyboardGestureActions {
   cancelGesture(): void;
   hasMarquee(): boolean;
+  navigation?: TimelineNavigationActions | undefined;
 }
 
 /** Routes timeline shortcuts and ruler navigation while preserving native typing and pointer cancellation. */
@@ -64,6 +66,49 @@ export class TimelineKeyboardController {
           }
           return;
         }
+        if (
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          event.target instanceof Element &&
+          this.app.contains(event.target) &&
+          event.target.closest('.timeline-panel')
+        ) {
+          const navigation = this.gestures.navigation;
+          const command = event.key.toLowerCase();
+          const action =
+            command === '+' || command === '='
+              ? () => navigation?.zoomBy(2)
+              : command === '-'
+                ? () => navigation?.zoomBy(0.5)
+                : command === 'f' && !event.shiftKey
+                  ? () => navigation?.fitAnimation()
+                  : command === '['
+                    ? () => {
+                        this.state.selectAdjacentKeyframe(-1);
+                      }
+                    : command === ']'
+                      ? () => {
+                          this.state.selectAdjacentKeyframe(1);
+                        }
+                      : undefined;
+          if (action && (navigation || command === '[' || command === ']')) {
+            event.preventDefault();
+            if (!event.repeat) {
+              action();
+              if (command === '[' || command === ']') navigation?.centerPlayhead();
+            }
+            return;
+          }
+        }
+        if (event.key === 'End' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+          event.preventDefault();
+          if (!event.repeat) {
+            this.state.setCurrentTime(this.state.duration);
+            this.gestures.navigation?.centerPlayhead();
+          }
+          return;
+        }
         if (this.nudgeSelection(event)) return;
         if (
           (event.key === 'Delete' || event.key === 'Backspace') &&
@@ -92,8 +137,10 @@ export class TimelineKeyboardController {
           return;
         event.preventDefault();
         if (!event.repeat) {
-          if (event.key === 'Home') this.state.restart();
-          else this.state.togglePlayback();
+          if (event.key === 'Home') {
+            this.state.restart();
+            this.gestures.navigation?.centerPlayhead();
+          } else this.state.togglePlayback();
         }
       },
       options,
@@ -125,6 +172,7 @@ export class TimelineKeyboardController {
         if (time === undefined) return;
         event.preventDefault();
         this.state.setCurrentTime(time);
+        if (event.key === 'Home' || event.key === 'End') this.gestures.navigation?.centerPlayhead();
       },
       options,
     );
@@ -155,6 +203,7 @@ export class TimelineKeyboardController {
         // Consume slider navigation before track/global shortcuts can move authored keys.
         event.preventDefault();
         this.state.setCurrentTime(time);
+        if (event.key === 'Home' || event.key === 'End') this.gestures.navigation?.centerPlayhead();
       },
       options,
     );

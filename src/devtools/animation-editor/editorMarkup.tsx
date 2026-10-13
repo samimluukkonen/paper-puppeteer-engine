@@ -274,6 +274,13 @@ export function AnimationEditorView({
               + Event
             </button>
             <output id="current-time" aria-label="Current time"></output>
+            <label className="timeline-time-control">
+              Time (s){' '}
+              <input id="timeline-time-input" type="number" min="0" step="any" aria-label="Current time in seconds" />
+            </label>
+            <label id="timeline-frame-control" className="timeline-time-control" hidden>
+              Frame <input id="timeline-frame-input" type="number" min="0" step="1" aria-label="Current frame" />
+            </label>
             <button id="play-pause" type="button" aria-keyshortcuts="Space">
               Play
             </button>
@@ -342,8 +349,38 @@ export function AnimationEditorView({
                 <option value="2">2×</option>
                 <option value="4">4×</option>
                 <option value="8">8×</option>
+                <option value="16">16×</option>
+                <option value="32">32×</option>
+                <option value="64">64×</option>
+                <option value="128">128×</option>
+                <option id="timeline-custom-zoom" value="custom" hidden>
+                  Custom
+                </option>
               </select>
             </label>
+            <details className="timeline-navigation-tools" open={!inspector.narrow}>
+              <summary>Navigation</summary>
+              <div className="timeline-navigation" aria-label="Timeline navigation">
+                <button id="timeline-zoom-out" type="button" aria-label="Zoom out" aria-keyshortcuts="-">
+                  −
+                </button>
+                <button id="timeline-zoom-in" type="button" aria-label="Zoom in" aria-keyshortcuts="+">
+                  +
+                </button>
+                <button id="timeline-fit-animation" type="button" aria-keyshortcuts="F">
+                  Fit Entire Animation
+                </button>
+                <button id="timeline-fit-selection" type="button">
+                  Fit Selected Keyframes
+                </button>
+                <button id="timeline-center-playhead" type="button">
+                  Center Playhead
+                </button>
+                <label>
+                  <input id="timeline-follow" type="checkbox" defaultChecked /> Follow playhead
+                </label>
+              </div>
+            </details>
           </div>
           <div className="timeline-track-controls" aria-label="Track navigation">
             <label>
@@ -535,14 +572,19 @@ export function AnimationEditorView({
           one Undo operation. Turn off fixed-target IK preview before baking.
         </p>
         <p>
-          Space plays or pauses. Home returns to time zero outside typing controls. Drag the ruler to scrub. Moving
-          selected keys or events pauses playback. Use the timeline arrow keys to nudge; Shift moves ten steps.
+          Space plays or pauses. Home/End jumps to the start/end outside typing controls. Drag the ruler to scrub.
+          Moving selected keys or events pauses playback. Use the timeline arrow keys to nudge; Shift moves ten steps.
         </p>
         <p>
           Collapsed bone diamonds summarize timing; expand the bone to edit individual keys. Search finds bone IDs,
           properties, IK targets and Events, keeping ancestors for context. Clear Filters restores your layout; Reveal
           Selection also opens selected tracks. Commands affect all selected keys, including hidden keys. Zoom reveals a
-          horizontal scrollbar. Reset layout restores panel sizes, all tracks, and Fit zoom.
+          horizontal scrollbar. Ctrl/Cmd + wheel zooms around the pointer; Shift + wheel pans horizontally. Zoom buttons
+          use the playhead as an anchor. Fit Entire Animation shows the complete clip; Fit Selected Keyframes includes
+          hidden selected keys. Center Playhead scrolls to the current time. Follow playhead scrolls near an edge during
+          playback and can be disabled. Time (s) accepts continuous seconds; Frame uses zero-based authored FPS when
+          present. In the timeline, +/− zooms, F fits the animation, and [ / ] selects the previous/next bone-property
+          key. Reset layout restores panel sizes, all tracks, and Fit zoom.
         </p>
         <details className="timeline-instructions">
           <summary>Timeline controls</summary>

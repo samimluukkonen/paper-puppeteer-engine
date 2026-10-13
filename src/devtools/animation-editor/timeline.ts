@@ -42,10 +42,15 @@ export interface RulerTick {
 /** Fit major labels about 80px apart using 1/2/2.5/5 decade intervals, with four subdivisions.
  * Integer tick indices avoid accumulated floating point drift. Endpoints are always included.
  */
-export function generateRulerTicks(duration: Seconds, width: number): readonly RulerTick[] {
+export function generateRulerTicks(
+  duration: Seconds,
+  width: number,
+  visibleStart: Seconds = 0,
+  visibleEnd: Seconds = duration,
+): readonly RulerTick[] {
   const start: RulerTick = { time: 0, major: true, label: '0 s' };
   if (!(duration > 0) || !Number.isFinite(duration) || !(width > 0) || !Number.isFinite(width)) return [start];
-  const target = duration / Math.max(1, Math.min(100, Math.floor(width / 80)));
+  const target = duration / Math.max(1, Math.floor(width / 80));
   const decade = 10 ** Math.floor(Math.log10(target));
   const majorStep = ([1, 2, 2.5, 5, 10].find((step) => step * decade >= target) ?? 10) * decade;
   const minorStep = majorStep / 4;
@@ -54,8 +59,11 @@ export function generateRulerTicks(duration: Seconds, width: number): readonly R
   const precision = Math.min(12, Math.max(0, -Math.floor(Math.log10(majorStep)) + 1));
   const label = (time: number): string => `${Number(time.toFixed(precision))} s`;
   const ticks: RulerTick[] = [start];
-  const count = Math.min(400, Math.ceil(duration / minorStep));
-  for (let index = 1; index < count; index += 1) {
+  const first = Math.max(1, Math.floor(clampTime(visibleStart, duration) / minorStep) - 1);
+  const last = Math.min(Math.ceil(duration / minorStep), Math.ceil(clampTime(visibleEnd, duration) / minorStep) + 1);
+  const count = Math.min(399, last - first + 1);
+  for (let offset = 0; offset < count; offset += 1) {
+    const index = first + offset;
     const time = index * minorStep;
     if (time >= duration) break;
     const major = index % 4 === 0;
