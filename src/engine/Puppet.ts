@@ -14,6 +14,7 @@ import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
+import { throwNotificationErrors } from './notifications.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
@@ -563,21 +564,36 @@ export class Puppet {
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.container.off(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
-    this.debugView?.destroy();
-    this.ikDebugView?.destroy();
-    this.slotDebugView?.destroy();
+    const errors: unknown[] = [];
+    const release = (dispose: () => void): void => {
+      try {
+        dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
+    release(() => this.debugView?.destroy());
+    release(() => this.ikDebugView?.destroy());
+    release(() => this.slotDebugView?.destroy());
     this.debugView = undefined;
     this.ikDebugView = undefined;
     this.slotDebugView = undefined;
     this.debugLabelSides.clear();
-    this.attachments.dispose();
-    this.renderer.destroy();
-    if (!this.container.isDestroyed) this.container.destroy();
+    release(() => this.attachments.dispose());
+    release(() => this.renderer.destroy());
+    // Rig order is parent-first. Remove leaves first so Phaser never recursively
+    // tears down the entire skeleton during puppet or scene cleanup.
+    for (let index = this.rig.bones.length - 1; index >= 0; --index) {
+      const container = this.bones.get(this.rig.bones[index]!.id)?.container;
+      if (container && !container.isDestroyed) release(() => container.destroy());
+    }
+    if (!this.container.isDestroyed) release(() => this.container.destroy());
     this.renderedSlotAttachments.clear();
     this.poses.clear();
     this.bones.clear();
     this.ikConstraints.clear();
-    this.poseController.destroy();
+    release(() => this.poseController.destroy());
+    throwNotificationErrors(errors, 'Puppet cleanup failed.');
   }
 
   private onUpdate(_time: number, delta: number): void {

@@ -19,6 +19,38 @@ vi.mock('phaser', () => ({
 }));
 afterEach(() => vi.restoreAllMocks());
 
+test('deep puppet skeletons are destroyed without recursive container teardown', () => {
+  const bones = Array.from({ length: 12_000 }, (_, index) => ({
+    id: `bone-${index}`,
+    ...(index === 0 ? {} : { parent: `bone-${index - 1}` }),
+  }));
+  const puppet = new Puppet(puppetScene(), { rig: { root: 'bone-0', bones }, autoUpdate: false });
+  const containers = bones.map(({ id }) => puppet.getBone(id).container);
+  assert.doesNotThrow(() => puppet.destroy());
+  assert.isTrue(puppet.container.isDestroyed);
+  assert.isTrue(containers.every((container) => container.isDestroyed));
+  assert.doesNotThrow(() => puppet.destroy());
+});
+
+test('a failing overlay cleanup does not retain skeletons or player state', () => {
+  vi.spyOn(PuppetDebug.prototype, 'update').mockImplementation(() => {});
+  const puppet = new Puppet(puppetScene(), {
+    rig: { root: 'root', bones: [{ id: 'root' }, { id: 'child', parent: 'root' }] },
+    debug: true,
+    autoUpdate: false,
+  });
+  const child = puppet.getBone('child').container;
+  const failure = new Error('Overlay cleanup failed');
+  vi.spyOn(PuppetDebug.prototype, 'destroy').mockImplementation(() => {
+    throw failure;
+  });
+  assert.throws(() => puppet.destroy(), failure.message);
+  assert.isTrue(puppet.container.isDestroyed);
+  assert.isTrue(child.isDestroyed);
+  assert.isTrue(puppet.animationPlayer.isDisposed);
+  assert.throws(() => puppet.getBone('child'), /Unknown bone/);
+});
+
 const rig = new Rig({
   root: 'root',
   bones: [{ id: 'root' }, { id: 'arm', parent: 'root' }, { id: 'hand', parent: 'arm' }],
