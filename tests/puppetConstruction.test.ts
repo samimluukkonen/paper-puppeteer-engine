@@ -19,18 +19,58 @@ vi.mock('phaser', () => ({
 }));
 afterEach(() => vi.restoreAllMocks());
 
-test('deep puppet skeletons are destroyed without recursive container teardown', () => {
-  const bones = Array.from({ length: 12_000 }, (_, index) => ({
-    id: `bone-${index}`,
-    ...(index === 0 ? {} : { parent: `bone-${index - 1}` }),
-  }));
-  const puppet = new Puppet(puppetScene(), { rig: { root: 'bone-0', bones }, autoUpdate: false });
-  const containers = bones.map(({ id }) => puppet.getBone(id).container);
-  assert.doesNotThrow(() => puppet.destroy());
-  assert.isTrue(puppet.container.isDestroyed);
-  assert.isTrue(containers.every((container) => container.isDestroyed));
-  assert.doesNotThrow(() => puppet.destroy());
-});
+test.each(['puppet', 'container', 'scene'] as const)(
+  'deep skeleton teardown is safe through %s destruction',
+  (owner) => {
+    const bones = Array.from({ length: 12_000 }, (_, index) => ({
+      id: `bone-${index}`,
+      ...(index === 0 ? {} : { parent: `bone-${index - 1}` }),
+    }));
+    const puppet = new Puppet(puppetScene(), { rig: { root: 'bone-0', bones }, autoUpdate: false });
+    const containers = bones.map(({ id }) => puppet.getBone(id).container);
+    assert.doesNotThrow(() => {
+      if (owner === 'puppet') puppet.destroy();
+      else puppet.container.destroy(owner === 'scene');
+    });
+    assert.isTrue(puppet.container.isDestroyed);
+    assert.isTrue(containers.every((container) => container.isDestroyed));
+    assert.doesNotThrow(() => puppet.destroy());
+  },
+);
+
+test.each(['container', 'puppet'] as const)(
+  'root destruction preserves the scene flag after ignored %s cleanup',
+  (owner) => {
+    const scene = puppetScene();
+    const addContainer = scene.add.container.bind(scene.add);
+    const nativeDestroy = vi.fn<(fromScene?: boolean) => void>();
+    vi.spyOn(scene.add, 'container').mockImplementation((x, y) => {
+      const container = addContainer(x, y);
+      if (nativeDestroy.mock.calls.length === 0 && !root) {
+        root = container;
+        const destroy = container.destroy.bind(container);
+        container.destroy = (fromScene) => {
+          if (container.ignoreDestroy) return;
+          nativeDestroy(fromScene);
+          destroy(fromScene);
+        };
+      }
+      return container;
+    });
+    let root: Phaser.GameObjects.Container | undefined;
+    const puppet = new Puppet(scene, { rig: { root: 'root', bones: [{ id: 'root' }] }, autoUpdate: false });
+    puppet.container.ignoreDestroy = true;
+    if (owner === 'container') puppet.container.destroy(true);
+    else puppet.destroy();
+    assert.equal(puppet.animationPlayer.isDisposed, owner === 'puppet');
+    assert.isFalse(puppet.container.isDestroyed);
+    assert.equal(nativeDestroy.mock.calls.length, 0);
+    puppet.container.ignoreDestroy = false;
+    puppet.container.destroy(true);
+    assert.deepEqual(nativeDestroy.mock.calls, [[true]]);
+    assert.isTrue(puppet.animationPlayer.isDisposed);
+  },
+);
 
 test('a failing overlay cleanup does not retain skeletons or player state', () => {
   vi.spyOn(PuppetDebug.prototype, 'update').mockImplementation(() => {});

@@ -52,6 +52,7 @@ export class Puppet {
   readonly rig: Rig;
   readonly container: Phaser.GameObjects.Container;
   readonly animationPlayer: AnimationPlayer;
+  private readonly destroyContainer: Phaser.GameObjects.Container['destroy'];
   private readonly bones = new Map<string, Bone>();
   private readonly attachments: PuppetAttachments;
   private debugView: PuppetDebug | undefined;
@@ -139,6 +140,7 @@ export class Puppet {
       .setName('puppet')
       .setScale(options.scale ?? 1)
       .setDepth(options.depth ?? 0);
+    this.destroyContainer = this.container.destroy.bind(this.container);
     for (const definition of this.rig.bones) {
       const bone = new Bone(scene, definition);
       this.bones.set(bone.id, bone);
@@ -173,6 +175,14 @@ export class Puppet {
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.container.once(Phaser.GameObjects.Events.DESTROY, this.destroy, this);
+    // Phaser's preDestroy recursively removes children before emitting DESTROY.
+    // Route host/display-list destruction through our leaf-first cleanup first.
+    this.container.destroy = (fromScene?: boolean): void => {
+      if (this.destroyed) {
+        // A host may release an ignored root after disposing its puppet.
+        if (!this.container.isDestroyed) this.destroyContainer(fromScene);
+      } else if (!this.container.ignoreDestroy) this.destroyInternal(fromScene);
+    };
   }
 
   get currentAnimation(): string | undefined {
@@ -554,6 +564,10 @@ export class Puppet {
   }
 
   destroy(): void {
+    this.destroyInternal();
+  }
+
+  private destroyInternal(fromScene?: boolean): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.ikAnimationSource = undefined;
@@ -587,7 +601,7 @@ export class Puppet {
       const container = this.bones.get(this.rig.bones[index]!.id)?.container;
       if (container && !container.isDestroyed) release(() => container.destroy());
     }
-    if (!this.container.isDestroyed) release(() => this.container.destroy());
+    if (!this.container.isDestroyed) release(() => this.destroyContainer(fromScene));
     this.renderedSlotAttachments.clear();
     this.poses.clear();
     this.bones.clear();
