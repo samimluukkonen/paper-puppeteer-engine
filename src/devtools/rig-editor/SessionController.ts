@@ -1,5 +1,6 @@
 import { type RigJsonDefinition, validateRigDefinition } from '../../engine/externalData.js';
 import { readJsonFile } from '../../engine/jsonInput.js';
+import { JsonWorkloadBudget, type JsonWorkloadLimitOptions } from '../../engine/jsonWorkloadLimits.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { RigEditor } from './RigEditor.js';
@@ -11,6 +12,7 @@ export function createSessionController(
   app: HTMLElement,
   getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
   onStateChange: (editor: RigEditor) => void = () => {},
+  inputLimits: JsonWorkloadLimitOptions = {},
 ) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
@@ -154,6 +156,7 @@ export function createSessionController(
       const text = await readJsonFile(file);
       if (!request.isCurrent()) return;
       const json = JSON.parse(text) as RigJsonDefinition;
+      new JsonWorkloadBudget(inputLimits).checkRig(json);
       const issues = validateRigDefinition(json);
       if (issues.some((issue) => issue.severity === 'error'))
         throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));

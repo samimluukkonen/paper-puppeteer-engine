@@ -1,5 +1,6 @@
 import { type CharacterData, CharacterDefinition, characterManifestSchema } from './CharacterDefinition.js';
 import { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError, readJsonResponse, validateInputLimit } from './jsonInput.js';
+import { JsonWorkloadBudget, type JsonWorkloadLimitOptions } from './jsonWorkloadLimits.js';
 
 export const DEFAULT_CHARACTER_LOAD_LIMITS = Object.freeze({
   maxJsonBytes: DEFAULT_MAX_JSON_BYTES,
@@ -9,14 +10,14 @@ export const DEFAULT_CHARACTER_LOAD_LIMITS = Object.freeze({
   timeoutMs: 30_000,
 });
 
-export interface CharacterLoadOptions {
+export interface CharacterLoadOptions extends JsonWorkloadLimitOptions {
   /** Cancel all metadata requests belonging to this load. Custom fetchers must honor RequestInit.signal. */
   signal?: AbortSignal;
   /** Maximum decoded bytes per JSON response. Defaults to 10 MiB. */
   maxJsonBytes?: number;
   /** Maximum decoded JSON bytes across the entire character load. Defaults to 50 MiB. */
   maxTotalJsonBytes?: number;
-  /** Maximum manifest, unique metadata files and texture entries combined. Defaults to 256. */
+  /** Maximum manifest, metadata references and texture entries combined. Defaults to 256. */
   maxResources?: number;
   /** Maximum simultaneous metadata requests. Defaults to 6. */
   concurrency?: number;
@@ -41,6 +42,7 @@ export const CharacterLoader = {
     signal?.addEventListener('abort', onAbort, { once: true });
     try {
       signal?.throwIfAborted();
+      const workload = new JsonWorkloadBudget(options);
       const limits = {
         maxJsonBytes: validateInputLimit(
           options.maxJsonBytes ?? DEFAULT_CHARACTER_LOAD_LIMITS.maxJsonBytes,
@@ -74,7 +76,10 @@ export const CharacterLoader = {
           );
       };
       const requestedUrl = new URL(url, globalThis.location?.href).href;
-      const read = async (resourceUrl: string): Promise<{ data: unknown; url: string }> => {
+      const read = async (
+        resourceUrl: string,
+        inspect?: (data: unknown) => void,
+      ): Promise<{ data: unknown; url: string }> => {
         controller.signal.throwIfAborted();
         let timer: ReturnType<typeof setTimeout> | undefined;
         let response: Response | undefined;
@@ -95,6 +100,7 @@ export const CharacterLoader = {
           if (response.url) checkUrl(response.url);
           if (!response.ok) throw new Error(`Could not load character JSON "${resourceUrl}" (${response.status}).`);
           const data = await readJsonResponse(response, limits.maxJsonBytes, controller.signal, countBytes);
+          inspect?.(data);
           return { data, url: response.url || resourceUrl };
         } catch (error) {
           // Stop workers before they acquire another resource after a sibling fails.
@@ -111,13 +117,22 @@ export const CharacterLoader = {
       const paths = [
         ...new Set([manifest.rig, ...Object.values(manifest.skins), ...manifest.animations, ...(manifest.poses ?? [])]),
       ];
-      if (1 + paths.length + Object.keys(manifest.textures).length > limits.maxResources)
+      // Bound references as well as unique requests: repeated paths must not
+      // amplify later validation/cloning while bypassing the resource budget.
+      const resourceCount =
+        2 +
+        Object.keys(manifest.skins).length +
+        manifest.animations.length +
+        (manifest.poses?.length ?? 0) +
+        Object.keys(manifest.textures).length;
+      if (resourceCount > limits.maxResources)
         throw new JsonInputLimitError(`Character exceeds the ${limits.maxResources}-resource limit.`);
       // Approve the complete resource list before starting sibling requests or handing artwork to the host.
       if (options.urlPolicy) {
         for (const path of [...paths, ...Object.values(manifest.textures)]) checkUrl(new URL(path, manifestUrl).href);
       }
       const entries: (readonly [string, unknown])[] = [];
+      const animationPaths = new Set(manifest.animations);
       let next = 0;
       await Promise.all(
         Array.from({ length: Math.min(limits.concurrency, paths.length) }, async () => {
@@ -125,7 +140,11 @@ export const CharacterLoader = {
             controller.signal.throwIfAborted();
             const index = next++;
             const path = paths[index]!;
-            entries[index] = [path, (await read(new URL(path, manifestUrl).href)).data];
+            const { data } = await read(new URL(path, manifestUrl).href, (input) => {
+              if (path === manifest.rig) workload.checkRig(input);
+              if (animationPaths.has(path)) workload.checkAnimation(input);
+            });
+            entries[index] = [path, data];
           }
         }),
       );

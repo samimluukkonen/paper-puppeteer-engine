@@ -2,6 +2,11 @@
 
 [All guides](../README.md#guides)
 
+External character loads, rig file imports, and recovered browser drafts allow at most 4096 bones
+and 256 hierarchy levels (including the root), in addition to JSON byte limits. Rejection preserves
+the current editor session. Custom hosts can raise `maxBones` and `maxBoneDepth` when loading trusted
+characters; development adapters can pass work limits as the fourth `createSessionController` argument.
+
 Local rig JSON imports have a 10 MiB size limit. Oversized files are rejected before reading,
 and failed imports preserve the active session and its undo history.
 

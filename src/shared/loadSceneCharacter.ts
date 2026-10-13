@@ -3,13 +3,15 @@ import type { CharacterDefinition } from '../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../engine/CharacterLoader.js';
 import { getCharacterTextureLimitError } from '../engine/characterTextureLimits.js';
 import { validateInputLimit } from '../engine/jsonInput.js';
+import type { JsonWorkloadLimitOptions } from '../engine/jsonWorkloadLimits.js';
 import {
   type CharacterTextureLoadOptions,
   DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS,
   queueCharacterTextures,
 } from '../engine/queueCharacterTextures.js';
 
-export interface SceneCharacterLoadOptions extends Omit<CharacterTextureLoadOptions, 'timeoutMs'> {
+export interface SceneCharacterLoadOptions
+  extends Omit<CharacterTextureLoadOptions, 'timeoutMs'>, JsonWorkloadLimitOptions {
   /** Deadline for the entire artwork phase, including queueing and image decoding. Defaults to 30 seconds. */
   artworkTimeoutMs?: number;
 }
@@ -146,6 +148,7 @@ export function loadSceneCharacter(
       // Scene.create() runs before Phaser marks the scene active; check after fetching instead.
       // Authoring views reload frequently after replacing rig and animation files.
       definition = await CharacterLoader.load(url, (input, init) => fetch(input, { ...init, cache: 'no-store' }), {
+        ...options,
         signal: controller.signal,
       });
       if (settled) return;

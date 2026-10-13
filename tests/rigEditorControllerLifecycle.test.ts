@@ -25,6 +25,26 @@ function editor() {
   return { ...controls, runtime: controls as unknown as RigEditor };
 }
 
+test('rig file imports reject excess hierarchy work without replacing the working session', async () => {
+  const query = stubRigEditorDom();
+  const current = editor();
+  const scene = { characterId: 'test', rigFilename: 'rig.json', reloadRig: vi.fn(), reloadOriginal: vi.fn() };
+  const controller = createSessionController(
+    query('#editor-app') as unknown as HTMLElement,
+    () => scene,
+    () => {},
+    { maxBoneDepth: 1 },
+  );
+  controller.updateStatus(current.runtime);
+  const json = JSON.stringify({ version: 1, root: 'root', bones: [{ id: 'root' }, { id: 'child', parent: 'root' }] });
+  query('#load-json').files = [{ name: 'rig.json', size: json.length, text: async () => json }];
+  await query('#load-json').dispatch('change');
+  await vi.waitFor(() => assert.match(query('#action-feedback').textContent, /1-level bone hierarchy limit/));
+  assert.equal(scene.reloadRig.mock.calls.length, 0);
+  assert.isFalse(current.state.dirty);
+  controller.dispose();
+});
+
 test('controls can remount on the same host without mutating the disposed editor', async () => {
   const query = stubRigEditorDom();
   const app = query('#editor-app') as unknown as HTMLElement;

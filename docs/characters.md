@@ -43,7 +43,7 @@ preserves the original error. Custom fetch implementations remain supported as t
 they must honor `RequestInit.signal` to cancel pending I/O.
 
 Metadata loading defaults to 10 MiB per JSON response, 50 MiB of JSON for the whole load,
-256 resources (the manifest, unique metadata paths, and texture entries combined), and six concurrent
+256 resources (the manifest, rig, skin/animation/pose references, and texture entries combined), and six concurrent
 metadata requests. Streaming byte checks also cover responses with missing or misleading
 `Content-Length` headers. Exceeding a limit rejects with `JsonInputLimitError` and cancels pending
 requests. Adjust these positive integer limits for larger trusted characters, for example
@@ -51,6 +51,17 @@ requests. Adjust these positive integer limits for larger trusted characters, fo
 `DEFAULT_CHARACTER_LOAD_LIMITS` exposes the defaults. Already parsed values passed to
 `CharacterDefinition.fromData` bypass these metadata I/O limits; artwork queued through
 `queueCharacterTextures` still receives its separate image limits.
+
+External metadata also defaults to at most 4096 bones per rig, 256 hierarchy levels (including the root),
+and 100000 bone/IK keyframe rows combined across all loaded animations. These checks run before schema
+parsing, cloning, or constructing render objects. `DEFAULT_JSON_WORKLOAD_LIMITS` exposes the defaults.
+Raise `maxBones`, `maxBoneDepth`, or `maxKeyframes` for trusted larger assets, for example
+`CharacterLoader.load(url, fetch, { maxBones: 8192, maxBoneDepth: 512, maxKeyframes: 200000 })`.
+`loadSceneCharacter` accepts the same options. Runtime rigs and `CharacterDefinition.fromData` retain
+their existing validation without these external-load work budgets.
+
+Metadata requests are deduplicated, but repeated manifest references still count toward the resource
+limit so they cannot amplify later validation and cloning work.
 
 Each metadata request has a 30-second timeout covering headers and the decoded body. A timeout
 rejects with a `TimeoutError` and cancels sibling requests. Configure `timeoutMs` as a positive integer

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import { checkJson, inspectRigDefinition, type ValidationIssue } from '../../engine/externalData.js';
+import { JsonWorkloadBudget } from '../../engine/jsonWorkloadLimits.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { RigDefinition } from '../../engine/types.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
@@ -25,7 +26,13 @@ export function inspectRigDraft(
   if (!checkJson(input, '', issues) || issues.length) return undefined;
   const recovery = recoveryDraftSchema.safeParse(input);
   // Earlier browser drafts stored only the rig file; they remain recoverable.
-  const { data } = inspectRigDefinition(recovery.success ? recovery.data.rig : input);
+  const candidate = recovery.success ? recovery.data.rig : input;
+  try {
+    new JsonWorkloadBudget().checkRig(candidate);
+  } catch {
+    return undefined;
+  }
+  const { data } = inspectRigDefinition(candidate);
   if (!data) return undefined;
   // A bind editor retains its original topology and artwork identities during authoring.
   if (

@@ -146,10 +146,65 @@ test.each([
   ['concurrency', 1.5],
   ['timeoutMs', 0],
   ['timeoutMs', Infinity],
+  ['maxBones', 0],
+  ['maxBoneDepth', Infinity],
+  ['maxKeyframes', 1.5],
 ] as const)('invalid %s is rejected before fetching', async (name, value) => {
   const fetcher = vi.fn<typeof fetch>();
   await expect(CharacterLoader.load(url, fetcher, { [name]: value })).rejects.toThrow(/positive safe integer/);
   assert.equal(fetcher.mock.calls.length, 0);
+});
+
+test.each(['maxBones', 'maxBoneDepth'] as const)(
+  'loaded rigs enforce configurable %s before assembly',
+  async (limit) => {
+    const metadata = {
+      ...files,
+      'rig.json': { version: 1, root: 'root', bones: [{ id: 'root' }, { id: 'child', parent: 'root' }] },
+    };
+    const fetcher = vi.fn<typeof fetch>(async (input) =>
+      Response.json(metadata[new URL(requestUrl(input)).pathname.slice(1) as keyof typeof metadata]),
+    );
+    await expect(CharacterLoader.load(url, fetcher, { [limit]: 1 })).rejects.toThrow(/limit/);
+    assert.equal((await CharacterLoader.load(url, fetcher, { [limit]: 2 })).rig.bones.length, 2);
+  },
+);
+
+test('keyframe budgets cover the combined rows of all loaded animations', async () => {
+  const metadata: Record<string, unknown> = {
+    ...files,
+    'character.json': { ...manifest, animations: ['idle.json', 'walk.json'] },
+    'idle.json': { version: 1, name: 'idle', duration: 1000, loop: false, tracks: { root: [{ time: 0, x: 1 }] } },
+    'walk.json': { version: 1, name: 'walk', duration: 1000, loop: false, tracks: { root: [{ time: 0, x: 2 }] } },
+  };
+  const fetcher = vi.fn<typeof fetch>(async (input) =>
+    Response.json(metadata[new URL(requestUrl(input)).pathname.slice(1)]),
+  );
+  await expect(CharacterLoader.load(url, fetcher, { maxKeyframes: 1 })).rejects.toThrow(/1-keyframe limit/);
+  assert.equal((await CharacterLoader.load(url, fetcher, { maxKeyframes: 2 })).animations.length, 2);
+});
+
+test('work-budget failures cancel the load before a worker acquires another file', async () => {
+  const metadata: Record<string, unknown> = {
+    ...files,
+    'rig.json': { version: 1, root: 'root', bones: [{ id: 'root' }, { id: 'child', parent: 'root' }] },
+  };
+  const signals: AbortSignal[] = [];
+  const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+    signals.push(init!.signal!);
+    return Response.json(metadata[new URL(requestUrl(input)).pathname.slice(1)]);
+  });
+  await expect(CharacterLoader.load(url, fetcher, { maxBones: 1, concurrency: 1 })).rejects.toThrow(/1-bone limit/);
+  assert.equal(fetcher.mock.calls.length, 2);
+  assert.isTrue(signals.every((signal) => signal.aborted));
+});
+
+test('repeated metadata paths cannot amplify assembly past the resource budget', async () => {
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(Response.json({ ...manifest, animations: Array.from({ length: 10 }, () => 'idle.json') }));
+  await expect(CharacterLoader.load(url, fetcher, { maxResources: 4 })).rejects.toThrow(/4-resource limit/);
+  assert.equal(fetcher.mock.calls.length, 1);
 });
 
 test.each([{}, { body: 'body.png', arm: 'arm.png' }])(

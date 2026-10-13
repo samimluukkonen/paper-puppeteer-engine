@@ -1,4 +1,5 @@
 import { inspectAnimationDefinition } from '../../engine/externalData.js';
+import { JsonWorkloadBudget } from '../../engine/jsonWorkloadLimits.js';
 import type { DraftRecovery } from '../shared/DraftRecovery.js';
 import { draftSource } from '../shared/draftSource.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
@@ -51,7 +52,14 @@ export class AnimationDraftRecoveryController {
             snapshot: () => state.workingAnimation,
             dirty: () => state.dirty,
             data: (snapshot) => snapshot,
-            validate: (data) => inspectAnimationDefinition(data, state.rig).data?.name === animation,
+            validate: (data) => {
+              try {
+                new JsonWorkloadBudget().checkAnimation(data);
+                return inspectAnimationDefinition(data, state.rig).data?.name === animation;
+              } catch {
+                return false;
+              }
+            },
             restore: (data) => state.replaceWorkingAnimation(data),
           },
           { recover: !imported },

@@ -48,6 +48,14 @@ function file(): AnimationJsonDefinition {
     ],
   };
 }
+
+test('animation imports enforce configurable keyframe work budgets before replacement', () => {
+  const input = JSON.stringify(file());
+  const rejected = importAnimationJson(input, rig, { maxKeyframes: 4 });
+  assert.isFalse(rejected.success);
+  assert.match(rejected.issues[0]!.message, /4-keyframe limit/);
+  assert.isTrue(importAnimationJson(input, rig, { maxKeyframes: 5 }).success);
+});
 function session() {
   const state = new AnimationEditorState(rig, [
     { name: 'old', duration: 2000, loop: true, tracks: { root: [{ time: 0, x: 1 }] } },

@@ -30,6 +30,8 @@ export {
 export type { CharacterLoadOptions } from './CharacterLoader.js';
 export { CharacterLoader, DEFAULT_CHARACTER_LOAD_LIMITS } from './CharacterLoader.js';
 export { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError } from './jsonInput.js';
+export { DEFAULT_JSON_WORKLOAD_LIMITS } from './jsonWorkloadLimits.js';
+export type { JsonWorkloadLimitOptions } from './jsonWorkloadLimits.js';
 export type {
   AnimationJsonDefinition,
   AnimationJsonEvent,
