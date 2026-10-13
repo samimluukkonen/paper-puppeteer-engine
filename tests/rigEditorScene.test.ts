@@ -8,6 +8,7 @@ import { parseRigDefinition, type RigJsonDefinition } from '../src/engine/extern
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../src/engine/ik/types.js';
 import { Joint } from '../src/engine/Joint.js';
+import { assertJsonInputSize, DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { rigDefinitionSchema } from '../src/engine/schemas.js';
@@ -489,6 +490,27 @@ test('an oversized rig file is rejected before reading and preserves the active 
   await element('#undo').click();
   assert.isFalse(editor.state.dirty);
   assert.isFalse(editor.state.canUndo);
+});
+
+test('a compact rig that cannot fit the formatted export is rejected without replacing edits or history', async () => {
+  const { scene, editor, file, element } = await panelFixture();
+  await editNumber(element, 'root', 'x', [5]);
+  const before = editor.exportJson(false);
+  const json = JSON.stringify({
+    ...file,
+    name: 'x'.repeat(DEFAULT_MAX_JSON_BYTES - JSON.stringify(file).length - 100),
+  });
+  assertJsonInputSize(json);
+  const input = element('#load-json');
+  input.files = [{ name: 'compact.json', size: new TextEncoder().encode(json).byteLength, text: async () => json }];
+  await input.dispatch('change');
+  assert.match(element('#action-feedback').textContent, /size limit/);
+  assert.strictEqual(scene.editor, editor);
+  assert.equal(scene.rigFilename, 'working.json');
+  assert.equal(editor.exportJson(false), before);
+  assert.isTrue(editor.state.dirty);
+  await element('#undo').click();
+  assert.isFalse(editor.state.dirty);
 });
 
 test.each(['malformed JSON', 'invalid rig', 'incompatible preview', 'enable failure'])(

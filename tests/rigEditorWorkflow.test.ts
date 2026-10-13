@@ -236,7 +236,7 @@ test('export is stable, data-only, valid, and preserves unedited precision', () 
   assert.equal(parseRigDefinition(result).getBone('arm').rotation, 0.5);
 });
 
-test('a compact rig within the import limit cannot save an oversized formatted export', () => {
+test('a compact rig within the import limit is rejected if its formatted export would be oversized', () => {
   const file: RigJsonDefinition = {
     version: 1,
     name: '',
@@ -249,8 +249,25 @@ test('a compact rig within the import limit cannot save an oversized formatted e
   // Keep compact JSON just below the limit without constructing tens of thousands of rig entries.
   const overhead = new TextEncoder().encode(JSON.stringify(file)).byteLength;
   file.name = 'x'.repeat(DEFAULT_MAX_JSON_BYTES - overhead - 1);
+  assert.doesNotThrow(() => assertJsonInputSize(JSON.stringify(file)));
+  assert.throws(() => new RigEditorState(parseRigDefinition(file), file), JsonInputLimitError);
+});
+
+test('edits exceeding the export limit cannot mark the rig saved and remain undoable', () => {
+  const file: RigJsonDefinition = {
+    version: 1,
+    name: '',
+    root: 'root',
+    bones: [{ id: 'root', x: 0 }],
+    slots: [],
+    attachments: [],
+    skins: [],
+  };
+  const overhead = new TextEncoder().encode(`${JSON.stringify(file, null, 2)}\n`).byteLength;
+  file.name = 'x'.repeat(DEFAULT_MAX_JSON_BYTES - overhead);
   const state = new RigEditorState(parseRigDefinition(file), file);
-  state.editBone('root', 'x', 1);
+  assert.doesNotThrow(() => state.exportJson());
+  state.editBone('root', 'x', 100000);
   assert.doesNotThrow(() => assertJsonInputSize(JSON.stringify(state.recoveryDraft)));
   const snapshot = state.workingSnapshot;
   assert.throws(() => state.exportJson(), JsonInputLimitError);

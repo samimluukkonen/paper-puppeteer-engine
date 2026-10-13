@@ -16,6 +16,7 @@ import type {
 } from '../../engine/types.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
+import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { inspectRigDraft, type RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
 import { serializeRigData, serializeRigJson } from './rigSerialization.js';
@@ -119,6 +120,9 @@ export class RigEditorState {
     this.rig = source;
     this.rebuildIndexes();
     this.initialCopy = this.workingCopy;
+    // Compact input can expand beyond the import limit when exported with indentation.
+    // Reject it before the scene replaces the working editor or clears its recovery draft.
+    assertJsonExportSize(this.exportCandidate());
     this.saved = this.initialCopy;
     this.cachedDirty = false;
     for (const bone of this.rig.bones) {
