@@ -133,7 +133,7 @@ export function createSessionController(
     if (!lastExport) throw new Error('Export the rig first.');
     if (editor?.state.dirty && !window.confirm('Discard edits made since the last export?')) return;
     requests.cancelImports();
-    getScene().reloadRig(lastExport, lastExportFilename);
+    getScene().reloadRig(lastExport, lastExportFilename, 'reload-export');
     feedback.textContent = 'Exported rig reloaded and validated.';
   });
   action('reload-original', () => {

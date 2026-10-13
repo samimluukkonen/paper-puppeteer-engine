@@ -1,10 +1,49 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { animationControl, test } from './fixtures.js';
+import { animationControl, rigFileAction, test } from './fixtures.js';
 
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
+
+for (const replacement of ['original', 'imported'] as const) {
+  test(`explicit ${replacement} rig replacement discards its own draft without recovering another tab`, async ({
+    page,
+  }) => {
+    await page.goto('rig-editor/');
+    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
+    await x.fill('44');
+    await x.press('Tab');
+    await expect.poll(() => draftKeys(page)).toHaveLength(1);
+    const otherDraft = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((entry) => entry.startsWith('paper-puppeteer:draft:'))!;
+      const otherKey = key.replace(/:session:.*$/, ':session:other-tab');
+      const text = localStorage.getItem(key)!;
+      localStorage.setItem(otherKey, text);
+      return { key: otherKey, text };
+    });
+    const dialogs: string[] = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.message());
+      await dialog.accept();
+    });
+    if (replacement === 'original') await rigFileAction(page, '#reload-original', (control) => control.click());
+    else {
+      const json = await readFile(new URL('../../public/characters/demo-puppet/rig.json', import.meta.url), 'utf8');
+      await rigFileAction(page, '#load-json', (control) =>
+        control.setInputFiles({ name: 'rig.json', mimeType: 'application/json', buffer: Buffer.from(json) }),
+      );
+    }
+    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    await expect(x).toHaveValue('0');
+    await expect(page.locator('#dirty-status')).toHaveText('No changes');
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0]).toContain('Discard unsaved rig edits');
+    expect(await draftKeys(page)).toEqual([otherDraft.key]);
+    expect(await page.evaluate((key) => localStorage.getItem(key), otherDraft.key)).toBe(otherDraft.text);
+  });
+}
 
 test('two dirty tabs retain independent drafts and saving one preserves the other', async ({ page }) => {
   await page.goto('animation-editor/');

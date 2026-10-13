@@ -18,6 +18,8 @@ export interface RigEditorSceneOptions {
   readonly ikChains?: readonly TwoBoneIKDefinition[];
 }
 
+type RigSessionReplacementReason = 'load' | 'import' | 'reload-export' | 'reload-original';
+
 export class RigEditorScene extends Phaser.Scene {
   editor: RigEditor | undefined;
   private definition: CharacterDefinition | undefined;
@@ -26,6 +28,11 @@ export class RigEditorScene extends Phaser.Scene {
   private loadSession = 0;
   private readonly characterUrl: string;
   private readonly ikChains: readonly TwoBoneIKDefinition[];
+  private replacementReason: RigSessionReplacementReason = 'load';
+
+  get sessionReplacementReason(): RigSessionReplacementReason {
+    return this.replacementReason;
+  }
 
   get characterId(): string {
     return this.definition?.id ?? 'unknown';
@@ -70,17 +77,17 @@ export class RigEditorScene extends Phaser.Scene {
       const definition = await loadSceneCharacter(this, url);
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
       this.definition = definition;
-      this.installRig(definition.rigFile!);
+      this.installRig(definition.rigFile!, 'load');
     } catch (error) {
       if (session === this.loadSession && this.sys.isActive()) this.onError(String(error));
     }
   }
 
-  reloadRig(json: RigJsonDefinition, filename?: string): void {
+  reloadRig(json: RigJsonDefinition, filename?: string, reason: 'import' | 'reload-export' = 'import'): void {
     const previous = this.loadedFilename;
     if (filename) this.loadedFilename = filename;
     try {
-      this.installRig(json);
+      this.installRig(json, reason);
     } catch (error) {
       this.loadedFilename = previous;
       throw error;
@@ -92,14 +99,14 @@ export class RigEditorScene extends Phaser.Scene {
     const previous = this.loadedFilename;
     this.loadedFilename = undefined;
     try {
-      this.installRig(this.definition.rigFile);
+      this.installRig(this.definition.rigFile, 'reload-original');
     } catch (error) {
       this.loadedFilename = previous;
       throw error;
     }
   }
 
-  private installRig(file: RigJsonDefinition): void {
+  private installRig(file: RigJsonDefinition, reason: RigSessionReplacementReason): void {
     const definition = this.definition;
     if (!definition) throw new Error('No character is loaded.');
     // The original file and character skeleton are already validated and owned.
@@ -137,6 +144,7 @@ export class RigEditorScene extends Phaser.Scene {
     this.puppet?.destroy();
     this.puppet = puppet;
     this.editor = editor;
+    this.replacementReason = reason;
     this.onReady(editor);
   }
 }

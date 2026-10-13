@@ -93,6 +93,35 @@ test('saving, discarding, or undoing to a clean baseline removes the draft and c
   assert.equal(values.size, 0);
 });
 
+test.each([false, true])(
+  'explicit discard cancels pending writes and removes only its owned draft (flushed: %s)',
+  (flushed) => {
+    const { recovery, session, edit, values, confirm } = fixture();
+    recovery.bind(session);
+    edit(44);
+    if (flushed) recovery.flush();
+    const otherKey = 'paper-puppeteer:draft:a:session:other-tab';
+    const other = JSON.stringify({ version: 1, source: 'original', data: { value: 99 } });
+    values.set(otherKey, other);
+    recovery.discard();
+    recovery.bind({ ...session, snapshot: () => ({ value: 0 }), dirty: () => false }, { recover: false });
+    vi.advanceTimersByTime(1000);
+    assert.deepEqual([...values], [[otherKey, other]]);
+    assert.equal(confirm.mock.calls.length, 0);
+  },
+);
+
+test('discard removes a recovered draft before its pending replacement is written', () => {
+  const { recovery, session, values } = fixture(
+    JSON.stringify({ version: 1, source: 'original', data: { value: 44 } }),
+  );
+  recovery.bind(session);
+  recovery.discard();
+  recovery.unbind();
+  vi.advanceTimersByTime(1000);
+  assert.equal(values.size, 0);
+});
+
 test.each(['pagehide', 'beforeunload', 'hidden', 'dispose'])(
   'final edits flush on %s before debounce fires',
   (event) => {

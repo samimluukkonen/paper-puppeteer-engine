@@ -28,21 +28,27 @@ export function initializeRigEditor(app: HTMLElement): () => void {
     () => scene,
     (editor) => {
       if (editor !== recoveryEditor) {
+        const recover = scene.sessionReplacementReason === 'load';
+        // The scene publishes this reason only after the replacement has initialized successfully.
+        if (!recover) recovery.discard();
         recoveryEditor = editor;
-        recovery.bind({
-          key: JSON.stringify([globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename]),
-          source: draftSource({ name: editor.state.name, rig: editor.state.workingCopy }),
-          label: 'rig',
-          snapshot: () => editor.state.recoverySnapshot,
-          dirty: () => editor.state.dirty,
-          data: (snapshot) => editor.state.createRecoveryDraft(snapshot),
-          validate: (data) => editor.state.canRestoreDraft(data),
-          restore: (data) => {
-            const restored = editor.state.restoreDraft(data);
-            if (restored) editor.refresh(false);
-            return restored;
+        recovery.bind(
+          {
+            key: JSON.stringify([globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename]),
+            source: draftSource({ name: editor.state.name, rig: editor.state.workingCopy }),
+            label: 'rig',
+            snapshot: () => editor.state.recoverySnapshot,
+            dirty: () => editor.state.dirty,
+            data: (snapshot) => editor.state.createRecoveryDraft(snapshot),
+            validate: (data) => editor.state.canRestoreDraft(data),
+            restore: (data) => {
+              const restored = editor.state.restoreDraft(data);
+              if (restored) editor.refresh(false);
+              return restored;
+            },
           },
-        });
+          { recover },
+        );
       }
       recovery.update();
     },

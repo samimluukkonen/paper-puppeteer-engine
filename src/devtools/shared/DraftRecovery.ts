@@ -211,6 +211,23 @@ export class DraftRecovery<Snapshot> {
     }
   }
 
+  /** Forget only this controller's discarded edits; other tabs and retained drafts keep their storage. */
+  discard(): void {
+    this.cancelTimer();
+    try {
+      if (this.session && this.owner) this.removeDraft(this.ownedKey(this.session), this.persisted);
+      if (this.recovered) this.removeDraft(this.recovered.key, this.recovered.text);
+    } catch {
+      this.reportStatus('Could not remove the discarded browser draft.');
+    } finally {
+      this.snapshot = undefined;
+      this.dirty = undefined;
+      this.persisted = null;
+      this.recovered = undefined;
+      this.pendingFlush = false;
+    }
+  }
+
   unbind(): void {
     this.flush();
     this.session = undefined;
