@@ -147,6 +147,30 @@ test('oversized PNG dimensions are rejected from their header before image decod
   assert.equal(f.error.mock.calls.length, 1);
 });
 
+test('browser decoding failures emit one load error and cannot complete the image', async () => {
+  const f = fixture();
+  const image = f.image();
+  image.decode.mockImplementation(() => image.file.onProcessError());
+  image.load();
+  await vi.waitFor(() => assert.equal(image.processError.mock.calls.length, 1));
+  assert.equal(f.error.mock.calls.length, 1);
+  assert.match(getCharacterTextureLimitError(image.file)!.message, /Could not decode image "body"/);
+  image.file.onProcessError();
+  image.file.onProcessComplete();
+  assert.equal(image.processError.mock.calls.length, 1);
+  assert.equal(image.complete.mock.calls.length, 0);
+  assert.equal(f.error.mock.calls.length, 1);
+});
+
+test('cancelled image decoding cannot report a late processing failure', () => {
+  const f = fixture();
+  const image = f.image();
+  f.cancel();
+  image.file.onProcessError();
+  assert.equal(f.error.mock.calls.length, 0);
+  assert.equal(image.processError.mock.calls.length, 0);
+});
+
 test.each([
   { label: 'JPEG', bytes: [255, 216, 255, 224, 0, 16] },
   { label: 'GIF', bytes: [...new TextEncoder().encode('GIF89a')] },

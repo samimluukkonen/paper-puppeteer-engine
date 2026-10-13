@@ -49,6 +49,21 @@ test('non-PNG content claiming to be PNG is rejected and a reload can load norma
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
 });
 
+test('a valid PNG header with corrupt image data rejects the character load', async ({ page }) => {
+  const artwork = '**/characters/demo-puppet/images/paper-torso.png';
+  const header = Buffer.alloc(24);
+  header.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
+  header.writeUInt32BE(2, 16);
+  header.writeUInt32BE(3, 20);
+  await page.route(artwork, (route) => route.fulfill({ body: header, contentType: 'image/png' }));
+  await page.goto('rig-editor/');
+  await expect(page.locator('#inspector')).toContainText('Could not decode image "paper-torso"');
+  await expect(page.locator('#session-status')).toHaveText('');
+  await page.unroute(artwork);
+  await page.reload();
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+});
+
 test('oversized image responses fail at the byte limit and retain a usable page', async ({ page }) => {
   const artwork = '**/characters/demo-puppet/images/paper-torso.png';
   await page.route(artwork, (route) =>

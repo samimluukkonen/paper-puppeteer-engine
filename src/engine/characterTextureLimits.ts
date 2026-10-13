@@ -135,6 +135,7 @@ export class CharacterTextureBudget {
     const loaded = file.onLoad.bind(file);
     const errored = file.onError.bind(file);
     const process = file.onProcess.bind(file);
+    const processError = file.onProcessError.bind(file);
     const complete = file.onProcessComplete.bind(file);
     let failed = false;
     let finished = false;
@@ -168,7 +169,7 @@ export class CharacterTextureBudget {
       try {
         file.loader.emit('loaderror', file);
       } finally {
-        file.onProcessError();
+        processError();
       }
     };
     file.onProgress = (event): void => {
@@ -198,6 +199,10 @@ export class CharacterTextureBudget {
     };
     file.onError = (xhr, event): void => {
       if (active() && !failed && !finished) errored(xhr, event);
+    };
+    file.onProcessError = (): void => {
+      if (!active() || failed || finished) return;
+      rejectProcessing(new CharacterTextureLimitError(`Could not decode image "${file.key}".`));
     };
     file.onProcess = (): void => {
       if (!active() || failed || finished) return;
