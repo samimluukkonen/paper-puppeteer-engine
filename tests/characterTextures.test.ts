@@ -36,7 +36,14 @@ function fixture(
     },
   },
 ) {
-  const load = Object.assign(new EventEmitter(), { image: vi.fn(), prefix: '', imageLoadType: 'HTMLImageElement' });
+  const load = Object.assign(new EventEmitter(), {
+    image: vi.fn(),
+    prefix: '',
+    imageLoadType: 'HTMLImageElement',
+    list: new Set<Phaser.Loader.File>(),
+    inflight: new Set<Phaser.Loader.File>(),
+    queue: new Set<Phaser.Loader.File>(),
+  });
   const events = new EventEmitter();
   const scene = { textures, load, events } as unknown as Phaser.Scene;
   const assertClean = () => {
@@ -60,6 +67,42 @@ test('loaded character keys reject different image URLs across scenes before que
   assert.equal(second.load.image.mock.calls.length, 0);
   second.assertClean();
 });
+
+for (const phase of ['list', 'inflight', 'queue'] as const) {
+  test.each(['body.png', 'other.png'])(
+    `a host image in ${phase} rejects character reuse of its key (%s) before queueing`,
+    (path) => {
+      const PhaserFile = createRequire(import.meta.url)(
+        '../node_modules/phaser/src/loader/File.js',
+      ) as typeof Phaser.Loader.File;
+      const { scene, load, assertClean } = fixture();
+      const hostFile = new PhaserFile(scene.load, {
+        type: 'image',
+        key: 'body',
+        url: `https://example.test/first/${path}`,
+        cache: false,
+      });
+      load[phase].add(hostFile);
+      const progress: unknown = Reflect.get(hostFile, 'onProgress');
+      assert.throws(
+        () =>
+          queueCharacterTextures(scene, character('first', { extra: 'extra.png', body: 'body.png' }), {
+            maxImageBytes: 1,
+          }),
+        /Texture key "body" is already pending/,
+      );
+      assert.equal(load.image.mock.calls.length, 0);
+      assert.strictEqual(Reflect.get(hostFile, 'onProgress'), progress);
+      assert.isTrue(load[phase].has(hostFile));
+      assertClean();
+      load[phase].delete(hostFile);
+      queueCharacterTextures(scene, character('second'));
+      assert.equal(load.image.mock.calls.length, 1);
+      load.emit('complete');
+      assertClean();
+    },
+  );
+}
 
 test('shared character images are reused and different texture managers remain independent', () => {
   const first = fixture();

@@ -35,6 +35,9 @@ export function queueCharacterTextures(
     characterTextures.set(scene.textures, registered);
   }
   const resources = Object.keys(definition.textures).map((key) => ({ key, url: definition.textureUrl(key) }));
+  const pendingKeys = new Set<string>();
+  for (const files of [scene.load.list, scene.load.inflight, scene.load.queue])
+    for (const file of files ?? []) if (file.type === 'image') pendingKeys.add(file.key);
   // Check the complete character before queueing any images or acquiring reservations.
   for (const { key, url } of resources) {
     // Phaser stores textures in an ordinary object and calls its hasOwnProperty method.
@@ -45,7 +48,15 @@ export function queueCharacterTextures(
       throw new Error(
         `Texture key "${key}" is already assigned to "${previous.url}"; character "${definition.id}" requests "${url}". Use unique texture keys for different images.`,
       );
-    if (!scene.textures.exists(key)) budget.checkInlineImage(key, url);
+    if (!scene.textures.exists(key)) {
+      // Phaser silently drops duplicate files without emitting addfile. Reusing
+      // one here would bypass this load's guards and share cancellation ownership.
+      if (pendingKeys.has(key))
+        throw new Error(
+          `Texture key "${key}" is already pending in this scene's loader. Finish or cancel that load before queueing the character.`,
+        );
+      budget.checkInlineImage(key, url);
+    }
   }
   const pending = new Map<string, TextureReservation>();
   let settled = false;
