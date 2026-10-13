@@ -44,7 +44,10 @@ export class IKInspectorController {
     this.state = state;
     this.text.clear();
     this.context = [];
-    this.unsubscribe = state.subscribe(() => this.refresh());
+    this.unsubscribe = state.subscribe(() => {
+      // A hidden, empty inspector has no clock-dependent presentation to reconcile.
+      if (state.selectedIKConstraintId || this.snapshot.constraintId) this.refresh();
+    });
     this.refresh();
   }
   unbind(): void {
@@ -135,7 +138,25 @@ export class IKInspectorController {
           : [],
       ),
     });
-    if (JSON.stringify(snapshot) === JSON.stringify(this.snapshot)) return;
+    const previous = this.snapshot;
+    if (
+      snapshot.constraintId === previous.constraintId &&
+      snapshot.ready === previous.ready &&
+      snapshot.disabledReason === previous.disabledReason &&
+      snapshot.dragging === previous.dragging &&
+      snapshot.fields.length === previous.fields.length &&
+      snapshot.fields.every((field, index) => {
+        const before = previous.fields[index]!;
+        return (
+          field.property === before.property &&
+          field.text === before.text &&
+          field.keyed === before.keyed &&
+          field.temporary === before.temporary &&
+          field.valid === before.valid
+        );
+      })
+    )
+      return;
     this.snapshot = snapshot;
     for (const listener of this.listeners) listener();
   }

@@ -22,7 +22,13 @@ class NavigationElement extends EventTarget {
   getBoundingClientRect() {
     return { left: 0, width: this.width };
   }
-  setAttribute() {}
+  private readonly attributes = new Map<string, string>();
+  getAttribute(name: string) {
+    return this.attributes.get(name) ?? null;
+  }
+  setAttribute(name: string, value: string) {
+    this.attributes.set(name, value);
+  }
   // Native browser AbortSignals permit many listeners.
   override addEventListener(
     type: string,

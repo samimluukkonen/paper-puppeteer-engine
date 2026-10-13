@@ -167,6 +167,8 @@ export class TimelineController {
   }
 
   showError(message: string): void {
+    // Discard the adapter's obsolete session, releasing authored snapshots and gesture capture.
+    this.bind(new AnimationEditorState());
     this.session.showError(message);
   }
 

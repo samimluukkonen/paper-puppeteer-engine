@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.7-5
+
+The v0.5.7.5 [Animation Editor UX and production hardening](docs/animation-editor-ux-verification.md) completes v0.5.7. Toolbar and keyboard deletion share typed bone/IK/event dispatch; Escape clears IK-key selection and tool dismissal retains background selection. Context commands provide actionable disabled explanations. Empty IK inspectors skip clock work, immutable authored-property queries reuse indexes, and fitting no longer builds selection arrays every playback frame. Failed scene adapters release obsolete timeline, bone hierarchy and workspace subscriptions. Combined regressions cover atomic history, hidden selection, immutable data and export → CharacterLoader → Puppet playback. Artist workflow/help and a local 32-bone dense browser profile document controls and measured responsiveness limits. Package version is `0.5.7-5`.
+
 ## 0.5.7-4
 
 The v0.5.7.4 [bulk keyframe retiming](docs/keyframe-retiming.md) adds proportional compression/expansion around the earliest selected time or current playhead. Tools → Retime selected keys shows actual selection counts and a read-only numerical proposal before one atomic Undo/Redo commit. Typed bone groups and IK channels preserve authored values, interpolation, FPS, duration and events. Bounds overflow and unrepresentable destinations reject the whole operation; external property collisions reuse group-move replacement. Unit and local browser regressions cover timing, selection, immutable sources, failure atomicity and exported playback. Package version is `0.5.7-4`.

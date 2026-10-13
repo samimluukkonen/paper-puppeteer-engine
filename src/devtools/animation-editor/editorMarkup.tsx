@@ -681,6 +681,11 @@ export function AnimationEditorView({
           Moving selected keys or events pauses playback. Use the timeline arrow keys to nudge; Shift moves ten steps.
         </p>
         <p>
+          Text fields, selects, editable text and dialogs keep native shortcuts. Space on a button or disclosure
+          activates that control. Tool-panel arrows and Delete leave background keys alone; Escape dismisses the tool or
+          its preview while preserving selection. Disabled commands explain the required selection or setup.
+        </p>
+        <p>
           Collapsed bone diamonds summarize timing; expand the bone to edit individual keys. Search finds bone IDs,
           properties, IK targets and Events, keeping ancestors for context. Clear Filters restores your layout; Reveal
           Selection also opens selected tracks. Commands affect all selected keys, including hidden keys. Zoom reveals a
@@ -701,6 +706,22 @@ export function AnimationEditorView({
               </tr>
             </thead>
             <tbody>
+              <tr>
+                <th scope="row">Space / Home / End</th>
+                <td>Play or pause / restart / seek to end outside typing controls.</td>
+              </tr>
+              <tr>
+                <th scope="row">Ctrl/Cmd + Z / Shift + Z</th>
+                <td>Undo / Redo one authored edit. Navigation and preview preferences do not enter history.</td>
+              </tr>
+              <tr>
+                <th scope="row">+ / − / F / [ / ]</th>
+                <td>With timeline focus: zoom in / out, fit animation, select previous / next bone-property key.</td>
+              </tr>
+              <tr>
+                <th scope="row">M</th>
+                <td>Toggle mirrored pose preview with workspace focus and a valid symmetry mapping.</td>
+              </tr>
               <tr>
                 <th scope="row">Ctrl/Cmd-click</th>
                 <td>Add or remove a key; keep the primary key and playhead where possible.</td>

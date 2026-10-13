@@ -510,6 +510,13 @@ export class AnimationEditorState {
   selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
     return this.batchNotifications(() => this.selectionCommands.selectKeyframeMarquee(box, additive));
   }
+  /** The toolbar and keyboard share the same typed selection dispatch. */
+  deleteTimelineSelection(): boolean {
+    if (this.selectedEvent) return this.deleteSelectedEvent();
+    if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
+    return this.deleteSelectedKeyframes();
+  }
+
   deleteSelectedKeyframes(): boolean {
     if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
     return this.batchNotifications(() => this.keyframes.deleteSelectedKeyframes());

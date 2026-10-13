@@ -106,3 +106,24 @@ Profile dense editor authoring with `VITE_PROFILE=1 npx vitest run tests/animati
 ## Onion-skin sampling and rendering
 
 Run `VITE_PROFILE=1 npx vitest run tests/animationOnionSkinningPerformance.test.ts --silent=false --reporter=verbose` for local CPU diagnostics with one or three ghosts per direction. The workload uses 32 tracked bones, 96 attachment slots, a 60-second animation, nonsequential scrubbing and normal playback in smooth/stepped modes. Normal tests assert bounded pooling and no new images, containers or texture checks after initial allocation; optional timings have no thresholds and exclude GPU/browser costs. See [production verification](animation-editor-onion-skinning-verification.md#performance-findings) for workload details and one local measurement.
+
+## Dense editor workflow
+
+Run `PLAYWRIGHT_CHANNEL=chrome npm run profile:timeline -- --workflow` locally (or omit the channel for installed Playwright Chromium). The diagnostic uses three fresh 1440×900 pages, extends the shipped rig to 32 bones and loads a 12.7-second smooth clip with 128 rows and three properties per bone, two three-channel IK tracks and 128 JSON events. That is 12,288 bone-property keys plus 768 IK-property keys. The original `profile:timeline` summary/expansion diagnostic remains available without `--workflow`.
+
+The workflow measures synchronous root expansion, 64 additive key selections, property search, zoom and 30 ruler scrubs, including layout. Real pointer input exercises group dragging and Escape cancellation; event-to-next-animation-frame samples include browser scheduling. Separate 30-frame playback samples with onion skinning off/on record observed frame intervals and timeline-track DOM mutations. These are local browser observations, not pure handler CPU times or GPU-independent benchmarks, and have no CI timing thresholds.
+
+One local headless Chrome run measured these medians across three pages:
+
+| Interaction                                       | Median (ms) |
+| ------------------------------------------------- | ----------: |
+| Expand root (384 property markers)                |        19.9 |
+| Add 64 keys to selection, total                   |        88.7 |
+| Search rotation (opens matching property groups)  |       265.2 |
+| Zoom one step                                     |        39.7 |
+| Ruler scrub, per change                           |         2.5 |
+| Pointer move to next frame (hover and group drag) |         8.0 |
+| Observed playback frame interval                  |        23.3 |
+| Observed frame interval with onion skins          |        23.9 |
+
+Playback caused **zero timeline-track DOM mutations** in all six off/on samples. These intervals are not a promise of a particular frame rate. Search opens many groups and still builds their individual property markers; dense filtering has a noticeable one-time cost, and expanding every track can cost more. No virtualized timeline was introduced. Use filters and selective expansion for large clips; rerun the diagnostic for your hardware and animation. See [the milestone verification](animation-editor-ux-verification.md) for lifecycle, React synchronization and regression coverage.

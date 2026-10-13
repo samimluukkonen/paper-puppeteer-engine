@@ -57,7 +57,8 @@ export class AnimationEditorSelectionCommands {
     this.actions.cancelTimelineDrag();
     const keys = this.selection.clearKey();
     const event = this.selection.clearEvent();
-    if (keys || event) this.actions.notify();
+    const ik = this.selection.clearIKKey();
+    if (keys || event || ik) this.actions.notify();
   }
 
   /** Resolve identity through the central tolerance policy, then select and seek together. */

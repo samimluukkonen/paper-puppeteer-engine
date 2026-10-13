@@ -69,11 +69,14 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
       ref={panel}
       className="animation-popover animation-mirror-tools"
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing) return;
         if (event.key === 'Escape' && controller.getSnapshot().preview) {
           event.preventDefault();
+          event.stopPropagation();
           controller.togglePreview();
         } else if (event.key === 'Escape') {
           event.preventDefault();
+          event.stopPropagation();
           event.currentTarget.open = false;
           document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
         }

@@ -9,8 +9,14 @@ class KeyboardElement extends EventTarget {
   tagName = 'DIV';
   isContentEditable = false;
   panel = false;
+  tool = false;
+  dialog = false;
   closest(selector: string) {
-    return selector === '.timeline-panel' && this.panel ? this : null;
+    return (selector === '.timeline-panel' && this.panel) ||
+      (selector === '[data-tool-panel]' && this.tool) ||
+      (selector === 'dialog' && this.dialog)
+      ? this
+      : null;
   }
   contains(element: Element): boolean {
     return element === (this as unknown as Element);
@@ -200,5 +206,32 @@ test('zoom, fit and adjacent shortcuts stay in the timeline with typing, modifie
   assert.strictEqual(state.selectedKeys, selected);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
+  keyboard.dispose();
+});
+
+test('tool navigation, dialogs and unrelated controls preserve background authored selection', () => {
+  const { browser, app, state, keyboard } = fixture();
+  state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
+  const working = state.workingAnimation;
+  const selection = state.selectedKeys;
+  const unrelated = new KeyboardElement();
+  for (const target of [unrelated, app]) {
+    app.tool = true;
+    for (const command of ['Delete', 'Backspace', 'ArrowRight', 'Escape']) {
+      const event = key(command, {}, target);
+      browser.dispatchEvent(event);
+      assert.isFalse(event.defaultPrevented);
+    }
+  }
+  app.tool = false;
+  app.dialog = true;
+  for (const command of ['Delete', 'ArrowRight', 'Home', 'End', ' ', 'z']) {
+    const event = key(command, { code: command === ' ' ? 'Space' : '', ctrlKey: command === 'z' }, app);
+    browser.dispatchEvent(event);
+    assert.isFalse(event.defaultPrevented);
+  }
+  assert.strictEqual(state.workingAnimation, working);
+  assert.strictEqual(state.selectedKeys, selection);
+  assert.equal(state.historyLength, 0);
   keyboard.dispose();
 });

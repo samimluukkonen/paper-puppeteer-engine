@@ -26,12 +26,22 @@ export class TimelineKeyboardController {
         if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
           return;
         if (isDialogTarget(event.target)) return;
+        // Body/canvas focus supports playback; controls outside this editor own their shortcuts.
+        if (event.target instanceof Element && !this.app.contains(event.target) && event.target.tagName !== 'BODY')
+          return;
         if (event.key === 'Escape' && (this.state.keyframeDrag || this.state.eventDrag)) {
           event.preventDefault();
           this.gestures.cancelGesture();
           return;
         }
         if (event.key === 'Escape') {
+          if (
+            event.altKey ||
+            event.ctrlKey ||
+            event.metaKey ||
+            (event.target instanceof Element && event.target.closest('[data-tool-panel]'))
+          )
+            return;
           event.preventDefault();
           if (this.gestures.hasMarquee()) this.gestures.cancelGesture();
           else this.state.clearTimelineSelection();
@@ -109,19 +119,20 @@ export class TimelineKeyboardController {
           }
           return;
         }
-        if (this.nudgeSelection(event)) return;
+        // Tool popovers own their navigation and dismissal, without nudging/deleting background keys.
+        const inToolPanel = event.target instanceof Element && !!event.target.closest('[data-tool-panel]');
+        if (!inToolPanel && this.nudgeSelection(event)) return;
         if (
           (event.key === 'Delete' || event.key === 'Backspace') &&
           !event.altKey &&
           !event.ctrlKey &&
-          !event.metaKey
+          !event.metaKey &&
+          !inToolPanel
         ) {
           // Prevent native Backspace navigation even when there is no selected key.
           event.preventDefault();
           if (!event.repeat) {
-            if (this.state.selectedEvent) this.state.deleteSelectedEvent();
-            else if (this.state.selectedIKKeyframe) this.state.deleteSelectedIKKeyframe();
-            else this.state.deleteSelectedKeyframes();
+            this.state.deleteTimelineSelection();
           }
           return;
         }

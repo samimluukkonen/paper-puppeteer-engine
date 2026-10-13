@@ -1,5 +1,6 @@
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { retimeSelectionReason } from './commandAvailability.js';
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 
 export interface KeyframeRetimingSnapshot {
@@ -98,13 +99,12 @@ export class KeyframeRetimingController {
   private buildSnapshot(): KeyframeRetimingSnapshot {
     const count = this.state?.selectedIKKeyframe ? 1 : (this.state?.selectedKeys.length ?? 0);
     const scale = Number(this.scale);
-    const reason = !this.state?.workingAnimation
-      ? 'Load a valid animation first.'
-      : !count
-        ? 'Select bone keyframes or an IK channel key to retime.'
-        : !Number.isFinite(scale) || scale <= 0
-          ? 'Scale must be a finite number greater than zero.'
-          : '';
+    const selectionReason = this.state ? retimeSelectionReason(this.state) : 'Load a valid animation first.';
+    const reason = selectionReason
+      ? selectionReason
+      : !Number.isFinite(scale) || scale <= 0
+        ? 'Scale must be a finite number greater than zero.'
+        : '';
     return { count, scale: this.scale, anchor: this.anchor, reason, preview: this.preview, feedback: this.feedback };
   }
   private refresh(): void {

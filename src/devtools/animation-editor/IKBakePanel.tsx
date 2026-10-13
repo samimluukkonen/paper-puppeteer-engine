@@ -15,8 +15,9 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
         controller.setPanelOpen(event.currentTarget.open);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') {
+        if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
           event.preventDefault();
+          event.stopPropagation();
           controller.setPanelOpen(false);
           event.currentTarget.open = false;
           document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
@@ -107,15 +108,29 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
           <button
             type="button"
             disabled={!plan}
+            aria-describedby="animation-bake-reason"
             aria-pressed={state.preview}
             onClick={() => controller.togglePreview()}
           >
             {state.preview ? 'Hide Bake Preview' : 'Preview Bake'}
           </button>
-          <button type="button" disabled={!plan} onClick={() => controller.commit()}>
+          <button
+            type="button"
+            disabled={!plan}
+            aria-describedby="animation-bake-reason"
+            onClick={() => controller.commit()}
+          >
             Bake IK
           </button>
         </div>
+        <p id="animation-bake-reason">
+          {!plan
+            ? state.pending
+              ? 'Wait for the bake proposal to finish.'
+              : state.issues.map((issue) => issue.message).join(' ') ||
+                'Select enabled constraints and a valid sampling FPS to prepare a bake.'
+            : ''}
+        </p>
         <p>
           Violet overlay: proposed baked animation. Original IK animation stays visible underneath. Scrub the timeline
           to compare; hide preview to inspect the original. Close this panel to clear the preview.

@@ -1,6 +1,7 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { AnimationFileController } from './AnimationFileController.js';
+import { retimeSelectionReason, setCommandAvailability } from './commandAvailability.js';
 import type { TimelineInputController } from './TimelineInputController.js';
 import type { TimelineSnapSettings } from './timelineSnapping.js';
 
@@ -131,8 +132,7 @@ export class TimelineSessionController {
     this.deleteKey.addEventListener(
       'click',
       () => {
-        if (this.state.selectedEvent) this.state.deleteSelectedEvent();
-        else this.state.deleteSelectedKeyframes();
+        this.state.deleteTimelineSelection();
       },
       options,
     );
@@ -247,6 +247,35 @@ export class TimelineSessionController {
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled = state.selectedKeys.length === 0 && !state.selectedIKKeyframe && !state.selectedEvent;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
+    setCommandAvailability(
+      this.deleteKey,
+      deleteDisabled ? 'Select keys or an event in the timeline to delete.' : '',
+      'Delete the complete selection (Delete / Backspace), including hidden keys',
+    );
+    setCommandAvailability(
+      this.element<HTMLButtonElement>('#animation-retime-open'),
+      retimeSelectionReason(state),
+      'Scale selected key times around the first selected time or playhead',
+    );
+    // Pair configuration must remain reachable when the current mapping needs repair.
+    setCommandAvailability(
+      this.element<HTMLButtonElement>('#animation-mirror-open'),
+      !state.rig ? 'Load a character to configure symmetry pairs.' : !animation ? 'Load a valid animation first.' : '',
+      'Configure bone pairs, preview and mirror authored bone motion',
+    );
+    const bakeReason =
+      !animation || !state.rig
+        ? 'Load a valid animation and rig first.'
+        : !(state.rig.ik ?? []).some(
+              (entry) => entry.enabled !== false && !animation.disabledIKConstraints?.includes(entry.name),
+            )
+          ? 'No active rig IK constraints. Undo a bake or load a rig with enabled IK.'
+          : '';
+    setCommandAvailability(
+      this.element<HTMLButtonElement>('#animation-bake-open'),
+      bakeReason,
+      'Select IK constraints and sampling FPS, then preview before baking',
+    );
     const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
     setText(
@@ -265,6 +294,24 @@ export class TimelineSessionController {
     setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
     const pasteDisabled = !!state.selectedIKConstraintId || !animation || !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
+    const clipboardReason = state.selectedIKConstraintId
+      ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
+      : copyDisabled
+        ? 'Select bone keys or an event first.'
+        : '';
+    setCommandAvailability(this.copyKeys, clipboardReason, 'Copy selection (Ctrl/Cmd+C in timeline)');
+    setCommandAvailability(this.duplicateKeys, clipboardReason, 'Duplicate selection (Ctrl/Cmd+D in timeline)');
+    setCommandAvailability(
+      this.pasteKeys,
+      state.selectedIKConstraintId
+        ? 'Select a bone track or event track to paste.'
+        : !animation
+          ? 'Load a valid animation first.'
+          : !state.timelineClipboard
+            ? 'Copy bone keys or an event first.'
+            : '',
+      'Paste at the playhead (Ctrl/Cmd+V in timeline)',
+    );
     setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
     setText(
       this.sessionStatus,

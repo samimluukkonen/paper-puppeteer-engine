@@ -13,8 +13,9 @@ export function KeyframeRetimingPanel({ controller }: { controller: KeyframeReti
         if (!event.currentTarget.open) controller.hidePreview();
       }}
       onKeyDown={(event) => {
-        if (event.key !== 'Escape') return;
+        if (event.key !== 'Escape' || event.nativeEvent.isComposing) return;
         event.preventDefault();
+        event.stopPropagation();
         event.currentTarget.open = false;
         controller.hidePreview();
         document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
@@ -66,10 +67,20 @@ export function KeyframeRetimingPanel({ controller }: { controller: KeyframeReti
         </p>
         <p>Unselected destination keys on the same property are replaced, like group movement.</p>
         <div className="animation-history">
-          <button type="button" disabled={!!state.reason} onClick={() => controller.previewRetiming()}>
+          <button
+            type="button"
+            disabled={!!state.reason}
+            aria-describedby="animation-retime-reason"
+            onClick={() => controller.previewRetiming()}
+          >
             Preview
           </button>
-          <button type="button" disabled={!!state.reason} onClick={() => controller.apply()}>
+          <button
+            type="button"
+            disabled={!!state.reason}
+            aria-describedby="animation-retime-reason"
+            onClick={() => controller.apply()}
+          >
             Apply
           </button>
         </div>

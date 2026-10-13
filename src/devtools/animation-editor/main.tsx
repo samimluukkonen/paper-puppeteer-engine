@@ -73,11 +73,14 @@ const unmount = mountView(app, editorView, (app) => {
       recovery.bind(state, id);
     },
     (message) => {
+      releaseWorkspaceSelection?.();
+      releaseWorkspaceSelection = undefined;
       recovery.unbind();
       mirrorTools.unbind();
       ikBake.unbind();
       retiming.unbind();
       ikInspector.unbind();
+      inspector.unbind();
       timeline.showError(message);
     },
     {

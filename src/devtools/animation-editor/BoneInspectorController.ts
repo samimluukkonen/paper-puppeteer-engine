@@ -228,14 +228,22 @@ export class BoneInspectorController {
     if (this.cancel.disabled !== cancelDisabled) this.cancel.disabled = cancelDisabled;
   }
 
-  dispose(): void {
+  /** A failed/replaced scene must release the previous rig and its selectable hierarchy. */
+  unbind(): void {
     this.unsubscribe?.();
-    this.abort.abort();
+    this.unsubscribe = undefined;
     this.hierarchyLifetime.abort();
     this.state = undefined;
+    this.hierarchy.replaceChildren();
     this.buttons.clear();
     this.hierarchyEntries.length = 0;
     this.selectedButton = undefined;
+    this.render(true);
+  }
+
+  dispose(): void {
+    this.unbind();
+    this.abort.abort();
     this.rows.clear();
   }
 }

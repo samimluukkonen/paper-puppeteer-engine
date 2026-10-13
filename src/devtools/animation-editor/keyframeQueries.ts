@@ -6,6 +6,8 @@ import { type Milliseconds } from './timeUnits.js';
 
 /** Authored presence anywhere in a track, independent of the playhead and evaluated pose. */
 export function getAuthoredBoneProperties(animation: AnimationData, boneId: string): TransformProperty[] {
+  const properties = propertyIndexes(animation, boneId);
+  if (properties !== false) return transformProperties.filter((property) => properties.has(property));
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   return transformProperties.filter((property) => keys.some((key) => key[property] !== undefined));
 }

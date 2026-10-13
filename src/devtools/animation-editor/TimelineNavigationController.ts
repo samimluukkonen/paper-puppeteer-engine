@@ -1,4 +1,5 @@
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { setCommandAvailability } from './commandAvailability.js';
 import { clampTime } from './timeline.js';
 import {
   centerTimelineTime,
@@ -247,7 +248,16 @@ export class TimelineNavigationController {
     if (state.isPlaying && this.follow.checked)
       this.inset.scrollLeft = followTimelineTime(this.view, state.currentTime);
     this.renderTime();
-    this.element<HTMLButtonElement>('#timeline-fit-selection').disabled = !this.selectedTimes().length;
+    const hasSelection = !!state.selectedIKKeyframe || !!state.selectedEvent || state.selectedKeys.length > 0;
+    setCommandAvailability(
+      this.element<HTMLButtonElement>('#timeline-fit-selection'),
+      !state.workingAnimation
+        ? 'Load a valid animation first.'
+        : !hasSelection
+          ? 'Select bone keys, an IK key or an event to fit, including hidden selections.'
+          : '',
+      'Fit selected keyframes or event, including hidden selections',
+    );
     this.element<HTMLButtonElement>('#timeline-zoom-in').disabled =
       !state.workingAnimation || this.zoom >= MAX_TIMELINE_ZOOM;
     this.element<HTMLButtonElement>('#timeline-zoom-out').disabled =
