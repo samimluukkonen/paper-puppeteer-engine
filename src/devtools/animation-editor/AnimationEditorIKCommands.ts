@@ -12,12 +12,11 @@ import type { Rig } from '../../engine/Rig.js';
 import { freezeData } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
-import type { AnimationEditorKeyframeCommands } from './AnimationEditorKeyframeCommands.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { evaluateIKTarget } from './ikInspectorSampling.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';
-import { animationDurationSeconds, snapKeyframeTime } from './timeline.js';
+import type { AnimationEditorTimelineSnapping } from './timelineSnapping.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 interface IKCommandActions {
@@ -118,7 +117,7 @@ export class AnimationEditorIKCommands {
     private readonly document: AnimationEditorDocument,
     private readonly selection: AnimationEditorSelection,
     private readonly playback: AnimationEditorPlayback,
-    private readonly keyframes: Pick<AnimationEditorKeyframeCommands, 'keyframeSnapMode' | 'keyframeFPS'>,
+    private readonly snapping: AnimationEditorTimelineSnapping,
     private readonly actions: IKCommandActions,
   ) {}
 
@@ -130,9 +129,6 @@ export class AnimationEditorIKCommands {
   }
   private get currentTime(): Seconds {
     return this.playback.currentTime;
-  }
-  private get duration(): Seconds {
-    return animationDurationSeconds(this.working);
   }
 
   get selectedIKConstraintId(): string | null {
@@ -276,12 +272,15 @@ export class AnimationEditorIKCommands {
   moveSelectedIKKeyframe(time: Seconds): boolean {
     const key = this.selectedIKKeyframe;
     if (!key || !Number.isFinite(time)) return false;
-    const destination = snapKeyframeTime(
-      time,
-      this.duration,
-      this.keyframes.keyframeSnapMode,
-      this.keyframes.keyframeFPS,
-    );
+    const destination = this.snapping.resolve(time, {
+      playheadTime: this.currentTime === key.time ? NaN : this.currentTime,
+      excludedKeys: [key],
+      ...(time > key.time
+        ? { minTime: key.time + Number.EPSILON * Math.max(1, key.time) * 2 }
+        : time < key.time
+          ? { maxTime: key.time - Number.EPSILON * Math.max(1, key.time) * 2 }
+          : {}),
+    }).time;
     return this.editIKKeys(
       (animation, rig) =>
         moveIKPropertyKeyframe(
@@ -305,7 +304,7 @@ export class AnimationEditorIKCommands {
   }
   nudgeSelectedIKKeyframe(direction: -1 | 1, large = false): boolean {
     const key = this.selectedIKKeyframe;
-    const step = this.keyframes.keyframeSnapMode === 'frame' ? 1 / this.keyframes.keyframeFPS : 0.01;
+    const step = this.snapping.settings.enabled && this.snapping.settings.frames ? 1 / this.snapping.fps : 0.01;
     return !!key && this.moveSelectedIKKeyframe(key.time + direction * step * (large ? 10 : 1));
   }
   /** Existing pure IK mutations install through the sole document/history boundary. */

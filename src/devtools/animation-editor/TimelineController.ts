@@ -18,6 +18,7 @@ export class TimelineController {
   private readonly timeline: HTMLElement;
   private readonly ruler: HTMLElement;
   private readonly playhead: HTMLElement;
+  private readonly snapGuide: HTMLElement;
   private readonly input: TimelineInputController;
   private readonly session: TimelineSessionController;
   private readonly tracks: TimelineTracksController;
@@ -41,6 +42,7 @@ export class TimelineController {
     this.inset = this.element('.timeline-inset');
     this.ruler = this.element('#timeline-ruler');
     this.playhead = this.element('#timeline-playhead');
+    this.snapGuide = this.element('#timeline-snap-guide');
     this.filter = this.element('#timeline-filter');
     this.filterStatus = this.element('#timeline-filter-status');
     this.search = this.element('#timeline-search');
@@ -176,6 +178,7 @@ export class TimelineController {
     this.width = this.navigation.view.contentWidth;
     const animation = state.workingAnimation;
     const width = this.width;
+    state.setTimelineSnapContentWidth(width);
     const filters = state.timelineFilters;
     const visibility = state.timelineVisibility;
     // Clock-only notifications need the playhead and time controls, not row/inspector reconciliation.
@@ -247,6 +250,18 @@ export class TimelineController {
           }
           return element;
         }),
+      );
+    }
+    const guide = state.timelineSnapGuide;
+    this.snapGuide.hidden = !guide;
+    if (guide) {
+      this.snapGuide.style.left = `${timeToTimelineX(guide.time, state.duration, width)}px`;
+      this.snapGuide.dataset.type = guide.type;
+      this.snapGuide.dataset.time = String(guide.time);
+      const names = { frame: 'Frame', keyframe: 'Keyframe', event: 'Event', playhead: 'Playhead' };
+      setText(
+        this.snapGuide.querySelector<HTMLElement>('span')!,
+        `Snap: ${names[guide.type]} @ ${guide.time.toFixed(3)} s`,
       );
     }
     const playheadX = `${timeToTimelineX(state.currentTime, state.duration, width)}px`;

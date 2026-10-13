@@ -72,7 +72,8 @@ test('marquee group previews all markers, follows clicked primary, replaces coll
   await marquee(page);
   await expect(selected(page)).toHaveCount(5);
   // Pointer/marker centers use fractional CSS pixels; snap to exercise exact collisions.
-  await page.locator('#timeline-snap').selectOption('frame');
+  await page.locator('#timeline-snap-enabled').check();
+  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
   const y = await beginDrag(page, 0.5);
   await movePointer(page, 0.9, y);
   await expect.poll(() => time(page)).toBeCloseTo(0.9, 2);
@@ -120,9 +121,10 @@ test('group boundaries, frame snapping and Escape retain spacing, original prima
 }) => {
   await openEditor(page);
   await marquee(page);
-  await page.locator('#timeline-snap').selectOption('frame');
+  await page.locator('#timeline-snap-enabled').check();
+  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
   let y = await beginDrag(page, 0.35, 'torso', 'rotation');
-  await movePointer(page, 0.67, y);
+  await movePointer(page, 0.697, y);
   await expect.poll(() => time(page)).toBe(0.7);
   await expect(page.locator('.timeline-keyframe[data-dragging="true"]')).toHaveCount(5);
   await page.keyboard.press('Escape');

@@ -134,9 +134,10 @@ test('frame snap uses authored FPS/fallback, Shift bypasses, Escape/pointer canc
   page,
 }) => {
   await openEditor(page);
-  await page.locator('#timeline-snap').selectOption('frame');
+  await page.locator('#timeline-snap-enabled').check();
+  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
   let y = await beginDrag(page, 0.5);
-  await movePointer(page, 0.143, y);
+  await movePointer(page, 0.103, y);
   await expect.poll(() => time(page)).toBe(0.1);
   await page.mouse.up();
   await expect(key(page, 0.1)).toHaveCount(1);
@@ -163,7 +164,7 @@ test('frame snap uses authored FPS/fallback, Shift bypasses, Escape/pointer canc
   await (await animationControl(page, '#animation-fps')).fill('20');
   await (await animationControl(page, '#animation-fps')).press('Tab');
   y = await beginDrag(page, 0.5);
-  await movePointer(page, 0.143, y);
+  await movePointer(page, 0.147, y);
   await expect.poll(() => time(page)).toBe(0.15);
   await page.mouse.up();
   await expect(key(page, 0.15)).toHaveCount(1);
@@ -182,7 +183,8 @@ test('keyboard nudges selected keys in one operation, preserves typing shortcuts
   await expect(key(page, 0.5)).toHaveCount(1);
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await key(page, 0.5).click();
-  await page.locator('#timeline-snap').selectOption('frame');
+  await page.locator('#timeline-snap-enabled').check();
+  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
   await timeline.press('ArrowRight');
   await expect(key(page, 0.6)).toHaveCount(1);
   await timeline.press('Shift+ArrowLeft');

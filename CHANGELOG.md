@@ -9,6 +9,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.7-3
+
+The v0.5.7.3 [advanced timeline snapping and guides](docs/timeline-snapping.md) adds independent editor-only frame, keyframe, event and captured-playhead targets through one shared resolver. An 8-pixel zoom-aware threshold and documented nearest-first tie priorities keep alignment deterministic. Bone/event drags show a temporary guide, exclude moving source identities, preserve group spacing and retain transactional collision/history behavior. Shift bypasses snapping even with a stationary pointer; supported IK key movements share the resolver. Unit and local browser regressions cover target modes, geometry, clean preferences, cancellation, source immutability and Undo/Redo. Package version is `0.5.7-3`.
+
 ## 0.5.7-2
 
 The v0.5.7.2 [timeline navigation and zoom](docs/timeline-navigation.md) extends the existing shared timeline coordinates with bounded 1×–128× zoom, pointer-anchored Ctrl/Cmd-wheel zoom, native/Shift-wheel horizontal panning, fit animation/selection and center-playhead commands, continuous time input, zero-based authored frame input, optional playback edge-follow and guarded keyboard navigation. Hidden selected keys participate in fitting. Resize preserves the center time; visible-range ruler ticks keep long clips readable without rebuilding offscreen ticks. Unit/controller and local browser regressions cover navigation, editing alignment, selection preservation and immutable authored snapshots/history/exports. Package version is `0.5.7-2`.

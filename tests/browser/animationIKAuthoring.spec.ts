@@ -86,7 +86,8 @@ test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview 
   await inspector.getByRole('button', { name: 'Set IK x key', exact: true }).click();
   await expect(ruler).toHaveAttribute('aria-valuenow', held!);
   await page.getByRole('button', { name: 'Select rightArmIK x key at 0 s', exact: true }).click();
-  await page.locator('#timeline-snap').selectOption('frame');
+  await page.locator('#timeline-snap-enabled').check();
+  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
   await page.locator('#timeline').press('ArrowRight');
   await expect(page.getByRole('button', { name: 'Select rightArmIK x key at 0.1 s', exact: true })).toHaveAttribute(
     'aria-pressed',

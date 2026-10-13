@@ -2,6 +2,7 @@ import { setAttribute, setText } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { AnimationFileController } from './AnimationFileController.js';
 import type { TimelineInputController } from './TimelineInputController.js';
+import type { TimelineSnapSettings } from './timelineSnapping.js';
 
 /** Settings, animation selection, history and session status; file controls have their own lifetime. */
 export class TimelineSessionController {
@@ -27,7 +28,7 @@ export class TimelineSessionController {
   private readonly duplicateKeys: HTMLButtonElement;
   private readonly previousKey: HTMLButtonElement;
   private readonly nextKey: HTMLButtonElement;
-  private readonly snap: HTMLSelectElement;
+  private readonly snap: readonly { setting: keyof TimelineSnapSettings; input: HTMLInputElement }[];
   private externalError = '';
   private authoredFPS = '';
   private animation: AnimationEditorState['workingAnimation'] = null;
@@ -61,7 +62,10 @@ export class TimelineSessionController {
     this.duplicateKeys = this.element<HTMLButtonElement>('#timeline-duplicate-keys');
     this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
     this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
-    this.snap = this.element<HTMLSelectElement>('#timeline-snap');
+    this.snap = (['enabled', 'frames', 'keyframes', 'events', 'playhead'] as const).map((setting) => ({
+      setting,
+      input: this.element<HTMLInputElement>(`#timeline-snap-${setting}`),
+    }));
     this.files = new AnimationFileController(app, getState, () => {
       this.externalError = '';
       this.render();
@@ -76,13 +80,8 @@ export class TimelineSessionController {
       },
       options,
     );
-    this.snap.addEventListener(
-      'change',
-      () => {
-        if (this.snap.value === 'none' || this.snap.value === 'frame') this.state.setKeyframeSnapMode(this.snap.value);
-      },
-      options,
-    );
+    for (const { setting, input } of this.snap)
+      input.addEventListener('change', () => this.state.setTimelineSnapSettings({ [setting]: input.checked }), options);
     this.selection.addEventListener(
       'change',
       () => {
@@ -180,7 +179,7 @@ export class TimelineSessionController {
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
-    if (this.snap.value !== state.keyframeSnapMode) this.snap.value = state.keyframeSnapMode;
+    for (const { setting, input } of this.snap) input.checked = state.timelineSnapSettings[setting];
     const selectedId = state.selectedAnimationId ?? '';
     if (this.selection.value !== selectedId) this.selection.value = selectedId;
     const playbackLabel = state.isPlaying ? 'Pause' : 'Play';
@@ -215,7 +214,7 @@ export class TimelineSessionController {
       state.animationIds,
       animation,
       selectedId,
-      state.keyframeSnapMode,
+      state.timelineSnapSettings,
       state.dirty,
       state.canUndo,
       state.canRedo,
@@ -230,7 +229,8 @@ export class TimelineSessionController {
     ];
     if (!force && this.renderedControls && controls.every((value, index) => value === this.renderedControls![index]))
       return;
-    this.snap.disabled = !animation;
+    for (const { setting, input } of this.snap)
+      input.disabled = !animation || (setting !== 'enabled' && !state.timelineSnapSettings.enabled);
     const selectionDisabled = !state.animationIds.length;
     if (this.selection.disabled !== selectionDisabled) this.selection.disabled = selectionDisabled;
     if (this.reset.disabled !== !animation) this.reset.disabled = !animation;

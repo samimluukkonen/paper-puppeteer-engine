@@ -64,6 +64,7 @@ import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSele
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
+import { AnimationEditorTimelineSnapping, type TimelineSnapSettings } from './timelineSnapping.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
 
@@ -91,6 +92,7 @@ export class AnimationEditorState {
   );
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
+  private readonly snapping: AnimationEditorTimelineSnapping;
   private readonly keyframes: AnimationEditorKeyframeCommands;
   private readonly ik: AnimationEditorIKCommands;
   private readonly events: AnimationEditorEventCommands;
@@ -111,6 +113,10 @@ export class AnimationEditorState {
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
+    this.snapping = new AnimationEditorTimelineSnapping(
+      () => this.workingAnimation,
+      () => this.notify(),
+    );
     this.selectionCommands = new AnimationEditorSelectionCommands(this.document, this.selection, this.playback, {
       cancelTimelineDrag: () => this.cancelTimelineDrag(),
       cancelEventDrag: () => this.cancelEventDrag(),
@@ -131,6 +137,7 @@ export class AnimationEditorState {
         notify: () => this.notify(),
       },
       this.clipboard,
+      this.snapping,
     );
     this.events = new AnimationEditorEventCommands(
       this.document,
@@ -145,7 +152,7 @@ export class AnimationEditorState {
         notify: () => this.notify(),
       },
       this.clipboard,
-      this.keyframes,
+      this.snapping,
     );
     this.playbackController = new AnimationEditorPlaybackController(this.document, this.selection, this.playback, {
       notify: () => this.notify(),
@@ -156,7 +163,7 @@ export class AnimationEditorState {
       install: (animation) => this.installWorkingAnimation(animation),
       notify: () => this.notify(),
     });
-    this.ik = new AnimationEditorIKCommands(this.document, this.selection, this.playback, this.keyframes, {
+    this.ik = new AnimationEditorIKCommands(this.document, this.selection, this.playback, this.snapping, {
       cancelTimelineDrag: () => this.cancelTimelineDrag(),
       pause: () => this.pause(),
       endScrub: () => this.endScrub(),
@@ -427,6 +434,27 @@ export class AnimationEditorState {
   get keyframeDrag(): KeyframeDrag | null {
     return this.keyframes.keyframeDrag;
   }
+  get timelineSnapSettings(): TimelineSnapSettings {
+    return this.snapping.settings;
+  }
+  get timelineSnapGuide() {
+    return this.keyframeDrag?.snapGuide ?? this.eventDrag?.snapGuide ?? null;
+  }
+  setTimelineSnapSettings(patch: Partial<TimelineSnapSettings>): void {
+    this.batchNotifications(() => {
+      const previous = this.snapping.settings;
+      this.snapping.setSettings(patch);
+      if (previous === this.snapping.settings) return;
+      const key = this.keyframeDrag;
+      const event = this.eventDrag;
+      if (key) this.keyframes.previewKeyframeDrag(key.proposedTime, key.disableSnapping);
+      if (event) this.events.previewEventDrag(event.proposedTime, event.disableSnapping);
+    });
+  }
+  /** Measured content width already includes timeline zoom; this never changes authored state. */
+  setTimelineSnapContentWidth(width: number): void {
+    this.snapping.setContentWidth(width);
+  }
   get keyframeSnapMode(): KeyframeSnapMode {
     return this.keyframes.keyframeSnapMode;
   }
@@ -434,7 +462,14 @@ export class AnimationEditorState {
     return this.keyframes.keyframeFPS;
   }
   setKeyframeSnapMode(mode: KeyframeSnapMode): void {
-    this.keyframes.setKeyframeSnapMode(mode);
+    if (mode !== 'none' && mode !== 'frame') return;
+    this.setTimelineSnapSettings({
+      enabled: mode === 'frame',
+      frames: true,
+      keyframes: false,
+      events: false,
+      playhead: false,
+    });
   }
   beginKeyframeDrag(key: KeyframeSelection): boolean {
     return this.batchNotifications(() => {

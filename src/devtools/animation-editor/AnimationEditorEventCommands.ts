@@ -4,7 +4,6 @@ import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
-import type { AnimationEditorKeyframeCommands } from './AnimationEditorKeyframeCommands.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import {
@@ -15,13 +14,14 @@ import {
   updateAnimationEvent,
   type AnimationEventRef,
 } from './animationEvents.js';
-import { animationDurationSeconds, snapKeyframeTime } from './timeline.js';
+import { animationDurationSeconds, clampTime } from './timeline.js';
 import {
   copyEventSelection,
   pasteEventClipboard,
   type EventClipboard,
   type TimelineClipboard,
 } from './TimelineClipboard.js';
+import type { AnimationEditorTimelineSnapping, TimelineSnapGuide } from './timelineSnapping.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 export interface EventDrag {
@@ -30,6 +30,10 @@ export interface EventDrag {
   /** Exact authored timestamp for cancellation; seconds remain the timeline geometry unit. */
   readonly originalTimeMilliseconds: Milliseconds;
   readonly previewTime: Seconds;
+  readonly playheadTime: Seconds;
+  readonly snapGuide: TimelineSnapGuide | null;
+  readonly proposedTime: Seconds;
+  readonly disableSnapping: boolean;
   readonly previewEvent: DeepReadonly<AnimationEvent>;
 }
 
@@ -52,7 +56,7 @@ export class AnimationEditorEventCommands {
     private readonly playback: AnimationEditorPlayback,
     private readonly actions: EventCommandActions,
     private readonly clipboard: TimelineClipboard,
-    private readonly snapping: Pick<AnimationEditorKeyframeCommands, 'keyframeSnapMode' | 'keyframeFPS'>,
+    private readonly snapping: AnimationEditorTimelineSnapping,
   ) {}
 
   private get working(): ReadonlyAnimation | null {
@@ -133,8 +137,8 @@ export class AnimationEditorEventCommands {
     const step =
       playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0
         ? 1 / playback.fps
-        : this.snapping.keyframeSnapMode === 'frame'
-          ? 1 / this.snapping.keyframeFPS
+        : this.snapping.settings.enabled && this.snapping.settings.frames
+          ? 1 / this.snapping.fps
           : 0.01;
     const source = data.event.time;
     const duration = this.working.duration;
@@ -188,6 +192,7 @@ export class AnimationEditorEventCommands {
     return this.dragEvent;
   }
   beginEventDrag(ref: AnimationEventRef): boolean {
+    const playheadTime = this.playback.currentTime;
     if (!this.actions.select(ref)) return false;
     const event = this.selectedEventData!;
     this.dragEvent = Object.freeze({
@@ -196,6 +201,10 @@ export class AnimationEditorEventCommands {
       originalTimeMilliseconds: event.time,
       previewTime: toSeconds(event.time),
       previewEvent: event,
+      playheadTime,
+      snapGuide: null,
+      proposedTime: toSeconds(event.time),
+      disableSnapping: false,
     });
     this.actions.notify();
     return true;
@@ -203,15 +212,18 @@ export class AnimationEditorEventCommands {
   previewEventDrag(time: Seconds, disableSnapping = false): boolean {
     const drag = this.dragEvent;
     if (!drag || !Number.isFinite(time)) return false;
-    const previewTime = snapKeyframeTime(
-      time,
-      this.duration,
-      disableSnapping ? 'none' : this.snapping.keyframeSnapMode,
-      this.snapping.keyframeFPS,
-    );
+    const result = this.snapping.resolve(time, {
+      playheadTime: drag.playheadTime,
+      excludedEvent: drag.ref,
+      disableSnapping,
+    });
+    const previewTime = result.time;
     this.dragEvent = Object.freeze({
       ...drag,
       previewTime,
+      snapGuide: result.guide,
+      proposedTime: time,
+      disableSnapping,
       previewEvent: Object.freeze({ ...drag.previewEvent, time: toMilliseconds(previewTime) }),
     });
     this.actions.updateTime(previewTime);
@@ -243,7 +255,7 @@ export class AnimationEditorEventCommands {
     const ref = this.selectedEvent;
     if (!event || !ref) return false;
     if (!Number.isFinite(time)) return this.updateAnimationEvent(ref, { ...event, time: toMilliseconds(time) });
-    const target = snapKeyframeTime(time, this.duration, 'none');
+    const target = clampTime(time, this.duration);
     // Preserve exact fractional milliseconds when displaying/committing an
     // unchanged seconds value; a unit round trip can otherwise change one bit.
     const authoredTime = target === toSeconds(event.time) ? event.time : toMilliseconds(target);
@@ -254,10 +266,25 @@ export class AnimationEditorEventCommands {
   }
   nudgeSelectedEvent(direction: -1 | 1, large = false): boolean {
     if (!this.selectedEventData || this.eventDrag) return false;
-    const step = this.snapping.keyframeSnapMode === 'frame' ? 1 / this.snapping.keyframeFPS : 0.01;
+    const step = this.snapping.settings.enabled && this.snapping.settings.frames ? 1 / this.snapping.fps : 0.01;
     const time = toSeconds(this.selectedEventData.time) + direction * step * (large ? 10 : 1);
     return this.moveSelectedEvent(
-      snapKeyframeTime(time, this.duration, this.snapping.keyframeSnapMode, this.snapping.keyframeFPS),
+      this.snapping.resolve(time, {
+        playheadTime:
+          this.playback.currentTime === toSeconds(this.selectedEventData.time) ? NaN : this.playback.currentTime,
+        ...(this.selectedEvent ? { excludedEvent: this.selectedEvent } : {}),
+        ...(direction > 0
+          ? {
+              minTime:
+                toSeconds(this.selectedEventData.time) +
+                Number.EPSILON * Math.max(1, toSeconds(this.selectedEventData.time)) * 2,
+            }
+          : {
+              maxTime:
+                toSeconds(this.selectedEventData.time) -
+                Number.EPSILON * Math.max(1, toSeconds(this.selectedEventData.time)) * 2,
+            }),
+      }).time,
     );
   }
 }

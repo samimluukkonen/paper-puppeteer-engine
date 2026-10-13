@@ -22,8 +22,9 @@ import {
 } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import { keyframeTimesMatch } from './keyframeTargets.js';
-import { animationDurationSeconds, DEFAULT_KEYFRAME_FPS, snapKeyframeTime, type KeyframeSnapMode } from './timeline.js';
+import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import type { TimelineClipboard } from './TimelineClipboard.js';
+import type { AnimationEditorTimelineSnapping, TimelineSnapGuide } from './timelineSnapping.js';
 import type { KeyframeSelection } from './timelineTracks.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
@@ -33,6 +34,10 @@ export interface KeyframeDrag {
   readonly originalKeys: readonly KeyframeSelection[];
   readonly originalPrimary: KeyframeSelection;
   readonly previewDelta: Seconds;
+  readonly playheadTime: Seconds;
+  readonly snapGuide: TimelineSnapGuide | null;
+  readonly proposedTime: Seconds;
+  readonly disableSnapping: boolean;
 }
 
 interface KeyframeCommandActions {
@@ -46,7 +51,6 @@ interface KeyframeCommandActions {
 /** Owns keyframe mutation transactions and transient drag/nudge state; the session coordinates navigation. */
 export class AnimationEditorKeyframeCommands {
   private drag: KeyframeDrag | null = null;
-  private snapMode: KeyframeSnapMode = 'none';
 
   constructor(
     private readonly document: AnimationEditorDocument,
@@ -54,6 +58,7 @@ export class AnimationEditorKeyframeCommands {
     private readonly playback: AnimationEditorPlayback,
     private readonly actions: KeyframeCommandActions,
     private readonly clipboard: TimelineClipboard,
+    private readonly snapping: AnimationEditorTimelineSnapping,
   ) {}
 
   private get working(): ReadonlyAnimation | null {
@@ -172,19 +177,14 @@ export class AnimationEditorKeyframeCommands {
     return this.drag;
   }
   get keyframeSnapMode(): KeyframeSnapMode {
-    return this.snapMode;
+    return this.snapping.settings.enabled && this.snapping.settings.frames ? 'frame' : 'none';
   }
   get keyframeFPS(): number {
-    const playback = this.working?.playback;
-    return playback?.mode === 'stepped' ? playback.fps : DEFAULT_KEYFRAME_FPS;
-  }
-  setKeyframeSnapMode(mode: KeyframeSnapMode): void {
-    if ((mode !== 'none' && mode !== 'frame') || mode === this.snapMode) return;
-    this.snapMode = mode;
-    this.actions.notify();
+    return this.snapping.fps;
   }
   beginKeyframeDrag(key: KeyframeSelection): boolean {
     this.cancelKeyframeDrag();
+    const playheadTime = this.currentTime;
     const originalPrimary = this.selection.key;
     const selected = this.selection.hasKey(key);
     if (selected) {
@@ -200,16 +200,37 @@ export class AnimationEditorKeyframeCommands {
       originalPrimary: selected ? originalPrimary! : anchor,
       previewTime: anchor.time,
       previewDelta: 0,
+      playheadTime,
+      snapGuide: null,
+      proposedTime: anchor.time,
+      disableSnapping: false,
     });
     this.actions.notify();
     return true;
   }
   previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
     if (!this.drag || !Number.isFinite(time)) return false;
-    const deltaMs = this.movementDelta(this.drag.originalKeys, this.drag.key, time, disableSnapping);
+    const { originalKeys, key, playheadTime } = this.drag;
+    const earliest = originalKeys.reduce((min, entry) => Math.min(min, entry.time), key.time);
+    const latest = originalKeys.reduce((max, entry) => Math.max(max, entry.time), key.time);
+    const result = this.snapping.resolve(time, {
+      playheadTime,
+      excludedKeys: originalKeys,
+      disableSnapping,
+      minTime: key.time - earliest,
+      maxTime: this.duration - latest + key.time,
+    });
+    const deltaMs = this.movementDelta(originalKeys, key, result.time);
     const previewDelta = toSeconds(deltaMs);
     const previewTime = toSeconds(toMilliseconds(this.drag.key.time) + deltaMs);
-    this.drag = Object.freeze({ ...this.drag, previewTime, previewDelta });
+    this.drag = Object.freeze({
+      ...this.drag,
+      previewTime,
+      previewDelta,
+      snapGuide: result.guide,
+      proposedTime: time,
+      disableSnapping,
+    });
     this.actions.updateTime(previewTime);
     this.actions.notify();
     return true;
@@ -234,14 +255,9 @@ export class AnimationEditorKeyframeCommands {
   resetSession(): void {
     this.drag = null;
   }
-  /** Snap the anchor once, then constrain a single delta in authored milliseconds. */
-  private movementDelta(
-    keys: readonly KeyframeSelection[],
-    anchor: KeyframeSelection,
-    time: Seconds,
-    disableSnapping = false,
-  ): Milliseconds {
-    const target = snapKeyframeTime(time, this.duration, disableSnapping ? 'none' : this.snapMode, this.keyframeFPS);
+  /** Constrain a single anchor delta in authored milliseconds. Drag snapping happens before this boundary. */
+  private movementDelta(keys: readonly KeyframeSelection[], anchor: KeyframeSelection, time: Seconds): Milliseconds {
+    const target = time;
     return constrainKeyframeMoveDelta(
       keys.map((key) => toMilliseconds(key.time)),
       toMilliseconds(target) - toMilliseconds(anchor.time),
@@ -258,7 +274,7 @@ export class AnimationEditorKeyframeCommands {
     this.playback.endScrub();
     const keys = this.selectedKeys;
     const primaryIndex = keys.indexOf(key);
-    const delta = this.movementDelta(keys, key, time, true);
+    const delta = this.movementDelta(keys, key, time);
     return this.editKeyframes((animation, rig) => {
       const moved = moveBonePropertyKeyframes(
         animation,
@@ -282,10 +298,17 @@ export class AnimationEditorKeyframeCommands {
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
     if (!this.selection.key || this.drag) return false;
-    const step = this.snapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
+    const step = this.keyframeSnapMode === 'frame' ? 1 / this.keyframeFPS : 0.01;
     const anchor = this.selection.key;
     const time = toSeconds(toMilliseconds(anchor.time) + direction * toMilliseconds(step) * (large ? 10 : 1));
-    const delta = this.movementDelta(this.selectedKeys, anchor, time);
+    const target = this.snapping.resolve(time, {
+      playheadTime: this.currentTime === anchor.time ? NaN : this.currentTime,
+      excludedKeys: this.selectedKeys,
+      ...(direction > 0
+        ? { minTime: anchor.time + Number.EPSILON * Math.max(1, anchor.time) * 2 }
+        : { maxTime: anchor.time - Number.EPSILON * Math.max(1, anchor.time) * 2 }),
+    }).time;
+    const delta = this.movementDelta(this.selectedKeys, anchor, target);
     return this.moveSelectedKeyframe(toSeconds(toMilliseconds(anchor.time) + delta));
   }
   /** All selected authored properties are removed before installing one validated history snapshot. */

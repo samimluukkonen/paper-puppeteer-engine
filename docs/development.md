@@ -143,6 +143,7 @@ src/devtools/animation-editor/
   AnimationFileController.ts  Import/export, export reload/source revert and asynchronous request lifetime
   AnimationDraftRecoveryController.ts  Source-bound drafts, import revisions and recovery subscription lifecycle
   timeline.ts          Shared content-time/pixel conversion, clamping and visible-range ruler generation
+  timelineSnapping.ts    Shared zoom-aware frame/key/event/playhead resolver, session preferences and marker targets
   timelineNavigation.ts  Pure view-only zoom, pan, fit, follow and time/frame conversion
   TimelineNavigationController.ts  Native scroll/zoom controls, precise jumps and optional playback follow
 src/devtools/shared/

@@ -251,7 +251,8 @@ test('event drag uses shared snap policy, follows playhead, nudges, cancels and 
   const marker = event(page, 'step-left');
   const time = page.locator('#animation-event-time');
   const ruler = page.locator('#timeline-ruler');
-  await page.locator('#timeline-snap').selectOption('frame');
+  await page.locator('#timeline-snap-enabled').check();
+  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
   async function dragTo(target: number, commit = true, bypass = false) {
     const bounds = (await page.locator('#timeline').boundingBox())!;
     const box = (await marker.boundingBox())!;
@@ -266,7 +267,7 @@ test('event drag uses shared snap policy, follows playhead, nudges, cancels and 
     if (commit) await page.mouse.up();
     if (bypass) await page.keyboard.up('Shift');
   }
-  await dragTo(0.74);
+  await dragTo(0.704);
   await expect(marker).toHaveAttribute('data-time', '0.7');
   await expect(time).toHaveValue('0.7');
   await expect(ruler).toHaveAttribute('aria-valuenow', '0.7');

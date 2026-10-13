@@ -122,6 +122,17 @@ export class TimelineInputController {
       },
       { ...options, capture: true },
     );
+    for (const name of ['keydown', 'keyup'] as const)
+      window.addEventListener(
+        name,
+        (event) => {
+          const pointer = this.gesture;
+          if (event.key !== 'Shift' || (pointer?.kind !== 'key-drag' && pointer?.kind !== 'event-drag')) return;
+          pointer.shift = name === 'keydown';
+          this.previewKeyDrag();
+        },
+        options,
+      );
     document.addEventListener(
       'visibilitychange',
       () => {
@@ -232,6 +243,7 @@ export class TimelineInputController {
     const pointer = this.gesture;
     if ((pointer?.kind !== 'key-drag' && pointer?.kind !== 'event-drag') || !pointer.moved) return;
     const bounds = this.timeline.getBoundingClientRect();
+    this.state.setTimelineSnapContentWidth(bounds.width);
     const preview =
       pointer.kind === 'event-drag'
         ? this.state.previewEventDrag.bind(this.state)

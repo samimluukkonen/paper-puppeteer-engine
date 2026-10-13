@@ -372,13 +372,23 @@ export function AnimationEditorView({
                 ))}
               </select>
             </label>
-            <label>
-              Snap{' '}
-              <select id="timeline-snap">
-                <option value="none">None</option>
-                <option value="frame">Frame</option>
-              </select>
-            </label>
+            <fieldset className="timeline-snapping">
+              <legend>Snapping</legend>
+              {(
+                [
+                  ['enabled', 'Enable Snapping'],
+                  ['frames', 'Frames'],
+                  ['keyframes', 'Keyframes'],
+                  ['events', 'Events'],
+                  ['playhead', 'Playhead'],
+                ] as const
+              ).map(([setting, label]) => (
+                <label key={setting}>
+                  <input id={`timeline-snap-${setting}`} type="checkbox" defaultChecked={setting !== 'enabled'} />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
             <div className="timeline-control-group timeline-zoom-controls" role="group" aria-label="Timeline zoom">
               <button
                 id="timeline-zoom-out"
@@ -540,6 +550,9 @@ export function AnimationEditorView({
               ></div>
               <div id="timeline-tracks"></div>
               <div id="timeline-playhead" aria-hidden="true"></div>
+              <div id="timeline-snap-guide" aria-hidden="true" hidden>
+                <span></span>
+              </div>
             </div>
           </div>
         </section>
@@ -705,8 +718,11 @@ export function AnimationEditorView({
                 <td>Cancel a key/event drag or rectangle; otherwise clear timeline selection.</td>
               </tr>
               <tr>
-                <th scope="row">Frame snap</th>
-                <td>Use authored FPS (10 FPS for smooth clips).</td>
+                <th scope="row">Snapping</th>
+                <td>
+                  Align to frames, keys, events or the playhead within 8 pixels. Frames use authored FPS (10 FPS for
+                  smooth clips).
+                </td>
               </tr>
               <tr>
                 <th scope="row">Left / Right Arrow</th>
