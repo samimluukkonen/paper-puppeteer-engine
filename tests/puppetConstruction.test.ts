@@ -260,6 +260,7 @@ test('construction compiles each initial clip once before scene allocation and r
 
 test('puppets share a character compilation while retaining independent playback, events, and lifecycle', () => {
   const compile = vi.spyOn(animationClip, 'compileClip');
+  const validatedCompile = vi.spyOn(animationClip, 'compileValidatedClip');
   const character = CharacterDefinition.fromData({
     manifest: {
       version: 1,
@@ -289,9 +290,11 @@ test('puppets share a character compilation while retaining independent playback
     },
   });
   assert.equal(compile.mock.calls.length, 0, 'metadata assembly remains lazy');
+  assert.equal(validatedCompile.mock.calls.length, 0);
   const first = new Puppet(puppetScene(), { definition: character, autoUpdate: false });
   const second = new Puppet(puppetScene(), { definition: character, autoUpdate: false });
-  assert.equal(compile.mock.calls.length, 1);
+  assert.equal(compile.mock.calls.length, 0, 'owned character clips do not need revalidation');
+  assert.equal(validatedCompile.mock.calls.length, 1);
   assert.strictEqual(character.compiledAnimations, character.compiledAnimations);
   assert.isTrue(Object.isFrozen(character.compiledAnimations));
   assert.isTrue(Object.isFrozen(character.compiledAnimations[0]!.events[0]!.data));
@@ -318,11 +321,11 @@ test('puppets share a character compilation while retaining independent playback
     animations: [{ ...animation, name: 'custom' }],
     autoUpdate: false,
   });
-  assert.equal(compile.mock.calls.length, 2);
+  assert.equal(compile.mock.calls.length, 1, 'explicit runtime overrides still use the validating compiler');
   override.play('custom');
   assert.throws(() => override.play('move'), /Unknown animation/);
   const empty = new Puppet(puppetScene(), { definition: character, animations: [], autoUpdate: false });
-  assert.equal(compile.mock.calls.length, 2);
+  assert.equal(compile.mock.calls.length, 1);
   assert.throws(() => empty.play('move'), /Unknown animation/);
   const independent = CharacterDefinition.fromData({
     manifest: {

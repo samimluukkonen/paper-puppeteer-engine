@@ -4,6 +4,7 @@ import { assert, test, vi } from 'vitest';
 import { demoHipPositions, demoRenderOrder } from '../src/demo/demoPresentation.js';
 import { compileClip } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
+import { evaluateClip } from '../src/engine/AnimationPose.js';
 import {
   CharacterDefinition,
   CharacterValidationError,
@@ -17,6 +18,7 @@ import {
   type RigJsonDefinition,
   type ValidationIssue,
 } from '../src/engine/externalData.js';
+import { evaluateIKClip } from '../src/engine/ik/AnimationIKPose.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
 import { Joint } from '../src/engine/Joint.js';
 import { parsePoseDefinition, validatePoseDefinition } from '../src/engine/Pose.js';
@@ -169,6 +171,28 @@ test('complete sample character validates and already-parsed data becomes runtim
   assert.equal(joints.get('leftThigh')!.pose.rotation, firstStep);
   player.update(20);
   assert.notEqual(joints.get('leftThigh')!.pose.rotation, firstStep);
+});
+
+test('validated character compilation preserves bone and IK samples, events and playback without reparsing', () => {
+  const character = CharacterDefinition.fromData(bundle());
+  const expected = character.animations.map((clip) => compileClip(clip, character.rig));
+  const parse = vi.spyOn(animationClipSchema, 'parse');
+  try {
+    const actual = character.compiledAnimations;
+    assert.equal(parse.mock.calls.length, 0);
+    for (const [index, clip] of actual.entries()) {
+      const baseline = expected[index]!;
+      assert.deepEqual(clip.events, baseline.events);
+      assert.deepEqual(clip.playback, baseline.playback);
+      assert.deepEqual(clip.disabledIKConstraints, baseline.disabledIKConstraints);
+      for (const time of [0, clip.duration / 3, clip.duration / 2, clip.duration]) {
+        assert.deepEqual(evaluateClip(clip, time), evaluateClip(baseline, time));
+        assert.deepEqual(evaluateIKClip(clip, time), evaluateIKClip(baseline, time));
+      }
+    }
+  } finally {
+    parse.mockRestore();
+  }
 });
 
 test('character assembly validates the rig once and reuses parsed clips', () => {

@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { type AnimationClip, type CompiledClip, compileClip } from './AnimationClip.js';
+import { type AnimationClip, type CompiledClip, compileValidatedClip } from './AnimationClip.js';
 import {
   inspectAnimationDefinition,
   inspectRigDefinition,
@@ -182,7 +182,9 @@ export class CharacterDefinition {
   get compiledAnimations(): readonly CompiledClip[] {
     let clips = compiledAnimations.get(this);
     if (!clips) {
-      clips = Object.freeze(this.animations.map((clip) => compileClip(clip, this.rig)));
+      // Assembly already validated and froze these rig-specific snapshots. Preserve
+      // their track identities for the compiler's immutable property caches.
+      clips = Object.freeze(this.animations.map((clip) => compileValidatedClip(clip)));
       compiledAnimations.set(this, clips);
     }
     return clips;
