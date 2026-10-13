@@ -6,6 +6,24 @@ import { Rig } from '../src/engine/Rig.js';
 
 afterEach(() => vi.restoreAllMocks());
 
+test.each([Number.MAX_VALUE, Number.MIN_VALUE])('length edits retain extreme child directions %s', (offset) => {
+  const state = new RigEditorState(
+    new Rig({ root: 'root', bones: [{ id: 'root' }, { id: 'child', parent: 'root', x: offset, y: -offset }] }),
+  );
+  state.editBone('root', 'length', 10);
+  assert.closeTo(state.getBone('child').x!, 10 / Math.sqrt(2), 1e-12);
+  assert.closeTo(state.getBone('child').y!, -10 / Math.sqrt(2), 1e-12);
+  state.editBone('root', 'length', 0);
+  const restored = new RigEditorState(state.source);
+  assert.isTrue(restored.restoreDraft(state.createRecoveryDraft()));
+  restored.editBone('root', 'length', 10);
+  assert.closeTo(restored.getBone('child').x!, 10 / Math.sqrt(2), 1e-12);
+  assert.closeTo(restored.getBone('child').y!, -10 / Math.sqrt(2), 1e-12);
+  state.undo();
+  state.undo();
+  assert.equal(state.getBone('child').x, offset);
+});
+
 test.each(['bone', 'slot', 'sprite', 'attachment'] as const)(
   'removing a %s override preserves other fields and supports undo and export',
   (type) => {

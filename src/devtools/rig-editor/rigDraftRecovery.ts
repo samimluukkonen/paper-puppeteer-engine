@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import { checkJson, inspectRigDefinition, type ValidationIssue } from '../../engine/externalData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { RigDefinition } from '../../engine/types.js';
@@ -56,10 +57,8 @@ export function inspectRigDraft(
   const directions = recovery.success
     ? recovery.data.directions
     : initial.bones.flatMap((bone): [string, { x: number; y: number }][] => {
-        const distance = Math.hypot(bone.x ?? 0, bone.y ?? 0);
-        return bone.parent !== undefined && distance > 0
-          ? [[bone.id, { x: (bone.x ?? 0) / distance, y: (bone.y ?? 0) / distance }]]
-          : [];
+        const direction = normalizeBoneDirection(bone.x ?? 0, bone.y ?? 0);
+        return bone.parent !== undefined && direction ? [[bone.id, direction]] : [];
       });
   const seen = new Set<string>();
   for (const [id, direction] of directions) {

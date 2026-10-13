@@ -1,3 +1,4 @@
+import { normalizeBoneDirection } from './boneMath.js';
 import type { TwoBoneIKDefinition } from './ik/types.js';
 import { freezeData } from './readonlyData.js';
 import type { DeepReadonly } from './readonlyData.js';
@@ -27,10 +28,10 @@ export function computeBonePosition(bone: BoneDefinition, parent?: BoneDefinitio
   const y = bone.y ?? 0;
   const length = parent?.length;
   if (length === undefined) return { x, y };
-  const distance = Math.hypot(x, y);
+  const direction = normalizeBoneDirection(x, y) ?? { x: 0, y: 1 };
   return {
-    x: distance > 0 ? (x / distance) * length : 0,
-    y: distance > 0 ? (y / distance) * length : length,
+    x: direction.x * length,
+    y: direction.y * length,
   };
 }
 

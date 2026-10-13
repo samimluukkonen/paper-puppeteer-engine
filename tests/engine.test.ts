@@ -5,6 +5,23 @@ import { Rig } from '../src/engine/Rig.js';
 import { rigDefinitionSchema } from '../src/engine/schemas.js';
 import type { RigDefinition } from '../src/engine/types.js';
 
+test.each([Number.MAX_VALUE, Number.MIN_VALUE, -Number.MAX_VALUE, -Number.MIN_VALUE])(
+  'logical lengths preserve the direction of extreme finite offsets %s',
+  (offset) => {
+    const rig = new Rig({
+      root: 'root',
+      bones: [
+        { id: 'root', length: 10 },
+        { id: 'child', parent: 'root', x: offset, y: offset },
+      ],
+    });
+    const child = rig.getBone('child');
+    assert.closeTo(child.x!, Math.sign(offset) * (10 / Math.sqrt(2)), 1e-12);
+    assert.closeTo(child.y!, Math.sign(offset) * (10 / Math.sqrt(2)), 1e-12);
+    assert.closeTo(Math.hypot(child.x!, child.y!), 10, 1e-12);
+  },
+);
+
 const definition: RigDefinition = {
   root: 'root',
   bones: [

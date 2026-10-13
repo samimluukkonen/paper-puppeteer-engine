@@ -1,3 +1,4 @@
+import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import {
   RIG_FORMAT_VERSION,
   type RigJsonDefinition,
@@ -425,10 +426,7 @@ export class RigEditorState {
           const child = { ...this.getBone(childId) };
           const x = child.x ?? 0;
           const y = child.y ?? 0;
-          const distance = Math.hypot(x, y);
-          const direction = distance
-            ? { x: x / distance, y: y / distance }
-            : (this.childDirections.get(childId) ?? { x: 0, y: 1 });
+          const direction = normalizeBoneDirection(x, y) ?? this.childDirections.get(childId) ?? { x: 0, y: 1 };
           this.childDirections.set(childId, direction);
           child.x = direction.x * values.length;
           child.y = direction.y * values.length;
