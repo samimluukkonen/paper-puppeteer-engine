@@ -214,6 +214,14 @@ export class Puppet {
     return this.renderer.getAppearanceRevision();
   }
 
+  /** Preview a loaded image for an asset without editing the rig, slots, poses or animations.
+   * The host owns replacement textures and must restore artwork before releasing them.
+   */
+  setArtworkTexture(assetKey: string, replacementKey?: string): this {
+    this.renderer.setArtworkTexture(assetKey, replacementKey);
+    return this;
+  }
+
   getBone(id: string): Bone {
     const bone = this.bones.get(id);
     if (!bone) throw new Error(`Unknown bone "${id}".`);

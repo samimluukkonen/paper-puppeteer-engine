@@ -1,6 +1,7 @@
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { observePreview } from '../../ui/observePreview.js';
+import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
@@ -14,7 +15,7 @@ import type { RigEditorRecoverySnapshot } from './RigEditorState.js';
 import { createSessionController } from './SessionController.js';
 
 /** Connect the existing editing model/controllers to their committed React hosts. */
-export function initializeRigEditor(app: HTMLElement): () => void {
+export function initializeRigEditor(app: HTMLElement, artwork?: ArtworkController): () => void {
   const releaseCharacterSelection = bindCharacterSelection(app);
 
   const recoveryControls = new DraftRecoveryControls<RigEditorRecoverySnapshot>(
@@ -53,7 +54,9 @@ export function initializeRigEditor(app: HTMLElement): () => void {
       recovery.update();
     },
   );
-  const releaseNavigationGuard = protectUnsavedChanges(session.hasUnsavedChanges);
+  const releaseNavigationGuard = protectUnsavedChanges(
+    () => session.hasUnsavedChanges() || !!artwork?.hasUnsavedChanges,
+  );
   const inspector = createInspectorController(app.querySelector<HTMLElement>('#inspector')!, session.updateStatus);
   const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#hierarchy')!);
   const controls = createControlsController(app, session.updateStatus);
@@ -67,10 +70,15 @@ export function initializeRigEditor(app: HTMLElement): () => void {
     controls.render(editor);
     inspector.render(editor);
   };
-  const scene = new RigEditorScene(render, inspector.showError, {
-    characterUrl: `../characters/${selectedCharacterId()}/character.json`,
-    ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
-  });
+  const scene = new RigEditorScene(
+    render,
+    inspector.showError,
+    {
+      characterUrl: `../characters/${selectedCharacterId()}/character.json`,
+      ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
+    },
+    artwork,
+  );
   const game = createEditorGame('editor-stage', scene);
   const releaseResize = observePreview(app.querySelector<HTMLElement>('#editor-stage')!, game);
 
@@ -85,5 +93,6 @@ export function initializeRigEditor(app: HTMLElement): () => void {
     hierarchy.dispose();
     session.dispose();
     game.destroy(true);
+    artwork?.dispose();
   };
 }

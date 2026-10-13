@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.8-1
+
+The v0.5.8.1 [sprite import and replacement foundation](docs/sprite-replacement.md) adds a shared React artwork panel to both editors. Local static PNG/WebP imports validate headers, dimensions, size and browser decoding before private Phaser textures are installed. Original/temporary/preview/applied artwork stays separate from rig and animation documents, history, drafts and JSON exports. Cancel restores the previous working artwork; Revert restores original textures. Pending asset changes independently protect navigation. Texture ownership, decode cancellation, rig reloads, attachment changes and hidden preview cleanup are covered by regressions. Source-file writes, dimension migration, atlas replacement and production asset packaging remain deferred. Package version is `0.5.8-1`.
+
 ## 0.5.7-5
 
 The v0.5.7.5 [Animation Editor UX and production hardening](docs/animation-editor-ux-verification.md) completes v0.5.7. Toolbar and keyboard deletion share typed bone/IK/event dispatch; Escape clears IK-key selection and tool dismissal retains background selection. Context commands provide actionable disabled explanations. Empty IK inspectors skip clock work, immutable authored-property queries reuse indexes, and fitting no longer builds selection arrays every playback frame. Failed scene adapters release obsolete timeline, bone hierarchy and workspace subscriptions. Combined regressions cover atomic history, hidden selection, immutable data and export → CharacterLoader → Puppet playback. Artist workflow/help and a local 32-bone dense browser profile document controls and measured responsiveness limits. Package version is `0.5.7-5`.

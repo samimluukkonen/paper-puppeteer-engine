@@ -40,6 +40,8 @@ export class PuppetRenderer {
   private order: readonly string[] = Object.freeze([]);
   private readonly appearanceValues: unknown[] = [];
   private appearanceRevision = 0;
+  private readonly artworkTextures = new Map<string, string>();
+  private readonly slotArtwork = new Map<string, SpriteAttachmentDefinition>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -238,13 +240,40 @@ export class PuppetRenderer {
     return this.slotImages.get(id);
   }
 
+  /** Render-only whole-image overrides. Authored texture/frame references remain unchanged. */
+  setArtworkTexture(assetKey: string, replacementKey?: string): void {
+    const key = replacementKey ?? assetKey;
+    if (!this.scene.textures.exists(key)) throw new Error(`Missing artwork texture "${key}".`);
+    if (replacementKey) this.artworkTextures.set(assetKey, replacementKey);
+    else this.artworkTextures.delete(assetKey);
+    const replace = (image: Phaser.GameObjects.Image | undefined, frame?: string | number): void => {
+      if (!image) return;
+      const { originX, originY } = image;
+      image.setTexture(key, replacementKey ? undefined : frame).setOrigin(originX, originY);
+    };
+    for (const definition of this.rig.bones) {
+      if (definition.sprite?.texture === assetKey)
+        replace(this.bones.get(definition.id)!.sprite, definition.sprite.frame);
+    }
+    for (const [id, definition] of this.slotArtwork)
+      if (definition.texture === assetKey) replace(this.slotImages.get(id), definition.frame);
+  }
+
   setSlotAttachment(id: string, definition: SpriteAttachmentDefinition | undefined): void {
     const mount = this.getSlotMount(id);
     this.slotImages.get(id)?.destroy();
     this.slotImages.delete(id);
+    this.slotArtwork.delete(id);
     if (!definition) return;
+    this.slotArtwork.set(id, definition);
+    const replacement = this.artworkTextures.get(definition.texture);
     const image = mount.scene.add
-      .image(definition.x ?? 0, definition.y ?? 0, definition.texture, definition.frame)
+      .image(
+        definition.x ?? 0,
+        definition.y ?? 0,
+        replacement ?? definition.texture,
+        replacement ? undefined : definition.frame,
+      )
       .setOrigin(definition.originX ?? 0.5, definition.originY ?? 0.5)
       .setRotation(definition.rotation ?? 0)
       .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
@@ -355,6 +384,8 @@ export class PuppetRenderer {
     this.branches.clear();
     this.slotBranches.clear();
     this.slotImages.clear();
+    this.slotArtwork.clear();
+    this.artworkTextures.clear();
     this.slotDepthOverrides.clear();
     this.nodes.clear();
     this.pending.length = 0;

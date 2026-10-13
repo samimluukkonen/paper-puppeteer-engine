@@ -1,6 +1,7 @@
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { mountView } from '../../ui/mountView.js';
+import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
@@ -23,6 +24,7 @@ if (!app) throw new Error('Missing animation editor host.');
 app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
+const artwork = new ArtworkController();
 const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const ikBake = new IKBakeController(
@@ -30,13 +32,19 @@ const ikBake = new IKBakeController(
   () => scene?.getBakeRuntimeConstraints() ?? [],
 );
 const editorView = (
-  <AnimationEditorView mirrorTools={mirrorTools} ikInspector={ikInspector} ikBake={ikBake} retiming={retiming} />
+  <AnimationEditorView
+    mirrorTools={mirrorTools}
+    ikInspector={ikInspector}
+    ikBake={ikBake}
+    retiming={retiming}
+    artwork={artwork}
+  />
 );
 const unmount = mountView(app, editorView, (app) => {
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
-  const releaseNavigationGuard = protectUnsavedChanges(() => timeline.hasUnsavedChanges);
+  const releaseNavigationGuard = protectUnsavedChanges(() => timeline.hasUnsavedChanges || artwork.hasUnsavedChanges);
   const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
     app.querySelector<HTMLElement>('#animation-draft-status')!,
     app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
@@ -87,6 +95,7 @@ const unmount = mountView(app, editorView, (app) => {
       characterUrl: `../characters/${selectedCharacterId()}/character.json`,
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
     },
+    artwork,
   );
   scene = editorScene;
   const previewControls = new AbortController();
@@ -148,6 +157,7 @@ const unmount = mountView(app, editorView, (app) => {
     previewControls.abort();
     releaseCharacterSelection();
     game.destroy(true);
+    artwork.dispose();
     scene = undefined;
   };
 });

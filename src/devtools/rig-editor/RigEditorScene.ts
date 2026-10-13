@@ -7,6 +7,7 @@ import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { Rig } from '../../engine/Rig.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
@@ -45,6 +46,7 @@ export class RigEditorScene extends Phaser.Scene {
     private readonly onReady: (editor: RigEditor) => void,
     private readonly onError: (message: string) => void,
     options: RigEditorSceneOptions = {},
+    private readonly artwork?: ArtworkController,
   ) {
     super('RigEditorScene');
     this.characterUrl = options.characterUrl ?? '../characters/demo-puppet/character.json';
@@ -62,6 +64,7 @@ export class RigEditorScene extends Phaser.Scene {
       this.definition = undefined;
       this.loadedFilename = undefined;
       try {
+        this.artwork?.unbind();
         editor?.disable();
       } finally {
         puppet?.destroy();
@@ -140,6 +143,7 @@ export class RigEditorScene extends Phaser.Scene {
       throw error;
     }
     // Keep the working session alive until the replacement is fully initialized.
+    this.artwork?.bind(this, puppet, definition);
     this.editor?.disable();
     this.puppet?.destroy();
     this.puppet = puppet;

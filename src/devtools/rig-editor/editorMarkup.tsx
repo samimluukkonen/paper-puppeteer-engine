@@ -1,8 +1,10 @@
 import { ViewHeader } from '../../ui/viewShell.js';
 import { openWorkspaceDialog, useWorkspaceInspector, WorkspaceDialog } from '../../ui/Workspace.js';
+import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
 import { RigHelp } from './RigHelp.js';
 
-export function RigEditorView() {
+export function RigEditorView({ artwork }: { artwork?: ArtworkController } = {}) {
   const inspector = useWorkspaceInspector();
   return (
     <>
@@ -125,6 +127,7 @@ export function RigEditorView() {
           <section aria-label="Rig properties">
             <div id="inspector">Loading character…</div>
           </section>
+          {artwork && <ArtworkPanel controller={artwork} />}
           <details open>
             <summary>Visibility</summary>
             <div id="visibility" />

@@ -25,6 +25,8 @@ The completed v0.5.6 [IK Baking workflow](docs/react-ik-baking.md) selects rig c
 
 The completed v0.5.7 [Animation Editor workflow](docs/animation-editor.md#production-animation-workflow) combines track filtering, zoom/navigation, advanced snapping, proportional retiming, bone/IK authoring, mirroring, baking and events. See [UX and production verification](docs/animation-editor-ux-verification.md) for command guards, history/lifecycle regressions and dense-workload measurements.
 
+The v0.5.8.1 [sprite import and replacement foundation](docs/sprite-replacement.md) adds local PNG/WebP validation, original/replacement comparison, Phaser preview, explicit Apply/Cancel and original-artwork reversion in both editors. Pending binary assets stay in session memory, separate from authored JSON.
+
 The v0.5.7.2 [timeline navigation and zoom](docs/timeline-navigation.md) adds pointer-anchored zoom, horizontal panning, fit/center commands, precise seconds/frame input and optional playhead follow. Navigation preserves authored data and selection.
 
 The v0.5.7.1 [timeline track search and filtering](docs/timeline-track-filtering.md) finds bones, properties, IK targets and events, preserves ancestor context, and reveals hidden selections. Visibility and expansion controls preserve authored data, history and exports.

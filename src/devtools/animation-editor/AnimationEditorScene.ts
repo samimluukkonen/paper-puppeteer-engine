@@ -5,6 +5,7 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
@@ -44,6 +45,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     private readonly onReady: (state: AnimationEditorState, characterId: string) => void,
     private readonly onError: (message: string) => void,
     options: AnimationEditorSceneOptions = {},
+    private readonly artwork?: ArtworkController,
   ) {
     super('AnimationEditorScene');
     this.options = structuredClone(options);
@@ -68,6 +70,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.ghosts = undefined;
       this.preview?.dispose();
       this.preview = undefined;
+      this.artwork?.unbind();
       this.puppet?.destroy();
       this.puppet = undefined;
     });
@@ -109,6 +112,22 @@ export class AnimationEditorScene extends Phaser.Scene {
   setIKHandlesVisible(visible: boolean): void {
     this.ikHandlesVisible = visible;
     this.ikHandles?.setVisible(visible);
+  }
+  private refreshArtwork(): void {
+    const puppet = this.puppet;
+    if (!puppet) return;
+    this.ghosts?.refreshArtwork();
+    const revision = puppet.getAppearanceRevision();
+    this.mirrorOverlay?.syncAppearance(
+      puppet,
+      { ...DEFAULT_ONION_SKIN_SETTINGS, nextOpacity: 0.35, nextTint: 0xa875e8 },
+      revision,
+    );
+    this.bakeOverlay?.syncAppearance(
+      puppet,
+      { ...DEFAULT_ONION_SKIN_SETTINGS, nextOpacity: 0.55, nextTint: 0xa875e8 },
+      revision,
+    );
   }
   setIKHandlesInteractive(interactive: boolean): void {
     this.ikHandlesInteractive = interactive;
@@ -286,6 +305,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.puppet = puppet;
       this.preview = preview;
       this.state = state;
+      this.artwork?.bind(this, puppet, definition, () => this.refreshArtwork());
       if (this.ikPreviewEnabled) this.setIKPreview(true);
       this.ikHandles = new AnimationEditorIKHandles(this, state, puppet);
       this.ikHandles.setVisible(this.ikHandlesVisible);
@@ -306,6 +326,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       ghosts?.dispose();
       this.ghosts = undefined;
       preview?.dispose();
+      this.artwork?.unbind();
       puppet?.destroy();
       this.preview = undefined;
       this.puppet = undefined;

@@ -181,6 +181,12 @@ export class AnimationEditorGhostLayer {
     for (const ghost of this.instances.values()) if (!visible.has(ghost)) ghost.hide();
   }
 
+  /** Include retained hidden ghosts before a replaced texture is released. */
+  refreshArtwork(): void {
+    const revision = this.puppet.getAppearanceRevision();
+    for (const ghost of this.instances.values()) ghost.syncAppearance(this.puppet, this.settings, revision);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

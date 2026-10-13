@@ -1,5 +1,7 @@
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
+import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
@@ -19,11 +21,13 @@ export function AnimationEditorView({
   ikInspector,
   ikBake,
   retiming,
+  artwork,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
   retiming: KeyframeRetimingController;
+  artwork?: ArtworkController;
 }) {
   const inspector = useWorkspaceInspector();
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
@@ -272,6 +276,7 @@ export function AnimationEditorView({
             </button>
           </section>
 
+          {artwork && <ArtworkPanel controller={artwork} />}
           <details className="animation-key-details">
             <summary>Key details</summary>
             <div className="timeline-interpolation">
