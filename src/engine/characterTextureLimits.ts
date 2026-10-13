@@ -10,7 +10,10 @@ export const DEFAULT_CHARACTER_TEXTURE_LIMITS = Object.freeze({
 });
 
 type TextureLimits = { [Key in keyof typeof DEFAULT_CHARACTER_TEXTURE_LIMITS]: number };
-export type CharacterTextureLimitOptions = Partial<TextureLimits>;
+export interface CharacterTextureLimitOptions extends Partial<TextureLimits> {
+  /** Require a PNG header before browser decoding. Defaults to true; disable only for trusted artwork. */
+  requirePng?: boolean;
+}
 
 export class CharacterTextureLimitError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -29,12 +32,16 @@ export function getCharacterTextureLimitError(file: Phaser.Loader.File): Charact
 /** @internal One character load owns its cumulative transfer and decoded-pixel budget. */
 export class CharacterTextureBudget {
   private readonly limits: TextureLimits;
+  private readonly requirePng: boolean;
   private readonly bytes = new Map<string, number>();
   private readonly pixels = new Map<string, number>();
   private totalBytes = 0;
   private totalPixels = 0;
 
   constructor(options: CharacterTextureLimitOptions) {
+    if (options.requirePng !== undefined && typeof options.requirePng !== 'boolean')
+      throw new Error('requirePng must be a boolean.');
+    this.requirePng = options.requirePng ?? true;
     this.limits = Object.fromEntries(
       Object.entries(DEFAULT_CHARACTER_TEXTURE_LIMITS).map(([name, fallback]) => [
         name,
@@ -87,7 +94,7 @@ export class CharacterTextureBudget {
         const base64 = decodeURIComponent(encoded).replace(/\s/g, '');
         this.countBytes(key, Math.floor(base64.replace(/=+$/, '').length * 0.75));
         const prefix = atob(base64.slice(0, 32));
-        this.checkPngHeader(
+        this.checkImageHeader(
           key,
           Uint8Array.from(prefix, (character) => character.charCodeAt(0)),
         );
@@ -101,7 +108,7 @@ export class CharacterTextureBudget {
             index += 2;
           } else header.push(...new TextEncoder().encode(encoded[index]));
         }
-        this.checkPngHeader(key, new Uint8Array(header));
+        this.checkImageHeader(key, new Uint8Array(header));
       }
     } catch (error) {
       if (error instanceof CharacterTextureLimitError) throw error;
@@ -109,12 +116,17 @@ export class CharacterTextureBudget {
     }
   }
 
-  private checkPngHeader(key: string, bytes: Uint8Array): void {
+  private checkImageHeader(key: string, bytes: Uint8Array): void {
     const signature = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82];
-    if (bytes.length >= 24 && signature.every((value, index) => bytes[index] === value)) {
-      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      this.countPixels(key, view.getUint32(16), view.getUint32(20));
+    if (bytes.length < 24 || !signature.every((value, index) => bytes[index] === value)) {
+      if (this.requirePng)
+        throw new CharacterTextureLimitError(
+          `Image "${key}" must have a PNG header before decoding. Set requirePng to false only for trusted artwork.`,
+        );
+      return;
     }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    this.countPixels(key, view.getUint32(16), view.getUint32(20));
   }
 
   /** Guard only this helper's files; unrelated assets keep the host loader's own behavior. */
@@ -191,12 +203,17 @@ export class CharacterTextureBudget {
       if (!active() || failed || finished) return;
       const response: unknown = file.xhrLoader?.response;
       if (!(response instanceof Blob)) {
+        // Inline images already passed the header check before being queued.
+        if (this.requirePng && !file.base64) {
+          rejectProcessing(new CharacterTextureLimitError(`Could not inspect image "${file.key}" before decoding.`));
+          return;
+        }
         process();
         return;
       }
       const state = file.state;
-      // PNG dimensions are available before any browser image decoding. Other
-      // formats still receive the decoded-dimension guard before texture upload.
+      // Require a recognizable header before browser decoding unless the host
+      // explicitly trusts alternative image formats.
       void response
         .slice(0, 24)
         .arrayBuffer()
@@ -204,7 +221,7 @@ export class CharacterTextureBudget {
           (buffer) => {
             if (!active() || failed || finished || file.state !== state) return;
             try {
-              this.checkPngHeader(file.key, new Uint8Array(buffer));
+              this.checkImageHeader(file.key, new Uint8Array(buffer));
             } catch (error) {
               rejectProcessing(error);
               return;

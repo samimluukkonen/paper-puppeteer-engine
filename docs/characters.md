@@ -83,10 +83,14 @@ queueCharacterTextures(scene, definition, {
 XHR progress and completed blob checks enforce byte limits without relying on `Content-Length`.
 Character image files use XHR even when the host prefers HTML image element loading; the host setting
 is restored immediately for other assets. Inline data URLs receive byte checks before queueing.
-PNG headers, including inline PNGs, receive dimension checks before browser decoding. Every decoded
-image receives dimension and cumulative pixel checks before entering Phaser's texture cache. For other
-formats, the browser can allocate decoding memory before those pixel checks run. Already loaded host
-textures and atlases remain trusted overrides and do not consume this queue's budget.
+Guarded image loads require a PNG header by default (`requirePng: true`), including inline data URLs.
+The policy checks the actual bytes rather than the URL extension or MIME type, and rejects missing,
+truncated, or non-PNG headers before browser decoding. PNG dimensions receive checks at the same boundary.
+Every decoded image also receives dimension and cumulative pixel checks before entering Phaser's texture
+cache. For trusted JPEG, WebP, GIF, SVG, or other artwork, explicitly pass `requirePng: false` to
+`queueCharacterTextures` or `loadSceneCharacter`; these formats can allocate decoding memory before
+the decoded-pixel checks run. Byte limits still apply. Already loaded host textures and atlases remain
+trusted overrides and do not consume this queue's budget.
 
 Limit failures emit Phaser's `loaderror` event. The demo and editors report a `CharacterTextureLimitError`
 with the exceeded limit and cancel the remaining character files. `loadSceneCharacter` accepts the same

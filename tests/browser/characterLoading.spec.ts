@@ -33,6 +33,22 @@ test('oversized PNG dimensions fail before decoding and a reload can load normal
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
 });
 
+test('non-PNG content claiming to be PNG is rejected and a reload can load normal artwork', async ({ page }) => {
+  const artwork = '**/characters/demo-puppet/images/paper-torso.png';
+  await page.route(artwork, (route) =>
+    route.fulfill({
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="90000" height="90000"></svg>',
+      contentType: 'image/png',
+    }),
+  );
+  await page.goto('rig-editor/');
+  await expect(page.locator('#inspector')).toContainText('PNG header before decoding');
+  await expect(page.locator('#editor-stage canvas')).toBeVisible();
+  await page.unroute(artwork);
+  await page.reload();
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+});
+
 test('oversized image responses fail at the byte limit and retain a usable page', async ({ page }) => {
   const artwork = '**/characters/demo-puppet/images/paper-torso.png';
   await page.route(artwork, (route) =>

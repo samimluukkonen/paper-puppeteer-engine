@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Require PNG-header checks before decoding character artwork by default; trusted alternative formats can opt out with `requirePng: false`.
+
 - Publish completed Animation Editor commands in one state notification.
 - Share pending import and export guards between the editors.
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.

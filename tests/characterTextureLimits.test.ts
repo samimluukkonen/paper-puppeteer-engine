@@ -44,7 +44,7 @@ function fixture(options: CharacterTextureLimitOptions = {}) {
       cache: false,
     });
     const xhr = {
-      response: new Blob(['artwork']),
+      response: png(2, 3),
       responseURL: 'https://example.test/body.png',
       readyState: 4,
       status: 200,
@@ -119,19 +119,19 @@ test('final blob sizes are enforced even when progress is absent or misleading',
 });
 
 test('total transfer accounting counts incremental progress once across distinct images', async () => {
-  const f = fixture({ maxTotalImageBytes: 15 });
+  const f = fixture({ maxTotalImageBytes: 50 });
   const first = f.image('first');
   const second = f.image('second');
   first.progress(4);
-  first.progress(7);
+  first.progress(24);
   first.load();
-  second.progress(7);
+  second.progress(24);
   second.load();
   await vi.waitFor(() => assert.equal(second.complete.mock.calls.length, 1));
   assert.equal(first.complete.mock.calls.length, 1);
   const third = f.image('third');
-  third.progress(2);
-  assert.match(getCharacterTextureLimitError(third.file)!.message, /15-byte total limit/);
+  third.progress(3);
+  assert.match(getCharacterTextureLimitError(third.file)!.message, /50-byte total limit/);
   assert.equal(third.decode.mock.calls.length, 0);
 });
 
@@ -145,6 +145,56 @@ test('oversized PNG dimensions are rejected from their header before image decod
   assert.equal(image.complete.mock.calls.length, 0);
   assert.match(getCharacterTextureLimitError(image.file)!.message, /10-pixel limit/);
   assert.equal(f.error.mock.calls.length, 1);
+});
+
+test.each([
+  { label: 'JPEG', bytes: [255, 216, 255, 224, 0, 16] },
+  { label: 'GIF', bytes: [...new TextEncoder().encode('GIF89a')] },
+  { label: 'WebP', bytes: [...new TextEncoder().encode('RIFF0000WEBP')] },
+  {
+    label: 'SVG with a PNG MIME type',
+    bytes: [...new TextEncoder().encode('<svg width="90000" height="90000"></svg>')],
+  },
+  { label: 'truncated PNG', bytes: [137, 80, 78, 71, 13, 10, 26, 10] },
+])('$label is rejected before decoding by default', async ({ bytes }) => {
+  const f = fixture();
+  const image = f.image();
+  image.xhr.response = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+  image.load();
+  await vi.waitFor(() => assert.equal(image.processError.mock.calls.length, 1));
+  assert.equal(image.decode.mock.calls.length, 0);
+  assert.equal(image.complete.mock.calls.length, 0);
+  assert.match(getCharacterTextureLimitError(image.file)!.message, /PNG header before decoding/);
+});
+
+test('uninspectable responses fail before decoding instead of bypassing the format policy', () => {
+  const f = fixture();
+  const image = f.image();
+  image.file.xhrLoader = null;
+  image.file.onProcess();
+  assert.equal(image.decode.mock.calls.length, 0);
+  assert.equal(image.processError.mock.calls.length, 1);
+  assert.match(getCharacterTextureLimitError(image.file)!.message, /before decoding/);
+});
+
+test('trusted alternative formats explicitly opt out while retaining decoded pixel limits', async () => {
+  for (const oversized of [false, true]) {
+    const f = fixture({ requirePng: false, maxImagePixels: 10 });
+    const image = f.image('body', { naturalWidth: oversized ? 4 : 2, naturalHeight: 3 });
+    image.xhr.response = new Blob(['trusted artwork']);
+    image.load();
+    await vi.waitFor(() => assert.equal(image.decode.mock.calls.length, 1));
+    assert.equal(image.complete.mock.calls.length, oversized ? 0 : 1);
+    assert.equal(image.processError.mock.calls.length, oversized ? 1 : 0);
+    if (oversized) assert.match(getCharacterTextureLimitError(image.file)!.message, /10-pixel limit/);
+  }
+});
+
+test.each(['yes', 0, null])('invalid requirePng value %s is rejected', (requirePng) => {
+  assert.throws(
+    () => new CharacterTextureBudget({ requirePng } as unknown as CharacterTextureLimitOptions),
+    /requirePng must be a boolean/,
+  );
 });
 
 test.each([
@@ -198,11 +248,22 @@ test('cancellation during header inspection prevents late decoding or failure no
 });
 
 test('inline image byte checks handle base64 padding, whitespace and percent-encoded bytes', () => {
-  const { budget } = fixture({ maxImageBytes: 3, maxTotalImageBytes: 5 });
+  const { budget } = fixture({ maxImageBytes: 3, maxTotalImageBytes: 5, requirePng: false });
   assert.doesNotThrow(() => budget.checkInlineImage('base64', 'data:image/png;base64,Y Q=='));
   assert.doesNotThrow(() => budget.checkInlineImage('percent', 'data:image/png,%89%50%4E'));
   assert.throws(() => budget.checkInlineImage('large', 'data:image/png;base64,YWJjZA=='), /3-byte limit/);
   assert.throws(() => budget.checkInlineImage('total', 'data:image/png,%00%01'), /5-byte total limit/);
+});
+
+test('inline non-PNG content cannot bypass pre-decode checks by claiming a PNG MIME type', () => {
+  const bytes = Buffer.from('<svg width="90000" height="90000"></svg>');
+  for (const url of [
+    `data:image/png;base64,${bytes.toString('base64')}`,
+    `data:image/png,${encodeURIComponent(bytes.toString())}`,
+  ]) {
+    const { budget } = fixture();
+    assert.throws(() => budget.checkInlineImage('body', url), /PNG header before decoding/);
+  }
 });
 
 test('inline PNG dimension checks run before the browser can decode base64 or percent data URLs', async () => {
