@@ -61,6 +61,7 @@ try {
     'ik.md',
     'animation-editor.md',
     'rig-editor.md',
+    'runtime-api.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 
@@ -79,6 +80,14 @@ try {
     `
 import { AnimationPlayer, CharacterLoader, Joint, Rig, compileClip, evaluateClip } from 'paper-puppeteer-engine/core';
 import type { AnimationClip, CharacterDefinition, CharacterLoadOptions, CompiledClip, DeepReadonly, RigJsonDefinition } from 'paper-puppeteer-engine/core';
+import type { CharacterManifest, IKAnimationTrack, RigDefinition } from 'paper-puppeteer-engine/data';
+import { validateCharacterDefinition, parseRigDefinition } from 'paper-puppeteer-engine/serialization';
+
+export function checkData(manifest: CharacterManifest, rig: RigDefinition, track: IKAnimationTrack): void {
+  validateCharacterDefinition({ manifest, rig });
+  parseRigDefinition({ version: 1, ...rig });
+  track[0]?.time satisfies number | undefined;
+}
 
 export function loadCharacter(url: string, options: CharacterLoadOptions): Promise<CharacterDefinition> {
   return CharacterLoader.load(url, undefined, options);
@@ -159,7 +168,13 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
     browserEntry,
     `
 import type { Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
-export { Puppet } from 'paper-puppeteer-engine';
+import { Puppet as RootPuppet } from 'paper-puppeteer-engine';
+import { Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
+export { Puppet } from 'paper-puppeteer-engine/runtime';
+export { runRuntimeExample } from './runtime-example.js';
+
+if (RootPuppet !== RuntimePuppet) throw new Error('Root and /runtime must share the Puppet class.');
+export const load = loadSceneCharacter;
 
 export function sync(puppet: Puppet, options: SyncPoseOptions): void {
   puppet.syncPose(options);
@@ -168,19 +183,45 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
 }
 `,
   );
+  // Compile and bundle the actual repository example against installed package entry points.
+  const example = await readFile(new URL('../src/examples/runtime.ts', import.meta.url), 'utf8');
+  assert.ok(example.includes('../engine/runtime.js'));
+  await writeFile(
+    join(consumer, 'runtime-example.ts'),
+    example.replace('../engine/runtime.js', 'paper-puppeteer-engine/runtime'),
+  );
   // Match the repository's skipLibCheck for the browser entry's third-party Phaser declarations.
   config.compilerOptions.skipLibCheck = true;
   config.include = ['browser.ts'];
   await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify(config));
   typecheck();
-  await build({
+  const browserBuild = await build({
     configFile: false,
     root: consumer,
     logLevel: 'warn',
-    build: { lib: { entry: browserEntry, formats: ['es'] }, rollupOptions: { external: ['phaser', 'zod'] } },
+    build: {
+      write: false,
+      lib: { entry: browserEntry, formats: ['es'] },
+      rollupOptions: { external: ['phaser', 'zod'] },
+    },
   });
+  for (const result of Array.isArray(browserBuild) ? browserBuild : [browserBuild]) {
+    assert.ok('output' in result, 'Consumer build must return bundle output.');
+    for (const output of result.output) {
+      if (output.type !== 'chunk') continue;
+      assert.ok(
+        output.imports.every((specifier) => ['phaser', 'zod'].includes(specifier)),
+        'Only declared runtime dependencies belong in the consumer bundle.',
+      );
+      for (const module of Object.keys(output.modules))
+        assert.ok(
+          !/\/(?:devtools|ui|react|react-dom)\//.test(module),
+          `Runtime bundle includes editor code: ${module}`,
+        );
+    }
+  }
   console.log(
-    'Packed package works in an isolated consumer: documentation links, Node /core imports, public declarations, and browser bundling.',
+    'Packed package works in an isolated consumer: documentation, Node entry points, public declarations, runtime example, compatibility, and browser isolation.',
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

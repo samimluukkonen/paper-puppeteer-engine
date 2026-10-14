@@ -47,6 +47,8 @@ The v0.5.4 [mirrored animation tools](docs/mirroring-hardening-verification.md) 
 
 ## Quick start
 
+v0.6.1 stabilizes the [runtime architecture and public API](docs/runtime-api.md), with explicit `/runtime`, `/data` and `/serialization` entry points alongside the existing root and `/core` imports. Character scene loading is available from the runtime, and ownership/cleanup contracts are documented.
+
 Build the library with `npm run build:lib`, then install this checkout in your Phaser project:
 
 ```bash
@@ -57,7 +59,7 @@ Load the shipped character's metadata and artwork before creating its puppet:
 
 ```ts
 import Phaser from 'phaser';
-import { CharacterLoader, Puppet, queueCharacterTextures } from 'paper-puppeteer-engine';
+import { CharacterLoader, Puppet, queueCharacterTextures } from 'paper-puppeteer-engine/runtime';
 
 const definition = await CharacterLoader.load('/characters/demo-puppet/character.json');
 queueCharacterTextures(scene, definition);

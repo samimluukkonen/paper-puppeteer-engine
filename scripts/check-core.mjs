@@ -18,6 +18,14 @@ const {
 
 // Exercise the built subpath in plain Node, with no browser globals or Phaser mock.
 assert.equal(typeof globalThis.window, 'undefined');
+const serializationSpecifier = 'paper-puppeteer-engine/serialization';
+const serialization = /** @type {typeof import('../src/engine/serialization.ts')} */ (
+  await import(serializationSpecifier)
+);
+assert.strictEqual(serialization.validateRigDefinition, validateRigDefinition);
+const dataSpecifier = 'paper-puppeteer-engine/data';
+const data = /** @type {typeof import('../src/engine/data.ts')} */ (await import(dataSpecifier));
+assert.deepEqual(Object.keys(data), [], '/data is a type-only entry.');
 // Consumers and the library must share the installed Zod runtime and error class.
 assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root', x: NaN }] }), z.ZodError);
 const character = await CharacterLoader.load(
@@ -60,4 +68,6 @@ const solved = solveTwoBoneIK({
 });
 assert.ok(Number.isFinite(solved.rootRotation));
 assert.ok(Number.isFinite(solved.middleRotation));
-console.log('Built /core package works in Node: character loading, validation, animation, and IK.');
+player.dispose();
+assert.equal(player.isDisposed, true);
+console.log('Built /core, /serialization and /data work in Node: loading, validation, animation, IK, and disposal.');

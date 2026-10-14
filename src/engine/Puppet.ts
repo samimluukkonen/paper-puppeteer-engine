@@ -49,6 +49,7 @@ interface PuppetSettings {
 export type PuppetOptions = PuppetSettings &
   ({ rig: RigDefinition | Rig; definition?: never } | { definition: CharacterDefinition; rig?: never });
 
+/** Public scene-owned puppet. destroy() releases objects and subscriptions, but leaves shared textures to the host. */
 export class Puppet {
   readonly rig: Rig;
   readonly container: Phaser.GameObjects.Container;
@@ -193,6 +194,9 @@ export class Puppet {
   get currentAnimation(): string | undefined {
     return this.animationPlayer.currentAnimation;
   }
+  get isDestroyed(): boolean {
+    return this.destroyed;
+  }
   get isPlaying(): boolean {
     return this.animationPlayer.isPlaying;
   }
@@ -209,7 +213,7 @@ export class Puppet {
     return this.facing;
   }
 
-  /** Share current artwork/layout with a compatible render-only preview; leaves both poses untouched. */
+  /** @internal Editor render-only preview bridge; leaves both poses untouched. */
   copyAppearanceTo(renderer: PuppetRenderer, tint: number): void {
     renderer.copyAppearanceFrom(this.renderer, tint);
   }
@@ -310,17 +314,15 @@ export class Puppet {
 
   /** Data only: normalized rig values, including pivots, slots and sprite offsets. */
   exportRig(): RigJsonDefinition {
-    return JSON.parse(
-      JSON.stringify({
-        version: RIG_FORMAT_VERSION,
-        root: this.rig.root,
-        ...(this.rig.ik === undefined ? {} : { ik: this.rig.ik }),
-        bones: this.rig.bones,
-        slots: this.rig.slots,
-        attachments: this.rig.attachments,
-        skins: this.rig.skins,
-      }),
-    ) as RigJsonDefinition;
+    return structuredClone({
+      version: RIG_FORMAT_VERSION,
+      root: this.rig.root,
+      ...(this.rig.ik === undefined ? {} : { ik: this.rig.ik }),
+      bones: this.rig.bones,
+      slots: this.rig.slots,
+      attachments: this.rig.attachments,
+      skins: this.rig.skins,
+    });
   }
 
   addAnimation(clip: AnimationClip): this {
@@ -586,6 +588,7 @@ export class Puppet {
   }
 
   addIK(definition: TwoBoneIKDefinition): TwoBoneIKConstraint {
+    if (this.destroyed) throw new Error('Puppet has been destroyed.');
     if (this.ikConstraints.has(definition.name)) {
       throw new Error(`IK "${definition.name}" is already registered.`);
     }
@@ -681,6 +684,7 @@ export class Puppet {
     this.renderedSlotDefinitions.clear();
     this.poses.clear();
     this.bones.clear();
+    for (const constraint of this.ikConstraints.values()) release(() => constraint.dispose());
     this.ikConstraints.clear();
     release(() => this.poseController.destroy());
     throwNotificationErrors(errors, 'Puppet cleanup failed.');
@@ -695,8 +699,9 @@ export class Puppet {
     this.poseController.preparePose();
   }
 
-  /** Use an external pose player's IK channels (for editor previews); undefined restores the runtime player. */
+  /** @internal Editor preview bridge; undefined restores the runtime player's IK channels. */
   setIKAnimationSource(player: Pick<AnimationPlayer, 'ikAnimation'> | undefined): void {
+    if (this.destroyed) throw new Error('Puppet has been destroyed.');
     this.ikAnimationSource = player;
   }
 

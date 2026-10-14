@@ -1,3 +1,4 @@
+/** Public renderer-independent APIs. Existing pure authoring and bake exports remain supported. */
 export type {
   AnimationClip,
   AnimationEvent,

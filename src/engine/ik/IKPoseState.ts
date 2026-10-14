@@ -61,4 +61,11 @@ export class IKPoseState {
       state.solved = state.joint.pose.rotation;
     }
   }
+
+  /** Release captured joint references after the owner restores its held pose. */
+  clear(): void {
+    this.rotations.length = 0;
+    this.captured.clear();
+    this.count = 0;
+  }
 }

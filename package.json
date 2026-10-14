@@ -1,6 +1,6 @@
 {
   "name": "paper-puppeteer-engine",
-  "version": "0.5.8-6",
+  "version": "0.6.1",
   "description": "A reusable Phaser engine for hierarchical 2D paper cutout puppets.",
   "type": "module",
   "files": [
@@ -22,6 +22,18 @@
     ".": {
       "types": "./dist/library/index.d.ts",
       "import": "./dist/library/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/library/runtime.d.ts",
+      "import": "./dist/library/runtime.js"
+    },
+    "./data": {
+      "types": "./dist/library/data.d.ts",
+      "import": "./dist/library/data.js"
+    },
+    "./serialization": {
+      "types": "./dist/library/serialization.d.ts",
+      "import": "./dist/library/serialization.js"
     }
   },
   "sideEffects": false,

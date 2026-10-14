@@ -47,6 +47,8 @@ Direct dependency versions are pinned in [package.json](../package.json), and `p
 
 ## Architecture
 
+See the [v0.6.1 runtime API and architecture audit](runtime-api.md) for dependency directions, public/internal/editor contracts, entry points, lifecycle ownership and the minimal consumer example. The package root and `/runtime` share the browser API; `/core`, `/data` and `/serialization` remain renderer independent. The scene character loader lives in the engine, with its old application path retained as a re-export.
+
 All three applications use React 19.3.0 with TypeScript JSX and Vite's JSX transform. `ui/viewShell.tsx` shares navigation and character identity, and `ui/workspace.css` shares the compact header, command bar, canvas/inspector layout, and narrow-screen drawer styling. `ui/mountView.tsx` initializes Phaser and the editing controllers in a layout effect after React commits their hosts; unmounting releases controllers, observers, and the game before React removes the DOM.
 
 The demo build emits separate Phaser and React vendor chunks. Changes to application modules retain the vendor chunk hashes, so browsers can reuse cached runtimes across application releases. The library build continues to leave Phaser external for the consuming application to supply.
@@ -88,6 +90,10 @@ src/engine/
     IKDebug.ts         Independent world-space IK overlay
   index.ts             Public library entry point
   core.ts              Renderer-independent public entry point for Node and asset tooling
+  runtime.ts           Explicit public Phaser runtime; index.ts remains its compatibility entry
+  data.ts              Type-only shared authored data contracts
+  serialization.ts     Versioned validation, parsing and pose serialization
+  loadSceneCharacter.ts  Cancellation-aware scene metadata/artwork loading
 src/demo/
   DemoScene.ts         Character loading, playback controls and UI state
   DemoInput.ts         Pointer/keyboard bindings and shutdown cleanup

@@ -16,7 +16,7 @@ interface PoseProjection {
   syncBone(id: string): void;
 }
 
-/** Owns temporary pose overrides and IK passes; Puppet supplies bones, rendering, and overlays. */
+/** @internal Owns pose overrides and IK passes; Puppet supplies bones, rendering, and overlays. */
 export class PuppetPoseController {
   private readonly ikPose = new IKPoseState();
   private readonly sortedIK: TwoBoneIKConstraint[] = [];
@@ -145,6 +145,7 @@ export class PuppetPoseController {
 
   destroy(): void {
     this.ikPose.restore();
+    this.ikPose.clear();
     this.poseUnderlying.clear();
     this.activePose = undefined;
     this.sortedIK.length = 0;
