@@ -143,6 +143,66 @@ test.each(['constructor', 'toString', 'hasOwnProperty'])(
   },
 );
 
+test('generated paths disambiguate sanitized, case-folded and source filename collisions deterministically', async () => {
+  const source = fixture();
+  const names = ['walk 2', 'walk_2', 'walk_2_2', 'Walk', 'walk', 'käsi', 'k_si', 'MOVE'];
+  const snapshot = {
+    ...source,
+    skins: [...source.skins, ...['base', 'base?', 'BASE'].map((name) => ({ version: 1 as const, name, slots: {} }))],
+    // Put generated names before source clips to exercise reservations independent of insertion order.
+    animations: [...names.map((name) => ({ name, duration: 1000, loop: true, tracks: {} })), ...source.animations],
+  };
+  const files = await buildCharacterPackage(snapshot, fetchImage);
+  const repeated = await buildCharacterPackage(snapshot, fetchImage);
+  assert.deepEqual([...files.keys()], [...repeated.keys()]);
+  const definition = await loadPackageDefinition(decodePackageZip(encodePackageZip(files)));
+  assert.deepEqual(
+    definition.animations.map((clip) => clip.name),
+    [...names, 'move'],
+  );
+  assert.equal(definition.animationPaths.move, 'animations/move.json');
+  assert.equal(definition.manifest!.skins.default, 'skins/base.json');
+  assert.equal(definition.animationPaths['walk 2'], 'animations/walk_2.json');
+  assert.equal(definition.animationPaths.walk_2, 'animations/walk_2_2.json');
+  assert.equal(definition.animationPaths.walk_2_2, 'animations/walk_2_2_2.json');
+  assert.equal(new Set([...files.keys()].map((path) => path.toLowerCase())).size, files.size);
+  assert.deepEqual(definition.standaloneSkins, snapshot.skins);
+});
+
+test('individual artwork paths avoid existing metadata and other generated image paths', async () => {
+  const source = fixture();
+  const files = await buildCharacterPackage(source, fetchImage);
+  const rigPath = 'images/shared_replacement_1.png';
+  const definition = CharacterDefinition.fromData({
+    manifest: { ...source.definition.manifest!, rig: rigPath },
+    rig: source.rig,
+    skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, packageJson(files, path)])),
+    animations: Object.fromEntries(manifest.animations.map((path) => [path, packageJson(files, path)])),
+    poses: Object.fromEntries(manifest.poses.map((path) => [path, packageJson(files, path)])),
+  });
+  const output = await buildCharacterPackage(
+    {
+      ...source,
+      definition,
+      replacements: [
+        {
+          assetKey: 'shared',
+          reference: 'attachment:part',
+          blob: new Blob([png]),
+          format: 'image/png',
+          originScaleX: 1,
+          originScaleY: 1,
+        },
+      ],
+    },
+    fetchImage,
+  );
+  const reloaded = await loadPackageDefinition(decodePackageZip(encodePackageZip(output)));
+  assert.equal(reloaded.rigPath, rigPath);
+  assert.equal(reloaded.textures.shared_replacement_1, 'images/shared_replacement_1_2.png');
+  assert.equal(reloaded.rig.attachments[0]!.texture, 'shared_replacement_1');
+});
+
 test('shared and individual replacements preserve stable IDs and precedence with distinct static assets', async () => {
   const source = fixture();
   source.replacements.push(

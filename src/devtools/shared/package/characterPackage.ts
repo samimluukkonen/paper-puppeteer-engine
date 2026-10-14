@@ -184,6 +184,16 @@ export async function buildCharacterPackage(
   if (!definition.manifest) throw new Error('Character has no source manifest.');
   const manifest = structuredClone(definition.manifest) as CharacterManifest;
   for (const path of manifestPaths(manifest)) packagePath(path);
+  // Reserve source paths before generating any names, even when their files are added later.
+  const reservedPaths = new Set(['character.json', ...manifestPaths(manifest)].map((path) => path.toLowerCase()));
+  const allocatePath = (directory: string, id: string, extension: string): string => {
+    const stem = safeName(id).slice(0, 200);
+    let path = `${directory}/${stem}${extension}`;
+    let suffix = 1;
+    while (reservedPaths.has(path.toLowerCase())) path = `${directory}/${stem}_${++suffix}${extension}`;
+    reservedPaths.add(path.toLowerCase());
+    return path;
+  };
   const files = new Map<string, Uint8Array<ArrayBuffer>>();
   const add = (path: string, bytes: Uint8Array<ArrayBuffer>): void => {
     packagePath(path);
@@ -208,9 +218,9 @@ export async function buildCharacterPackage(
       do {
         key = `${replacement.assetKey}_replacement_${++serial}`;
       } while (Object.hasOwn(manifest.textures, key));
-      manifest.textures[key] = `images/${safeName(key)}${extension}`;
+      manifest.textures[key] = allocatePath('images', key, extension);
     } else if (!manifest.textures[key]!.toLowerCase().endsWith(extension)) {
-      manifest.textures[key] = `images/${safeName(key)}_replacement${extension}`;
+      manifest.textures[key] = allocatePath('images', `${key}_replacement`, extension);
     }
     textures.set(key, new Uint8Array(await replacement.blob.arrayBuffer()));
     const scope = replacement.reference ?? `texture:${replacement.assetKey}`;
@@ -240,7 +250,7 @@ export async function buildCharacterPackage(
     snapshot.skins.map((skin) => {
       const path = Object.hasOwn(manifest.skins, skin.name)
         ? manifest.skins[skin.name]!
-        : `skins/${safeName(skin.name)}.json`;
+        : allocatePath('skins', skin.name, '.json');
       json(path, skin);
       return [skin.name, path];
     }),
@@ -248,7 +258,7 @@ export async function buildCharacterPackage(
   manifest.animations = snapshot.animations.map((clip) => {
     const path = Object.hasOwn(definition.animationPaths, clip.name)
       ? definition.animationPaths[clip.name]!
-      : `animations/${safeName(clip.name)}.json`;
+      : allocatePath('animations', clip.name, '.json');
     json(path, { ...clip, version: 1 });
     return path;
   });
