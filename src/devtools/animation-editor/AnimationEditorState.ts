@@ -86,6 +86,8 @@ export type EditorMode = 'animation' | 'rig-tweak';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  /** Loaded character rig, retained independently of restored drafts and preview tweaks. */
+  readonly sourceRig: Rig | undefined;
   private readonly document: AnimationEditorDocument;
   private readonly listeners = new Set<() => void>();
   private readonly clipboard = new TimelineClipboard();
@@ -110,6 +112,7 @@ export class AnimationEditorState {
   private mode: EditorMode = 'animation';
 
   constructor(rig?: Rig, animations: readonly AnimationClip[] = [], options: AnimationEditorStateOptions = {}) {
+    this.sourceRig = rig;
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);

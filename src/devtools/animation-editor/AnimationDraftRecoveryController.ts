@@ -47,7 +47,7 @@ export class AnimationDraftRecoveryController {
         this.recovery.bind(
           {
             key: JSON.stringify([this.pathname, this.characterId, animation]),
-            source: draftSource({ rig: state.rig, animation: source }),
+            source: draftSource({ rig: state.sourceRig, animation: source }),
             label: `animation "${animation}"`,
             snapshot: () => state.workingAnimation,
             dirty: () => state.dirty,

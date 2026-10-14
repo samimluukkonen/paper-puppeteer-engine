@@ -67,6 +67,49 @@ test('synchronous restoration cannot recursively rebind and remains one undoable
   controller.dispose();
 });
 
+test('rig tweaks and restored rig drafts retain animation recovery identity and authored edits', () => {
+  const { state, rig, animations, recovery, controller, session } = fixture();
+  controller.bind(state, 'character');
+  const original = session();
+  const tweaked = new Rig({ root: 'root', bones: [{ id: 'root', x: 20 }] });
+  state.updatePreviewRig(tweaked);
+  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  const snapshot = original.snapshot();
+  assert.equal(recovery.bind.mock.calls.length, 1);
+  controller.unbind();
+
+  // The rig draft restores before animation recovery binds on page reload.
+  const reloaded = new AnimationEditorState(rig, animations);
+  reloaded.selectAnimation('first');
+  reloaded.updatePreviewRig(tweaked);
+  controller.bind(reloaded, 'character');
+  assert.equal(session().source, original.source);
+  assert.isTrue(session().validate(snapshot));
+  assert.isTrue(session().restore(snapshot));
+  assert.isTrue(reloaded.dirty);
+  assert.equal(reloaded.getEvaluatedBonePropertyValue('root', 'x', 0), 42);
+  assert.strictEqual(reloaded.rig, tweaked);
+  reloaded.undo();
+  assert.isFalse(reloaded.dirty);
+  assert.strictEqual(reloaded.rig, tweaked);
+  controller.dispose();
+});
+
+test('source rig changes invalidate recovery while validation uses the current preview rig', () => {
+  const { state, animations, controller, session } = fixture();
+  controller.bind(state, 'character');
+  const original = session();
+  const changed = new Rig({ root: 'root', bones: [{ id: 'root', x: 20 }] });
+  const reloaded = new AnimationEditorState(changed, animations);
+  reloaded.selectAnimation('first');
+  controller.bind(reloaded, 'character');
+  assert.notEqual(session().source, original.source);
+  // Source identity stays fixed, but compatibility must reflect the current rig.
+  reloaded.updatePreviewRig(new Rig({ root: 'different', bones: [{ id: 'different' }] }));
+  assert.isFalse(session().validate(state.workingAnimation));
+  controller.dispose();
+});
+
 test('animation navigation binds separate keys and deselection releases the current draft', () => {
   const { state, recovery, controller, session } = fixture();
   controller.bind(state, 'character');
