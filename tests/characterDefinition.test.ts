@@ -464,8 +464,8 @@ test('character validation preserves pose leaf diagnostics rather than combining
   const path = manifest.poses![0]!;
   data.poses[path] = { version: 1, name: 'bad', bones: { ghost: { x: 1 }, other: { y: 2 } } };
   assert.deepEqual(validateCharacterDefinition(data), [
-    { severity: 'error', path: 'poses[0].bones.ghost', message: 'Unknown bone "ghost".' },
-    { severity: 'error', path: 'poses[0].bones.other', message: 'Unknown bone "other".' },
+    { severity: 'error', path: 'poses[0].bones.ghost', message: 'poses/combat-ready.json: Unknown bone "ghost".' },
+    { severity: 'error', path: 'poses[0].bones.other', message: 'poses/combat-ready.json: Unknown bone "other".' },
   ]);
   data.poses[path] = { version: 1, name: 'bad', bones: { torso: { x: 'invalid', rotation: 'invalid' } } };
   assert.deepEqual(

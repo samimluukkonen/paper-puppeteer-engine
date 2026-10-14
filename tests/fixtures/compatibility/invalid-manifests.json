@@ -1,0 +1,34 @@
+[
+  {
+    "label": "unsupported version",
+    "patch": {
+      "version": 2
+    }
+  },
+  {
+    "label": "missing default skin",
+    "patch": {
+      "defaultSkin": "missing"
+    }
+  },
+  {
+    "label": "duplicate animation path",
+    "patch": {
+      "animations": ["animations/reach.json", "animations/reach.json"]
+    }
+  },
+  {
+    "label": "metadata/image collision",
+    "patch": {
+      "textures": {
+        "paper": "rig.json"
+      }
+    }
+  },
+  {
+    "label": "unresolved metadata",
+    "patch": {
+      "rig": "missing.json"
+    }
+  }
+]

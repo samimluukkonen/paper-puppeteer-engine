@@ -50,7 +50,7 @@ function stable(value: unknown, original: unknown, field?: string, artwork = fal
         .sort((a, b) => {
           const ai = order.indexOf(a),
             bi = order.indexOf(b);
-          return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b);
+          return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || (a < b ? -1 : a > b ? 1 : 0);
         })
         .map((key) => [
           key,

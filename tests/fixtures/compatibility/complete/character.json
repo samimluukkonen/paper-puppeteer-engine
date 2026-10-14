@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "complete",
+  "rig": "rig.json",
+  "defaultSkin": "default",
+  "skins": {
+    "default": "skins/default.json",
+    "clear": "skins/clear.json"
+  },
+  "animations": ["animations/reach.json", "animations/baked.json"],
+  "poses": ["poses/rest.json"],
+  "textures": {
+    "paper": "images/paper.png"
+  }
+}

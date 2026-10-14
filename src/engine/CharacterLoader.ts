@@ -27,6 +27,10 @@ export interface CharacterLoadOptions extends JsonWorkloadLimitOptions {
    * Custom fetchers must honor RequestInit.redirect; DNS/network restrictions belong to the host.
    */
   urlPolicy?: (url: URL) => boolean;
+  /** Inspect each authored metadata/artwork path before URL normalization. Throw to reject it.
+   * Package loaders use this to reject traversal and encoded aliases that URL policy cannot detect.
+   */
+  pathPolicy?: (path: string, field: string) => void;
 }
 
 /** Fetches only JSON metadata. Image decoding/loading belongs to Phaser or the host. */
@@ -127,6 +131,22 @@ export const CharacterLoader = {
         Object.keys(manifest.textures).length;
       if (resourceCount > limits.maxResources)
         throw new JsonInputLimitError(`Character exceeds the ${limits.maxResources}-resource limit.`);
+      if (options.pathPolicy) {
+        const references: [string, string][] = [
+          ['rig', manifest.rig],
+          ...Object.entries(manifest.skins).map(([name, path]): [string, string] => [`skins.${name}`, path]),
+          ...manifest.animations.map((path, index): [string, string] => [`animations[${index}]`, path]),
+          ...(manifest.poses ?? []).map((path, index): [string, string] => [`poses[${index}]`, path]),
+          ...Object.entries(manifest.textures).map(([key, path]): [string, string] => [`textures.${key}`, path]),
+        ];
+        for (const [field, path] of references) {
+          try {
+            options.pathPolicy(path, `manifest.${field}`);
+          } catch (error) {
+            throw new Error(`character.json manifest.${field}: ${String(error)}`, { cause: error });
+          }
+        }
+      }
       // Approve the complete resource list before starting sibling requests or handing artwork to the host.
       if (options.urlPolicy) {
         for (const path of [...paths, ...Object.values(manifest.textures)]) checkUrl(new URL(path, manifestUrl).href);

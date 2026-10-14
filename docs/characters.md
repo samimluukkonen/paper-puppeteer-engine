@@ -4,6 +4,8 @@
 
 ## External characters
 
+See the [schema inventory and compatibility policy](schema-compatibility.md) for supported versions, field defaults, canonical serialization and handling older character assets.
+
 The primary demo loads [character.json](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/public/characters/demo-puppet/character.json) from `public/characters/demo-puppet/`. The folder contains `rig.json`, three skin files, four animation files, `poses/combat-ready.json`, and transparent PNG files under `images/`. The combat idle file has the runtime clip name `sword`; file names and stable animation IDs can differ.
 
 The version 1 manifest names a rig path, a default skin key, skin keys mapped to JSON paths, animation and optional pose JSON paths, and Phaser texture keys mapped to image paths. All paths resolve relative to `character.json`, using its final response URL after redirects. Custom fetchers with an empty response URL fall back to the requested manifest URL. Texture keys are separate from bone, slot, and attachment IDs. `frame` on an attachment or legacy bone sprite selects an atlas frame when the host has preloaded an atlas under the named texture key. The sample uses ordinary PNGs.

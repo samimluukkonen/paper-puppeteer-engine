@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "root": "root",
+  "bones": [
+    {
+      "id": "root"
+    }
+  ]
+}

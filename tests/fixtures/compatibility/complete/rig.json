@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "name": "Compatibility chain",
+  "root": "root",
+  "bones": [
+    {
+      "id": "root",
+      "sprite": {
+        "texture": "paper",
+        "frame": "__BASE"
+      }
+    },
+    {
+      "id": "middle",
+      "parent": "root",
+      "x": 40
+    },
+    {
+      "id": "end",
+      "parent": "middle",
+      "x": 30
+    }
+  ],
+  "slots": [
+    {
+      "id": "hand",
+      "bone": "end",
+      "depth": 2
+    }
+  ],
+  "attachments": [
+    {
+      "id": "paper-hand",
+      "texture": "paper",
+      "frame": "__BASE",
+      "originX": 0.25
+    }
+  ],
+  "skins": [
+    {
+      "version": 1,
+      "name": "default",
+      "slots": {
+        "hand": null
+      }
+    }
+  ],
+  "ik": [
+    {
+      "name": "arm",
+      "rootBone": "root",
+      "middleBone": "middle",
+      "endBone": "end"
+    }
+  ]
+}

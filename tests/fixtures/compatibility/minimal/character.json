@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "minimal",
+  "rig": "rig.json",
+  "defaultSkin": "default",
+  "skins": {
+    "default": "skin.json"
+  },
+  "animations": [],
+  "textures": {}
+}

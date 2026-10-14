@@ -180,11 +180,25 @@ test('complete ZIP includes metadata and exact binaries and reloads with Charact
   assert.deepEqual(reloaded.rigFile, source.rig);
   assert.deepEqual(reloaded.animations, source.animations);
   assert.deepEqual(reloaded.poses, source.definition.poses);
-  assert.deepEqual(reloaded.standaloneSkins, source.skins);
+  assert.deepEqual(
+    Object.fromEntries(reloaded.standaloneSkins.map((skin) => [skin.name, skin])),
+    Object.fromEntries(source.skins.map((skin) => [skin.name, skin])),
+  );
   assert.deepEqual(files.get('images/part.png'), png);
   assert.equal(files.size, 7);
   assert.equal(JSON.stringify(source), before);
   assert.notInclude(new TextDecoder().decode(files.get('character.json')), 'blob:');
+  const repeated = await buildCharacterPackage(
+    {
+      definition: reloaded,
+      rig: structuredClone(reloaded.rigFile!),
+      skins: reloaded.standaloneSkins,
+      animations: reloaded.animations,
+      replacements: [],
+    },
+    fetchImage,
+  );
+  for (const [path, bytes] of files) assert.deepEqual(repeated.get(path), bytes, path);
 });
 
 test.each(['constructor', 'toString', 'hasOwnProperty'])(
@@ -239,7 +253,10 @@ test('generated paths disambiguate sanitized, case-folded and source filename co
   assert.equal(definition.animationPaths.walk_2, 'animations/walk_2_2.json');
   assert.equal(definition.animationPaths.walk_2_2, 'animations/walk_2_2_2.json');
   assert.equal(new Set([...files.keys()].map((path) => path.toLowerCase())).size, files.size);
-  assert.deepEqual(definition.standaloneSkins, snapshot.skins);
+  assert.deepEqual(
+    Object.fromEntries(definition.standaloneSkins.map((skin) => [skin.name, skin])),
+    Object.fromEntries(snapshot.skins.map((skin) => [skin.name, skin])),
+  );
 });
 
 test('individual artwork paths avoid existing metadata and other generated image paths', async () => {
@@ -303,7 +320,10 @@ test('shared and individual replacements preserve stable IDs and precedence with
   assert.equal(definition.rig.attachments[0]!.originX, 0.375);
   assert.notEqual(definition.rig.attachments[0]!.texture, 'shared');
   assert.deepEqual(definition.rig.slots, source.definition.rig.slots);
-  assert.deepEqual(definition.standaloneSkins, source.skins);
+  assert.deepEqual(
+    Object.fromEntries(definition.standaloneSkins.map((skin) => [skin.name, skin])),
+    Object.fromEntries(source.skins.map((skin) => [skin.name, skin])),
+  );
   assert.deepEqual(definition.animations, source.animations);
 });
 

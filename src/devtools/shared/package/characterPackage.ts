@@ -1,4 +1,5 @@
 import type { AnimationClip } from '../../../engine/AnimationClip.js';
+import { canonicalJson } from '../../../engine/authoredSerialization.js';
 import type { CharacterDefinition, CharacterManifest } from '../../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../../engine/CharacterLoader.js';
 import type { RigJsonDefinition } from '../../../engine/externalData.js';
@@ -56,6 +57,9 @@ export function loadPackageDefinition(files: PackageFiles, signal?: AbortSignal)
     },
     {
       ...(signal ? { signal } : {}),
+      pathPolicy: (path) => {
+        packagePath(path);
+      },
       urlPolicy: (url) =>
         url.origin === new URL(packageBase).origin &&
         !url.search &&
@@ -203,7 +207,7 @@ export async function buildCharacterPackage(
     files.set(path, bytes);
   };
   const json = (path: string, data: unknown): void => {
-    const text = `${JSON.stringify(data, null, 2)}\n`;
+    const text = canonicalJson(data);
     assertJsonInputSize(text);
     add(path, encoder.encode(text));
   };

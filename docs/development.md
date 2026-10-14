@@ -47,6 +47,8 @@ Direct dependency versions are pinned in [package.json](../package.json), and `p
 
 ## Architecture
 
+The [v0.6.2 schema and compatibility guide](schema-compatibility.md) inventories the version-1 authored formats, validation boundaries, deterministic serialization, existing migration behavior and historical fixture coverage.
+
 See the [v0.6.1 runtime API and architecture audit](runtime-api.md) for dependency directions, public/internal/editor contracts, entry points, lifecycle ownership and the minimal consumer example. The package root and `/runtime` share the browser API; `/core`, `/data` and `/serialization` remain renderer independent. The scene character loader lives in the engine, with its old application path retained as a re-export.
 
 All three applications use React 19.3.0 with TypeScript JSX and Vite's JSX transform. `ui/viewShell.tsx` shares navigation and character identity, and `ui/workspace.css` shares the compact header, command bar, canvas/inspector layout, and narrow-screen drawer styling. `ui/mountView.tsx` initializes Phaser and the editing controllers in a layout effect after React commits their hosts; unmounting releases controllers, observers, and the game before React removes the DOM.

@@ -1,3 +1,4 @@
+import { serializeSkinDefinition } from '../../engine/authoredSerialization.js';
 import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import {
   RIG_FORMAT_VERSION,
@@ -560,8 +561,8 @@ export class RigEditorState {
     const skin = this.getSkin(name);
     checkSkinReferences([skin], this.workingCopy, throwValidationIssue);
     for (const id of Object.values(skin.slots)) if (id !== null) this.assertArtwork(this.getAttachment(id));
-    const json = `${JSON.stringify(skin, null, 2)}\n`;
     assertJsonExportSize(skin);
+    const json = serializeSkinDefinition(skin, this.workingCopy);
     if (saveBaseline && this.isStandaloneSkin(name)) {
       this.savedExternalSkins.set(name, skin);
       this.cachedDirty = undefined;

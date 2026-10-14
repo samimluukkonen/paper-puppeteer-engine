@@ -1,4 +1,10 @@
 /** Versioned JSON validation and pose serialization; no browser, Phaser, or editor state. */
+export {
+  serializeRigDefinition,
+  serializeAnimationDefinition,
+  serializeSkinDefinition,
+  serializeCharacterManifest,
+} from './authoredSerialization.js';
 export type {
   AnimationJsonDefinition,
   AnimationJsonEvent,

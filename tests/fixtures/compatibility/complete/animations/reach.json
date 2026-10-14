@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "name": "reach",
+  "duration": 1000,
+  "loop": false,
+  "interpolation": "linear",
+  "tracks": {
+    "root": [
+      {
+        "time": 0,
+        "x": 0
+      },
+      {
+        "time": 1000,
+        "x": 10
+      }
+    ]
+  },
+  "ikTracks": {
+    "arm": [
+      {
+        "time": 0,
+        "x": 50,
+        "y": 20,
+        "mix": 1
+      },
+      {
+        "time": 1000,
+        "x": 30,
+        "y": 40,
+        "mix": 0.75
+      }
+    ]
+  },
+  "events": [
+    {
+      "time": 0,
+      "name": "start"
+    },
+    {
+      "time": 500,
+      "name": "contact",
+      "data": {
+        "z": [null, true, 0.30000000000000004],
+        "a": "hand"
+      }
+    },
+    {
+      "time": 500,
+      "name": "second"
+    },
+    {
+      "time": 1000,
+      "name": "end"
+    }
+  ]
+}

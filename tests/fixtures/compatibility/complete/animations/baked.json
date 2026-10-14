@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "name": "baked",
+  "duration": 1000,
+  "loop": false,
+  "disabledIKConstraints": ["arm"],
+  "tracks": {
+    "root": [
+      {
+        "time": 0,
+        "rotation": 0.25
+      },
+      {
+        "time": 1000,
+        "rotation": 0.75
+      }
+    ],
+    "middle": [
+      {
+        "time": 0,
+        "rotation": 0.5
+      },
+      {
+        "time": 1000,
+        "rotation": 1
+      }
+    ]
+  }
+}

@@ -135,3 +135,9 @@ export { commitIKBake } from './ik/IKBakeCommit.js';
 export type { IKBakeCommitResult } from './ik/IKBakeCommit.js';
 export { compareIKBakeMotion, DEFAULT_IK_BAKE_MOTION_TOLERANCES } from './ik/IKBakeMotionFidelity.js';
 export type { IKBakeMotionErrors, IKBakeMotionFidelity } from './ik/IKBakeMotionFidelity.js';
+export {
+  serializeRigDefinition,
+  serializeAnimationDefinition,
+  serializeSkinDefinition,
+  serializeCharacterManifest,
+} from './authoredSerialization.js';

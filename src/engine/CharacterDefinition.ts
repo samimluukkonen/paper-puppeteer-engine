@@ -29,12 +29,39 @@ export interface CharacterData {
   poses?: Readonly<Record<string, unknown>>;
 }
 
-function prefixed(issues: readonly ValidationIssue[], prefix: string): ValidationIssue[] {
-  return issues.map((issue) => ({ ...issue, path: issue.path ? `${prefix}.${issue.path}` : prefix }));
+function prefixed(issues: readonly ValidationIssue[], prefix: string, document?: string): ValidationIssue[] {
+  return issues.map((issue) => ({
+    ...issue,
+    path: issue.path ? `${prefix}.${issue.path}` : prefix,
+    message: document ? `${document}: ${issue.message}` : issue.message,
+  }));
 }
 
 function issue(path: string, message: string): ValidationIssue {
   return { severity: 'error', path, message };
+}
+
+/** @internal Metadata documents have distinct roles; texture keys may share one image path. */
+export function checkManifestReferences(manifest: CharacterManifest): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!Object.hasOwn(manifest.skins, manifest.defaultSkin))
+    issues.push(issue('manifest.defaultSkin', `Unknown default skin "${manifest.defaultSkin}".`));
+  const paths = new Map<string, string>();
+  const references: [string, string][] = [
+    ['manifest.rig', manifest.rig],
+    ...Object.entries(manifest.skins).map(([name, path]): [string, string] => [`manifest.skins.${name}`, path]),
+    ...manifest.animations.map((path, index): [string, string] => [`manifest.animations[${index}]`, path]),
+    ...(manifest.poses ?? []).map((path, index): [string, string] => [`manifest.poses[${index}]`, path]),
+  ];
+  for (const [field, path] of references) {
+    const previous = paths.get(path);
+    if (previous) issues.push(issue(field, `Metadata path "${path}" is already used by ${previous}.`));
+    else paths.set(path, field);
+  }
+  for (const [key, path] of Object.entries(manifest.textures))
+    if (paths.has(path))
+      issues.push(issue(`manifest.textures.${key}`, `Image path "${path}" is also a metadata document.`));
+  return issues;
 }
 
 interface CharacterInspection {
@@ -57,13 +84,15 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     return result;
   }
   const manifest = parsed.data;
+  issues.push(...checkManifestReferences(manifest));
   result.manifest = manifest;
   if (data.rig === undefined) issues.push(issue('rig', `Missing rig file "${manifest.rig}".`));
   const source = data.rig === undefined ? undefined : inspectRigDefinition(data.rig);
-  if (source) issues.push(...prefixed(source.issues, 'rig'));
+  if (source) issues.push(...prefixed(source.issues, 'rig', manifest.rig));
 
   const skins = result.skins;
   const skinPaths: string[] = [];
+  const skinDocuments: string[] = [];
   for (const [name, path] of Object.entries(manifest.skins)) {
     const value = data.skins && Object.hasOwn(data.skins, path) ? data.skins[path] : undefined;
     if (value === undefined) {
@@ -75,15 +104,14 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     if (issues.length !== previousIssueCount) continue;
     const skin = skinFileSchema.safeParse(value);
     if (!skin.success) {
-      issues.push(...prefixed(shapeIssues(skin.error), `skins.${name}`));
+      issues.push(...prefixed(shapeIssues(skin.error), `skins.${name}`, path));
       continue;
     }
     if (skin.data.name !== name) issues.push(issue(`skins.${name}.name`, `Skin name must be "${name}".`));
     skinPaths.push(`skins.${name}`);
+    skinDocuments.push(path);
     skins.push(skin.data);
   }
-  if (!Object.hasOwn(manifest.skins, manifest.defaultSkin))
-    issues.push(issue('manifest.defaultSkin', `Unknown default skin "${manifest.defaultSkin}".`));
 
   if (source?.data) {
     const skinIssues = validateSkinReferences(skins, source.data);
@@ -93,7 +121,13 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
         /^skins\[(\d+)\]/,
         (prefix, index: string) => skinPaths[Number(index)] ?? prefix,
       );
-      issues.push(path === undefined ? entry : { ...entry, path });
+      const index = Number(entry.path?.match(/^skins\[(\d+)\]/)?.[1]);
+      const document = skinDocuments[index];
+      issues.push({
+        ...entry,
+        ...(path === undefined ? {} : { path }),
+        message: document ? `${document}: ${entry.message}` : entry.message,
+      });
     }
     // Keep checking clips and poses when standalone skins have broken references.
     result.rig = new Rig({
@@ -103,10 +137,17 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     const textures = new Set(Object.keys(manifest.textures));
     for (const [index, bone] of source.data.bones.entries())
       if (bone.sprite && !textures.has(bone.sprite.texture))
-        issues.push(issue(`rig.bones[${index}].sprite.texture`, `Missing texture asset "${bone.sprite.texture}".`));
+        issues.push(
+          issue(
+            `rig.bones[${index}].sprite.texture`,
+            `${manifest.rig}: Missing texture asset "${bone.sprite.texture}".`,
+          ),
+        );
     for (const [index, attachment] of result.rig.attachments.entries())
       if (!textures.has(attachment.texture))
-        issues.push(issue(`rig.attachments[${index}].texture`, `Missing texture asset "${attachment.texture}".`));
+        issues.push(
+          issue(`rig.attachments[${index}].texture`, `${manifest.rig}: Missing texture asset "${attachment.texture}".`),
+        );
   }
   const names = new Set<string>();
   const rig = result.rig;
@@ -117,7 +158,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       continue;
     }
     const clip = inspectAnimationDefinition(value, rig);
-    issues.push(...prefixed(clip.issues, `animations[${index}]`));
+    issues.push(...prefixed(clip.issues, `animations[${index}]`, path));
     if (clip.data) result.animations.push(clip.data);
     const name: unknown =
       typeof value === 'object' && value !== null ? Object.getOwnPropertyDescriptor(value, 'name')?.value : undefined;
@@ -134,7 +175,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       continue;
     }
     const pose = inspectPoseDefinition(value, rig);
-    issues.push(...prefixed(pose.issues, `poses[${index}]`));
+    issues.push(...prefixed(pose.issues, `poses[${index}]`, path));
     if (pose.data) {
       result.poses.push(pose.data);
       if (poseNames.has(pose.data.name))
