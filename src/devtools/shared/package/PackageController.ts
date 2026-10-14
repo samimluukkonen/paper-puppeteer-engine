@@ -1,5 +1,4 @@
 import { downloadBlob } from '../../../shared/downloadJson.js';
-import { draftSource } from '../draftSource.js';
 import { notifySubscribers } from '../subscriberNotifications.js';
 import {
   buildCharacterPackage,
@@ -8,10 +7,11 @@ import {
   type PackageSnapshot,
   validatePackage,
 } from './characterPackage.js';
+import { PackageFingerprints, type PackageDomains } from './PackageFingerprints.js';
 import { PACKAGE_MAX_BYTES } from './packageZip.js';
 import { type PackageZipProcessor, packageZipWorker } from './packageZipWorkerClient.js';
 
-export type PackageDomains = Readonly<Record<'Rig' | 'Skins' | 'Animations' | 'Assets', string>>;
+export type { PackageDomains } from './PackageFingerprints.js';
 const clean: PackageDomains = { Rig: '', Skins: '', Animations: '', Assets: '' };
 
 /** Independent package checkpoints never mark source files or individual editor documents saved. */
@@ -20,12 +20,9 @@ export class PackageController {
 
   private source: (() => PackageSnapshot) | undefined;
   private baseline: PackageDomains = clean;
-  private domains: PackageDomains = clean;
-  private readonly blobIds = new WeakMap<Blob, number>();
-  private blobSerial = 0;
+  private readonly fingerprints = new PackageFingerprints();
   private listeners = new Set<() => void>();
   private request: AbortController | undefined;
-  private cachedInputs: unknown[] = [];
   private lastFiles: PackageFiles | null = null;
   private snapshot = {
     ready: false,
@@ -52,14 +49,13 @@ export class PackageController {
     this.request = undefined;
     this.source = source;
     const current = source();
-    this.baseline = this.fingerprint({
+    this.baseline = this.fingerprints.compute({
       ...current,
       rig: structuredClone(current.definition.rigFile!),
       skins: current.definition.standaloneSkins,
       animations: current.definition.animations,
       replacements: [],
     });
-    this.cachedInputs = [];
     this.lastFiles = null;
     this.refresh();
     this.publish({
@@ -69,56 +65,19 @@ export class PackageController {
       message: 'Export includes all character files and images.',
     });
   }
-  private fingerprint(snapshot: PackageSnapshot): PackageDomains {
-    const { skins: embedded, ...rig } = snapshot.rig;
-    return {
-      Rig: draftSource(rig),
-      Skins: draftSource([embedded, snapshot.skins]),
-      Animations: draftSource(snapshot.animations.map((clip) => ({ ...clip, version: 1 }))),
-      Assets: draftSource(
-        snapshot.replacements.map((entry) => {
-          let id = this.blobIds.get(entry.blob);
-          if (!id) {
-            id = ++this.blobSerial;
-            this.blobIds.set(entry.blob, id);
-          }
-          return { ...entry, blob: id };
-        }),
-      ),
-    };
-  }
   refresh = (): void => {
     if (!this.source) return;
     try {
-      const current = this.source();
-      const { rig } = current;
-      const inputs = [
-        rig.name,
-        rig.root,
-        rig.bones,
-        rig.slots,
-        rig.attachments,
-        rig.skins,
-        rig.ik,
-        ...current.skins,
-        ...current.animations,
-        ...current.replacements.flatMap((entry) => [
-          entry.blob,
-          entry.assetKey,
-          entry.reference,
-          entry.originScaleX,
-          entry.originScaleY,
-        ]),
-      ];
-      if (inputs.length === this.cachedInputs.length && inputs.every((entry, i) => entry === this.cachedInputs[i]))
+      const domains = this.fingerprints.compute(this.source());
+      const modified = (Object.keys(domains) as (keyof PackageDomains)[]).filter(
+        (key) => domains[key] !== this.baseline[key],
+      );
+      if (
+        modified.length === this.snapshot.modified.length &&
+        modified.every((domain, index) => domain === this.snapshot.modified[index])
+      )
         return;
-      this.cachedInputs = inputs;
-      this.domains = this.fingerprint(current);
-      this.publish({
-        modified: Object.keys(this.domains).filter(
-          (key) => this.domains[key as keyof PackageDomains] !== this.baseline[key as keyof PackageDomains],
-        ),
-      });
+      this.publish({ modified });
     } catch {
       // An uncommitted artwork proposal blocks export but does not replace the last authored dirty state.
     }
@@ -131,7 +90,7 @@ export class PackageController {
     this.publish({ busy: true, message: 'Building and validating package…' });
     try {
       const captured = capturePackage(this.source());
-      const checkpoint = this.fingerprint(captured);
+      const checkpoint = this.fingerprints.compute(captured);
       const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]);
       const files = await buildCharacterPackage(captured, fetch, signal);
       const { bytes, files: exportedFiles } = await this.zip.encode(files, signal);
@@ -142,7 +101,6 @@ export class PackageController {
       );
       this.lastFiles = exportedFiles;
       this.baseline = checkpoint;
-      this.cachedInputs = [];
       this.refresh();
       this.publish({
         message: 'Package download started. Checkpoint recorded for these bytes; source files were not overwritten.',
@@ -195,7 +153,7 @@ export class PackageController {
     this.request = undefined;
     this.source = undefined;
     this.lastFiles = null;
-    this.cachedInputs = [];
+    this.fingerprints.clear();
     this.publish({ ready: false, busy: false, preview: null, modified: [] });
   }
   dispose(): void {
