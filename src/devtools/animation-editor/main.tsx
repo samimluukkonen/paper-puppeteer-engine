@@ -1,6 +1,7 @@
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { mountView } from '../../ui/mountView.js';
+import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
@@ -26,7 +27,8 @@ app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
 const artwork = new ArtworkController();
-const rigTweak = new RigTweakController();
+const attachments = new AttachmentController(artwork);
+const rigTweak = new RigTweakController(attachments);
 const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const ikBake = new IKBakeController(
@@ -41,6 +43,7 @@ const editorView = (
     retiming={retiming}
     artwork={artwork}
     rigTweak={rigTweak}
+    attachments={attachments}
   />
 );
 const unmount = mountView(app, editorView, (app) => {
@@ -174,6 +177,7 @@ const unmount = mountView(app, editorView, (app) => {
     previewControls.abort();
     releaseCharacterSelection();
     game.destroy(true);
+    attachments.dispose();
     artwork.dispose();
     scene = undefined;
   };

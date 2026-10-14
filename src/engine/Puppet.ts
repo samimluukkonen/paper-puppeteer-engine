@@ -23,7 +23,7 @@ import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
 import { SlotDebug } from './SlotDebug.js';
 import { SlotState } from './SlotState.js';
-import type { AttachmentOptions, Facing, RigDefinition } from './types.js';
+import type { AttachmentOptions, Facing, RigDefinition, SkinDefinition, SpriteAttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
 export type { SyncPoseOptions } from './PuppetPoseController.js';
@@ -61,6 +61,7 @@ export class Puppet {
   private readonly slotState: SlotState;
   private slotDebugView: SlotDebug | undefined;
   private readonly renderedSlotAttachments = new Map<string, string>();
+  private readonly renderedSlotDefinitions = new Map<string, Readonly<SpriteAttachmentDefinition>>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
   private ikAnimationSource: Pick<AnimationPlayer, 'ikAnimation'> | undefined;
@@ -449,6 +450,13 @@ export class Puppet {
     return this;
   }
 
+  /** Update the artwork catalog and skins in place; skeleton, player, IK and slot mounts retain identity. */
+  updateSlotDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): this {
+    this.slotState.updateDefinitions(attachments, skins);
+    this.renderSlots();
+    return this;
+  }
+
   clearAttachment(slot: string): this {
     if (this.slotState.clearAttachment(slot) && this.renderSlot(slot)) this.slotDebugView?.update();
     return this;
@@ -484,8 +492,12 @@ export class Puppet {
 
   private renderSlot(slot: string): boolean {
     const id = this.slotState.getAttachment(slot);
-    if (this.renderedSlotAttachments.get(slot) === id) return false;
-    this.renderer.setSlotAttachment(slot, id ? this.rig.getAttachment(id) : undefined);
+    const definition = id ? this.slotState.getDefinition(id) : undefined;
+    if (this.renderedSlotAttachments.get(slot) === id && this.renderedSlotDefinitions.get(slot) === definition)
+      return false;
+    this.renderer.setSlotAttachment(slot, definition);
+    if (definition) this.renderedSlotDefinitions.set(slot, definition);
+    else this.renderedSlotDefinitions.delete(slot);
     if (id) this.renderedSlotAttachments.set(slot, id);
     else this.renderedSlotAttachments.delete(slot);
     return true;
@@ -611,6 +623,7 @@ export class Puppet {
     }
     if (!this.container.isDestroyed) release(() => this.destroyContainer(fromScene));
     this.renderedSlotAttachments.clear();
+    this.renderedSlotDefinitions.clear();
     this.poses.clear();
     this.bones.clear();
     this.ikConstraints.clear();

@@ -6,7 +6,9 @@ import {
   validateRigDefinition,
 } from '../../engine/externalData.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import { mergeSkins } from '../../engine/mergeSkins.js';
 import type { Rig } from '../../engine/Rig.js';
+import { identifierSchema, spriteAttachmentSchema } from '../../engine/schemas.js';
 import type {
   BoneDefinition,
   RigDefinition,
@@ -15,6 +17,7 @@ import type {
   SpriteAttachmentDefinition,
   TransformProperty,
 } from '../../engine/types.js';
+import { checkSkinReferences, throwValidationIssue } from '../../engine/validation.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
@@ -34,6 +37,9 @@ export type RotationSnap = 0 | 1 | 5 | 15;
 export interface RigEditorStateOptions {
   /** Maximum undo entries, including grouped operations. Defaults to 100; zero disables history. */
   historyLimit?: number;
+  defaultSkin?: string;
+  standaloneSkins?: readonly SkinDefinition[];
+  artworkIssue?: (texture: string, frame?: string | number) => string | undefined;
 }
 
 export type { RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
@@ -99,15 +105,28 @@ export class RigEditorState {
   private readonly boneIndices = new Map<string, number>();
   private readonly slotIndices = new Map<string, number>();
   private readonly attachmentIndices = new Map<string, number>();
+  private externalSkins: readonly SkinDefinition[];
+  private readonly initialExternalSkins: readonly SkinDefinition[];
+  private readonly savedExternalSkins = new Map<string, SkinDefinition>();
+  readonly defaultSkin: string;
+  private selectedSkin: string;
+  private readonly artworkIssue: RigEditorStateOptions['artworkIssue'];
 
   constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
     this.history = new SnapshotHistory(
       () => this.historyEntry(),
       (entry) => this.restoreHistory(entry),
-      (left, right) => equalEditorData(left.rig, right.rig),
+      (left, right) =>
+        equalEditorData(left.rig, right.rig) && equalEditorData(left.standaloneSkins, right.standaloneSkins),
       options.historyLimit ?? 100,
     );
     this.source = source;
+    this.artworkIssue = options.artworkIssue;
+    this.externalSkins = freezeData(structuredClone(options.standaloneSkins ?? []));
+    this.initialExternalSkins = this.externalSkins;
+    for (const skin of this.externalSkins) this.savedExternalSkins.set(skin.name, skin);
+    this.defaultSkin = options.defaultSkin ?? mergeSkins(source.skins, this.externalSkins)[0]?.name ?? '';
+    this.selectedSkin = this.defaultSkin;
     this.name = file?.name;
     this.includeSkins = file ? file.skins !== undefined : true;
     this.data = structuredClone({
@@ -137,7 +156,8 @@ export class RigEditorState {
   }
 
   get dirty(): boolean {
-    this.cachedDirty ??= !equalEditorData(this.workingCopy, this.saved);
+    this.cachedDirty ??=
+      !equalEditorData(this.workingCopy, this.saved) || this.externalSkins.some((skin) => this.skinDirty(skin.name));
     return this.cachedDirty;
   }
 
@@ -210,7 +230,11 @@ export class RigEditorState {
   }
 
   private historyEntry(): HistoryEntry {
-    this.cachedHistoryEntry ??= freezeData({ rig: this.workingCopy, directions: [...this.childDirections] });
+    this.cachedHistoryEntry ??= freezeData({
+      rig: this.workingCopy,
+      directions: [...this.childDirections],
+      standaloneSkins: this.externalSkins,
+    });
     return this.cachedHistoryEntry;
   }
 
@@ -238,6 +262,7 @@ export class RigEditorState {
   }
 
   private restoreHistory(entry: HistoryEntry): void {
+    this.externalSkins = entry.standaloneSkins ?? this.initialExternalSkins;
     this.restore(entry.rig);
     this.childDirections.clear();
     for (const [id, direction] of entry.directions) this.childDirections.set(id, direction);
@@ -284,8 +309,8 @@ export class RigEditorState {
         // The inspector's artwork fields belong to the active slot attachment.
         if (attachmentId) {
           const attachmentIndex = this.attachmentIndices.get(attachmentId);
-          if (attachmentIndex !== undefined)
-            this.data.attachments![attachmentIndex] = this.initialCopy.attachments![attachmentIndex]!;
+          const original = this.initialCopy.attachments?.find((entry) => entry.id === attachmentId);
+          if (attachmentIndex !== undefined && original) this.data.attachments![attachmentIndex] = original;
         }
       }
     });
@@ -295,6 +320,7 @@ export class RigEditorState {
   resetRig(): void {
     this.change(() => {
       this.restore(this.initialCopy);
+      this.externalSkins = this.initialExternalSkins;
       this.childDirections.clear();
     });
   }
@@ -317,6 +343,17 @@ export class RigEditorState {
   validationIssues(): readonly ValidationIssue[] {
     if (this.cachedIssues === undefined || (this.validationDirty && !this.history.inOperation)) {
       this.cachedIssues = validateRigDefinition(this.exportCandidate());
+      const externalIssues: ValidationIssue[] = [];
+      checkSkinReferences(this.externalSkins, this.workingCopy, (issue) => externalIssues.push(issue));
+      this.cachedIssues = [...this.cachedIssues, ...externalIssues];
+      for (const attachment of this.data.attachments ?? []) {
+        const message = this.artworkIssue?.(attachment.texture, attachment.frame);
+        if (message)
+          this.cachedIssues = [
+            ...this.cachedIssues,
+            { severity: 'error', path: `attachments.${attachment.id}`, message },
+          ];
+      }
       this.validationDirty = false;
     }
     return this.cachedIssues;
@@ -331,7 +368,7 @@ export class RigEditorState {
       bones: copy.bones,
       ...(copy.slots === undefined ? {} : { slots: copy.slots }),
       ...(copy.attachments === undefined ? {} : { attachments: copy.attachments }),
-      ...(this.includeSkins && copy.skins !== undefined ? { skins: copy.skins } : {}),
+      ...((this.includeSkins || copy.skins?.length) && copy.skins !== undefined ? { skins: copy.skins } : {}),
     };
   }
 
@@ -346,16 +383,21 @@ export class RigEditorState {
   }
 
   createRecoveryDraft(snapshot = this.recoverySnapshot) {
-    return { version: 1, rig: this.exportCandidate(snapshot.rig), directions: snapshot.directions };
+    return {
+      version: 1,
+      rig: this.exportCandidate(snapshot.rig),
+      directions: snapshot.directions,
+      standaloneSkins: snapshot.standaloneSkins ?? [],
+    };
   }
 
   canRestoreDraft(input: unknown): boolean {
-    return inspectRigDraft(input, this.initialCopy, this.rig) !== undefined;
+    return inspectRigDraft(input, this.initialCopy, this.rig, this.initialExternalSkins) !== undefined;
   }
 
   /** Restored authored changes stay dirty and form one undoable operation. */
   restoreDraft(input: unknown): boolean {
-    const data = inspectRigDraft(input, this.initialCopy, this.rig);
+    const data = inspectRigDraft(input, this.initialCopy, this.rig, this.initialExternalSkins);
     if (!data) return false;
     this.endOperation();
     this.change(() => {
@@ -373,7 +415,7 @@ export class RigEditorState {
   exportRig(saveBaseline = true): RigJsonDefinition {
     this.endOperation();
     const candidate = serializeRigData(this.exportCandidate(), this.initialCopy);
-    const issues = validateRigDefinition(candidate);
+    const issues = [...validateRigDefinition(candidate), ...this.validationIssues()];
     if (issues.some((issue) => issue.severity === 'error'))
       throw new Error(
         `Cannot export rig.\nErrors:\n${issues
@@ -410,6 +452,125 @@ export class RigEditorState {
     const attachment = index === undefined ? undefined : this.data.attachments?.[index];
     if (!attachment) throw new Error(`Unknown attachment "${id}".`);
     return attachment;
+  }
+
+  get standaloneSkins(): readonly SkinDefinition[] {
+    return this.externalSkins;
+  }
+  get skins(): readonly SkinDefinition[] {
+    return mergeSkins(this.data.skins ?? [], this.externalSkins);
+  }
+  get activeSkin(): string {
+    return this.skins.some((skin) => skin.name === this.selectedSkin) ? this.selectedSkin : this.defaultSkin;
+  }
+  selectSkin(name: string): void {
+    this.getSkin(name);
+    this.selectedSkin = name;
+  }
+  getSkin(name: string): SkinDefinition {
+    const skin = this.skins.find((entry) => entry.name === name);
+    if (!skin) throw new Error(`Unknown skin "${name}".`);
+    return skin;
+  }
+  isStandaloneSkin(name: string): boolean {
+    return this.externalSkins.some((skin) => skin.name === name);
+  }
+  skinDirty(name: string): boolean {
+    return this.isStandaloneSkin(name) && !equalEditorData(this.getSkin(name), this.savedExternalSkins.get(name));
+  }
+  /** Resolve a partial override from a fresh default baseline, so repeated switching never accumulates mappings. */
+  resolvedAttachment(slot: string, skin = this.activeSkin): string | undefined {
+    this.getSlot(slot);
+    const fallback = this.skins.find((entry) => entry.name === this.defaultSkin)?.slots;
+    const overrides = this.skins.find((entry) => entry.name === skin)?.slots;
+    const value = overrides && Object.hasOwn(overrides, slot) ? overrides[slot] : fallback?.[slot];
+    return value ?? undefined;
+  }
+  createAttachment(input: unknown): void {
+    const attachment = spriteAttachmentSchema.strict().parse(input);
+    if (/^(blob:|__paper_artwork_)/.test(attachment.texture))
+      throw new Error('Choose a stable character texture key, not a temporary preview texture.');
+    if (this.attachmentIndices.has(attachment.id)) throw new Error(`Duplicate attachment ID "${attachment.id}".`);
+    this.assertArtwork(attachment);
+    this.endOperation();
+    this.change(() => {
+      this.data.attachments = [...(this.data.attachments ?? []), freezeData(attachment)];
+      this.rebuildIndexes();
+    });
+  }
+  removeAttachment(id: string): void {
+    this.getAttachment(id);
+    const references = [...(this.data.skins ?? []), ...this.externalSkins].flatMap((skin) =>
+      Object.entries(skin.slots)
+        .filter(([, value]) => value === id)
+        .map(([slot]) => `${skin.name}/${slot}`),
+    );
+    if (references.length)
+      throw new Error(`Attachment "${id}" is used by ${references.join(', ')}. Clear or replace these mappings first.`);
+    this.endOperation();
+    this.change(() => {
+      this.data.attachments = this.data.attachments!.filter((entry) => entry.id !== id);
+      this.rebuildIndexes();
+    });
+  }
+  createSkin(name: string): void {
+    identifierSchema.parse(name);
+    if (this.skins.some((skin) => skin.name === name)) throw new Error(`Duplicate skin name "${name}".`);
+    this.endOperation();
+    this.change(() => {
+      this.data.skins = [...(this.data.skins ?? []), freezeData({ version: 1 as const, name, slots: {} })];
+    });
+    this.selectedSkin = name;
+  }
+  renameSkin(name: string, next: string): void {
+    const skin = this.getSkin(name);
+    identifierSchema.parse(next);
+    if (name === next) return;
+    if (name === this.defaultSkin || this.isStandaloneSkin(name))
+      throw new Error('This skin name is referenced by the character manifest. Create a new skin to use another name.');
+    if (this.skins.some((entry) => entry.name === next)) throw new Error(`Duplicate skin name "${next}".`);
+    this.endOperation();
+    this.change(() => {
+      this.data.skins = this.data.skins!.map((entry) =>
+        entry.name === name ? freezeData({ ...skin, name: next }) : entry,
+      );
+    });
+    if (this.selectedSkin === name) this.selectedSkin = next;
+  }
+  /** Undefined removes an override (inherit); null explicitly hides the slot. */
+  assignAttachment(slot: string, attachment: string | null | undefined, skin = this.activeSkin): void {
+    this.getSlot(slot);
+    if (attachment !== null && attachment !== undefined) this.assertArtwork(this.getAttachment(attachment));
+    const original = this.getSkin(skin);
+    const slots = { ...original.slots };
+    if (attachment === undefined) delete slots[slot];
+    else
+      Object.defineProperty(slots, slot, { value: attachment, enumerable: true, configurable: true, writable: true });
+    const next = freezeData({ ...original, slots });
+    checkSkinReferences([next], this.workingCopy, throwValidationIssue);
+    this.endOperation();
+    this.change(() => {
+      if (this.isStandaloneSkin(skin))
+        this.externalSkins = freezeData(this.externalSkins.map((entry) => (entry.name === skin ? next : entry)));
+      else this.data.skins = this.data.skins!.map((entry) => (entry.name === skin ? next : entry));
+    });
+  }
+  exportSkinJson(name: string, saveBaseline = true): string {
+    this.endOperation();
+    const skin = this.getSkin(name);
+    checkSkinReferences([skin], this.workingCopy, throwValidationIssue);
+    for (const id of Object.values(skin.slots)) if (id !== null) this.assertArtwork(this.getAttachment(id));
+    const json = `${JSON.stringify(skin, null, 2)}\n`;
+    assertJsonExportSize(skin);
+    if (saveBaseline && this.isStandaloneSkin(name)) {
+      this.savedExternalSkins.set(name, skin);
+      this.cachedDirty = undefined;
+    }
+    return json;
+  }
+  private assertArtwork(attachment: SpriteAttachmentDefinition): void {
+    const issue = this.artworkIssue?.(attachment.texture, attachment.frame);
+    if (issue) throw new Error(issue);
   }
 
   private replaceBone(bone: BoneDefinition): void {

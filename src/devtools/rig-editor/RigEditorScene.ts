@@ -8,6 +8,7 @@ import { Puppet } from '../../engine/Puppet.js';
 import { Rig } from '../../engine/Rig.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
@@ -122,7 +123,11 @@ export class RigEditorScene extends Phaser.Scene {
     const ikChains = this.ikChains.map((chain) =>
       parseTwoBoneIKDefinition(rig.ik?.find((authored) => authored.name === chain.name) ?? chain, rig),
     );
-    const state = new RigEditorState(rig, file);
+    const state = new RigEditorState(rig, file, {
+      defaultSkin: definition.defaultSkin,
+      standaloneSkins: definition.standaloneSkins,
+      artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
+    });
     const puppet = new Puppet(this, {
       rig: previewRig,
       skin: definition.defaultSkin,

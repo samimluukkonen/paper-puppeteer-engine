@@ -1,4 +1,5 @@
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { createHierarchyController } from '../rig-editor/HierarchyController.js';
 import { createInspectorController } from '../rig-editor/InspectorController.js';
 import type { RigEditor } from '../rig-editor/RigEditor.js';
@@ -41,6 +42,8 @@ export class RigTweakController {
     return () => this.listeners.delete(listener);
   };
   readonly getSnapshot = (): typeof emptySnapshot => this.snapshot;
+
+  constructor(private readonly attachments?: AttachmentController) {}
 
   setMode(mode: EditorMode): void {
     this.state?.setEditorMode(mode);
@@ -101,7 +104,11 @@ export class RigTweakController {
       if (!editor) return;
       recovery.bind({
         key: rigDraftKey(window.location.pathname, getScene().characterId, getScene().rigFilename),
-        source: draftSource({ name: editor.state.name, rig: editor.state.workingCopy }),
+        source: draftSource({
+          name: editor.state.name,
+          rig: editor.state.workingCopy,
+          standaloneSkins: editor.state.standaloneSkins,
+        }),
         label: 'rig',
         snapshot: () => editor.state.recoverySnapshot,
         dirty: () => editor.state.dirty,
@@ -136,6 +143,7 @@ export class RigTweakController {
     this.refresh();
   }
   refresh(): void {
+    if (this.editor) this.attachments?.bind(this.editor);
     this.renderUI?.();
     this.publish();
   }
@@ -160,6 +168,7 @@ export class RigTweakController {
     this.clearDraft?.();
     this.state = undefined;
     this.editor = undefined;
+    this.attachments?.unbind();
     this.publish();
   }
   dispose(): void {

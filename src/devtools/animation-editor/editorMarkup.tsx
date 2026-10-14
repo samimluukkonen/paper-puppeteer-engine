@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
+import type { AttachmentController } from '../rig-editor/AttachmentController.js';
+import { AttachmentPanel } from '../rig-editor/AttachmentPanel.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
@@ -26,6 +28,7 @@ export function AnimationEditorView({
   retiming,
   artwork,
   rigTweak,
+  attachments,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
@@ -33,6 +36,7 @@ export function AnimationEditorView({
   retiming: KeyframeRetimingController;
   artwork?: ArtworkController;
   rigTweak?: RigTweakController;
+  attachments?: AttachmentController;
 }) {
   const inspector = useWorkspaceInspector();
   const mode = useSyncExternalStore(
@@ -276,6 +280,7 @@ export function AnimationEditorView({
             </button>
           </div>
           {rigTweak && <RigTweakPanel active={tweaking} />}
+          {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} />}
           <div hidden={tweaking} inert={tweaking}>
             <details className="animation-bone-list" open>
               <summary>Bones</summary>

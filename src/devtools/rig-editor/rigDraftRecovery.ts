@@ -3,17 +3,21 @@ import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import { checkJson, inspectRigDefinition, type ValidationIssue } from '../../engine/externalData.js';
 import { JsonWorkloadBudget } from '../../engine/jsonWorkloadLimits.js';
 import type { Rig } from '../../engine/Rig.js';
-import type { RigDefinition } from '../../engine/types.js';
+import { skinFileSchema } from '../../engine/schemas.js';
+import type { RigDefinition, SkinDefinition } from '../../engine/types.js';
+import { checkSkinReferences } from '../../engine/validation.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 
 export type RigEditorRecoverySnapshot = ReadonlyEditorData<{
   rig: RigDefinition;
   directions: [string, { x: number; y: number }][];
+  standaloneSkins?: readonly SkinDefinition[];
 }>;
 const recoveryDraftSchema = z.strictObject({
   version: z.literal(1),
   rig: z.unknown(),
   directions: z.array(z.tuple([z.string(), z.strictObject({ x: z.number(), y: z.number() })])),
+  standaloneSkins: skinFileSchema.array().optional(),
 });
 
 /** Parse compatible legacy/current drafts without changing editor state or input data. */
@@ -21,6 +25,7 @@ export function inspectRigDraft(
   input: unknown,
   initial: ReadonlyEditorData<RigDefinition>,
   rig: Rig,
+  standaloneSkins: readonly SkinDefinition[] = [],
 ): RigEditorRecoverySnapshot | undefined {
   const issues: ValidationIssue[] = [];
   if (!checkJson(input, '', issues) || issues.length) return undefined;
@@ -34,7 +39,7 @@ export function inspectRigDraft(
   }
   const { data } = inspectRigDefinition(candidate);
   if (!data) return undefined;
-  // A bind editor retains its original topology and artwork identities during authoring.
+  // Attachment/skin authoring may change artwork catalogs, but never joint or slot topology.
   if (
     data.root !== initial.root ||
     data.bones.length !== initial.bones.length ||
@@ -52,15 +57,19 @@ export function inspectRigDraft(
     (data.slots ?? []).some(
       (slot, index) => slot.id !== initial.slots![index]!.id || slot.bone !== initial.slots![index]!.bone,
     ) ||
-    (data.attachments ?? []).length !== (initial.attachments ?? []).length ||
-    (data.attachments ?? []).some((attachment, index) => {
-      const before = initial.attachments![index]!;
-      return attachment.id !== before.id || attachment.texture !== before.texture || attachment.frame !== before.frame;
-    }) ||
-    !equalEditorData(data.skins ?? [], initial.skins ?? []) ||
     !equalEditorData(data.ik ?? [], initial.ik ?? [])
   )
     return undefined;
+  const external = recovery.success ? (recovery.data.standaloneSkins ?? standaloneSkins) : standaloneSkins;
+  if (
+    !equalEditorData(
+      external.map((skin) => skin.name),
+      standaloneSkins.map((skin) => skin.name),
+    )
+  )
+    return undefined;
+  checkSkinReferences(external, data, (issue) => issues.push(issue));
+  if (issues.some((issue) => issue.severity === 'error')) return undefined;
   const directions = recovery.success
     ? recovery.data.directions
     : initial.bones.flatMap((bone): [string, { x: number; y: number }][] => {
@@ -81,5 +90,6 @@ export function inspectRigDraft(
   return freezeData({
     rig: { ...data, slots: data.slots ?? [], attachments: data.attachments ?? [], skins: data.skins ?? [] },
     directions,
+    standaloneSkins: external,
   });
 }

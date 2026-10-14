@@ -7,6 +7,7 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
 import { createTransform, type RigDefinition } from '../../engine/types.js';
+import { equalEditorData } from '../shared/editorData.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { RigEditorInputController } from './RigEditorInputController.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
@@ -22,6 +23,8 @@ export class RigEditor {
   private readonly ikChains: readonly TwoBoneIKDefinition[];
   private artworkDraft: { id: string; attachment: boolean; values: Partial<Record<SpriteField, number>> } | undefined;
   private previewClip: CompiledClip | undefined;
+  private appliedCatalog: RigDefinition | undefined;
+  private appliedSkins: readonly import('../../engine/types.js').SkinDefinition[] | undefined;
   previewTime = 0;
 
   constructor(
@@ -91,8 +94,14 @@ export class RigEditor {
 
   refresh(notify = true): void {
     const rig = this.state.workingCopy;
+    this.syncAttachments();
     if (rig !== this.appliedRig) {
-      this.applyRig(rig);
+      if (
+        !this.appliedRig ||
+        !equalEditorData(rig.bones, this.appliedRig.bones) ||
+        !equalEditorData(rig.slots, this.appliedRig.slots)
+      )
+        this.applyRig(rig);
       this.appliedRig = rig;
     }
     this.evaluateContext?.();
@@ -101,6 +110,40 @@ export class RigEditor {
     this.overlay?.invalidate();
     this.update();
     if (notify) this.onChange();
+  }
+
+  /** Appearance selection never seeks the player or restores bone transforms. */
+  selectSkin(name: string): void {
+    this.cancelGesture();
+    this.state.selectSkin(name);
+    this.syncAttachments();
+    this.applyArtworkGeometry();
+    this.updateArtwork();
+    this.overlay?.invalidate();
+    this.update();
+    this.onChange();
+  }
+
+  private syncAttachments(): void {
+    // Older hosts with no skin/catalog authoring retain their runtime-only assignments.
+    if (!this.state.skins.length) return;
+    const rig = this.state.workingCopy;
+    const skins = this.state.skins;
+    if (rig !== this.appliedCatalog || !equalEditorData(skins, this.appliedSkins)) {
+      const available = new Set((rig.attachments ?? []).map((entry) => entry.id));
+      for (const slot of rig.slots ?? []) {
+        const id = this.puppet.getAttachment(slot.id);
+        if (id && !available.has(id)) this.puppet.clearAttachment(slot.id);
+      }
+      this.puppet.updateSlotDefinitions(rig.attachments ?? [], skins);
+      this.appliedCatalog = rig;
+      this.appliedSkins = skins;
+    }
+    for (const slot of rig.slots ?? []) {
+      const id = this.state.resolvedAttachment(slot.id);
+      if (id) this.puppet.setAttachment(slot.id, id);
+      else this.puppet.clearAttachment(slot.id);
+    }
   }
 
   private applyRig(rig: RigDefinition): void {

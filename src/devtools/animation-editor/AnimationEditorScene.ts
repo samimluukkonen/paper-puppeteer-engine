@@ -4,7 +4,6 @@ import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { Rig } from '../../engine/Rig.js';
 import type { Facing } from '../../engine/types.js';
@@ -12,6 +11,7 @@ import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { RigEditor } from '../rig-editor/RigEditor.js';
 import { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
@@ -47,7 +47,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     if (!editor) throw new Error('No rig is loaded.');
     if (!editor.state.canRestoreDraft(file))
       throw new Error(
-        'Rig Tweak requires the same hierarchy, artwork, skins and IK definitions. Use the Rig Editor to load a different rig.',
+        'Rig Tweak requires the same hierarchy, bone artwork and IK definitions. Use the Rig Editor to load a different rig.',
       );
     editor.cancelGesture();
     editor.state.restoreDraft(file);
@@ -358,7 +358,11 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state = state;
       this.definition = definition;
       const file = definition.rigFile;
-      const rigState = new RigEditorState(new Rig(definition.rig, file?.skins ?? []), file);
+      const rigState = new RigEditorState(new Rig(definition.rig, file?.skins ?? []), file, {
+        defaultSkin: definition.defaultSkin,
+        standaloneSkins: definition.standaloneSkins,
+        artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
+      });
       this.rigEditor = new RigEditor(
         this,
         puppet,
@@ -377,7 +381,7 @@ export class AnimationEditorScene extends Phaser.Scene {
             let nextRig: Rig | undefined;
             try {
               const authored = new Rig(rigState.workingCopy);
-              nextRig = new Rig(authored, mergeSkins(authored.skins, definition.standaloneSkins));
+              nextRig = new Rig(authored, rigState.skins);
             } catch {
               // Export/validation still reports the invalid authored rig through RigEditorState.
             }

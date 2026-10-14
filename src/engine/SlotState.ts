@@ -1,16 +1,52 @@
+import { equalJsonData } from './equalJsonData.js';
 import type { Rig } from './Rig.js';
+import { spriteAttachmentSchema, skinFileSchema } from './schemas.js';
+import type { SkinDefinition, SpriteAttachmentDefinition } from './types.js';
+import { checkSkinReferences, throwValidationIssue } from './validation.js';
 
 /** Attachment selection only; changing it never touches bones or IK state. */
 export class SlotState {
   private readonly assigned = new Map<string, string>();
   private readonly slots: Set<string>;
-  private readonly attachments: Set<string>;
-  private readonly skins: Map<string, Readonly<Record<string, string | null>>>;
+  private attachments = new Map<string, Readonly<SpriteAttachmentDefinition>>();
+  private skins = new Map<string, Readonly<Record<string, string | null>>>();
 
   constructor(rig: Rig) {
     this.slots = new Set(rig.slots.map((slot) => slot.id));
-    this.attachments = new Set(rig.attachments.map((attachment) => attachment.id));
-    this.skins = new Map(rig.skins.map((skin) => [skin.name, skin.slots]));
+    this.updateDefinitions(rig.attachments, rig.skins);
+  }
+
+  /** Install owned artwork/skin data without changing joints or current slot assignments.
+   * Clear assignments to removed IDs first. Invalid updates leave all runtime state untouched.
+   */
+  updateDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): void {
+    const parsed = spriteAttachmentSchema.strict().array().parse(attachments);
+    const next = new Map(parsed.map((entry) => [entry.id, Object.freeze(entry)]));
+    if (next.size !== parsed.length) throw new Error('Duplicate attachment IDs.');
+    const parsedSkins = skinFileSchema.array().parse(skins);
+    checkSkinReferences(
+      parsedSkins,
+      {
+        root: '',
+        bones: [],
+        slots: [...this.slots].map((id) => ({ id, bone: '' })),
+        attachments: parsed,
+      },
+      throwValidationIssue,
+    );
+    for (const id of this.assigned.values())
+      if (!next.has(id)) throw new Error(`Clear assigned attachment "${id}" before removing its definition.`);
+    // Keep unchanged definition identities so rendering can retain existing images.
+    for (const [id, entry] of next)
+      if (equalJsonData(entry, this.attachments.get(id))) next.set(id, this.attachments.get(id)!);
+    this.attachments = next;
+    this.skins = new Map(parsedSkins.map((skin) => [skin.name, Object.freeze(skin.slots)]));
+  }
+
+  getDefinition(id: string): Readonly<SpriteAttachmentDefinition> {
+    const entry = this.attachments.get(id);
+    if (!entry) throw new Error(`Unknown attachment "${id}".`);
+    return entry;
   }
 
   getAttachment(slot: string): string | undefined {

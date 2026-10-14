@@ -261,7 +261,11 @@ export class PuppetRenderer {
 
   setSlotAttachment(id: string, definition: SpriteAttachmentDefinition | undefined): void {
     const mount = this.getSlotMount(id);
-    this.slotImages.get(id)?.destroy();
+    const previous = this.slotImages.get(id);
+    const presentation = previous
+      ? { alpha: previous.alpha, visible: previous.visible, depth: previous.depth }
+      : undefined;
+    previous?.destroy();
     this.slotImages.delete(id);
     this.slotArtwork.delete(id);
     if (!definition) return;
@@ -277,6 +281,7 @@ export class PuppetRenderer {
       .setOrigin(definition.originX ?? 0.5, definition.originY ?? 0.5)
       .setRotation(definition.rotation ?? 0)
       .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
+    if (presentation) image.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
     mount.add(image).sort('depth');
     this.slotImages.set(id, image);
   }

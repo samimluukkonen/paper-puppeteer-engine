@@ -46,7 +46,7 @@ test('invalid and incompatible rig drafts leave the working copy and history unc
     { ...file, bones: file.bones.map((bone) => (bone.id === 'arm' ? { ...bone, x: NaN } : bone)) },
     { ...file, bones: file.bones.map((bone) => (bone.id === 'arm' ? { ...bone, parent: 'root' } : bone)) },
     { ...file, slots: [] },
-    { ...file, attachments: file.attachments!.map((attachment) => ({ ...attachment, texture: 'other' })) },
+    { ...file, attachments: [] },
   ];
   for (const candidate of variants) {
     assert.isFalse(state.canRestoreDraft(candidate));

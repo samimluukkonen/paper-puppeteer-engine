@@ -66,6 +66,15 @@ export class ArtworkController {
   get hasUnsavedChanges(): boolean {
     return this.applied.size > 0;
   }
+  assetPreview(key: string): { url: string; filename: string; imported: boolean } | undefined {
+    const target = this.snapshot.targets.find((entry) => entry.key === key);
+    const imported = this.applied.get(key)?.sprite;
+    return imported
+      ? { url: imported.url, filename: imported.filename, imported: true }
+      : target
+        ? { url: target.url, filename: target.filename, imported: false }
+        : undefined;
+  }
 
   private publish(update: Partial<ArtworkSnapshot>): void {
     this.snapshot = { ...this.snapshot, ...update };

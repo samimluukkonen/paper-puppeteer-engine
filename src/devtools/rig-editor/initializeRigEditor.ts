@@ -7,6 +7,7 @@ import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { rigDraftKey } from '../shared/rigDraftSession.js';
+import type { AttachmentController } from './AttachmentController.js';
 import { createControlsController } from './ControlsController.js';
 import { createHierarchyController } from './HierarchyController.js';
 import { createInspectorController } from './InspectorController.js';
@@ -16,7 +17,11 @@ import type { RigEditorRecoverySnapshot } from './RigEditorState.js';
 import { createSessionController } from './SessionController.js';
 
 /** Connect the existing editing model/controllers to their committed React hosts. */
-export function initializeRigEditor(app: HTMLElement, artwork?: ArtworkController): () => void {
+export function initializeRigEditor(
+  app: HTMLElement,
+  artwork?: ArtworkController,
+  attachments?: AttachmentController,
+): () => void {
   const releaseCharacterSelection = bindCharacterSelection(app);
 
   const recoveryControls = new DraftRecoveryControls<RigEditorRecoverySnapshot>(
@@ -37,7 +42,11 @@ export function initializeRigEditor(app: HTMLElement, artwork?: ArtworkControlle
         recovery.bind(
           {
             key: rigDraftKey(globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename),
-            source: draftSource({ name: editor.state.name, rig: editor.state.workingCopy }),
+            source: draftSource({
+              name: editor.state.name,
+              rig: editor.state.workingCopy,
+              standaloneSkins: editor.state.standaloneSkins,
+            }),
             label: 'rig',
             snapshot: () => editor.state.recoverySnapshot,
             dirty: () => editor.state.dirty,
@@ -70,6 +79,7 @@ export function initializeRigEditor(app: HTMLElement, artwork?: ArtworkControlle
     hierarchy.render(editor);
     controls.render(editor);
     inspector.render(editor);
+    attachments?.bind(editor);
   };
   const scene = new RigEditorScene(
     render,
@@ -94,6 +104,7 @@ export function initializeRigEditor(app: HTMLElement, artwork?: ArtworkControlle
     hierarchy.dispose();
     session.dispose();
     game.destroy(true);
+    attachments?.dispose();
     artwork?.dispose();
   };
 }

@@ -13,7 +13,7 @@ import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { rigDefinitionSchema } from '../src/engine/schemas.js';
 import { SlotState } from '../src/engine/SlotState.js';
-import type { RigDefinition } from '../src/engine/types.js';
+import type { RigDefinition, SkinDefinition, SpriteAttachmentDefinition } from '../src/engine/types.js';
 import { paperDollIK } from '../src/shared/paperDollIK.js';
 import { EditorElement, stubRigEditorDom } from './helpers/rigEditorDom.js';
 
@@ -25,6 +25,7 @@ vi.mock('phaser', () => ({
     Scale: { FIT: 0, CENTER_BOTH: 0 },
     Scene: class {
       input = { on: vi.fn(), off: vi.fn() };
+      textures = { exists: () => true, get: () => ({ has: () => true }) };
       events = { on: vi.fn(), off: vi.fn() };
     },
     Scenes: { Events: { UPDATE: 'update' } },
@@ -74,6 +75,18 @@ vi.mock('../src/engine/Puppet.js', () => ({
       }
       getAttachment(id: string) {
         return this.slots.getAttachment(id);
+      }
+      updateSlotDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]) {
+        this.slots.updateDefinitions(attachments, skins);
+        return this;
+      }
+      setAttachment(slot: string, id: string) {
+        this.slots.setAttachment(slot, id);
+        return this;
+      }
+      clearAttachment(slot: string) {
+        this.slots.clearAttachment(slot);
+        return this;
       }
       getSlotImage() {
         return undefined;
