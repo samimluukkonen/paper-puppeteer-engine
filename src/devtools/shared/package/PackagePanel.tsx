@@ -142,18 +142,21 @@ export function PackagePanel({ controller }: { controller: PackageController }) 
             .map((domain) => `${domain}: ${snapshot.modified.includes(domain) ? 'Modified' : 'Clean'}`)
             .join(' · ')}
         </p>
-        <button
-          type="button"
-          disabled={!snapshot.ready || snapshot.busy}
-          onClick={() => {
-            void controller.download();
-          }}
-        >
-          Download character ZIP
-        </button>{' '}
-        <button type="button" disabled={snapshot.busy} onClick={() => controller.previewExport()}>
-          Reload exported package
-        </button>{' '}
+        <div className="package-tools-actions">
+          <button
+            type="button"
+            className="workspace-primary"
+            disabled={!snapshot.ready || snapshot.busy}
+            onClick={() => {
+              void controller.download();
+            }}
+          >
+            Download character ZIP
+          </button>
+          <button type="button" disabled={snapshot.busy} onClick={() => controller.previewExport()}>
+            Reload exported package
+          </button>
+        </div>
         <label>
           Import ZIP for runtime preview{' '}
           <input
