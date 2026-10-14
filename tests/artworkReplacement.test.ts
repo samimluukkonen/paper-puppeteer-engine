@@ -378,6 +378,62 @@ test('rebind restores a cancelled preview and reapplies pending artwork after ri
   puppet.destroy();
 });
 
+test('incompatible rebind preserves the active artwork, proposal, and controller ownership', async () => {
+  const f = fixture();
+  f.controller.selectReference('bone:forearm');
+  await f.controller.import(file());
+  f.controller.preview();
+  f.controller.apply();
+  const key = f.puppet.getBone('forearm').sprite!.texture.key;
+  f.setNext(sprite('proposal.png'));
+  await f.controller.import(file());
+  const snapshot = f.controller.getSnapshot();
+  const incompatible = new Puppet(f.scene, {
+    rig: { root: 'root', bones: [{ id: 'root', sprite: { texture: 'shared' } }] },
+    autoUpdate: false,
+  });
+  assert.throws(() => f.controller.bind(f.scene, incompatible, f.definition), /no longer uses/);
+  assert.strictEqual(f.controller.getSnapshot(), snapshot);
+  assert.equal(f.puppet.getBone('forearm').sprite!.texture.key, key);
+  f.controller.cancel();
+  f.controller.undo();
+  assert.equal(f.puppet.getBone('forearm').sprite!.texture.key, 'shared');
+  f.controller.redo();
+  assert.notEqual(f.puppet.getBone('forearm').sprite!.texture.key, 'shared');
+  f.controller.dispose();
+  assert.equal(f.textures.size, 1);
+  f.puppet.destroy();
+  incompatible.destroy();
+});
+
+test.each(['replacement', 'original'] as const)('failed %s refresh rolls back artwork binding', async (failing) => {
+  const f = fixture();
+  await f.controller.import(file());
+  f.controller.preview();
+  f.controller.apply();
+  const key = f.puppet.getBone('root').sprite!.texture.key;
+  const puppet = new Puppet(f.scene, { rig: f.rig, skin: 'a', autoUpdate: false });
+  const refreshOld = vi.fn();
+  const refreshNew = vi.fn();
+  f.controller.bind(f.scene, f.puppet, f.definition, refreshOld);
+  (failing === 'original' ? refreshOld : refreshNew).mockImplementationOnce(() => {
+    throw new Error('Refresh failed');
+  });
+  assert.throws(() => f.controller.bind(f.scene, puppet, f.definition, refreshNew), /Refresh failed/);
+  assert.equal(f.puppet.getBone('root').sprite!.texture.key, key);
+  assert.equal(puppet.getBone('root').sprite!.texture.key, 'shared');
+  assert.equal(f.controller.exportReplacements().length, 1);
+  f.controller.undo();
+  assert.equal(f.puppet.getBone('root').sprite!.texture.key, 'shared');
+  f.controller.redo();
+  assert.notEqual(f.puppet.getBone('root').sprite!.texture.key, 'shared');
+  assert.equal(puppet.getBone('root').sprite!.texture.key, 'shared');
+  f.controller.dispose();
+  assert.equal(f.textures.size, 1);
+  f.puppet.destroy();
+  puppet.destroy();
+});
+
 test('failed Phaser installation and invalid decode leave the original visible', async () => {
   const f = fixture();
   f.decode.mockRejectedValueOnce(new Error('corrupt image'));

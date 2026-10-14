@@ -3,6 +3,7 @@ import { afterEach, assert, test, vi } from 'vitest';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
 import { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
+import { ArtworkController } from '../src/devtools/shared/artwork/ArtworkController.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { parseRigDefinition, type RigJsonDefinition } from '../src/engine/externalData.js';
 import { TwoBoneIKConstraint } from '../src/engine/ik/TwoBoneIKConstraint.js';
@@ -382,6 +383,31 @@ test('replaces the session only after the new editor enables successfully', () =
   assert.equal(vi.mocked(puppet).destroy.mock.calls.length, 1);
   assert.deepEqual(onReady.mock.calls, [[scene.editor]]);
 });
+
+test.each(['reloadRig', 'reloadOriginal'] as const)(
+  '%s releases a replacement when artwork binding fails',
+  (method) => {
+    const { scene, file, assertPreserved } = fixture();
+    const artwork = new ArtworkController();
+    vi.spyOn(artwork, 'bind').mockImplementationOnce(() => {
+      throw new Error('Artwork reference no longer uses this texture');
+    });
+    Reflect.set(scene, 'artwork', artwork);
+    const disableReplacement = vi.spyOn(RigEditor.prototype, 'disable');
+    assert.throws(() => {
+      if (method === 'reloadRig') scene.reloadRig(file, 'replacement.json');
+      else scene.reloadOriginal();
+    }, /Artwork reference/);
+    const replacement = vi.mocked(Puppet).mock.results[1]!.value as Puppet;
+    assert.equal(vi.mocked(replacement).destroy.mock.calls.length, 1);
+    assert.equal(disableReplacement.mock.calls.length, 1);
+    assert.deepEqual(
+      vi.mocked(scene.input).off.mock.calls.map(([event]) => event),
+      ['pointerdown', 'pointermove', 'pointerup', 'pointerupoutside', 'wheel'],
+    );
+    assertPreserved();
+  },
+);
 
 async function panelFixture() {
   const element = stubRigEditorDom();

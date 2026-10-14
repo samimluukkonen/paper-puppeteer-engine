@@ -164,6 +164,12 @@ export class RigEditorScene extends Phaser.Scene {
         definition.compiledAnimations,
       );
       editor.enable();
+      // Artwork validation and refresh are part of replacement initialization too.
+      this.artwork?.bind(this, puppet, definition, () => {
+        editor?.cancelGesture();
+        editor?.refresh(false);
+        if (editor && this.editor === editor) this.onReady(editor);
+      });
     } catch (error) {
       try {
         editor?.disable();
@@ -173,11 +179,6 @@ export class RigEditorScene extends Phaser.Scene {
       throw error;
     }
     // Keep the working session alive until the replacement is fully initialized.
-    this.artwork?.bind(this, puppet, definition, () => {
-      editor?.cancelGesture();
-      editor?.refresh(false);
-      if (editor && this.editor === editor) this.onReady(editor);
-    });
     this.editor?.disable();
     this.puppet?.destroy();
     this.puppet = puppet;

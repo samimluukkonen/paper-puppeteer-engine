@@ -169,6 +169,21 @@ export class ArtworkController {
   refreshTargets(): void {
     const { puppet, textures, definition } = this;
     if (!puppet || !textures || !definition) return;
+    const targets = this.artworkTargets(puppet, textures, definition);
+    this.publish({ targets, selectedKey: this.targetSelection(targets) });
+  }
+
+  private targetSelection(targets: readonly ArtworkTarget[]): string | null {
+    return targets.some((target) => target.key === this.snapshot.selectedKey)
+      ? this.snapshot.selectedKey
+      : (targets[0]?.key ?? null);
+  }
+
+  private artworkTargets(
+    puppet: Puppet,
+    textures: Phaser.Textures.TextureManager,
+    definition: CharacterDefinition,
+  ): ArtworkTarget[] {
     const usages = puppet.getArtworkUsages();
     const keys = new Set([
       ...Object.keys(definition.textures),
@@ -200,10 +215,7 @@ export class ArtworkController {
           : null,
       });
     }
-    const selectedKey = targets.some((target) => target.key === this.snapshot.selectedKey)
-      ? this.snapshot.selectedKey
-      : (targets[0]?.key ?? null);
-    this.publish({ targets, selectedKey });
+    return targets;
   }
 
   bind(
@@ -217,17 +229,40 @@ export class ArtworkController {
       this.refreshTargets();
       return;
     }
+    const targets = this.artworkTargets(puppet, scene.textures, definition);
+    const sharedTextures = !this.textures || this.textures === scene.textures;
+    const state = sharedTextures ? this.applied : new Map<string, SpriteResource>();
+    // Validate retained replacements before canceling a proposal or changing either puppet.
+    for (const resource of state.values()) {
+      this.register(resource);
+      puppet.validateArtworkReplacement(resource.assetKey, this.override(resource), resource.reference);
+    }
     this.cancel();
-    // A surviving old puppet must relinquish owned textures too, before any later collection.
-    if (this.puppet) this.install(new Map());
-    if (this.textures && this.textures !== scene.textures) this.unbind();
+    if (this.candidate) throw new Error('Could not cancel the artwork proposal before replacing the preview.');
+    const rendered = this.installOn(puppet, new Map(), state, refreshAppearance);
+    try {
+      // Release the old consumers only after the replacement can render every override.
+      if (sharedTextures) this.install(new Map());
+      else this.unbind();
+    } catch (error) {
+      try {
+        this.installOn(puppet, rendered, new Map(), refreshAppearance);
+      } catch (rollbackError) {
+        // oxlint-disable-next-line eslint/preserve-caught-error -- Both failures are retained in AggregateError.errors.
+        throw new AggregateError([error, rollbackError], 'Artwork binding and rollback failed.', { cause: error });
+      }
+      throw error;
+    }
     this.puppet = puppet;
     this.textures = scene.textures;
     this.definition = definition;
     this.refreshAppearance = refreshAppearance;
-    this.install(this.applied);
-    this.refreshTargets();
-    this.publish({ message: 'Choose shared artwork or one logical attachment/bone, then import a PNG or WebP.' });
+    this.rendered = rendered;
+    this.publish({
+      targets,
+      selectedKey: this.targetSelection(targets),
+      message: 'Choose shared artwork or one logical attachment/bone, then import a PNG or WebP.',
+    });
   }
 
   select(key: string): void {
@@ -367,9 +402,16 @@ export class ArtworkController {
 
   /** Register first; refresh every retained consumer before releasing any displaced texture. */
   private install(state: ArtworkState): void {
-    const puppet = this.puppet;
-    if (!puppet) return;
-    const before = this.rendered;
+    if (this.puppet) this.rendered = this.installOn(this.puppet, this.rendered, state, this.refreshAppearance);
+  }
+
+  /** Stage another puppet without transferring controller ownership until both previews are synchronized. */
+  private installOn(
+    puppet: Puppet,
+    before: ArtworkState,
+    state: ArtworkState,
+    refreshAppearance: () => void,
+  ): Map<string, SpriteResource> {
     // Complete registration and validation before touching even the first active image.
     for (const resource of state.values()) {
       this.register(resource);
@@ -387,17 +429,17 @@ export class ArtworkController {
           resource.reference,
         );
       }
-      this.refreshAppearance();
+      refreshAppearance();
     };
     try {
       apply(state);
-      this.rendered = new Map(state);
+      return new Map(state);
     } catch (error) {
       try {
         apply(before);
       } catch (rollbackError) {
         // Track every possibly installed scope so a later Cancel/teardown can retry restoration safely.
-        this.rendered = new Map([...before, ...state]);
+        if (puppet === this.puppet) this.rendered = new Map([...before, ...state]);
         // oxlint-disable-next-line eslint/preserve-caught-error -- Both errors are retained in AggregateError.errors.
         throw new AggregateError(
           [error, rollbackError],
