@@ -406,22 +406,36 @@ export class PuppetRenderer {
     const presentation = previous
       ? { alpha: previous.alpha, visible: previous.visible, depth: previous.depth }
       : undefined;
-    previous?.destroy();
-    this.slotImages.delete(id);
-    this.slotArtwork.delete(id);
-    if (!definition) return;
-    this.slotArtwork.set(id, definition);
+    if (!definition) {
+      previous?.destroy();
+      this.slotImages.delete(id);
+      this.slotArtwork.delete(id);
+      return;
+    }
     const replacement = this.getArtworkReplacement(definition.texture, `attachment:${definition.id}`);
-    const image = mount.scene.add
-      .image(definition.x ?? 0, definition.y ?? 0, replacement?.textureKey ?? definition.texture, definition.frame)
-      .setOrigin(
-        (definition.originX ?? 0.5) * (replacement?.originScaleX ?? 1),
-        (definition.originY ?? 0.5) * (replacement?.originScaleY ?? 1),
-      )
-      .setRotation(definition.rotation ?? 0)
-      .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
-    if (presentation) image.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
-    mount.add(image).sort('depth');
+    const image = mount.scene.add.image(
+      definition.x ?? 0,
+      definition.y ?? 0,
+      replacement?.textureKey ?? definition.texture,
+      definition.frame,
+    );
+    try {
+      image
+        .setOrigin(
+          (definition.originX ?? 0.5) * (replacement?.originScaleX ?? 1),
+          (definition.originY ?? 0.5) * (replacement?.originScaleY ?? 1),
+        )
+        .setRotation(definition.rotation ?? 0)
+        .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
+      if (presentation)
+        image.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
+      mount.add(image).sort('depth');
+    } catch (error) {
+      image.destroy();
+      throw error;
+    }
+    previous?.destroy();
+    this.slotArtwork.set(id, definition);
     this.slotImages.set(id, image);
   }
 

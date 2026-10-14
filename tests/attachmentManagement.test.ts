@@ -313,6 +313,98 @@ test('runtime catalog edits refresh same-ID geometry while retaining mount, visi
   puppet.destroy();
 });
 
+test.each([
+  { id: 'open', texture: 'missing', frame: undefined, error: /Missing texture/ },
+  { id: 'helmet', texture: 'missing', frame: undefined, error: /Missing texture/ },
+  { id: 'open', texture: 'hand.png', frame: 'missing', error: /Missing frame/ },
+  { id: 'helmet', texture: 'helmet.png', frame: 99, error: /Missing frame/ },
+])('runtime catalog rejects unavailable artwork for $id ($texture, $frame) before changing state', (invalid) => {
+  const scene = puppetScene();
+  scene.textures.exists = (key) => ['hand.png', 'grip.webp', 'helmet.png'].includes(key);
+  scene.textures.get = vi.fn(() => ({
+    has: (frame: string) => frame === '0' || frame === 'valid',
+  })) as unknown as typeof scene.textures.get;
+  const puppet = new Puppet(scene, { rig: definition, skin: 'default', autoUpdate: false });
+  const original = puppet.getSlotImage('hand-art')!;
+  const next = definition.attachments!.map((entry) =>
+    entry.id === invalid.id
+      ? { ...entry, texture: invalid.texture, ...(invalid.frame === undefined ? {} : { frame: invalid.frame }) }
+      : { ...entry, x: 17 },
+  );
+  const skins: SkinDefinition[] = [...definition.skins!, { version: 1, name: 'new', slots: { 'hand-art': 'grip' } }];
+  assert.throws(() => puppet.updateSlotDefinitions(next, skins), invalid.error);
+  assert.strictEqual(puppet.getSlotImage('hand-art'), original);
+  assert.isFalse(original.isDestroyed);
+  assert.equal(puppet.getAttachment('hand-art'), 'open');
+  assert.equal(original.x, 7);
+  assert.throws(() => puppet.setSkin('new'), /Unknown skin/);
+  puppet.setAttachment('hand-art', 'grip');
+  assert.equal(puppet.getSlotImage('hand-art')!.texture.key, 'grip.webp');
+  puppet.destroy();
+});
+
+test.each(['allocation', 'configuration'] as const)(
+  'failed image %s retains the previous catalog and image',
+  (stage) => {
+    const scene = puppetScene();
+    const puppet = new Puppet(scene, { rig: definition, skin: 'default', autoUpdate: false });
+    const original = puppet.getSlotImage('hand-art')!;
+    const image = scene.add.image.bind(scene.add);
+    let disposedCandidate = false;
+    const create = vi.spyOn(scene.add, 'image').mockImplementationOnce((...args) => {
+      if (stage === 'allocation') throw new Error('Image allocation failed');
+      const candidate = image(...args);
+      vi.spyOn(candidate, 'setOrigin').mockImplementationOnce(() => {
+        throw new Error('Image configuration failed');
+      });
+      const destroy = candidate.destroy.bind(candidate);
+      candidate.destroy = () => {
+        disposedCandidate = true;
+        destroy();
+      };
+      return candidate;
+    });
+    const next = definition.attachments!.map((entry) => ({ ...entry, x: 17 }));
+    assert.throws(() => puppet.updateSlotDefinitions(next, definition.skins!), /Image .* failed/);
+    assert.strictEqual(puppet.getSlotImage('hand-art'), original);
+    assert.isFalse(original.isDestroyed);
+    assert.equal(original.x, 7);
+    assert.equal(disposedCandidate, stage === 'configuration');
+    create.mockRestore();
+    puppet.updateSlotDefinitions(next, definition.skins!);
+    assert.equal(puppet.getSlotImage('hand-art')!.x, 17);
+    puppet.destroy();
+  },
+);
+
+test('a failure after replacing an earlier slot restores all catalog entries and visible slots', () => {
+  const scene = puppetScene();
+  const puppet = new Puppet(scene, { rig: definition, skin: 'default', autoUpdate: false });
+  puppet.applySkin('helmet-only');
+  const oldHand = puppet.getSlotImage('hand-art')!;
+  const oldHat = puppet.getSlotImage('hat')!;
+  const image = scene.add.image.bind(scene.add);
+  const create = vi
+    .spyOn(scene.add, 'image')
+    .mockImplementationOnce(image)
+    .mockImplementationOnce(() => {
+      throw new Error('Second slot failed');
+    });
+  const next = definition.attachments!.map((entry) => ({ ...entry, x: 17 }));
+  assert.throws(() => puppet.updateSlotDefinitions(next, definition.skins!), /Second slot failed/);
+  assert.isTrue(oldHand.isDestroyed);
+  assert.equal(puppet.getSlotImage('hand-art')!.x, 7);
+  assert.strictEqual(puppet.getSlotImage('hat'), oldHat);
+  assert.isFalse(oldHat.isDestroyed);
+  assert.equal(puppet.getAttachment('hand-art'), 'open');
+  assert.equal(puppet.getAttachment('hat'), 'helmet');
+  create.mockRestore();
+  puppet.clearAttachment('hand-art');
+  puppet.setSkin('default');
+  assert.equal(puppet.getSlotImage('hand-art')!.x, 7);
+  puppet.destroy();
+});
+
 test('texture/frame lookup checks real availability rather than Phaser placeholders', () => {
   const scene = puppetScene();
   scene.textures.exists = (key) => key === 'loaded';

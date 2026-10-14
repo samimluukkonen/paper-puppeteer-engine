@@ -434,6 +434,24 @@ test.each(['replacement', 'original'] as const)('failed %s refresh rolls back ar
   puppet.destroy();
 });
 
+test('catalog updates validate frames against the effective artwork replacement before changing images', async () => {
+  const f = fixture();
+  f.controller.selectReference('attachment:armA');
+  await f.controller.import(file());
+  f.controller.preview();
+  f.controller.apply();
+  const original = f.puppet.getSlotImage('arm')!;
+  const replacement = f.textures.get(original.texture.key)!;
+  replacement.has = () => false;
+  const next = f.rig.attachments.map((entry) => (entry.id === 'armA' ? { ...entry, frame: 'new-frame' } : entry));
+  assert.throws(() => f.puppet.updateSlotDefinitions(next, f.rig.skins), /Missing frame "new-frame"/);
+  assert.strictEqual(f.puppet.getSlotImage('arm'), original);
+  assert.isFalse(original.isDestroyed);
+  assert.equal(f.puppet.getAttachment('arm'), 'armA');
+  f.controller.dispose();
+  f.puppet.destroy();
+});
+
 test('failed Phaser installation and invalid decode leave the original visible', async () => {
   const f = fixture();
   f.decode.mockRejectedValueOnce(new Error('corrupt image'));
@@ -808,7 +826,7 @@ test('pixel policy survives rig projection, artwork alignment edits, Cancel and 
   f.puppet.destroy();
 });
 
-test('live catalogs include newly created attachments and skins and validate newly introduced frames at commit', async () => {
+test('live catalogs include newly created attachments and skins and revalidate replacement frames at commit', async () => {
   const f = fixture();
   const attachments = [...f.rig.attachments, { id: 'new-part', texture: 'shared' }];
   const skins = [...f.rig.skins, { version: 1 as const, name: 'new-skin', slots: { arm: 'new-part' } }];
@@ -826,8 +844,8 @@ test('live catalogs include newly created attachments and skins and validate new
   assert.isTrue(f.controller.getSnapshot().previewing);
   const key = f.puppet.getBone('root').sprite!.texture.key;
   const texture = f.textures.get(key)!;
-  texture.has = (frame?: string) => frame === '__BASE';
   f.puppet.updateSlotDefinitions([...attachments, { id: 'framed', texture: 'shared', frame: 'absent' }], skins);
+  texture.has = (frame?: string) => frame === '__BASE';
   f.controller.apply();
   assert.include(f.controller.getSnapshot().message, 'lacks frame');
   assert.equal(f.controller.getSnapshot().pendingCount, 1, 'failed commit never installs the shared proposal');

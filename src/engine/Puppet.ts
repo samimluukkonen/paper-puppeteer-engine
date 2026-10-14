@@ -59,7 +59,7 @@ export class Puppet {
   private debugView: PuppetDebug | undefined;
   private readonly debugLabelSides = new Map<string, Facing>();
   private readonly renderer: PuppetRenderer;
-  private readonly slotState: SlotState;
+  private slotState: SlotState;
   private slotDebugView: SlotDebug | undefined;
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly renderedSlotDefinitions = new Map<string, Readonly<SpriteAttachmentDefinition>>();
@@ -90,15 +90,11 @@ export class Puppet {
     const rig = options.rig ?? options.definition?.rig;
     if (!rig) throw new Error('Puppet requires a rig or character definition.');
     this.rig = rig instanceof Rig ? rig : new Rig(rig);
-    const validateSpriteAsset = (sprite: { texture: string; frame?: string | number }, owner: string): void => {
-      if (!scene.textures.exists(sprite.texture)) throw new Error(`Missing texture "${sprite.texture}" for ${owner}.`);
-      if (sprite.frame !== undefined && !scene.textures.get(sprite.texture).has(String(sprite.frame)))
-        throw new Error(`Missing frame "${sprite.frame}" for ${owner}.`);
-    };
     for (const bone of this.rig.bones) {
-      if (bone.sprite) validateSpriteAsset(bone.sprite, `bone "${bone.id}"`);
+      if (bone.sprite) this.validateSpriteAsset(bone.sprite, `bone "${bone.id}"`);
     }
-    for (const attachment of this.rig.attachments) validateSpriteAsset(attachment, `attachment "${attachment.id}"`);
+    for (const attachment of this.rig.attachments)
+      this.validateSpriteAsset(attachment, `attachment "${attachment.id}"`);
     for (const [label, value] of Object.entries({
       x: options.x ?? 0,
       y: options.y ?? 0,
@@ -185,6 +181,13 @@ export class Puppet {
         if (!this.container.isDestroyed) this.destroyContainer(fromScene);
       } else if (!this.container.ignoreDestroy) this.destroyInternal(fromScene);
     };
+  }
+
+  private validateSpriteAsset(sprite: { texture: string; frame?: string | number }, owner: string): void {
+    if (!this.scene.textures.exists(sprite.texture))
+      throw new Error(`Missing texture "${sprite.texture}" for ${owner}.`);
+    if (sprite.frame !== undefined && !this.scene.textures.get(sprite.texture).has(String(sprite.frame)))
+      throw new Error(`Missing frame "${sprite.frame}" for ${owner}.`);
   }
 
   get currentAnimation(): string | undefined {
@@ -481,9 +484,31 @@ export class Puppet {
 
   /** Update the artwork catalog and skins in place; skeleton, player, IK and slot mounts retain identity. */
   updateSlotDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): this {
-    this.slotState.updateDefinitions(attachments, skins);
-    this.renderer.updateArtworkDefinitions(this.slotState.getDefinitions(), this.slotState.getSkins());
-    this.renderSlots();
+    const previous = this.slotState;
+    const next = new SlotState(previous);
+    next.updateDefinitions(attachments, skins);
+    // Validate inactive artwork too, including the effective shared/individual replacement frame.
+    for (const attachment of next.getDefinitions()) {
+      const owner = `attachment "${attachment.id}"`;
+      this.validateSpriteAsset(attachment, owner);
+      const replacement = this.renderer.getArtworkReplacement(attachment.texture, `attachment:${attachment.id}`);
+      if (replacement) this.validateSpriteAsset({ ...attachment, texture: replacement.textureKey }, owner);
+    }
+    this.slotState = next;
+    try {
+      this.renderer.updateArtworkDefinitions(next.getDefinitions(), next.getSkins());
+      this.renderSlots();
+    } catch (error) {
+      this.slotState = previous;
+      try {
+        this.renderer.updateArtworkDefinitions(previous.getDefinitions(), previous.getSkins());
+        this.renderSlots();
+      } catch (rollbackError) {
+        // oxlint-disable-next-line eslint/preserve-caught-error -- Both failures are retained in AggregateError.errors.
+        throw new AggregateError([error, rollbackError], 'Attachment update and rollback failed.', { cause: error });
+      }
+      throw error;
+    }
     return this;
   }
 

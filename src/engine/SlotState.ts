@@ -11,7 +11,15 @@ export class SlotState {
   private attachments = new Map<string, Readonly<SpriteAttachmentDefinition>>();
   private skins = new Map<string, Readonly<Record<string, string | null>>>();
 
-  constructor(rig: Rig) {
+  /** Copy runtime assignments and immutable catalogs when staging a transactional update. */
+  constructor(rig: Rig | SlotState) {
+    if (rig instanceof SlotState) {
+      this.slots = rig.slots;
+      for (const [slot, attachment] of rig.assigned) this.assigned.set(slot, attachment);
+      this.attachments = rig.attachments;
+      this.skins = rig.skins;
+      return;
+    }
     this.slots = new Set(rig.slots.map((slot) => slot.id));
     this.updateDefinitions(rig.attachments, rig.skins);
   }
