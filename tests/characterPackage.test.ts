@@ -114,6 +114,35 @@ test('complete ZIP includes metadata and exact binaries and reloads with Charact
   assert.notInclude(new TextDecoder().decode(files.get('character.json')), 'blob:');
 });
 
+test.each(['constructor', 'toString', 'hasOwnProperty'])(
+  'new clips and skins named %s export and retain their paths after reloading',
+  async (name) => {
+    const source = fixture();
+    const files = await buildCharacterPackage(
+      {
+        ...source,
+        skins: [...source.skins, { version: 1, name, slots: { slot: 'part' } }],
+        animations: [...source.animations, { name, duration: 1000, loop: true, tracks: {} }],
+      },
+      fetchImage,
+    );
+    const definition = await loadPackageDefinition(decodePackageZip(encodePackageZip(files)));
+    assert.equal(definition.animationPaths[name], `animations/${name}.json`);
+    assert.equal(definition.manifest!.skins[name], `skins/${name}.json`);
+    const reexported = await buildCharacterPackage(
+      {
+        definition,
+        rig: structuredClone(definition.rigFile!),
+        skins: definition.standaloneSkins,
+        animations: definition.animations,
+        replacements: [],
+      },
+      fetchImage,
+    );
+    assert.deepEqual((await loadPackageDefinition(reexported)).manifest, definition.manifest);
+  },
+);
+
 test('shared and individual replacements preserve stable IDs and precedence with distinct static assets', async () => {
   const source = fixture();
   source.replacements.push(

@@ -238,13 +238,17 @@ export async function buildCharacterPackage(
   json(manifest.rig, rig);
   manifest.skins = Object.fromEntries(
     snapshot.skins.map((skin) => {
-      const path = manifest.skins[skin.name] ?? `skins/${safeName(skin.name)}.json`;
+      const path = Object.hasOwn(manifest.skins, skin.name)
+        ? manifest.skins[skin.name]!
+        : `skins/${safeName(skin.name)}.json`;
       json(path, skin);
       return [skin.name, path];
     }),
   );
   manifest.animations = snapshot.animations.map((clip) => {
-    const path = definition.animationPaths[clip.name] ?? `animations/${safeName(clip.name)}.json`;
+    const path = Object.hasOwn(definition.animationPaths, clip.name)
+      ? definition.animationPaths[clip.name]!
+      : `animations/${safeName(clip.name)}.json`;
     json(path, { ...clip, version: 1 });
     return path;
   });
