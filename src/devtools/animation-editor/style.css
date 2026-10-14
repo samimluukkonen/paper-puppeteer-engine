@@ -49,7 +49,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: 8px;
   padding: 10px 12px;
   background: #f8f5ec;
   border: 1px solid #d6d7c8;
@@ -318,14 +318,6 @@ a {
 }
 .animation-key-details .timeline-interpolation {
   display: block;
-}
-.animation-key-details select {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  opacity: 1;
-  min-height: 0;
 }
 #animation-event-inspector input {
   width: 100%;
@@ -1079,12 +1071,6 @@ a {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 1px solid #cbd1c1;
-  border-radius: 4px;
-  background: #fff;
-  cursor: pointer;
   list-style: none;
   white-space: nowrap;
 }
@@ -1094,10 +1080,6 @@ a {
 .animation-menu > summary::after {
   content: "▾";
   color: #6d786a;
-}
-.animation-menu[open] > summary {
-  background: #dce7d7;
-  border-color: #39574b;
 }
 .animation-menu-content {
   position: fixed;
@@ -1110,10 +1092,10 @@ a {
   display: grid;
   gap: 6px;
   padding: 10px;
-  border: 1px solid #b7c0ac;
+  border: 1px solid var(--dropdown-panel-border);
   border-radius: 6px;
-  background: #f8f5ec;
-  box-shadow: 0 8px 24px #34473e26;
+  background: var(--dropdown-panel-background);
+  box-shadow: var(--dropdown-panel-shadow);
   font-size: 12px;
 }
 .animation-menu-content > button {

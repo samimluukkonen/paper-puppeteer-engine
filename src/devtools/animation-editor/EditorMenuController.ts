@@ -28,6 +28,8 @@ export class EditorMenuController {
       'keydown',
       (event) => {
         if (event.key !== 'Escape' || event.isComposing || app.querySelector('dialog[open]')) return;
+        // Let Escape dismiss a select picker before closing its containing menu.
+        if (CSS.supports('selector(select:open)') && app.querySelector('select:open')) return;
         const menu = this.openMenus()[0];
         if (!menu) return;
         event.preventDefault();

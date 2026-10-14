@@ -4,6 +4,7 @@ import { characterChoices, selectedCharacterId } from './characterSelection.js';
 import puppetLogo from './images/puppet-running-header.png';
 import './viewShell.css';
 import './workspace.css';
+import './dropdowns.css';
 
 const views = {
   demo: { title: 'Engine Demo', path: '', description: 'Explore animation, playback, and inverse kinematics.' },

@@ -38,6 +38,8 @@ export function useWorkspaceInspector() {
         (event.target instanceof Element && event.target.closest('dialog'))
       )
         return;
+      // An open select picker owns the first Escape, including inside the drawer.
+      if (CSS.supports('selector(select:open)') && document.querySelector('select:open')) return;
       event.preventDefault();
       setOpen(false);
       toggle.current?.focus({ preventScroll: true });

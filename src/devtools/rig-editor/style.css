@@ -62,12 +62,6 @@ input {
   margin-top: 18px;
   justify-content: space-between;
 }
-.opacity-label select {
-  border: 1px solid #d0d2c0;
-  padding: 5px;
-  background: white;
-  color: #34473e;
-}
 #editor-stage {
   aspect-ratio: 760 / 640;
   width: 100%;

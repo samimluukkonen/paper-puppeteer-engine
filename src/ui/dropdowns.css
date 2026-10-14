@@ -1,0 +1,109 @@
+.view-shell {
+  --dropdown-border: #cbd1c1;
+  --dropdown-panel-border: #b7c0ac;
+  --dropdown-panel-background: #f8f5ec;
+  --dropdown-panel-shadow: 0 8px 24px #34473e26;
+  --dropdown-active-background: #dce7d7;
+  --dropdown-active-border: #39574b;
+}
+
+.view-shell select,
+.animation-menu > summary {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--dropdown-border);
+  border-radius: 4px;
+  color: #34473e;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.view-shell select {
+  max-width: 100%;
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236d786a' d='M0 0h10L5 6z'/%3E%3C/svg%3E");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+}
+
+.view-shell select:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.animation-menu[open] > summary {
+  background: var(--dropdown-active-background);
+  border-color: var(--dropdown-active-border);
+}
+
+/* Keep native selection, keyboard handling and controller-owned options. */
+@supports (appearance: base-select) {
+  .view-shell select,
+  .view-shell select::picker(select) {
+    appearance: base-select;
+  }
+
+  .view-shell select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-right: 8px;
+    background-image: none;
+  }
+
+  .view-shell select::picker-icon {
+    content: "▾";
+    color: #6d786a;
+  }
+
+  .view-shell select:open {
+    background: var(--dropdown-active-background);
+    border-color: var(--dropdown-active-border);
+  }
+
+  .view-shell select::picker(select) {
+    margin-block: 4px;
+    max-width: calc(100vw - 16px);
+    max-height: min(500px, calc(100dvh - 16px));
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid var(--dropdown-panel-border);
+    border-radius: 6px;
+    color: #34473e;
+    background: var(--dropdown-panel-background);
+    box-shadow: var(--dropdown-panel-shadow);
+    font: inherit;
+    font-size: 12px;
+  }
+
+  .view-shell select option {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 4px 8px;
+    border: 1px solid var(--dropdown-border);
+    border-radius: 4px;
+    background: #fff;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .view-shell select option + option {
+    margin-top: 6px;
+  }
+
+  .view-shell select option:checked,
+  .view-shell select option:enabled:hover,
+  .view-shell select option:enabled:focus {
+    border-color: var(--dropdown-active-border);
+    background: var(--dropdown-active-background);
+  }
+
+  .view-shell select option:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}

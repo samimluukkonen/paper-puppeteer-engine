@@ -96,15 +96,6 @@
   color: #6d786a;
   font-size: 12px;
 }
-.character-choice select {
-  max-width: 100%;
-  border: 1px solid #cbd1c1;
-  border-radius: 3px;
-  padding: 5px 8px;
-  color: #34473e;
-  background: #fff;
-  font: inherit;
-}
 .view-navigation {
   display: flex;
   flex-wrap: wrap;
