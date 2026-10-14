@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test } from './fixtures.js';
 
 test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview and preserves bone authoring', async ({
   page,
@@ -96,7 +96,7 @@ test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview 
   await (await animationMenuControl(page, '#timeline-delete-key')).click();
   await expect(page.getByRole('button', { name: 'Select rightArmIK x key at 0.1 s', exact: true })).toHaveCount(0);
   await page.locator('#animation-undo').click();
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightUpperArm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightUpperArm', exact: true }).click();
   await expect(inspector).toBeHidden();
   const boneInspector = page.locator('#animation-bone-inspector');
   await boneInspector.locator('[data-property="rotation"]').fill('30');

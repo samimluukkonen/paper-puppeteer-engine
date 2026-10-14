@@ -77,6 +77,7 @@ test('skin switching during animation and rig authoring preserve animation JSON 
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   const panel = page.locator('#attachment-panel');
+  await panel.locator(':scope > summary').click();
   const exportAnimation = async () => {
     const waiting = page.waitForEvent('download');
     await page.locator('#animation-download').click();

@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { test } from './fixtures.js';
+import { animationHierarchy, test } from './fixtures.js';
 
 for (const view of [
   { route: './', prefix: 'demo', stage: '#stage', ready: '#status-text', text: 'Current: idle' },
@@ -54,7 +54,7 @@ for (const view of [
       await x.press('Tab');
       await expect(page.locator('#dirty-status')).toContainText('Unsaved changes');
     } else if (view.prefix === 'animation') {
-      await page.locator('#animation-bones').getByRole('button', { name: 'head', exact: true }).click();
+      await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
       await page.locator('#animation-bone-fields [data-property="x"]').fill('12');
       await page.getByRole('button', { name: 'Set X key', exact: true }).click();
       await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');

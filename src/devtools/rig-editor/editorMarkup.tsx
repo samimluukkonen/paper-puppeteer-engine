@@ -129,7 +129,7 @@ export function RigEditorView({
         <aside
           ref={inspector.panel}
           id="rig-inspector"
-          className="workspace-inspector inspector"
+          className="workspace-inspector inspector workspace-inspector-sections"
           inert={inspector.narrow && !inspector.open}
           aria-label="Selection inspector"
         >

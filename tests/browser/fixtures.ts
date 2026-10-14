@@ -1,5 +1,13 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
+/** Expand the inspector's initially collapsed bone hierarchy before using its controls. */
+export async function animationHierarchy(page: Page): Promise<Locator> {
+  const panel = page.locator('.animation-bone-list');
+  if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open)))
+    await panel.locator(':scope > summary').click();
+  return page.locator('#animation-bones');
+}
+
 /** Follow the visible disclosure before interacting with a secondary animation command. */
 export async function animationMenuControl(page: Page, selector: string): Promise<Locator> {
   const control = page.locator(selector);

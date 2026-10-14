@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, animationFileAction, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, animationFileAction, test } from './fixtures.js';
 
 /** Locate the selected Phaser crosshair from its rendered pixels, without runtime test hooks. */
 async function targetPoint(page: Page) {
@@ -91,7 +91,7 @@ test('hand and foot handles preview, cancel, commit two keys, animate and retain
     const originalX = Number(await x.inputValue());
     const originalY = Number(await y.inputValue());
     const start = await targetPoint(page);
-    await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
+    await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
     const originalCanvas = await canvas.screenshot();
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();

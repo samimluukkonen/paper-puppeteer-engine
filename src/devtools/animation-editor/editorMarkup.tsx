@@ -269,7 +269,7 @@ export function AnimationEditorView({
         <aside
           ref={inspector.panel}
           id="animation-inspector"
-          className="animation-authoring"
+          className="animation-authoring workspace-inspector-sections"
           inert={inspector.narrow && !inspector.open}
           aria-label="Selection inspector"
         >
@@ -280,9 +280,9 @@ export function AnimationEditorView({
             </button>
           </div>
           {rigTweak && <RigTweakPanel active={tweaking} />}
-          {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} />}
+          {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
-            <details className="animation-bone-list" open>
+            <details className="animation-bone-list">
               <summary>Bones</summary>
               <div id="animation-bones" aria-label="Bone hierarchy"></div>
             </details>

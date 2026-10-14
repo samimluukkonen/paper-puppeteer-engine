@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
 
 test('onion skins render through scrubbing, facing, playback and boundaries without blocking editing or dirtying', async ({
   page,
@@ -30,8 +30,10 @@ test('onion skins render through scrubbing, facing, playback and boundaries with
   await page.mouse.click(box.x + box.width * 0.7, box.y + 18);
   await expect.poll(async () => (await canvas.screenshot()).equals(mirrored)).toBe(false);
   await page.locator('#animation-show-bones').check();
-  await page
-    .locator('#animation-bones button')
+  await (
+    await animationHierarchy(page)
+  )
+    .locator('button')
     .filter({ hasText: /^head$/ })
     .click();
   await expect(page.locator('#animation-bone-title')).toContainText('head');

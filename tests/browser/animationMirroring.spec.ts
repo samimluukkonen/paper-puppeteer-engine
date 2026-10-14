@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, toggleAnimationToolPanel, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, toggleAnimationToolPanel, test } from './fixtures.js';
 
 test.describe.configure({ timeout: 60000 });
 
@@ -136,7 +136,7 @@ test('current pose and selected keys refresh inspector and timeline with one Und
 }) => {
   await openEditor(page);
   await toggleAnimationToolPanel(page, 'mirror');
-  await page.locator('#animation-bones').getByRole('button', { name: 'leftUpperArm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'leftUpperArm', exact: true }).click();
   await toggleAnimationToolPanel(page, 'mirror');
   await poseButton(page).click();
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: rightUpperArm');

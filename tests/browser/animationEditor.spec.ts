@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
-import { animationControl, test } from './fixtures.js';
+import { animationHierarchy, animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -435,7 +435,7 @@ test('playback advances without measuring layout or rewriting unchanged editor c
     await route.fulfill({ json: { ...animationFileSchema.parse(await response.json()), duration: 60_000 } });
   });
   await openEditor(page);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await page.locator('#play-pause').click();
   await expect(page.locator('#play-pause')).toHaveText('Pause');
   const work = await page.evaluate(async () => {

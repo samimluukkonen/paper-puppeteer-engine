@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { animationMenuControl, animationControl, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, animationControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -59,7 +59,7 @@ async function selectedBonePoint(page: Page): Promise<{ x: number; y: number }> 
 test('bone hierarchy keyboard navigation keeps one tab stop without authoring or seeking', async ({ page }) => {
   await openEditor(page);
   await time(page, 0.5);
-  const hierarchy = page.locator('#animation-bones');
+  const hierarchy = await animationHierarchy(page);
   const root = hierarchy.getByRole('button', { name: 'root', exact: true });
   const pelvis = hierarchy.getByRole('button', { name: 'pelvis', exact: true });
   const torso = hierarchy.getByRole('button', { name: 'torso', exact: true });
@@ -92,8 +92,8 @@ test('bone hierarchy keyboard navigation keeps one tab stop without authoring or
 
 test('three-key authoring, exact history, interpolation, parent-local editing and playback', async ({ page }) => {
   await openEditor(page);
-  const selectBone = (bone: string) =>
-    page.locator('#animation-bones').getByRole('button', { name: bone, exact: true }).click();
+  const selectBone = async (bone: string) =>
+    (await animationHierarchy(page)).getByRole('button', { name: bone, exact: true }).click();
   const setRotation = async (value: string) => {
     await input(page, 'rotation').fill(value);
     await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
@@ -172,7 +172,7 @@ test('drafts cancel at held endpoints and empty history; shortcuts respect typin
   page,
 }) => {
   await openEditor(page);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   const timeline = page.locator('#timeline');
   await timeline.focus();
   await timeline.press('End');
@@ -215,7 +215,7 @@ test('drafts cancel at held endpoints and empty history; shortcuts respect typin
 
 test('dirty animation switching preserves authored history and new sessions start clean', async ({ page }) => {
   await openEditor(page);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await time(page, 0.5);
   await input(page, 'rotation').fill('35');
   await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
@@ -240,17 +240,17 @@ test('dirty animation switching preserves authored history and new sessions star
 test('demo bone hierarchy, temporary preview, sparse create/update/delete, and playback', async ({ page }) => {
   await openEditor(page);
   for (const bone of ['torso', 'rightUpperArm', 'rightForearm', 'rightHand']) {
-    await page.locator('#animation-bones').getByRole('button', { name: bone, exact: true }).click();
+    await (await animationHierarchy(page)).getByRole('button', { name: bone, exact: true }).click();
     await expect(page.locator('#animation-bone-title')).toHaveText(`Bone: ${bone}`);
   }
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  await page.locator('#animation-bones').getByRole('button', { name: 'torso', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'torso', exact: true }).click();
   const torsoPoint = await selectedBonePoint(page);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightHand', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightHand', exact: true }).click();
   await page.mouse.click(torsoPoint.x, torsoPoint.y);
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: torso');
   await time(page, 0.5);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await expect(keyed(page, 'rotation')).toHaveAttribute('data-keyed', 'false');
   const canvas = page.locator('#animation-stage canvas');
   const before = await canvas.screenshot();
@@ -304,7 +304,7 @@ test('demo bone hierarchy, temporary preview, sparse create/update/delete, and p
 test('draft cancel, navigation, invalid fields, and preview-only IK/facing', async ({ page }) => {
   await openEditor(page);
   await time(page, 0.5);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   const evaluated = await input(page, 'rotation').inputValue();
   await input(page, 'rotation').fill('35');
   await page.locator('#animation-cancel-transform').click();
@@ -316,7 +316,7 @@ test('draft cancel, navigation, invalid fields, and preview-only IK/facing', asy
   await time(page, 0.8);
   await expect(input(page, 'rotation')).toHaveAttribute('data-temporary', 'false');
   await input(page, 'rotation').fill('35');
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightHand', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightHand', exact: true }).click();
   await expect(input(page, 'rotation')).toHaveAttribute('data-temporary', 'false');
   await input(page, 'rotation').fill('');
   await expect(page.getByRole('button', { name: 'Set Rotation (°) key', exact: true })).toBeDisabled();
@@ -326,7 +326,7 @@ test('draft cancel, navigation, invalid fields, and preview-only IK/facing', asy
   await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await time(page, 0.5);
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await input(page, 'rotation').fill('35');
   await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
   await expect(input(page, 'rotation')).toHaveValue('35');

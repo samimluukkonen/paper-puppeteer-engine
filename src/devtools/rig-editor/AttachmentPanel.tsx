@@ -5,9 +5,11 @@ import './attachments.css';
 export function AttachmentPanel({
   controller,
   authoring = true,
+  defaultOpen = true,
 }: {
   controller: AttachmentController;
   authoring?: boolean;
+  defaultOpen?: boolean;
 }) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const [attachmentId, setAttachmentId] = useState('');
@@ -27,7 +29,7 @@ export function AttachmentPanel({
   const errors = state?.validationIssues().filter((issue) => issue.severity === 'error') ?? [];
   const mapping = slot && skin && Object.hasOwn(skin.slots, slot) ? skin.slots[slot] : undefined;
   return (
-    <details className="attachment-panel" id="attachment-panel" open>
+    <details className="attachment-panel" id="attachment-panel" open={defaultOpen || undefined}>
       <summary>Attachments &amp; skins</summary>
       {!state ? (
         <p>Load a character to manage attachments.</p>

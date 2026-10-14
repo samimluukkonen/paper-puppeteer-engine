@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -71,7 +71,7 @@ test('compact property actions preserve drafts, keyed state and history', async 
   await openEditor(page);
   await expect(page.locator('#animation-bone-empty')).toBeVisible();
   await expect(page.locator('#animation-bone-fields')).toBeHidden();
-  await page.locator('#animation-bones .tree-entry').first().click();
+  await (await animationHierarchy(page)).locator('.tree-entry').first().click();
   const input = page.locator('#animation-bone-fields input[data-property="x"]');
   const diamond = page.getByRole('button', { name: 'Set X key', exact: true });
   await expect(diamond).toHaveText('◇');

@@ -246,15 +246,6 @@ a {
   margin: 0 0 8px;
   font-size: 13px;
 }
-.animation-bone-list {
-  margin-bottom: 12px;
-}
-.animation-bone-list summary,
-.animation-key-details summary {
-  cursor: pointer;
-  padding: 6px 0;
-  font-weight: 600;
-}
 #animation-bones {
   max-height: 112px;
   overflow-y: auto;
@@ -312,9 +303,6 @@ a {
 .animation-field-help {
   font-size: 11px;
   line-height: 1.5;
-}
-.animation-key-details {
-  margin-top: 8px;
 }
 .animation-key-details .timeline-interpolation {
   display: block;

@@ -1,8 +1,8 @@
 import { expect, type Page } from '@playwright/test';
-import { animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
 
 async function editRoot(page: Page, value: string) {
-  await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
   await page.locator('#animation-bone-fields input[data-property="x"]').fill(value);
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
 }
@@ -52,7 +52,7 @@ test('revert restores loaded source after export and pauses/resets preview witho
 }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
   const x = page.locator('#animation-bone-fields input[data-property="x"]');
   const original = await x.inputValue();
   await editRoot(page, '130');
@@ -69,7 +69,7 @@ test('revert restores loaded source after export and pauses/resets preview witho
   await expect(page.locator('#animation-bone-title')).toHaveText('Select a bone');
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await expect(page.locator('#animation-redo')).toBeDisabled();
-  await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
   await expect(x).toHaveValue(original);
   expect(fetchedAssets).toEqual([]);
 });

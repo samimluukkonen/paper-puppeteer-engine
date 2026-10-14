@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationHierarchy, test } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -14,7 +14,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
 }) => {
   await openEditor(page);
   const labels = page.locator('#timeline-track-labels');
-  const expectedBones = await page.locator('#animation-bones .tree-entry').allTextContents();
+  const expectedBones = await (await animationHierarchy(page)).locator('.tree-entry').allTextContents();
   expect(
     await labels
       .locator('.timeline-bone-track')
@@ -23,7 +23,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   const timeline = page.locator('#timeline');
   await timeline.press('Shift+ArrowRight');
   const initialTime = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
-  await page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await expect(labels.getByRole('button', { name: 'Select bone rightForearm', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -35,7 +35,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   await labels.getByRole('button', { name: 'Select rightForearm rotation track', exact: true }).click();
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: rightForearm');
   await expect(
-    page.locator('#animation-bones').getByRole('button', { name: 'rightForearm', exact: true }),
+    (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(labels.getByRole('button', { name: 'Select rightForearm rotation track', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -47,7 +47,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', initialTime!);
 
   await labels.getByRole('button', { name: 'Select bone torso', exact: true }).click();
-  await expect(page.locator('#animation-bones').getByRole('button', { name: 'torso', exact: true })).toHaveAttribute(
+  await expect((await animationHierarchy(page)).getByRole('button', { name: 'torso', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -61,7 +61,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   const canvas = page.locator('#animation-stage canvas');
   // Camera fitting changes the projected root position. Locate its rendered selection ring,
   // switch selection away, then pick that same point through the actual canvas input path.
-  await page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
   let rootPoint: { x: number; y: number } | null = null;
   await expect
     .poll(async () => {
@@ -106,7 +106,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
     'aria-pressed',
     'true',
   );
-  await expect(page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true })).toHaveAttribute(
+  await expect((await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -231,7 +231,7 @@ test('unkeyed bones/properties remain available, key presence refreshes, and no 
     'true',
   );
   await page.getByRole('button', { name: 'Select root rotation track', exact: true }).click();
-  await expect(page.locator('#animation-bones').getByRole('button', { name: 'root', exact: true })).toHaveAttribute(
+  await expect((await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

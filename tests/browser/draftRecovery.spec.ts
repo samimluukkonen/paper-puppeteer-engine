@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { animationControl, rigFileAction, test } from './fixtures.js';
+import { animationHierarchy, animationControl, rigFileAction, test } from './fixtures.js';
 
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
@@ -144,7 +144,7 @@ test('animation drafts recover committed settings, exclude temporary fields and 
   await (await animationControl(page, '#animation-mode')).selectOption('stepped');
   await (await animationControl(page, '#animation-fps')).fill('17');
   await (await animationControl(page, '#animation-fps')).press('Tab');
-  await page.locator('#animation-bones').getByRole('button', { name: 'head', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
   const x = page.locator('#animation-bone-fields input[data-property="x"]');
   await x.fill('123');
   page.on('dialog', async (dialog) => {
@@ -156,7 +156,7 @@ test('animation drafts recover committed settings, exclude temporary fields and 
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('stepped');
   await expect(await animationControl(page, '#animation-fps')).toHaveValue('17');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
-  await page.locator('#animation-bones').getByRole('button', { name: 'head', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
   await expect(x).toHaveValue('0');
   await page.locator('#animation-undo').click();
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
