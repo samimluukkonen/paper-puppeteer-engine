@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { assert, test, vi } from 'vitest';
+import { afterEach, assert, test, vi } from 'vitest';
 import {
   AnimationEditorGhostLayer,
   AnimationPoseOverlay,
@@ -124,6 +124,39 @@ function fixture(frame?: string | number, overrideRig?: Rig) {
   };
 }
 const file = () => new File(['image'], 'replacement.png', { type: 'image/png' });
+
+afterEach(() => vi.unstubAllGlobals());
+
+test('throwing subscribers cannot dispose accepted proposals or interrupt artwork history', async () => {
+  const f = fixture();
+  const reporter = vi.fn();
+  vi.stubGlobal('reportError', reporter);
+  const failure = new Error('Subscriber failed');
+  f.controller.subscribe(() => {
+    throw failure;
+  });
+  const observer = vi.fn(() => f.controller.getSnapshot());
+  f.controller.subscribe(observer);
+  await f.controller.import(file());
+  assert.strictEqual(f.controller.getSnapshot().proposed, f.next);
+  assert.equal(vi.mocked(f.next.dispose).mock.calls.length, 0);
+  assert.isFalse(f.controller.getSnapshot().importing);
+  f.controller.preview();
+  f.controller.apply();
+  assert.equal(f.controller.exportReplacements().length, 1);
+  assert.isFalse(f.controller.hasPendingProposal);
+  assert.equal(vi.mocked(f.next.dispose).mock.calls.length, 0);
+  f.controller.undo();
+  assert.equal(f.controller.exportReplacements().length, 0);
+  f.controller.redo();
+  assert.equal(f.controller.exportReplacements().length, 1);
+  assert.isAbove(observer.mock.calls.length, 0);
+  assert.equal(observer.mock.calls.length, reporter.mock.calls.length);
+  assert.isTrue(reporter.mock.calls.every(([error]) => error === failure));
+  f.controller.dispose();
+  assert.equal(vi.mocked(f.next.dispose).mock.calls.length, 1);
+  f.puppet.destroy();
+});
 
 test('retained hidden onion and pose overlays release old texture references before removal', async () => {
   const f = fixture();

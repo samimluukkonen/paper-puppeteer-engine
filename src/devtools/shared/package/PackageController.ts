@@ -1,5 +1,6 @@
 import { downloadBlob } from '../../../shared/downloadJson.js';
 import { draftSource } from '../draftSource.js';
+import { notifySubscribers } from '../subscriberNotifications.js';
 import {
   buildCharacterPackage,
   capturePackage,
@@ -41,7 +42,7 @@ export class PackageController {
 
   private publish(update: Partial<typeof this.snapshot> = {}): void {
     this.snapshot = { ...this.snapshot, ...update };
-    for (const listener of this.listeners) listener();
+    notifySubscribers(this.listeners, 'Package subscribers failed.');
   }
   bind(source: () => PackageSnapshot): void {
     this.request?.abort();

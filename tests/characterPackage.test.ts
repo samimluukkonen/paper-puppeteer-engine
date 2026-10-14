@@ -445,6 +445,35 @@ test('failed download and disposed in-flight requests cannot establish clean che
   assert.equal(vi.mocked(downloadBlob).mock.calls.length, 1);
 });
 
+test('throwing subscribers cannot interrupt package downloads or leave the controller busy', async () => {
+  const source = fixture();
+  source.rig.bones[0]!.x = 7;
+  const controller = new PackageController();
+  controller.bind(() => source);
+  const reporter = vi.fn();
+  vi.stubGlobal('reportError', reporter);
+  vi.stubGlobal('fetch', fetchImage);
+  const failure = new Error('Subscriber failed');
+  controller.subscribe(() => {
+    throw failure;
+  });
+  const observer = vi.fn(() => controller.getSnapshot());
+  controller.subscribe(observer);
+  await controller.download();
+  assert.equal(vi.mocked(downloadBlob).mock.calls.length, 1);
+  assert.isFalse(controller.getSnapshot().busy);
+  assert.isFalse(controller.hasUnsavedChanges);
+  controller.previewExport();
+  assert.isNotNull(controller.getSnapshot().preview);
+  controller.closePreview();
+  await controller.importPreview(new File(['invalid'], 'invalid.zip'));
+  assert.isFalse(controller.getSnapshot().busy);
+  assert.include(controller.getSnapshot().message, 'Invalid ZIP size');
+  assert.equal(observer.mock.calls.length, reporter.mock.calls.length);
+  assert.isTrue(reporter.mock.calls.every(([error]) => error === failure));
+  controller.dispose();
+});
+
 test('runtime preview leases revoke every object URL on disposal and cancellation', async () => {
   const files = await buildCharacterPackage(fixture(), fetchImage);
   const create = vi.spyOn(URL, 'createObjectURL');

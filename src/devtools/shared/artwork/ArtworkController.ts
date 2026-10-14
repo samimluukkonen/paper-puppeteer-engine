@@ -10,6 +10,7 @@ import { DEFAULT_CHARACTER_TEXTURE_LIMITS as limits } from '../../../engine/char
 import type { Puppet } from '../../../engine/Puppet.js';
 import { assetFilename } from '../assetFilename.js';
 import { SnapshotHistory } from '../SnapshotHistory.js';
+import { notifySubscribers } from '../subscriberNotifications.js';
 import { importSprite, type ImportedSprite, type SpriteMetadata } from './spriteImport.js';
 
 export interface ArtworkTarget {
@@ -161,7 +162,7 @@ export class ArtworkController {
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
     };
-    for (const listener of this.listeners) listener();
+    notifySubscribers(this.listeners, 'Artwork subscribers failed.');
   }
 
   /** Catalog edits can introduce new logical references without replacing the preview puppet. */
