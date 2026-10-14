@@ -39,7 +39,7 @@ export class AnimationEditorDocument {
   private issues: readonly ValidationIssue[] = [];
   private history = this.createHistory();
   constructor(
-    readonly rig?: Rig,
+    public rig?: Rig,
     animations: readonly AnimationClip[] = [],
     options: AnimationEditorStateOptions = {},
   ) {

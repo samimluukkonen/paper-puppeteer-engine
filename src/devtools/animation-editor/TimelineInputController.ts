@@ -69,7 +69,8 @@ export class TimelineInputController {
     this.timeline.addEventListener(
       'pointerdown',
       (event) => {
-        if (event.button !== 0 || this.gesture || !this.state.workingAnimation) return;
+        if (!this.state.animationAuthoringEnabled || event.button !== 0 || this.gesture || !this.state.workingAnimation)
+          return;
         event.preventDefault();
         if (
           event.target instanceof Element &&
@@ -153,7 +154,8 @@ export class TimelineInputController {
     const gesture = this.gesture;
     if (!gesture) return;
     const invalid =
-      gesture.kind === 'marquee'
+      !this.state.animationAuthoringEnabled ||
+      (gesture.kind === 'marquee'
         ? gesture.state !== this.state ||
           gesture.animation !== this.state.workingAnimation ||
           gesture.tracks !== this.state.timelineTracks ||
@@ -162,7 +164,7 @@ export class TimelineInputController {
           ? !this.state.keyframeDrag
           : gesture.kind === 'event-drag'
             ? !this.state.eventDrag
-            : !this.state.isScrubbing;
+            : !this.state.isScrubbing);
     if (invalid) this.cancelGesture();
   }
 

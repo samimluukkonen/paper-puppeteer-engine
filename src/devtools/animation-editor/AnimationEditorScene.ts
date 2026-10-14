@@ -1,11 +1,18 @@
 import Phaser from 'phaser';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
+import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Puppet } from '../../engine/Puppet.js';
+import { Rig } from '../../engine/Rig.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import { RigEditor } from '../rig-editor/RigEditor.js';
+import { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { assetFilename } from '../shared/assetFilename.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
@@ -21,6 +28,40 @@ export interface AnimationEditorSceneOptions {
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
+  rigEditor: RigEditor | undefined;
+  private definition: CharacterDefinition | undefined;
+  private appliedWorkingRig: RigEditorState['workingCopy'] | undefined;
+  private releaseMode: (() => void) | undefined;
+  private rigMode = false;
+
+  get characterId(): string {
+    return this.definition?.id ?? 'unknown';
+  }
+  get rigFilename(): string {
+    return assetFilename(this.definition?.rigPath, 'rig.json');
+  }
+
+  /** Rig-tweak imports retain topology, artwork identities and all animation sessions/history. */
+  reloadRig(file: RigJsonDefinition, _filename?: string, reason?: 'import' | 'reload-export'): void {
+    const editor = this.rigEditor;
+    if (!editor) throw new Error('No rig is loaded.');
+    if (!editor.state.canRestoreDraft(file))
+      throw new Error(
+        'Rig Tweak requires the same hierarchy, artwork, skins and IK definitions. Use the Rig Editor to load a different rig.',
+      );
+    editor.cancelGesture();
+    editor.state.restoreDraft(file);
+    editor.refresh();
+    if (reason === 'reload-export') editor.state.markSaved();
+    this.onRigChange();
+  }
+
+  reloadOriginal(): void {
+    this.rigEditor?.cancelGesture();
+    this.rigEditor?.resetRig();
+    this.rigEditor?.state.markSaved();
+    this.onRigChange();
+  }
   private puppet: Puppet | undefined;
   private ikHandles: AnimationEditorIKHandles | undefined;
   private ikHandlesVisible = true;
@@ -46,6 +87,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     private readonly onError: (message: string) => void,
     options: AnimationEditorSceneOptions = {},
     private readonly artwork?: ArtworkController,
+    private readonly onRigChange: () => void = () => {},
   ) {
     super('AnimationEditorScene');
     this.options = structuredClone(options);
@@ -55,6 +97,13 @@ export class AnimationEditorScene extends Phaser.Scene {
     const session = ++this.loadSession;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       ++this.loadSession;
+      this.releaseMode?.();
+      this.releaseMode = undefined;
+      this.rigEditor?.disable();
+      this.rigEditor = undefined;
+      this.appliedWorkingRig = undefined;
+      this.definition = undefined;
+      this.rigMode = false;
       this.state?.pause();
       this.state?.endScrub();
       this.ikHandles?.dispose();
@@ -86,13 +135,14 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.ikHandles?.render();
     const overlay = this.selectionOverlay;
     overlay?.clear();
-    if (overlay && this.puppet && this.state?.selectedBoneId) {
+    if (overlay && !this.rigMode && this.puppet && this.state?.selectedBoneId) {
       const point = this.puppet.getBone(this.state.selectedBoneId).getWorldPosition();
       overlay.lineStyle(3, 0xb7543a).strokeCircle(point.x, point.y, 10);
     }
   }
 
   private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
+    if (this.rigMode) return;
     if (this.ikHandles?.pointerDown(pointer)) return;
     if (!this.puppet || !this.state || pointer.button !== 0) return;
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -111,7 +161,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   setIKHandlesVisible(visible: boolean): void {
     this.ikHandlesVisible = visible;
-    this.ikHandles?.setVisible(visible);
+    this.ikHandles?.setVisible(visible && !this.rigMode);
   }
   private refreshArtwork(): void {
     const puppet = this.puppet;
@@ -131,10 +181,11 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
   setIKHandlesInteractive(interactive: boolean): void {
     this.ikHandlesInteractive = interactive;
-    this.ikHandles?.setInteractive(interactive);
+    this.ikHandles?.setInteractive(interactive && !this.rigMode);
   }
   setFacing(facing: Facing): void {
     this.facing = facing;
+    if (this.rigEditor) this.rigEditor.state.facing = facing;
     this.puppet?.setFacing(facing);
     this.ghosts?.sync();
     this.syncMirrorPreview();
@@ -227,7 +278,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   setBonesVisible(visible: boolean): void {
     this.bonesVisible = visible;
-    this.puppet?.setDebug(visible);
+    this.puppet?.setDebug(visible && !this.rigMode);
   }
 
   /** Frame the loaded artwork once; keep the camera stable while authoring and playing. */
@@ -305,6 +356,57 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.puppet = puppet;
       this.preview = preview;
       this.state = state;
+      this.definition = definition;
+      const file = definition.rigFile;
+      const rigState = new RigEditorState(new Rig(definition.rig, file?.skins ?? []), file);
+      this.rigEditor = new RigEditor(
+        this,
+        puppet,
+        () => this.onRigChange(),
+        rigState,
+        [
+          ...(definition.rig.ik ?? []),
+          ...(this.options.ikChains ?? []).filter(
+            (chain) => !definition.rig.ik?.some((authored) => authored.name === chain.name),
+          ),
+        ],
+        [],
+        () => {
+          if (this.appliedWorkingRig !== rigState.workingCopy) {
+            // Temporarily invalid inspector drafts retain the last valid preview and existing validation feedback.
+            let nextRig: Rig | undefined;
+            try {
+              const authored = new Rig(rigState.workingCopy);
+              nextRig = new Rig(authored, mergeSkins(authored.skins, definition.standaloneSkins));
+            } catch {
+              // Export/validation still reports the invalid authored rig through RigEditorState.
+            }
+            if (nextRig) {
+              this.appliedWorkingRig = rigState.workingCopy;
+              state.updatePreviewRig(nextRig);
+            }
+          }
+          preview?.refresh(true);
+        },
+      );
+      this.releaseMode = state.subscribe(() => {
+        const tweaking = !state.animationAuthoringEnabled;
+        if (tweaking === this.rigMode) return;
+        this.rigMode = tweaking;
+        this.clearMirrorPreview();
+        this.clearBakePreview();
+        this.ikHandles?.setVisible(this.ikHandlesVisible && !tweaking);
+        this.ikHandles?.setInteractive(this.ikHandlesInteractive && !tweaking);
+        this.puppet?.setDebug(this.bonesVisible && !tweaking);
+        if (tweaking) {
+          if (state.selectedBoneId) rigState.selectBone(state.selectedBoneId);
+          this.rigEditor?.enable();
+        } else {
+          this.rigEditor?.disable();
+          rigState.endOperation();
+          this.rigEditor?.refresh(false);
+        }
+      });
       this.artwork?.bind(this, puppet, definition, () => this.refreshArtwork());
       if (this.ikPreviewEnabled) this.setIKPreview(true);
       this.ikHandles = new AnimationEditorIKHandles(this, state, puppet);
@@ -315,6 +417,12 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
     } catch (error) {
+      this.releaseMode?.();
+      this.releaseMode = undefined;
+      this.rigEditor?.disable();
+      this.rigEditor = undefined;
+      this.definition = undefined;
+      this.appliedWorkingRig = undefined;
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();

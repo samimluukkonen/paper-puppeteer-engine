@@ -29,6 +29,8 @@ The v0.5.8.1 [sprite import and replacement foundation](docs/sprite-replacement.
 
 The v0.5.8.2 [visual artwork alignment](docs/visual-artwork-alignment.md) adds explicit joint, artwork offset, sprite origin and slot transform modes; exact pixel pivots, joint references, undoable alignment helpers, facing and read-only animation bone poses. Artwork drag proposals stay separate from authored rig data until release.
 
+The v0.5.8.3 [Animation Editor Rig-Tweak Mode](docs/animation-rig-tweak.md) reuses rig joint/artwork/slot tools at the paused animation pose. Rig and animation histories, dirty states and exports remain independent; rig changes reevaluate the animation and IK without creating keys.
+
 The v0.5.7.2 [timeline navigation and zoom](docs/timeline-navigation.md) adds pointer-anchored zoom, horizontal panning, fit/center commands, precise seconds/frame input and optional playhead follow. Navigation preserves authored data and selection.
 
 The v0.5.7.1 [timeline track search and filtering](docs/timeline-track-filtering.md) finds bones, properties, IK targets and events, preserves ancestor context, and reveals hidden selections. Visibility and expansion controls preserve authored data, history and exports.

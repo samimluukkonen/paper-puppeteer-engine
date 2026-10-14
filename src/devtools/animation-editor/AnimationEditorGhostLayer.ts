@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { Bone } from '../../engine/Bone.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { PuppetRenderer } from '../../engine/PuppetRenderer.js';
+import type { Rig } from '../../engine/Rig.js';
 import { transformProperties } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import type { GhostPoseSample } from './ghostPoseSampling.js';
@@ -101,6 +102,7 @@ export class AnimationEditorGhostLayer {
   private disposed = false;
   private frameDepth = 0;
   private animation: ReadonlyAnimation | null | undefined;
+  private rig: Rig | undefined;
   private time: number | undefined;
   private samples: GhostPoseSample[] = [];
 
@@ -148,10 +150,14 @@ export class AnimationEditorGhostLayer {
   /** Also called each scene frame to follow skin, frame, visibility, facing and preview layout changes. */
   sync(): void {
     if (this.disposed || !this.settings.enabled || this.frameDepth > 0) return;
-    const changed = this.animation !== this.state.workingAnimation || this.time !== this.state.currentTime;
+    const changed =
+      this.rig !== this.state.rig ||
+      this.animation !== this.state.workingAnimation ||
+      this.time !== this.state.currentTime;
     if (changed) {
       this.samples = this.state.sampleGhostPoses(this.settings);
       this.animation = this.state.workingAnimation;
+      this.rig = this.state.rig;
       this.time = this.state.currentTime;
     }
     if (!this.puppet.container.visible) {

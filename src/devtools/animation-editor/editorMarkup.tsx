@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
@@ -14,6 +15,8 @@ import type { KeyframeRetimingController } from './KeyframeRetimingController.js
 import { KeyframeRetimingPanel } from './KeyframeRetimingPanel.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
+import { type RigTweakController, emptyRigTweakSnapshot, subscribeNoRigTweak } from './RigTweakController.js';
+import { RigTweakPanel } from './RigTweakPanel.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
 export function AnimationEditorView({
@@ -22,14 +25,21 @@ export function AnimationEditorView({
   ikBake,
   retiming,
   artwork,
+  rigTweak,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
   retiming: KeyframeRetimingController;
   artwork?: ArtworkController;
+  rigTweak?: RigTweakController;
 }) {
   const inspector = useWorkspaceInspector();
+  const mode = useSyncExternalStore(
+    rigTweak?.subscribe ?? subscribeNoRigTweak,
+    rigTweak?.getSnapshot ?? emptyRigTweakSnapshot,
+  );
+  const tweaking = mode.mode === 'rig-tweak';
   const interpolationOptions = AUTHORED_INTERPOLATION_MODES.map((mode) => (
     <option key={mode} value={mode}>
       {interpolationLabel(mode)}
@@ -38,12 +48,30 @@ export function AnimationEditorView({
   return (
     <>
       <ViewHeader view="animation" />
-
-      <section className="animation-command-bar" aria-label="Animation session">
-        <label>
+      <section className={`animation-command-bar ${tweaking ? 'rig-tweak-active' : ''}`} aria-label="Animation session">
+        {rigTweak && (
+          <label className="editor-mode-control">
+            <span className="editor-sr-only">Editor Mode</span>
+            <select
+              id="editor-mode"
+              value={mode.mode}
+              disabled={!mode.ready}
+              title={tweaking ? 'Editing rig data · Playback paused' : 'Editor Mode'}
+              onChange={(event) => {
+                const next = event.target.value === 'rig-tweak' ? 'rig-tweak' : 'animation';
+                rigTweak.setMode(next);
+                if (next === 'rig-tweak' && inspector.narrow && !inspector.open) inspector.toggleOpen();
+              }}
+            >
+              <option value="animation">Animation</option>
+              <option value="rig-tweak">Rig Tweak</option>
+            </select>
+          </label>
+        )}
+        <label inert={tweaking}>
           Animation <select id="animation-selection"></select>
         </label>
-        <div className="animation-history">
+        <div className="animation-history" inert={tweaking}>
           <button
             id="animation-undo"
             className="editor-icon-button"
@@ -67,7 +95,7 @@ export function AnimationEditorView({
             <span className="editor-sr-only">Redo</span>
           </button>
         </div>
-        <details id="animation-clip-settings" className="animation-menu" data-workspace-menu>
+        <details id="animation-clip-settings" className="animation-menu" data-workspace-menu inert={tweaking}>
           <summary>Clip settings</summary>
           <div className="animation-menu-content animation-clip-panel">
             <div className="animation-settings" aria-label="Authored animation settings">
@@ -109,17 +137,19 @@ export function AnimationEditorView({
             <p id="animation-session-status"></p>
           </div>
         </details>
-        <EditorMenu id="animation-authoring-tools" label="Tools">
-          <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
-            Retime selected keys…
-          </button>
-          <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
-            Mirror tools…
-          </button>
-          <button id="animation-bake-open" type="button" data-open-panel="animation-bake-panel">
-            Bake IK…
-          </button>
-        </EditorMenu>
+        <div className="animation-authoring-tools" inert={tweaking}>
+          <EditorMenu id="animation-authoring-tools" label="Tools">
+            <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
+              Retime selected keys…
+            </button>
+            <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
+              Mirror tools…
+            </button>
+            <button id="animation-bake-open" type="button" data-open-panel="animation-bake-panel">
+              Bake IK…
+            </button>
+          </EditorMenu>
+        </div>
         <EditorMenu id="animation-view-menu" label="View">
           <button id="animation-reset-layout" type="button">
             Reset layout
@@ -128,7 +158,7 @@ export function AnimationEditorView({
             Editor help…
           </button>
         </EditorMenu>
-        <button id="animation-tools-open" type="button" aria-haspopup="dialog">
+        <button id="animation-tools-open" type="button" aria-haspopup="dialog" inert={tweaking}>
           File tools
         </button>
         <button
@@ -141,10 +171,12 @@ export function AnimationEditorView({
         >
           Inspector
         </button>
-        <MirrorToolsPanel controller={mirrorTools} />
-        <IKBakePanel controller={ikBake} />
-        <KeyframeRetimingPanel controller={retiming} />
-        <div className="animation-save">
+        <div className="animation-authoring-tools" inert={tweaking}>
+          <MirrorToolsPanel controller={mirrorTools} />
+          <IKBakePanel controller={ikBake} />
+          <KeyframeRetimingPanel controller={retiming} />
+        </div>
+        <div className="animation-save" inert={tweaking}>
           <span id="animation-dirty" role="status"></span>
           <button
             id="animation-download"
@@ -156,6 +188,17 @@ export function AnimationEditorView({
           <small>Saves an exported file</small>
         </div>
         <div className="animation-feedback">
+          {rigTweak && (
+            <span id="rig-session-dirty" role="status">
+              Rig: {mode.rigDirty ? 'Modified' : 'Clean'}
+            </span>
+          )}
+          {tweaking && (
+            <span id="editor-mode-status" role="status">
+              Editing rig data · Playback paused
+            </span>
+          )}
+
           <p id="animation-status" role="status">
             Loading character…
           </p>
@@ -232,65 +275,68 @@ export function AnimationEditorView({
               Close
             </button>
           </div>
-          <details className="animation-bone-list" open>
-            <summary>Bones</summary>
-            <div id="animation-bones" aria-label="Bone hierarchy"></div>
-          </details>
-          <IKInspectorPanel controller={ikInspector} />
-          <section id="animation-bone-inspector" aria-label="Bone keyframing">
-            <h2 id="animation-bone-title">Select a bone</h2>
-            <p id="animation-bone-empty">Select a bone in the preview or hierarchy to edit its properties.</p>
-            <fieldset id="animation-bone-fields" aria-label="Animated local transform"></fieldset>
-            <button id="animation-cancel-transform" type="button">
-              Cancel edits
-            </button>
-            <p className="animation-field-help">
-              Yellow fields are temporary. Click ◇ to set a key; ◆ updates an existing key. Use ⋯ to delete a key.
-            </p>
-          </section>
-          <section id="animation-event-inspector" aria-label="Selected animation event" hidden>
-            <h3>Event</h3>
-            <label>
-              Time (seconds) <input id="animation-event-time" type="number" min="0" step="any" />
-            </label>
-            <label>
-              Name <input id="animation-event-name" type="text" required />
-            </label>
-            <div id="animation-event-payload">
+          {rigTweak && <RigTweakPanel active={tweaking} />}
+          <div hidden={tweaking} inert={tweaking}>
+            <details className="animation-bone-list" open>
+              <summary>Bones</summary>
+              <div id="animation-bones" aria-label="Bone hierarchy"></div>
+            </details>
+            <IKInspectorPanel controller={ikInspector} />
+            <section id="animation-bone-inspector" aria-label="Bone keyframing">
+              <h2 id="animation-bone-title">Select a bone</h2>
+              <p id="animation-bone-empty">Select a bone in the preview or hierarchy to edit its properties.</p>
+              <fieldset id="animation-bone-fields" aria-label="Animated local transform"></fieldset>
+              <button id="animation-cancel-transform" type="button">
+                Cancel edits
+              </button>
+              <p className="animation-field-help">
+                Yellow fields are temporary. Click ◇ to set a key; ◆ updates an existing key. Use ⋯ to delete a key.
+              </p>
+            </section>
+            <section id="animation-event-inspector" aria-label="Selected animation event" hidden>
+              <h3>Event</h3>
               <label>
-                Data (JSON; blank removes data){' '}
-                <textarea
-                  id="animation-event-data"
-                  rows={4}
-                  spellCheck="false"
-                  aria-describedby="animation-event-help animation-event-error"
-                ></textarea>
+                Time (seconds) <input id="animation-event-time" type="number" min="0" step="any" />
               </label>
-            </div>
-            <p id="animation-event-help">
-              Commit on blur or Enter. JSON uses Ctrl/Cmd+Enter. Escape resets the field drafts.
-            </p>
-            <p id="animation-event-error" role="alert"></p>
-            <button id="animation-delete-event" type="button" aria-keyshortcuts="Delete Backspace">
-              Delete Event
-            </button>
-          </section>
+              <label>
+                Name <input id="animation-event-name" type="text" required />
+              </label>
+              <div id="animation-event-payload">
+                <label>
+                  Data (JSON; blank removes data){' '}
+                  <textarea
+                    id="animation-event-data"
+                    rows={4}
+                    spellCheck="false"
+                    aria-describedby="animation-event-help animation-event-error"
+                  ></textarea>
+                </label>
+              </div>
+              <p id="animation-event-help">
+                Commit on blur or Enter. JSON uses Ctrl/Cmd+Enter. Escape resets the field drafts.
+              </p>
+              <p id="animation-event-error" role="alert"></p>
+              <button id="animation-delete-event" type="button" aria-keyshortcuts="Delete Backspace">
+                Delete Event
+              </button>
+            </section>
 
-          {artwork && <ArtworkPanel controller={artwork} />}
-          <details className="animation-key-details">
-            <summary>Key details</summary>
-            <div className="timeline-interpolation">
-              <label>
-                Selected key interpolation{' '}
-                <select id="timeline-interpolation" aria-describedby="timeline-interpolation-help" disabled>
-                  <option value="">—</option>
-                  {interpolationOptions}
-                </select>
-              </label>
-              <span id="timeline-interpolation-help">Select a key to inspect its outgoing interpolation.</span>
-              <span className="timeline-interpolation-legend">◆ Linear outgoing segment · ◇ No outgoing segment</span>
-            </div>
-          </details>
+            {artwork && <ArtworkPanel controller={artwork} />}
+            <details className="animation-key-details">
+              <summary>Key details</summary>
+              <div className="timeline-interpolation">
+                <label>
+                  Selected key interpolation{' '}
+                  <select id="timeline-interpolation" aria-describedby="timeline-interpolation-help" disabled>
+                    <option value="">—</option>
+                    {interpolationOptions}
+                  </select>
+                </label>
+                <span id="timeline-interpolation-help">Select a key to inspect its outgoing interpolation.</span>
+                <span className="timeline-interpolation-legend">◆ Linear outgoing segment · ◇ No outgoing segment</span>
+              </div>
+            </details>
+          </div>
         </aside>
         <div
           id="animation-workspace-divider"
@@ -303,7 +349,7 @@ export function AnimationEditorView({
           aria-valuenow={52}
           title="Drag to resize. Up/Down adjusts; Home/End selects the limits."
         ></div>
-        <section className="timeline-panel" aria-label="Animation timeline">
+        <section className="timeline-panel" aria-label="Animation timeline" inert={tweaking}>
           <div className="timeline-toolbar" aria-label="Playback and timing">
             <h2>Timeline</h2>
             <div className="timeline-control-group" role="group" aria-label="Playback">
@@ -397,8 +443,13 @@ export function AnimationEditorView({
                 ] as const
               ).map(([setting, label]) => (
                 <label key={setting}>
-                  <input id={`timeline-snap-${setting}`} type="checkbox" defaultChecked={setting !== 'enabled'} />
-                  {label}
+                  <input
+                    id={`timeline-snap-${setting}`}
+                    type="checkbox"
+                    aria-label={label}
+                    defaultChecked={setting !== 'enabled'}
+                  />
+                  {setting === 'enabled' ? 'Snap' : setting === 'keyframes' ? 'Keys' : label}
                 </label>
               ))}
             </fieldset>

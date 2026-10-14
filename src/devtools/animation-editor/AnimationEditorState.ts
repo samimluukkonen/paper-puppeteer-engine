@@ -82,6 +82,8 @@ export type { EventDrag } from './AnimationEditorEventCommands.js';
 export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 export type { AnimationExportResult } from './animationSerialization.js';
 
+export type EditorMode = 'animation' | 'rig-tweak';
+
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
   private readonly document: AnimationEditorDocument;
@@ -105,12 +107,9 @@ export class AnimationEditorState {
   private animationSessions = 0;
   private symmetry: BoneSymmetryMapping | null;
   private symmetryIssues: readonly BoneSymmetryIssue[] = Object.freeze([]);
+  private mode: EditorMode = 'animation';
 
-  constructor(
-    readonly rig?: Rig,
-    animations: readonly AnimationClip[] = [],
-    options: AnimationEditorStateOptions = {},
-  ) {
+  constructor(rig?: Rig, animations: readonly AnimationClip[] = [], options: AnimationEditorStateOptions = {}) {
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
@@ -176,6 +175,40 @@ export class AnimationEditorState {
 
   private get working(): ReadonlyAnimation | null {
     return this.document.workingAnimation;
+  }
+
+  get rig(): Rig | undefined {
+    return this.document.rig;
+  }
+  get editorMode(): EditorMode {
+    return this.mode;
+  }
+  get animationAuthoringEnabled(): boolean {
+    return this.mode === 'animation';
+  }
+
+  setEditorMode(mode: EditorMode): void {
+    if (mode === this.mode) return;
+    this.batchNotifications(() => {
+      const heldTime = this.currentTimeMilliseconds;
+      this.cancelTimelineDrag();
+      this.cancelTransformEdit();
+      this.cancelIKEdit();
+      this.pause();
+      this.endScrub();
+      this.mode = mode;
+      this.updateTimeMilliseconds(heldTime);
+      this.notify();
+    });
+  }
+
+  /** Same-topology rig edits invalidate sampling, without installing animation snapshots. */
+  updatePreviewRig(rig: Rig): void {
+    if (rig === this.rig) return;
+    this.document.rig = rig;
+    this.selection.updateRig(rig);
+    this.symmetry = createBoneSymmetryMapping(rig, { manualPairs: this.symmetry?.pairs ?? [] }).mapping;
+    this.notify();
   }
 
   /** Rig-session preferences survive animation changes and stay outside authored data and history. */
@@ -257,30 +290,39 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.ik.cancelIKEdit());
   }
   beginIKEdit(): void {
+    if (!this.animationAuthoringEnabled) return;
     return this.batchNotifications(() => this.ik.beginIKEdit());
   }
   setTemporaryIKProperty(property: IKAnimationProperty, value: number): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.setTemporaryIKProperty(property, value));
   }
   commitIKProperty(property: IKAnimationProperty): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.commitIKProperty(property));
   }
   setIKPropertyKeyframe(id: string, property: IKAnimationProperty, value: number, time = this.currentTime): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.setIKPropertyKeyframe(id, property, value, time));
   }
   deleteIKPropertyKey(property: IKAnimationProperty): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.deleteIKPropertyKey(property));
   }
   removeIKPropertyKeyframe(id: string, property: IKAnimationProperty, time = this.currentTime): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.removeIKPropertyKeyframe(id, property, time));
   }
   deleteSelectedIKKeyframe(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.deleteSelectedIKKeyframe());
   }
   moveSelectedIKKeyframe(time: Seconds): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.moveSelectedIKKeyframe(time));
   }
   nudgeSelectedIKKeyframe(direction: -1 | 1, large = false): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.nudgeSelectedIKKeyframe(direction, large));
   }
   get ikTargetDrag() {
@@ -296,18 +338,22 @@ export class AnimationEditorState {
     this.batchNotifications(() => this.ik.setIKManipulationDisabledReason(id, reason));
   }
   beginIKTargetDrag(id: string): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.beginIKTargetDrag(id));
   }
   previewIKTargetDrag(point: Point): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.previewIKTargetDrag(point));
   }
   endIKTargetDrag(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.endIKTargetDrag());
   }
   cancelIKTargetDrag(): boolean {
     return this.batchNotifications(() => this.ik.cancelIKTargetDrag());
   }
   commitIKTarget(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.ik.commitIKTarget());
   }
   get selectedBoneId(): string | null {
@@ -342,18 +388,23 @@ export class AnimationEditorState {
     });
   }
   addAnimationEvent(event: DeepReadonly<AnimationEvent>): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.addAnimationEvent(event));
   }
   updateAnimationEvent(ref: AnimationEventRef, event: DeepReadonly<AnimationEvent>): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.updateAnimationEvent(ref, event));
   }
   removeAnimationEvent(ref: AnimationEventRef): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.removeAnimationEvent(ref));
   }
   createAnimationEvent(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.createAnimationEvent());
   }
   deleteSelectedEvent(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.deleteSelectedEvent());
   }
   get timelineClipboard() {
@@ -366,9 +417,11 @@ export class AnimationEditorState {
     return this.events.copySelectedEvent();
   }
   pasteEvent(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.pasteEvent());
   }
   duplicateSelectedEvent(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.duplicateSelectedEvent());
   }
   copyTimelineSelection(): boolean {
@@ -384,27 +437,33 @@ export class AnimationEditorState {
     return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
   }
   setSelectedEventDataJson(text: string): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.setSelectedEventDataJson(text));
   }
   get eventDrag(): EventDrag | null {
     return this.events.eventDrag;
   }
   beginEventDrag(ref: AnimationEventRef): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.beginEventDrag(ref));
   }
   previewEventDrag(time: Seconds, disableSnapping = false): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.previewEventDrag(time, disableSnapping));
   }
   commitEventDrag(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.commitEventDrag());
   }
   cancelEventDrag(): boolean {
     return this.batchNotifications(() => this.events.cancelEventDrag());
   }
   moveSelectedEvent(time: Seconds): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.moveSelectedEvent(time));
   }
   nudgeSelectedEvent(direction: -1 | 1, large = false): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
@@ -425,10 +484,12 @@ export class AnimationEditorState {
     return this.keyframes.copySelectedKeyframes();
   }
   pasteKeyframes(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     if (this.selectedIKConstraintId) return false;
     return this.batchNotifications(() => this.keyframes.pasteKeyframes());
   }
   duplicateSelectedKeyframes(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     if (this.selectedIKConstraintId) return false;
     return this.batchNotifications(() => this.keyframes.duplicateSelectedKeyframes());
   }
@@ -473,24 +534,29 @@ export class AnimationEditorState {
     });
   }
   beginKeyframeDrag(key: KeyframeSelection): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       this.cancelEventDrag();
       return this.keyframes.beginKeyframeDrag(key);
     });
   }
   previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.previewKeyframeDrag(time, disableSnapping));
   }
   commitKeyframeDrag(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.commitKeyframeDrag());
   }
   cancelKeyframeDrag(): boolean {
     return this.batchNotifications(() => this.keyframes.cancelKeyframeDrag());
   }
   moveSelectedKeyframe(time: Seconds): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.moveSelectedKeyframe(time));
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.nudgeSelectedKeyframe(direction, large));
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
@@ -512,17 +578,20 @@ export class AnimationEditorState {
   }
   /** The toolbar and keyboard share the same typed selection dispatch. */
   deleteTimelineSelection(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     if (this.selectedEvent) return this.deleteSelectedEvent();
     if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
     return this.deleteSelectedKeyframes();
   }
 
   deleteSelectedKeyframes(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
     return this.batchNotifications(() => this.keyframes.deleteSelectedKeyframes());
   }
   /** Compatibility alias: deletion operates on the whole selection. */
   deleteSelectedKeyframe(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.deleteSelectedKeyframes();
   }
   /** Previous/next authored key on the selected property, relative to the current playhead. */
@@ -591,12 +660,14 @@ export class AnimationEditorState {
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
+    if (!this.animationAuthoringEnabled) return;
     return this.batchNotifications(() => {
       this.cancelTimelineDrag();
       if (this.selection.boneId && this.working) this.pause();
     });
   }
   setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       if (!this.selection.boneId || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
         return false;
@@ -608,6 +679,7 @@ export class AnimationEditorState {
     });
   }
   commitBoneProperty(property: TransformProperty): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       if (!this.selection.boneId || !transformProperties.includes(property)) return false;
       this.beginTransformEdit();
@@ -616,6 +688,7 @@ export class AnimationEditorState {
     });
   }
   deleteBonePropertyKey(property: TransformProperty): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       if (!this.selection.boneId || !transformProperties.includes(property)) return false;
       this.beginTransformEdit();
@@ -713,6 +786,7 @@ export class AnimationEditorState {
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       const selected = this.document.selectAnimation(id, options);
       if (selected) {
@@ -752,10 +826,12 @@ export class AnimationEditorState {
 
   /** Authored metadata edits share the session's atomic notification boundary. */
   setAuthoredFPS(fps: number): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.playbackCommands.setAuthoredFPS(fps));
   }
 
   setAuthoredPlaybackMode(mode: AnimationPlaybackMode['mode']): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.playbackCommands.setAuthoredPlaybackMode(mode));
   }
 
@@ -773,6 +849,7 @@ export class AnimationEditorState {
 
   /** Clip-level declaration only; undefined restores the implicit linear default. */
   setAuthoredInterpolation(mode: Interpolation | undefined): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       if (!this.working || !this.rig) return false;
       try {
@@ -787,6 +864,7 @@ export class AnimationEditorState {
 
   /** The current format has no per-key overrides; unavailable edits preserve all session state. */
   setSelectedKeyframeInterpolation(mode: Interpolation): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     if (!this.working) return false;
     try {
       setInterpolationForKeys(this.working, this.selectedKeys, mode);
@@ -803,17 +881,20 @@ export class AnimationEditorState {
     value: number,
     timeSeconds = this.currentTime,
   ): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.setBonePropertyKeyframe(boneId, property, value, timeSeconds));
   }
 
   /** Explicit authored mirror command; defaults to the selected bone or all mapped sources. */
   mirrorCurrentPoseToKeys(direction: MirrorDirection, options: MirrorCurrentPoseOptions = {}): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() =>
       this.symmetry ? this.keyframes.mirrorCurrentPoseToKeys(this.symmetry, direction, options) : false,
     );
   }
 
   mirrorSelectedKeyframes(direction: MirrorDirection): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() =>
       this.symmetry ? this.keyframes.mirrorSelectedKeyframes(this.symmetry, direction) : false,
     );
@@ -824,10 +905,12 @@ export class AnimationEditorState {
   }
 
   retimeSelectedKeyframes(options: RetimeOptions): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.retimeSelectedKeyframes(options));
   }
 
   removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.removeBonePropertyKeyframe(boneId, property, timeSeconds));
   }
 
@@ -890,6 +973,7 @@ export class AnimationEditorState {
 
   /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
   beginScrub(): void {
+    if (!this.animationAuthoringEnabled) return;
     return this.batchNotifications(() => {
       this.cancelTimelineDrag();
       this.playbackController.beginScrub();
@@ -901,6 +985,7 @@ export class AnimationEditorState {
   }
 
   play(): void {
+    if (!this.animationAuthoringEnabled) return;
     this.playbackController.play();
   }
 
@@ -909,15 +994,18 @@ export class AnimationEditorState {
   }
 
   togglePlayback(): void {
+    if (!this.animationAuthoringEnabled) return;
     this.playbackController.togglePlayback();
   }
 
   restart(): void {
+    if (!this.animationAuthoringEnabled) return;
     this.playbackController.restart();
   }
 
   /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
   advancePlayback(deltaSeconds: Seconds): void {
+    if (!this.animationAuthoringEnabled) return;
     this.playbackController.advancePlayback(deltaSeconds);
   }
 
@@ -928,6 +1016,7 @@ export class AnimationEditorState {
 
   /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */
   replaceWorkingAnimation(input: unknown): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       if (!this.working) return false;
       const next = this.document.inspect(input);
@@ -941,6 +1030,7 @@ export class AnimationEditorState {
 
   /** Commit a validated full-clip IK proposal as one authored history operation. */
   commitIKBake(plan: IKBakePlan): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       if (!this.working || !this.rig) return false;
       const result = commitIKBake(this.working, plan, this.rig);
@@ -966,6 +1056,7 @@ export class AnimationEditorState {
     retainDraft = false,
     selectedKeys?: readonly KeyframeSelection[],
   ): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     this.cancelTimelineDrag();
     if (!this.document.install(next)) {
       this.notify();
@@ -1001,6 +1092,7 @@ export class AnimationEditorState {
 
   /** Revert uses the current session's source, never a network reload or the last exported copy. */
   revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       const reverted = this.document.revertAnimation(options);
       if (reverted) this.resetAnimationSession(true);
@@ -1011,6 +1103,7 @@ export class AnimationEditorState {
 
   /** Validate before touching navigation; notify once with the complete fresh session and pose at zero. */
   importJson(json: string, options: AnimationImportOptions = {}): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       const imported = this.document.importJson(json, options);
       if (imported) {
@@ -1046,9 +1139,11 @@ export class AnimationEditorState {
   }
 
   undo(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.restoreHistory(() => this.document.undo()));
   }
   redo(): boolean {
+    if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.restoreHistory(() => this.document.redo()));
   }
   private restoreHistory(restore: () => boolean): boolean {

@@ -23,7 +23,13 @@ export class TimelineKeyboardController {
     window.addEventListener(
       'keydown',
       (event) => {
-        if (event.defaultPrevented || event.isComposing || isTypingTarget(event.target) || !this.state.workingAnimation)
+        if (
+          !this.state.animationAuthoringEnabled ||
+          event.defaultPrevented ||
+          event.isComposing ||
+          isTypingTarget(event.target) ||
+          !this.state.workingAnimation
+        )
           return;
         if (isDialogTarget(event.target)) return;
         // Body/canvas focus supports playback; controls outside this editor own their shortcuts.
@@ -160,6 +166,7 @@ export class TimelineKeyboardController {
       'keydown',
       (event) => {
         if (
+          !this.state.animationAuthoringEnabled ||
           !this.state.workingAnimation ||
           event.defaultPrevented ||
           event.isComposing ||
@@ -191,6 +198,7 @@ export class TimelineKeyboardController {
       'keydown',
       (event) => {
         if (
+          !this.state.animationAuthoringEnabled ||
           !this.state.workingAnimation ||
           event.defaultPrevented ||
           event.isComposing ||

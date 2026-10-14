@@ -16,6 +16,7 @@ import { IKInspectorController } from './IKInspectorController.js';
 import { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
+import { RigTweakController } from './RigTweakController.js';
 import { TimelineController } from './TimelineController.js';
 import './style.css';
 
@@ -25,6 +26,7 @@ app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
 const artwork = new ArtworkController();
+const rigTweak = new RigTweakController();
 const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const ikBake = new IKBakeController(
@@ -38,13 +40,16 @@ const editorView = (
     ikBake={ikBake}
     retiming={retiming}
     artwork={artwork}
+    rigTweak={rigTweak}
   />
 );
 const unmount = mountView(app, editorView, (app) => {
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
-  const releaseNavigationGuard = protectUnsavedChanges(() => timeline.hasUnsavedChanges || artwork.hasUnsavedChanges);
+  const releaseNavigationGuard = protectUnsavedChanges(
+    () => timeline.hasUnsavedChanges || rigTweak.hasUnsavedChanges || artwork.hasUnsavedChanges,
+  );
   const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
     app.querySelector<HTMLElement>('#animation-draft-status')!,
     app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
@@ -53,6 +58,7 @@ const unmount = mountView(app, editorView, (app) => {
   let releaseWorkspaceSelection: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
     (state, id) => {
+      rigTweak.bind(state, editorScene.rigEditor!);
       editorScene.fitPreview();
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
       ikBake.bind(state);
@@ -65,7 +71,14 @@ const unmount = mountView(app, editorView, (app) => {
       let selectedBone = state.selectedBoneId;
       let selectedEvent = state.selectedEvent;
       let selectedKeys = state.selectedKeys;
+      let authoringMode = state.editorMode;
       releaseWorkspaceSelection = state.subscribe(() => {
+        if (state.editorMode !== authoringMode) {
+          authoringMode = state.editorMode;
+          mirrorTools.hidePreview();
+          ikBake.hidePreview();
+          for (const panel of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]')) panel.open = false;
+        }
         if (
           (state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK) ||
           (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
@@ -81,6 +94,7 @@ const unmount = mountView(app, editorView, (app) => {
       recovery.bind(state, id);
     },
     (message) => {
+      rigTweak.unbind();
       releaseWorkspaceSelection?.();
       releaseWorkspaceSelection = undefined;
       recovery.unbind();
@@ -96,7 +110,9 @@ const unmount = mountView(app, editorView, (app) => {
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
     },
     artwork,
+    () => rigTweak.refresh(),
   );
+  rigTweak.initialize(app, () => editorScene);
   scene = editorScene;
   const previewControls = new AbortController();
   app.querySelector<HTMLSelectElement>('#animation-facing')!.addEventListener(
@@ -143,6 +159,7 @@ const unmount = mountView(app, editorView, (app) => {
 
   return () => {
     recovery.dispose();
+    rigTweak.dispose();
     releaseWorkspaceSelection?.();
     mirrorTools.dispose();
     ikBake.dispose();

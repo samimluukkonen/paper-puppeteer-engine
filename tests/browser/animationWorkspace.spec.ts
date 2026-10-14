@@ -8,6 +8,7 @@ async function openEditor(page: Page): Promise<void> {
 }
 
 test('desktop authoring fits the viewport and event selection leaves the ruler in place', async ({ page }) => {
+  test.setTimeout(60000);
   for (const [width, height] of [
     [1000, 768],
     [1280, 800],
@@ -16,6 +17,24 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
   ]) {
     await page.setViewportSize({ width: width!, height: height! });
     await openEditor(page);
+    const mode = page.getByRole('combobox', { name: 'Editor Mode', exact: true });
+    const modeBox = (await mode.boundingBox())!;
+    const animationBox = (await page.locator('#animation-selection').boundingBox())!;
+    expect(modeBox.y).toBe(animationBox.y);
+    const commandBar = page.locator('.animation-command-bar');
+    const toolbarHeight = (await commandBar.boundingBox())!.height;
+    // Compare against the same workspace without the new controls: mode selection must cost no extra row.
+    await page.locator('.editor-mode-control').evaluate((element) => {
+      (element as HTMLElement).style.display = 'none';
+    });
+    expect(toolbarHeight).toBe((await commandBar.boundingBox())!.height);
+    await page.locator('.editor-mode-control').evaluate((element) => {
+      (element as HTMLElement).style.removeProperty('display');
+    });
+    await mode.selectOption('rig-tweak');
+    expect((await commandBar.boundingBox())!.height).toBe(toolbarHeight);
+    await expect(page.locator('#animation-inspector-toggle')).not.toHaveAttribute('inert');
+    await mode.selectOption('animation');
     for (const selector of ['#animation-selection', '#animation-undo', '#animation-download', '#timeline-ruler']) {
       const box = (await page.locator(selector).boundingBox())!;
       expect(box.y).toBeGreaterThanOrEqual(0);

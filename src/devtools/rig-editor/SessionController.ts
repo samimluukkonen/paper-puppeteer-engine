@@ -13,6 +13,7 @@ export function createSessionController(
   getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
   onStateChange: (editor: RigEditor) => void = () => {},
   inputLimits: JsonWorkloadLimitOptions = {},
+  presentation: { stageSelector?: string; dirtyLabel?: string } = {},
 ) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
@@ -29,8 +30,14 @@ export function createSessionController(
     editor = current;
     onStateChange(current);
     const isDirty = current.state.dirty;
-    dirty.textContent = isDirty ? 'Unsaved changes *' : 'No changes';
-    app.querySelector('#editor-stage')!.classList.toggle('grid-active', current.state.gridSnap !== 0);
+    dirty.textContent = presentation.dirtyLabel
+      ? `${presentation.dirtyLabel}: ${isDirty ? 'Modified' : 'Clean'}`
+      : isDirty
+        ? 'Unsaved changes *'
+        : 'No changes';
+    app
+      .querySelector(presentation.stageSelector ?? '#editor-stage')!
+      .classList.toggle('grid-active', current.state.gridSnap !== 0);
     const issues = current.state.validationIssues();
     const validationStatus = current.state.validationPending
       ? 'Pending'

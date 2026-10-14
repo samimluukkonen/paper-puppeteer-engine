@@ -6,6 +6,7 @@ import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
+import { rigDraftKey } from '../shared/rigDraftSession.js';
 import { createControlsController } from './ControlsController.js';
 import { createHierarchyController } from './HierarchyController.js';
 import { createInspectorController } from './InspectorController.js';
@@ -35,7 +36,7 @@ export function initializeRigEditor(app: HTMLElement, artwork?: ArtworkControlle
         recoveryEditor = editor;
         recovery.bind(
           {
-            key: JSON.stringify([globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename]),
+            key: rigDraftKey(globalThis.location?.pathname ?? '', selectedCharacterId(), scene.rigFilename),
             source: draftSource({ name: editor.state.name, rig: editor.state.workingCopy }),
             label: 'rig',
             snapshot: () => editor.state.recoverySnapshot,

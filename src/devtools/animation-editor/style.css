@@ -1048,7 +1048,7 @@ a {
   color: #243e31;
 }
 .timeline-toolbar {
-  gap: 8px;
+  gap: 6px;
 }
 .timeline-control-group {
   display: flex;
@@ -1062,7 +1062,7 @@ a {
   padding-right: 0;
 }
 .timeline-track-controls {
-  gap: 8px;
+  gap: 6px;
 }
 .timeline-time-control input {
   width: 68px;
@@ -1215,15 +1215,24 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  border: 1px solid #39574b40;
-  border-radius: 5px;
-  padding: 4px 8px 6px;
+  gap: 6px;
+  border: 0;
+  padding: 0;
   margin: 0;
+  font-size: 11px;
 }
 .timeline-snapping legend {
-  font-size: 11px;
-  text-transform: uppercase;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.timeline-snapping input {
+  min-height: 0;
+  width: 12px;
+  height: 12px;
+  margin: 0;
 }
 .timeline-snapping label {
   display: inline-flex;
@@ -1285,4 +1294,51 @@ a {
   padding: 4px 8px;
   text-align: left;
   font-variant-numeric: tabular-nums;
+}
+/* Mode selection shares the command row; it never reserves workspace height. */
+.editor-mode-control {
+  flex: 0 0 auto;
+}
+#editor-mode {
+  width: 108px;
+}
+.animation-authoring-tools {
+  display: contents;
+}
+.animation-command-bar.rig-tweak-active {
+  box-shadow: inset 3px 0 0 #b7543a;
+}
+.rig-tweak-active #editor-mode {
+  border-color: #b7543a;
+  color: #8f412e;
+}
+.animation-command-bar.rig-tweak-active [inert] :is(button, select, summary),
+.animation-command-bar.rig-tweak-active :is(button, select, summary)[inert],
+.animation-command-bar.rig-tweak-active .animation-save[inert] #animation-download {
+  color: #92988f;
+  background: #eeede7;
+  border-color: #d7dbd0;
+  opacity: 1;
+  cursor: not-allowed;
+}
+.rig-tweak-panel {
+  padding: 8px;
+}
+.rig-tweak-panel label {
+  display: block;
+  margin: 6px 0;
+}
+.rig-tweak-panel .action-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.rig-tweak-panel input[type="number"] {
+  width: 90px;
+}
+.rig-tweak-panel [role="tree"] {
+  display: grid;
+  max-height: 220px;
+  overflow: auto;
 }

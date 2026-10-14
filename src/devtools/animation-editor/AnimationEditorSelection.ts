@@ -179,7 +179,14 @@ export class AnimationEditorSelection {
     this.expandTimeline('selected');
   }
 
-  constructor(private readonly rig: Rig | undefined) {}
+  constructor(private rig: Rig | undefined) {}
+
+  updateRig(rig: Rig): void {
+    this.rig = rig;
+    this.rowsDirty = true;
+    this.visibilityInputs = undefined;
+    this.visibilityResult = undefined;
+  }
 
   private boneTarget: { readonly kind: 'bone'; readonly boneId: string } | null = null;
   get target() {

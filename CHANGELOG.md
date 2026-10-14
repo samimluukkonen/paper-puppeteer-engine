@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.8-3
+
+The v0.5.8.3 [Animation Editor Rig-Tweak Mode](docs/animation-rig-tweak.md) adds explicit Animation/Rig Tweak authoring modes at a preserved, paused playhead. The existing Rig Editor supplies joint, artwork offset/origin, slot, hierarchy, inspector, validation, history and file tools. One rig working copy projects updated bind data through detached animation sampling and existing runtime IK; animation keys and history remain unchanged. Separate rig/animation statuses, export/revert paths, navigation protection and shared source-bound browser rig drafts keep ownership clear across editor routes. Same-topology rig imports retain animation sessions; topology/artwork replacement belongs to the Rig Editor. Package version is `0.5.8-3`.
+
 ## 0.5.8-2
 
 The v0.5.8.2 [visual artwork alignment](docs/visual-artwork-alignment.md) separates joint, artwork offset, sprite origin and slot transform canvas operations and keyboard nudges. The React inspector shows current image dimensions, pixel/normalized pivots, joint references and artwork transform settings, with undoable offset/origin reset and origin centering. Phaser draws selected bounds and joint/pivot guides; artwork drag proposals remain render-only until one release commit. Escape and lifecycle interruptions cancel gestures while preserving redo. Facing and existing animation bone pose/time previews stay outside authored data; animation keys, IK keys, events and timing are untouched. Artwork offsets/origins serialize at full precision. Unit and local Chrome regressions cover transforms, replacement dimensions, history and export/reload. Package version is `0.5.8-2`.

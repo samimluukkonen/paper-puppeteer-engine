@@ -31,6 +31,8 @@ export class RigEditor {
     state?: RigEditorState,
     ikChains: readonly TwoBoneIKDefinition[] = [],
     readonly previewClips: readonly CompiledClip[] = [],
+    /** Embedded editors supply the evaluated animation/IK pose after rig projection. */
+    private readonly evaluateContext?: () => void,
   ) {
     this.state = state ?? new RigEditorState(puppet.rig);
     // Authored definitions own same-name preview chains, including their endpoint offsets.
@@ -39,9 +41,9 @@ export class RigEditor {
 
   enable(): void {
     if (this.overlay) return;
-    this.puppet.resetToBindPose().setFacing(this.state.facing);
+    if (!this.evaluateContext) this.puppet.resetToBindPose().setFacing(this.state.facing);
     this.appliedRig = undefined;
-    for (const chain of this.ikChains) {
+    for (const chain of this.evaluateContext ? [] : this.ikChains) {
       let constraint = this.registeredIK.get(chain.name);
       if (!constraint) {
         constraint = this.puppet.rig.ik?.some((authored) => authored.name === chain.name)
@@ -65,7 +67,7 @@ export class RigEditor {
     this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
     // Activation must project retained edits before drawing or capturing IK targets.
     this.refresh(false);
-    if (this.state.ikPreview) {
+    if (this.state.ikPreview && !this.evaluateContext) {
       for (const chain of this.ikChains) {
         const constraint = this.puppet.getIK(chain.name);
         if (!constraint.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
@@ -93,6 +95,7 @@ export class RigEditor {
       this.applyRig(rig);
       this.appliedRig = rig;
     }
+    this.evaluateContext?.();
     this.applyArtworkGeometry();
     this.updateArtwork();
     this.overlay?.invalidate();

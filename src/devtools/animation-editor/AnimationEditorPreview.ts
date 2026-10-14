@@ -1,7 +1,9 @@
 import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { IKAnimationPose } from '../../engine/ik/AnimationIKPose.js';
+import { Joint } from '../../engine/Joint.js';
 import type { Puppet } from '../../engine/Puppet.js';
+import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { getCompiledPreviewClip } from './previewClip.js';
@@ -10,6 +12,8 @@ import { getCompiledPreviewClip } from './previewClip.js';
 export class AnimationEditorPreview {
   private disposed = false;
   private player: AnimationPlayer | undefined;
+  private rig: Rig | undefined;
+  private joints: Map<string, Joint> | undefined;
   private animation: ReadonlyAnimation | null | undefined;
   private sampledTime: number | undefined;
   private draft: Readonly<Partial<JointTransform>> | undefined;
@@ -26,9 +30,10 @@ export class AnimationEditorPreview {
     this.unsubscribe = state.subscribe(() => this.refresh());
   }
 
-  private refresh(): void {
+  refresh(force = false): void {
     if (this.disposed) return;
     const animation = this.state.workingAnimation;
+    const rig = this.state.rig ?? this.puppet.rig;
     const time = animation ? this.state.currentTimeMilliseconds : 0;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.
     const sampledTime =
@@ -39,6 +44,8 @@ export class AnimationEditorPreview {
     const ikDraft = this.state.ikTargetDraft;
     const ikId = this.state.selectedIKConstraintId;
     if (
+      !force &&
+      rig === this.rig &&
       animation === this.animation &&
       sampledTime === this.sampledTime &&
       draft === this.draft &&
@@ -46,15 +53,17 @@ export class AnimationEditorPreview {
       ikId === this.ikId
     )
       return;
-    if (animation !== this.animation) {
+    if (animation !== this.animation || rig !== this.rig) {
+      // Detached joints carry the current working bind pose. Runtime/source bind data stays immutable.
+      const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
       // Compile before replacing the held preview. No data or interpolation lives in the timeline UI.
       const next = animation
         ? new AnimationPlayer(
-            this.puppet.rig,
-            new Map(this.puppet.rig.bones.map((bone) => [bone.id, this.puppet.getBone(bone.id)])),
+            rig,
+            joints,
             // The editor clock owns wrapping; sampling must retain the exact stepped endpoint for scrubs.
             // Preview is pose-only, including initialization/recompilation at time-zero event markers.
-            [getCompiledPreviewClip(animation, this.puppet.rig)],
+            [getCompiledPreviewClip(animation, rig)],
           )
         : undefined;
       this.player?.dispose();
@@ -62,6 +71,8 @@ export class AnimationEditorPreview {
       this.puppet.preparePose();
       for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
       this.player = next;
+      this.rig = rig;
+      this.joints = joints;
       this.puppet.setIKAnimationSource(this.ikSource);
       this.animation = animation;
       if (next && animation) {
@@ -71,8 +82,9 @@ export class AnimationEditorPreview {
     }
     // Restore even untracked temporary properties before sampling. Drafts belong before presets/IK/rendering.
     this.puppet.preparePose();
-    for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
+    for (const joint of this.joints?.values() ?? []) joint.reset();
     this.player?.sample(time, { mode: 'playback' });
+    for (const joint of this.joints?.values() ?? []) Object.assign(this.puppet.getBone(joint.id).pose, joint.pose);
     if (this.state.selectedBoneId) Object.assign(this.puppet.getBone(this.state.selectedBoneId).pose, draft);
     // Overlay provisional channels without touching compiled clips, runtime targets or ownership.
     const pose = new Map(this.player?.ikAnimation);
@@ -99,6 +111,8 @@ export class AnimationEditorPreview {
     this.puppet.setIKAnimationSource(undefined);
     this.player?.dispose();
     this.player = undefined;
+    this.rig = undefined;
+    this.joints = undefined;
     this.animation = undefined;
     this.draft = undefined;
     this.ikDraft = undefined;
