@@ -13,6 +13,8 @@ import {
 } from '../src/devtools/shared/package/characterPackage.js';
 import { PackageController } from '../src/devtools/shared/package/PackageController.js';
 import { decodePackageZip, encodePackageZip, packagePath } from '../src/devtools/shared/package/packageZip.js';
+import { processPackageZip } from '../src/devtools/shared/package/packageZipTasks.js';
+import type { PackageZipProcessor } from '../src/devtools/shared/package/packageZipWorkerClient.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { type AnimationClip, commitIKBake, generateBakedBoneKeys, sampleIKBake } from '../src/engine/core.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -40,6 +42,18 @@ const png = new Uint8Array(
   readFileSync(new URL('../public/characters/demo-puppet/images/paper-head.png', import.meta.url)),
 );
 const fetchImage: typeof fetch = () => Promise.resolve(new Response(png));
+const zipProcessor: PackageZipProcessor = {
+  async encode(files, signal) {
+    signal.throwIfAborted();
+    const result = processPackageZip({ operation: 'encode', files });
+    if (result.operation !== 'encode') throw new Error('Unexpected test ZIP result.');
+    return result;
+  },
+  async decode(bytes, signal) {
+    signal.throwIfAborted();
+    return processPackageZip({ operation: 'decode', bytes }).files;
+  },
+};
 const manifest = {
   version: 1,
   id: 'test',
@@ -376,7 +390,7 @@ test('ZIP checksum, truncation, unsupported compression and traversal are reject
 
 test('package checkpoints cover each domain and delayed download cannot clean newer edits', async () => {
   let current = fixture();
-  const controller = new PackageController();
+  const controller = new PackageController(zipProcessor);
   controller.bind(() => current);
   assert.deepEqual(controller.getSnapshot().modified, []);
   const rig = new RigEditorState(new Rig(current.definition.rig, []), current.rig, {
@@ -420,7 +434,7 @@ test('package checkpoints cover each domain and delayed download cannot clean ne
 test('failed download and disposed in-flight requests cannot establish clean checkpoints', async () => {
   const source = fixture();
   source.rig.bones[0]!.x = 7;
-  const controller = new PackageController();
+  const controller = new PackageController(zipProcessor);
   controller.bind(() => source);
   vi.stubGlobal('fetch', fetchImage);
   vi.mocked(downloadBlob).mockImplementation(() => {
@@ -448,7 +462,7 @@ test('failed download and disposed in-flight requests cannot establish clean che
 test('throwing subscribers cannot interrupt package downloads or leave the controller busy', async () => {
   const source = fixture();
   source.rig.bones[0]!.x = 7;
-  const controller = new PackageController();
+  const controller = new PackageController(zipProcessor);
   controller.bind(() => source);
   const reporter = vi.fn();
   vi.stubGlobal('reportError', reporter);
@@ -471,6 +485,89 @@ test('throwing subscribers cannot interrupt package downloads or leave the contr
   assert.include(controller.getSnapshot().message, 'Invalid ZIP size');
   assert.equal(observer.mock.calls.length, reporter.mock.calls.length);
   assert.isTrue(reporter.mock.calls.every(([error]) => error === failure));
+  controller.dispose();
+});
+
+test('edits during ZIP processing remain modified after the captured archive finishes', async () => {
+  let source = fixture();
+  vi.stubGlobal('fetch', fetchImage);
+  let complete!: (result: Awaited<ReturnType<PackageZipProcessor['encode']>>) => void;
+  const encode = vi.fn<PackageZipProcessor['encode']>(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const controller = new PackageController({ ...zipProcessor, encode });
+  controller.bind(() => source);
+  const pending = controller.download();
+  await vi.waitFor(() => assert.equal(encode.mock.calls.length, 1));
+  assert.isTrue(controller.getSnapshot().busy);
+  source = { ...source, rig: { ...source.rig, bones: source.rig.bones.map((bone) => ({ ...bone, x: 42 })) } };
+  controller.refresh();
+  complete(await zipProcessor.encode(encode.mock.calls[0]![0], new AbortController().signal));
+  await pending;
+  assert.deepEqual(controller.getSnapshot().modified, ['Rig']);
+  assert.isFalse(controller.getSnapshot().busy);
+  assert.equal(vi.mocked(downloadBlob).mock.calls.length, 1);
+  controller.previewExport();
+  const definition = await loadPackageDefinition(controller.getSnapshot().preview!);
+  assert.isUndefined(definition.rig.bones[0]!.x);
+  controller.dispose();
+});
+
+test.each(['dispose', 'rebind'] as const)(
+  'ZIP completion after %s cannot download or install a stale checkpoint',
+  async (action) => {
+    const source = fixture();
+    vi.stubGlobal('fetch', fetchImage);
+    let complete!: (result: Awaited<ReturnType<PackageZipProcessor['encode']>>) => void;
+    const encode = vi.fn<PackageZipProcessor['encode']>(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const controller = new PackageController({ ...zipProcessor, encode });
+    controller.bind(() => source);
+    const pending = controller.download();
+    await vi.waitFor(() => assert.equal(encode.mock.calls.length, 1));
+    const [files, signal] = encode.mock.calls[0]!;
+    if (action === 'dispose') controller.dispose();
+    else {
+      const replacement = fixture();
+      replacement.rig.bones[0]!.x = 99;
+      controller.bind(() => replacement);
+    }
+    const before = controller.getSnapshot();
+    assert.isTrue(signal.aborted);
+    complete(await zipProcessor.encode(files, new AbortController().signal));
+    await pending;
+    assert.strictEqual(controller.getSnapshot(), before);
+    assert.equal(vi.mocked(downloadBlob).mock.calls.length, 0);
+    assert.isNull(controller.getSnapshot().preview);
+    controller.dispose();
+  },
+);
+
+test('canceling a ZIP import prevents a delayed decoded archive from opening a preview', async () => {
+  const files = await buildCharacterPackage(fixture(), fetchImage);
+  let complete!: (result: Awaited<ReturnType<PackageZipProcessor['decode']>>) => void;
+  const decode = vi.fn<PackageZipProcessor['decode']>(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const controller = new PackageController({ ...zipProcessor, decode });
+  const pending = controller.importPreview(new File([encodePackageZip(files)], 'character.zip'));
+  await vi.waitFor(() => assert.equal(decode.mock.calls.length, 1));
+  controller.unbind();
+  assert.isTrue(decode.mock.calls[0]![1].aborted);
+  complete(files);
+  await pending;
+  assert.isFalse(controller.getSnapshot().busy);
+  assert.isNull(controller.getSnapshot().preview);
   controller.dispose();
 });
 
@@ -589,7 +686,7 @@ test('browser image validation rejects corrupt bodies and releases decode URLs b
 
 test('package skin and artwork checkpoints survive undo/revert and retain rig-animation separation', async () => {
   let source = fixture();
-  const controller = new PackageController();
+  const controller = new PackageController(zipProcessor);
   controller.bind(() => source);
   const original = source;
   source = { ...source, skins: source.skins.map((skin) => ({ ...skin, slots: {} })) };

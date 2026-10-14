@@ -10,6 +10,27 @@ for (const editor of ['rig', 'animation'] as const) {
     page,
   }) => {
     test.setTimeout(90_000);
+    await page.addInitScript(() => {
+      const stats = { started: 0, finished: 0, uiTicks: 0 };
+      Reflect.set(window, 'packageZipWorkerStats', stats);
+      const NativeWorker = window.Worker;
+      window.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          if (!String(url).includes('packageZip.worker')) return;
+          ++stats.started;
+          const timer = window.setInterval(() => ++stats.uiTicks, 0);
+          this.addEventListener(
+            'message',
+            () => {
+              window.clearInterval(timer);
+              ++stats.finished;
+            },
+            { once: true },
+          );
+        }
+      };
+    });
     await page.goto(`${editor}-editor/`);
     await expect(page.locator(editor === 'rig' ? '#validation' : '#animation-status')).toHaveText('Validation: OK');
     const packages = page.locator('.package-tools');
@@ -90,5 +111,11 @@ for (const editor of ['rig', 'animation'] as const) {
     await expect(packages).toContainText('Invalid ZIP size');
     await expect(joint).toHaveValue('77');
     await expect(artwork.getByLabel('Artwork changes')).toHaveText('1 pending artwork change(s)');
+    const workerStats = await page.evaluate(
+      () => Reflect.get(window, 'packageZipWorkerStats') as { started: number; finished: number; uiTicks: number },
+    );
+    expect(workerStats.started).toBe(3);
+    expect(workerStats.finished).toBe(3);
+    expect(workerStats.uiTicks).toBeGreaterThan(0);
   });
 }

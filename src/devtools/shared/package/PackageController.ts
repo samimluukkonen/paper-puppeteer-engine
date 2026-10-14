@@ -8,13 +8,16 @@ import {
   type PackageSnapshot,
   validatePackage,
 } from './characterPackage.js';
-import { decodePackageZip, encodePackageZip, PACKAGE_MAX_BYTES } from './packageZip.js';
+import { PACKAGE_MAX_BYTES } from './packageZip.js';
+import { type PackageZipProcessor, packageZipWorker } from './packageZipWorkerClient.js';
 
 export type PackageDomains = Readonly<Record<'Rig' | 'Skins' | 'Animations' | 'Assets', string>>;
 const clean: PackageDomains = { Rig: '', Skins: '', Animations: '', Assets: '' };
 
 /** Independent package checkpoints never mark source files or individual editor documents saved. */
 export class PackageController {
+  constructor(private readonly zip: PackageZipProcessor = packageZipWorker) {}
+
   private source: (() => PackageSnapshot) | undefined;
   private baseline: PackageDomains = clean;
   private domains: PackageDomains = clean;
@@ -46,6 +49,7 @@ export class PackageController {
   }
   bind(source: () => PackageSnapshot): void {
     this.request?.abort();
+    this.request = undefined;
     this.source = source;
     const current = source();
     this.baseline = this.fingerprint({
@@ -130,11 +134,10 @@ export class PackageController {
       const checkpoint = this.fingerprint(captured);
       const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]);
       const files = await buildCharacterPackage(captured, fetch, signal);
-      const zip = encodePackageZip(files);
-      const exportedFiles = decodePackageZip(zip);
-      request.signal.throwIfAborted();
+      const { bytes, files: exportedFiles } = await this.zip.encode(files, signal);
+      signal.throwIfAborted();
       downloadBlob(
-        new Blob([zip], { type: 'application/zip' }),
+        new Blob([bytes], { type: 'application/zip' }),
         `${captured.definition.id.replace(/[^a-zA-Z0-9_-]/g, '_')}.zip`,
       );
       this.lastFiles = exportedFiles;
@@ -167,9 +170,10 @@ export class PackageController {
     this.publish({ busy: true, message: 'Validating imported package…' });
     try {
       if (file.size > PACKAGE_MAX_BYTES) throw new Error('Package exceeds 100 MiB.');
-      const files = decodePackageZip(new Uint8Array(await file.arrayBuffer()));
-      await validatePackage(files, request.signal);
-      request.signal.throwIfAborted();
+      const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]);
+      const files = await this.zip.decode(new Uint8Array(await file.arrayBuffer()), signal);
+      await validatePackage(files, signal);
+      signal.throwIfAborted();
       this.publish({
         preview: files,
         message: 'Imported package validated. Runtime preview leaves your authored session intact.',
