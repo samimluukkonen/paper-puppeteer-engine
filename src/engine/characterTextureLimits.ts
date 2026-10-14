@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { IMAGE_HEADER_BYTES, inspectImageHeader } from './imageHeader.js';
 import { validateInputLimit } from './jsonInput.js';
 
 export const DEFAULT_CHARACTER_TEXTURE_LIMITS = Object.freeze({
@@ -11,8 +12,12 @@ export const DEFAULT_CHARACTER_TEXTURE_LIMITS = Object.freeze({
 
 type TextureLimits = { [Key in keyof typeof DEFAULT_CHARACTER_TEXTURE_LIMITS]: number };
 export interface CharacterTextureLimitOptions extends Partial<TextureLimits> {
-  /** Require a PNG header before browser decoding. Defaults to true; disable only for trusted artwork. */
+  /** Require an allowed image header before decoding (PNG, plus WebP when allowWebp is true).
+   * Defaults to true; disable only for trusted artwork.
+   */
   requirePng?: boolean;
+  /** Allow static WebP alongside PNG, with header dimension checks before decoding. Defaults to false. */
+  allowWebp?: boolean;
 }
 
 export class CharacterTextureLimitError extends Error {
@@ -33,6 +38,7 @@ export function getCharacterTextureLimitError(file: Phaser.Loader.File): Charact
 export class CharacterTextureBudget {
   private readonly limits: TextureLimits;
   private readonly requirePng: boolean;
+  private readonly allowWebp: boolean;
   private readonly bytes = new Map<string, number>();
   private readonly pixels = new Map<string, number>();
   private totalBytes = 0;
@@ -42,6 +48,9 @@ export class CharacterTextureBudget {
     if (options.requirePng !== undefined && typeof options.requirePng !== 'boolean')
       throw new Error('requirePng must be a boolean.');
     this.requirePng = options.requirePng ?? true;
+    if (options.allowWebp !== undefined && typeof options.allowWebp !== 'boolean')
+      throw new Error('allowWebp must be a boolean.');
+    this.allowWebp = options.allowWebp ?? false;
     this.limits = Object.fromEntries(
       Object.entries(DEFAULT_CHARACTER_TEXTURE_LIMITS).map(([name, fallback]) => [
         name,
@@ -93,7 +102,7 @@ export class CharacterTextureBudget {
       if (/;base64$/i.test(url.slice(0, comma))) {
         const base64 = decodeURIComponent(encoded).replace(/\s/g, '');
         this.countBytes(key, Math.floor(base64.replace(/=+$/, '').length * 0.75));
-        const prefix = atob(base64.slice(0, 32));
+        const prefix = atob(base64.slice(0, Math.ceil(IMAGE_HEADER_BYTES / 3) * 4));
         this.checkImageHeader(
           key,
           Uint8Array.from(prefix, (character) => character.charCodeAt(0)),
@@ -101,7 +110,7 @@ export class CharacterTextureBudget {
       } else {
         this.countBytes(key, new TextEncoder().encode(encoded.replace(/%[\da-f]{2}/gi, 'x')).byteLength);
         const header: number[] = [];
-        for (let index = 0; index < encoded.length && header.length < 24; index++) {
+        for (let index = 0; index < encoded.length && header.length < IMAGE_HEADER_BYTES; index++) {
           const hex = encoded.slice(index + 1, index + 3);
           if (encoded[index] === '%' && /^[\da-f]{2}$/i.test(hex)) {
             header.push(parseInt(hex, 16));
@@ -117,16 +126,20 @@ export class CharacterTextureBudget {
   }
 
   private checkImageHeader(key: string, bytes: Uint8Array): void {
-    const signature = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82];
-    if (bytes.length < 24 || !signature.every((value, index) => bytes[index] === value)) {
+    let header: ReturnType<typeof inspectImageHeader>;
+    try {
+      header = inspectImageHeader(bytes, this.allowWebp);
+    } catch (error) {
+      throw new CharacterTextureLimitError(`Image "${key}" has an invalid header: ${String(error)}`, { cause: error });
+    }
+    if (!header || (header.format === 'image/webp' && !this.allowWebp)) {
       if (this.requirePng)
         throw new CharacterTextureLimitError(
-          `Image "${key}" must have a PNG header before decoding. Set requirePng to false only for trusted artwork.`,
+          `Image "${key}" must have a ${this.allowWebp ? 'PNG or static WebP' : 'PNG'} header before decoding. Set requirePng to false only for trusted artwork.`,
         );
       return;
     }
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    this.countPixels(key, view.getUint32(16), view.getUint32(20));
+    this.countPixels(key, header.width, header.height);
   }
 
   /** Guard only this helper's files; unrelated assets keep the host loader's own behavior. */
@@ -220,7 +233,7 @@ export class CharacterTextureBudget {
       // Require a recognizable header before browser decoding unless the host
       // explicitly trusts alternative image formats.
       void response
-        .slice(0, 24)
+        .slice(0, IMAGE_HEADER_BYTES)
         .arrayBuffer()
         .then(
           (buffer) => {

@@ -5,6 +5,46 @@ import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.j
 import { characterManifestSchema, rigFileSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
+test('static WebP replacement exports and reloads with guarded runtime image loading', async ({ page }) => {
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  const artwork = page.locator('#artwork-panel');
+  await artwork.locator(':scope > summary').click();
+  await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
+  const encoded = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 80;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#ff00ff';
+    context.fillRect(6, 2, 20, 76);
+    return canvas.toDataURL('image/webp').split(',')[1]!;
+  });
+  await artwork.getByLabel('Import sprite').setInputFiles({
+    name: 'forearm.webp',
+    mimeType: 'image/webp',
+    buffer: Buffer.from(encoded, 'base64'),
+  });
+  await artwork.getByLabel('Alignment policy').selectOption('pixels');
+  await artwork.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
+  await artwork.getByRole('button', { name: 'Apply Replacement', exact: true }).click();
+  const packages = page.locator('.package-tools');
+  await packages.locator(':scope > summary').click();
+  const waiting = page.waitForEvent('download');
+  await packages.getByRole('button', { name: 'Download character ZIP', exact: true }).click();
+  const download = await waiting;
+  const path = await download.path();
+  if (!path) throw new Error('Missing ZIP download');
+  const files = decodePackageZip(await readFile(path));
+  const manifest = characterManifestSchema.parse(packageJson(files, 'character.json'));
+  expect(manifest.textures['paper-left-forearm']).toMatch(/\.webp$/);
+  expect(Buffer.from(files.get(manifest.textures['paper-left-forearm']!)!)).toEqual(Buffer.from(encoded, 'base64'));
+  await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Package runtime preview' });
+  await expect(dialog).toContainText('runtime playback ready');
+  await dialog.getByRole('button', { name: 'Close preview' }).click();
+});
+
 for (const editor of ['rig', 'animation'] as const) {
   test(`${editor} artwork and elbow edits export a complete ZIP and reload in production Puppet playback`, async ({
     page,

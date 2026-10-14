@@ -2,6 +2,7 @@ import type { AnimationClip } from '../../../engine/AnimationClip.js';
 import type { CharacterDefinition, CharacterManifest } from '../../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../../engine/CharacterLoader.js';
 import type { RigJsonDefinition } from '../../../engine/externalData.js';
+import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
 import type { DeepReadonly } from '../../../engine/readonlyData.js';
 import type { SkinDefinition, SpriteDefinition, SpriteAttachmentDefinition } from '../../../engine/types.js';
@@ -87,7 +88,7 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
     const bytes = files.get(path);
     if (!bytes) throw new Error(`Missing image "${path}" for texture "${key}".`);
     if (bytes.length > PACKAGE_MAX_FILE_BYTES) throw new Error(`Image "${path}" exceeds 10 MiB.`);
-    const header = inspectSpriteHeader(bytes.subarray(0, 30));
+    const header = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
     images.set(path, { bytes, format: header.format });
     imageBytes += bytes.length;
     pixels += header.width * header.height;
@@ -241,7 +242,7 @@ export async function buildCharacterPackage(
       throw new Error(`Replacement target "${reference}" now uses another texture. Revert that artwork replacement.`);
     if (sprite.frame !== undefined && sprite.frame !== '__BASE')
       throw new Error(`Cannot replace frame "${sprite.frame}" in ${reference}. Resolve it before export.`);
-    const header = inspectSpriteHeader(textures.get(replacement.assetKey)!.subarray(0, 30));
+    const header = inspectSpriteHeader(textures.get(replacement.assetKey)!.subarray(0, IMAGE_HEADER_BYTES));
     migrateOrigin(sprite, replacement, header.width, header.height);
     sprite.texture = replacement.assetKey;
     delete sprite.frame;
@@ -304,7 +305,7 @@ export async function openPackageRuntime(
     const manifest = structuredClone(source.manifest!) as CharacterManifest;
     for (const [key, path] of Object.entries(manifest.textures)) {
       const bytes = files.get(path)!;
-      const { format } = inspectSpriteHeader(bytes.subarray(0, 30));
+      const { format } = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
       const url = URL.createObjectURL(new Blob([bytes], { type: format }));
       urls.push(url);
       manifest.textures[key] = url;

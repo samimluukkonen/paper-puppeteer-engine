@@ -22,6 +22,34 @@ function png(width: number, height: number): Blob {
   return new Blob([bytes]);
 }
 
+function webp(width = 2, height = 3, chunk: 'VP8X' | 'VP8L' | 'VP8 ' = 'VP8X'): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(30);
+  bytes.set(new TextEncoder().encode('RIFF'), 0);
+  bytes.set(new TextEncoder().encode('WEBP'), 8);
+  bytes.set(new TextEncoder().encode(chunk), 12);
+  const view = new DataView(bytes.buffer);
+  if (chunk === 'VP8X') {
+    view.setUint32(16, 10, true);
+    bytes[24] = (width - 1) & 255;
+    bytes[25] = ((width - 1) >> 8) & 255;
+    bytes[26] = ((width - 1) >> 16) & 255;
+    bytes[27] = (height - 1) & 255;
+    bytes[28] = ((height - 1) >> 8) & 255;
+    bytes[29] = ((height - 1) >> 16) & 255;
+  } else if (chunk === 'VP8L') {
+    bytes[20] = 0x2f;
+    bytes[21] = (width - 1) & 255;
+    bytes[22] = (((width - 1) >> 8) & 63) | (((height - 1) & 3) << 6);
+    bytes[23] = ((height - 1) >> 2) & 255;
+    bytes[24] = ((height - 1) >> 10) & 15;
+  } else {
+    bytes.set([0x9d, 1, 0x2a], 23);
+    view.setUint16(26, width, true);
+    view.setUint16(28, height, true);
+  }
+  return bytes;
+}
+
 function fixture(options: CharacterTextureLimitOptions = {}) {
   const budget = new CharacterTextureBudget(options);
   let active = true;
@@ -175,6 +203,7 @@ test.each([
   { label: 'JPEG', bytes: [255, 216, 255, 224, 0, 16] },
   { label: 'GIF', bytes: [...new TextEncoder().encode('GIF89a')] },
   { label: 'WebP', bytes: [...new TextEncoder().encode('RIFF0000WEBP')] },
+  { label: 'valid static WebP without allowWebp', bytes: [...webp()] },
   {
     label: 'SVG with a PNG MIME type',
     bytes: [...new TextEncoder().encode('<svg width="90000" height="90000"></svg>')],
@@ -212,6 +241,93 @@ test('trusted alternative formats explicitly opt out while retaining decoded pix
     assert.equal(image.processError.mock.calls.length, oversized ? 1 : 0);
     if (oversized) assert.match(getCharacterTextureLimitError(image.file)!.message, /10-pixel limit/);
   }
+});
+
+test('trusted WebP keeps the existing opt-out when guarded WebP is not enabled', async () => {
+  const f = fixture({ requirePng: false });
+  const image = f.image();
+  const animated = webp();
+  animated[20] = 2;
+  image.xhr.response = new Blob([animated]);
+  image.load();
+  await vi.waitFor(() => assert.equal(image.complete.mock.calls.length, 1));
+  assert.equal(image.decode.mock.calls.length, 1);
+});
+
+test.each(['VP8X', 'VP8L', 'VP8 '] as const)('allowWebp validates %s headers before decoding', async (chunk) => {
+  const f = fixture({ allowWebp: true, maxImagePixels: 10 });
+  const image = f.image();
+  image.xhr.response = new Blob([webp(2, 3, chunk)]);
+  image.load();
+  await vi.waitFor(() => assert.equal(image.complete.mock.calls.length, 1));
+  assert.equal(image.decode.mock.calls.length, 1);
+
+  const oversized = f.image('oversized');
+  oversized.xhr.response = new Blob([webp(4, 3, chunk)]);
+  oversized.load();
+  await vi.waitFor(() => assert.equal(oversized.processError.mock.calls.length, 1));
+  assert.equal(oversized.decode.mock.calls.length, 0);
+  assert.match(getCharacterTextureLimitError(oversized.file)!.message, /10-pixel limit/);
+});
+
+test('allowWebp enforces cumulative pixels before decoding and never counts a header twice', async () => {
+  const f = fixture({ allowWebp: true, maxTotalImagePixels: 12 });
+  for (const key of ['first', 'second']) {
+    const image = f.image(key);
+    image.xhr.response = new Blob([webp()]);
+    image.load();
+    await vi.waitFor(() => assert.equal(image.complete.mock.calls.length, 1));
+  }
+  const third = f.image('third');
+  third.xhr.response = new Blob([webp()]);
+  third.load();
+  await vi.waitFor(() => assert.equal(third.processError.mock.calls.length, 1));
+  assert.equal(third.decode.mock.calls.length, 0);
+  assert.match(getCharacterTextureLimitError(third.file)!.message, /12-pixel total limit/);
+});
+
+test('allowWebp rejects animated, malformed, truncated and unsupported headers before decoding', async () => {
+  const animated = webp();
+  animated[20] = 2;
+  const malformed = webp();
+  new DataView(malformed.buffer).setUint32(16, 9, true);
+  for (const bytes of [animated, malformed, webp().subarray(0, 29), new TextEncoder().encode('GIF89a')]) {
+    const f = fixture({ allowWebp: true });
+    const image = f.image();
+    image.xhr.response = new Blob([bytes]);
+    image.load();
+    await vi.waitFor(() => assert.equal(image.processError.mock.calls.length, 1));
+    assert.equal(image.decode.mock.calls.length, 0);
+    assert.equal(image.complete.mock.calls.length, 0);
+  }
+});
+
+test('allowWebp guards both base64 and percent-encoded inline dimensions before queueing', () => {
+  for (const chunk of ['VP8X', 'VP8L', 'VP8 '] as const) {
+    const bytes = webp(4, 3, chunk);
+    const base64 = Buffer.from(bytes).toString('base64');
+    const percent = Array.from(bytes, (byte) => `%${byte.toString(16).padStart(2, '0')}`).join('');
+    for (const url of [`data:image/webp;base64,${base64}`, `data:image/webp,${percent}`]) {
+      const { budget } = fixture({ allowWebp: true, maxImagePixels: 10 });
+      assert.throws(() => budget.checkInlineImage('body', url), /10-pixel limit/);
+    }
+  }
+});
+
+test('allowWebp never permits uninspectable responses to bypass the pre-decode policy', () => {
+  const f = fixture({ allowWebp: true });
+  const image = f.image();
+  image.file.xhrLoader = null;
+  image.file.onProcess();
+  assert.equal(image.decode.mock.calls.length, 0);
+  assert.equal(image.processError.mock.calls.length, 1);
+});
+
+test.each(['yes', 0, null])('invalid allowWebp value %s is rejected', (allowWebp) => {
+  assert.throws(
+    () => new CharacterTextureBudget({ allowWebp } as unknown as CharacterTextureLimitOptions),
+    /allowWebp must be a boolean/,
+  );
 });
 
 test.each(['yes', 0, null])('invalid requirePng value %s is rejected', (requirePng) => {

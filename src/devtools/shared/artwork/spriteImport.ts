@@ -1,4 +1,5 @@
 import { DEFAULT_CHARACTER_TEXTURE_LIMITS as limits } from '../../../engine/characterTextureLimits.js';
+import { IMAGE_HEADER_BYTES, inspectImageHeader } from '../../../engine/imageHeader.js';
 
 export interface SpriteMetadata {
   readonly filename: string;
@@ -24,37 +25,10 @@ function checkDimensions(width: number, height: number): void {
 
 /** Inspect dimensions before allowing the browser to allocate decoded pixels. */
 export function inspectSpriteHeader(bytes: Uint8Array): Pick<SpriteMetadata, 'format' | 'width' | 'height'> {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const ascii = (start: number, length: number): string => String.fromCharCode(...bytes.slice(start, start + length));
-  let format: SpriteMetadata['format'];
-  let width: number;
-  let height: number;
-  if (
-    bytes.length >= 24 &&
-    [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82].every((value, index) => bytes[index] === value)
-  ) {
-    format = 'image/png';
-    width = view.getUint32(16);
-    height = view.getUint32(20);
-  } else if (bytes.length >= 30 && ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') {
-    format = 'image/webp';
-    const chunk = ascii(12, 4);
-    if (chunk === 'VP8X') {
-      if (view.getUint32(16, true) !== 10) throw new Error('Invalid WebP header. Export the sprite again.');
-      width = 1 + bytes[24]! + (bytes[25]! << 8) + (bytes[26]! << 16);
-      height = 1 + bytes[27]! + (bytes[28]! << 8) + (bytes[29]! << 16);
-    } else if (chunk === 'VP8L' && bytes[20] === 0x2f) {
-      width = 1 + bytes[21]! + ((bytes[22]! & 0x3f) << 8);
-      height = 1 + (bytes[22]! >> 6) + (bytes[23]! << 2) + ((bytes[24]! & 0x0f) << 10);
-    } else if (chunk === 'VP8 ' && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
-      width = view.getUint16(26, true) & 0x3fff;
-      height = view.getUint16(28, true) & 0x3fff;
-    } else throw new Error('Invalid or unsupported WebP header. Export a static PNG or WebP sprite.');
-    if (chunk === 'VP8X' && bytes[20]! & 0x02)
-      throw new Error('Animated WebP is not supported. Export a static sprite.');
-  } else throw new Error('This file is not a valid PNG or WebP image. Export the sprite as PNG or static WebP.');
-  checkDimensions(width, height);
-  return { format, width, height };
+  const header = inspectImageHeader(bytes);
+  if (!header) throw new Error('This file is not a valid PNG or WebP image. Export the sprite as PNG or static WebP.');
+  checkDimensions(header.width, header.height);
+  return header;
 }
 
 /** One decoded image serves the HTML comparison and Phaser; disposal also releases its object URL. */
@@ -64,7 +38,7 @@ export async function importSprite(file: File, signal: AbortSignal): Promise<Imp
   if (file.size > limits.maxImageBytes) throw new Error('The sprite exceeds 10 MiB. Export a smaller PNG or WebP.');
   if (!/\.(png|webp)$/i.test(file.name) || (file.type && !['image/png', 'image/webp'].includes(file.type)))
     throw new Error('Choose a PNG (.png) or static WebP (.webp) image.');
-  const header = inspectSpriteHeader(new Uint8Array(await file.slice(0, 30).arrayBuffer()));
+  const header = inspectSpriteHeader(new Uint8Array(await file.slice(0, IMAGE_HEADER_BYTES).arrayBuffer()));
   signal.throwIfAborted();
   if (
     (file.type && file.type !== header.format) ||

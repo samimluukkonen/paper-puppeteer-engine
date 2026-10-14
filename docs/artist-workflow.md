@@ -40,14 +40,14 @@ Edits and binary replacements do not automatically travel between the Rig Editor
 6. Reopen a saved editor ZIP using **Import ZIP for runtime preview**. This validates it before opening the preview. Invalid/interrupted imports retain the existing authored editor session. The importer accepts the UTF-8 stored ZIP subset emitted by this editor; re-compressed, encrypted, ZIP64 and general third-party archives are unsupported. Standard ZIP tools can extract exported archives.
 7. Extract the ZIP into a character directory in your application's public/served assets, then load its `character.json`. This file placement and any source-control commit are manual. Paths inside the ZIP start at `character.json`; the downloaded filename supplies the character name.
 
-Existing relative metadata/image paths are retained when possible. A shared replacement keeps its texture key and image path when the extension matches; switching PNG/WebP generates a matching image path. Individual overrides get distinct deterministic texture keys/image paths while bone/attachment/slot/skin identities remain unchanged. Generated clip, skin and image filenames receive numeric suffixes when they collide after sanitization or case folding. Conflicts between existing manifest paths still block export. Pixel-preserving pivots serialize into ordinary normalized origins; pivots outside 0..1 use an equivalent artwork offset, including attachment rotation/scale, to preserve rendering without extending the format.
+Existing relative metadata/image paths are retained when possible. A shared replacement keeps its texture key and image path when the extension matches and no other texture key uses that path. Replacing an aliased source image or switching PNG/WebP generates a distinct matching image path. Individual overrides get distinct deterministic texture keys/image paths while bone/attachment/slot/skin identities remain unchanged. Generated clip, skin and image filenames receive numeric suffixes when they collide after sanitization or case folding. Conflicts between existing manifest paths still block export. Pixel-preserving pivots serialize into ordinary normalized origins; pivots outside 0..1 use an equivalent artwork offset, including attachment rotation/scale, to preserve rendering without extending the format.
 
 ```ts
 import { CharacterLoader, Puppet, queueCharacterTextures } from 'paper-puppeteer-engine';
 
 const definition = await CharacterLoader.load('/characters/my-puppet/character.json');
 // In your Phaser scene, queue artwork before creating the puppet:
-const release = queueCharacterTextures(scene, definition, { requirePng: false });
+const release = queueCharacterTextures(scene, definition, { allowWebp: true });
 scene.load.once('complete', () => {
   release();
   const puppet = new Puppet(scene, { definition, x: 400, y: 500 });
@@ -56,7 +56,7 @@ scene.load.once('complete', () => {
 scene.load.start();
 ```
 
-Use `requirePng: false` when the package contains WebP. Runtime texture-key uniqueness across characters remains the host application's responsibility. Scene hosts should follow the cancelable loading pattern in the development guide for shutdown/error handling. Runtime facing is a host option; the package retains authored transforms and animation/mirroring results, not editor-only facing, camera, onion, mirror or IK preview settings. Add preview-only IK chains to the authored rig if production clips need them.
+Use `allowWebp: true` when the package contains static WebP. PNG and WebP dimensions are checked before decoding; animated WebP and other formats remain rejected. Runtime texture-key uniqueness across characters remains the host application's responsibility. Scene hosts should follow the cancelable loading pattern in the development guide for shutdown/error handling. Runtime facing is a host option; the package retains authored transforms and animation/mirroring results, not editor-only facing, camera, onion, mirror or IK preview settings. Add preview-only IK chains to the authored rig if production clips need them.
 
 ## Checkpoints and losing a session
 

@@ -96,9 +96,9 @@ Character image files use XHR even when the host prefers HTML image element load
 is restored immediately for other assets. Inline data URLs receive byte checks before queueing.
 Guarded image loads require a PNG header by default (`requirePng: true`), including inline data URLs.
 The policy checks the actual bytes rather than the URL extension or MIME type, and rejects missing,
-truncated, or non-PNG headers before browser decoding. PNG dimensions receive checks at the same boundary.
+truncated, or non-PNG headers before browser decoding. PNG dimensions receive checks at the same boundary. Pass `allowWebp: true` to permit static WebP with the same pre-decode dimension and cumulative pixel checks. Animated, malformed and truncated WebP headers remain rejected, including inline data URLs.
 Every decoded image also receives dimension and cumulative pixel checks before entering Phaser's texture
-cache. For trusted JPEG, WebP, GIF, SVG, or other artwork, explicitly pass `requirePng: false` to
+cache. For trusted JPEG, GIF, SVG, animated WebP, or other artwork, explicitly pass `requirePng: false` to
 `queueCharacterTextures` or `loadSceneCharacter`; these formats can allocate decoding memory before
 the decoded-pixel checks run. Byte limits still apply. Already loaded host textures and atlases remain
 trusted overrides and do not consume this queue's budget.

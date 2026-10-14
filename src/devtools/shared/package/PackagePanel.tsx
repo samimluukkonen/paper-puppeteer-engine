@@ -20,7 +20,7 @@ class PackageRuntimeScene extends Phaser.Scene {
       this.puppet?.destroy();
       this.puppet = undefined;
     });
-    void loadSceneCharacter(this, 'local-package', { definition: this.definition, requirePng: false })
+    void loadSceneCharacter(this, 'local-package', { definition: this.definition, allowWebp: true })
       .then((definition) => {
         if (!definition) return;
         this.puppet = new Puppet(this, { definition, x: 380, y: 435 });
