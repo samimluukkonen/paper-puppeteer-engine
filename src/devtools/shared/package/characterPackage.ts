@@ -219,7 +219,14 @@ export async function buildCharacterPackage(
         key = `${replacement.assetKey}_replacement_${++serial}`;
       } while (Object.hasOwn(manifest.textures, key));
       manifest.textures[key] = allocatePath('images', key, extension);
-    } else if (!manifest.textures[key]!.toLowerCase().endsWith(extension)) {
+    } else if (
+      !manifest.textures[key]!.toLowerCase().endsWith(extension) ||
+      Object.entries(manifest.textures).some(
+        ([otherKey, path]) => otherKey !== key && path.toLowerCase() === manifest.textures[key]!.toLowerCase(),
+      )
+    ) {
+      // Texture keys can alias one source file. Replacing one key must not
+      // overwrite artwork still referenced by another key in the package.
       manifest.textures[key] = allocatePath('images', `${key}_replacement`, extension);
     }
     textures.set(key, new Uint8Array(await replacement.blob.arrayBuffer()));

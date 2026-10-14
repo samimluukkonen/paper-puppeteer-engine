@@ -42,6 +42,65 @@ const png = new Uint8Array(
   readFileSync(new URL('../public/characters/demo-puppet/images/paper-head.png', import.meta.url)),
 );
 const fetchImage: typeof fetch = () => Promise.resolve(new Response(png));
+
+test.each(['first', 'second'])('replacing aliased texture %s exports independent image files', async (assetKey) => {
+  const definition = CharacterDefinition.fromData(
+    {
+      manifest: {
+        version: 1,
+        id: 'aliased-artwork',
+        rig: 'rig.json',
+        defaultSkin: 'default',
+        skins: { default: 'skin.json' },
+        animations: [],
+        textures: { first: 'images/shared.png', second: 'images/shared.png' },
+      },
+      rig: {
+        version: 1,
+        root: 'root',
+        bones: [
+          { id: 'root', sprite: { texture: 'first' } },
+          { id: 'child', parent: 'root', sprite: { texture: 'second' } },
+        ],
+      },
+      skins: { 'skin.json': { version: 1, name: 'default', slots: {} } },
+    },
+    'https://source.invalid/character.json',
+  );
+  const replacement = new Uint8Array(
+    readFileSync(new URL('../public/characters/demo-puppet/images/paper-torso.png', import.meta.url)),
+  );
+  const files = decodePackageZip(
+    encodePackageZip(
+      await buildCharacterPackage(
+        {
+          definition,
+          rig: structuredClone(definition.rigFile!),
+          skins: definition.standaloneSkins,
+          animations: definition.animations,
+          replacements: [
+            {
+              assetKey,
+              reference: undefined,
+              blob: new Blob([replacement]),
+              format: 'image/png',
+              originScaleX: 1,
+              originScaleY: 1,
+            },
+          ],
+        },
+        fetchImage,
+      ),
+    ),
+  );
+  const exported = await validatePackage(files);
+  const otherKey = assetKey === 'first' ? 'second' : 'first';
+  assert.notEqual(exported.textures[assetKey], exported.textures[otherKey]);
+  assert.deepEqual(files.get(exported.textures[assetKey]!), replacement);
+  assert.equal(exported.textures[otherKey], 'images/shared.png');
+  assert.deepEqual(files.get('images/shared.png'), png);
+  assert.deepEqual(definition.textures, { first: 'images/shared.png', second: 'images/shared.png' });
+});
 const zipProcessor: PackageZipProcessor = {
   async encode(files, signal) {
     signal.throwIfAborted();
