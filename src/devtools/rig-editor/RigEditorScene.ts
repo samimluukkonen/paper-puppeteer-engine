@@ -10,6 +10,7 @@ import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
+import type { PackageSnapshot } from '../shared/package/characterPackage.js';
 import { RigEditor } from './RigEditor.js';
 import { RigEditorState } from './RigEditorState.js';
 
@@ -34,6 +35,23 @@ export class RigEditorScene extends Phaser.Scene {
 
   get sessionReplacementReason(): RigSessionReplacementReason {
     return this.replacementReason;
+  }
+
+  get hasPendingArtworkProposal(): boolean {
+    return this.artwork?.hasPendingProposal ?? false;
+  }
+
+  packageSnapshot(): PackageSnapshot {
+    const definition = this.definition;
+    const editor = this.editor;
+    if (!definition || !editor) throw new Error('No character is loaded.');
+    return {
+      definition,
+      rig: editor.state.recoveryDraft,
+      skins: editor.state.standaloneSkins,
+      animations: definition.animations,
+      replacements: this.artwork?.exportReplacements() ?? [],
+    };
   }
 
   get characterId(): string {

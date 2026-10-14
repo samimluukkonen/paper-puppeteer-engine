@@ -5,6 +5,7 @@ import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { PackageController } from '../shared/package/PackageController.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
@@ -26,6 +27,7 @@ if (!app) throw new Error('Missing animation editor host.');
 app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
+const packages = new PackageController();
 const artwork = new ArtworkController();
 const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
@@ -44,6 +46,7 @@ const editorView = (
     artwork={artwork}
     rigTweak={rigTweak}
     attachments={attachments}
+    packages={packages}
   />
 );
 const unmount = mountView(app, editorView, (app) => {
@@ -51,13 +54,15 @@ const unmount = mountView(app, editorView, (app) => {
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
   const releaseNavigationGuard = protectUnsavedChanges(
-    () => timeline.hasUnsavedChanges || rigTweak.hasUnsavedChanges || artwork.hasUnsavedChanges,
+    () => timeline.hasUnsavedChanges || rigTweak.hasUnsavedChanges || artwork.hasPendingChanges,
   );
   const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
     app.querySelector<HTMLElement>('#animation-draft-status')!,
     app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
   );
   const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
+  const releaseArtworkPackage = artwork.subscribe(packages.refresh);
+  let releaseAnimationPackage: (() => void) | undefined;
   let releaseWorkspaceSelection: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
     (state, id) => {
@@ -95,8 +100,14 @@ const unmount = mountView(app, editorView, (app) => {
         selectedKeys = state.selectedKeys;
       });
       recovery.bind(state, id);
+      packages.bind(() => editorScene.packageSnapshot());
+      releaseAnimationPackage?.();
+      releaseAnimationPackage = state.subscribe(packages.refresh);
     },
     (message) => {
+      packages.unbind();
+      releaseAnimationPackage?.();
+      releaseAnimationPackage = undefined;
       rigTweak.unbind();
       releaseWorkspaceSelection?.();
       releaseWorkspaceSelection = undefined;
@@ -113,7 +124,10 @@ const unmount = mountView(app, editorView, (app) => {
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
     },
     artwork,
-    () => rigTweak.refresh(),
+    () => {
+      rigTweak.refresh();
+      packages.refresh();
+    },
   );
   rigTweak.initialize(app, () => editorScene);
   scene = editorScene;
@@ -161,6 +175,9 @@ const unmount = mountView(app, editorView, (app) => {
   });
 
   return () => {
+    releaseArtworkPackage();
+    releaseAnimationPackage?.();
+    packages.dispose();
     recovery.dispose();
     rigTweak.dispose();
     releaseWorkspaceSelection?.();

@@ -7,6 +7,8 @@ preserve the active session and its undo history.
 
 Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
+Expand **Character package** above the command bar to download the complete validated character ZIP, including applied sprite replacements, and reload/import it into an isolated production runtime preview. Individual JSON downloads retain their existing checkpoints and file placement workflow. See the [complete artist and package workflow](artist-workflow.md).
+
 ## Workspace
 
 Animation selection, Undo/Redo, **Download JSON**, and save/validation status stay above the workspace. The preview and selection inspector share the upper area; the timeline spans the full width below. The canvas fits both dimensions of its host and frames the loaded artwork once, keeping the camera stable during playback and authoring.

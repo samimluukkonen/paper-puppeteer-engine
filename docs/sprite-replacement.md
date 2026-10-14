@@ -81,4 +81,6 @@ The production individual-replacement screenshot was visually inspected. A human
 
 For a human manual pass: load a character with several animations; replace the forearm with same-size artwork; play/scrub; replace it with different dimensions; inspect each pivot policy before Apply; switch skins; enable onion skinning and IK; revert both individual and shared scopes; undo/redo; replace again and inspect for cache artifacts. Automated checks are reported separately from human manual verification.
 
-Deferred functionality: atlas import/packing, bulk replacement, binary persistence/package export, source-file overwrite, automatic sprite generation, image painting, animation retargeting, mesh deformation and scene choreography.
+Complete binary exports are now available through the [production character package workflow](artist-workflow.md). Individual rig/animation JSON downloads continue to omit binary changes.
+
+Deferred functionality: atlas import/packing, bulk replacement, binary draft persistence, source-file overwrite, automatic sprite generation, image painting, animation retargeting, mesh deformation and scene choreography.

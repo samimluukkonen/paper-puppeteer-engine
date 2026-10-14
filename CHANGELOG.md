@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.8-6
+
+The v0.5.8.6 [production asset workflow](docs/artist-workflow.md) completes v0.5.8 with transactional character ZIP downloads in both editors. Existing manifest, rig, skin, animation and pose formats retain relative paths and stable IDs; binaries include shared/individual sprite replacements and exact origin/offset migration. Package checkpoints remain separate from source files and per-document history. ZIP validation rejects missing resources, unsafe/colliding paths, duplicate IDs, incompatible frames, unsupported versions and corrupt entries. Reload/import opens an isolated `CharacterLoader` → `Puppet` runtime preview with animations, skins and facing. Pending image proposals protect navigation and rig reload/import. Unit and local browser coverage exercise round trips, runtime motion, failures and repeated preview disposal. No new dependency or CI browser steps. Package version is `0.5.8-6`.
+
 ## 0.5.8-5
 
 The v0.5.8.5 [Safe Sprite Replacement & Hot Reload](docs/sprite-replacement.md) adds explicit shared/individual artwork scopes using stable bone and attachment IDs, dimension comparison and previewed normalized/pixel/manual pivot policies. Current catalog and frame preflight, transactional texture registration/installation/preview refresh and independent bounded artwork Undo/Redo preserve rig, skins, render order, facing, IK and animation data. Inactive textures are released after all retained previews refresh; undo resources remain session-local and recreate textures lazily. Unit motion regressions cover idle, walk, attack, IK, baked IK and mirrored playback; local browser scenarios cover both editors. Package version is `0.5.8-5`.

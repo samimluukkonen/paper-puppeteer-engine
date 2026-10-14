@@ -113,6 +113,12 @@ export class ArtworkController {
   get hasUnsavedChanges(): boolean {
     return this.applied.size > 0;
   }
+  get hasPendingChanges(): boolean {
+    return this.hasUnsavedChanges || this.hasPendingProposal;
+  }
+  get hasPendingProposal(): boolean {
+    return !!this.candidate || !!this.request;
+  }
   private get selectedIdentity(): string {
     return identity(this.snapshot.selectedKey ?? '', this.snapshot.selectedReference ?? undefined);
   }
@@ -130,6 +136,20 @@ export class ArtworkController {
       : target
         ? { url: target.url, filename: target.filename, imported: false }
         : undefined;
+  }
+
+  /** Detached metadata retains immutable blobs, never private texture keys or object URLs. */
+  exportReplacements() {
+    if (this.candidate || this.request)
+      throw new Error('Apply or cancel the artwork proposal before exporting a package.');
+    return [...this.applied.values()].map((entry) => ({
+      assetKey: entry.assetKey,
+      reference: entry.reference,
+      blob: entry.sprite.blob,
+      format: entry.sprite.format,
+      originScaleX: entry.originScaleX,
+      originScaleY: entry.originScaleY,
+    }));
   }
 
   private publish(update: Partial<ArtworkSnapshot>): void {

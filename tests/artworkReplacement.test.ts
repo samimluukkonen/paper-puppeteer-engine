@@ -944,3 +944,28 @@ test('failed refresh and rollback retain textures until successful recovery move
   f.controller.dispose();
   f.puppet.destroy();
 });
+
+test('package snapshots expose applied binaries without runtime keys and block unfinished proposals', async () => {
+  const { controller, puppet, next } = fixture();
+  const authored = JSON.stringify(puppet.rig);
+  await controller.import({} as File);
+  assert.isTrue(controller.hasPendingChanges);
+  assert.throws(() => controller.exportReplacements(), /Apply or cancel/);
+  controller.preview();
+  controller.apply();
+  const replacements = controller.exportReplacements();
+  assert.lengthOf(replacements, 1);
+  assert.strictEqual(replacements[0]!.blob, next.blob);
+  assert.equal(replacements[0]!.assetKey, 'shared');
+  assert.notInclude(JSON.stringify(replacements), '__paper_artwork_');
+  assert.notInclude(JSON.stringify(replacements), 'blob:');
+  replacements[0]!.originScaleX = 99;
+  assert.equal(controller.exportReplacements()[0]!.originScaleX, 1);
+  controller.revert();
+  assert.deepEqual(controller.exportReplacements(), []);
+  controller.undo();
+  assert.strictEqual(controller.exportReplacements()[0]!.blob, next.blob);
+  assert.equal(JSON.stringify(puppet.rig), authored);
+  controller.dispose();
+  assert.isFalse(controller.hasPendingChanges);
+});

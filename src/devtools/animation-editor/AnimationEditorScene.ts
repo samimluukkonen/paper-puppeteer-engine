@@ -14,6 +14,7 @@ import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
+import type { PackageSnapshot } from '../shared/package/characterPackage.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
@@ -33,6 +34,23 @@ export class AnimationEditorScene extends Phaser.Scene {
   private appliedWorkingRig: RigEditorState['workingCopy'] | undefined;
   private releaseMode: (() => void) | undefined;
   private rigMode = false;
+
+  get hasPendingArtworkProposal(): boolean {
+    return this.artwork?.hasPendingProposal ?? false;
+  }
+
+  packageSnapshot(): PackageSnapshot {
+    const definition = this.definition;
+    const editor = this.rigEditor;
+    if (!definition || !editor) throw new Error('No character is loaded.');
+    return {
+      definition,
+      rig: editor.state.recoveryDraft,
+      skins: editor.state.standaloneSkins,
+      animations: this.state?.packageAnimations() ?? definition.animations,
+      replacements: this.artwork?.exportReplacements() ?? [],
+    };
+  }
 
   get characterId(): string {
     return this.definition?.id ?? 'unknown';

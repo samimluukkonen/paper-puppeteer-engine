@@ -66,7 +66,12 @@ export class RigTweakController {
         this.publish();
       },
       {},
-      { stageSelector: '#animation-stage', dirtyLabel: 'Rig', sessionFormat: 'table' },
+      {
+        stageSelector: '#animation-stage',
+        dirtyLabel: 'Rig',
+        sessionFormat: 'table',
+        hasPendingChanges: () => getScene().hasPendingArtworkProposal,
+      },
     );
     const inspector = createInspectorController(app.querySelector<HTMLElement>('#inspector')!, session.updateStatus);
     const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#hierarchy')!);

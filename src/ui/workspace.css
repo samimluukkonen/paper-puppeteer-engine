@@ -362,3 +362,25 @@
 .workspace-inspector input[type="checkbox"] {
   min-height: 0;
 }
+
+.package-tools {
+  flex: 0 0 auto;
+  padding: 0.4rem 1rem;
+  border-bottom: 1px solid var(--workspace-border, #d8cfc2);
+  background: var(--workspace-panel, #faf6ee);
+}
+
+.package-tools > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.package-tools-content {
+  max-height: 30vh;
+  overflow: auto;
+  padding-bottom: 0.5rem;
+}
+
+.package-runtime-dialog {
+  width: min(900px, 92vw);
+}

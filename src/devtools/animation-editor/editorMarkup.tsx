@@ -5,6 +5,8 @@ import type { AttachmentController } from '../rig-editor/AttachmentController.js
 import { AttachmentPanel } from '../rig-editor/AttachmentPanel.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
+import type { PackageController } from '../shared/package/PackageController.js';
+import { PackagePanel } from '../shared/package/PackagePanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
@@ -29,6 +31,7 @@ export function AnimationEditorView({
   artwork,
   rigTweak,
   attachments,
+  packages,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
@@ -37,6 +40,7 @@ export function AnimationEditorView({
   artwork?: ArtworkController;
   rigTweak?: RigTweakController;
   attachments?: AttachmentController;
+  packages?: PackageController;
 }) {
   const inspector = useWorkspaceInspector();
   const mode = useSyncExternalStore(
@@ -52,6 +56,7 @@ export function AnimationEditorView({
   return (
     <>
       <ViewHeader view="animation" />
+      {packages && <PackagePanel controller={packages} />}
       <section className={`animation-command-bar ${tweaking ? 'rig-tweak-active' : ''}`} aria-label="Animation session">
         {rigTweak && (
           <label className="editor-mode-control">

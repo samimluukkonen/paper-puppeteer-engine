@@ -252,3 +252,32 @@ test('pixel-origin inspector edits use current image dimensions and share focus-
   assert.equal(input.reportValidity.mock.calls.length, 1);
   controller.dispose();
 });
+
+test('rig reload/import protects pending artwork proposals even when the rig is clean', async () => {
+  const query = stubRigEditorDom();
+  const current = editor();
+  const scene = { characterId: 'test', rigFilename: 'rig.json', reloadRig: vi.fn(), reloadOriginal: vi.fn() };
+  const confirm = vi.fn((_message: string) => false);
+  vi.stubGlobal('window', { confirm });
+  let proposal = true;
+  const controller = createSessionController(
+    query('#editor-app') as unknown as HTMLElement,
+    () => scene,
+    () => {},
+    {},
+    { hasPendingChanges: () => proposal },
+  );
+  controller.updateStatus(current.runtime);
+  await query('#reload-original').click();
+  assert.equal(scene.reloadOriginal.mock.calls.length, 0);
+  assert.include(confirm.mock.calls[0]?.[0] ?? '', 'artwork');
+  const json = JSON.stringify(current.state.exportRig(false));
+  query('#load-json').files = [{ name: 'rig.json', size: json.length, text: async () => json }];
+  await query('#load-json').dispatch('change');
+  await vi.waitFor(() => assert.equal(confirm.mock.calls.length, 2));
+  assert.equal(scene.reloadRig.mock.calls.length, 0);
+  proposal = false;
+  await query('#reload-original').click();
+  assert.equal(scene.reloadOriginal.mock.calls.length, 1);
+  controller.dispose();
+});

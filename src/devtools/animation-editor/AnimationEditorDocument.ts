@@ -118,6 +118,14 @@ export class AnimationEditorDocument {
     return result.data;
   }
 
+  /** All committed session clips plus the current authored snapshot; no selection/history changes. */
+  packageAnimations(): readonly ReadonlyAnimation[] {
+    return [...this.animations.entries()].flatMap(([id, entry]) => {
+      const clip = id === this.selectedId ? this.working : entry.saved;
+      return clip ? [clip] : [];
+    });
+  }
+
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
     if (this.dirty && !options.discardChanges) {

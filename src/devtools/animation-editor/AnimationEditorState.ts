@@ -1129,6 +1129,10 @@ export class AnimationEditorState {
     return this.document.exportAnimation();
   }
 
+  packageAnimations(): readonly ReadonlyAnimation[] {
+    return this.document.packageAnimations();
+  }
+
   exportJson(): string {
     return this.document.exportJson();
   }

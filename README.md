@@ -31,6 +31,8 @@ The v0.5.8.2 [visual artwork alignment](docs/visual-artwork-alignment.md) adds e
 
 The v0.5.8.3 [Animation Editor Rig-Tweak Mode](docs/animation-rig-tweak.md) reuses rig joint/artwork/slot tools at the paused animation pose. Rig and animation histories, dirty states and exports remain independent; rig changes reevaluate the animation and IK without creating keys.
 
+The v0.5.8.6 [production asset workflow](docs/artist-workflow.md) exports complete validated character ZIPs with replacement image binaries and reloads them through `CharacterLoader` and `Puppet`. Package checkpoints track rig, skin, animation and artwork changes independently of individual file downloads.
+
 The v0.5.8.5 [Safe Sprite Replacement & Hot Reload](docs/sprite-replacement.md) adds explicit shared/individual artwork scopes, dimension and pivot policies, transactional preview refresh and independent artwork Undo/Redo. Stable attachment IDs, skins, slots, rig transforms and existing animations remain intact.
 
 The v0.5.7.2 [timeline navigation and zoom](docs/timeline-navigation.md) adds pointer-anchored zoom, horizontal panning, fit/center commands, precise seconds/frame input and optional playhead follow. Navigation preserves authored data and selection.
@@ -69,6 +71,8 @@ scene.load.start();
 `scene` is your Phaser scene. Serve the sample folder from `public/characters/demo-puppet/` at the URL above, or use your own character manifest. The puppet updates automatically with the scene. For Node asset tooling, use the renderer-independent `paper-puppeteer-engine/core` entry point.
 
 ## Guides
+
+- [Complete artist workflow and production character packages](docs/artist-workflow.md)
 
 | Guide                                                              | Contents                                                                                                   |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |

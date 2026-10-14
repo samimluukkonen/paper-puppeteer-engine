@@ -5,6 +5,7 @@ import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import type { PackageController } from '../shared/package/PackageController.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { rigDraftKey } from '../shared/rigDraftSession.js';
 import type { AttachmentController } from './AttachmentController.js';
@@ -21,7 +22,10 @@ export function initializeRigEditor(
   app: HTMLElement,
   artwork?: ArtworkController,
   attachments?: AttachmentController,
+  packages?: PackageController,
 ): () => void {
+  let packageBound = false;
+  const releaseArtworkPackage = artwork?.subscribe(() => packages?.refresh());
   const releaseCharacterSelection = bindCharacterSelection(app);
 
   const recoveryControls = new DraftRecoveryControls<RigEditorRecoverySnapshot>(
@@ -62,10 +66,13 @@ export function initializeRigEditor(
         );
       }
       recovery.update();
+      if (packageBound) packages?.refresh();
     },
+    {},
+    { hasPendingChanges: () => !!artwork?.hasPendingProposal },
   );
   const releaseNavigationGuard = protectUnsavedChanges(
-    () => session.hasUnsavedChanges() || !!artwork?.hasUnsavedChanges,
+    () => session.hasUnsavedChanges() || !!artwork?.hasPendingChanges,
   );
   const inspector = createInspectorController(app.querySelector<HTMLElement>('#inspector')!, session.updateStatus);
   const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#hierarchy')!);
@@ -80,6 +87,11 @@ export function initializeRigEditor(
     controls.render(editor);
     inspector.render(editor);
     attachments?.bind(editor);
+    if (!packageBound && packages) {
+      packages.bind(() => scene.packageSnapshot());
+      packageBound = true;
+    }
+    packages?.refresh();
   };
   const scene = new RigEditorScene(
     render,
@@ -103,6 +115,8 @@ export function initializeRigEditor(
     controls.dispose();
     hierarchy.dispose();
     session.dispose();
+    releaseArtworkPackage?.();
+    packages?.dispose();
     game.destroy(true);
     attachments?.dispose();
     artwork?.dispose();

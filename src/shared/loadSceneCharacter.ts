@@ -12,6 +12,8 @@ import {
 
 export interface SceneCharacterLoadOptions
   extends Omit<CharacterTextureLoadOptions, 'timeoutMs'>, JsonWorkloadLimitOptions {
+  /** Already loaded immutable metadata, for local package/runtime hosts. */
+  definition?: CharacterDefinition;
   /** Deadline for the entire artwork phase, including queueing and image decoding. Defaults to 30 seconds. */
   artworkTimeoutMs?: number;
 }
@@ -147,10 +149,11 @@ export function loadSceneCharacter(
     const load = async (): Promise<void> => {
       // Scene.create() runs before Phaser marks the scene active; check after fetching instead.
       // Authoring views reload frequently after replacing rig and animation files.
-      definition = await CharacterLoader.load(url, (input, init) => fetch(input, { ...init, cache: 'no-store' }), {
-        ...options,
-        signal: controller.signal,
-      });
+      definition = await (options.definition ??
+        CharacterLoader.load(url, (input, init) => fetch(input, { ...init, cache: 'no-store' }), {
+          ...options,
+          signal: controller.signal,
+        }));
       if (settled) return;
       if (!scene.sys.isActive()) {
         succeed();

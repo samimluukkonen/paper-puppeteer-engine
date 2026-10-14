@@ -176,6 +176,8 @@ export class CharacterDefinition {
     readonly baseUrl?: string,
     readonly rigFile?: DeepReadonly<RigJsonDefinition>,
     readonly rigPath?: string,
+    /** Original relative paths retained for complete package round trips. */
+    readonly manifest?: DeepReadonly<CharacterManifest>,
   ) {}
 
   /** Immutable clips compiled once per character; players retain their own clocks and pose buffers. */
@@ -206,6 +208,7 @@ export class CharacterDefinition {
         baseUrl,
         freezeData(structuredClone(data.rig) as RigJsonDefinition),
         manifest.rig,
+        freezeData(structuredClone(manifest)),
       ),
     );
   }

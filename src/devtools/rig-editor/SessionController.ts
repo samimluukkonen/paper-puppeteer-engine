@@ -13,7 +13,12 @@ export function createSessionController(
   getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
   onStateChange: (editor: RigEditor) => void = () => {},
   inputLimits: JsonWorkloadLimitOptions = {},
-  presentation: { stageSelector?: string; dirtyLabel?: string; sessionFormat?: 'text' | 'table' } = {},
+  presentation: {
+    stageSelector?: string;
+    dirtyLabel?: string;
+    sessionFormat?: 'text' | 'table';
+    hasPendingChanges?: () => boolean;
+  } = {},
 ) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
@@ -172,15 +177,22 @@ export function createSessionController(
     commitExport(prepared);
     feedback.textContent = 'Rig JSON logged to the console.';
   });
+  const confirmReplacement = (message: string): boolean => {
+    const proposal = presentation.hasPendingChanges?.() ?? false;
+    return (
+      !(editor?.state.dirty || proposal) ||
+      window.confirm(proposal ? `${message} Pending artwork proposals will also be discarded.` : message)
+    );
+  };
   action('reload-exported', () => {
     if (!lastExport) throw new Error('Export the rig first.');
-    if (editor?.state.dirty && !window.confirm('Discard edits made since the last export?')) return;
+    if (!confirmReplacement('Discard edits made since the last export?')) return;
     requests.cancelImports();
     getScene().reloadRig(lastExport, lastExportFilename, 'reload-export');
     feedback.textContent = 'Exported rig reloaded and validated.';
   });
   action('reload-original', () => {
-    if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and reload the original?')) return;
+    if (!confirmReplacement('Discard unsaved rig edits and reload the original?')) return;
     requests.cancelImports();
     getScene().reloadOriginal();
     feedback.textContent = 'Original rig reloaded.';
@@ -201,7 +213,7 @@ export function createSessionController(
       const issues = validateRigDefinition(json);
       if (issues.some((issue) => issue.severity === 'error'))
         throw new Error(issues.map((issue) => `${issue.path ?? 'rig'}: ${issue.message}`).join('\n'));
-      if (editor?.state.dirty && !window.confirm('Discard unsaved rig edits and load this file?')) {
+      if (!confirmReplacement('Discard unsaved rig edits and load this file?')) {
         return;
       }
       getScene().reloadRig(json, file.name);

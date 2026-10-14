@@ -2,6 +2,8 @@ import { ViewHeader } from '../../ui/viewShell.js';
 import { openWorkspaceDialog, useWorkspaceInspector, WorkspaceDialog } from '../../ui/Workspace.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
+import type { PackageController } from '../shared/package/PackageController.js';
+import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
 import { AttachmentPanel } from './AttachmentPanel.js';
 import { RigHelp } from './RigHelp.js';
@@ -9,11 +11,13 @@ import { RigHelp } from './RigHelp.js';
 export function RigEditorView({
   artwork,
   attachments,
-}: { artwork?: ArtworkController; attachments?: AttachmentController } = {}) {
+  packages,
+}: { artwork?: ArtworkController; attachments?: AttachmentController; packages?: PackageController } = {}) {
   const inspector = useWorkspaceInspector();
   return (
     <>
       <ViewHeader view="rig" />
+      {packages && <PackagePanel controller={packages} />}
       <section className="workspace-command-bar" aria-label="Rig session">
         <label>
           Edit{' '}

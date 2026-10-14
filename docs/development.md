@@ -29,7 +29,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-The command builds the demo, then runs every scenario against both the Vite development server and the production preview under `/paper-puppeteer-engine/`. Tests cover animation playback, global Home navigation, shortcut typing/modifier/IME guards, repeated animation switching, scrub interruption, demo playback, facing, skins, IK controls, navigation between demo and editor, dragging outside the canvas, inspector focus and per-field undo, exported/original/imported rig reloads plus a page reload, animation replacement confirmations and source revert, and smooth/stepped canvas round trips with facing and fixed-target IK. They verify artwork changes through canvas screenshots and catch browser exceptions and failed local asset requests. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
+The command builds the demo, then runs every scenario against both the Vite development server and the production preview under `/paper-puppeteer-engine/`. Tests cover animation playback, global Home navigation, shortcut typing/modifier/IME guards, repeated animation switching, scrub interruption, demo playback, facing, skins, IK controls, navigation between demo and editor, dragging outside the canvas, inspector focus and per-field undo, exported/original/imported rig reloads plus a page reload, animation replacement confirmations and source revert, and smooth/stepped canvas round trips with facing and fixed-target IK. Character package scenarios also export replacement binaries and rig edits, reload/import ZIPs through CharacterLoader and Puppet, switch runtime skins/facing and repeatedly dispose previews. They verify artwork changes through canvas screenshots and catch browser exceptions and failed local asset requests. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
 
 See the [profiling guide](profiling.md) for optional CPU and browser profiles, workload descriptions, and historical measurements. Profiles are local diagnostics and have no timing thresholds.
 
@@ -155,6 +155,10 @@ src/devtools/shared/
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
   editorGame.ts        Shared Phaser rendering and scaling defaults for editor previews
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom
+  package/characterPackage.ts  Detached package snapshots, metadata/image validation and runtime leases
+  package/packageZip.ts  Bounded stored ZIP encoding/decoding with path and CRC checks
+  package/PackageController.ts  Independent package checkpoints and asynchronous request ownership
+  package/PackagePanel.tsx  Shared package download/import and regular Puppet runtime preview
   editorData.ts        Readonly data and editor number rounding
   boneSymmetry.ts      Pure rig-bound bone pairs, automatic candidates, reciprocal lookup and validation
   poseMirroring.ts     Pure bind-relative authored-pose reflection and structured compatibility errors
@@ -197,6 +201,10 @@ Saved baselines retain immutable authored snapshots directly. Rig inspector inpu
 Browser draft source identities use versioned SHA-256 digests of canonical authored data, keeping stored fingerprints at 74 characters regardless of document size. Runtime rig indexes and derived render order are excluded; authored array order and event payloads remain significant. Hashing is synchronous and works on HTTP development hosts without `crypto.subtle`. Recovery accepts older raw and canonical JSON fingerprints, then replaces a restored draft only after its compact replacement is durable.
 
 Mirroring production regression coverage and the supported transform contract are documented in [mirroring hardening](mirroring-hardening-verification.md). Local `animationMirroring.spec.ts` scenarios cover repeated animation/character/route lifecycle, mirrored onion-skin refresh and identical authored exports with IK/facing enabled or disabled. `MirrorToolsController.unbind()` releases cached session references after failures; React panel cleanup hides its preview independently of application disposal.
+
+Complete character downloads use the existing version-1 formats; see the [artist package workflow](artist-workflow.md) and [production verification report](production-asset-verification.md). `CharacterDefinition.manifest` owns the original relative resource paths. Both scenes expose detached package snapshot adapters, artwork exports retain immutable blobs, and the animation document queries every session clip without changing selection/history. Package checkpoints are independent of individual JSON export checkpoints; existing per-document navigation semantics stay intact. Navigation also protects pending artwork proposals, while compatible rig reload/import retains applied artwork and confirms before canceling proposals.
+
+Runtime package previews lease temporary image URLs and own an independent Phaser game/texture manager. Metadata passes through `CharacterLoader`; `loadSceneCharacter` accepts an already loaded immutable definition and still yields asynchronously before checking the scene's active flag. Preview shutdown cancels texture loads and destroys puppets; game destruction releases the URL lease. Do not serialize runtime blob URLs or private artwork texture keys into a package.
 
 ## Use as a local package
 
