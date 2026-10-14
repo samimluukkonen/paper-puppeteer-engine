@@ -231,7 +231,7 @@ test('animation recovery ignores reordered tracks and retains changed-source dra
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
 
-test('declining animation draft recovery keeps the loaded source and removes the stored draft', async ({ page }) => {
+test('declining animation draft recovery keeps the loaded source and preserves the stored draft', async ({ page }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await (await animationControl(page, '#animation-mode')).selectOption('stepped');
@@ -243,7 +243,7 @@ test('declining animation draft recovery keeps the loaded source and removes the
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  await expect.poll(() => draftKeys(page)).toHaveLength(0);
+  await expect.poll(() => draftKeys(page)).toHaveLength(1);
 });
 
 test('rig source changes retain unsaved edits for manual download', async ({ page }) => {

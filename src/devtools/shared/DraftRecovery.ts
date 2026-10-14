@@ -148,7 +148,9 @@ export class DraftRecovery<Snapshot> {
             this.retained.push({ text });
             this.reportStatus('The draft could not be restored.');
           }
-        } else this.removeDraft(key, text);
+        }
+        // Declining restoration only skips this candidate. Its owner may still
+        // be editing in another tab, so rejection must not discard its backup.
       }
       if (this.retained.length && !this.recovered) this.reportStatus('');
     } catch {
