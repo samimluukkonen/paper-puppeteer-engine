@@ -13,12 +13,13 @@ export function createSessionController(
   getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
   onStateChange: (editor: RigEditor) => void = () => {},
   inputLimits: JsonWorkloadLimitOptions = {},
-  presentation: { stageSelector?: string; dirtyLabel?: string } = {},
+  presentation: { stageSelector?: string; dirtyLabel?: string; sessionFormat?: 'text' | 'table' } = {},
 ) {
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
   const dirty = app.querySelector<HTMLElement>('#dirty-status')!;
   const session = app.querySelector<HTMLElement>('#session-status')!;
+  let sessionCells: HTMLTableCellElement[] | undefined;
   const validation = app.querySelector<HTMLElement>('#validation')!;
   const feedback = app.querySelector<HTMLElement>('#action-feedback')!;
   let lastExport: RigJsonDefinition | undefined;
@@ -49,7 +50,40 @@ export function createSessionController(
       : issues.length
         ? issues.map((issue) => `${issue.severity}: ${issue.path ?? 'rig'}: ${issue.message}`).join('\n')
         : 'Validation: OK';
-    session.textContent = `Character: ${getScene().characterId}\nRig: ${getScene().rigFilename}\nMode: ${current.state.editMode}\nSelected: ${current.state.selection?.id ?? 'none'}\nGrid: ${current.state.gridSnap || 'Off'}\nRotation snap: ${current.state.rotationSnap ? `${current.state.rotationSnap}°` : 'Off'}\nModified: ${isDirty ? 'Yes' : 'No'}\nValidation: ${validationStatus}`;
+    const sessionRows = [
+      ['Character', getScene().characterId],
+      ['Rig', getScene().rigFilename],
+      ['Mode', current.state.editMode],
+      ['Selected', current.state.selection?.id ?? 'none'],
+      ['Grid', current.state.gridSnap || 'Off'],
+      ['Rotation snap', current.state.rotationSnap ? `${current.state.rotationSnap}°` : 'Off'],
+      ['Modified', isDirty ? 'Yes' : 'No'],
+      ['Validation', validationStatus],
+    ] as const;
+    if (presentation.sessionFormat === 'table') {
+      if (!sessionCells) {
+        const table = document.createElement('table');
+        table.setAttribute('aria-label', 'Rig session details');
+        const body = document.createElement('tbody');
+        sessionCells = sessionRows.map(([label]) => {
+          const row = document.createElement('tr');
+          const heading = document.createElement('th');
+          heading.scope = 'row';
+          heading.textContent = label;
+          const cell = document.createElement('td');
+          row.append(heading, cell);
+          body.append(row);
+          return cell;
+        });
+        table.append(body);
+        session.replaceChildren(table);
+      }
+      sessionRows.forEach(([, value], index) => {
+        sessionCells![index]!.textContent = String(value);
+      });
+    } else {
+      session.textContent = sessionRows.map(([label, value]) => `${label}: ${value}`).join('\n');
+    }
     app.querySelector<HTMLButtonElement>('#undo')!.disabled = !current.state.canUndo;
     app.querySelector<HTMLButtonElement>('#redo')!.disabled = !current.state.canRedo;
     app.querySelector<HTMLButtonElement>('#reset-selected')!.disabled = !current.state.selection;
