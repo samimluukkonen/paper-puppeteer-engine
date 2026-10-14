@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.5.8-5
+
+The v0.5.8.5 [Safe Sprite Replacement & Hot Reload](docs/sprite-replacement.md) adds explicit shared/individual artwork scopes using stable bone and attachment IDs, dimension comparison and previewed normalized/pixel/manual pivot policies. Current catalog and frame preflight, transactional texture registration/installation/preview refresh and independent bounded artwork Undo/Redo preserve rig, skins, render order, facing, IK and animation data. Inactive textures are released after all retained previews refresh; undo resources remain session-local and recreate textures lazily. Unit motion regressions cover idle, walk, attack, IK, baked IK and mirrored playback; local browser scenarios cover both editors. Package version is `0.5.8-5`.
+
 ## 0.5.8-4
 
 The v0.5.8.4 [Visual Attachment & Skin Management](docs/visual-attachment-skins.md) adds a shared React slot/attachment/skin panel with immediate appearance previews, stable attachment IDs, sparse overrides, explicit clearing/inheritance, skin creation/renaming and attachment deletion diagnostics. Manifest skin documents keep their existing precedence and separate downloads/dirty baselines. Rig history and source-bound drafts cover catalog and standalone skin edits independently of animation history. In-place runtime catalog installation retains puppet joints, slot mounts, depth, facing, playback and IK; validation reports missing textures and invalid frames. Unit and local browser regressions cover authoring, immutability, export/reload and preserved animation. Package version is `0.5.8-4`.

@@ -91,6 +91,12 @@ vi.mock('../src/engine/Puppet.js', () => ({
       getSlotImage() {
         return undefined;
       }
+      getArtworkReplacement() {
+        return undefined;
+      }
+      setArtworkOrigin(_reference: string, _asset: string, image: Phaser.GameObjects.Image, x: number, y: number) {
+        image.setOrigin(x, y);
+      }
       setSlotTransform = vi.fn();
       preparePose = vi.fn();
       syncPose = vi.fn();

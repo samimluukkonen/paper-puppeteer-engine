@@ -96,12 +96,11 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
       if (!definition) continue;
       const candidate = current.getSelectedImage?.();
       const image = candidate && candidate.width > 0 && candidate.height > 0 ? candidate : undefined;
+      const scale = current.getArtworkOriginScale?.() ?? { x: 1, y: 1 };
+      const dimension = image ? (field === 'originX' ? image.width * scale.x : image.height * scale.y) : 0;
       const raw = valuesByScope[scope]?.[definition.field];
-      const value =
-        input.dataset.pixels && image
-          ? originPixels(raw ?? 0.5, field === 'originX' ? image.width : image.height)
-          : raw;
-      if (input.dataset.pixels && image) input.max = String(field === 'originX' ? image.width : image.height);
+      const value = input.dataset.pixels && image ? originPixels(raw ?? 0.5, dimension) : raw;
+      if (input.dataset.pixels && image) input.max = String(dimension);
       // Keep partially typed text during unrelated refreshes. External edits and
       // history restores still replace a focused field when its authored value changes.
       if (input !== editedInput && (document.activeElement !== input || authoredValues.get(input) !== value)) {
@@ -237,7 +236,8 @@ export function createInspectorController(inspector: HTMLElement, updateStatus: 
         if (input.dataset.pixels && value !== undefined) {
           const image = editor.getSelectedImage();
           if (!image) throw new Error('Select visible artwork to edit pixel origins.');
-          value = normalizedOrigin(value, field === 'originX' ? image.width : image.height);
+          const scale = editor.getArtworkOriginScale?.() ?? { x: 1, y: 1 };
+          value = normalizedOrigin(value, field === 'originX' ? image.width * scale.x : image.height * scale.y);
         }
         editor.editSprite(spriteId, definition.field, value, scope === 'attachment', false);
       } else throw new Error(`Unknown inspector scope "${scope}".`);

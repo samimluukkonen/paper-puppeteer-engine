@@ -156,10 +156,16 @@ export class RigEditor {
         ...createTransform(edited),
         ...computeBonePosition(edited, edited.parent === undefined ? undefined : definitions.get(edited.parent)),
       });
-      if (runtime.sprite && edited.sprite)
-        runtime.sprite
-          .setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0)
-          .setOrigin(edited.sprite.originX ?? 0.5, edited.sprite.originY ?? 0.5);
+      if (runtime.sprite && edited.sprite) {
+        runtime.sprite.setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0);
+        this.puppet.setArtworkOrigin(
+          `bone:${edited.id}`,
+          edited.sprite.texture,
+          runtime.sprite,
+          edited.sprite.originX ?? 0.5,
+          edited.sprite.originY ?? 0.5,
+        );
+      }
     }
     if (this.previewClip) {
       const pose = evaluateClip(this.previewClip, this.previewTime);
@@ -173,9 +179,14 @@ export class RigEditor {
       const attachmentId = this.puppet.getAttachment(slot.id);
       if (image && attachmentId) {
         const attachment = this.state.getAttachment(attachmentId);
-        image
-          .setPosition(attachment.x ?? 0, attachment.y ?? 0)
-          .setOrigin(attachment.originX ?? 0.5, attachment.originY ?? 0.5);
+        image.setPosition(attachment.x ?? 0, attachment.y ?? 0);
+        this.puppet.setArtworkOrigin(
+          `attachment:${attachment.id}`,
+          attachment.texture,
+          image,
+          attachment.originX ?? 0.5,
+          attachment.originY ?? 0.5,
+        );
       }
     }
     this.updateRenderOrder(rig);
@@ -221,6 +232,24 @@ export class RigEditor {
         : undefined;
   }
 
+  getArtworkOriginScale(): { x: number; y: number } {
+    const selection = this.state.selection;
+    const id = selection?.type === 'slot' ? this.getAttachment(selection.id) : selection?.id;
+    const sprite = id
+      ? selection?.type === 'slot'
+        ? this.state.getAttachment(id)
+        : this.state.getBone(id).sprite
+      : undefined;
+    const override =
+      sprite && id
+        ? this.puppet.getArtworkReplacement(
+            sprite.texture,
+            selection?.type === 'slot' ? `attachment:${id}` : `bone:${id}`,
+          )
+        : undefined;
+    return { x: override?.originScaleX ?? 1, y: override?.originScaleY ?? 1 };
+  }
+
   getJointReference(): { x: number; y: number } | undefined {
     const selected = this.state.selection;
     if (!selected) return undefined;
@@ -235,7 +264,14 @@ export class RigEditor {
       if (!image || !authored) return;
       const draft = this.artworkDraft;
       const sprite = draft?.id === id && draft.attachment === attachment ? { ...authored, ...draft.values } : authored;
-      image.setPosition(sprite.x ?? 0, sprite.y ?? 0).setOrigin(sprite.originX ?? 0.5, sprite.originY ?? 0.5);
+      image.setPosition(sprite.x ?? 0, sprite.y ?? 0);
+      this.puppet.setArtworkOrigin(
+        attachment ? `attachment:${id}` : `bone:${id}`,
+        sprite.texture,
+        image,
+        sprite.originX ?? 0.5,
+        sprite.originY ?? 0.5,
+      );
     };
     for (const bone of this.state.rig.bones) apply(this.puppet.getBone(bone.id).sprite, bone.id, false);
     for (const slot of this.state.rig.slots) {

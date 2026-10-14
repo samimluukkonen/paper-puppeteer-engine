@@ -9,3 +9,10 @@ export {
   DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS,
   queueCharacterTextures,
 } from './queueCharacterTextures.js';
+
+export type {
+  ArtworkReference,
+  ArtworkReplacement,
+  ArtworkUsage,
+  ArtworkAlignmentPolicy,
+} from './artworkReplacement.js';

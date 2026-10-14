@@ -200,6 +200,9 @@ test.each(dragCases)(
     };
     const bone = Object.assign(new Joint('root'), { container: { ...frame, parentContainer: frame }, sprite: image });
     const puppet = {
+      getArtworkReplacement: () => undefined,
+      setArtworkOrigin: (_reference: string, _asset: string, image: Phaser.GameObjects.Image, x: number, y: number) =>
+        image.setOrigin(x, y),
       rig,
       getBone: () => bone,
       getSlotImage: () => image,

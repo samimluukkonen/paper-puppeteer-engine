@@ -124,6 +124,9 @@ function fixture(mode: EditMode = 'sprite', attachment = false, facing = 1) {
     }),
   };
   const puppet = {
+    getArtworkReplacement: () => undefined,
+    setArtworkOrigin: (_reference: string, _asset: string, image: Phaser.GameObjects.Image, x: number, y: number) =>
+      image.setOrigin(x, y),
     rig,
     container: { ...frame(placement), x: 380, y: 435, parentContainer: null },
     getBone: (id: string) => bones[id as keyof typeof bones],

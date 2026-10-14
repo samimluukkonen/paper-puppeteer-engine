@@ -19,6 +19,7 @@ export class AttachmentController {
   bind(editor: RigEditor): void {
     if (this.editor !== editor) this.snapshot = { ...this.snapshot, message: '' };
     this.editor = editor;
+    this.artwork?.refreshTargets();
     this.refresh();
   }
   refresh(): void {

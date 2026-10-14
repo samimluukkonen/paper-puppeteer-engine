@@ -8,6 +8,7 @@ import {
   type PlayAnimationOptions,
   type SampleAnimationOptions,
 } from './AnimationPlayer.js';
+import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
@@ -221,6 +222,34 @@ export class Puppet {
   setArtworkTexture(assetKey: string, replacementKey?: string): this {
     this.renderer.setArtworkTexture(assetKey, replacementKey);
     return this;
+  }
+
+  getArtworkUsages(): readonly ArtworkUsage[] {
+    return this.renderer.getArtworkUsages();
+  }
+
+  getArtworkReplacement(assetKey: string, reference?: ArtworkReference): ArtworkReplacement | undefined {
+    return this.renderer.getArtworkReplacement(assetKey, reference);
+  }
+
+  /** Preflight a transaction spanning several shared and individual replacements. */
+  validateArtworkReplacement(assetKey: string, replacement?: ArtworkReplacement, reference?: ArtworkReference): void {
+    this.renderer.validateArtworkReplacement(assetKey, replacement, reference);
+  }
+
+  setArtworkReplacement(assetKey: string, replacement?: ArtworkReplacement, reference?: ArtworkReference): this {
+    this.renderer.setArtworkReplacement(assetKey, replacement, reference);
+    return this;
+  }
+
+  setArtworkOrigin(
+    reference: ArtworkReference,
+    assetKey: string,
+    image: Phaser.GameObjects.Image,
+    x: number,
+    y: number,
+  ): void {
+    this.renderer.setArtworkOrigin(reference, assetKey, image, x, y);
   }
 
   getBone(id: string): Bone {
@@ -453,6 +482,7 @@ export class Puppet {
   /** Update the artwork catalog and skins in place; skeleton, player, IK and slot mounts retain identity. */
   updateSlotDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): this {
     this.slotState.updateDefinitions(attachments, skins);
+    this.renderer.updateArtworkDefinitions(this.slotState.getDefinitions(), this.slotState.getSkins());
     this.renderSlots();
     return this;
   }

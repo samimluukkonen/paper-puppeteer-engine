@@ -2,9 +2,10 @@ import type Phaser from 'phaser';
 import type { Affine } from './affineMath.js';
 import { composeAffine, transformToAffine } from './affineMath.js';
 import { type AffineFactors, factorAffine } from './affineProjection.js';
+import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
-import type { SpriteAttachmentDefinition } from './types.js';
+import type { SkinDefinition, SpriteAttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
 interface RenderBranch {
@@ -40,7 +41,10 @@ export class PuppetRenderer {
   private order: readonly string[] = Object.freeze([]);
   private readonly appearanceValues: unknown[] = [];
   private appearanceRevision = 0;
-  private readonly artworkTextures = new Map<string, string>();
+  private readonly artworkTextures = new Map<string, ArtworkReplacement>();
+  private readonly individualArtwork = new Map<string, ArtworkReplacement>();
+  private artworkDefinitions: readonly SpriteAttachmentDefinition[];
+  private artworkSkins: readonly SkinDefinition[];
   private readonly slotArtwork = new Map<string, SpriteAttachmentDefinition>();
 
   constructor(
@@ -49,6 +53,8 @@ export class PuppetRenderer {
     private readonly rig: Rig,
     private readonly bones: ReadonlyMap<string, Bone>,
   ) {
+    this.artworkDefinitions = rig.attachments;
+    this.artworkSkins = rig.skins;
     this.container = scene.add.container(0, 0).setName('puppet-render');
     parent.add(this.container);
     for (const definition of rig.bones) {
@@ -240,23 +246,158 @@ export class PuppetRenderer {
     return this.slotImages.get(id);
   }
 
-  /** Render-only whole-image overrides. Authored texture/frame references remain unchanged. */
-  setArtworkTexture(assetKey: string, replacementKey?: string): void {
-    const key = replacementKey ?? assetKey;
+  getArtworkUsages(): readonly ArtworkUsage[] {
+    return [
+      ...this.rig.bones.flatMap((bone): ArtworkUsage[] =>
+        bone.sprite
+          ? [
+              {
+                reference: `bone:${bone.id}`,
+                texture: bone.sprite.texture,
+                frame: bone.sprite.frame,
+                slots: [],
+                skins: [],
+              },
+            ]
+          : [],
+      ),
+      ...this.artworkDefinitions.map((entry): ArtworkUsage => ({
+        reference: `attachment:${entry.id}`,
+        texture: entry.texture,
+        frame: entry.frame,
+        slots: [
+          ...new Set([
+            ...this.artworkSkins.flatMap((skin) =>
+              Object.entries(skin.slots)
+                .filter(([, id]) => id === entry.id)
+                .map(([slot]) => slot),
+            ),
+            ...[...this.slotArtwork].filter(([, definition]) => definition.id === entry.id).map(([slot]) => slot),
+          ]),
+        ],
+        skins: this.artworkSkins
+          .filter((skin) => Object.values(skin.slots).includes(entry.id))
+          .map((skin) => skin.name),
+      })),
+    ];
+  }
+
+  updateArtworkDefinitions(definitions: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): void {
+    this.artworkDefinitions = definitions;
+    this.artworkSkins = skins;
+  }
+
+  getArtworkReplacement(assetKey: string, reference?: ArtworkReference): ArtworkReplacement | undefined {
+    return (
+      (reference ? this.individualArtwork.get(JSON.stringify([assetKey, reference])) : undefined) ??
+      this.artworkTextures.get(assetKey)
+    );
+  }
+
+  /** Validate inactive references too; Phaser frame fallback must never hide an invalid replacement. */
+  validateArtworkReplacement(assetKey: string, replacement?: ArtworkReplacement, reference?: ArtworkReference): void {
+    const usages = this.getArtworkUsages().filter(
+      (entry) => entry.texture === assetKey && (reference === undefined || entry.reference === reference),
+    );
+    if (reference && !usages.length && replacement)
+      throw new Error(`Artwork reference "${reference}" no longer uses "${assetKey}".`);
+    const key = replacement?.textureKey ?? assetKey;
     if (!this.scene.textures.exists(key)) throw new Error(`Missing artwork texture "${key}".`);
-    if (replacementKey) this.artworkTextures.set(assetKey, replacementKey);
-    else this.artworkTextures.delete(assetKey);
-    const replace = (image: Phaser.GameObjects.Image | undefined, frame?: string | number): void => {
-      if (!image) return;
-      const { originX, originY } = image;
-      image.setTexture(key, replacementKey ? undefined : frame).setOrigin(originX, originY);
-    };
-    for (const definition of this.rig.bones) {
-      if (definition.sprite?.texture === assetKey)
-        replace(this.bones.get(definition.id)!.sprite, definition.sprite.frame);
+    if (replacement) {
+      for (const value of [replacement.originScaleX, replacement.originScaleY]) {
+        assertFinite(value, 'Artwork origin multiplier');
+        if (value <= 0) throw new Error('Artwork origin multipliers must be positive.');
+      }
+      for (const usage of usages) {
+        if (usage.frame !== undefined && !this.scene.textures.get(key).has(String(usage.frame)))
+          throw new Error(
+            `Replacement lacks frame "${usage.frame}" for ${usage.reference}. Supply the same frame catalog or choose a whole-image reference.`,
+          );
+      }
     }
+  }
+
+  /** Preflight every affected frame, then install atomically. Texture ownership belongs to the host. */
+  setArtworkReplacement(assetKey: string, replacement?: ArtworkReplacement, reference?: ArtworkReference): void {
+    this.validateArtworkReplacement(assetKey, replacement, reference);
+    const map = reference ? this.individualArtwork : this.artworkTextures;
+    const identity = reference ? JSON.stringify([assetKey, reference]) : assetKey;
+    const previous = map.get(identity);
+    const images: {
+      image: Phaser.GameObjects.Image;
+      texture: string;
+      frame: string | number;
+      x: number;
+      y: number;
+      reference: ArtworkReference;
+      old: ArtworkReplacement | undefined;
+    }[] = [];
+    const remember = (image: Phaser.GameObjects.Image | undefined, ref: ArtworkReference): void => {
+      if (image)
+        images.push({
+          image,
+          texture: image.texture.key,
+          frame: image.frame.name,
+          x: image.originX,
+          y: image.originY,
+          reference: ref,
+          old: this.getArtworkReplacement(assetKey, ref),
+        });
+    };
+    for (const bone of this.rig.bones)
+      if (bone.sprite?.texture === assetKey && (!reference || reference === `bone:${bone.id}`))
+        remember(this.bones.get(bone.id)!.sprite, `bone:${bone.id}`);
     for (const [id, definition] of this.slotArtwork)
-      if (definition.texture === assetKey) replace(this.slotImages.get(id), definition.frame);
+      if (definition.texture === assetKey && (!reference || reference === `attachment:${definition.id}`))
+        remember(this.slotImages.get(id), `attachment:${definition.id}`);
+    const install = (value: ArtworkReplacement | undefined): void => {
+      if (value) map.set(identity, Object.freeze({ ...value }));
+      else map.delete(identity);
+    };
+    install(replacement);
+    try {
+      for (const entry of images) {
+        const next = this.getArtworkReplacement(assetKey, entry.reference);
+        // Preserve the authored pivot even across a temporary pixel policy and Cancel/Revert.
+        entry.image
+          .setTexture(next?.textureKey ?? assetKey, entry.frame)
+          .setOrigin(
+            (entry.x / (entry.old?.originScaleX ?? 1)) * (next?.originScaleX ?? 1),
+            (entry.y / (entry.old?.originScaleY ?? 1)) * (next?.originScaleY ?? 1),
+          );
+      }
+    } catch (error) {
+      install(previous);
+      for (const entry of images) entry.image.setTexture(entry.texture, entry.frame).setOrigin(entry.x, entry.y);
+      throw error;
+    }
+  }
+
+  /** Compatibility API for shared normalized-origin replacement. Frames are preserved and validated. */
+  setArtworkTexture(assetKey: string, replacementKey?: string): void {
+    const current = this.getArtworkReplacement(assetKey);
+    this.setArtworkReplacement(
+      assetKey,
+      replacementKey
+        ? {
+            textureKey: replacementKey,
+            originScaleX: current?.originScaleX ?? 1,
+            originScaleY: current?.originScaleY ?? 1,
+          }
+        : undefined,
+    );
+  }
+
+  /** Editor alignment remains authored; apply the session policy when projecting its normalized origins. */
+  setArtworkOrigin(
+    reference: ArtworkReference,
+    assetKey: string,
+    image: Phaser.GameObjects.Image,
+    x: number,
+    y: number,
+  ): void {
+    const replacement = this.getArtworkReplacement(assetKey, reference);
+    image.setOrigin(x * (replacement?.originScaleX ?? 1), y * (replacement?.originScaleY ?? 1));
   }
 
   setSlotAttachment(id: string, definition: SpriteAttachmentDefinition | undefined): void {
@@ -270,15 +411,13 @@ export class PuppetRenderer {
     this.slotArtwork.delete(id);
     if (!definition) return;
     this.slotArtwork.set(id, definition);
-    const replacement = this.artworkTextures.get(definition.texture);
+    const replacement = this.getArtworkReplacement(definition.texture, `attachment:${definition.id}`);
     const image = mount.scene.add
-      .image(
-        definition.x ?? 0,
-        definition.y ?? 0,
-        replacement ?? definition.texture,
-        replacement ? undefined : definition.frame,
+      .image(definition.x ?? 0, definition.y ?? 0, replacement?.textureKey ?? definition.texture, definition.frame)
+      .setOrigin(
+        (definition.originX ?? 0.5) * (replacement?.originScaleX ?? 1),
+        (definition.originY ?? 0.5) * (replacement?.originScaleY ?? 1),
       )
-      .setOrigin(definition.originX ?? 0.5, definition.originY ?? 0.5)
       .setRotation(definition.rotation ?? 0)
       .setScale(definition.scaleX ?? 1, definition.scaleY ?? 1);
     if (presentation) image.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
@@ -391,6 +530,7 @@ export class PuppetRenderer {
     this.slotImages.clear();
     this.slotArtwork.clear();
     this.artworkTextures.clear();
+    this.individualArtwork.clear();
     this.slotDepthOverrides.clear();
     this.nodes.clear();
     this.pending.length = 0;

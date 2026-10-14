@@ -80,13 +80,20 @@ export function AttachmentPanel({
                 Bone: {state.getSlot(slot).bone} · Depth: {state.getSlot(slot).depth ?? 'follows bone'} ·{' '}
                 {attachment && state.visibility.artwork ? 'Artwork visible' : 'Artwork hidden or empty'}
               </p>
-              {attachment && controller.artwork?.assetPreview(state.getAttachment(attachment).texture)?.url && (
-                <img
-                  className="attachment-thumbnail"
-                  src={controller.artwork.assetPreview(state.getAttachment(attachment).texture)!.url}
-                  alt={`Artwork for ${attachment}`}
-                />
-              )}
+              {attachment &&
+                controller.artwork?.assetPreview(state.getAttachment(attachment).texture, `attachment:${attachment}`)
+                  ?.url && (
+                  <img
+                    className="attachment-thumbnail"
+                    src={
+                      controller.artwork.assetPreview(
+                        state.getAttachment(attachment).texture,
+                        `attachment:${attachment}`,
+                      )!.url
+                    }
+                    alt={`Artwork for ${attachment}`}
+                  />
+                )}
               <p>
                 Assignment: {attachment ?? 'empty'} ·{' '}
                 {mapping === undefined ? 'inherited' : mapping === null ? 'explicitly cleared' : 'skin mapping'}

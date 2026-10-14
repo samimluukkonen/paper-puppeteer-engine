@@ -28,7 +28,7 @@ export class RigEditorInputController {
       RigEditor,
       'state' | 'editBone' | 'undo' | 'redo' | 'refresh' | 'moveCharacter' | 'previewArtwork' | 'finishArtworkGesture'
     > &
-      Partial<Pick<RigEditor, 'previewName'>>,
+      Partial<Pick<RigEditor, 'previewName' | 'getArtworkOriginScale'>>,
     private readonly overlay: RigEditorOverlay,
     private readonly onChange: () => void,
     private readonly redraw: () => void,
@@ -292,12 +292,13 @@ export class RigEditorInputController {
       if (id && image && sprite) {
         if (this.state.editMode === 'origin') {
           const m = image.getWorldTransformMatrix();
+          const originScale = this.editor.getArtworkOriginScale?.() ?? { x: 1, y: 1 };
           this.originDrag = {
             id,
             attachment,
             matrix: { a: m.a, b: m.b, c: m.c, d: m.d, tx: m.tx, ty: m.ty },
             origin: { x: sprite.originX ?? 0.5, y: sprite.originY ?? 0.5 },
-            size: { x: image.width, y: image.height },
+            size: { x: image.width * originScale.x, y: image.height * originScale.y },
           };
         } else {
           this.artworkFrame = image.parentContainer;

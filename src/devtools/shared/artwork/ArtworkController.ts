@@ -1,8 +1,15 @@
 import type Phaser from 'phaser';
+import {
+  type ArtworkAlignmentPolicy,
+  type ArtworkReference,
+  type ArtworkReplacement,
+  replacementOriginScale,
+} from '../../../engine/artworkReplacement.js';
 import type { CharacterDefinition } from '../../../engine/CharacterDefinition.js';
 import { DEFAULT_CHARACTER_TEXTURE_LIMITS as limits } from '../../../engine/characterTextureLimits.js';
 import type { Puppet } from '../../../engine/Puppet.js';
 import { assetFilename } from '../assetFilename.js';
+import { SnapshotHistory } from '../SnapshotHistory.js';
 import { importSprite, type ImportedSprite, type SpriteMetadata } from './spriteImport.js';
 
 export interface ArtworkTarget {
@@ -12,35 +19,58 @@ export interface ArtworkTarget {
   readonly width: number;
   readonly height: number;
   readonly references: readonly string[];
+  readonly individuals: readonly { reference: ArtworkReference; reason: string | null }[];
   readonly reason: string | null;
 }
 
 interface SpriteResource {
   readonly sprite: ImportedSprite;
+  readonly assetKey: string;
+  readonly reference: ArtworkReference | undefined;
+  readonly previous: { width: number; height: number; originScaleX: number; originScaleY: number };
+  originScaleX: number;
+  originScaleY: number;
   key: string | null;
   texture: Phaser.Textures.Texture | null;
 }
 
+type ArtworkState = ReadonlyMap<string, SpriteResource>;
+
 export interface ArtworkSnapshot {
   readonly targets: readonly ArtworkTarget[];
   readonly selectedKey: string | null;
+  readonly selectedReference: ArtworkReference | null;
+  readonly policy: ArtworkAlignmentPolicy | null;
+  readonly previousSize: { width: number; height: number } | null;
   readonly proposed: (SpriteMetadata & { readonly url: string }) | null;
   readonly applied: (SpriteMetadata & { readonly url: string }) | null;
   readonly pendingCount: number;
   readonly previewing: boolean;
   readonly importing: boolean;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
   readonly message: string;
 }
 
 let nextNamespace = 0;
+const identity = (assetKey: string, reference?: ArtworkReference): string =>
+  JSON.stringify([assetKey, reference ?? null]);
+const frameReason = (frame?: string | number): string | null =>
+  frame !== undefined && frame !== '__BASE'
+    ? `Atlas/frame "${frame}" cannot be preserved by a static PNG/WebP. Choose a whole-image reference or resolve the frame in the attachment editor first.`
+    : null;
 
-/** Session-local binary working copy. Nothing here participates in rig/animation serialization or history. */
+/** Session-only artwork document and independent bounded history. Authored rig/animation data stays immutable. */
 export class ArtworkController {
   private puppet: Puppet | undefined;
   private textures: Phaser.Textures.TextureManager | undefined;
+  private definition: CharacterDefinition | undefined;
   private refreshAppearance: () => void = () => {};
   private readonly listeners = new Set<() => void>();
-  private readonly applied = new Map<string, SpriteResource>();
+  private applied = new Map<string, SpriteResource>();
+  private rendered = new Map<string, SpriteResource>();
+  private readonly resources = new Set<SpriteResource>();
+  private history = this.createHistory();
   private candidate: SpriteResource | undefined;
   private request: AbortController | undefined;
   private readonly namespace = `__paper_artwork_${++nextNamespace}_`;
@@ -48,15 +78,32 @@ export class ArtworkController {
   private snapshot: ArtworkSnapshot = {
     targets: [],
     selectedKey: null,
+    selectedReference: null,
+    policy: null,
+    previousSize: null,
     proposed: null,
     applied: null,
     pendingCount: 0,
     previewing: false,
     importing: false,
+    canUndo: false,
+    canRedo: false,
     message: 'Load a character to replace artwork.',
   };
 
   constructor(private readonly decode: typeof importSprite = importSprite) {}
+
+  private createHistory(): SnapshotHistory<ArtworkState> {
+    return new SnapshotHistory<ArtworkState>(
+      () => new Map(this.applied),
+      (state) => {
+        this.install(state);
+        this.applied = new Map(state);
+      },
+      (a, b) => a.size === b.size && [...a].every(([key, value]) => b.get(key) === value),
+      20,
+    );
+  }
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -66,9 +113,18 @@ export class ArtworkController {
   get hasUnsavedChanges(): boolean {
     return this.applied.size > 0;
   }
-  assetPreview(key: string): { url: string; filename: string; imported: boolean } | undefined {
+  private get selectedIdentity(): string {
+    return identity(this.snapshot.selectedKey ?? '', this.snapshot.selectedReference ?? undefined);
+  }
+
+  assetPreview(
+    key: string,
+    reference?: ArtworkReference,
+  ): { url: string; filename: string; imported: boolean } | undefined {
     const target = this.snapshot.targets.find((entry) => entry.key === key);
-    const imported = this.applied.get(key)?.sprite;
+    const imported =
+      (reference ? this.applied.get(identity(key, reference)) : undefined)?.sprite ??
+      this.applied.get(identity(key))?.sprite;
     return imported
       ? { url: imported.url, filename: imported.filename, imported: true }
       : target
@@ -77,75 +133,80 @@ export class ArtworkController {
   }
 
   private publish(update: Partial<ArtworkSnapshot>): void {
-    this.snapshot = { ...this.snapshot, ...update };
+    const next = { ...this.snapshot, ...update };
+    this.snapshot = {
+      ...next,
+      pendingCount: this.applied.size,
+      applied: this.applied.get(identity(next.selectedKey ?? '', next.selectedReference ?? undefined))?.sprite ?? null,
+      canUndo: this.history.canUndo,
+      canRedo: this.history.canRedo,
+    };
     for (const listener of this.listeners) listener();
   }
 
-  /** Rebind after rig reload; original Phaser keys remain loaded and authored files remain unchanged. */
+  /** Catalog edits can introduce new logical references without replacing the preview puppet. */
+  refreshTargets(): void {
+    const { puppet, textures, definition } = this;
+    if (!puppet || !textures || !definition) return;
+    const usages = puppet.getArtworkUsages();
+    const keys = new Set([
+      ...Object.keys(definition.textures),
+      ...usages.map((entry) => entry.texture),
+      ...[...this.applied.values()].map((entry) => entry.assetKey),
+    ]);
+    const targets: ArtworkTarget[] = [];
+    for (const key of keys) {
+      if (!textures.exists(key)) continue;
+      const texture = textures.get(key);
+      const frame = texture.get('__BASE');
+      const source = texture.getSourceImage();
+      const entries = usages.filter((entry) => entry.texture === key);
+      const references: string[] = entries.map((entry) =>
+        entry.reference.replace('bone:', 'Bone: ').replace('attachment:', 'Attachment: '),
+      );
+      for (const entry of entries)
+        references.push(...entry.slots.map((slot) => `Slot: ${slot}`), ...entry.skins.map((skin) => `Skin: ${skin}`));
+      targets.push({
+        key,
+        filename: assetFilename(definition.textures[key], key),
+        url: Object.hasOwn(definition.textures, key) ? definition.textureUrl(key) : 'src' in source ? source.src : '',
+        width: frame.width,
+        height: frame.height,
+        references: [...new Set(references)],
+        individuals: entries.map((entry) => ({ reference: entry.reference, reason: frameReason(entry.frame) })),
+        reason: entries.some((entry) => frameReason(entry.frame))
+          ? 'Atlas/frame references prevent shared replacement. Select a whole-image attachment or bone, or resolve every frame first.'
+          : null,
+      });
+    }
+    const selectedKey = targets.some((target) => target.key === this.snapshot.selectedKey)
+      ? this.snapshot.selectedKey
+      : (targets[0]?.key ?? null);
+    this.publish({ targets, selectedKey });
+  }
+
   bind(
     scene: Phaser.Scene,
     puppet: Puppet,
     definition: CharacterDefinition,
     refreshAppearance: () => void = () => {},
   ): void {
-    if (this.puppet === puppet) return;
+    if (this.puppet === puppet) {
+      this.refreshAppearance = refreshAppearance;
+      this.refreshTargets();
+      return;
+    }
     this.cancel();
+    // A surviving old puppet must relinquish owned textures too, before any later collection.
+    if (this.puppet) this.install(new Map());
     if (this.textures && this.textures !== scene.textures) this.unbind();
     this.puppet = puppet;
     this.textures = scene.textures;
+    this.definition = definition;
     this.refreshAppearance = refreshAppearance;
-    const references = new Map<string, string[]>(Object.keys(definition.textures).map((key) => [key, []]));
-    const framed = new Set<string>();
-    const add = (sprite: { texture: string; frame?: string | number }, label: string): void => {
-      const entries = references.get(sprite.texture) ?? [];
-      entries.push(label);
-      references.set(sprite.texture, entries);
-      if (sprite.frame !== undefined && sprite.frame !== '__BASE') framed.add(sprite.texture);
-    };
-    for (const bone of puppet.rig.bones) if (bone.sprite) add(bone.sprite, `Bone: ${bone.id}`);
-    for (const attachment of puppet.rig.attachments) {
-      add(attachment, `Attachment: ${attachment.id}`);
-      for (const slot of puppet.rig.slots)
-        if (puppet.rig.skins.some((skin) => skin.slots[slot.id] === attachment.id)) add(attachment, `Slot: ${slot.id}`);
-      for (const skin of puppet.rig.skins)
-        if (Object.values(skin.slots).includes(attachment.id)) add(attachment, `Skin: ${skin.name}`);
-    }
-    const targets: ArtworkTarget[] = [];
-    for (const [key, entries] of references) {
-      const texture = scene.textures.get(key);
-      const frame = texture.get();
-      const source = texture.getSourceImage();
-      const url = Object.hasOwn(definition.textures, key)
-        ? definition.textureUrl(key)
-        : 'src' in source
-          ? source.src
-          : '';
-      targets.push({
-        key,
-        filename: assetFilename(definition.textures[key], key),
-        url,
-        width: frame.width,
-        height: frame.height,
-        references: [...new Set(entries)],
-        reason: framed.has(key) ? 'Atlas/frame replacement is deferred. Choose a whole-image asset.' : null,
-      });
-    }
-    // Imported rigs may stop referring to a pending asset; keep it selectable for reversion.
-    for (const previous of this.snapshot.targets)
-      if (this.applied.has(previous.key) && !references.has(previous.key))
-        targets.push({ ...previous, references: [] });
-    for (const [key, resource] of this.applied) puppet.setArtworkTexture(key, resource.key!);
-    this.refreshAppearance();
-    const selectedKey = targets.some((target) => target.key === this.snapshot.selectedKey)
-      ? this.snapshot.selectedKey
-      : (targets[0]?.key ?? null);
-    this.publish({
-      targets,
-      selectedKey,
-      applied: this.applied.get(selectedKey ?? '')?.sprite ?? null,
-      pendingCount: this.applied.size,
-      message: 'Choose an artwork asset and import a PNG or WebP.',
-    });
+    this.install(this.applied);
+    this.refreshTargets();
+    this.publish({ message: 'Choose shared artwork or one logical attachment/bone, then import a PNG or WebP.' });
   }
 
   select(key: string): void {
@@ -153,19 +214,66 @@ export class ArtworkController {
     this.cancel();
     this.publish({
       selectedKey: key,
-      applied: this.applied.get(key)?.sprite ?? null,
+      selectedReference: null,
+      policy: null,
       message: 'Ready to import a replacement.',
     });
   }
 
+  selectReference(reference: ArtworkReference | null): void {
+    this.refreshTargets();
+    const target = this.snapshot.targets.find((entry) => entry.key === this.snapshot.selectedKey);
+    if (reference && !target?.individuals.some((entry) => entry.reference === reference)) return;
+    if (reference === this.snapshot.selectedReference) return;
+    this.cancel();
+    this.publish({
+      selectedReference: reference,
+      policy: null,
+      message: reference
+        ? 'Only this logical artwork reference changes, across all slots and skins using it.'
+        : 'Shared replacement updates all uses except explicit individual replacements.',
+    });
+  }
+
+  setPolicy(policy: ArtworkAlignmentPolicy): void {
+    if (!['normalized', 'pixels', 'manual'].includes(policy)) return;
+    // Restore the baseline first so changing policies cannot compound a proposal's pivot migration.
+    if (this.snapshot.previewing) {
+      try {
+        this.install(this.applied);
+      } catch (error) {
+        this.report(error);
+        return;
+      }
+    }
+    this.publish({ policy, previewing: false, message: 'Alignment policy changed. Preview again before applying.' });
+  }
+
   async import(file: File): Promise<void> {
     this.cancel();
-    const key = this.snapshot.selectedKey;
-    const target = this.snapshot.targets.find((entry) => entry.key === key);
-    if (!target || !this.puppet || target.reason) {
-      this.publish({ message: target?.reason ?? 'Load a character and choose an artwork asset first.' });
+    if (this.candidate) return;
+    this.refreshTargets();
+    const target = this.snapshot.targets.find((entry) => entry.key === this.snapshot.selectedKey);
+    const reference = this.snapshot.selectedReference ?? undefined;
+    const reason = reference
+      ? target?.individuals.find((entry) => entry.reference === reference)?.reason
+      : target?.reason;
+    if (!target || !this.puppet || !this.textures || reason) {
+      this.publish({ message: reason ?? 'Load a character and choose an artwork reference first.' });
       return;
     }
+    if (reference && !target.individuals.some((entry) => entry.reference === reference)) {
+      this.publish({ message: 'This artwork reference was removed. Select an existing attachment or bone.' });
+      return;
+    }
+    const old = this.puppet.getArtworkReplacement(target.key, reference);
+    const oldFrame = this.textures.get(old?.textureKey ?? target.key).get('__BASE');
+    const previous = {
+      width: oldFrame.width,
+      height: oldFrame.height,
+      originScaleX: old?.originScaleX ?? 1,
+      originScaleY: old?.originScaleY ?? 1,
+    };
     const request = new AbortController();
     this.request = request;
     this.publish({ importing: true, message: 'Validating and decoding image…' });
@@ -176,110 +284,229 @@ export class ArtworkController {
         sprite.dispose();
         return;
       }
-      const resources = [...this.applied.values()].map((entry) => entry.sprite);
+      // Include retained undo data in the budget, not just textures currently visible.
+      const resources = [...this.resources].map((entry) => entry.sprite);
       if (
         resources.reduce((sum, entry) => sum + entry.bytes, sprite.bytes) > limits.maxTotalImageBytes ||
         resources.reduce((sum, entry) => sum + entry.width * entry.height, sprite.width * sprite.height) >
           limits.maxTotalImagePixels
       )
         throw new Error(
-          'Pending artwork exceeds the session budget (50 MiB or 64 megapixels). Revert an applied replacement first.',
+          'Artwork and undo data exceed the session budget (50 MiB or 64 megapixels). Reopen the character to clear session history, or import a smaller image.',
         );
-      this.candidate = { sprite, key: null, texture: null };
+      this.candidate = {
+        sprite,
+        assetKey: target.key,
+        reference,
+        previous,
+        originScaleX: previous.originScaleX,
+        originScaleY: previous.originScaleY,
+        key: null,
+        texture: null,
+      };
+      this.resources.add(this.candidate);
       this.publish({
         proposed: sprite,
+        previousSize: { width: previous.width, height: previous.height },
         importing: false,
-        message: 'Image ready. Preview it on the character before applying.',
+        policy: previous.width === sprite.width && previous.height === sprite.height ? 'normalized' : null,
+        message: 'Image ready. Choose an alignment policy for changed dimensions, then preview before applying.',
       });
     } catch (error) {
       sprite?.dispose();
-      if (!request.signal.aborted && this.request === request)
-        this.publish({ importing: false, message: error instanceof Error ? error.message : String(error) });
+      if (!request.signal.aborted && this.request === request) this.report(error, { importing: false });
     } finally {
       if (this.request === request) this.request = undefined;
     }
   }
 
+  private register(resource: SpriteResource): void {
+    if (resource.key && this.textures?.get(resource.key) === resource.texture) return;
+    const textures = this.textures;
+    if (!textures) throw new Error('Artwork preview is unavailable. Reload the character.');
+    let key: string;
+    do {
+      key = `${this.namespace}${++this.serial}`;
+    } while (textures.exists(key));
+    try {
+      const texture = textures.addImage(key, resource.sprite.image);
+      if (!texture) throw new Error('Phaser could not create the replacement texture. Try a smaller PNG.');
+      resource.key = key;
+      resource.texture = texture;
+    } catch (error) {
+      // addImage can fail after adding a cache entry. This freshly allocated key was absent before the call.
+      if (textures.exists(key)) textures.remove(key);
+      throw error;
+    }
+  }
+
+  private override(resource: SpriteResource): ArtworkReplacement {
+    return { textureKey: resource.key!, originScaleX: resource.originScaleX, originScaleY: resource.originScaleY };
+  }
+
+  /** Register first; refresh every retained consumer before releasing any displaced texture. */
+  private install(state: ArtworkState): void {
+    const puppet = this.puppet;
+    if (!puppet) return;
+    const before = this.rendered;
+    // Complete registration and validation before touching even the first active image.
+    for (const resource of state.values()) {
+      this.register(resource);
+      puppet.validateArtworkReplacement(resource.assetKey, this.override(resource), resource.reference);
+    }
+    const apply = (next: ArtworkState): void => {
+      for (const resource of next.values()) this.register(resource);
+      const all = new Map([...before, ...state]);
+      // Shared overrides install first; individual overrides always take precedence.
+      for (const resource of [...all.values()].sort((a, b) => Number(!!a.reference) - Number(!!b.reference))) {
+        const desired = next.get(identity(resource.assetKey, resource.reference));
+        puppet.setArtworkReplacement(
+          resource.assetKey,
+          desired ? this.override(desired) : undefined,
+          resource.reference,
+        );
+      }
+      this.refreshAppearance();
+    };
+    try {
+      apply(state);
+      this.rendered = new Map(state);
+    } catch (error) {
+      try {
+        apply(before);
+      } catch (rollbackError) {
+        // Track every possibly installed scope so a later Cancel/teardown can retry restoration safely.
+        this.rendered = new Map([...before, ...state]);
+        // oxlint-disable-next-line eslint/preserve-caught-error -- Both errors are retained in AggregateError.errors.
+        throw new AggregateError(
+          [error, rollbackError],
+          'Artwork refresh and rollback failed. Original asset data is retained; reload the preview.',
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+  }
+
   preview(): void {
     const candidate = this.candidate;
-    const key = this.snapshot.selectedKey;
-    if (!candidate || !key || !this.puppet || !this.textures) return;
+    if (!candidate || !this.puppet) return;
+    if (!this.snapshot.policy) {
+      this.publish({ message: 'Dimensions changed. Choose an alignment policy before previewing.' });
+      return;
+    }
+    Object.assign(candidate, replacementOriginScale(this.snapshot.policy, candidate.previous, candidate.sprite));
+    const state = new Map(this.applied).set(identity(candidate.assetKey, candidate.reference), candidate);
     try {
-      if (!candidate.key) {
-        let textureKey: string;
-        do {
-          textureKey = `${this.namespace}${++this.serial}`;
-        } while (this.textures.exists(textureKey));
-        const texture = this.textures.addImage(textureKey, candidate.sprite.image);
-        if (!texture) throw new Error('Phaser could not create the replacement texture. Try a smaller PNG.');
-        candidate.key = textureKey;
-        candidate.texture = texture;
-      }
-      this.puppet.setArtworkTexture(key, candidate.key);
-      this.refreshAppearance();
+      this.install(state);
       this.publish({
         previewing: true,
-        message: 'Preview only. Apply to keep this pending artwork change, or Cancel to restore.',
+        message:
+          this.snapshot.policy === 'manual'
+            ? 'Preview uses the current normalized origin. Apply, then realign with the artwork alignment tools.'
+            : 'Preview only. Apply to keep this artwork change, or Cancel to restore.',
       });
     } catch (error) {
-      // Keep the previous applied/original appearance usable even if texture installation fails.
-      this.puppet.setArtworkTexture(key, this.applied.get(key)?.key ?? undefined);
-      this.refreshAppearance();
-      this.publish({ previewing: false, message: error instanceof Error ? error.message : String(error) });
+      // A failed rollback may leave a consumer holding the proposed texture; retain it until teardown.
+      if (!(error instanceof AggregateError) && ![...this.rendered.values()].includes(candidate))
+        this.releaseTexture(candidate);
+      this.report(error, { previewing: false });
     }
   }
 
   apply(): void {
-    const key = this.snapshot.selectedKey;
-    if (!key || !this.candidate || !this.snapshot.previewing) return;
-    const previous = this.applied.get(key);
-    this.applied.set(key, this.candidate);
-    const sprite = this.candidate.sprite;
+    const candidate = this.candidate;
+    if (!candidate || !this.snapshot.previewing) return;
+    try {
+      // The catalog may have changed since Preview. Commit must revalidate its current frame references.
+      this.install(this.rendered);
+      this.history.change(() => {
+        this.applied.set(identity(candidate.assetKey, candidate.reference), candidate);
+      });
+    } catch (error) {
+      try {
+        this.install(this.applied);
+        this.collect();
+        this.report(error, { previewing: false });
+      } catch (rollbackError) {
+        this.report(rollbackError);
+      }
+      return;
+    }
     this.candidate = undefined;
-    if (previous) this.release(previous);
+    this.collect();
     this.publish({
       proposed: null,
-      applied: sprite,
+      previousSize: null,
       previewing: false,
-      pendingCount: this.applied.size,
-      message: 'Replacement applied as a pending session asset change. Source files have not been written.',
+      message: 'Replacement applied in this session. Artwork Undo/Redo is separate from rig and animation history.',
     });
   }
 
   cancel(): void {
     this.request?.abort();
     this.request = undefined;
-    if (this.snapshot.previewing && this.snapshot.selectedKey) {
-      this.puppet?.setArtworkTexture(
-        this.snapshot.selectedKey,
-        this.applied.get(this.snapshot.selectedKey)?.key ?? undefined,
-      );
-      this.refreshAppearance();
+    try {
+      if (this.snapshot.previewing || this.candidate?.key) this.install(this.applied);
+      this.candidate = undefined;
+      this.collect();
+      this.publish({
+        proposed: null,
+        previousSize: null,
+        previewing: false,
+        importing: false,
+        message: 'Replacement cancelled. Previous artwork restored.',
+      });
+    } catch (error) {
+      this.report(error);
     }
-    if (this.candidate) this.release(this.candidate);
-    this.candidate = undefined;
-    this.publish({
-      proposed: null,
-      previewing: false,
-      importing: false,
-      message: 'Replacement cancelled. Previous artwork restored.',
-    });
   }
 
   revert(): void {
     this.cancel();
-    const key = this.snapshot.selectedKey;
-    const resource = key ? this.applied.get(key) : undefined;
-    if (!key || !resource) return;
-    this.puppet?.setArtworkTexture(key);
-    this.refreshAppearance();
-    this.applied.delete(key);
-    this.release(resource);
-    this.publish({ applied: null, pendingCount: this.applied.size, message: 'Original artwork restored.' });
+    if (this.candidate || !this.applied.has(this.selectedIdentity)) return;
+    try {
+      this.history.change(() => {
+        const state = new Map(this.applied);
+        state.delete(this.selectedIdentity);
+        this.install(state);
+        this.applied = state;
+      });
+      this.collect();
+      this.publish({
+        message: this.snapshot.selectedReference
+          ? 'Individual replacement reverted. Shared or original artwork restored.'
+          : 'Original shared artwork restored.',
+      });
+    } catch (error) {
+      this.report(error);
+    }
   }
 
-  private release(resource: SpriteResource): void {
-    // Only remove the exact texture this controller created, never a host-owned key.
+  undo(): void {
+    this.restoreHistory('undo');
+  }
+  redo(): void {
+    this.restoreHistory('redo');
+  }
+  private restoreHistory(action: 'undo' | 'redo'): void {
+    this.cancel();
+    if (this.candidate) return;
+    try {
+      this.history[action]();
+      this.collect();
+      this.publish({ message: `Artwork ${action} complete.` });
+    } catch (error) {
+      if (!(error instanceof AggregateError)) this.collect();
+      this.report(error);
+    }
+  }
+
+  private report(error: unknown, update: Partial<ArtworkSnapshot> = {}): void {
+    this.publish({ ...update, message: error instanceof Error ? error.message : String(error) });
+  }
+
+  private releaseTexture(resource: SpriteResource): void {
     if (
       resource.key &&
       resource.texture &&
@@ -287,23 +514,51 @@ export class ArtworkController {
       this.textures.get(resource.key) === resource.texture
     )
       this.textures.remove(resource.key);
-    resource.sprite.dispose();
+    resource.key = null;
+    resource.texture = null;
+  }
+
+  private collect(): void {
+    const retained = new Set([
+      ...this.applied.values(),
+      ...this.history.retainedSnapshots.flatMap((entry) => [...entry.values()]),
+      ...(this.candidate ? [this.candidate] : []),
+    ]);
+    const visible = new Set(this.rendered.values());
+    for (const resource of this.resources) {
+      if (!visible.has(resource)) this.releaseTexture(resource);
+      if (!retained.has(resource) && !visible.has(resource)) {
+        resource.sprite.dispose();
+        this.resources.delete(resource);
+      }
+    }
   }
 
   unbind(): void {
     this.cancel();
-    for (const key of this.applied.keys()) this.puppet?.setArtworkTexture(key);
-    this.refreshAppearance();
-    for (const resource of this.applied.values()) this.release(resource);
+    this.install(new Map());
+    for (const resource of this.resources) {
+      this.releaseTexture(resource);
+      resource.sprite.dispose();
+    }
+    this.resources.clear();
     this.applied.clear();
+    this.rendered.clear();
+    this.candidate = undefined;
+    this.history = this.createHistory();
     this.puppet = undefined;
     this.textures = undefined;
+    this.definition = undefined;
     this.refreshAppearance = () => {};
     this.publish({
       targets: [],
       selectedKey: null,
-      applied: null,
-      pendingCount: 0,
+      selectedReference: null,
+      policy: null,
+      proposed: null,
+      previousSize: null,
+      previewing: false,
+      importing: false,
       message: 'Load a character to replace artwork.',
     });
   }

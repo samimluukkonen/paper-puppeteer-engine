@@ -49,6 +49,15 @@ export class SlotState {
     return entry;
   }
 
+  /** Owned, validated catalog snapshots for render-only artwork inspection. */
+  getDefinitions(): readonly Readonly<SpriteAttachmentDefinition>[] {
+    return [...this.attachments.values()];
+  }
+
+  getSkins(): readonly SkinDefinition[] {
+    return [...this.skins].map(([name, slots]) => ({ version: 1, name, slots }));
+  }
+
   getAttachment(slot: string): string | undefined {
     this.requireSlot(slot);
     return this.assigned.get(slot);

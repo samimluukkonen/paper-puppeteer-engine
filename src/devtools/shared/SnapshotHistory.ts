@@ -26,6 +26,11 @@ export class SnapshotHistory<Entry> {
     return this.operation !== undefined;
   }
 
+  /** Resources owned by snapshots can be collected only after all history references disappear. */
+  get retainedSnapshots(): readonly Entry[] {
+    return [...this.past, ...this.future, ...(this.operation ? [this.operation.before] : [])];
+  }
+
   beginOperation(): void {
     this.operation ??= { before: this.capture() };
   }

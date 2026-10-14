@@ -31,7 +31,7 @@ The v0.5.8.2 [visual artwork alignment](docs/visual-artwork-alignment.md) adds e
 
 The v0.5.8.3 [Animation Editor Rig-Tweak Mode](docs/animation-rig-tweak.md) reuses rig joint/artwork/slot tools at the paused animation pose. Rig and animation histories, dirty states and exports remain independent; rig changes reevaluate the animation and IK without creating keys.
 
-The v0.5.8.4 [Visual Attachment & Skin Management](docs/visual-attachment-skins.md) adds visual slot assignment, stable attachment creation, sparse skin authoring and immediate skin previews. Rig history and separate manifest skin downloads preserve animation data and existing JSON formats.
+The v0.5.8.5 [Safe Sprite Replacement & Hot Reload](docs/sprite-replacement.md) adds explicit shared/individual artwork scopes, dimension and pivot policies, transactional preview refresh and independent artwork Undo/Redo. Stable attachment IDs, skins, slots, rig transforms and existing animations remain intact.
 
 The v0.5.7.2 [timeline navigation and zoom](docs/timeline-navigation.md) adds pointer-anchored zoom, horizontal panning, fit/center commands, precise seconds/frame input and optional playhead follow. Navigation preserves authored data and selection.
 
