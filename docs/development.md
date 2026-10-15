@@ -216,6 +216,8 @@ Complete character downloads use the existing version-1 formats; see the [artist
 
 Runtime package previews lease temporary image URLs and own an independent Phaser game/texture manager. Metadata passes through `CharacterLoader`; `loadSceneCharacter` accepts an already loaded immutable definition and still yields asynchronously before checking the scene's active flag. Preview shutdown cancels texture loads and destroys puppets; game destruction releases the URL lease. Do not serialize runtime blob URLs or private artwork texture keys into a package.
 
+The [v0.6.4 standalone integration guide](runtime-integration.md) documents exported package structure, asset loading, coordinates, scene/texture ownership and the independent consumer project. `npm run test:package` also runs that project's actual Node tests and production build against the packed library; its browser smoke tests remain local-only. The root lint/typecheck scope excludes this independently installed project; its own strict TypeScript check runs in the packed consumer build without checkout aliases.
+
 ## Use as a local package
 
 `new Rig(existingRig)` shares its validated immutable skeleton and indexes. Pass a second skin array to create a rig with independently validated, owned skins: `new Rig(existingRig, skins)`. The rig editor uses this to retain authored skins separately from preview skins, and its working copy stays independent of the shared source skeleton. New JSON imports still receive full rig validation.

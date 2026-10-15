@@ -912,3 +912,70 @@ test('ZIP size budgets include the exact UTF-8 filename and directory bytes befo
   const files = new Map(Array.from({ length: 256 }, (_, index) => [`${'图'.repeat(500)}/${index}.png`, bytes]));
   assert.throws(() => encodePackageZip(files), /exceeds 100 MiB/);
 });
+
+test.each(['IMAGEs/part.png', 'images', 'images/part.png/child'])(
+  'validation rejects portable file collisions before opening a preview: %s',
+  async (path) => {
+    const files = new Map(await buildCharacterPackage(fixture(), fetchImage));
+    files.set(path, png);
+    await rejected(validatePackage(files), /Duplicate|collision/);
+  },
+);
+
+test('image aliases consume one binary/pixel budget and are fetched and decoded once', async () => {
+  const source = fixture();
+  const data = {
+    manifest: {
+      ...manifest,
+      textures: Object.fromEntries(
+        Array.from({ length: 6 }, (_, index) => [index ? `alias${index}` : 'shared', 'images/part.png']),
+      ),
+    },
+    rig: source.rig,
+    skins: Object.fromEntries(
+      source.skins.map((skin) => [manifest.skins[skin.name as keyof typeof manifest.skins], skin]),
+    ),
+    animations: { 'animations/move.json': { ...source.animations[0], version: 1 } },
+    poses: { 'poses/ready.json': source.definition.poses[0] },
+  };
+  const largeHeader = new Uint8Array(png);
+  const view = new DataView(largeHeader.buffer);
+  view.setUint32(16, 4096);
+  view.setUint32(20, 4096);
+  const fetcher = vi.fn<typeof fetch>(() => Promise.resolve(new Response(largeHeader)));
+  // Node performs header validation; six aliases of 16 megapixels must count as 16, not 96.
+  const files = await buildCharacterPackage({ ...source, definition: CharacterDefinition.fromData(data) }, fetcher);
+  assert.equal(fetcher.mock.calls.length, 1);
+  const decode = vi.fn(() => Promise.resolve());
+  vi.stubGlobal(
+    'Image',
+    class {
+      src = '';
+      naturalWidth = 4096;
+      naturalHeight = 4096;
+      decode = decode;
+    },
+  );
+  await validatePackage(files);
+  assert.equal(decode.mock.calls.length, 1);
+});
+
+test.each([
+  ['rigs/body.json', { ...fixture().rig, version: 99 }, /Unsupported|version/],
+  ['skins/base.json', { version: 99, name: 'default', slots: {} }, /Invalid input|version/],
+  ['skins/base.json', { version: 1, name: 'default', slots: { missing: 'part' } }, /slot/],
+  [
+    'animations/move.json',
+    { version: 1, name: 'move', duration: 1000, loop: true, tracks: { missing: [{ time: 0, x: 1 }] } },
+    /bone/,
+  ],
+  [
+    'animations/move.json',
+    { version: 99, name: 'move', duration: 1000, loop: true, tracks: {} },
+    /Unsupported|version/,
+  ],
+] as const)('export validation rejects incompatible document %s', async (path, data, error) => {
+  const files = new Map(await buildCharacterPackage(fixture(), fetchImage));
+  files.set(path, new TextEncoder().encode(JSON.stringify(data)));
+  await rejected(validatePackage(files), error);
+});

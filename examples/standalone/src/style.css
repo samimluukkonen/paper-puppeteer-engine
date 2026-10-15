@@ -1,0 +1,23 @@
+body {
+  margin: 1.5rem auto;
+  max-width: 800px;
+  padding: 0 1rem;
+  font:
+    16px system-ui,
+    sans-serif;
+  color: #29251f;
+  background: #faf7f1;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+button {
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+canvas {
+  max-width: 100%;
+  height: auto;
+}

@@ -117,4 +117,10 @@ test('the minimal runtime example imports only the public runtime barrel and Pha
     { specifier: 'phaser', typeOnly: true },
     { specifier: '../engine/runtime.js', typeOnly: false },
   ]);
+  const standalone = readFileSync(new URL('../examples/standalone/src/main.ts', import.meta.url), 'utf8');
+  assert.deepEqual(dependencies(standalone), [
+    { specifier: 'paper-puppeteer-engine/runtime', typeOnly: false },
+    { specifier: 'phaser', typeOnly: false },
+    { specifier: './style.css', typeOnly: false },
+  ]);
 });

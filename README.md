@@ -76,8 +76,11 @@ scene.load.start();
 
 `scene` is your Phaser scene. Serve the sample folder from `public/characters/demo-puppet/` at the URL above, or use your own character manifest. The puppet updates automatically with the scene. For Node asset tooling, use the renderer-independent `paper-puppeteer-engine/core` entry point.
 
+v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
+
 ## Guides
 
+- [Standalone character runtime integration](docs/runtime-integration.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Schema inventory, compatibility policy and canonical serialization](docs/schema-compatibility.md)
 

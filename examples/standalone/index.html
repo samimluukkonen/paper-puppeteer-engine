@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paper Puppeteer standalone consumer</title>
+  </head>
+  <body>
+    <h1>Standalone runtime consumer</h1>
+    <p>Extract an editor character ZIP into public/character/ to try your own export.</p>
+    <nav aria-label="Playback">
+      <button data-clip="idle" disabled>Idle</button>
+      <button data-clip="walk" disabled>Walk</button>
+      <button data-clip="sword" disabled>Sword</button>
+      <button data-clip="reach" disabled>IK reach</button>
+      <button data-clip="baked" disabled>Baked reach</button>
+      <button id="skin" disabled>Switch skin</button>
+      <button id="dispose">Clean up</button>
+    </nav>
+    <p id="status" role="status">Loading character…</p>
+    <p id="event" aria-live="polite">Waiting for animation event…</p>
+    <div id="stage"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

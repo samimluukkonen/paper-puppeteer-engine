@@ -1,0 +1,321 @@
+{
+  "attachments": [
+    {
+      "id": "pelvisDefault",
+      "originY": 0.4,
+      "texture": "paper-pelvis"
+    },
+    {
+      "id": "pelvisArmored",
+      "originY": 0.4,
+      "texture": "paper-armor-pelvis"
+    },
+    {
+      "id": "torsoDefault",
+      "originY": 1,
+      "texture": "paper-torso",
+      "y": 8
+    },
+    {
+      "id": "torsoArmored",
+      "originY": 1,
+      "texture": "paper-armor-torso",
+      "y": 8
+    },
+    {
+      "id": "headDefault",
+      "originX": 0.5,
+      "originY": 0.86,
+      "texture": "paper-head",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "headArmored",
+      "originY": 0.86,
+      "texture": "paper-helmet-head"
+    },
+    {
+      "id": "leftUpperArmDefault",
+      "originY": 0.15384615384615385,
+      "texture": "paper-left-upper-arm"
+    },
+    {
+      "id": "leftForearmDefault",
+      "originY": 0.1791044776119403,
+      "texture": "paper-left-forearm"
+    },
+    {
+      "id": "leftHandDefault",
+      "originY": 0.2,
+      "texture": "paper-left-hand"
+    },
+    {
+      "id": "rightUpperArmDefault",
+      "originY": 0.15384615384615385,
+      "texture": "paper-right-upper-arm"
+    },
+    {
+      "id": "rightForearmDefault",
+      "originY": 0.1791044776119403,
+      "texture": "paper-right-forearm"
+    },
+    {
+      "id": "rightHandDefault",
+      "originY": 0.2,
+      "texture": "paper-right-hand"
+    },
+    {
+      "id": "leftThighDefault",
+      "originY": 0.1590909090909091,
+      "texture": "paper-left-thigh"
+    },
+    {
+      "id": "leftLowerLegDefault",
+      "originY": 0.15,
+      "texture": "paper-left-shin"
+    },
+    {
+      "id": "leftFootDefault",
+      "originX": 0.28,
+      "originY": 0.3,
+      "texture": "paper-left-foot"
+    },
+    {
+      "id": "rightThighDefault",
+      "originY": 0.1590909090909091,
+      "texture": "paper-right-thigh"
+    },
+    {
+      "id": "rightLowerLegDefault",
+      "originY": 0.15,
+      "texture": "paper-right-shin"
+    },
+    {
+      "id": "rightFootDefault",
+      "originX": 0.28,
+      "originY": 0.3,
+      "texture": "paper-right-foot"
+    },
+    {
+      "id": "rightHandGrip",
+      "originY": 0.2,
+      "texture": "paper-right-grip-hand"
+    },
+    {
+      "id": "kabuto",
+      "originY": 0.75,
+      "texture": "paper-kabuto",
+      "y": -12
+    },
+    {
+      "id": "katana",
+      "originX": 0.13333333333333333,
+      "originY": 0.5,
+      "rotation": -0.65,
+      "texture": "paper-slot-katana"
+    }
+  ],
+  "bones": [
+    {
+      "id": "root"
+    },
+    {
+      "id": "pelvis",
+      "parent": "root"
+    },
+    {
+      "depth": 2,
+      "id": "torso",
+      "parent": "pelvis",
+      "y": -16
+    },
+    {
+      "depth": 2,
+      "id": "head",
+      "parent": "torso",
+      "y": -106
+    },
+    {
+      "depth": -1,
+      "id": "leftUpperArm",
+      "parent": "torso",
+      "rotation": -0.12,
+      "x": 38,
+      "y": -86
+    },
+    {
+      "depth": 1,
+      "id": "leftForearm",
+      "parent": "leftUpperArm",
+      "rotation": -0.12,
+      "y": 60
+    },
+    {
+      "depth": 1,
+      "id": "leftHand",
+      "parent": "leftForearm",
+      "y": 54
+    },
+    {
+      "depth": 3,
+      "id": "rightUpperArm",
+      "parent": "torso",
+      "rotation": 0.12,
+      "x": -38,
+      "y": -86
+    },
+    {
+      "depth": 1,
+      "id": "rightForearm",
+      "parent": "rightUpperArm",
+      "rotation": -0.12,
+      "y": 60
+    },
+    {
+      "depth": 1,
+      "id": "rightHand",
+      "parent": "rightForearm",
+      "y": 54
+    },
+    {
+      "depth": -2,
+      "id": "leftThigh",
+      "parent": "pelvis",
+      "rotation": -0.04,
+      "x": 20,
+      "y": 12
+    },
+    {
+      "depth": 1,
+      "id": "leftLowerLeg",
+      "parent": "leftThigh",
+      "rotation": 0.08,
+      "y": 68
+    },
+    {
+      "depth": 1,
+      "id": "leftFoot",
+      "parent": "leftLowerLeg",
+      "rotation": -0.04,
+      "y": 64
+    },
+    {
+      "depth": 1,
+      "id": "rightThigh",
+      "parent": "pelvis",
+      "rotation": -0.04,
+      "x": -20,
+      "y": 12
+    },
+    {
+      "depth": 1,
+      "id": "rightLowerLeg",
+      "parent": "rightThigh",
+      "rotation": 0.08,
+      "y": 68
+    },
+    {
+      "depth": 1,
+      "id": "rightFoot",
+      "parent": "rightLowerLeg",
+      "rotation": -0.04,
+      "y": 64
+    }
+  ],
+  "ik": [
+    {
+      "bendDirection": -1,
+      "endBone": "rightHand",
+      "middleBone": "rightForearm",
+      "name": "rightArmIK",
+      "rootBone": "rightUpperArm"
+    },
+    {
+      "bendDirection": 1,
+      "endBone": "rightFoot",
+      "middleBone": "rightLowerLeg",
+      "name": "rightLegIK",
+      "priority": 2,
+      "rootBone": "rightThigh"
+    }
+  ],
+  "name": "paper-puppet",
+  "root": "root",
+  "slots": [
+    {
+      "bone": "pelvis",
+      "id": "pelvisVisual"
+    },
+    {
+      "bone": "torso",
+      "id": "torsoVisual"
+    },
+    {
+      "bone": "head",
+      "id": "headVisual"
+    },
+    {
+      "bone": "leftUpperArm",
+      "depth": -30,
+      "id": "leftUpperArmVisual"
+    },
+    {
+      "bone": "leftForearm",
+      "depth": -20,
+      "id": "leftForearmVisual"
+    },
+    {
+      "bone": "leftHand",
+      "depth": -10,
+      "id": "leftHandVisual"
+    },
+    {
+      "bone": "rightUpperArm",
+      "id": "rightUpperArmVisual"
+    },
+    {
+      "bone": "rightForearm",
+      "id": "rightForearmVisual"
+    },
+    {
+      "bone": "rightHand",
+      "id": "rightHandVisual"
+    },
+    {
+      "bone": "leftThigh",
+      "id": "leftThighVisual"
+    },
+    {
+      "bone": "leftLowerLeg",
+      "id": "leftLowerLegVisual"
+    },
+    {
+      "bone": "leftFoot",
+      "id": "leftFootVisual"
+    },
+    {
+      "bone": "rightThigh",
+      "id": "rightThighVisual"
+    },
+    {
+      "bone": "rightLowerLeg",
+      "id": "rightLowerLegVisual"
+    },
+    {
+      "bone": "rightFoot",
+      "id": "rightFootVisual"
+    },
+    {
+      "bone": "head",
+      "id": "headwear",
+      "y": -42
+    },
+    {
+      "bone": "rightHand",
+      "id": "rightHandItem",
+      "y": 15
+    }
+  ],
+  "version": 1
+}

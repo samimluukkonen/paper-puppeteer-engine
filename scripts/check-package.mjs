@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -14,7 +14,11 @@ const installed = createRequire(new URL('../package.json', import.meta.url));
 const manifest = await readPackageManifest(new URL('../package.json', import.meta.url));
 const temporary = await mkdtemp(join(tmpdir(), 'paper-puppeteer-package-'));
 const consumer = join(temporary, 'consumer');
-const env = { ...process.env, npm_config_cache: join(temporary, 'npm-cache') };
+const env = {
+  ...process.env,
+  npm_config_cache: join(temporary, 'npm-cache'),
+  PATH: `${join(root, 'node_modules/.bin')}:${process.env.PATH}`,
+};
 /**
  * @param {string[]} args
  * @param {string} [cwd]
@@ -62,6 +66,8 @@ try {
     'animation-editor.md',
     'rig-editor.md',
     'runtime-api.md',
+    'runtime-integration.md',
+    'artist-workflow.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 
@@ -220,8 +226,19 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
         );
     }
   }
+  // Run the real standalone project's commands against the packed install in a separate directory.
+  // The checkout supplies only build tools through PATH; package imports resolve the tarball above.
+  const standalone = join(temporary, 'standalone');
+  await cp(join(root, 'examples/standalone'), standalone, {
+    recursive: true,
+    filter: (path) => !['node_modules', 'dist', 'test-results', 'playwright-report'].includes(path.split('/').at(-1)),
+  });
+  await symlink(join(consumer, 'node_modules'), join(standalone, 'node_modules'), 'dir');
+  npm(['run', 'test'], standalone);
+  npm(['run', 'build'], standalone);
+  await readFile(join(standalone, 'dist/character/character.json'));
   console.log(
-    'Packed package works in an isolated consumer: documentation, Node entry points, public declarations, runtime example, compatibility, and browser isolation.',
+    'Packed package works in an isolated consumer: documentation, Node entry points, public declarations, runtime example, compatibility, browser isolation, and standalone test/build.',
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

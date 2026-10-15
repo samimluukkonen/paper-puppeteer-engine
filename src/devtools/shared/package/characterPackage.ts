@@ -9,7 +9,7 @@ import type { DeepReadonly } from '../../../engine/readonlyData.js';
 import type { SkinDefinition, SpriteDefinition, SpriteAttachmentDefinition } from '../../../engine/types.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
-import { PACKAGE_MAX_FILE_BYTES, packagePath } from './packageZip.js';
+import { PACKAGE_MAX_FILE_BYTES, packagePath, validatePackageFiles } from './packageZip.js';
 
 export interface PackageSnapshot {
   readonly definition: CharacterDefinition;
@@ -73,7 +73,8 @@ export function loadPackageDefinition(files: PackageFiles, signal?: AbortSignal)
 
 /** Metadata, static frame references, image headers and aggregate budgets are checked before download/import. */
 export async function validatePackage(files: PackageFiles, signal?: AbortSignal): Promise<CharacterDefinition> {
-  for (const path of files.keys()) packagePath(path);
+  signal?.throwIfAborted();
+  validatePackageFiles(files);
   const definition = await loadPackageDefinition(files, signal);
   const manifest = definition.manifest!;
   const metadata = [
@@ -91,6 +92,7 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
     pixels = 0;
   for (const [key, path] of Object.entries(manifest.textures)) {
     if (folded.includes(path.toLowerCase())) throw new Error(`Image "${key}" collides with metadata at "${path}".`);
+    if (images.has(path)) continue;
     const bytes = files.get(path);
     if (!bytes) throw new Error(`Missing image "${path}" for texture "${key}".`);
     if (bytes.length > PACKAGE_MAX_FILE_BYTES) throw new Error(`Image "${path}" exceeds 10 MiB.`);
@@ -281,12 +283,13 @@ export async function buildCharacterPackage(
   let includedImageBytes = 0;
   for (const [key, path] of Object.entries(manifest.textures)) {
     signal.throwIfAborted();
-    const bytes = textures.get(key) ?? (await readImage(definition.textureUrl(key), fetcher, signal));
-    includedImageBytes += bytes.length;
-    if (includedImageBytes > 50 * 1024 * 1024) throw new Error('Package images exceed 50 MiB.');
+    const bytes =
+      textures.get(key) ?? files.get(path) ?? (await readImage(definition.textureUrl(key), fetcher, signal));
     const existing = files.get(path);
     if (existing && existing.length === bytes.length && existing.every((byte, index) => byte === bytes[index]))
       continue;
+    includedImageBytes += bytes.length;
+    if (includedImageBytes > 50 * 1024 * 1024) throw new Error('Package images exceed 50 MiB.');
     add(path, bytes);
   }
   json('character.json', manifest);

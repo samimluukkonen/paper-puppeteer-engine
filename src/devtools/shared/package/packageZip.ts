@@ -30,7 +30,8 @@ function crc32(bytes: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function checkFiles(files: ReadonlyMap<string, Uint8Array>): void {
+/** Check the same portable file layout before validation, previews and ZIP encoding. */
+export function validatePackageFiles(files: ReadonlyMap<string, Uint8Array>): void {
   if (!files.size || files.size > PACKAGE_MAX_FILES) throw new Error('Package must contain 1–256 files.');
   let total = 22;
   const paths = new Set<string>();
@@ -42,11 +43,20 @@ function checkFiles(files: ReadonlyMap<string, Uint8Array>): void {
     if (!bytes.length || bytes.length > PACKAGE_MAX_FILE_BYTES) throw new Error(`"${path}" must be 1 byte–10 MiB.`);
     total += bytes.length + 76 + new TextEncoder().encode(path).length * 2;
   }
+  // A file cannot also be an extraction directory (including on case-insensitive hosts).
+  for (const path of paths) {
+    const parts = path.split('/');
+    parts.pop();
+    while (parts.length) {
+      if (paths.has(parts.join('/'))) throw new Error(`Package file/directory collision at "${path}".`);
+      parts.pop();
+    }
+  }
   if (total > PACKAGE_MAX_BYTES) throw new Error('Package exceeds 100 MiB.');
 }
 
 export function encodePackageZip(files: ReadonlyMap<string, Uint8Array>): Uint8Array<ArrayBuffer> {
-  checkFiles(files);
+  validatePackageFiles(files);
   const encoder = new TextEncoder();
   const entries = [...files].map(([path, bytes]) => ({ name: encoder.encode(path), bytes, crc: crc32(bytes) }));
   const size = entries.reduce((sum, entry) => sum + 76 + entry.name.length * 2 + entry.bytes.length, 22);
@@ -145,6 +155,6 @@ export function decodePackageZip(bytes: Uint8Array): ReadonlyMap<string, Uint8Ar
     offset = entryEnd;
   }
   if (offset !== end || localEnd !== central) throw new Error('Invalid ZIP layout.');
-  checkFiles(files);
+  validatePackageFiles(files);
   return files;
 }

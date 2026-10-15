@@ -2,7 +2,9 @@
 
 [All guides](../README.md#guides)
 
-The v0.6.3 character workspace keeps rig, artwork, skins and animation documents together. Both editor views offer **Character package** above the command bar. This combines current authored data with applied artwork into a downloadable ZIP, validates the result, and provides an isolated production runtime preview.
+The v0.6.4 character workspace keeps rig, artwork, skins and animation documents together. Both editor views offer **Character package** above the command bar. This combines current authored data with applied artwork into a downloadable ZIP, validates the result, and provides an isolated production runtime preview.
+
+The [standalone developer guide](runtime-integration.md) takes the exported character into another Phaser application without editor code.
 
 ## Preparing artwork
 
@@ -46,19 +48,16 @@ Opening an editor in a separate browser tab or typing its URL starts a separate 
 
 Existing relative metadata/image paths are retained when possible. A shared replacement keeps its texture key and image path when the extension matches and no other texture key uses that path. Replacing an aliased source image or switching PNG/WebP generates a distinct matching image path. Individual overrides get distinct deterministic texture keys/image paths while bone/attachment/slot/skin identities remain unchanged. Generated clip, skin and image filenames receive numeric suffixes when they collide after sanitization or case folding. Conflicts between existing manifest paths still block export. Pixel-preserving pivots serialize into ordinary normalized origins; pivots outside 0..1 use an equivalent artwork offset, including attachment rotation/scale, to preserve rendering without extending the format.
 
-```ts
-import { CharacterLoader, Puppet, queueCharacterTextures } from 'paper-puppeteer-engine';
+The verified [standalone consumer](https://github.com/samimluukkonen/paper-puppeteer-engine/tree/master/examples/standalone) uses this public API inside its Phaser scene:
 
-const definition = await CharacterLoader.load('/characters/my-puppet/character.json');
-// In your Phaser scene, queue artwork before creating the puppet:
-const release = queueCharacterTextures(scene, definition, { allowWebp: true });
-scene.load.once('complete', () => {
-  release();
-  const puppet = new Puppet(scene, { definition, x: 400, y: 500 });
-  puppet.play(definition.animations[0]!.name);
-});
-scene.load.start();
+```ts
+const url = new URL('character/character.json', document.baseURI).href;
+const definition = await loadSceneCharacter(this, url, { allowWebp: true });
+if (!definition) return; // Shutdown while fetching metadata or decoding images.
+const puppet = new Puppet(this, { definition, x: 380, y: 380 });
 ```
+
+It imports `loadSceneCharacter` and `Puppet` from `paper-puppeteer-engine/runtime`, then calls `puppet.play('idle')`. See the [developer guide](runtime-integration.md) for the full verified excerpts, event/skin controls and resource cleanup.
 
 Use `allowWebp: true` when the package contains static WebP. PNG and WebP dimensions are checked before decoding; animated WebP and other formats remain rejected. Runtime texture-key uniqueness across characters remains the host application's responsibility. Scene hosts should follow the cancelable loading pattern in the development guide for shutdown/error handling. Runtime facing is a host option; the package retains authored transforms and animation/mirroring results, not editor-only facing, camera, onion, mirror or IK preview settings. Add preview-only IK chains to the authored rig if production clips need them.
 

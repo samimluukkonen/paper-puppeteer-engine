@@ -1,0 +1,25 @@
+{
+  "name": "paper-puppeteer-standalone-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "test:browser": "npm run build && playwright test"
+  },
+  "dependencies": {
+    "paper-puppeteer-engine": "file:../../dist/paper-puppeteer-engine-0.6.4.tgz",
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.1"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
