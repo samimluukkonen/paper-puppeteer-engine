@@ -109,6 +109,8 @@
 #dirty-status {
   /* Reserve the status line before loading so Phaser's initial canvas bounds stay current. */
   min-height: 1.6em;
+  display: flex;
+  align-items: center;
   color: var(--attention-fg);
   font-weight: 600;
 }
