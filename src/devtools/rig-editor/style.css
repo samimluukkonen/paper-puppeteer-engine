@@ -113,7 +113,6 @@
   font-weight: 600;
 }
 #validation {
-  margin-top: 12px;
   color: var(--attention-fg);
   font-size: 11px;
   line-height: 1.5;
@@ -133,7 +132,6 @@
   color: var(--accent-fg);
   font-size: 11px;
   line-height: 1.5;
-  margin-top: 12px;
 }
 .action-grid {
   display: grid;
