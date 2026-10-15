@@ -15,6 +15,8 @@ type AnimationEntry = {
   saved: ReadonlyAnimation | null;
   issues: readonly ValidationIssue[];
   path?: string;
+  working?: ReadonlyAnimation | null;
+  history?: SnapshotHistory<ReadonlyAnimation | null>;
 };
 
 export interface AnimationEditorStateOptions {
@@ -82,6 +84,16 @@ export class AnimationEditorDocument {
     this.cachedDirty ??= !equalEditorData(this.working, this.saved);
     return this.cachedDirty;
   }
+  get hasUnsavedChanges(): boolean {
+    return (
+      this.dirty ||
+      [...this.animations.entries()].some(
+        ([id, entry]) =>
+          id !== this.selectedId && entry.working !== undefined && !equalEditorData(entry.working, entry.saved),
+      )
+    );
+  }
+
   get validationIssues(): readonly ValidationIssue[] {
     return this.issues;
   }
@@ -121,14 +133,14 @@ export class AnimationEditorDocument {
   /** All committed session clips plus the current authored snapshot; no selection/history changes. */
   packageAnimations(): readonly ReadonlyAnimation[] {
     return [...this.animations.entries()].flatMap(([id, entry]) => {
-      const clip = id === this.selectedId ? this.working : entry.saved;
+      const clip = id === this.selectedId ? this.working : (entry.working ?? entry.saved);
       return clip ? [clip] : [];
     });
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
-  selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
-    if (this.dirty && !options.discardChanges) {
+  selectAnimation(id: string | null, options: { discardChanges?: boolean; keepChanges?: boolean } = {}): boolean {
+    if (this.dirty && !options.discardChanges && !options.keepChanges) {
       this.issues = [
         { severity: 'error', message: 'Unsaved animation changes; download, discard, or undo edits before selecting.' },
       ];
@@ -139,14 +151,23 @@ export class AnimationEditorDocument {
       this.issues = entry?.issues ?? [{ severity: 'error', message: `Animation "${id}" is missing.` }];
       return false;
     }
+    const previous = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
+    if (previous) {
+      previous.working = options.discardChanges ? this.saved : this.working;
+      if (options.discardChanges) delete previous.history;
+      else previous.history = this.history;
+    }
     this.source = entry?.source ?? null;
     // Edits replace immutable snapshots; retain their identity for validation and preview caches.
-    this.working = entry?.saved ?? null;
+    this.working =
+      options.discardChanges && id === this.selectedId
+        ? (entry?.saved ?? null)
+        : (entry?.working ?? entry?.saved ?? null);
     this.selectedId = id;
     this.issues = [];
-    this.saved = this.working;
-    this.cachedDirty = false;
-    this.history = this.createHistory();
+    this.saved = entry?.saved ?? null;
+    this.cachedDirty = this.working === this.saved ? false : undefined;
+    this.history = options.keepChanges ? (entry?.history ?? this.createHistory()) : this.createHistory();
     return true;
   }
 
@@ -157,7 +178,16 @@ export class AnimationEditorDocument {
       this.reportIssues(result.issues);
       return false;
     }
-    if (this.dirty && options.confirmDiscard && !options.confirmDiscard()) return false;
+    const replacing = this.animations.get(result.data.name);
+    const replacingDirty = replacing?.working !== undefined && !equalEditorData(replacing.working, replacing.saved);
+    if ((this.dirty || replacingDirty) && options.confirmDiscard && !options.confirmDiscard()) return false;
+    if (this.selectedId !== result.data.name) {
+      const current = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
+      if (current) {
+        current.working = this.working;
+        current.history = this.history;
+      }
+    }
     const source = result.data;
     const working = source;
     const path = this.animations.get(source.name)?.path;

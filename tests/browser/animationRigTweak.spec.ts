@@ -27,21 +27,21 @@ test('paused elbow tweak, separate history, export/reload and continued animatio
   await page.keyboard.press('Space');
   await expect(page.locator('#timeline-time-input')).toHaveValue(time);
   await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
-  const y = page.locator('#inspector input[data-scope="bone"][data-field="y"]');
+  const y = page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]');
   await expect(y).toHaveValue('60');
   const canvas = page.locator('#animation-stage canvas');
   const before = await canvas.screenshot();
   await y.fill('80');
   await y.press('Tab');
   await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
-  await expect(page.locator('#dirty-status')).toHaveText('Rig: Modified');
+  await expect(page.locator('#tweak-dirty-status')).toHaveText('Rig: Modified');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.getByText('Editing rig data · Playback paused', { exact: true }).click();
   await page.keyboard.press('Delete');
-  await page.locator('#undo').click();
+  await page.locator('#tweak-undo').click();
   await expect(y).toHaveValue('60');
   await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(true);
-  await page.locator('#redo').click();
+  await page.locator('#tweak-redo').click();
   await expect(y).toHaveValue('80');
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('animation');
   expect(await downloadAnimation()).toBe(original);
@@ -51,7 +51,7 @@ test('paused elbow tweak, separate history, export/reload and continued animatio
   await expect.poll(async () => page.locator('#timeline-time-input').inputValue()).not.toBe('0.7');
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('rig-tweak');
   const waiting = page.waitForEvent('download');
-  await page.locator('#download-json').click();
+  await page.locator('#tweak-download-json').click();
   const download = await waiting;
   expect(download.suggestedFilename()).toBe('rig.json');
   const path = await download.path();
@@ -59,16 +59,16 @@ test('paused elbow tweak, separate history, export/reload and continued animatio
   const rigText = await readFile(path, 'utf8');
   const rig = rigDefinitionSchema.parse(JSON.parse(rigText));
   expect(rig.bones.find((bone) => bone.id === 'leftForearm')!.y).toBe(80);
-  await expect(page.locator('#dirty-status')).toHaveText('Rig: Clean');
+  await expect(page.locator('#tweak-dirty-status')).toHaveText('Rig: Clean');
   await page.locator('.rig-tweak-panel').getByText('Rig file tools', { exact: true }).click();
-  await page.locator('#reload-original').click();
+  await page.locator('#tweak-reload-original').click();
   await expect(y).toHaveValue('60');
-  await page.locator('#reload-exported').click();
+  await page.locator('#tweak-reload-exported').click();
   await expect(y).toHaveValue('80');
   await page
-    .locator('#load-json')
+    .locator('#tweak-load-json')
     .setInputFiles({ name: 'rig.json', mimeType: 'application/json', buffer: Buffer.from(rigText) });
-  await expect(page.locator('#action-feedback')).toContainText('loaded and validated');
+  await expect(page.locator('#tweak-action-feedback')).toContainText('loaded and validated');
   await expect(y).toHaveValue('80');
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('animation');
   expect(await downloadAnimation()).toBe(original);
@@ -79,8 +79,8 @@ test('unsaved rig tweaks survive navigation to the Rig Editor and recover into i
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('rig-tweak');
   await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
-  await page.locator('#inspector input[data-scope="bone"][data-field="y"]').fill('77');
-  await page.locator('#inspector input[data-scope="bone"][data-field="y"]').press('Tab');
+  await page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]').fill('77');
+  await page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]').press('Tab');
   const dialogs: string[] = [];
   page.on('dialog', async (dialog) => {
     dialogs.push(dialog.type());
@@ -90,5 +90,5 @@ test('unsaved rig tweaks survive navigation to the Rig Editor and recover into i
   await expect(page.locator('#rig-draft-status')).toContainText('Draft restored');
   await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
   await expect(page.locator('#inspector input[data-scope="bone"][data-field="y"]')).toHaveValue('77');
-  expect(dialogs).toContain('confirm');
+  expect(dialogs).toContain('beforeunload');
 });

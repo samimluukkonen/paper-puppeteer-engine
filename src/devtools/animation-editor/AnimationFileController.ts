@@ -141,7 +141,9 @@ export class AnimationFileController {
     let cancelled = false;
     const imported = run({
       confirmDiscard: () => {
-        cancelled = !window.confirm('Discard unsaved animation changes and replace the current animation session?');
+        cancelled = !window.confirm(
+          'Import or reload this animation? Pending edits to a clip with the imported name will be replaced. Other clips will be kept.',
+        );
         return !cancelled;
       },
     });

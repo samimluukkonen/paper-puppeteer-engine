@@ -9,7 +9,7 @@ export function RigTweakPanel({ active }: { active: boolean }) {
       </p>
       <label>
         Edit{' '}
-        <select id="edit-mode">
+        <select id="tweak-edit-mode">
           <option value="joint">Joint Editing</option>
           <option value="sprite">Artwork Offset Editing</option>
           <option value="origin">Sprite Origin Editing</option>
@@ -18,7 +18,7 @@ export function RigTweakPanel({ active }: { active: boolean }) {
       </label>
       <label>
         Grid{' '}
-        <select id="grid-snap">
+        <select id="tweak-grid-snap">
           {[0, 1, 2, 5, 10].map((value) => (
             <option key={value} value={value}>
               {value || 'Off'}
@@ -28,7 +28,7 @@ export function RigTweakPanel({ active }: { active: boolean }) {
       </label>
       <label>
         Rotation snap{' '}
-        <select id="rotation-snap">
+        <select id="tweak-rotation-snap">
           {[0, 1, 5, 15].map((value) => (
             <option key={value} value={value}>
               {value ? `${value}°` : 'Off'}
@@ -37,60 +37,63 @@ export function RigTweakPanel({ active }: { active: boolean }) {
         </select>
       </label>
       <div className="action-grid">
-        <button id="undo" type="button">
+        <button id="tweak-undo" type="button">
           Undo rig
         </button>
-        <button id="redo" type="button">
+        <button id="tweak-redo" type="button">
           Redo rig
         </button>
       </div>
-      <span id="dirty-status" role="status" />
-      <div id="hierarchy" role="tree" aria-label="Rig hierarchy" />
-      <div id="inspector" />
+      <span id="tweak-dirty-status" role="status" />
+      <div id="tweak-hierarchy" role="tree" aria-label="Rig hierarchy" />
+      <div id="tweak-inspector" />
       <div className="action-grid">
-        <button id="reset-selected" type="button">
+        <button id="tweak-reset-selected" type="button">
           Reset Selected
         </button>
-        <button id="reset-rig" type="button">
+        <button id="tweak-reset-rig" type="button">
           Revert rig tweaks
         </button>
-        <button id="download-json" type="button">
+        <button id="tweak-download-json" type="button">
           Download rig JSON
         </button>
       </div>
       <details>
         <summary>Rig file tools</summary>
-        <p>Import accepts alignment edits for this rig. Use the Rig Editor for a different hierarchy or artwork.</p>
+        <p>
+          Import accepts alignment edits for this rig. Open another character to change hierarchy. Compatible rig files
+          retain all clips and applied images.
+        </p>
         <div className="action-grid">
-          <button id="validate-rig" type="button">
+          <button id="tweak-validate-rig" type="button">
             Validate rig
           </button>
-          <button id="copy-json" type="button">
+          <button id="tweak-copy-json" type="button">
             Copy rig JSON
           </button>
-          <button id="log-json" type="button">
+          <button id="tweak-log-json" type="button">
             Log rig JSON
           </button>
-          <button id="reload-exported" type="button">
+          <button id="tweak-reload-exported" type="button">
             Reload exported rig
           </button>
-          <button id="reload-original" type="button">
+          <button id="tweak-reload-original" type="button">
             Reload original rig
           </button>
         </div>
         <label>
-          Load rig JSON <input id="load-json" type="file" accept=".json,application/json" />
+          Load rig JSON <input id="tweak-load-json" type="file" accept=".json,application/json" />
         </label>
       </details>
-      <div id="validation" role="status" />
-      <div id="action-feedback" role="status" />
-      <p id="rig-draft-status" role="status" />
-      <button id="rig-download-retained-drafts" type="button" hidden>
+      <div id="tweak-validation" role="status" />
+      <div id="tweak-action-feedback" role="status" />
+      <p id="tweak-rig-draft-status" role="status" />
+      <button id="tweak-rig-download-retained-drafts" type="button" hidden>
         Download retained rig drafts
       </button>
       <details>
         <summary>Rig session</summary>
-        <div id="session-status" />
+        <div id="tweak-session-status" />
       </details>
     </section>
   );

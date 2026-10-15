@@ -86,9 +86,7 @@ export class TimelineSessionController {
     this.selection.addEventListener(
       'change',
       () => {
-        const discardChanges =
-          this.state.dirty && window.confirm('Discard unsaved animation changes and select another animation?');
-        if (this.state.selectAnimation(this.selection.value || null, { discardChanges })) {
+        if (this.state.selectAnimation(this.selection.value || null, { keepChanges: true })) {
           this.files.invalidateSession();
         }
         this.render(true);

@@ -121,6 +121,19 @@ test('animation navigation binds separate keys and deselection releases the curr
   state.selectAnimation('first');
   assert.equal(session().key, JSON.stringify(['/animation-editor/', 'character', 'first']));
   assert.equal(recovery.bind.mock.calls.length, 3);
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: false });
+  controller.dispose();
+});
+
+test('returning to an in-memory dirty clip never offers to overwrite it with a browser draft', () => {
+  const { state, recovery, controller } = fixture();
+  controller.bind(state, 'character');
+  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  const authored = state.workingAnimation;
+  state.selectAnimation('second', { keepChanges: true });
+  state.selectAnimation('first', { keepChanges: true });
+  assert.strictEqual(state.workingAnimation, authored);
+  assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: false });
   controller.dispose();
 });
 

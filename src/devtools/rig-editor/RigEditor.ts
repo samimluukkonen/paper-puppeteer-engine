@@ -33,13 +33,18 @@ export class RigEditor {
     private readonly onChange: () => void,
     state?: RigEditorState,
     ikChains: readonly TwoBoneIKDefinition[] = [],
-    readonly previewClips: readonly CompiledClip[] = [],
+    private readonly initialPreviewClips: readonly CompiledClip[] = [],
     /** Embedded editors supply the evaluated animation/IK pose after rig projection. */
     private readonly evaluateContext?: () => void,
+    private readonly currentPreviewClips?: () => readonly CompiledClip[],
   ) {
     this.state = state ?? new RigEditorState(puppet.rig);
     // Authored definitions own same-name preview chains, including their endpoint offsets.
     this.ikChains = ikChains.map((chain) => puppet.rig.ik?.find((authored) => authored.name === chain.name) ?? chain);
+  }
+
+  get previewClips(): readonly CompiledClip[] {
+    return this.currentPreviewClips?.() ?? this.initialPreviewClips;
   }
 
   enable(): void {

@@ -8,12 +8,13 @@ export function selectedCharacterId(): string {
 }
 
 /** Navigate through the normal page lifecycle, including the rig editor's unsaved-change guard. */
-export function bindCharacterSelection(app: HTMLElement): () => void {
-  const select = app.querySelector<HTMLSelectElement>('#character-selection')!;
+export function bindCharacterSelection(app: HTMLElement, selector = '#character-selection'): () => void {
   const lifetime = new AbortController();
-  select.addEventListener(
+  app.addEventListener(
     'change',
-    () => {
+    (event) => {
+      const select = event.target;
+      if (!(select instanceof HTMLSelectElement) || !select.matches(selector)) return;
       const url = new URL(window.location.href);
       if (select.value === defaultCharacterId) url.searchParams.delete('character');
       else url.searchParams.set('character', select.value);

@@ -82,7 +82,7 @@ export type { EventDrag } from './AnimationEditorEventCommands.js';
 export type { KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 export type { AnimationExportResult } from './animationSerialization.js';
 
-export type EditorMode = 'animation' | 'rig-tweak';
+export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
@@ -110,6 +110,7 @@ export class AnimationEditorState {
   private symmetry: BoneSymmetryMapping | null;
   private symmetryIssues: readonly BoneSymmetryIssue[] = Object.freeze([]);
   private mode: EditorMode = 'animation';
+  private readonly clipContexts = new Map<string, { time: Seconds; keys: readonly KeyframeSelection[] }>();
 
   constructor(rig?: Rig, animations: readonly AnimationClip[] = [], options: AnimationEditorStateOptions = {}) {
     this.sourceRig = rig;
@@ -742,6 +743,20 @@ export class AnimationEditorState {
   get loop(): boolean {
     return this.working?.loop ?? false;
   }
+  get hasPendingAnimationEdits(): boolean {
+    return (
+      this.hasTemporaryTransform ||
+      Object.keys(this.ikTargetDraft).length > 0 ||
+      !!this.keyframeDrag ||
+      !!this.eventDrag ||
+      !!this.ikTargetDrag
+    );
+  }
+
+  get hasUnsavedChanges(): boolean {
+    return this.document.hasUnsavedChanges;
+  }
+
   get dirty(): boolean {
     return this.document.dirty;
   }
@@ -788,12 +803,20 @@ export class AnimationEditorState {
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
-  selectAnimation(id: string | null, options: { discardChanges?: boolean } = {}): boolean {
+  selectAnimation(id: string | null, options: { discardChanges?: boolean; keepChanges?: boolean } = {}): boolean {
     if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
+      if (options.keepChanges && this.selectedAnimationId) {
+        this.clipContexts.set(this.selectedAnimationId, { time: this.currentTime, keys: this.selectedKeys });
+      }
       const selected = this.document.selectAnimation(id, options);
       if (selected) {
         this.resetAnimationSession();
+        const context = options.keepChanges && id ? this.clipContexts.get(id) : undefined;
+        if (context) {
+          this.selectionCommands.selectKeyframes(context.keys);
+          this.updateTime(context.time);
+        }
       }
       this.notify();
       return selected;

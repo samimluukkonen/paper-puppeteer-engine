@@ -32,6 +32,10 @@ export class AnimationEditorPreview {
 
   refresh(force = false): void {
     if (this.disposed) return;
+    if (this.state.editorMode === 'rig') {
+      this.puppet.setIKAnimationSource(undefined);
+      return;
+    }
     const animation = this.state.workingAnimation;
     const rig = this.state.rig ?? this.puppet.rig;
     const time = animation ? this.state.currentTimeMilliseconds : 0;
@@ -73,7 +77,6 @@ export class AnimationEditorPreview {
       this.player = next;
       this.rig = rig;
       this.joints = joints;
-      this.puppet.setIKAnimationSource(this.ikSource);
       this.animation = animation;
       if (next && animation) {
         next.play(animation.name);
@@ -97,6 +100,7 @@ export class AnimationEditorPreview {
       pose.set(ikId, Object.freeze(values));
     }
     this.ikSource.ikAnimation = pose;
+    this.puppet.setIKAnimationSource(this.ikSource);
     this.puppet.syncPose();
     this.sampledTime = sampledTime;
     this.draft = draft;

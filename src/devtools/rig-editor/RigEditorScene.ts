@@ -32,6 +32,7 @@ export class RigEditorScene extends Phaser.Scene {
   private readonly characterUrl: string;
   private readonly ikChains: readonly TwoBoneIKDefinition[];
   private replacementReason: RigSessionReplacementReason = 'load';
+  rigSessionRevision = 0;
 
   get sessionReplacementReason(): RigSessionReplacementReason {
     return this.replacementReason;
@@ -50,7 +51,8 @@ export class RigEditorScene extends Phaser.Scene {
       rig: editor.state.recoveryDraft,
       skins: editor.state.standaloneSkins,
       animations: definition.animations,
-      replacements: this.artwork?.exportReplacements() ?? [],
+      replacements: this.artwork?.appliedReplacements() ?? [],
+      pendingArtwork: this.hasPendingArtworkProposal,
     };
   }
 
@@ -183,6 +185,7 @@ export class RigEditorScene extends Phaser.Scene {
     this.puppet?.destroy();
     this.puppet = puppet;
     this.editor = editor;
+    ++this.rigSessionRevision;
     this.replacementReason = reason;
     this.onReady(editor);
   }

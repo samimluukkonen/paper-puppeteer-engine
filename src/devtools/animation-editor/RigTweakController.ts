@@ -45,8 +45,18 @@ export class RigTweakController {
 
   constructor(private readonly attachments?: AttachmentController) {}
 
-  setMode(mode: EditorMode): void {
-    this.state?.setEditorMode(mode);
+  setMode(mode: EditorMode): boolean {
+    if (!this.state) return false;
+    if (
+      mode !== this.state.editorMode &&
+      this.state.hasPendingAnimationEdits &&
+      !window.confirm(
+        'Discard uncommitted animation previews and change mode? Committed keys, rig edits and artwork will be kept.',
+      )
+    )
+      return false;
+    this.state.setEditorMode(mode);
+    return true;
   }
   get hasUnsavedChanges(): boolean {
     return this.editor?.state.dirty ?? false;
@@ -54,8 +64,16 @@ export class RigTweakController {
 
   initialize(app: HTMLElement, getScene: () => AnimationEditorScene): void {
     const recoveryControls = new DraftRecoveryControls<RigEditorRecoverySnapshot>(
-      app.querySelector<HTMLElement>('#rig-draft-status')!,
-      app.querySelector<HTMLButtonElement>('#rig-download-retained-drafts')!,
+      [
+        app.querySelector<HTMLElement>('#tweak-rig-draft-status')!,
+        ...Array.from(app.parentElement?.querySelectorAll<HTMLElement>('#editor-app #rig-draft-status') ?? []),
+      ],
+      [
+        app.querySelector<HTMLButtonElement>('#tweak-rig-download-retained-drafts')!,
+        ...Array.from(
+          app.parentElement?.querySelectorAll<HTMLButtonElement>('#editor-app #rig-download-retained-drafts') ?? [],
+        ),
+      ],
     );
     const recovery = recoveryControls.recovery;
     const session = createSessionController(
@@ -67,17 +85,21 @@ export class RigTweakController {
       },
       {},
       {
+        idPrefix: 'tweak-',
         stageSelector: '#animation-stage',
         dirtyLabel: 'Rig',
         sessionFormat: 'table',
         hasPendingChanges: () => getScene().hasPendingArtworkProposal,
       },
     );
-    const inspector = createInspectorController(app.querySelector<HTMLElement>('#inspector')!, session.updateStatus);
-    const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#hierarchy')!);
+    const inspector = createInspectorController(
+      app.querySelector<HTMLElement>('#tweak-inspector')!,
+      session.updateStatus,
+    );
+    const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#tweak-hierarchy')!);
     const lifetime = new AbortController();
     for (const id of ['edit-mode', 'grid-snap', 'rotation-snap'] as const) {
-      app.querySelector<HTMLSelectElement>(`#${id}`)!.addEventListener(
+      app.querySelector<HTMLSelectElement>(`#tweak-${id}`)!.addEventListener(
         'change',
         (event) => {
           const editor = this.editor;
@@ -100,9 +122,9 @@ export class RigTweakController {
         inspector.render(editor);
         hierarchy.render(editor);
       }
-      app.querySelector<HTMLSelectElement>('#edit-mode')!.value = editor.state.editMode;
-      app.querySelector<HTMLSelectElement>('#grid-snap')!.value = String(editor.state.gridSnap);
-      app.querySelector<HTMLSelectElement>('#rotation-snap')!.value = String(editor.state.rotationSnap);
+      app.querySelector<HTMLSelectElement>('#tweak-edit-mode')!.value = editor.state.editMode;
+      app.querySelector<HTMLSelectElement>('#tweak-grid-snap')!.value = String(editor.state.gridSnap);
+      app.querySelector<HTMLSelectElement>('#tweak-rotation-snap')!.value = String(editor.state.rotationSnap);
     };
     this.bindDraft = () => {
       const editor = this.editor;
@@ -156,7 +178,7 @@ export class RigTweakController {
     const next = {
       mode: this.state?.editorMode ?? 'animation',
       ready: !!this.state,
-      rigDirty: this.editor?.state.dirty ?? false,
+      rigDirty: this.editor?.state.rigDirty ?? false,
       animationDirty: this.state?.dirty ?? false,
     };
     if (Object.keys(next).every((key) => next[key as keyof typeof next] === this.snapshot[key as keyof typeof next]))

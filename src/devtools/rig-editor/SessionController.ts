@@ -10,10 +10,19 @@ import { serializeRigJson } from './rigSerialization.js';
 /** Session status, history actions, validation, export completion, and rig reload/import. */
 export function createSessionController(
   app: HTMLElement,
-  getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'>,
+  getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'> & {
+    readonly rigSessionRevision?: number;
+    readonly rigExportCheckpoint?: {
+      rig?: RigJsonDefinition;
+      filename?: string;
+      requestSequence?: number;
+      committedSequence?: number;
+    };
+  },
   onStateChange: (editor: RigEditor) => void = () => {},
   inputLimits: JsonWorkloadLimitOptions = {},
   presentation: {
+    idPrefix?: string;
     stageSelector?: string;
     dirtyLabel?: string;
     sessionFormat?: 'text' | 'table';
@@ -21,21 +30,25 @@ export function createSessionController(
   } = {},
 ) {
   const lifetime = new AbortController();
+  const prefix = presentation.idPrefix ?? '';
   let editor: RigEditor | undefined;
-  const dirty = app.querySelector<HTMLElement>('#dirty-status')!;
-  const session = app.querySelector<HTMLElement>('#session-status')!;
+  let rigRevision: number | undefined;
+  const dirty = app.querySelector<HTMLElement>(`#${prefix}dirty-status`)!;
+  const session = app.querySelector<HTMLElement>(`#${prefix}session-status`)!;
   let sessionCells: HTMLTableCellElement[] | undefined;
-  const validation = app.querySelector<HTMLElement>('#validation')!;
-  const feedback = app.querySelector<HTMLElement>('#action-feedback')!;
+  const validation = app.querySelector<HTMLElement>(`#${prefix}validation`)!;
+  const feedback = app.querySelector<HTMLElement>(`#${prefix}action-feedback`)!;
   let lastExport: RigJsonDefinition | undefined;
   let lastExportFilename: string | undefined;
   const requests = new SessionActionGuard(lifetime.signal);
   function updateStatus(current: RigEditor): void {
     if (lifetime.signal.aborted) return;
-    if (editor !== current) requests.invalidate();
+    const nextRevision = getScene().rigSessionRevision;
+    if (editor !== current || rigRevision !== nextRevision) requests.invalidate();
+    rigRevision = nextRevision;
     editor = current;
     onStateChange(current);
-    const isDirty = current.state.dirty;
+    const isDirty = current.state.rigDirty;
     dirty.textContent = presentation.dirtyLabel
       ? `${presentation.dirtyLabel}: ${isDirty ? 'Modified' : 'Clean'}`
       : isDirty
@@ -89,13 +102,13 @@ export function createSessionController(
     } else {
       session.textContent = sessionRows.map(([label, value]) => `${label}: ${value}`).join('\n');
     }
-    app.querySelector<HTMLButtonElement>('#undo')!.disabled = !current.state.canUndo;
-    app.querySelector<HTMLButtonElement>('#redo')!.disabled = !current.state.canRedo;
-    app.querySelector<HTMLButtonElement>('#reset-selected')!.disabled = !current.state.selection;
+    app.querySelector<HTMLButtonElement>(`#${prefix}undo`)!.disabled = !current.state.canUndo;
+    app.querySelector<HTMLButtonElement>(`#${prefix}redo`)!.disabled = !current.state.canRedo;
+    app.querySelector<HTMLButtonElement>(`#${prefix}reset-selected`)!.disabled = !current.state.selection;
   }
 
   const action = (id: string, run: () => void | Promise<void>): void => {
-    app.querySelector<HTMLButtonElement>(`#${id}`)!.addEventListener(
+    app.querySelector<HTMLButtonElement>(`#${prefix}${id}`)!.addEventListener(
       'click',
       () => {
         try {
@@ -115,6 +128,7 @@ export function createSessionController(
   action('redo', () => editor?.redo());
   action('reset-selected', () => editor?.resetSelected());
   action('reset-rig', () => {
+    if (!confirmReplacement('Reset rig edits to the session start?')) return;
     editor?.resetRig();
     feedback.textContent = 'Rig reset to session start.';
   });
@@ -134,20 +148,33 @@ export function createSessionController(
       ? `Ready with warnings: ${warnings.map((issue) => issue.message).join(' · ')}`
       : 'Rig JSON ready.';
     const exportingEditor = editor;
+    const exportingRevision = getScene().rigSessionRevision;
+    const shared = getScene().rigExportCheckpoint;
+    const sequence = shared ? (shared.requestSequence = (shared.requestSequence ?? 0) + 1) : 0;
     return {
       editor,
       json,
       rig,
       filename: getScene().rigFilename,
       snapshot: editor.state.workingSnapshot,
-      request: requests.beginExport(() => editor === exportingEditor),
+      sequence,
+      request: requests.beginExport(
+        () => editor === exportingEditor && getScene().rigSessionRevision === exportingRevision,
+      ),
     };
   };
   const commitExport = (prepared: ReturnType<typeof prepareExport>): boolean => {
     // A delayed copy must not replace a newer successful export or another session.
+    const shared = getScene().rigExportCheckpoint;
+    if (shared && prepared.sequence < (shared.committedSequence ?? 0)) return false;
     if (!prepared.request.commit()) return false;
     lastExport = prepared.rig;
     lastExportFilename = prepared.filename;
+    if (shared) {
+      shared.committedSequence = prepared.sequence;
+      shared.rig = prepared.rig;
+      shared.filename = prepared.filename;
+    }
     prepared.editor.state.markSaved(prepared.snapshot);
     updateStatus(prepared.editor);
     return true;
@@ -185,10 +212,12 @@ export function createSessionController(
     );
   };
   action('reload-exported', () => {
-    if (!lastExport) throw new Error('Export the rig first.');
+    const shared = getScene().rigExportCheckpoint;
+    const exported = shared?.rig ?? lastExport;
+    if (!exported) throw new Error('Export the rig first.');
     if (!confirmReplacement('Discard edits made since the last export?')) return;
     requests.cancelImports();
-    getScene().reloadRig(lastExport, lastExportFilename, 'reload-export');
+    getScene().reloadRig(exported, shared?.filename ?? lastExportFilename, 'reload-export');
     feedback.textContent = 'Exported rig reloaded and validated.';
   });
   action('reload-original', () => {
@@ -204,7 +233,10 @@ export function createSessionController(
     // Capture the file before clearing so selecting it again starts a new request.
     input.value = '';
     const sessionEditor = editor;
-    const request = requests.beginImport(() => editor === sessionEditor);
+    const importingRevision = getScene().rigSessionRevision;
+    const request = requests.beginImport(
+      () => editor === sessionEditor && getScene().rigSessionRevision === importingRevision,
+    );
     try {
       const text = await readJsonFile(file);
       if (!request.isCurrent()) return;
@@ -222,7 +254,7 @@ export function createSessionController(
       if (request.isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
     }
   };
-  app.querySelector<HTMLInputElement>('#load-json')!.addEventListener(
+  app.querySelector<HTMLInputElement>(`#${prefix}load-json`)!.addEventListener(
     'change',
     (event) => {
       void importRig(event);

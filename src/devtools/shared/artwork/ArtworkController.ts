@@ -143,6 +143,11 @@ export class ArtworkController {
   exportReplacements() {
     if (this.candidate || this.request)
       throw new Error('Apply or cancel the artwork proposal before exporting a package.');
+    return this.appliedReplacements();
+  }
+
+  /** Dirty status can inspect committed artwork while a separate proposal blocks export. */
+  appliedReplacements() {
     return [...this.applied.values()].map((entry) => ({
       assetKey: entry.assetKey,
       reference: entry.reference,

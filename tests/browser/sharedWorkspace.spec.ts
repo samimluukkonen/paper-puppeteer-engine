@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { animationHierarchy, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test } from './fixtures.js';
 
 for (const view of [
   { route: './', prefix: 'demo', stage: '#stage', ready: '#status-text', text: 'Current: idle' },
@@ -69,7 +69,8 @@ for (const view of [
     await expect(inspector).not.toBeVisible();
     await expect(toggle).toBeFocused();
     const help = page.locator(`#${view.prefix}-help-open`);
-    await help.click();
+    if (view.prefix === 'animation') await (await animationMenuControl(page, '#animation-help-open')).click();
+    else await help.click();
     await expect(page.getByRole('dialog')).toBeVisible();
     if (view.prefix === 'rig') {
       await page.keyboard.press('ArrowRight');

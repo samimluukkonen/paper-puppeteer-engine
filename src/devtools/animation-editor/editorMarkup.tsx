@@ -32,6 +32,7 @@ export function AnimationEditorView({
   rigTweak,
   attachments,
   packages,
+  header = true,
 }: {
   mirrorTools: MirrorToolsController;
   ikInspector: IKInspectorController;
@@ -41,6 +42,7 @@ export function AnimationEditorView({
   rigTweak?: RigTweakController;
   attachments?: AttachmentController;
   packages?: PackageController;
+  header?: boolean;
 }) {
   const inspector = useWorkspaceInspector();
   const mode = useSyncExternalStore(
@@ -55,7 +57,7 @@ export function AnimationEditorView({
   ));
   return (
     <>
-      <ViewHeader view="animation" />
+      <ViewHeader view="animation" selectionId={header ? 'character-selection' : 'inactive-character-selection'} />
       {packages && <PackagePanel controller={packages} />}
       <section className={`animation-command-bar ${tweaking ? 'rig-tweak-active' : ''}`} aria-label="Animation session">
         {rigTweak && (

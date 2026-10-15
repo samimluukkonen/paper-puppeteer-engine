@@ -20,6 +20,7 @@ import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
+import { getCompiledPreviewClip } from './previewClip.js';
 import { toSeconds } from './timeUnits.js';
 
 export interface AnimationEditorSceneOptions {
@@ -34,6 +35,14 @@ export class AnimationEditorScene extends Phaser.Scene {
   private appliedWorkingRig: RigEditorState['workingCopy'] | undefined;
   private releaseMode: (() => void) | undefined;
   private rigMode = false;
+  rigSessionRevision = 0;
+  readonly rigExportCheckpoint: {
+    rig?: RigJsonDefinition;
+    filename?: string;
+    requestSequence?: number;
+    committedSequence?: number;
+  } = {};
+  private loadedRigFilename: string | undefined;
 
   get hasPendingArtworkProposal(): boolean {
     return this.artwork?.hasPendingProposal ?? false;
@@ -48,7 +57,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       rig: editor.state.recoveryDraft,
       skins: editor.state.standaloneSkins,
       animations: this.state?.packageAnimations() ?? definition.animations,
-      replacements: this.artwork?.exportReplacements() ?? [],
+      replacements: this.artwork?.appliedReplacements() ?? [],
+      pendingArtwork: this.hasPendingArtworkProposal,
     };
   }
 
@@ -56,25 +66,31 @@ export class AnimationEditorScene extends Phaser.Scene {
     return this.definition?.id ?? 'unknown';
   }
   get rigFilename(): string {
-    return assetFilename(this.definition?.rigPath, 'rig.json');
+    return this.loadedRigFilename ?? assetFilename(this.definition?.rigPath, 'rig.json');
   }
 
   /** Rig-tweak imports retain topology, artwork identities and all animation sessions/history. */
-  reloadRig(file: RigJsonDefinition, _filename?: string, reason?: 'import' | 'reload-export'): void {
+  reloadRig(file: RigJsonDefinition, filename?: string, reason?: 'import' | 'reload-export'): void {
     const editor = this.rigEditor;
     if (!editor) throw new Error('No rig is loaded.');
     if (!editor.state.canRestoreDraft(file))
       throw new Error(
-        'Rig Tweak requires the same hierarchy, bone artwork and IK definitions. Use the Rig Editor to load a different rig.',
+        'Rig import requires the same hierarchy, bone artwork, IK definitions and default skin, with loaded image assets and valid frames. Open another character for a different hierarchy; this workspace retains its animation references.',
       );
     editor.cancelGesture();
+    this.artwork?.cancel();
+    ++this.rigSessionRevision;
     editor.state.restoreDraft(file);
     editor.refresh();
-    if (reason === 'reload-export') editor.state.markSaved();
+    if (filename) this.loadedRigFilename = filename;
+    if (reason === 'reload-export' || this.state?.editorMode === 'rig') editor.state.markSaved();
     this.onRigChange();
   }
 
   reloadOriginal(): void {
+    this.artwork?.cancel();
+    ++this.rigSessionRevision;
+    this.loadedRigFilename = undefined;
     this.rigEditor?.cancelGesture();
     this.rigEditor?.resetRig();
     this.rigEditor?.state.markSaved();
@@ -121,6 +137,11 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.rigEditor = undefined;
       this.appliedWorkingRig = undefined;
       this.definition = undefined;
+      this.loadedRigFilename = undefined;
+      delete this.rigExportCheckpoint.rig;
+      delete this.rigExportCheckpoint.filename;
+      delete this.rigExportCheckpoint.requestSequence;
+      delete this.rigExportCheckpoint.committedSequence;
       this.rigMode = false;
       this.state?.pause();
       this.state?.endScrub();
@@ -184,6 +205,8 @@ export class AnimationEditorScene extends Phaser.Scene {
   private refreshArtwork(): void {
     const puppet = this.puppet;
     if (!puppet) return;
+    this.rigEditor?.cancelGesture();
+    this.rigEditor?.refresh(false);
     this.ghosts?.refreshArtwork();
     const revision = puppet.getAppearanceRevision();
     this.mirrorOverlay?.syncAppearance(
@@ -196,6 +219,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       { ...DEFAULT_ONION_SKIN_SETTINGS, nextOpacity: 0.55, nextTint: 0xa875e8 },
       revision,
     );
+    this.onRigChange();
   }
   setIKHandlesInteractive(interactive: boolean): void {
     this.ikHandlesInteractive = interactive;
@@ -392,7 +416,7 @@ export class AnimationEditorScene extends Phaser.Scene {
             (chain) => !definition.rig.ik?.some((authored) => authored.name === chain.name),
           ),
         ],
-        [],
+        definition.compiledAnimations,
         () => {
           if (this.appliedWorkingRig !== rigState.workingCopy) {
             // Temporarily invalid inspector drafts retain the last valid preview and existing validation feedback.
@@ -408,25 +432,38 @@ export class AnimationEditorScene extends Phaser.Scene {
               state.updatePreviewRig(nextRig);
             }
           }
-          preview?.refresh(true);
+          if (state.editorMode !== 'rig') preview?.refresh(true);
         },
+        () => state.packageAnimations().map((clip) => getCompiledPreviewClip(clip, state.rig!)),
       );
+      let previousMode = state.editorMode;
       this.releaseMode = state.subscribe(() => {
+        if (state.editorMode === previousMode) return;
+        const leavingBindPose = previousMode === 'rig';
+        previousMode = state.editorMode;
         const tweaking = !state.animationAuthoringEnabled;
-        if (tweaking === this.rigMode) return;
+
         this.rigMode = tweaking;
         this.clearMirrorPreview();
         this.clearBakePreview();
         this.ikHandles?.setVisible(this.ikHandlesVisible && !tweaking);
         this.ikHandles?.setInteractive(this.ikHandlesInteractive && !tweaking);
         this.puppet?.setDebug(this.bonesVisible && !tweaking);
+        this.rigEditor?.cancelGesture();
+        if (state.editorMode === 'rig') {
+          for (const chain of [...(definition.rig.ik ?? []), ...(this.options.ikChains ?? [])])
+            puppet!.getIK(chain.name).enabled = rigState.ikPreview;
+        } else if (leavingBindPose) this.setIKPreview(this.ikPreviewEnabled);
+        this.rigEditor?.setPreviewPose('');
         if (tweaking) {
           if (state.selectedBoneId) rigState.selectBone(state.selectedBoneId);
           this.rigEditor?.enable();
         } else {
           this.rigEditor?.disable();
+          if (rigState.selection?.type === 'bone') state.selectBone(rigState.selection.id);
           rigState.endOperation();
           this.rigEditor?.refresh(false);
+          preview?.refresh(true);
         }
       });
       this.artwork?.bind(this, puppet, definition, () => this.refreshArtwork());

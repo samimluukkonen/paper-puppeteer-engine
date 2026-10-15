@@ -113,6 +113,33 @@ async function session() {
   return { scene, state, puppet, editor: scene.rigEditor!, definition, browser, ready };
 }
 
+test('full rig and animation routes use one document and bounded scene listeners across repeated transitions', async () => {
+  const { scene, state, puppet, editor } = await session();
+  state.setCurrentTime(0.5);
+  const clip = state.workingAnimation;
+  const listenerCount = scene.input.listenerCount('pointerdown');
+  const subscribers = (Reflect.get(state, 'listeners') as Set<unknown>).size;
+  for (let index = 0; index < 12; ++index) {
+    state.setEditorMode('rig');
+    assert.strictEqual(scene.rigEditor, editor);
+    assert.equal(puppet.getBone('root').pose.rotation, 0);
+    assert.isFalse(puppet.getIK('arm').enabled, 'full rig bind-pose editing keeps animation IK disabled');
+    editor.editBone('lower', 'y', 70 + index);
+    state.setEditorMode('rig-tweak');
+    assert.closeTo(puppet.getBone('root').pose.rotation, 0.2, 1e-12);
+    state.setEditorMode('animation');
+    assert.equal(puppet.getBone('lower').pose.y, 70 + index);
+    assert.strictEqual(state.workingAnimation, clip);
+    assert.equal(state.currentTime, 0.5);
+    assert.equal(scene.input.listenerCount('pointerdown'), listenerCount);
+    assert.equal((Reflect.get(state, 'listeners') as Set<unknown>).size, subscribers);
+  }
+  scene.events.emit('shutdown');
+  assert.isUndefined(scene.rigEditor);
+  assert.equal(scene.input.listenerCount('pointerdown'), 0);
+  assert.equal((Reflect.get(state, 'listeners') as Set<unknown>).size, 0);
+});
+
 test('mode changes pause and cancel animation gestures/drafts without authoring or playback resumption', () => {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
   const state = new AnimationEditorState(rig, [

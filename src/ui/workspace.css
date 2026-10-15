@@ -404,3 +404,7 @@
 .package-runtime-dialog {
   width: min(900px, 92vw);
 }
+
+#character-workspace > [hidden] {
+  display: none !important;
+}

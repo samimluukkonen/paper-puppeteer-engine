@@ -93,6 +93,24 @@ test('saving, discarding, or undoing to a clean baseline removes the draft and c
   assert.equal(values.size, 0);
 });
 
+test('retained document navigation reuses its owned draft and a later save removes that draft', () => {
+  const { recovery, session, edit, values } = fixture();
+  const other = { ...session, key: 'b', snapshot: () => ({ value: 0 }), dirty: () => false };
+  recovery.bind(session);
+  edit(1);
+  recovery.flush();
+  const originalKey = [...values.keys()][0];
+  for (let index = 0; index < 8; ++index) {
+    recovery.bind(other, { recover: false });
+    recovery.bind(session, { recover: false });
+    edit(index + 2);
+    recovery.flush();
+    assert.deepEqual([...values.keys()], [originalKey]);
+  }
+  edit(0, false);
+  assert.equal(values.size, 0);
+});
+
 test.each([false, true])(
   'explicit discard cancels pending writes and removes only its owned draft (flushed: %s)',
   (flushed) => {

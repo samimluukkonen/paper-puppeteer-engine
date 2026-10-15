@@ -38,6 +38,28 @@ afterEach(() => {
 async function rejected(promise: Promise<unknown>, pattern?: RegExp): Promise<void> {
   await expect(promise).rejects.toThrow(pattern);
 }
+
+test('pending proposals block export while committed domain indicators continue to update', async () => {
+  let snapshot = fixture();
+  const controller = new PackageController();
+  controller.bind(() => snapshot);
+  snapshot = {
+    ...snapshot,
+    pendingArtwork: true,
+    rig: {
+      ...snapshot.rig,
+      bones: snapshot.rig.bones.map((bone, index) => (index === 0 ? { ...bone, x: 123 } : bone)),
+    },
+  };
+  controller.refresh();
+  assert.deepEqual(controller.getSnapshot().modified, ['Rig']);
+  assert.throws(() => capturePackage(snapshot), /Apply or cancel/);
+  await controller.download();
+  assert.match(controller.getSnapshot().message, /Apply or cancel/);
+  assert.equal(vi.mocked(downloadBlob).mock.calls.length, 0);
+  assert.deepEqual(controller.getSnapshot().modified, ['Rig']);
+  controller.dispose();
+});
 const png = new Uint8Array(
   readFileSync(new URL('../public/characters/demo-puppet/images/paper-head.png', import.meta.url)),
 );

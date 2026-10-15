@@ -164,9 +164,9 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
           {state.pendingCount ? `${state.pendingCount} pending artwork change(s)` : 'No pending artwork changes'}
         </p>
         <small>
-          Session only. Apply keeps artwork in memory; rig and animation JSON downloads do not include images.
-          Navigating away discards replacements and artwork history. Artwork Undo/Redo is independent of animation and
-          rig edits.
+          Session only. Apply keeps artwork in memory; rig and animation JSON downloads do not include images. Editor
+          tabs keep replacements and history. Leaving the character workspace or reloading can discard them. Download a
+          character ZIP to include images. Artwork Undo/Redo is independent of animation and rig edits.
         </small>
       </section>
     </details>

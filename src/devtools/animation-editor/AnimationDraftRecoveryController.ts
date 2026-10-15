@@ -14,6 +14,7 @@ export class AnimationDraftRecoveryController {
   private animation: string | null | undefined;
   private source: ReadonlyAnimation | null | undefined;
   private importRevision = 0;
+  private visitedSources = new WeakSet<object>();
 
   constructor(
     private readonly recovery: Recovery,
@@ -22,6 +23,7 @@ export class AnimationDraftRecoveryController {
 
   bind(state: AnimationEditorState, characterId: string): void {
     this.unbind();
+    this.visitedSources = new WeakSet();
     this.state = state;
     this.characterId = characterId;
     this.importRevision = state.importRevision;
@@ -42,11 +44,17 @@ export class AnimationDraftRecoveryController {
       // Restoration notifies state subscribers synchronously; publish identity before binding.
       this.animation = animation;
       this.source = source;
+      const recover = !imported && !!source && !this.visitedSources.has(source);
+      if (source) this.visitedSources.add(source);
       if (animation === null) this.recovery.unbind();
       else
         this.recovery.bind(
           {
-            key: JSON.stringify([this.pathname, this.characterId, animation]),
+            key: JSON.stringify([
+              this.pathname.replace(/\/rig-editor(?=\/|$)/, '/animation-editor'),
+              this.characterId,
+              animation,
+            ]),
             source: draftSource({ rig: state.sourceRig, animation: source }),
             label: `animation "${animation}"`,
             snapshot: () => state.workingAnimation,
@@ -62,7 +70,7 @@ export class AnimationDraftRecoveryController {
             },
             restore: (data) => state.replaceWorkingAnimation(data),
           },
-          { recover: !imported },
+          { recover },
         );
     }
     this.recovery.update();

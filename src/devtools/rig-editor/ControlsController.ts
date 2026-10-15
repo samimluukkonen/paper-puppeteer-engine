@@ -6,6 +6,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
   const lifetime = new AbortController();
   let editor: RigEditor | undefined;
   let clipsEditor: RigEditor | undefined;
+  let clipNames = '';
   const visibility = app.querySelector<HTMLElement>('#visibility')!;
   function render(current: RigEditor): void {
     if (lifetime.signal.aborted) return;
@@ -40,8 +41,10 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
         visibility.append(label);
       }
     }
-    if (clipsEditor !== current) {
+    const namesKey = JSON.stringify((current.previewClips ?? []).map((clip) => clip.name));
+    if (clipsEditor !== current || clipNames !== namesKey) {
       clipsEditor = current;
+      clipNames = namesKey;
       const poses = app.querySelector<HTMLSelectElement>('#rig-preview-pose')!;
       poses.replaceChildren();
       for (const [name, title] of [

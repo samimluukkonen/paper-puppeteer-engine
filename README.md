@@ -47,6 +47,8 @@ The v0.5.4 [mirrored animation tools](docs/mirroring-hardening-verification.md) 
 
 ## Quick start
 
+v0.6.3 unifies the [React editor production workflow](docs/react-editor-workflow-verification.md): shared character ownership, retained clip sessions, independent dirty domains and safe editor navigation.
+
 v0.6.2 hardens [schema compatibility and serialization](docs/schema-compatibility.md), retaining version-1 authored formats and verifying real v0.4.3 assets, canonical exports, cross-file references and safe package paths.
 
 v0.6.1 stabilizes the [runtime architecture and public API](docs/runtime-api.md), with explicit `/runtime`, `/data` and `/serialization` entry points alongside the existing root and `/core` imports. Character scene loading is available from the runtime, and ownership/cleanup contracts are documented.

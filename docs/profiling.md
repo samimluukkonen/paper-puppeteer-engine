@@ -127,3 +127,5 @@ One local headless Chrome run measured these medians across three pages:
 | Observed frame interval with onion skins          |        23.9 |
 
 Playback caused **zero timeline-track DOM mutations** in all six off/on samples. These intervals are not a promise of a particular frame rate. Search opens many groups and still builds their individual property markers; dense filtering has a noticeable one-time cost, and expanding every track can cost more. No virtualized timeline was introduced. Use filters and selective expansion for large clips; rerun the diagnostic for your hardware and animation. See [the milestone verification](animation-editor-ux-verification.md) for lifecycle, React synchronization and regression coverage.
+
+The v0.6.3 workflow diagnostic also measures synchronous active-skin changes and a generated 256×256 PNG replacement. Artwork decode includes asynchronous browser scheduling; preview/apply includes synchronous layout. All authored domains remain separate during the measurement. Run the profile without other browser suites for meaningful observations on your machine; there are no timing thresholds.

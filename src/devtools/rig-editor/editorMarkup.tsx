@@ -12,11 +12,17 @@ export function RigEditorView({
   artwork,
   attachments,
   packages,
-}: { artwork?: ArtworkController; attachments?: AttachmentController; packages?: PackageController } = {}) {
+  header = true,
+}: {
+  artwork?: ArtworkController;
+  attachments?: AttachmentController;
+  packages?: PackageController;
+  header?: boolean;
+} = {}) {
   const inspector = useWorkspaceInspector();
   return (
     <>
-      <ViewHeader view="rig" />
+      <ViewHeader view="rig" selectionId={header ? 'character-selection' : 'inactive-character-selection'} />
       {packages && <PackagePanel controller={packages} />}
       <section className="workspace-command-bar" aria-label="Rig session">
         <label>

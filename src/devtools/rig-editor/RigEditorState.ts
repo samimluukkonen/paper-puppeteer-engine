@@ -98,6 +98,7 @@ export class RigEditorState {
   private readonly initialCopy: ReadonlyRigData<RigDefinition>;
   private saved: ReadonlyRigData<RigDefinition>;
   private cachedDirty: boolean | undefined;
+  private cachedRigDirty: boolean | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
   private validationDirty = true;
   private readonly history: SnapshotHistory<HistoryEntry>;
@@ -162,6 +163,19 @@ export class RigEditorState {
     return this.cachedDirty;
   }
 
+  get rigDirty(): boolean {
+    if (this.cachedRigDirty !== undefined) return this.cachedRigDirty;
+    const { skins: _workingSkins, ...working } = this.workingCopy;
+    const { skins: _savedSkins, ...saved } = this.saved;
+    return (this.cachedRigDirty = !equalEditorData(working, saved));
+  }
+  get skinsDirty(): boolean {
+    return (
+      !equalEditorData(this.workingCopy.skins, this.saved.skins) ||
+      this.externalSkins.some((skin) => this.skinDirty(skin.name))
+    );
+  }
+
   /** Immutable data view; edits replace only changed entries and preserve older views. */
   get workingCopy(): ReadonlyRigData<RigDefinition> {
     this.cachedWorkingCopy ??= freezeData({
@@ -188,6 +202,7 @@ export class RigEditorState {
     this.cachedWorkingCopy = undefined;
     this.cachedHistoryEntry = undefined;
     this.cachedDirty = undefined;
+    this.cachedRigDirty = undefined;
     this.validationDirty = true;
   }
 
@@ -393,12 +408,25 @@ export class RigEditorState {
   }
 
   canRestoreDraft(input: unknown): boolean {
-    return inspectRigDraft(input, this.initialCopy, this.rig, this.initialExternalSkins) !== undefined;
+    return this.inspectDraft(input) !== undefined;
+  }
+
+  private inspectDraft(input: unknown): RigEditorRecoverySnapshot | undefined {
+    const data = inspectRigDraft(input, this.initialCopy, this.rig, this.initialExternalSkins, this.defaultSkin);
+    if (!data) return undefined;
+    for (const attachment of data.rig.attachments ?? []) {
+      if (
+        /^(blob:|__paper_artwork_)/.test(attachment.texture) ||
+        this.artworkIssue?.(attachment.texture, attachment.frame)
+      )
+        return undefined;
+    }
+    return data;
   }
 
   /** Restored authored changes stay dirty and form one undoable operation. */
   restoreDraft(input: unknown): boolean {
-    const data = inspectRigDraft(input, this.initialCopy, this.rig, this.initialExternalSkins);
+    const data = this.inspectDraft(input);
     if (!data) return false;
     this.endOperation();
     this.change(() => {
@@ -411,6 +439,7 @@ export class RigEditorState {
     // A delayed export can save an older working copy after subsequent edits.
     this.saved = savedSnapshot;
     this.cachedDirty = undefined;
+    this.cachedRigDirty = undefined;
   }
 
   exportRig(saveBaseline = true): RigJsonDefinition {
@@ -566,6 +595,7 @@ export class RigEditorState {
     if (saveBaseline && this.isStandaloneSkin(name)) {
       this.savedExternalSkins.set(name, skin);
       this.cachedDirty = undefined;
+      this.cachedRigDirty = undefined;
     }
     return json;
   }

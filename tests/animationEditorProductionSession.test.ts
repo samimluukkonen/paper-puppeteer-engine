@@ -154,30 +154,25 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
   },
 );
 
-test('switch confirmation cancellation keeps playback, drafts, history and selection; acceptance starts clean', async () => {
+test('clip navigation keeps pending edits and history without a discard dialog', async () => {
   const { state, query, confirm, dispose } = fixture();
   state.setBonePropertyKeyframe('root', 'x', 12);
   state.setCurrentTime(0.4);
   state.play();
-  state.beginScrub();
   const before = state.workingAnimation;
   query('#animation-selection').value = 'idle';
   await query('#animation-selection').dispatch('change');
-  assert.equal(confirm.mock.calls.length, 1);
-  assert.strictEqual(state.workingAnimation, before);
-  assert.equal(state.currentTime, 0.4);
-  assert.isTrue(state.isPlaying);
-  assert.isTrue(state.isScrubbing);
-  assert.equal(query('#animation-selection').value, 'walk');
-  assert.match(query('#animation-session-status').textContent, /Animation: walk.*Status: Modified/);
-  confirm.mockReturnValue(true);
-  query('#animation-selection').value = 'idle';
-  await query('#animation-selection').dispatch('change');
+  assert.equal(confirm.mock.calls.length, 0);
   assert.equal(state.selectedAnimationId, 'idle');
   assert.isFalse(state.dirty);
+  assert.isTrue(state.hasUnsavedChanges);
   assert.isFalse(state.isPlaying);
-  assert.equal(state.historyLength, 0);
-  assert.match(query('#animation-session-status').textContent, /Animation: idle.*Status: Clean/);
+  query('#animation-selection').value = 'walk';
+  await query('#animation-selection').dispatch('change');
+  assert.strictEqual(state.workingAnimation, before);
+  assert.equal(state.currentTime, 0.4);
+  assert.isTrue(state.canUndo);
+  assert.match(query('#animation-session-status').textContent, /Animation: walk.*Status: Modified/);
   dispose();
 });
 

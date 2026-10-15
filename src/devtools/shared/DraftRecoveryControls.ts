@@ -6,23 +6,31 @@ export class DraftRecoveryControls<Snapshot> {
   readonly recovery: DraftRecovery<Snapshot>;
   private readonly lifetime = new AbortController();
 
-  constructor(status: HTMLElement, download: HTMLButtonElement) {
+  constructor(
+    status: HTMLElement | readonly HTMLElement[],
+    download: HTMLButtonElement | readonly HTMLButtonElement[],
+  ) {
+    const statuses: readonly HTMLElement[] = Array.isArray(status) ? status : [status as HTMLElement];
+    const downloads: readonly HTMLButtonElement[] = Array.isArray(download)
+      ? download
+      : [download as HTMLButtonElement];
     this.recovery = new DraftRecovery<Snapshot>(
       (message) => {
-        status.textContent = message;
+        for (const target of statuses) target.textContent = message;
       },
       (count) => {
-        download.hidden = count === 0;
+        for (const target of downloads) target.hidden = count === 0;
       },
     );
-    download.addEventListener(
-      'click',
-      () => {
-        const json = this.recovery.retainedDraftsJson();
-        if (json) downloadJson(json, 'retained-editor-drafts.json');
-      },
-      { signal: this.lifetime.signal },
-    );
+    for (const target of downloads)
+      target.addEventListener(
+        'click',
+        () => {
+          const json = this.recovery.retainedDraftsJson();
+          if (json) downloadJson(json, 'retained-editor-drafts.json');
+        },
+        { signal: this.lifetime.signal },
+      );
   }
 
   dispose(): void {

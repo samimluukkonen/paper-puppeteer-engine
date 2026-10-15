@@ -1,15 +1,21 @@
+import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { mountView } from '../../ui/mountView.js';
+import { observePreview } from '../../ui/observePreview.js';
+import '../rig-editor/style.css';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
+import { RigEditorView } from '../rig-editor/editorMarkup.js';
+import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { PackageController } from '../shared/package/PackageController.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
+import { bindWorkspaceNavigation, workspaceView } from '../shared/WorkspaceNavigation.js';
 import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
-import type { ReadonlyAnimation } from './AnimationEditorState.js';
+import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
@@ -22,9 +28,11 @@ import { RigTweakController } from './RigTweakController.js';
 import { TimelineController } from './TimelineController.js';
 import './style.css';
 
-const app = document.querySelector<HTMLElement>('#animation-editor-app');
-if (!app) throw new Error('Missing animation editor host.');
-app.classList.add('view-shell', 'workspace-shell', 'animation-workspace');
+const host = document.querySelector<HTMLElement>('#animation-editor-app, #editor-app');
+if (!host) throw new Error('Missing character workspace host.');
+host.id = 'character-workspace';
+const initialRigView = workspaceView(new URL(window.location.href)) === 'rig';
+let movePreview: (() => void) | undefined;
 let scene: AnimationEditorScene | undefined;
 const ikInspector = new IKInspectorController();
 const packages = new PackageController();
@@ -37,24 +45,53 @@ const ikBake = new IKBakeController(
   (pose) => scene?.setBakePreview(pose),
   () => scene?.getBakeRuntimeConstraints() ?? [],
 );
-const editorView = (
-  <AnimationEditorView
-    mirrorTools={mirrorTools}
-    ikInspector={ikInspector}
-    ikBake={ikBake}
-    retiming={retiming}
-    artwork={artwork}
-    rigTweak={rigTweak}
-    attachments={attachments}
-    packages={packages}
-  />
-);
-const unmount = mountView(app, editorView, (app) => {
+function CharacterWorkspace() {
+  const snapshot = useSyncExternalStore(rigTweak.subscribe, rigTweak.getSnapshot);
+  const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
+  useLayoutEffect(() => movePreview?.(), [rigView]);
+  return (
+    <>
+      <div id="editor-app" className="view-shell workspace-shell rig-workspace" hidden={!rigView} inert={!rigView}>
+        <RigEditorView header={rigView} {...(rigView ? { packages, artwork, attachments } : {})} />
+      </div>
+      <div
+        id="animation-editor-app"
+        className="view-shell workspace-shell animation-workspace"
+        hidden={rigView}
+        inert={rigView}
+      >
+        <AnimationEditorView
+          mirrorTools={mirrorTools}
+          ikInspector={ikInspector}
+          ikBake={ikBake}
+          retiming={retiming}
+          rigTweak={rigTweak}
+          header={!rigView}
+          {...(!rigView ? { packages, artwork, attachments } : {})}
+        />
+      </div>
+    </>
+  );
+}
+const unmount = mountView(host, <CharacterWorkspace />, (root) => {
+  const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
+  const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
+  let stateOwner: AnimationEditorState | undefined;
+  let focusViewOnMove = false;
+  const rigWorkspace = createRigWorkspaceController(
+    rigApp,
+    () => editorScene,
+    () => packages.refresh(),
+  );
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);
   const inspector = new BoneInspectorController(app);
   const releaseNavigationGuard = protectUnsavedChanges(
-    () => timeline.hasUnsavedChanges || rigTweak.hasUnsavedChanges || artwork.hasPendingChanges,
+    () =>
+      timeline.hasUnsavedChanges ||
+      !!stateOwner?.hasPendingAnimationEdits ||
+      rigTweak.hasUnsavedChanges ||
+      artwork.hasPendingChanges,
   );
   const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
     app.querySelector<HTMLElement>('#animation-draft-status')!,
@@ -66,7 +103,9 @@ const unmount = mountView(app, editorView, (app) => {
   let releaseWorkspaceSelection: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
     (state, id) => {
+      stateOwner = state;
       rigTweak.bind(state, editorScene.rigEditor!);
+      rigWorkspace.render(editorScene.rigEditor!);
       editorScene.fitPreview();
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
       ikBake.bind(state);
@@ -103,8 +142,12 @@ const unmount = mountView(app, editorView, (app) => {
       packages.bind(() => editorScene.packageSnapshot());
       releaseAnimationPackage?.();
       releaseAnimationPackage = state.subscribe(packages.refresh);
+      if (initialRigView) state.setEditorMode('rig');
+      movePreview?.();
     },
     (message) => {
+      stateOwner = undefined;
+      rigWorkspace.showError(message);
       packages.unbind();
       releaseAnimationPackage?.();
       releaseAnimationPackage = undefined;
@@ -126,6 +169,7 @@ const unmount = mountView(app, editorView, (app) => {
     artwork,
     () => {
       rigTweak.refresh();
+      if (editorScene.rigEditor) rigWorkspace.render(editorScene.rigEditor);
       packages.refresh();
     },
   );
@@ -168,13 +212,46 @@ const unmount = mountView(app, editorView, (app) => {
     },
     { signal: previewControls.signal },
   );
-  const game = createEditorGame('animation-stage', editorScene);
+  const game = createEditorGame(initialRigView ? 'editor-stage' : 'animation-stage', editorScene);
+  movePreview = () => {
+    const rigView = stateOwner ? stateOwner.editorMode === 'rig' : initialRigView;
+    const target = root.querySelector<HTMLElement>(rigView ? '#editor-stage' : '#animation-stage')!;
+    if (game.canvas && game.canvas.parentElement !== target) target.append(game.canvas);
+    game.scale.parent = target;
+    const facingControl = app.querySelector<HTMLSelectElement>('#animation-facing');
+    if (facingControl && editorScene.rigEditor) facingControl.value = editorScene.rigEditor.state.facing;
+    game.scale.getParentBounds();
+    game.scale.refresh();
+    const characterStatus = app.querySelector<HTMLElement>('#character-status');
+    if (characterStatus) characterStatus.textContent = `Character: ${editorScene.characterId}`;
+    document.title = `${rigView ? 'Rig Editor' : 'Animation Editor'} · Paper Puppeteer Engine`;
+    const shell = target.closest<HTMLElement>('.workspace-shell');
+    if (focusViewOnMove && shell && !shell.hidden) {
+      shell.querySelector<HTMLHeadingElement>('h1')?.focus();
+      focusViewOnMove = false;
+    }
+  };
+  const releaseRigResize = observePreview(rigApp.querySelector<HTMLElement>('#editor-stage')!, game);
+  const releaseRoutes = bindWorkspaceNavigation(root, (view) => {
+    if (!stateOwner) return false;
+    for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog[open]')) dialog.close();
+    packages.closePreview();
+    if (!rigTweak.setMode(view === 'rig' ? 'rig' : 'animation')) return 'cancel';
+    focusViewOnMove = true;
+    movePreview?.();
+    return true;
+  });
   const workspace = new AnimationWorkspaceController(app, () => {
     game.scale.getParentBounds();
     game.scale.refresh();
   });
 
   return () => {
+    releaseRoutes();
+    releaseRigResize();
+    rigWorkspace.dispose();
+    stateOwner = undefined;
+    movePreview = undefined;
     releaseArtworkPackage();
     releaseAnimationPackage?.();
     packages.dispose();

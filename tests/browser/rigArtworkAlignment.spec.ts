@@ -29,6 +29,7 @@ test('replacement forearm alignment, pose inspection, facing and export reload p
   await panel
     .getByLabel('Import sprite')
     .setInputFiles({ name: 'alignment.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await panel.getByLabel('Alignment policy').selectOption('normalized');
   await panel.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
   await expect(inspector.locator('[data-alignment="dimensions"]')).toHaveText('137 × 251');
   await panel.getByRole('button', { name: 'Apply Replacement', exact: true }).click();

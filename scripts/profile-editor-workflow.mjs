@@ -179,7 +179,52 @@ export async function profileEditorWorkflow(baseUrl, sourceRig, channel) {
         const onion = await measure();
         return { normal, onion };
       });
-      samples.push({ ...interactions, dragToFrameMs, playback });
+      const appearance = await page.evaluate(async () => {
+        const panel = document.querySelector('#attachment-panel');
+        const skin = /** @type {HTMLSelectElement} */ (panel.querySelector('[aria-label="Active skin"]'));
+        const skinSwitchMs = [];
+        const original = skin.value;
+        for (const option of skin.options) {
+          const start = performance.now();
+          skin.value = option.value;
+          skin.dispatchEvent(new Event('change', { bubbles: true }));
+          panel.getBoundingClientRect();
+          skinSwitchMs.push(performance.now() - start);
+        }
+        skin.value = original;
+        skin.dispatchEvent(new Event('change', { bubbles: true }));
+        const artwork = /** @type {HTMLDetailsElement} */ (document.querySelector('#artwork-panel'));
+        artwork.open = true;
+        const surface = document.createElement('canvas');
+        surface.width = 256;
+        surface.height = 256;
+        surface.getContext('2d').fillRect(0, 0, 256, 256);
+        const blob = await /** @type {Promise<Blob>} */ (
+          new Promise((resolve) => surface.toBlob(resolve, 'image/png'))
+        );
+        const files = new DataTransfer();
+        files.items.add(new File([blob], 'profile.png', { type: 'image/png' }));
+        const input = /** @type {HTMLInputElement} */ (artwork.querySelector('input[type="file"]'));
+        const start = performance.now();
+        input.files = files.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        const button = (label) => [...artwork.querySelectorAll('button')].find((entry) => entry.textContent === label);
+        const preview = button('Preview Replacement');
+        while (!artwork.querySelector('[aria-label="Alignment policy"]')) {
+          if (performance.now() - start > 10_000) throw new Error('Artwork import did not complete.');
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+        const artworkDecodeMs = performance.now() - start;
+        const policy = /** @type {HTMLSelectElement} */ (artwork.querySelector('[aria-label="Alignment policy"]'));
+        policy.value = 'normalized';
+        policy.dispatchEvent(new Event('change', { bubbles: true }));
+        const applyStart = performance.now();
+        preview.click();
+        button('Apply Replacement').click();
+        artwork.getBoundingClientRect();
+        return { skinSwitchMs, artworkDecodeMs, artworkPreviewApplyMs: performance.now() - applyStart };
+      });
+      samples.push({ ...interactions, dragToFrameMs, playback, appearance });
       if (errors.length) throw new Error(errors.join('\n'));
       await page.close();
     }

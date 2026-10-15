@@ -32,6 +32,15 @@ export class DraftRecovery<Snapshot> {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private readonly lifetime = new AbortController();
   private readonly retained: { text: string }[] = [];
+  private readonly owners = new Map<string, { owner: string; persisted: string | null }>();
+
+  private rememberOwner(): void {
+    if (this.session && this.owner)
+      this.owners.set(JSON.stringify([this.session.key, this.session.source]), {
+        owner: this.owner,
+        persisted: this.persisted,
+      });
+  }
 
   constructor(
     private readonly status: (message: string) => void,
@@ -121,12 +130,14 @@ export class DraftRecovery<Snapshot> {
   /** Explicit imported baselines can skip restoration while retaining normal persistence afterward. */
   bind(session: DraftSession<Snapshot>, options: { recover?: boolean } = {}): void {
     this.flush();
+    this.rememberOwner();
     this.session = session;
     // A replacement source must not overwrite an incompatible draft from this same controller.
-    this.owner = undefined;
+    const previous = this.owners.get(JSON.stringify([session.key, session.source]));
+    this.owner = previous?.owner;
     this.snapshot = undefined;
     this.dirty = undefined;
-    this.persisted = null;
+    this.persisted = previous?.persisted ?? null;
     this.recovered = undefined;
     this.pendingFlush = false;
     this.retained.length = 0;
@@ -232,6 +243,7 @@ export class DraftRecovery<Snapshot> {
 
   unbind(): void {
     this.flush();
+    this.rememberOwner();
     this.session = undefined;
     this.snapshot = undefined;
     this.dirty = undefined;
@@ -253,5 +265,6 @@ export class DraftRecovery<Snapshot> {
     this.lifetime.abort();
     this.session = undefined;
     this.retained.length = 0;
+    this.owners.clear();
   }
 }

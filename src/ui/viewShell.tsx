@@ -13,7 +13,13 @@ const views = {
 } as const;
 
 /** Shared navigation and page identity for the demo and authoring tools. */
-export function ViewHeader({ view }: { view: keyof typeof views }) {
+export function ViewHeader({
+  view,
+  selectionId = 'character-selection',
+}: {
+  view: keyof typeof views;
+  selectionId?: string;
+}) {
   const current = views[view];
   const root = view === 'demo' ? './' : '../';
   const characterId = selectedCharacterId();
@@ -29,7 +35,7 @@ export function ViewHeader({ view }: { view: keyof typeof views }) {
       </div>
       <div className="view-header-main">
         <div className="view-heading">
-          <h1>
+          <h1 tabIndex={-1}>
             {current.title}
             {view === 'rig' && (
               <>
@@ -43,7 +49,7 @@ export function ViewHeader({ view }: { view: keyof typeof views }) {
           </p>
           <label className="character-choice">
             Character
-            <select id="character-selection" defaultValue={characterId}>
+            <select id={selectionId} defaultValue={characterId}>
               {characterChoices.map(({ id, label }) => (
                 <option key={id} value={id}>
                   {label}

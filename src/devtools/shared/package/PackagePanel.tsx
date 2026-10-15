@@ -134,7 +134,16 @@ export function PackagePanel({ controller }: { controller: PackageController }) 
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   return (
     <details className="package-tools">
-      <summary>Character package</summary>
+      <summary>
+        Character package{' '}
+        <small aria-label="Package document status">
+          {snapshot.ready
+            ? ['Rig', 'Animations', 'Assets', 'Skins']
+                .map((domain) => `${domain}: ${snapshot.modified.includes(domain) ? 'Modified' : 'Clean'}`)
+                .join(' · ')
+            : 'Loading character…'}
+        </small>
+      </summary>
       <div className="package-tools-content">
         <p>
           Package checkpoint:{' '}

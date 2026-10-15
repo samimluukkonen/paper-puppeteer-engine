@@ -82,7 +82,9 @@ for (const editor of ['rig', 'animation'] as const) {
       await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('rig-tweak');
     }
     await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
-    const joint = page.locator('#inspector input[data-scope="bone"][data-field="y"]');
+    const joint = page.locator(
+      `${editor === 'animation' ? '#tweak-inspector' : '#inspector'} input[data-scope="bone"][data-field="y"]`,
+    );
     await joint.fill('77');
     await joint.press('Tab');
     await expect(packages).toContainText('Rig: Modified');

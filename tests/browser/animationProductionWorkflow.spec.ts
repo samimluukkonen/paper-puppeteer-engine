@@ -28,7 +28,6 @@ test('switch, file import, round-trip reload and source revert confirm dirty rep
     ),
   };
   for (const action of [
-    () => page.locator('#animation-selection').selectOption('walk'),
     () => animationFileAction(page, '#animation-import-file', (control) => control.setInputFiles(file)),
     () => animationFileAction(page, '#animation-reload-export', (control) => control.click()),
     () => animationFileAction(page, '#animation-revert', (control) => control.click()),
@@ -39,12 +38,12 @@ test('switch, file import, round-trip reload and source revert confirm dirty rep
     await expect(page.locator('#animation-undo')).toBeEnabled();
     await expect(page.locator('#animation-session-status')).toContainText('Modified');
   }
-  await Promise.all([
-    page.waitForEvent('dialog').then((dialog) => dialog.accept()),
-    page.locator('#animation-selection').selectOption('walk'),
-  ]);
+  await page.locator('#animation-selection').selectOption('walk');
   await expect(page.locator('#animation-session-status')).toHaveText('Animation: walk · Status: Clean');
   await expect(page.locator('#animation-undo')).toBeDisabled();
+  await page.locator('#animation-selection').selectOption('idle');
+  await expect(page.locator('#animation-session-status')).toContainText('Modified');
+  await expect(page.locator('#animation-undo')).toBeEnabled();
 });
 
 test('revert restores loaded source after export and pauses/resets preview without network reload', async ({

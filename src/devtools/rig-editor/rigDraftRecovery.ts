@@ -26,6 +26,7 @@ export function inspectRigDraft(
   initial: ReadonlyEditorData<RigDefinition>,
   rig: Rig,
   standaloneSkins: readonly SkinDefinition[] = [],
+  defaultSkin = '',
 ): RigEditorRecoverySnapshot | undefined {
   const issues: ValidationIssue[] = [];
   if (!checkJson(input, '', issues) || issues.length) return undefined;
@@ -61,6 +62,7 @@ export function inspectRigDraft(
   )
     return undefined;
   const external = recovery.success ? (recovery.data.standaloneSkins ?? standaloneSkins) : standaloneSkins;
+  if (defaultSkin && ![...(data.skins ?? []), ...external].some((skin) => skin.name === defaultSkin)) return undefined;
   if (
     !equalEditorData(
       external.map((skin) => skin.name),

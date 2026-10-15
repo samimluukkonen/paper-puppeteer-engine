@@ -147,7 +147,7 @@ export class TimelineController {
   }
 
   get hasUnsavedChanges(): boolean {
-    return this.state.dirty;
+    return this.state.hasUnsavedChanges;
   }
 
   private element<T extends HTMLElement = HTMLElement>(selector: string): T {

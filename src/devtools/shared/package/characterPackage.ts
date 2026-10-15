@@ -17,6 +17,7 @@ export interface PackageSnapshot {
   readonly skins: readonly SkinDefinition[];
   readonly animations: readonly AnimationClip[];
   readonly replacements: ReturnType<ArtworkController['exportReplacements']>;
+  readonly pendingArtwork?: boolean;
 }
 export type PackageFiles = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 const packageBase = 'https://character-package.invalid/';
@@ -26,6 +27,7 @@ const safeName = (id: string): string => id.replace(/[^a-zA-Z0-9_-]/g, '_') || '
 
 /** Capture once before any asynchronous I/O. Blobs and loaded definitions are immutable. */
 export function capturePackage(snapshot: PackageSnapshot): PackageSnapshot {
+  if (snapshot.pendingArtwork) throw new Error('Apply or cancel the artwork proposal before exporting a package.');
   return {
     definition: snapshot.definition,
     rig: structuredClone(snapshot.rig),

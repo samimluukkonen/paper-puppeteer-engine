@@ -3,7 +3,7 @@ import type { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import type { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { createSessionController } from '../src/devtools/rig-editor/SessionController.js';
-import { parseRigDefinition } from '../src/engine/externalData.js';
+import { parseRigDefinition, type RigJsonDefinition } from '../src/engine/externalData.js';
 import { DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
 
@@ -44,6 +44,8 @@ async function fixture() {
   const writeText = vi.fn((_json: string) => pending);
   vi.stubGlobal('navigator', { clipboard: { writeText } });
   const scene = {
+    rigSessionRevision: 0,
+    rigExportCheckpoint: {} as { rig?: RigJsonDefinition; filename?: string },
     characterId: 'test-character',
     rigFilename: 'rig.json',
     reloadRig: vi.fn<RigEditorScene['reloadRig']>(),
@@ -62,6 +64,63 @@ async function fixture() {
   const feedback = querySelector('#action-feedback');
   return { state, load, copy, writeText, resolve, reject, feedback, querySelector, scene };
 }
+
+test('rig file checkpoints can be reloaded from either view of the shared owner', async () => {
+  const { state, copy, resolve, feedback, scene, querySelector } = await fixture();
+  state.editBone('root', 'x', 15);
+  copy();
+  resolve();
+  await vi.waitFor(() => assert.equal(feedback.textContent, 'Rig JSON copied.'));
+  const second = createSessionController(
+    { querySelector } as unknown as HTMLElement,
+    () => scene,
+    () => {},
+    {},
+    { idPrefix: 'tweak-' },
+  );
+  querySelector('#tweak-reload-exported').click();
+  assert.equal(scene.reloadRig.mock.calls.at(-1)![0].bones[0]!.x, 15);
+  second.dispose();
+});
+
+test('a delayed export from another rig view cannot overwrite a newer successful document checkpoint', async () => {
+  const { state, copy, resolve, scene, querySelector, writeText } = await fixture();
+  state.editBone('root', 'x', 10);
+  copy();
+  const second = createSessionController(
+    { querySelector } as unknown as HTMLElement,
+    () => scene,
+    () => {},
+    {},
+    { idPrefix: 'tweak-' },
+  );
+  second.updateStatus({ state, exportRig: (save: boolean) => state.exportRig(save) } as RigEditor);
+  state.editBone('root', 'x', 20);
+  writeText.mockResolvedValueOnce(undefined);
+  querySelector('#tweak-copy-json').click();
+  await vi.waitFor(() => assert.equal(querySelector('#tweak-action-feedback').textContent, 'Rig JSON copied.'));
+  resolve();
+  await new Promise((done) => setTimeout(done, 0));
+  assert.isFalse(state.dirty);
+  assert.equal(scene.rigExportCheckpoint.rig!.bones[0]!.x, 20);
+  state.undo();
+  assert.isTrue(state.dirty);
+  second.dispose();
+});
+
+test('clipboard completion cannot checkpoint a rig replaced in the same workspace owner', async () => {
+  const { state, copy, resolve, feedback, scene } = await fixture();
+  state.editBone('root', 'x', 10);
+  copy();
+  ++scene.rigSessionRevision;
+  state.editBone('root', 'x', 20);
+  const message = feedback.textContent;
+  resolve();
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(feedback.textContent, message);
+  state.undo();
+  assert.isTrue(state.dirty, 'the old clipboard export did not save the replaced rig baseline');
+});
 
 test('clipboard completion saves the captured snapshot and leaves later edits dirty', async () => {
   const { state, copy, writeText, resolve, feedback, querySelector } = await fixture();
