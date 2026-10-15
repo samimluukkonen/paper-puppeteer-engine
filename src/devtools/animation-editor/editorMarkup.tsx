@@ -278,6 +278,18 @@ export function AnimationEditorView({
           </div>
           <div id="animation-stage" aria-label="Puppet preview"></div>
         </section>
+        <div
+          id="animation-inspector-divider"
+          role="separator"
+          tabIndex={0}
+          aria-label="Inspector width"
+          aria-controls="animation-inspector"
+          aria-orientation="vertical"
+          aria-valuemin={280}
+          aria-valuemax={640}
+          aria-valuenow={360}
+          title="Drag to resize. Left/Right adjusts; Home/End selects the limits."
+        ></div>
         <aside
           ref={inspector.panel}
           id="animation-inspector"

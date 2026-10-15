@@ -153,11 +153,45 @@ test('panel dividers support keyboard and pointer resizing and reset without aut
   const labels = page.locator('#timeline-label-divider');
   await labels.press('ArrowRight');
   await expect(labels).toHaveAttribute('aria-valuenow', '250');
+  const inspectorDivider = page.getByRole('separator', { name: 'Inspector width', exact: true });
+  const inspector = page.locator('#animation-inspector');
+  const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
+  await inspectorDivider.press('ArrowLeft');
+  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '370');
+  expect((await inspector.boundingBox())!.width).toBe(370);
+  const inspectorHandle = (await inspectorDivider.boundingBox())!;
+  await page.mouse.move(inspectorHandle.x + inspectorHandle.width / 2, inspectorHandle.y + inspectorHandle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    inspectorHandle.x + inspectorHandle.width / 2 - 80,
+    inspectorHandle.y + inspectorHandle.height / 2,
+    {
+      steps: 5,
+    },
+  );
+  await page.mouse.up();
+  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '450');
+  expect((await inspector.boundingBox())!.width).toBe(450);
+  expect(await page.locator('#timeline-ruler').boundingBox()).toEqual(ruler);
+  await inspectorDivider.press('Home');
+  expect((await inspector.boundingBox())!.width).toBe(280);
+  await inspectorDivider.press('ArrowRight');
+  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '280');
+  await inspectorDivider.press('End');
+  expect((await inspector.boundingBox())!.width).toBe(640);
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await expect
+    .poll(async () => Number(await inspectorDivider.getAttribute('aria-valuenow')))
+    .toBe((await page.locator('.animation-layout').boundingBox())!.width - 332);
+  expect((await page.locator('.animation-preview').boundingBox())!.width).toBeGreaterThanOrEqual(320);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('#timeline-zoom').selectOption('4');
   await page.locator('#timeline-filter').selectOption('keyed');
   await (await animationMenuControl(page, '#animation-reset-layout')).click();
   await expect(divider).toHaveAttribute('aria-valuenow', '52');
   await expect(labels).toHaveAttribute('aria-valuenow', '240');
+  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '360');
+  expect((await inspector.boundingBox())!.width).toBe(360);
   await expect(page.locator('#timeline-zoom')).toHaveValue('1');
   await expect(page.locator('#timeline-filter')).toHaveValue('all');
   await expect(page.locator('#animation-undo')).toBeDisabled();
@@ -241,6 +275,7 @@ test('narrow screens keep timing visible and open the inspector as a dismissible
   await page.setViewportSize({ width: 390, height: 844 });
   await openEditor(page);
   await expect(page.locator('#animation-inspector')).toBeHidden();
+  await expect(page.locator('#animation-inspector-divider')).toBeHidden();
   expect((await page.locator('#timeline-ruler').boundingBox())!.y).toBeLessThan(844);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.locator('#timeline-add-event').click();

@@ -22,7 +22,15 @@ export class AnimationWorkspaceController {
     const layout = app.querySelector<HTMLElement>('.animation-layout')!;
     const vertical = app.querySelector<HTMLElement>('#animation-workspace-divider')!;
     const horizontal = app.querySelector<HTMLElement>('#timeline-label-divider')!;
+    const inspectorDivider = app.querySelector<HTMLElement>('#animation-inspector-divider')!;
+    const inspector = app.querySelector<HTMLElement>('#animation-inspector')!;
     const inset = app.querySelector<HTMLElement>('.timeline-inset')!;
+    const inspectorMaximum = (): number => Math.max(280, Math.min(640, layout.clientWidth - 332));
+    const updateInspector = (value: number): void => {
+      const width = Math.max(280, Math.min(inspectorMaximum(), value));
+      layout.style.setProperty('--inspector-width', `${width}px`);
+      inspectorDivider.setAttribute('aria-valuenow', String(Math.round(width)));
+    };
     const limits = (): { min: number; max: number } => {
       const height = layout.clientHeight;
       const timelineMinimum = 320;
@@ -73,6 +81,20 @@ export class AnimationWorkspaceController {
         return true;
       },
     );
+    this.bindDivider(
+      inspectorDivider,
+      'x',
+      (coordinate) => updateInspector(layout.getBoundingClientRect().right - coordinate - 6),
+      (key) => {
+        const held = Number(inspectorDivider.getAttribute('aria-valuenow'));
+        if (key === 'ArrowLeft') updateInspector(held + 10);
+        else if (key === 'ArrowRight') updateInspector(held - 10);
+        else if (key === 'Home') updateInspector(280);
+        else if (key === 'End') updateInspector(inspectorMaximum());
+        else return false;
+        return true;
+      },
+    );
     app.querySelector('#animation-reset-layout')!.addEventListener(
       'click',
       () => {
@@ -83,6 +105,8 @@ export class AnimationWorkspaceController {
         );
         app.style.removeProperty('--timeline-label-width');
         horizontal.setAttribute('aria-valuenow', String(Math.round(inset.clientWidth <= 600 ? 150 : 240)));
+        layout.style.removeProperty('--inspector-width');
+        inspectorDivider.setAttribute('aria-valuenow', '360');
         app.querySelector<HTMLButtonElement>('#timeline-clear-filters')!.click();
         const zoom = app.querySelector<HTMLSelectElement>('#timeline-zoom')!;
         zoom.value = '1';
@@ -110,6 +134,10 @@ export class AnimationWorkspaceController {
             ),
           ),
         );
+        if (inspectorDivider.getClientRects().length) {
+          inspectorDivider.setAttribute('aria-valuemax', String(inspectorMaximum()));
+          inspectorDivider.setAttribute('aria-valuenow', String(Math.round(inspector.getBoundingClientRect().width)));
+        }
         refreshPreview();
       });
     });
