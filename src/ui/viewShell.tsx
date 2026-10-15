@@ -1,15 +1,32 @@
+import { Clapperboard, MonitorPlay, Network } from 'lucide-react';
 import packageInfo from '../../package.json';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
 import { characterChoices, selectedCharacterId } from './characterSelection.js';
 import puppetLogo from './images/puppet-running-header.png';
+import './theme.css';
 import './viewShell.css';
 import './workspace.css';
 import './dropdowns.css';
 
 const views = {
-  demo: { title: 'Engine Demo', path: '', description: 'Explore animation, playback, and inverse kinematics.' },
-  rig: { title: 'Rig Editor', path: 'rig-editor/', description: 'Edit local rig values · align artwork' },
-  animation: { title: 'Animation Editor', path: 'animation-editor/', description: 'Loading character…' },
+  demo: {
+    title: 'Engine Demo',
+    path: '',
+    description: 'Explore animation, playback, and inverse kinematics.',
+    icon: MonitorPlay,
+  },
+  rig: {
+    title: 'Rig Editor',
+    path: 'rig-editor/',
+    description: 'Edit local rig values · align artwork',
+    icon: Network,
+  },
+  animation: {
+    title: 'Animation Editor',
+    path: 'animation-editor/',
+    description: 'Loading character…',
+    icon: Clapperboard,
+  },
 } as const;
 
 /** Shared navigation and page identity for the demo and authoring tools. */
@@ -29,7 +46,9 @@ export function ViewHeader({
       <div className="view-header-top">
         <a className="wordmark" href={`${root}${characterQuery}`} aria-label="Paper Puppeteer Engine">
           <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
-          PAPER PUPPETEER <span className="wordmark-sub">ENGINE</span>
+          <span className="wordmark-name">
+            Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
+          </span>
         </a>
         <span className="view-version">v{packageInfo.version}</span>
       </div>
@@ -61,6 +80,7 @@ export function ViewHeader({
         <nav className="view-navigation" aria-label="Views">
           {Object.entries(views).map(([id, item]) => (
             <a key={id} href={`${root}${item.path}${characterQuery}`} aria-current={id === view ? 'page' : undefined}>
+              <item.icon size={16} aria-hidden="true" />
               {item.title}
             </a>
           ))}

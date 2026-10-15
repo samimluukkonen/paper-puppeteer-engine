@@ -9,7 +9,7 @@
 }
 .view-header {
   padding: 20px 0;
-  border-bottom: 1px solid #cfcec0;
+  border-bottom: 1px solid var(--border-default);
 }
 .view-header-top,
 .view-header-main {
@@ -23,30 +23,35 @@
   flex-wrap: wrap;
 }
 .view-version {
-  color: #6d786a;
+  padding: 2px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: 20px;
+  color: var(--fg-muted);
   font-size: 11px;
   flex-shrink: 0;
 }
 .view-header a {
-  color: #746752;
+  color: var(--accent-fg);
   text-decoration: none;
 }
 .view-header a:hover {
-  color: #34473e;
+  color: var(--fg-default);
   text-decoration: underline;
 }
 .view-header a:focus-visible {
-  outline: 2px solid #a2674f;
+  outline: 2px solid var(--accent-fg);
   outline-offset: 3px;
 }
 .view-header .wordmark {
   color: inherit;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 2px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+}
+.wordmark-name {
+  white-space: nowrap;
 }
 .view-header .wordmark:hover {
   text-decoration: none;
@@ -57,34 +62,32 @@
   width: 44px;
   height: 44px;
   object-fit: contain;
+  filter: brightness(0) invert(0.9);
 }
 .wordmark-sub {
   font-weight: 400;
-  color: #899083;
-  font-size: 11px;
-  letter-spacing: 1px;
+  color: var(--fg-muted);
+  font-size: inherit;
 }
 .view-heading h1 {
   margin: 0 0 4px;
-  font:
-    36px Georgia,
-    serif;
+  font-size: 24px;
+  font-weight: 600;
   letter-spacing: normal;
 }
 .view-title-badge {
   display: inline-block;
   vertical-align: middle;
-  color: #ad6547;
-  font:
-    12px "Avenir Next",
-    "Segoe UI",
-    sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  color: var(--fg-muted);
+  padding: 2px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
 }
 .view-heading p {
   margin: 0;
-  color: #6d786a;
+  color: var(--fg-muted);
   font-size: 11px;
   line-height: 1.6;
 }
@@ -93,7 +96,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 10px;
-  color: #6d786a;
+  color: var(--fg-muted);
   font-size: 12px;
 }
 .view-navigation {
@@ -103,12 +106,34 @@
   font-size: 12px;
 }
 .view-navigation a {
-  border-radius: 4px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
   padding: 8px 10px;
+  color: var(--fg-default);
+}
+.view-navigation a svg {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.view-header .view-navigation a:hover {
+  background: var(--bg-hover);
+  text-decoration: none;
 }
 .view-navigation a[aria-current="page"] {
-  color: #f3efe2;
-  background: #39574b;
+  font-weight: 600;
+}
+.view-navigation a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--nav-indicator);
 }
 @media (max-width: 660px) {
   .view-shell {
@@ -126,7 +151,6 @@
   }
   .view-header .wordmark {
     font-size: 10px;
-    letter-spacing: 1px;
     gap: 4px;
   }
   .wordmark-sub {

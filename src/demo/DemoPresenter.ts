@@ -24,27 +24,27 @@ export function createDemoBackdrop(scene: Phaser.Scene, boneCount: number, profi
   const { width, height } = scene.scale;
   const floor = scene.add.graphics();
   floor
-    .lineStyle(1, 0x9eaa97, 0.45)
+    .lineStyle(1, 0x59636e, 0.65)
     .lineBetween(70, height - profile.feet.floorYOffset, width - 70, height - profile.feet.floorYOffset);
-  floor.fillStyle(0x515e4e, 0.08).fillEllipse(width / 2, height - profile.feet.floorYOffset, 170, 18);
+  floor.fillStyle(0x59636e, 0.12).fillEllipse(width / 2, height - profile.feet.floorYOffset, 170, 18);
   scene.add.text(30, 28, 'FIG. 03 / ANIMATION PLAYBACK', {
     fontFamily: 'monospace',
     fontSize: '11px',
-    color: '#7e8678',
+    color: '#59636e',
     letterSpacing: 1,
   });
   scene.add
     .text(width - 30, 28, `${boneCount} JOINTS · ${profile.ikChains.length} IK CHAINS`, {
       fontFamily: 'monospace',
       fontSize: '11px',
-      color: '#7e8678',
+      color: '#59636e',
     })
     .setOrigin(1, 0);
   scene.add
     .text(width / 2, height - 62, 'MOUSE: HAND TARGET · Q / E: KATANA', {
       fontFamily: 'monospace',
       fontSize: '11px',
-      color: '#7e8678',
+      color: '#59636e',
       letterSpacing: 2,
     })
     .setOrigin(0.5);

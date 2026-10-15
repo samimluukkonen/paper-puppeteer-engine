@@ -1,10 +1,10 @@
 .view-shell {
-  --dropdown-border: #cbd1c1;
-  --dropdown-panel-border: #b7c0ac;
-  --dropdown-panel-background: #f8f5ec;
-  --dropdown-panel-shadow: 0 8px 24px #34473e26;
-  --dropdown-active-background: #dce7d7;
-  --dropdown-active-border: #39574b;
+  --dropdown-border: var(--border-default);
+  --dropdown-panel-border: var(--border-emphasis);
+  --dropdown-panel-background: var(--bg-panel);
+  --dropdown-panel-shadow: 0 8px 24px var(--shadow-color);
+  --dropdown-active-background: var(--accent-muted);
+  --dropdown-active-border: var(--accent-fg);
 }
 
 .view-shell select,
@@ -12,9 +12,9 @@
   min-height: 32px;
   padding: 4px 8px;
   border: 1px solid var(--dropdown-border);
-  border-radius: 4px;
-  color: #34473e;
-  background: #fff;
+  border-radius: 6px;
+  color: var(--fg-default);
+  background: var(--bg-inset);
   font: inherit;
   cursor: pointer;
 }
@@ -23,7 +23,7 @@
   max-width: 100%;
   appearance: none;
   padding-right: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236d786a' d='M0 0h10L5 6z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%239198a1' d='M0 0h10L5 6z'/%3E%3C/svg%3E");
   background-position: right 8px center;
   background-repeat: no-repeat;
 }
@@ -56,7 +56,7 @@
 
   .view-shell select::picker-icon {
     content: "▾";
-    color: #6d786a;
+    color: var(--fg-muted);
   }
 
   .view-shell select:open {
@@ -72,7 +72,7 @@
     padding: 10px;
     border: 1px solid var(--dropdown-panel-border);
     border-radius: 6px;
-    color: #34473e;
+    color: var(--fg-default);
     background: var(--dropdown-panel-background);
     box-shadow: var(--dropdown-panel-shadow);
     font: inherit;
@@ -85,8 +85,8 @@
     min-height: 32px;
     padding: 4px 8px;
     border: 1px solid var(--dropdown-border);
-    border-radius: 4px;
-    background: #fff;
+    border-radius: 6px;
+    background: var(--bg-inset);
     overflow-wrap: anywhere;
     cursor: pointer;
   }

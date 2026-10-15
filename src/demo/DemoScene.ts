@@ -93,7 +93,7 @@ export class DemoScene extends Phaser.Scene {
   }
 
   private showLoadError(message: string): void {
-    this.add.text(30, 60, `Character load failed: ${message}`, { color: '#a03930', wordWrap: { width: 600 } });
+    this.add.text(30, 60, `Character load failed: ${message}`, { color: '#f85149', wordWrap: { width: 600 } });
   }
 
   private createPuppet(definition: CharacterDefinition): void {
