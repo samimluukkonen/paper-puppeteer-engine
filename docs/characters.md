@@ -55,9 +55,9 @@ requests. Adjust these positive integer limits for larger trusted characters, fo
 `queueCharacterTextures` still receives its separate image limits.
 
 External metadata also defaults to at most 4096 bones per rig, 256 hierarchy levels (including the root),
-and 100000 bone/IK keyframe rows combined across all loaded animations. These checks run before schema
+100000 bone/IK keyframe rows and 10000 events combined across all loaded animations. These checks run before schema
 parsing, cloning, or constructing render objects. `DEFAULT_JSON_WORKLOAD_LIMITS` exposes the defaults.
-Raise `maxBones`, `maxBoneDepth`, or `maxKeyframes` for trusted larger assets, for example
+Raise `maxBones`, `maxBoneDepth`, `maxKeyframes`, or `maxEvents` for trusted larger assets, for example
 `CharacterLoader.load(url, fetch, { maxBones: 8192, maxBoneDepth: 512, maxKeyframes: 200000 })`.
 `loadSceneCharacter` accepts the same options. Runtime rigs and `CharacterDefinition.fromData` retain
 their existing validation without these external-load work budgets.

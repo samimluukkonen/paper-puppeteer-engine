@@ -6,9 +6,22 @@ function chain(length: number) {
   return Array.from({ length }, (_, index) => ({ id: `b${index}`, ...(index ? { parent: `b${index - 1}` } : {}) }));
 }
 
-test.each(['maxBones', 'maxBoneDepth', 'maxKeyframes'] as const)('%s rejects invalid limits', (name) => {
+test.each(['maxBones', 'maxBoneDepth', 'maxKeyframes', 'maxEvents'] as const)('%s rejects invalid limits', (name) => {
   for (const value of [0, -1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1])
     assert.throws(() => new JsonWorkloadBudget({ [name]: value }), /positive safe integer/);
+});
+
+test('event budgets accumulate across clips independently of keyframes and precede event reads', () => {
+  const budget = new JsonWorkloadBudget({ maxEvents: 3, maxKeyframes: 1 });
+  budget.checkAnimation({ events: [{}, {}] });
+  budget.checkAnimation({ events: [{}], tracks: { root: [{ time: 0 }] } });
+  assert.throws(() => budget.checkAnimation({ events: [{}] }), /3-event limit/);
+  const rows = Array.from({ length: DEFAULT_JSON_WORKLOAD_LIMITS.maxEvents + 1 }, () => ({}));
+  Object.defineProperty(rows, '0', { get: () => assert.fail('Oversized event arrays must not be read') });
+  assert.throws(() => new JsonWorkloadBudget().checkAnimation({ events: rows }), /10000-event limit/);
+  assert.doesNotThrow(() => new JsonWorkloadBudget({ maxEvents: rows.length }).checkAnimation({ events: rows }));
+  const unsafe = Object.defineProperty({}, 'events', { get: () => assert.fail('Do not invoke event getters') });
+  assert.doesNotThrow(() => new JsonWorkloadBudget().checkAnimation(unsafe));
 });
 
 test('bone count is checked before reading entries or constructing a graph', () => {

@@ -56,6 +56,19 @@ test('animation imports enforce configurable keyframe work budgets before replac
   assert.match(rejected.issues[0]!.message, /4-keyframe limit/);
   assert.isTrue(importAnimationJson(input, rig, { maxKeyframes: 5 }).success);
 });
+
+test('event-heavy imports are rejected before replacing authored state and trusted callers can raise the limit', () => {
+  const state = session();
+  const before = snapshot(state);
+  const input = JSON.stringify({ ...file(), events: Array.from({ length: 100001 }, () => ({ time: 500, name: 'e' })) });
+  assert.isBelow(input.length, 10 * 1024 * 1024);
+  assert.isFalse(state.importJson(input));
+  assert.match(state.validationIssues[0]!.message, /10000-event limit/);
+  assert.deepEqual(snapshot(state), before);
+  const small = JSON.stringify(file());
+  assert.isFalse(importAnimationJson(small, rig, { maxEvents: 4 }).success);
+  assert.isTrue(importAnimationJson(small, rig, { maxEvents: 5 }).success);
+});
 function session() {
   const state = new AnimationEditorState(rig, [
     { name: 'old', duration: 2000, loop: true, tracks: { root: [{ time: 0, x: 1 }] } },

@@ -149,6 +149,7 @@ test.each([
   ['maxBones', 0],
   ['maxBoneDepth', Infinity],
   ['maxKeyframes', 1.5],
+  ['maxEvents', 0],
 ] as const)('invalid %s is rejected before fetching', async (name, value) => {
   const fetcher = vi.fn<typeof fetch>();
   await expect(CharacterLoader.load(url, fetcher, { [name]: value })).rejects.toThrow(/positive safe integer/);
@@ -182,6 +183,24 @@ test('keyframe budgets cover the combined rows of all loaded animations', async 
   );
   await expect(CharacterLoader.load(url, fetcher, { maxKeyframes: 1 })).rejects.toThrow(/1-keyframe limit/);
   assert.equal((await CharacterLoader.load(url, fetcher, { maxKeyframes: 2 })).animations.length, 2);
+});
+
+test('event budgets cover the combined markers of all loaded animations', async () => {
+  const metadata: Record<string, unknown> = {
+    ...files,
+    'character.json': { ...manifest, animations: ['idle.json', 'walk.json'] },
+    ...Object.fromEntries(
+      ['idle', 'walk'].map((name) => [
+        `${name}.json`,
+        { version: 1, name, duration: 1000, loop: false, tracks: {}, events: [{ time: 500, name: 'e' }] },
+      ]),
+    ),
+  };
+  const fetcher = vi.fn<typeof fetch>(async (input) =>
+    Response.json(metadata[new URL(requestUrl(input)).pathname.slice(1)]),
+  );
+  await expect(CharacterLoader.load(url, fetcher, { maxEvents: 1 })).rejects.toThrow(/1-event limit/);
+  assert.equal((await CharacterLoader.load(url, fetcher, { maxEvents: 2 })).animations.length, 2);
 });
 
 test('work-budget failures cancel the load before a worker acquires another file', async () => {

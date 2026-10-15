@@ -5,6 +5,7 @@ export const DEFAULT_JSON_WORKLOAD_LIMITS = Object.freeze({
   maxBones: 4096,
   maxBoneDepth: 256,
   maxKeyframes: 100_000,
+  maxEvents: 10_000,
 });
 
 export interface JsonWorkloadLimitOptions {
@@ -14,6 +15,8 @@ export interface JsonWorkloadLimitOptions {
   maxBoneDepth?: number;
   /** Maximum bone and IK keyframe rows combined, across all loaded clips. Defaults to 100000. */
   maxKeyframes?: number;
+  /** Maximum authored events combined across all loaded clips. Defaults to 10000. */
+  maxEvents?: number;
 }
 
 /** Read only owned data properties; malformed shapes remain the schema validator's responsibility. */
@@ -22,10 +25,11 @@ function ownValue(input: unknown, key: string): unknown {
   return Object.getOwnPropertyDescriptor(input, key)?.value;
 }
 
-/** @internal One external load owns a cumulative keyframe budget, before schema parsing or cloning. */
+/** @internal One external load owns cumulative keyframe/event budgets, before schema parsing or cloning. */
 export class JsonWorkloadBudget {
   private readonly limits: Required<JsonWorkloadLimitOptions>;
   private keyframes = 0;
+  private events = 0;
 
   constructor(options: JsonWorkloadLimitOptions = {}) {
     this.limits = {
@@ -38,6 +42,7 @@ export class JsonWorkloadBudget {
         options.maxKeyframes ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxKeyframes,
         'maxKeyframes',
       ),
+      maxEvents: validateInputLimit(options.maxEvents ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxEvents, 'maxEvents'),
     };
   }
 
@@ -81,6 +86,12 @@ export class JsonWorkloadBudget {
   }
 
   checkAnimation(input: unknown): void {
+    const events = ownValue(input, 'events');
+    if (Array.isArray(events)) {
+      this.events += events.length;
+      if (this.events > this.limits.maxEvents)
+        throw new JsonInputLimitError(`Animation data exceeds the ${this.limits.maxEvents}-event limit.`);
+    }
     for (const field of ['tracks', 'ikTracks']) {
       const tracks = ownValue(input, field);
       if (tracks === null || typeof tracks !== 'object' || Array.isArray(tracks)) continue;

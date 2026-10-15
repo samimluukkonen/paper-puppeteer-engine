@@ -56,6 +56,30 @@ async function editRoot(page: Page, value: string) {
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
 }
 
+for (const input of ['file', 'paste'] as const) {
+  test(`event-heavy ${input} imports are rejected before replacing the timeline`, async ({ page }) => {
+    await page.goto('animation-editor/');
+    await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+    await paste(page, JSON.stringify(animation));
+    await editRoot(page, '140');
+    const json = JSON.stringify({
+      ...animation,
+      events: Array.from({ length: 10001 }, () => ({ time: 500, name: 'e' })),
+    });
+    if (input === 'paste') await paste(page, json);
+    else
+      await animationFileAction(page, '#animation-import-file', (control) =>
+        control.setInputFiles({ name: 'many-events.json', mimeType: 'application/json', buffer: Buffer.from(json) }),
+      );
+    await expect(page.locator('#animation-import-feedback')).toContainText('10000-event limit');
+    await expect(page.locator('#animation-selection')).toHaveValue('roundTrip');
+    await expect(page.locator('.timeline-event')).toHaveCount(5);
+    await expect(page.locator('#animation-bone-fields input[data-property="x"]')).toHaveValue('140');
+    await expect(page.locator('#animation-undo')).toBeEnabled();
+    await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  });
+}
+
 test('paste and downloaded file imports restore authored data, timeline and rendered pose; normal edits still undo/redo', async ({
   page,
 }) => {

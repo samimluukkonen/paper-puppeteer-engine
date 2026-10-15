@@ -362,9 +362,9 @@ See [export verification](animation-editor-export-verification.md) for automated
 
 ## Animation import and reload
 
-File, paste, and browser draft imports allow at most 100000 bone/IK keyframe rows per animation,
+File, paste, and browser draft imports allow at most 100000 bone/IK keyframe rows and 10000 events per animation,
 in addition to JSON byte limits. Development callers can configure the work budget with
-`importAnimationJson(text, rig, { maxKeyframes: 200000 })` for trusted larger files. Rejected inputs
+`importAnimationJson(text, rig, { maxKeyframes: 200000, maxEvents: 20000 })` for trusted larger files. Rejected inputs
 retain the current working session.
 
 **Import / Paste Animation JSON** opens a text area with **Parse / Import** and **Cancel**. **Import local animation JSON** reads a local `.json` file through the same pipeline. Load a character first: its rig supplies bone-reference validation. The file must have supported animation `version: 1`; unknown bones, unsupported versions, syntax errors and invalid authored data produce field-path diagnostics before replacement.
