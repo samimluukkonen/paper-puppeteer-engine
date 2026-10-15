@@ -3,8 +3,8 @@ import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettin
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
-import '../rig-editor/style.css';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
+import '../rig-editor/style.css';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
@@ -23,6 +23,7 @@ import { IKBakeController } from './IKBakeController.js';
 import { IKInspectorController } from './IKInspectorController.js';
 import { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
+import { NewAnimationController } from './NewAnimationController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { RigTweakController } from './RigTweakController.js';
 import { TimelineController } from './TimelineController.js';
@@ -39,6 +40,7 @@ const packages = new PackageController();
 const artwork = new ArtworkController();
 const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
+const newAnimation = new NewAnimationController();
 const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const ikBake = new IKBakeController(
@@ -62,6 +64,7 @@ function CharacterWorkspace() {
       >
         <AnimationEditorView
           mirrorTools={mirrorTools}
+          newAnimation={newAnimation}
           ikInspector={ikInspector}
           ikBake={ikBake}
           retiming={retiming}
@@ -104,6 +107,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       stateOwner = state;
+      newAnimation.bind(state);
       rigTweak.bind(state, editorScene.rigEditor!);
       rigWorkspace.render(editorScene.rigEditor!);
       editorScene.fitPreview();
@@ -147,6 +151,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     },
     (message) => {
       stateOwner = undefined;
+      newAnimation.unbind();
       rigWorkspace.showError(message);
       packages.unbind();
       releaseAnimationPackage?.();
@@ -261,6 +266,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     mirrorTools.dispose();
     ikBake.dispose();
     retiming.dispose();
+    newAnimation.dispose();
     workspace.dispose();
     recoveryControls.dispose();
     releaseNavigationGuard();

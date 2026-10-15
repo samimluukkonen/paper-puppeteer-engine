@@ -192,6 +192,27 @@ function fixture(): PackageSnapshot {
   };
 }
 
+test('new session clips join existing manifest clips without changing source paths, artwork or animations', async () => {
+  const source = fixture();
+  const before = JSON.stringify(source);
+  const state = new AnimationEditorState(source.definition.rig, source.animations, {
+    animationPaths: source.definition.animationPaths,
+  });
+  state.selectAnimation('move');
+  assert.isTrue(state.createAnimation({ name: 'idle' }));
+  assert.isTrue(state.createAnimation({ name: 'MOVE' }));
+  const files = await buildCharacterPackage({ ...source, animations: state.packageAnimations() }, fetchImage);
+  const loaded = await loadPackageDefinition(files);
+  assert.deepEqual(loaded.manifest!.animations, [
+    'animations/move.json',
+    'animations/idle.json',
+    'animations/MOVE_2.json',
+  ]);
+  assert.deepEqual(loaded.animations[0], source.animations[0]);
+  assert.deepEqual(files.get('images/part.png'), png);
+  assert.equal(JSON.stringify(source), before);
+});
+
 test('complete ZIP includes metadata and exact binaries and reloads with CharacterLoader', async () => {
   const source = fixture();
   const before = JSON.stringify(source);

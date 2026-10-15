@@ -1384,3 +1384,13 @@ a {
   max-height: 220px;
   overflow: auto;
 }
+#animation-new-dialog form {
+  display: grid;
+  gap: 12px;
+}
+
+#animation-new-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

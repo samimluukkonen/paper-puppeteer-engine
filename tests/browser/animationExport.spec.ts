@@ -83,8 +83,11 @@ test('a failed download retains unsaved changes and reports an actionable error'
   await expect(page.locator('#animation-export-feedback')).toContainText('Download unavailable');
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#animation-selection')).toHaveValue('walk');
+  await page.locator('#animation-selection').selectOption('idle');
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
-  await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
+  await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
+  await expect(page.locator('#animation-bone-fields input[data-property="x"]')).toHaveValue('17');
 });
 
 test('clipboard and repeated downloads share canonical JSON across smooth and stepped playback', async ({

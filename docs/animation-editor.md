@@ -9,6 +9,16 @@ Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animat
 
 Expand **Character package** above the command bar to download the complete validated character ZIP, including applied sprite replacements, and reload/import it into an isolated production runtime preview. Individual JSON downloads retain their existing checkpoints and file placement workflow. See the [complete artist and package workflow](artist-workflow.md).
 
+## Create an animation from scratch
+
+Load a character with a valid rig, then choose **+ New Animation** above the workspace. This works with no animation files and with no clip selected. Enter **Animation name / ID**, duration in seconds, FPS and loop preference. Defaults are one second, 12 FPS and loop enabled. The version-1 format uses `name` as its stable ID; there is no separate display-name field. New IDs start with a letter or number and contain only letters, numbers, hyphens or underscores. Duplicate IDs are rejected without changing the current document.
+
+Creation selects the new clip, pauses at zero and clears animation selections and drafts. Its timeline contains the normal rig rows with no authored bone keys, IK keys or events. Missing tracks use the existing bind-pose fallback. Select a bone, move the playhead, enter a local value and click its diamond to create the first key. Every existing authoring tool remains available. FPS sets stepped playback; choose Smooth in Clip settings for continuous sampling.
+
+New clips appear with **(New)** in the animation selector and **New / Unsaved** in status. Creation starts a separate document with empty Undo/Redo history. Later edits use normal history; undoing every key keeps the new document registered and unsaved. Switching clips retains each document's authored data and history. Download, copy or log its JSON to establish an individual export checkpoint. Discard/revert can restore its empty baseline but do not remove an unexported document or its unsaved status.
+
+Character ZIP export includes all new in-memory clips, including inactive clips, and automatically adds their generated animation file paths to the exported manifest. The original manifest remains unchanged. JSON reload/import uses the same format as existing clips; replacing unsaved same-ID work asks for confirmation. Leaving, reloading or closing the workspace uses existing unsaved-session protection, including new clips with no keys. Downloads do not write into the source directory. Save JSON or the character ZIP before leaving; automatic rediscovery of new document IDs after a page reload and animation deletion/renaming are outside the current workflow.
+
 ## Workspace
 
 Animation selection, Undo/Redo, **Download JSON**, and save/validation status stay above the workspace. The preview and selection inspector share the upper area; the timeline spans the full width below. The canvas fits both dimensions of its host and frames the loaded artwork once, keeping the camera stable during playback and authoring.

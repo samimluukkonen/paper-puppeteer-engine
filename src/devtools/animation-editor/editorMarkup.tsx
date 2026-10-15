@@ -19,12 +19,15 @@ import type { KeyframeRetimingController } from './KeyframeRetimingController.js
 import { KeyframeRetimingPanel } from './KeyframeRetimingPanel.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
+import type { NewAnimationController } from './NewAnimationController.js';
+import { NewAnimationDialog } from './NewAnimationDialog.js';
 import { type RigTweakController, emptyRigTweakSnapshot, subscribeNoRigTweak } from './RigTweakController.js';
 import { RigTweakPanel } from './RigTweakPanel.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
 export function AnimationEditorView({
   mirrorTools,
+  newAnimation,
   ikInspector,
   ikBake,
   retiming,
@@ -35,6 +38,7 @@ export function AnimationEditorView({
   header = true,
 }: {
   mirrorTools: MirrorToolsController;
+  newAnimation?: NewAnimationController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
   retiming: KeyframeRetimingController;
@@ -79,6 +83,7 @@ export function AnimationEditorView({
             </select>
           </label>
         )}
+        {newAnimation && <NewAnimationDialog controller={newAnimation} />}
         <label inert={tweaking}>
           Animation <select id="animation-selection"></select>
         </label>

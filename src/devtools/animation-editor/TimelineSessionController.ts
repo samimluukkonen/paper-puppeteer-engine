@@ -35,6 +35,7 @@ export class TimelineSessionController {
   private animation: AnimationEditorState['workingAnimation'] = null;
   private readonly files: AnimationFileController;
   private animationIds: readonly string[] | undefined;
+  private animationOptions: readonly { id: string; element: HTMLOptionElement }[] = [];
   private renderedControls: readonly unknown[] | undefined;
 
   constructor(
@@ -161,9 +162,16 @@ export class TimelineSessionController {
 
   private updateAnimationOptions(state: AnimationEditorState): void {
     const ids = state.animationIds;
-    if (ids === this.animationIds) return;
-    this.animationIds = ids;
-    this.selection.replaceChildren(new Option('No animation selected', ''), ...ids.map((id) => new Option(id, id)));
+    if (ids !== this.animationIds) {
+      this.animationIds = ids;
+      this.animationOptions = ids.map((id) => ({ id, element: new Option(id, id) }));
+      this.selection.replaceChildren(
+        new Option('No animation selected', ''),
+        ...this.animationOptions.map((option) => option.element),
+      );
+    }
+    for (const { id, element } of this.animationOptions)
+      setText(element, `${id}${state.isNewAnimation(id) ? ' (New)' : ''}`);
   }
 
   showError(message: string): void {
@@ -173,7 +181,6 @@ export class TimelineSessionController {
 
   render(force = false): void {
     const state = this.state;
-    this.updateAnimationOptions(state);
     const animation = state.workingAnimation;
     const authoredChanged = animation !== this.animation;
     this.animation = animation;
@@ -214,6 +221,7 @@ export class TimelineSessionController {
       selectedId,
       state.timelineSnapSettings,
       state.dirty,
+      state.isNewAnimation(),
       state.canUndo,
       state.canRedo,
       state.selectedKeys,
@@ -227,6 +235,8 @@ export class TimelineSessionController {
     ];
     if (!force && this.renderedControls && controls.every((value, index) => value === this.renderedControls![index]))
       return;
+    this.updateAnimationOptions(state);
+    if (this.selection.value !== selectedId) this.selection.value = selectedId;
     for (const { setting, input } of this.snap)
       input.disabled = !animation || (setting !== 'enabled' && !state.timelineSnapSettings.enabled);
     const selectionDisabled = !state.animationIds.length;
@@ -310,10 +320,13 @@ export class TimelineSessionController {
             : '',
       'Paste at the playhead (Ctrl/Cmd+V in timeline)',
     );
-    setText(this.dirty, state.dirty ? 'Unsaved changes' : 'No unsaved changes');
+    setText(
+      this.dirty,
+      state.isNewAnimation() ? 'New / Unsaved' : state.dirty ? 'Unsaved changes' : 'No unsaved changes',
+    );
     setText(
       this.sessionStatus,
-      `Animation: ${state.selectedAnimationId ?? 'none'} · Status: ${animation ? (state.dirty ? 'Modified' : 'Clean') : 'No animation'}`,
+      `Animation: ${state.selectedAnimationId ?? 'none'} · Status: ${animation ? (state.isNewAnimation() ? 'New / Unsaved' : state.dirty ? 'Modified' : 'Clean') : 'No animation'}`,
     );
     setText(
       this.status,

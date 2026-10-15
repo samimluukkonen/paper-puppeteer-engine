@@ -42,7 +42,8 @@ test('unsaved animation settings protect navigation, refresh, and character sele
     expect(dialog.type()).toBe('beforeunload');
     await dialog.dismiss();
   };
-  await Promise.all([dismissNavigation(), page.getByRole('link', { name: 'Rig Editor', exact: true }).click()]);
+  // Editor tabs retain the shared workspace; leaving it for the demo must protect unsaved clips.
+  await Promise.all([dismissNavigation(), page.getByRole('link', { name: 'Engine Demo', exact: true }).click()]);
   await Promise.all([
     dismissNavigation(),
     page.evaluate(() => {
@@ -208,8 +209,11 @@ test('authored mode and FPS update the paused pose immediately and undo restores
   expect((await capturePose()).equals(steppedPose)).toBe(false);
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#animation-selection')).toHaveValue('walk');
+  await page.locator('#animation-selection').selectOption('idle');
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
-  await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await expect(await animationControl(page, '#animation-fps')).toHaveValue('20');
   await page.locator('#animation-undo').click();
   await expect(await animationControl(page, '#animation-fps')).toHaveValue('10');
   expect((await capturePose()).equals(steppedPose)).toBe(true);
@@ -711,16 +715,28 @@ test('Home rewinds from outside the timeline, preserves playback, and ignores ty
   await expect(playPause).toBeDisabled();
 });
 
-test('repeated animation switches reset playback and time while retaining transient preferences', async ({ page }) => {
+test('repeated animation switches pause playback and restore clip time while retaining transient preferences', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2030-01-01T00:00:00Z') });
   await openEditor(page);
+  await page.clock.pauseAt(new Date('2030-01-01T01:00:00Z'));
   const playPause = page.locator('#play-pause');
+  const times = new Map<string, string>();
   await page.locator('#preview-loop').click();
   await page.locator('#playback-speed').selectOption('2');
   for (const animation of ['walk', 'idle', '', 'walk', 'idle', '', 'idle']) {
-    if (!(await playPause.isDisabled())) await playPause.click();
+    if (!(await playPause.isDisabled())) {
+      await playPause.click();
+      await page.clock.runFor(100);
+      times.set(
+        await page.locator('#animation-selection').inputValue(),
+        (await page.locator('#timeline-ruler').getAttribute('aria-valuenow'))!,
+      );
+    }
     await page.locator('#animation-selection').selectOption(animation);
     await expect(playPause).toHaveText('Play');
-    await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
+    await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', times.get(animation) ?? '0');
     await expect(page.locator('#preview-loop')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#playback-speed')).toHaveValue('2');
     await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');

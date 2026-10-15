@@ -41,6 +41,7 @@ import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionComm
 import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
 import type { AnimationExportResult } from './animationSerialization.js';
 import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
+import type { NewAnimationOptions } from './createEmptyAnimation.js';
 import {
   type GhostPoseSample,
   type GhostSamplingSettings,
@@ -757,6 +758,10 @@ export class AnimationEditorState {
     return this.document.hasUnsavedChanges;
   }
 
+  isNewAnimation(id: string | null = this.selectedAnimationId): boolean {
+    return this.document.isNewAnimation(id);
+  }
+
   get dirty(): boolean {
     return this.document.dirty;
   }
@@ -1124,6 +1129,22 @@ export class AnimationEditorState {
       if (reverted) this.resetAnimationSession(true);
       this.notify();
       return reverted;
+    });
+  }
+
+  /** A new document is a navigation boundary, never an edit to the previously selected clip. */
+  createAnimation(options: NewAnimationOptions): boolean {
+    if (!this.animationAuthoringEnabled) return false;
+    return this.batchNotifications(() => {
+      const previousId = this.selectedAnimationId;
+      const previousContext = { time: this.currentTime, keys: this.selectedKeys };
+      const created = this.document.createAnimation(options);
+      if (created) {
+        if (previousId) this.clipContexts.set(previousId, previousContext);
+        this.resetAnimationSession(true);
+      }
+      this.notify();
+      return created;
     });
   }
 

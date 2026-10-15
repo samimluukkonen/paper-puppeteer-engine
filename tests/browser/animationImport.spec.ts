@@ -184,7 +184,7 @@ test('import cancels an active marquee and clears temporary event inspector edit
 test('reimporting a clip with a previous browser draft starts clean without a recovery prompt', async ({ page }) => {
   const dialogs: string[] = [];
   page.on('dialog', async (dialog) => {
-    if (!dialog.message().startsWith('Discard unsaved animation changes')) {
+    if (!dialog.message().startsWith('Import or reload this animation?')) {
       dialogs.push(dialog.message());
       await dialog.dismiss();
     }

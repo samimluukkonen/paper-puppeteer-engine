@@ -7,6 +7,7 @@ import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { importAnimationJson } from './animationImport.js';
 import { serializeAnimation, type AnimationExportResult } from './animationSerialization.js';
+import { createEmptyAnimation, type NewAnimationOptions } from './createEmptyAnimation.js';
 import { inspectEditorAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 
 export type { ReadonlyAnimation } from './validatedAnimation.js';
@@ -15,6 +16,7 @@ type AnimationEntry = {
   saved: ReadonlyAnimation | null;
   issues: readonly ValidationIssue[];
   path?: string;
+  unsavedNew?: boolean;
   working?: ReadonlyAnimation | null;
   history?: SnapshotHistory<ReadonlyAnimation | null>;
 };
@@ -80,7 +82,11 @@ export class AnimationEditorDocument {
   get workingAnimation(): ReadonlyAnimation | null {
     return this.working;
   }
+  isNewAnimation(id: string | null = this.selectedId): boolean {
+    return id !== null && !!this.animations.get(id)?.unsavedNew;
+  }
   get dirty(): boolean {
+    if (this.isNewAnimation()) return true;
     this.cachedDirty ??= !equalEditorData(this.working, this.saved);
     return this.cachedDirty;
   }
@@ -89,7 +95,8 @@ export class AnimationEditorDocument {
       this.dirty ||
       [...this.animations.entries()].some(
         ([id, entry]) =>
-          id !== this.selectedId && entry.working !== undefined && !equalEditorData(entry.working, entry.saved),
+          id !== this.selectedId &&
+          (entry.unsavedNew || (entry.working !== undefined && !equalEditorData(entry.working, entry.saved))),
       )
     );
   }
@@ -171,6 +178,33 @@ export class AnimationEditorDocument {
     return true;
   }
 
+  /** Validate completely before registering; creation preserves every other clip and its history. */
+  createAnimation(options: NewAnimationOptions): boolean {
+    let animation: ReadonlyAnimation;
+    try {
+      if (this.animations.has(options.name)) throw new Error(`Animation "${options.name}" is already registered.`);
+      animation = createEmptyAnimation(this.rig, options);
+    } catch (error) {
+      this.reportError(error);
+      return false;
+    }
+    const previous = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
+    if (previous) {
+      previous.working = this.working;
+      previous.history = this.history;
+    }
+    this.animations.set(animation.name, { source: animation, saved: animation, issues: [], unsavedNew: true });
+    this.ids = Object.freeze([...this.animations.keys()]);
+    this.selectedId = animation.name;
+    this.source = animation;
+    this.working = animation;
+    this.saved = animation;
+    this.cachedDirty = false;
+    this.issues = [];
+    this.history = this.createHistory();
+    return true;
+  }
+
   /** Import starts a clean session; rejection changes diagnostics only. */
   importJson(json: string, options: AnimationImportOptions = {}): boolean {
     const result = importAnimationJson(json, this.rig);
@@ -179,7 +213,9 @@ export class AnimationEditorDocument {
       return false;
     }
     const replacing = this.animations.get(result.data.name);
-    const replacingDirty = replacing?.working !== undefined && !equalEditorData(replacing.working, replacing.saved);
+    const replacingDirty =
+      replacing?.unsavedNew ||
+      (replacing?.working !== undefined && !equalEditorData(replacing.working, replacing.saved));
     if ((this.dirty || replacingDirty) && options.confirmDiscard && !options.confirmDiscard()) return false;
     if (this.selectedId !== result.data.name) {
       const current = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
@@ -212,8 +248,9 @@ export class AnimationEditorDocument {
   revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
     if (!this.source || (this.dirty && !options.discardChanges)) return false;
     this.working = this.source;
-    this.markSaved();
-    this.cachedDirty = false;
+    // Reverting an unexported document keeps its New / Unsaved status.
+    if (!this.isNewAnimation()) this.markSaved();
+    this.cachedDirty = undefined;
     this.history = this.createHistory();
     return true;
   }
@@ -262,7 +299,10 @@ export class AnimationEditorDocument {
 
   markSaved(snapshot: ReadonlyAnimation | null = this.working): void {
     const entry = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
-    if (entry) entry.saved = snapshot;
+    if (entry) {
+      entry.saved = snapshot;
+      if (snapshot) entry.unsavedNew = false;
+    }
     this.saved = snapshot;
     this.cachedDirty = undefined;
     this.issues = [];
