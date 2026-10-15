@@ -84,7 +84,12 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const rigWorkspace = createRigWorkspaceController(
     rigApp,
     () => editorScene,
-    () => packages.refresh(),
+    () => {
+      // Inspector edits suppress scene notifications to preserve focused input text.
+      // Still notify the shared rig recovery owner used by both editor views.
+      rigTweak.refresh();
+      packages.refresh();
+    },
   );
   const releaseCharacterSelection = bindCharacterSelection(app);
   const timeline = new TimelineController(app);

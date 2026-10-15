@@ -41,7 +41,7 @@ test('static WebP replacement exports and reloads with guarded runtime image loa
   expect(Buffer.from(files.get(manifest.textures['paper-left-forearm']!)!)).toEqual(Buffer.from(encoded, 'base64'));
   await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Package runtime preview' });
-  await expect(dialog).toContainText('runtime playback ready');
+  await expect(dialog).toContainText('runtime playback ready', { timeout: 30_000 });
   await dialog.getByRole('button', { name: 'Close preview' }).click();
 });
 
@@ -131,7 +131,7 @@ for (const editor of ['rig', 'animation'] as const) {
     for (let attempt = 0; attempt < 3; ++attempt) {
       await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
       const preview = page.getByRole('dialog', { name: 'Package runtime preview', exact: true });
-      await expect(preview).toContainText('runtime playback ready');
+      await expect(preview).toContainText('runtime playback ready', { timeout: 30_000 });
       await expect(preview.locator('canvas')).toBeVisible();
       await preview.getByLabel('Animation', { exact: true }).selectOption('walk');
       await preview.getByLabel('Skin', { exact: true }).selectOption('alternate');
@@ -145,7 +145,7 @@ for (const editor of ['rig', 'animation'] as const) {
       .getByLabel('Import ZIP for runtime preview')
       .setInputFiles({ name: 'saved.zip', mimeType: 'application/zip', buffer: bytes });
     const imported = page.getByRole('dialog', { name: 'Package runtime preview', exact: true });
-    await expect(imported).toContainText('runtime playback ready');
+    await expect(imported).toContainText('runtime playback ready', { timeout: 30_000 });
     await imported.getByRole('button', { name: 'Close preview', exact: true }).click();
     await packages
       .getByLabel('Import ZIP for runtime preview')

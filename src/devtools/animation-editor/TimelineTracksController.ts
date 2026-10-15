@@ -208,7 +208,13 @@ export class TimelineTracksController {
               // Markers own clicks; they must not begin a scrub or resume playback on release.
               const button = marker;
               marker.addEventListener('pointerdown', (event) => this.onKeyPointerDown(event, keyframe, button));
-              marker.addEventListener('contextmenu', () => {
+              marker.addEventListener('contextmenu', (event) => {
+                // macOS emits contextmenu after Control-click. The pointer handler already
+                // toggled this key; selecting it again would replace the remaining group.
+                if (event.ctrlKey) {
+                  event.preventDefault();
+                  return;
+                }
                 if (button.getAttribute('aria-pressed') !== 'true')
                   this.selectMarker(keyframe, { additive: false, range: false });
               });

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import type { RigJsonDefinition } from '../../src/engine/externalData.js';
-import { rigFileAction, test } from './fixtures.js';
+import { rigCanvasProjection, rigFileAction, test } from './fixtures.js';
 
 const field = (page: Page, name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
 
@@ -42,27 +42,21 @@ for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
         await expect(page.locator('#validation')).toHaveText('Validation: OK');
       }
       const original = (await (await page.request.get(`characters/${character}/rig.json`)).json()) as RigJsonDefinition;
+      const projection = await rigCanvasProjection(page);
       if (selection !== 'none') await page.getByRole('treeitem', { name: selection, exact: true }).click();
       await page.locator('#edit-mode').selectOption('sprite');
       const box = await page.locator('#editor-stage canvas').boundingBox();
       if (!box) throw new Error('Missing editor canvas');
-      // With a selection, start on the artwork where its joint marker overlaps it.
-      const jointY = character === 'demo-puppet' ? 313 : 284.5;
-      const start = {
-        x: box.x + (380 / 760) * box.width,
-        y: box.y + ((jointY - (selection === 'none' ? 15 : 0)) / 640) * box.height,
-      };
+      const jointY = projection.head.y;
+      const start = await projection.point(projection.head.x, jointY - (selection === 'none' ? 15 : 0));
       await page.mouse.move(start.x, start.y);
       await page.mouse.down();
       await expect(page.locator('#inspector h3')).toHaveText('Slot: headVisual');
       // Selecting artwork can reflow the session header and shift the canvas vertically.
       const selectedBox = await page.locator('#editor-stage canvas').boundingBox();
       if (!selectedBox) throw new Error('Missing editor canvas');
-      await page.mouse.move(
-        selectedBox.x + ((380 + 24) / 760) * selectedBox.width,
-        selectedBox.y + ((jointY - (selection === 'none' ? 15 : 0) + 12) / 640) * selectedBox.height,
-        { steps: 4 },
-      );
+      const end = await projection.point(projection.head.x + 24, jointY - (selection === 'none' ? 15 : 0) + 12);
+      await page.mouse.move(end.x, end.y, { steps: 4 });
       await page.mouse.up();
       await expect(page.locator('#inspector h3')).toHaveText('Slot: headVisual');
       const offset = (axis: string) => page.locator(`#inspector input[data-scope="attachment"][data-field="${axis}"]`);
@@ -119,8 +113,8 @@ test('a canvas drag released outside commits one undo and stops moving', async (
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   if (!box) throw new Error('Missing editor canvas');
-  // The sample head joint is at (380, 435 - 16 - 106) in the 760 × 640 scene.
-  const start = { x: box.x + (380 / 760) * box.width, y: box.y + (313 / 640) * box.height };
+  const projection = await rigCanvasProjection(page);
+  const start = await projection.point(projection.head.x, projection.head.y);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(start.x + 40, start.y + 20, { steps: 4 });
@@ -153,7 +147,8 @@ test('a canvas drag released outside commits one undo and stops moving', async (
 test('undo during a held canvas drag ends the gesture and preserves redo', async ({ page }) => {
   const box = await page.locator('#editor-stage canvas').boundingBox();
   if (!box) throw new Error('Missing editor canvas');
-  const start = { x: box.x + (380 / 760) * box.width, y: box.y + (313 / 640) * box.height };
+  const projection = await rigCanvasProjection(page);
+  const start = await projection.point(projection.head.x, projection.head.y);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(start.x + 30, start.y + 20, { steps: 4 });
@@ -175,6 +170,8 @@ test('undo during a held canvas drag ends the gesture and preserves redo', async
 
 for (const mode of ['joint', 'sprite']) {
   test(`background dragging repositions the character without editing the rig in ${mode} mode`, async ({ page }) => {
+    const projection = await rigCanvasProjection(page);
+    const initialHead = await projection.point(projection.head.x, projection.head.y);
     await page.getByRole('treeitem', { name: 'head', exact: true }).click();
     await page.locator('#edit-mode').selectOption(mode);
     const canvas = page.locator('#editor-stage canvas');
@@ -198,7 +195,7 @@ for (const mode of ['joint', 'sprite']) {
     await page.locator('#edit-mode').selectOption('joint');
     await page.mouse.click(start.x, start.y);
     await expect(page.locator('#session-status')).toContainText('Selected: none');
-    const head = point(380 + 45, 313 + 35);
+    const head = { x: initialHead.x + end.x - start.x, y: initialHead.y + end.y - start.y };
     await page.mouse.move(head.x, head.y);
     await page.mouse.down();
     await page.mouse.move(head.x + 20, head.y + 10, { steps: 4 });
@@ -216,7 +213,8 @@ for (const interruption of ['blur', 'hidden'] as const) {
   test(`a canvas drag interrupted by ${interruption} cancels and accepts the next drag`, async ({ page }) => {
     const box = await page.locator('#editor-stage canvas').boundingBox();
     if (!box) throw new Error('Missing editor canvas');
-    const start = { x: box.x + (380 / 760) * box.width, y: box.y + (313 / 640) * box.height };
+    const projection = await rigCanvasProjection(page);
+    const start = await projection.point(projection.head.x, projection.head.y);
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
     await page.mouse.move(start.x + 20, start.y + 10, { steps: 4 });
@@ -246,7 +244,9 @@ for (const interruption of ['blur', 'hidden'] as const) {
   });
 }
 
-test('hierarchy selection retains button focus and rebuilds for a different imported rig', async ({ page }) => {
+test('hierarchy selection retains focus, rejects incompatible imports and rebuilds for another character', async ({
+  page,
+}) => {
   const head = page.getByRole('treeitem', { name: 'head', exact: true });
   const slot = page.getByRole('treeitem', { name: '◇ headVisual', exact: true });
   await head.click();
@@ -274,15 +274,19 @@ test('hierarchy selection retains button focus and rebuilds for a different impo
     }),
   );
   const hierarchy = page.locator('#hierarchy');
-  await expect(page.locator('#action-feedback')).toHaveText('different.json loaded and validated.');
-  await expect(hierarchy.getByRole('treeitem')).toHaveCount(imported.bones.length + imported.slots!.length);
+  await expect(page.locator('#action-feedback')).toContainText('same hierarchy');
+  await expect(hierarchy.getByRole('treeitem')).toHaveCount(original.bones.length + original.slots!.length);
+  await expect(slot).toHaveAttribute('aria-selected', 'true');
+  await page.locator('#character-selection').selectOption('random-paperdoll-sketch');
+  await expect(page).toHaveURL(/character=random-paperdoll-sketch/);
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  const nextRig = (await (
+    await page.request.get('characters/random-paperdoll-sketch/rig.json')
+  ).json()) as RigJsonDefinition;
+  await expect(hierarchy.getByRole('treeitem')).toHaveCount(nextRig.bones.length + nextRig.slots!.length);
   await expect(hierarchy.locator('[aria-selected="true"]')).toHaveCount(0);
-  await page.getByRole('treeitem', { name: 'importedChild', exact: true }).click();
-  await expect(page.locator('#inspector h3')).toHaveText('Bone: importedChild');
-  await expect(field(page, 'y')).toHaveValue('20');
-  await page.getByRole('treeitem', { name: '◇ importedVisual', exact: true }).click();
-  await expect(page.locator('#inspector h3')).toHaveText('Slot: importedVisual');
-  await expect(hierarchy.locator('[aria-selected="true"]')).toHaveText('◇ importedVisual');
+  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await expect(page.locator('#inspector h3')).toHaveText('Bone: head');
 });
 
 test('hierarchy keyboard navigation selects entries without authoring joint changes', async ({ page }) => {
@@ -383,7 +387,9 @@ for (const name of ['head', '◇ headVisual']) {
   });
 }
 
-test('exported, original and imported reloads keep controls attached to the active editor', async ({ page }) => {
+test('compatible reloads retain view preferences and keep history controls attached to the active editor', async ({
+  page,
+}) => {
   const original = await (await page.request.get('characters/demo-puppet/rig.json')).text();
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();
   await field(page, 'x').fill('12');
@@ -411,16 +417,20 @@ test('exported, original and imported reloads keep controls attached to the acti
         source === 'exported' ? 'Exported rig reloaded and validated.' : 'Original rig reloaded.',
       );
     }
-    await expect(page.locator('#session-status')).toContainText('Selected: none');
+    await expect(page.locator('#session-status')).toContainText('Selected: head');
     await expect(page.locator('#dirty-status')).toHaveText('No changes');
-    await expect(page.locator('#undo')).toBeDisabled();
-    await expect(page.locator('#redo')).toBeDisabled();
-    await expect(page.locator('#edit-mode')).toHaveValue('joint');
-    await expect(page.locator('#grid-snap')).toHaveValue('0');
-    await expect(page.locator('#dim-selection')).not.toBeChecked();
-    await expect(page.locator('#opacity')).toHaveValue('1');
+    await expect(page.locator('#edit-mode')).toHaveValue('sprite');
+    await expect(page.locator('#grid-snap')).toHaveValue('5');
+    await expect(page.locator('#dim-selection')).toBeChecked();
+    await expect(page.locator('#opacity')).toHaveValue('0.25');
+    await page.locator('#edit-mode').selectOption('joint');
+    await page.locator('#grid-snap').selectOption('0');
+    await page.locator('#dim-selection').uncheck();
+    await page.locator('#opacity').selectOption('1');
+    const undoEnabled = await page.locator('#undo').isEnabled();
     const artwork = page.locator('input[data-visibility="artwork"]');
-    await expect(artwork).toBeChecked();
+    await expect(artwork).not.toBeChecked();
+    await artwork.check();
     const canvas = page.locator('#editor-stage canvas');
     const visible = await canvas.screenshot();
     await artwork.uncheck();
@@ -436,7 +446,7 @@ test('exported, original and imported reloads keep controls attached to the acti
     await expect(field(page, 'x')).toHaveValue(String(expectedX + 1));
     await page.locator('#undo').click();
     await expect(field(page, 'x')).toHaveValue(String(expectedX));
-    await expect(page.locator('#undo')).toBeDisabled();
+    expect(await page.locator('#undo').isEnabled()).toBe(undoEnabled);
   }
   await page.reload();
   await page.getByRole('treeitem', { name: 'head', exact: true }).click();

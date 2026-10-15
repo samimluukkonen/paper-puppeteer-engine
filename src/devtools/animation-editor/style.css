@@ -148,7 +148,7 @@ a {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  grid-template-rows: minmax(240px, min(var(--preview-share), calc(100% - 332px))) 12px minmax(320px, 1fr);
+  grid-template-rows: minmax(180px, min(var(--preview-share), calc(100% - 332px))) 12px minmax(320px, 1fr);
   column-gap: 12px;
   padding: 0;
 }

@@ -50,7 +50,8 @@ class CharacterScene extends Phaser.Scene {
       'click',
       () => {
         skinIndex = (skinIndex + 1) % skins.length;
-        puppet.setSkin(skins[skinIndex]!);
+        // Start from the base each time so sparse overrides match the authoring preview.
+        puppet.setSkin(definition.defaultSkin).applySkin(skins[skinIndex]!);
         skinButton.textContent = `Skin: ${skins[skinIndex]}`;
       },
       { signal: listeners.signal },

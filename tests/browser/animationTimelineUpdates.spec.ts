@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { animationHierarchy, test } from './fixtures.js';
 
 test('playback updates time without mutating authored rows, inspectors, or file controls', async ({ page }) => {
   await page.goto('animation-editor/');
@@ -145,7 +145,7 @@ test('unrelated edits and playback metadata reuse collapsed summaries', async ({
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await expect(page.locator('#timeline-tracks [data-bone-id="root"] .timeline-summary').first()).toBeVisible();
-  await page.getByRole('button', { name: 'torso', exact: true }).click();
+  await (await animationHierarchy(page)).getByRole('button', { name: 'torso', exact: true }).click();
   const reads = await page.evaluate(() => {
     const styles = new Set(
       Array.from(

@@ -213,15 +213,19 @@ test('drafts cancel at held endpoints and empty history; shortcuts respect typin
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
 });
 
-test('dirty animation switching preserves authored history and new sessions start clean', async ({ page }) => {
+test('dirty animation switching retains per-clip history and clears temporary transforms', async ({ page }) => {
   await openEditor(page);
   await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await time(page, 0.5);
   await input(page, 'rotation').fill('35');
   await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
   await page.locator('#animation-selection').selectOption('walk');
+  await expect(page.locator('#animation-selection')).toHaveValue('walk');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.locator('#animation-selection').selectOption('idle');
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
-  await expect(page.locator('#animation-status')).toContainText('Unsaved animation changes');
+  await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await expect(input(page, 'rotation')).toHaveValue('35');
   await page.locator('#animation-undo').click();
   await input(page, 'rotation').fill('99');
@@ -234,6 +238,9 @@ test('dirty animation switching preserves authored history and new sessions star
   await time(page, 0.5);
   await expect(keyed(page, 'rotation')).toHaveAttribute('data-keyed', 'false');
   await expect(input(page, 'rotation')).not.toHaveValue('99');
+  await expect(page.locator('#animation-redo')).toBeEnabled();
+  await page.locator('#animation-redo').click();
+  await expect(input(page, 'rotation')).toHaveValue('35');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
 });
 

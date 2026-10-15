@@ -219,7 +219,9 @@ test('drag coordinates follow horizontal scrolling, resize and the original prop
   await movePointer(page, 0.8, row!.y + row!.height / 2);
   await expect.poll(() => time(page)).toBeCloseTo(0.8, 2);
   await page.mouse.up();
-  await expect(lane(page).locator('[aria-pressed="true"]')).toHaveAttribute('data-time', /^0\.8/);
+  await expect
+    .poll(async () => Number(await lane(page).locator('[aria-pressed="true"]').getAttribute('data-time')))
+    .toBeCloseTo(0.8, 6);
   await expect(lane(page, 'y').locator('[data-time="0.5"]')).toHaveCount(1);
   await expect(lane(page, 'y').locator('.timeline-keyframe')).toHaveCount(2);
   await page.locator('.timeline-panel').screenshot({ path: test.info().outputPath('scrolled-key.png') });

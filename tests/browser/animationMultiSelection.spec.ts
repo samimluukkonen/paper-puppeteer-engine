@@ -70,6 +70,11 @@ test('normal/Ctrl/Cmd/Shift selection, primary context, clear, and playback stay
   await expect(selected(page)).toHaveCount(3);
   await key(page, 0.25).click({ modifiers: ['Control'] });
   await expect(selected(page)).toHaveCount(2);
+  // Also exercise macOS's follow-up event on platforms that do not emit it natively.
+  await key(page, 0.25).evaluate((element) =>
+    element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ctrlKey: true })),
+  );
+  await expect(selected(page)).toHaveCount(2);
   await expect(key(page, 0.5, 'torso', 'rotation')).toHaveAttribute('data-primary', 'true');
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: torso');
   expect(await time(page)).toBe(0.25);
@@ -92,6 +97,9 @@ test('normal/Ctrl/Cmd/Shift selection, primary context, clear, and playback stay
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await key(page, 0.25).click();
   await key(page, 0.5).click({ modifiers: ['Meta'] });
+  await key(page, 0.75).dispatchEvent('contextmenu', { button: 2 });
+  await expect(selected(page)).toHaveCount(1);
+  await expect(key(page, 0.75)).toHaveAttribute('data-primary', 'true');
   await page.locator('#animation-selection').selectOption('walk');
   await expect(selected(page)).toHaveCount(0);
 });

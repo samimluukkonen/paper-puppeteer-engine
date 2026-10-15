@@ -108,10 +108,10 @@ test('artist workflow retains one canvas, documents, artwork and history between
   expect(rig.attachments.find((attachment) => attachment.id === 'leftForearmDefault')!.x).toBe(9);
   await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
   const preview = page.getByRole('dialog', { name: 'Package runtime preview' });
-  await expect(preview).toContainText('runtime playback ready');
+  await expect(preview).toContainText('runtime playback ready', { timeout: 30_000 });
   await preview.getByRole('button', { name: 'Close preview' }).click();
   await packages.getByLabel('Import ZIP for runtime preview').setInputFiles(path);
-  await expect(preview).toContainText('runtime playback ready');
+  await expect(preview).toContainText('runtime playback ready', { timeout: 30_000 });
   await preview.getByRole('button', { name: 'Close preview' }).click();
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
 });

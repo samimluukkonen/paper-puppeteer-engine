@@ -78,6 +78,8 @@ scene.load.start();
 
 v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
 
+v0.6.5 prepares the v0.6 Production Authoring release with [explicit release gates and regression results](docs/release-readiness.md), repeated package/lifecycle checks and [release notes](docs/release-notes-v0.6.md). Check the report's verdict and remaining verification gaps before adopting the release.
+
 ## Guides
 
 - [Standalone character runtime integration](docs/runtime-integration.md)
@@ -108,6 +110,8 @@ v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) wi
 | [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
 | [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                              |
 | [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                         |
+| [v0.6 release readiness](docs/release-readiness.md)                | Release gates, regression results, resource and performance observations, outstanding risks                |
+| [v0.6 release notes](docs/release-notes-v0.6.md)                   | Public API summary, supported formats, migration and known limitations                                     |
 
 ## Development checks
 
@@ -117,6 +121,8 @@ npm run check
 npm test
 npm run build
 npm run test:package
+# All non-browser release checks in sequence:
+npm run check:release
 ```
 
 `npm run check` validates Oxfmt formatting, Oxlint's type-aware lint rules, and TypeScript 7 types. Use `npm run check:fix` to apply safe lint fixes and formatting. VS Code recommends the official Oxc extension for formatting and fixes on save.

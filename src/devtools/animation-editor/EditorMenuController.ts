@@ -76,6 +76,7 @@ export class EditorMenuController {
     app.addEventListener(
       'contextmenu',
       (event) => {
+        if (event.defaultPrevented || event.ctrlKey) return;
         if (!(event.target instanceof Element)) return;
         const marker = event.target.closest<HTMLElement>('.timeline-keyframe, .timeline-event');
         if (!marker) return;

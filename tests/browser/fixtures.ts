@@ -8,6 +8,71 @@ export async function animationHierarchy(page: Page): Promise<Locator> {
   return page.locator('#animation-bones');
 }
 
+/** Calibrate the fitted rig camera from visible joint references, without private scene hooks. */
+export async function rigCanvasProjection(page: Page) {
+  const canvas = page.locator('#editor-stage canvas');
+  const visibility = await page.locator('#visibility input').evaluateAll((inputs) =>
+    inputs.map((input) => ({
+      key: (input as HTMLInputElement).dataset.visibility!,
+      checked: (input as HTMLInputElement).checked,
+    })),
+  );
+  await page.locator('#edit-mode').selectOption('sprite');
+  for (const key of ['artwork', 'bones', 'slots']) await page.locator(`input[data-visibility="${key}"]`).uncheck();
+  const reference = async (slot: string) => {
+    await page.getByRole('treeitem', { name: `◇ ${slot}`, exact: true }).click();
+    const world = (await page.locator('#inspector [data-alignment="joint"]').textContent())!.split(',').map(Number);
+    const png = await canvas.screenshot();
+    const screen = await page.evaluate(
+      async (data) => {
+        const bitmap = await createImageBitmap(await (await fetch(data)).blob());
+        const surface = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const context = surface.getContext('2d')!;
+        context.drawImage(bitmap, 0, 0);
+        const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+        let x = 0,
+          y = 0,
+          count = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (
+            Math.abs(pixels[i]! - 33) <= 2 &&
+            Math.abs(pixels[i + 1]! - 124) <= 2 &&
+            Math.abs(pixels[i + 2]! - 135) <= 2
+          ) {
+            x += (i / 4) % bitmap.width;
+            y += Math.floor(i / 4 / bitmap.width);
+            ++count;
+          }
+        }
+        bitmap.close();
+        if (!count) throw new Error('Missing rendered joint reference.');
+        return { x: x / count / surface.width, y: y / count / surface.height };
+      },
+      `data:image/png;base64,${png.toString('base64')}`,
+    );
+    return { world: { x: world[0]!, y: world[1]! }, screen };
+  };
+  const head = await reference('headVisual');
+  const torso = await reference('torsoVisual');
+  const scaleY = (head.screen.y - torso.screen.y) / (head.world.y - torso.world.y);
+  const scaleX = (scaleY * 640) / 760;
+  for (const { key, checked } of visibility) await page.locator(`input[data-visibility="${key}"]`).setChecked(checked);
+  await page.locator('#edit-mode').selectOption('joint');
+  await canvas.click({ position: { x: 4, y: 4 } });
+  await page.getByRole('heading', { name: 'Rig Editor Bind Pose', exact: true }).click();
+  return {
+    head: head.world,
+    async point(x: number, y: number) {
+      const bounds = await canvas.boundingBox();
+      if (!bounds) throw new Error('Missing rig canvas.');
+      return {
+        x: bounds.x + (head.screen.x + (x - head.world.x) * scaleX) * bounds.width,
+        y: bounds.y + (head.screen.y + (y - head.world.y) * scaleY) * bounds.height,
+      };
+    },
+  };
+}
+
 /** Follow the visible disclosure before interacting with a secondary animation command. */
 export async function animationMenuControl(page: Page, selector: string): Promise<Locator> {
   const control = page.locator(selector);

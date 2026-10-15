@@ -105,9 +105,10 @@ test('smooth/stepped sample timing uses the existing evaluator and does not chan
     await (await animationControl(page, '#animation-mode')).selectOption(mode);
     if (mode === 'stepped') await (await animationControl(page, '#animation-fps')).fill('1');
     if (mode === 'stepped') await (await animationControl(page, '#animation-fps')).press('Tab');
-    await ruler.press('Home');
     for (const time of [0, 0.25, 0.5, 0.75, 1]) {
-      if (time !== 0) for (let step = 0; step < 25; step++) await ruler.press('ArrowRight');
+      // Sample exact times directly; keyboard scrubbing has dedicated coverage.
+      await page.locator('#timeline-time-input').fill(String(time));
+      await page.locator('#timeline-time-input').press('Enter');
       expect(Number(await ruler.getAttribute('aria-valuenow'))).toBeCloseTo(time, 8);
       const radians = mode === 'stepped' && time < 1 ? 0 : time;
       expect(Number(await rotation(page).inputValue())).toBeCloseTo((radians * 180) / Math.PI, 2);

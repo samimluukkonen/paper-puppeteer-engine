@@ -205,7 +205,8 @@ test('six ghosts survive JSON round trips and IK preview; route changes keep oni
   await (await animationMenuControl(page, '#animation-ik-preview')).uncheck();
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await expect(page.locator('#animation-onion-skinning')).toHaveCount(0);
+  // The shared workspace retains the inactive editor host, with its controls hidden.
+  await expect(page.locator('#animation-onion-skinning')).toBeHidden();
   await page.goto('animation-editor/?character=random-paperdoll-sketch');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await expect(page.locator('#animation-onion-skinning')).not.toBeChecked();

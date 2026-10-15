@@ -14,11 +14,14 @@ npm run audit
 npm run build
 npm run preview
 npm run test:package
+npm run check:release
 ```
 
 `check` runs Oxfmt formatting validation, Oxlint linting (including type-aware TypeScript rules), and TypeScript 7's authoritative `tsc --noEmit` check. `npm run check:fix` applies Oxlint's safe fixes, formats with Oxfmt, and checks types. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
 `audit` checks all locked dependencies, including development tooling, and fails on advisories of any severity. CI runs it for pull requests and pushes to `master`. A separate workflow can be triggered manually; it audits the lockfile without installing packages or running dependency lifecycle scripts.
+
+`check:release` runs formatting, lint, typecheck, version validation, all normal unit regressions, both builds and the packed standalone consumer checks in sequence. It does not replace the local browser, performance and human acceptance gates in the [release-readiness report](release-readiness.md). Run optional profiles separately from browser tests to avoid competing workloads. Browser checks stay local-only; dependency audit scheduling is unchanged.
 
 ### Local browser checks
 

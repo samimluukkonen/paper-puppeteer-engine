@@ -105,7 +105,10 @@ function PackageRuntimePreview({ files, close }: { files: PackageFiles; close: (
             <select
               aria-label="Skin"
               defaultValue={definition.defaultSkin}
-              onChange={(event) => scene.current?.puppet?.setSkin(event.target.value)}
+              onChange={(event) => {
+                // Authoring skins are sparse overrides of the character's default appearance.
+                scene.current?.puppet?.setSkin(definition.defaultSkin).applySkin(event.target.value);
+              }}
             >
               {definition.rig.skins.map((skin) => (
                 <option key={skin.name}>{skin.name}</option>
