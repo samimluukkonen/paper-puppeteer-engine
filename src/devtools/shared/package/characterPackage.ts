@@ -2,6 +2,7 @@ import type { AnimationClip } from '../../../engine/AnimationClip.js';
 import { canonicalJson } from '../../../engine/authoredSerialization.js';
 import type { CharacterDefinition, CharacterManifest } from '../../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../../engine/CharacterLoader.js';
+import { CharacterTextureBudget, DEFAULT_CHARACTER_TEXTURE_LIMITS } from '../../../engine/characterTextureLimits.js';
 import type { RigJsonDefinition } from '../../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
@@ -88,20 +89,16 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
   if (new Set(folded).size !== folded.length) throw new Error('Metadata files must have distinct package paths.');
   for (const path of manifestPaths(manifest)) packagePath(path);
   const images = new Map<string, { bytes: Uint8Array<ArrayBuffer>; format: string }>();
-  let imageBytes = 0,
-    pixels = 0;
+  const budget = new CharacterTextureBudget({ allowWebp: true });
   for (const [key, path] of Object.entries(manifest.textures)) {
     if (folded.includes(path.toLowerCase())) throw new Error(`Image "${key}" collides with metadata at "${path}".`);
-    if (images.has(path)) continue;
     const bytes = files.get(path);
     if (!bytes) throw new Error(`Missing image "${path}" for texture "${key}".`);
-    if (bytes.length > PACKAGE_MAX_FILE_BYTES) throw new Error(`Image "${path}" exceeds 10 MiB.`);
     const header = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
+    // A ZIP stores aliases once, but Phaser loads/allocates each distinct texture key.
+    budget.checkImage(key, bytes);
+    if (images.has(path)) continue;
     images.set(path, { bytes, format: header.format });
-    imageBytes += bytes.length;
-    pixels += header.width * header.height;
-    if (imageBytes > 50 * 1024 * 1024 || pixels > 64 * 1024 * 1024)
-      throw new Error('Package images exceed 50 MiB or 64 megapixels.');
   }
   for (const reference of [
     ...definition.rig.bones.flatMap((bone) => (bone.sprite ? [bone.sprite] : [])),
@@ -289,7 +286,8 @@ export async function buildCharacterPackage(
     if (existing && existing.length === bytes.length && existing.every((byte, index) => byte === bytes[index]))
       continue;
     includedImageBytes += bytes.length;
-    if (includedImageBytes > 50 * 1024 * 1024) throw new Error('Package images exceed 50 MiB.');
+    if (includedImageBytes > DEFAULT_CHARACTER_TEXTURE_LIMITS.maxTotalImageBytes)
+      throw new Error('Package images exceed 50 MiB.');
     add(path, bytes);
   }
   json('character.json', manifest);

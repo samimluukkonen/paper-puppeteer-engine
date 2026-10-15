@@ -19,6 +19,7 @@ import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { type AnimationClip, commitIKBake, generateBakedBoneKeys, sampleIKBake } from '../src/engine/core.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
+import { characterManifestSchema } from '../src/engine/schemas.js';
 import { downloadBlob } from '../src/shared/downloadJson.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -922,13 +923,13 @@ test.each(['IMAGEs/part.png', 'images', 'images/part.png/child'])(
   },
 );
 
-test('image aliases consume one binary/pixel budget and are fetched and decoded once', async () => {
+test('image aliases within runtime budgets are fetched and validated by browser decoding once', async () => {
   const source = fixture();
   const data = {
     manifest: {
       ...manifest,
       textures: Object.fromEntries(
-        Array.from({ length: 6 }, (_, index) => [index ? `alias${index}` : 'shared', 'images/part.png']),
+        Array.from({ length: 4 }, (_, index) => [index ? `alias${index}` : 'shared', 'images/part.png']),
       ),
     },
     rig: source.rig,
@@ -943,7 +944,7 @@ test('image aliases consume one binary/pixel budget and are fetched and decoded 
   view.setUint32(16, 4096);
   view.setUint32(20, 4096);
   const fetcher = vi.fn<typeof fetch>(() => Promise.resolve(new Response(largeHeader)));
-  // Node performs header validation; six aliases of 16 megapixels must count as 16, not 96.
+  // Four runtime textures reach the 64-megapixel budget; ZIP storage and validation decode remain deduplicated.
   const files = await buildCharacterPackage({ ...source, definition: CharacterDefinition.fromData(data) }, fetcher);
   assert.equal(fetcher.mock.calls.length, 1);
   const decode = vi.fn(() => Promise.resolve());
@@ -958,6 +959,20 @@ test('image aliases consume one binary/pixel budget and are fetched and decoded 
   );
   await validatePackage(files);
   assert.equal(decode.mock.calls.length, 1);
+  const loadedManifest = characterManifestSchema.parse(packageJson(files, 'character.json'));
+  const extraAlias = new Map(files);
+  extraAlias.set(
+    'character.json',
+    new TextEncoder().encode(
+      JSON.stringify({
+        ...loadedManifest,
+        textures: { ...loadedManifest.textures, overBudget: 'images/part.png' },
+      }),
+    ),
+  );
+  await rejected(validatePackage(extraAlias), /67108864-pixel total limit/);
+  await rejected(openPackageRuntime(extraAlias, new AbortController().signal), /67108864-pixel total limit/);
+  assert.equal(decode.mock.calls.length, 1, 'Reject excess aliases before allocating decoded pixels.');
 });
 
 test.each([

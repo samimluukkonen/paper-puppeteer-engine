@@ -109,6 +109,22 @@ function fixture(options: CharacterTextureLimitOptions = {}) {
   };
 }
 
+test('package binaries and runtime transfers share per-texture byte and pixel budgets', async () => {
+  const bytes = new Uint8Array(await png(2, 3).arrayBuffer());
+  const pixelBudget = new CharacterTextureBudget({ maxTotalImagePixels: 12 });
+  pixelBudget.checkImage('first', bytes);
+  pixelBudget.checkImage('second', bytes);
+  assert.throws(() => pixelBudget.checkImage('third', bytes), /12-pixel total limit/);
+  const byteBudget = new CharacterTextureBudget({ maxTotalImageBytes: bytes.length * 2 });
+  byteBudget.checkImage('first', bytes);
+  byteBudget.checkImage('second', bytes);
+  assert.throws(() => byteBudget.checkImage('third', bytes), /byte total limit/);
+  assert.throws(
+    () => new CharacterTextureBudget({ maxImageBytes: bytes.length - 1 }).checkImage('large', bytes),
+    /byte limit/,
+  );
+});
+
 test('unknown-length image transfers are aborted at the byte limit without decoding', () => {
   const f = fixture({ maxImageBytes: 8 });
   const image = f.image();

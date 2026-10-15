@@ -92,6 +92,12 @@ export class CharacterTextureBudget {
       );
   }
 
+  /** Validate complete package binaries against the same per-texture runtime allocation budget. */
+  checkImage(key: string, bytes: Uint8Array): void {
+    this.countBytes(key, bytes.byteLength);
+    this.checkImageHeader(key, bytes);
+  }
+
   /** Inline image URLs use Phaser's image-element path; bound their encoded payload before queueing. */
   checkInlineImage(key: string, url: string): void {
     if (!url.startsWith('data:')) return;

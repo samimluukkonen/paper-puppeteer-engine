@@ -80,8 +80,13 @@ failure, or scene shutdown.
 
 Character artwork defaults to 10 MiB per image, 50 MiB in total, at most 8192 pixels on either axis,
 16 million (`16 * 1024 * 1024`) pixels per image, and 64 million (`64 * 1024 * 1024`) pixels in total.
-`DEFAULT_CHARACTER_TEXTURE_LIMITS` exposes these defaults. Adjust the positive safe integer limits for
-trusted larger artwork:
+`DEFAULT_CHARACTER_TEXTURE_LIMITS` exposes these defaults.
+
+Package validation applies the same artwork budgets per texture key. Multiple keys referencing one
+image share a file in the ZIP, but each key counts toward runtime byte and pixel limits because Phaser
+loads a separate texture for each key. Excess aliases are rejected before export or runtime preview.
+
+Adjust the positive safe integer limits for trusted larger artwork:
 
 ```ts
 queueCharacterTextures(scene, definition, {
