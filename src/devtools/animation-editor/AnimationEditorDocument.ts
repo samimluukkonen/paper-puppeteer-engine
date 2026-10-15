@@ -205,6 +205,17 @@ export class AnimationEditorDocument {
     return true;
   }
 
+  /** Recover an absent document with its original source and one undoable authored snapshot. */
+  recoverAnimation(sourceInput: unknown, draftInput: unknown): boolean {
+    const source = this.inspect(sourceInput);
+    const draft = this.inspect(draftInput);
+    if (!source || !draft || source.name !== draft.name || this.animations.has(source.name)) return false;
+    // Validate both snapshots before registering; importing retains every other clip's authored state.
+    if (!this.importJson(JSON.stringify(source))) return false;
+    this.animations.get(source.name)!.unsavedNew = true;
+    return this.install(draft);
+  }
+
   /** Import starts a clean session; rejection changes diagnostics only. */
   importJson(json: string, options: AnimationImportOptions = {}): boolean {
     const result = importAnimationJson(json, this.rig);

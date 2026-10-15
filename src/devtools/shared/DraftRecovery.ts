@@ -7,12 +7,22 @@ const draftSchema = z.strictObject({
   data: z.unknown(),
   revision: z.string().optional(),
   savedAt: z.string().optional(),
+  context: z.unknown().optional(),
 });
+
+export interface StoredDraft {
+  readonly key: string;
+  readonly source: string;
+  readonly data: unknown;
+  readonly context?: unknown;
+}
 
 export interface DraftSession<Snapshot> {
   readonly key: string;
   readonly source: string;
   readonly label: string;
+  /** Optional source metadata for discovering documents absent from the loaded catalog. */
+  readonly context?: unknown;
   snapshot(this: void): Snapshot;
   dirty(this: void): boolean;
   data(this: void, snapshot: Snapshot): unknown;
@@ -33,6 +43,7 @@ export class DraftRecovery<Snapshot> {
   private readonly lifetime = new AbortController();
   private readonly retained: { text: string }[] = [];
   private readonly owners = new Map<string, { owner: string; persisted: string | null }>();
+  private readonly discovered = new Map<string, { key: string; text: string }>();
 
   private rememberOwner(): void {
     if (this.session && this.owner)
@@ -69,6 +80,56 @@ export class DraftRecovery<Snapshot> {
   retainedDraftsJson(): string | undefined {
     if (!this.retained.length) return undefined;
     return `{\n  "version": 1,\n  "drafts": [\n${this.retained.map(({ text }) => text).join(',\n')}\n  ]\n}\n`;
+  }
+
+  /** Discover missing documents without registering them until validated restoration is accepted. */
+  recoverDocuments(
+    matches: (key: string) => boolean,
+    inspect: (draft: StoredDraft) => { label: string; source: string; restore: () => boolean } | undefined,
+  ): void {
+    try {
+      const storage = window.localStorage;
+      const candidates = [];
+      for (let index = 0; index < storage.length; ++index) {
+        const key = storage.key(index);
+        if (!key?.startsWith('paper-puppeteer:draft:')) continue;
+        const suffix = key.lastIndexOf(':session:');
+        const documentKey = key.slice('paper-puppeteer:draft:'.length, suffix < 0 ? undefined : suffix);
+        if (!matches(documentKey)) continue;
+        const text = storage.getItem(key);
+        if (text === null) continue;
+        try {
+          const parsed = draftSchema.safeParse(JSON.parse(text));
+          if (parsed.success) candidates.push({ key, text, documentKey, draft: parsed.data });
+        } catch {
+          // Discovery never deletes another document's invalid or incompatible backup.
+        }
+      }
+      const timestamp = (savedAt?: string): number => {
+        const time = Date.parse(savedAt ?? '');
+        return Number.isFinite(time) ? time : -Infinity;
+      };
+      candidates.sort((a, b) => {
+        const left = timestamp(a.draft.savedAt),
+          right = timestamp(b.draft.savedAt);
+        return left === right ? 0 : right - left;
+      });
+      const restored = new Set<string>();
+      for (const candidate of candidates) {
+        if (restored.has(candidate.documentKey)) continue;
+        const document = inspect({ key: candidate.documentKey, ...candidate.draft });
+        if (!document || !window.confirm(`Restore unsaved ${document.label} from this browser?`)) continue;
+        if (!document.restore()) continue;
+        restored.add(candidate.documentKey);
+        // Transfer only after the ordinary session has durably written its replacement.
+        this.discovered.set(JSON.stringify([candidate.documentKey, document.source]), {
+          key: candidate.key,
+          text: candidate.text,
+        });
+      }
+    } catch {
+      this.reportStatus('Browser draft recovery is unavailable. Download JSON to save your work.');
+    }
   }
 
   private storageKey(session: DraftSession<Snapshot>): string {
@@ -138,11 +199,13 @@ export class DraftRecovery<Snapshot> {
     this.snapshot = undefined;
     this.dirty = undefined;
     this.persisted = previous?.persisted ?? null;
-    this.recovered = undefined;
+    const identity = JSON.stringify([session.key, session.source]);
+    this.recovered = this.discovered.get(identity);
+    this.discovered.delete(identity);
     this.pendingFlush = false;
     this.retained.length = 0;
     this.retainedDraftsChanged(0);
-    this.reportStatus('');
+    this.reportStatus(this.recovered ? 'Draft restored. Download JSON to save your work.' : '');
     try {
       const candidates = options.recover === false ? [] : this.recoveryCandidates(session);
       for (const [index, { key, text, draft }] of candidates.entries()) {
@@ -206,6 +269,7 @@ export class DraftRecovery<Snapshot> {
           version: 1,
           source: session.source,
           data,
+          ...(session.context === undefined ? {} : { context: session.context }),
           revision,
           savedAt: new Date().toISOString(),
         });
@@ -266,5 +330,6 @@ export class DraftRecovery<Snapshot> {
     this.session = undefined;
     this.retained.length = 0;
     this.owners.clear();
+    this.discovered.clear();
   }
 }

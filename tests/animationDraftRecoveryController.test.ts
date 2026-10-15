@@ -17,6 +17,7 @@ function fixture() {
   state.selectAnimation('first');
   const calls: string[] = [];
   const recovery = {
+    recoverDocuments: vi.fn(),
     bind: vi.fn((_session: DraftSession<ReadonlyAnimation | null>, _options: { recover?: boolean } = {}) => {
       calls.push('bind');
     }),

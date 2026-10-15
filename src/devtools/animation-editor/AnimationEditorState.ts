@@ -1148,6 +1148,16 @@ export class AnimationEditorState {
     });
   }
 
+  /** Recovery registers a missing clip as unsaved and preserves every other document. */
+  recoverAnimation(source: unknown, draft: unknown): boolean {
+    return this.batchNotifications(() => {
+      const recovered = this.document.recoverAnimation(source, draft);
+      if (recovered) this.resetAnimationSession(true);
+      this.notify();
+      return recovered;
+    });
+  }
+
   /** Validate before touching navigation; notify once with the complete fresh session and pose at zero. */
   importJson(json: string, options: AnimationImportOptions = {}): boolean {
     if (!this.animationAuthoringEnabled) return false;

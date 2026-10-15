@@ -6,6 +6,39 @@ import { animationHierarchy, animationControl, rigFileAction, test } from './fix
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
 
+test('new clips absent from the manifest recover after reload with their keys and unsaved status', async ({ page }) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-new')).toBeEnabled();
+  for (const [name, value] of [
+    ['new-one', '42'],
+    ['new-two', '84'],
+  ]) {
+    await page.locator('#animation-new').click();
+    const dialog = page.locator('#animation-new-dialog');
+    await dialog.getByLabel('Animation name / ID', { exact: true }).fill(name!);
+    await dialog.getByRole('button', { name: 'Create Animation', exact: true }).click();
+    await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+    await page.locator('#animation-bone-fields input[data-property="x"]').fill(value!);
+    await page.getByRole('button', { name: 'Set X key', exact: true }).click();
+  }
+  page.on('dialog', async (dialog) => {
+    await dialog.accept();
+  });
+  await page.reload();
+  await expect(page.locator('#animation-selection option[value="new-one"]')).toHaveCount(1);
+  await expect(page.locator('#animation-selection option[value="new-two"]')).toHaveCount(1);
+  await page.locator('#animation-selection').selectOption('new-one');
+  await expect(page.locator('#animation-dirty')).toHaveText('New / Unsaved');
+  await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+  await expect(page.locator('#animation-bone-fields input[data-property="x"]')).toHaveValue('42');
+  await page.locator('#animation-undo').click();
+  await expect(page.locator('#animation-bone-fields input[data-property="x"]')).toHaveValue('0');
+  await page.locator('#animation-redo').click();
+  await page.locator('#animation-selection').selectOption('new-two');
+  await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+  await expect(page.locator('#animation-bone-fields input[data-property="x"]')).toHaveValue('84');
+});
+
 for (const replacement of ['original', 'imported'] as const) {
   test(`explicit ${replacement} rig replacement discards its own draft without recovering another tab`, async ({
     page,
