@@ -12,6 +12,7 @@ class PackageRuntimeScene extends Phaser.Scene {
   constructor(
     private readonly definition: CharacterDefinition,
     private readonly report: (message: string) => void,
+    private readonly ready: () => void,
   ) {
     super('PackageRuntime');
   }
@@ -31,6 +32,7 @@ class PackageRuntimeScene extends Phaser.Scene {
         }
         const clip = definition.animations[0];
         if (clip) this.puppet.play(clip.name);
+        this.ready();
         this.report('CharacterLoader → Puppet: runtime playback ready.');
       })
       .catch((error: unknown) => this.report(String(error)));
@@ -40,7 +42,8 @@ class PackageRuntimeScene extends Phaser.Scene {
 function PackageRuntimePreview({ files, close }: { files: PackageFiles; close: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [message, setMessage] = useState('Loading exported character through CharacterLoader…');
-  const [definition, setDefinition] = useState<CharacterDefinition | null>(null);
+  const [runtime, setRuntime] = useState<{ files: PackageFiles; definition: CharacterDefinition } | null>(null);
+  const definition = runtime?.files === files ? runtime.definition : null;
   const scene = useRef<PackageRuntimeScene | null>(null);
   useEffect(() => {
     dialog.current?.showModal();
@@ -54,10 +57,15 @@ function PackageRuntimePreview({ files, close }: { files: PackageFiles; close: (
           return;
         }
         release = runtime.dispose;
-        setDefinition(runtime.definition);
-        const preview = new PackageRuntimeScene(runtime.definition, (text) => {
-          if (!request.signal.aborted) setMessage(text);
-        });
+        const preview = new PackageRuntimeScene(
+          runtime.definition,
+          (text) => {
+            if (!request.signal.aborted) setMessage(text);
+          },
+          () => {
+            if (!request.signal.aborted) setRuntime({ files, definition: runtime.definition });
+          },
+        );
         scene.current = preview;
         game = createEditorGame('package-runtime-stage', preview);
         // Phaser destroys games on its next frame; release image URLs after scene shutdown and texture destruction.

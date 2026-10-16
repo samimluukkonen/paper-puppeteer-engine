@@ -5,6 +5,54 @@ import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.j
 import { characterManifestSchema, rigFileSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
+test('package preview exposes controls only after its artwork and puppet are ready', async ({ page }) => {
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  const packages = page.locator('.package-tools');
+  await packages.locator(':scope > summary').click();
+  const download = page.waitForEvent('download');
+  await packages.getByRole('button', { name: 'Download character ZIP', exact: true }).click();
+  await download;
+  await page.evaluate(() => {
+    // oxlint-disable-next-line typescript/unbound-method -- Resume the native method with its original XMLHttpRequest receiver.
+    const send = XMLHttpRequest.prototype.send;
+    const pending: (() => void)[] = [];
+    let hold = true;
+    // Hold artwork requests after metadata validation without relying on a timed delay.
+    XMLHttpRequest.prototype.send = function (body) {
+      if (hold) pending.push(() => send.call(this, body));
+      else send.call(this, body);
+    };
+    Reflect.set(window, 'packageArtworkGate', {
+      get count() {
+        return pending.length;
+      },
+      release() {
+        hold = false;
+        for (const resume of pending.splice(0)) resume();
+      },
+    });
+  });
+  await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Package runtime preview', exact: true });
+  await expect
+    .poll(() => page.evaluate(() => (Reflect.get(window, 'packageArtworkGate') as { count: number }).count))
+    .toBeGreaterThan(0);
+  await expect(dialog.locator('select')).toHaveCount(0);
+  await page.evaluate(() => (Reflect.get(window, 'packageArtworkGate') as { release(): void }).release());
+  await expect(dialog).toContainText('runtime playback ready', { timeout: 30_000 });
+  await expect(dialog.locator('select')).toHaveCount(3);
+  await dialog.getByLabel('Animation', { exact: true }).selectOption('walk');
+  await dialog.getByLabel('Skin', { exact: true }).selectOption('alternate');
+  await dialog.getByLabel('Facing', { exact: true }).selectOption('left');
+  await expect(dialog.getByLabel('Facing', { exact: true })).toHaveValue('left');
+  await dialog.getByRole('button', { name: 'Close preview' }).click();
+  await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
+  await expect(dialog).toContainText('runtime playback ready', { timeout: 30_000 });
+  await expect(dialog.getByLabel('Facing', { exact: true })).toHaveValue('right');
+  await dialog.getByRole('button', { name: 'Close preview' }).click();
+});
+
 test('static WebP replacement exports and reloads with guarded runtime image loading', async ({ page }) => {
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
