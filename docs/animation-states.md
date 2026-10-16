@@ -85,6 +85,10 @@ Existing queue loop rejection remains: queue requests cannot reference authored 
 
 All controller playback targets `base`. Existing overlay identities, clocks, masks and weights remain in place. State transitions use normal Puppet animation synchronization and do not replace the rig, reset skins/facing/attachments or recreate IK constraints and target providers.
 
+## Awaiting actions
+
+v0.7.4 adds [async playback waits](async-animation.md). Start an action with `controller.playAction('attack')`, then await `host.waitForPlayback({ signal })`. This observes the owned instance without restarting it. The controller keeps its existing single lifecycle subscription and owns its automatic return. `completed` reports the action's endpoint even if the controller has already returned or a queued successor has started by the time the promise continuation runs. An interrupted action reports `interrupted`; an aborted wait leaves the action and its return policy running. Compare playback IDs before issuing state changes from asynchronous continuations.
+
 ## Playback additions and callback order
 
 Puppet and AnimationPlayer expose `hasAnimation(name): boolean`. `isPlaybackStopped(layer = 'base'): boolean` reports an explicitly frozen channel, including a stop requested after its instance already completed; the instance's terminal lifecycle outcome remains `completed`. This distinction lets completion callbacks cancel an automatic return without relabeling a completed instance. `PlayAnimationOptions.loop?: boolean` overrides only the new playback instance, sharing the registered compiled tracks and events. It does not mutate registered clips, other instances or authored data. Restart retains the instance override; a fresh ordinary play without an override uses authored looping. Existing matching `restart: false` requests retain all current instance options.

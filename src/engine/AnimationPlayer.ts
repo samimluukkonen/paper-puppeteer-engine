@@ -21,6 +21,7 @@ import type {
   PlaybackLifecycleOptions,
   PlaybackOutcome,
   PlaybackStatus,
+  PlaybackWaitResult,
 } from './PlaybackLifecycle.js';
 import type { Rig } from './Rig.js';
 import { assertFinite } from './types.js';
@@ -30,6 +31,17 @@ export interface PlayAnimationOptions extends QueueAnimationOptions {
   layer?: string;
   /** Override looping for this playback instance without changing the registered clip. */
   loop?: boolean;
+}
+
+export interface PlayAndWaitOptions extends PlayAnimationOptions {
+  /** Abort releases this wait without stopping playback or changing queues. */
+  signal?: AbortSignal;
+}
+
+export interface WaitForPlaybackOptions {
+  layer?: string;
+  /** Abort releases only this wait. An already-aborted signal takes precedence over validation. */
+  signal?: AbortSignal;
 }
 
 export interface SampleAnimationOptions {
@@ -81,6 +93,7 @@ export class AnimationPlayer {
   private readonly lifecycleListeners = new Set<PlaybackListener>();
   private readonly settledCompletionListeners = new Set<PlaybackListener>();
   private disposalListeners: Set<PlaybackListener> | undefined;
+  private readonly pendingWaitDisposers = new Set<() => void>();
   private readonly notifications: PlaybackNotification[] = [];
   private notifying = false;
   private notifyingLifecycle = false;
@@ -215,12 +228,107 @@ export class AnimationPlayer {
     this.playAnimation(name, options, preparePose, synchronizePose);
   }
 
+  /** Play and await this exact finite instance. Validation errors reject the promise. */
+  playAndWait(
+    name: string,
+    options: PlayAndWaitOptions = {},
+    preparePose?: () => void,
+    synchronizePose?: () => void,
+  ): Promise<PlaybackWaitResult> {
+    return this.waitForSelection(
+      (select) => this.playAnimation(name, options, preparePose, synchronizePose, false, select),
+      options.signal,
+    );
+  }
+
+  /** Await the selected instance, including a held terminal outcome; never follows replacements. */
+  waitForPlayback(options: WaitForPlaybackOptions = {}): Promise<PlaybackWaitResult> {
+    return this.waitForSelection((select) => {
+      this.assertActive();
+      const layer = options.layer ?? 'base';
+      const state = this.layers.get(layer)?.state;
+      if (!state) throw new Error(`No animation playback selected on layer "${layer}".`);
+      select(state, layer);
+    }, options.signal);
+  }
+
+  private assertWaitable(clip: CompiledClip): void {
+    if (clip.loop)
+      throw new Error(
+        `Cannot await indefinitely looping animation "${clip.name}"; use playAndWait with { loop: false } or play() instead.`,
+      );
+  }
+
+  private waitForSelection(
+    start: (select: (state: AnimationState, layer: string) => void) => void,
+    signal?: AbortSignal,
+  ): Promise<PlaybackWaitResult> {
+    return new Promise((resolve, reject) => {
+      let selected: { state: AnimationState; layer: string } | undefined;
+      let settled = false;
+      let releaseLifecycle: (() => void) | undefined;
+      const cleanup = (): void => {
+        releaseLifecycle?.();
+        releaseLifecycle = undefined;
+        signal?.removeEventListener('abort', abort);
+        this.pendingWaitDisposers.delete(dispose);
+      };
+      const finish = (status: PlaybackOutcome | 'cancelled', playback?: PlaybackStatus): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (status === 'cancelled') resolve(playback ? { status, playback } : { status });
+        else if (playback) resolve({ status, playback });
+      };
+      const snapshot = (): PlaybackStatus | undefined =>
+        selected ? this.playbackStatus(selected.state, selected.layer) : undefined;
+      const abort = (): void => finish(selected?.state.outcome ?? 'cancelled', snapshot());
+      // Disposal can suppress queued terminal notifications (e.g. from an end-marker callback).
+      // Read the same instance's committed lifecycle outcome before player cleanup drops it.
+      const dispose = (): void => finish(selected!.state.outcome!, snapshot());
+      if (signal?.aborted) {
+        abort();
+        return;
+      }
+      signal?.addEventListener('abort', abort, { once: true });
+      try {
+        start((state, layer) => {
+          if (!state.outcome) this.assertWaitable(state.clip);
+          selected = { state, layer };
+          if (settled) return;
+          if (state.outcome) {
+            finish(state.outcome, snapshot());
+            return;
+          }
+          releaseLifecycle = this.onPlaybackLifecycle((event) => {
+            if (event.playbackId !== state.playbackId) return;
+            if (
+              event.type === 'completed' ||
+              event.type === 'interrupted' ||
+              event.type === 'stopped' ||
+              event.type === 'disposed'
+            ) {
+              const { type, ...playback } = event;
+              finish(type, playback);
+            }
+          });
+          this.pendingWaitDisposers.add(dispose);
+        });
+      } catch (error) {
+        settled = true;
+        cleanup();
+        reject(error);
+      }
+    });
+  }
+
   private playAnimation(
     name: string,
     options: PlayAnimationOptions = {},
     preparePose?: () => void,
     synchronizePose?: () => void,
     fromQueue = false,
+    select?: (state: AnimationState, layer: string) => void,
   ): void {
     this.assertActive();
     const registered = this.clips.get(name);
@@ -240,10 +348,12 @@ export class AnimationPlayer {
     const speed = options.speed ?? 1;
     validateSpeed(speed);
     if (options.restart === false && this.layers.get(layerName)?.state?.clip.name === name) {
+      select?.(this.layers.get(layerName)!.state!, layerName);
       if (layerName === 'base' && !fromQueue) this.discardQueue();
       synchronizePose?.();
       return;
     }
+    if (select) this.assertWaitable(clip);
     const events = collectAnimationStartEvents(clip, layerName);
     if (layerName === 'base' && !fromQueue) this.discardQueue();
     preparePose?.();
@@ -271,6 +381,7 @@ export class AnimationPlayer {
     lifecycle.push({ ...this.playbackStatus(layer.state, layerName), type: 'started' });
     layer.transition = source ? { source, elapsed: 0, duration: fade, ...(ikSource ? { ikSource } : {}) } : undefined;
     layer.stopped = false;
+    select?.(layer.state, layerName);
     this.poseEvaluator.invalidate();
     if (layerName === 'base' && !source) this.resetPose();
     this.applyCurrentPose();
@@ -764,6 +875,7 @@ export class AnimationPlayer {
     for (const [name, layer] of this.layers) {
       if (layer.state) this.finishPlayback(layer.state, name, 'disposed', lifecycle);
     }
+    for (const disposeWait of this.pendingWaitDisposers) disposeWait();
     // Cancel pending notifications from the old host. Only disposal delivery survives cleanup.
     this.notifications.length = 0;
     const listeners = new Set(this.lifecycleListeners);

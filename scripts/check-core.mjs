@@ -70,6 +70,19 @@ assert.equal(controller.currentState, 'idle');
 assert.equal(controller.currentAction, undefined);
 assert.equal(player.getPlaybackStatus().loop, true);
 controller.dispose();
+const awaitedPlayback = player.playAndWait('test');
+const playbackId = player.getPlaybackStatus().playbackId;
+player.update(1000);
+const outcome = await awaitedPlayback;
+assert.equal(outcome.status, 'completed');
+assert.equal(outcome.playback.playbackId, playbackId);
+assert.deepEqual(await player.waitForPlayback(), outcome);
+const abort = new AbortController();
+const cancelledPlayback = player.playAndWait('test', { signal: abort.signal });
+abort.abort();
+assert.equal((await cancelledPlayback).status, 'cancelled');
+assert.equal(player.isPlaying, true);
+await assert.rejects(player.playAndWait('test', { loop: true }), /loop: false/);
 const solved = solveTwoBoneIK({
   root: { x: 0, y: 0 },
   target: { x: 60, y: 70 },
@@ -81,4 +94,6 @@ assert.ok(Number.isFinite(solved.rootRotation));
 assert.ok(Number.isFinite(solved.middleRotation));
 player.dispose();
 assert.equal(player.isDisposed, true);
-console.log('Built /core, /serialization and /data work in Node: loading, validation, animation, IK, and disposal.');
+console.log(
+  'Built /core, /serialization and /data work in Node: loading, validation, async animation, IK, and disposal.',
+);

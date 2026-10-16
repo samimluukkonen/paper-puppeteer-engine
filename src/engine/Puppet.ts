@@ -6,7 +6,9 @@ import {
   AnimationPlayer,
   type FiredAnimationEvent,
   type PlayAnimationOptions,
+  type PlayAndWaitOptions,
   type SampleAnimationOptions,
+  type WaitForPlaybackOptions,
 } from './AnimationPlayer.js';
 import type { AnimationQueueRequest, QueueAnimationOptions } from './AnimationQueue.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
@@ -17,7 +19,12 @@ import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
 import { throwNotificationErrors } from './notifications.js';
-import type { PlaybackLifecycleEvent, PlaybackLifecycleOptions, PlaybackStatus } from './PlaybackLifecycle.js';
+import type {
+  PlaybackLifecycleEvent,
+  PlaybackLifecycleOptions,
+  PlaybackStatus,
+  PlaybackWaitResult,
+} from './PlaybackLifecycle.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
@@ -339,6 +346,16 @@ export class Puppet {
   play(name: string, options?: PlayAnimationOptions): this {
     this.animationPlayer.play(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
     return this;
+  }
+
+  /** Await this finite playback instance; aborting cancels only the wait. */
+  playAndWait(name: string, options?: PlayAndWaitOptions): Promise<PlaybackWaitResult> {
+    return this.animationPlayer.playAndWait(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
+  }
+
+  /** Await current playback without restarting it or changing queue/controller ownership. */
+  waitForPlayback(options?: WaitForPlaybackOptions): Promise<PlaybackWaitResult> {
+    return this.animationPlayer.waitForPlayback(options);
   }
 
   /** Append a nonlooping request on the base channel; starts immediately when idle. */

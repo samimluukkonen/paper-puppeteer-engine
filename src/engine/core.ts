@@ -15,7 +15,9 @@ export type {
   AnimationCompletion,
   FiredAnimationEvent,
   PlayAnimationOptions,
+  PlayAndWaitOptions,
   SampleAnimationOptions,
+  WaitForPlaybackOptions,
 } from './AnimationPlayer.js';
 export { AnimationPlayer } from './AnimationPlayer.js';
 export type { AnimationQueueRequest, QueueAnimationOptions } from './AnimationQueue.js';
@@ -30,6 +32,7 @@ export type {
 export type {
   PlaybackInstanceId,
   PlaybackOutcome,
+  PlaybackWaitResult,
   PlaybackState,
   PlaybackStatus,
   PlaybackLifecycleEvent,

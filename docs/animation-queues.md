@@ -27,6 +27,8 @@ puppet.replaceQueue([
 
 These types are exported from `/core`, `/runtime` and the package root. Puppet mutation methods return `this` for chaining. AnimationPlayer mutation methods return `void` and accept the same optional preparation/synchronization hooks as its existing play/update methods. Normal Puppet methods supply those hooks automatically; custom hosts using AnimationPlayer directly should supply them on queue/replacement starts and updates when they need host pose synchronization before notifications.
 
+v0.7.4 [async playback](async-animation.md) can observe the active queued instance using `waitForPlayback()`. It resolves for that exact instance even if the FIFO has already advanced. `playAndWait()` follows ordinary `play()` queue-clearing semantics; it does not append. Cancelling a wait leaves the queue untouched. Promises for requests that have not started remain deferred.
+
 ## Requests and inspection
 
 `queue(name, options?)` validates the complete request before changing playback or pending requests. Supported options are `speed` (default 1) and `fadeDuration` (default 0 milliseconds), using the existing nonnegative finite-number rules. Each request starts a fresh playback instance, even for repeated names. `restart` and `layer` are unsupported queue options and reject at runtime as well as in typed object literals.

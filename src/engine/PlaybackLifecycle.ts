@@ -4,6 +4,11 @@ export type PlaybackInstanceId = number;
 export type PlaybackOutcome = 'completed' | 'interrupted' | 'stopped' | 'disposed';
 export type PlaybackState = 'playing' | 'paused' | PlaybackOutcome;
 
+/** Terminal lifecycle outcomes are preserved; cancellation releases only the wait. */
+export type PlaybackWaitResult =
+  | { [Outcome in PlaybackOutcome]: { readonly status: Outcome; readonly playback: PlaybackStatus } }[PlaybackOutcome]
+  | { readonly status: 'cancelled'; readonly playback?: PlaybackStatus };
+
 /** Detached snapshot of a selected layer's playback. All times are milliseconds. */
 export interface PlaybackStatus {
   readonly playbackId: PlaybackInstanceId;
