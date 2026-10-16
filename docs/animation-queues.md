@@ -2,6 +2,8 @@
 
 [All guides](../README.md#guides)
 
+v0.7.3 [animation states](animation-states.md) use this same base channel. Pending FIFO requests and completion-callback queue additions take precedence over a controller action's automatic return. Queue validation and cancellation behavior below continue to apply.
+
 Puppet and the renderer-independent AnimationPlayer provide a FIFO queue for the ordinary base playback channel. Requests reference registered animation names and contain only playback options. The existing player owns all clocks, lifecycle outcomes, authored events, pose evaluation, layers and crossfades. Queue state does not enter animation files or React.
 
 ```ts

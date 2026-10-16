@@ -2,6 +2,10 @@
 
 [All guides](../README.md#guides)
 
+v0.7.3 adds optional `onPlaybackLifecycle(listener, { completionPhase: 'settled' })` delivery for natural completions after ordinary completion callbacks and queue advancement. Default subscriptions keep the ordering below. See [animation states](animation-states.md#playback-additions-and-callback-order) for the option and its use in action returns.
+
+`isPlaybackStopped(layer?)` reports explicit channel freeze independently of the terminal instance outcome. For example, stopping from a completion callback freezes the channel while its already-committed outcome remains `completed`.
+
 Puppet and the renderer-independent AnimationPlayer expose the same additive lifecycle API. The existing player still owns every clock, layer, fade, pose and authored event. No independent timer or React dependency is involved.
 
 ```ts

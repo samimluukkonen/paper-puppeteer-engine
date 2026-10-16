@@ -88,6 +88,7 @@ test('root, runtime, core, serialization and previous scene-loader imports retai
     'Puppet',
     'Bone',
     'AnimationPlayer',
+    'AnimationStateController',
     'TwoBoneIKConstraint',
     'loadSceneCharacter',
     'queueCharacterTextures',

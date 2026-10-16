@@ -11,7 +11,7 @@
     "test:browser": "npm run build && playwright test"
   },
   "dependencies": {
-    "paper-puppeteer-engine": "file:../../dist/paper-puppeteer-engine-0.7.2.tgz",
+    "paper-puppeteer-engine": "file:../../dist/paper-puppeteer-engine-0.7.3.tgz",
     "phaser": "4.2.1"
   },
   "devDependencies": {

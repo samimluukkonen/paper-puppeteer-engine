@@ -18,3 +18,10 @@ export interface PlaybackStatus {
 export type PlaybackLifecycleEvent = PlaybackStatus & {
   readonly type: 'started' | 'paused' | 'resumed' | PlaybackOutcome;
 };
+
+export interface PlaybackLifecycleOptions {
+  /** Defer natural completion until authored/legacy callbacks and queue advancement finish.
+   * Other lifecycle events retain their ordinary order. Defaults to immediate.
+   */
+  readonly completionPhase?: 'immediate' | 'settled';
+}

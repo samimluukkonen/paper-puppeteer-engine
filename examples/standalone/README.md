@@ -13,7 +13,7 @@ npm run build
 npm run dev
 ```
 
-`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.7.2.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
+`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.7.3.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
 
 The checked-in `public/character/` folder is an extracted character export. It includes an edited idle key, walk and sword events, authored and baked IK reach clips, several skins/attachments, and helmet artwork replacing the default head. The root integration test re-exports its representative editor snapshot through the existing exporter and checks these files. The Node test loads this fixture using the installed `/core` API, checks motion/events and verifies every image exists.
 

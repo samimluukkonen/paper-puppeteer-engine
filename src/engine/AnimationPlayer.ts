@@ -16,13 +16,20 @@ import {
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
-import type { PlaybackLifecycleEvent, PlaybackOutcome, PlaybackStatus } from './PlaybackLifecycle.js';
+import type {
+  PlaybackLifecycleEvent,
+  PlaybackLifecycleOptions,
+  PlaybackOutcome,
+  PlaybackStatus,
+} from './PlaybackLifecycle.js';
 import type { Rig } from './Rig.js';
 import { assertFinite } from './types.js';
 
 export interface PlayAnimationOptions extends QueueAnimationOptions {
   restart?: boolean;
   layer?: string;
+  /** Override looping for this playback instance without changing the registered clip. */
+  loop?: boolean;
 }
 
 export interface SampleAnimationOptions {
@@ -42,7 +49,12 @@ export interface AnimationCompletion {
 
 type PlaybackListener = (event: PlaybackLifecycleEvent) => void;
 type PlaybackNotification =
-  | { kind: 'lifecycle'; event: PlaybackLifecycleEvent; listeners?: ReadonlySet<PlaybackListener> }
+  | {
+      kind: 'lifecycle';
+      event: PlaybackLifecycleEvent;
+      listeners?: ReadonlySet<PlaybackListener>;
+      completionPhase?: 'immediate' | 'settled';
+    }
   | { kind: 'events'; events: readonly FiredAnimationEvent[] }
   | { kind: 'complete'; event: AnimationCompletion }
   | {
@@ -67,6 +79,7 @@ export class AnimationPlayer {
   private readonly eventListeners = new Set<(event: FiredAnimationEvent) => void>();
   private readonly completionListeners = new Set<(event: AnimationCompletion) => void>();
   private readonly lifecycleListeners = new Set<PlaybackListener>();
+  private readonly settledCompletionListeners = new Set<PlaybackListener>();
   private disposalListeners: Set<PlaybackListener> | undefined;
   private readonly notifications: PlaybackNotification[] = [];
   private notifying = false;
@@ -163,11 +176,24 @@ export class AnimationPlayer {
     return state ? this.playbackStatus(state, layer) : undefined;
   }
 
-  onPlaybackLifecycle(listener: PlaybackListener): () => void {
+  /** Explicit channel freeze, including a stop requested after its instance already completed. */
+  isPlaybackStopped(layer = 'base'): boolean {
+    return this.layers.get(layer)?.stopped ?? false;
+  }
+
+  onPlaybackLifecycle(listener: PlaybackListener, options: PlaybackLifecycleOptions = {}): () => void {
     this.assertActive();
+    if (
+      options.completionPhase !== undefined &&
+      options.completionPhase !== 'immediate' &&
+      options.completionPhase !== 'settled'
+    )
+      throw new Error('Unsupported lifecycle completion phase.');
     this.lifecycleListeners.add(listener);
+    if (options.completionPhase === 'settled') this.settledCompletionListeners.add(listener);
     return () => {
       this.lifecycleListeners.delete(listener);
+      this.settledCompletionListeners.delete(listener);
       this.disposalListeners?.delete(listener);
     };
   }
@@ -176,6 +202,10 @@ export class AnimationPlayer {
     this.assertActive();
     if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
     this.clips.set(clip.name, compileClip(clip, this.rig));
+  }
+
+  hasAnimation(name: string): boolean {
+    return this.clips.has(name);
   }
 
   /** Restart the clip unless restart:false keeps it active. Host hooks prepare after validation
@@ -193,8 +223,15 @@ export class AnimationPlayer {
     fromQueue = false,
   ): void {
     this.assertActive();
-    const clip = this.clips.get(name);
-    if (!clip) throw new Error(`Unknown animation "${name}".`);
+    const registered = this.clips.get(name);
+    if (!registered) throw new Error(`Unknown animation "${name}".`);
+    if (options.loop !== undefined && typeof options.loop !== 'boolean')
+      throw new Error('Animation loop must be a boolean.');
+    // Only metadata varies; the existing evaluator still consumes the shared compiled tracks.
+    const clip =
+      options.loop === undefined || options.loop === registered.loop
+        ? registered
+        : Object.freeze({ ...registered, loop: options.loop });
     const layerName = options.layer ?? 'base';
     if (!layerName) throw new Error('Layer name cannot be empty.');
     const fade = options.fadeDuration ?? 0;
@@ -637,13 +674,14 @@ export class AnimationPlayer {
     for (const event of lifecycle) notifications.push({ kind: 'lifecycle', event });
     if (events.length) notifications.push({ kind: 'events', events });
     for (const event of completions) {
-      notifications.push({ kind: 'lifecycle', event });
+      notifications.push({ kind: 'lifecycle', event, completionPhase: 'immediate' });
       // Keep the legacy completion payload and its ordering after authored events.
       notifications.push({ kind: 'complete', event: { clip: event.clip, layer: event.layer } });
     }
     const baseCompletion = completions.find((event) => event.layer === 'base');
     if (baseCompletion)
       notifications.push(this.queueNotification(baseCompletion.playbackId, preparePose, synchronizePose));
+    for (const event of completions) notifications.push({ kind: 'lifecycle', event, completionPhase: 'settled' });
     if (this.notifying && !this.notifyingLifecycle) {
       throwNotificationErrors(this.deliverNotifications(notifications), 'Animation listeners failed.');
       return;
@@ -692,10 +730,19 @@ export class AnimationPlayer {
             ),
           );
         } else {
-          const { event, listeners } = notification;
+          const { event, completionPhase } = notification;
+          const listeners =
+            notification.listeners ??
+            (completionPhase === 'settled'
+              ? this.settledCompletionListeners
+              : completionPhase === 'immediate'
+                ? new Set(
+                    [...this.lifecycleListeners].filter((listener) => !this.settledCompletionListeners.has(listener)),
+                  )
+                : this.lifecycleListeners);
           errors.push(
             ...dispatchListeners(
-              listeners ?? this.lifecycleListeners,
+              listeners,
               (listener) => listener({ ...event }),
               () => event.type === 'disposed' || !this.disposed,
             ),
@@ -723,6 +770,7 @@ export class AnimationPlayer {
     this.disposalListeners = listeners;
     for (const event of lifecycle) this.notifications.push({ kind: 'lifecycle', event, listeners });
     this.lifecycleListeners.clear();
+    this.settledCompletionListeners.clear();
     this.eventListeners.clear();
     this.completionListeners.clear();
     this.clips.clear();

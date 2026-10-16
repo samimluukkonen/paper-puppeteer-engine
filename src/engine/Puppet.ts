@@ -17,7 +17,7 @@ import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
 import { throwNotificationErrors } from './notifications.js';
-import type { PlaybackLifecycleEvent, PlaybackStatus } from './PlaybackLifecycle.js';
+import type { PlaybackLifecycleEvent, PlaybackLifecycleOptions, PlaybackStatus } from './PlaybackLifecycle.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
@@ -332,6 +332,10 @@ export class Puppet {
     return this;
   }
 
+  hasAnimation(name: string): boolean {
+    return this.animationPlayer.hasAnimation(name);
+  }
+
   play(name: string, options?: PlayAnimationOptions): this {
     this.animationPlayer.play(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
     return this;
@@ -375,8 +379,15 @@ export class Puppet {
     return this.animationPlayer.getPlaybackStatus(layer);
   }
 
-  onPlaybackLifecycle(listener: (event: PlaybackLifecycleEvent) => void): () => void {
-    return this.animationPlayer.onPlaybackLifecycle(listener);
+  isPlaybackStopped(layer = 'base'): boolean {
+    return this.animationPlayer.isPlaybackStopped(layer);
+  }
+
+  onPlaybackLifecycle(
+    listener: (event: PlaybackLifecycleEvent) => void,
+    options?: PlaybackLifecycleOptions,
+  ): () => void {
+    return this.animationPlayer.onPlaybackLifecycle(listener, options);
   }
 
   pauseAnimation(): this {

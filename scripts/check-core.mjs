@@ -6,6 +6,7 @@ import { z } from 'zod';
 const coreSpecifier = 'paper-puppeteer-engine/core';
 const {
   AnimationPlayer,
+  AnimationStateController,
   CharacterLoader,
   compileClip,
   evaluateClip,
@@ -59,6 +60,16 @@ player.addAnimation(clip);
 player.play('test');
 player.update(500);
 assert.equal(joints.get(rig.root).pose.x, 5);
+const controller = new AnimationStateController(player, {
+  initialState: 'idle',
+  states: { idle: { animation: 'test', loop: true }, action: { animation: 'test' } },
+});
+controller.playAction('action');
+player.update(1000);
+assert.equal(controller.currentState, 'idle');
+assert.equal(controller.currentAction, undefined);
+assert.equal(player.getPlaybackStatus().loop, true);
+controller.dispose();
 const solved = solveTwoBoneIK({
   root: { x: 0, y: 0 },
   target: { x: 60, y: 70 },

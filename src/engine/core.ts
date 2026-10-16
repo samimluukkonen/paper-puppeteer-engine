@@ -19,12 +19,21 @@ export type {
 } from './AnimationPlayer.js';
 export { AnimationPlayer } from './AnimationPlayer.js';
 export type { AnimationQueueRequest, QueueAnimationOptions } from './AnimationQueue.js';
+export { AnimationStateController } from './AnimationStateController.js';
+export type {
+  AnimationStateHost,
+  AnimationStateDefinition,
+  AnimationStateControllerOptions,
+  SetAnimationStateOptions,
+  AnimationActionOptions,
+} from './AnimationStateController.js';
 export type {
   PlaybackInstanceId,
   PlaybackOutcome,
   PlaybackState,
   PlaybackStatus,
   PlaybackLifecycleEvent,
+  PlaybackLifecycleOptions,
 } from './PlaybackLifecycle.js';
 export type { AnimationPose } from './AnimationPose.js';
 export { blendPose, evaluateClip, lerpProperty } from './AnimationPose.js';

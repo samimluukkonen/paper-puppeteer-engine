@@ -79,6 +79,7 @@ src/engine/
   AnimationClip.ts      Keyframe types, validation and property-track compilation
   validatedAnimation.ts  Shared immutable animation validation for editor previews and IK authoring queries
   AnimationPlayer.ts    Layer clocks, transitions, events and completion
+  AnimationStateController.ts  Named base states and temporary action policy over existing playback
   AnimationLayerEvaluator.ts  Layer sampling, blending, pose buffers and controlled properties
   AnimationPose.ts      Pure clip evaluation and pose blending
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
