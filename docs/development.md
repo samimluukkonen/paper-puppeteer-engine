@@ -258,4 +258,6 @@ For stateless pose tooling, import `compileClip` and `evaluateClip` from `/core`
 
 Compiled clips own immutable metadata, property maps, keyframes, playback settings, and JSON event payloads, so they can be shared between compatible players. `AnimationPlayer` takes an independent snapshot of externally assembled compiled clips. Non-JSON runtime event payloads retain reference semantics; listener notifications receive independent metadata and copies of JSON payloads.
 
+Visual rig constraint and default-target editing is documented in the [Rig IK editor guide](rig-ik-editor.md).
+
 IK authoring production coverage is documented in the [IK workflow](ik-animation-authoring.md). Preview and gizmo disposal are idempotent; disposed gizmos ignore late render/input calls, and solver-scale restrictions use current transforms rather than a held status.

@@ -1,0 +1,17 @@
+# Visual rig IK editing
+
+The Rig Editor's **IK constraints** panel creates and edits the existing two-bone IK definitions. Select three directly connected joints, give the constraint a unique name, initialize its default target at the current end effector or enter coordinates, and confirm creation. Bone choices come from the current skeleton and support new characters and non-humanoid chains.
+
+Select a constraint to highlight its start, middle and end joints. Edit its rig-local target, influence, bend direction, enabled flag, priority and end-bone-local endpoint offset. Numeric changes commit on blur or Enter; Escape discards unfinished numeric text. Creation enables live solver preview; the panel and existing preview checkbox control the same preview state.
+
+Target crosshairs and endpoint links are editor-only Phaser graphics. Selected handles take precedence where targets overlap. Gray handles distinguish disabled constraints and targets controlled by external runtime owners. Disabled constraints can still have their defaults edited. Runtime/provider ownership blocks direct dragging until that owner releases the target; selecting a constraint shows the reason.
+
+Dragging converts the camera pointer to world space and then through the full inverse puppet transform, including placement, rotation, scaling, facing and enclosing containers. Grid snapping applies in rig coordinates. The authoritative rig working copy drives both numeric controls and handles. Requested unreachable targets retain their authored coordinates while the existing solver applies its clamped-pose behavior.
+
+A drag groups changes into one rig history entry. Escape, window blur, hidden-page notification or editor deactivation cancels the gesture and restores the original pose/defaults. Selection and preview controls consume no history. During a gesture, the existing runtime constraint receives a temporary world target; completion installs the authored defaults through the existing preview reconstruction path. No solver is added. Animation Editor targets retain their separate keyframe/draft workflow; rig operations never create animation keys.
+
+Live dependency messages identify animation tracks, baked IK metadata and host references. Chain/endpoint edits and deletion are disabled when referenced, and every command still uses the validated model APIs. Export/reload uses the existing rig JSON format and preserves the default targets and solver settings.
+
+Implementation lives in `RigIKPanel.tsx` (panel, creation form and numeric controls), `rigIKForm.ts` (topology choices and model-backed validation), `AttachmentController` (React command/subscription adapter), `RigEditorState` (authoritative data and grouped target gesture APIs), `RigEditorInputController` (pointer ownership/cancellation), `RigEditorOverlay` (gizmos/picking) and `RigEditor` (solver preview and reconstruction).
+
+Unit coverage includes form validation, creation, selection, numeric/handle synchronization, affine coordinate conversion, commit/cancel, reachability, enabled state, undo/redo, dependencies, runtime ownership changes, empty state and lifecycle cleanup. Shared-workspace coverage verifies animation data, drafts and history remain unchanged. Local Playwright scenarios exercise the React/Phaser workflow on an existing character and creation/deletion on a new three-joint character, including export/reload. Browser tests remain local-only; see [development checks](development.md#local-browser-checks).

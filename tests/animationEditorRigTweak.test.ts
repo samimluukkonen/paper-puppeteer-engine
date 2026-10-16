@@ -444,3 +444,38 @@ test('rig drafts use one source-bound namespace across editor routes and hosted 
     rigDraftKey('/base/rig-editor/', 'other', 'rig.json'),
   );
 });
+
+test('Rig Editor default-target drags preview and commit independently of animation keys, drafts and history', async () => {
+  const { scene, state, editor } = await session();
+  try {
+    const animation = state.workingAnimation;
+    const history = state.historyLength;
+    state.setEditorMode('rig');
+    editor.setIKPreview(true);
+    editor.state.beginIKTargetDrag('arm');
+    editor.state.moveIKTarget({ x: 30, y: 80 });
+    editor.refresh();
+    let puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const target = puppet.container.getWorldTransformMatrix().transformPoint(30, 80);
+    assert.closeTo(puppet.getBone('hand').getWorldPosition().x, target.x, 1e-6);
+    assert.closeTo(puppet.getBone('hand').getWorldPosition().y, target.y, 1e-6);
+    editor.state.endIKTargetDrag();
+    editor.refresh();
+    assert.equal(editor.state.historyLength, 1);
+    assert.strictEqual(state.workingAnimation, animation);
+    assert.equal(state.historyLength, history);
+    assert.deepEqual(state.ikTargetDraft, {});
+    puppet = Reflect.get(scene, 'puppet') as Puppet;
+    assert.equal(puppet.getIK('arm').targetOwnership, 'animation');
+    editor.undo();
+    assert.isUndefined(editor.state.getIKConstraint('arm').target);
+    editor.redo();
+    assert.deepEqual(editor.state.getIKConstraint('arm').target, { x: 30, y: 80 });
+    state.setEditorMode('animation');
+    assert.strictEqual(state.workingAnimation, animation);
+    assert.equal(state.historyLength, history);
+    assert.equal((Reflect.get(scene, 'puppet') as Puppet).getIK('arm').targetOwnership, 'animation');
+  } finally {
+    scene.events.emit('shutdown');
+  }
+});

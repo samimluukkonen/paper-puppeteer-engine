@@ -1,3 +1,4 @@
+import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import type { RigEditor } from './RigEditor.js';
@@ -38,6 +39,28 @@ export class AttachmentController {
       this.snapshot = { ...this.snapshot, message: error instanceof Error ? error.message : String(error) };
     }
     this.refresh();
+  }
+  selectIK(id: string): void {
+    this.run((editor) => {
+      editor.state.selectIKConstraint(id);
+      editor.state.visibility.ik = true;
+      editor.refresh();
+    }, 'Rig default target selected. Drag its crosshair in the canvas.');
+  }
+  createIK(options: CreateIKConstraintOptions): void {
+    this.run((editor) => {
+      editor.createIKConstraint(options);
+      editor.setIKPreview(true);
+    }, 'IK constraint created. Drag its default target to preview the chain.');
+  }
+  updateIK(id: string, patch: IKConstraintPatch): void {
+    this.run((editor) => editor.updateIKConstraint(id, patch), 'Rig IK defaults updated.');
+  }
+  removeIK(id: string): void {
+    this.run((editor) => editor.removeIKConstraint(id), 'IK constraint deleted.');
+  }
+  previewIK(enabled: boolean): void {
+    this.run((editor) => editor.setIKPreview(enabled), 'IK preview updated.');
   }
   createBone(id: string): void {
     this.run((editor) => {

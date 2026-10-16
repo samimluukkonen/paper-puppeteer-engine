@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
+import { localToWorld } from '../../engine/affineMath.js';
 import type { CompiledClip } from '../../engine/AnimationClip.js';
 import { evaluateClip } from '../../engine/AnimationPose.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import type { IKTarget, TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder, Rig } from '../../engine/Rig.js';
 import { createTransform, type RigDefinition } from '../../engine/types.js';
@@ -34,6 +35,30 @@ export class RigEditor {
   previewTime = 0;
   actionError = '';
   private resumeAfterRebuild = false;
+  private dragTargetOverride:
+    | {
+        constraint: TwoBoneIKConstraint;
+        previous: Readonly<IKTarget> | undefined;
+        current: Readonly<IKTarget> | undefined;
+      }
+    | undefined;
+  private readonly previewTargets = new Map<string, Readonly<IKTarget>>();
+
+  private ownsPreviewTarget(id: string): boolean {
+    const constraint = this.puppet.getIK(id);
+    const target = this.previewTargets.get(id);
+    return (
+      (!!target && constraint.target === target) ||
+      (this.dragTargetOverride?.constraint === constraint && constraint.target === this.dragTargetOverride.current)
+    );
+  }
+
+  private pinPreviewTarget(constraint: TwoBoneIKConstraint): void {
+    // Hosts retain explicit runtime/provider ownership.
+    if (constraint.targetOwnership !== 'animation' && !this.ownsPreviewTarget(constraint.name)) return;
+    constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
+    this.previewTargets.set(constraint.name, constraint.target!);
+  }
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -83,7 +108,9 @@ export class RigEditor {
       }
       constraint.enabled = false;
     }
-    this.overlay = new RigEditorOverlay(this.scene, this.puppet, this.state, this.ikChains);
+    this.overlay = new RigEditorOverlay(this.scene, this.puppet, this.state, this.ikChains, (id) =>
+      this.ownsPreviewTarget(id),
+    );
     this.inputController = new RigEditorInputController(
       this.scene,
       this.puppet,
@@ -100,7 +127,7 @@ export class RigEditor {
     if (this.state.ikPreview && !this.evaluateContext) {
       for (const chain of this.ikChains) {
         const constraint = this.puppet.getIK(chain.name);
-        if (!chain.target && !constraint.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
+        if (!chain.target && !constraint.target) this.pinPreviewTarget(constraint);
         constraint.enabled = chain.enabled !== false;
       }
       this.puppet.syncPose();
@@ -121,7 +148,31 @@ export class RigEditor {
 
   refresh(notify = true): void {
     const rig = this.state.workingCopy;
-    if (rig !== this.appliedRig) this.syncTopology(rig);
+    // A target gesture retains its puppet/input owner until its single commit or cancellation.
+    if (!this.state.ikTargetDragId) {
+      if (this.dragTargetOverride) {
+        const { constraint, previous, current } = this.dragTargetOverride;
+        if (constraint.targetOwnership === 'runtime' && constraint.target === current) {
+          constraint.target = previous;
+          if (previous && this.previewTargets.get(constraint.name) === previous)
+            this.previewTargets.set(constraint.name, constraint.target!);
+        }
+      }
+      this.dragTargetOverride = undefined;
+      if (rig !== this.appliedRig || !equalEditorData(this.puppet.rig.ik, rig.ik)) this.syncTopology(rig);
+    } else {
+      const definition = this.state.getIKConstraint(this.state.ikTargetDragId);
+      const constraint = this.puppet.getIK(definition.name);
+      if (
+        definition.target &&
+        constraint.targetOwnership !== 'provider' &&
+        (constraint.targetOwnership === 'animation' || this.ownsPreviewTarget(definition.name))
+      ) {
+        this.dragTargetOverride ??= { constraint, previous: constraint.target, current: constraint.target };
+        constraint.setTarget(localToWorld(definition.target, this.puppet.container.getWorldTransformMatrix()));
+        this.dragTargetOverride.current = constraint.target;
+      }
+    }
     if (this.resumeAfterRebuild) {
       this.resumeAfterRebuild = false;
       this.enable();
@@ -131,7 +182,8 @@ export class RigEditor {
       if (
         !this.appliedRig ||
         !equalEditorData(rig.bones, this.appliedRig.bones) ||
-        !equalEditorData(rig.slots, this.appliedRig.slots)
+        !equalEditorData(rig.slots, this.appliedRig.slots) ||
+        !equalEditorData(rig.ik, this.appliedRig.ik)
       )
         this.applyRig(rig);
       this.appliedRig = rig;
@@ -167,6 +219,7 @@ export class RigEditor {
       .setDepth(container.depth)
       .setAlpha(container.alpha)
       .setVisible(container.visible);
+    container.parentContainer?.add(next.container);
     const enabled = !!this.overlay;
     this.disable();
     this.puppet = next;
@@ -174,6 +227,7 @@ export class RigEditor {
     this.appliedCatalog = undefined;
     this.appliedSkins = undefined;
     this.registeredIK.clear();
+    this.previewTargets.clear();
     try {
       this.onRebuild?.(next);
     } catch (error) {
@@ -421,11 +475,19 @@ export class RigEditor {
     const after = container.getWorldTransformMatrix();
     for (const constraint of this.registeredIK.values()) {
       const target = constraint.target;
-      if (target) constraint.setTarget(target.x + after.tx - oldX, target.y + after.ty - oldY);
+      if (target) {
+        const owned = this.ownsPreviewTarget(constraint.name);
+        constraint.setTarget(target.x + after.tx - oldX, target.y + after.ty - oldY);
+        if (owned) this.previewTargets.set(constraint.name, constraint.target!);
+      }
     }
     this.overlay?.invalidate();
     this.update();
     this.onChange();
+  }
+
+  getIKTargetEditIssue(id: string): string | undefined {
+    return this.overlay?.getIKTargets().find((handle) => handle.id === id)?.disabledReason ?? undefined;
   }
 
   createIKConstraint(options: CreateIKConstraintOptions): void {
@@ -497,12 +559,13 @@ export class RigEditor {
   }
 
   setIKPreview(enabled: boolean): void {
+    this.cancelGesture();
     this.state.ikPreview = enabled;
     this.state.visibility.ik = enabled;
     this.puppet.preparePose();
     for (const chain of this.ikChains) {
       const constraint = this.puppet.getIK(chain.name);
-      if (enabled && !chain.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
+      if (enabled && !chain.target) this.pinPreviewTarget(constraint);
       constraint.enabled = enabled && chain.enabled !== false;
     }
     this.puppet.syncPose();

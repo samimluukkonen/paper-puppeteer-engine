@@ -95,6 +95,10 @@ export class RigEditorState {
   }
   selection: RigEditorSelection = null;
   selectedIKConstraintId: string | null = null;
+  private targetDragId: string | undefined;
+  get ikTargetDragId(): string | undefined {
+    return this.targetDragId;
+  }
   editMode: EditMode = 'joint';
   dimUnselected = false;
   ikPreview = false;
@@ -727,6 +731,33 @@ export class RigEditorState {
         references: (name) => this.ikReferences?.(name) ?? [],
       }),
     );
+  }
+
+  /** Only the rig default target changes; animation documents are never involved. */
+  beginIKTargetDrag(id: string): void {
+    this.getIKConstraint(id);
+    this.endOperation();
+    this.selectIKConstraint(id);
+    this.beginOperation();
+    this.targetDragId = id;
+  }
+
+  moveIKTarget(target: { x: number; y: number }): void {
+    const id = this.targetDragId;
+    if (!id) return;
+    const candidate = updateIKConstraint(this.workingCopy, id, { target });
+    this.change(() => {
+      this.data.ik = freezeData(candidate.ik!);
+    });
+  }
+
+  endIKTargetDrag(commit = true): void {
+    if (!this.targetDragId) return;
+    this.targetDragId = undefined;
+    if (commit) {
+      this.syncTopologyRig();
+      this.endOperation();
+    } else this.cancelOperation();
   }
 
   removeIKConstraint(id: string): void {

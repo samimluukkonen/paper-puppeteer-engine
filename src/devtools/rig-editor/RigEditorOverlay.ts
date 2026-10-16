@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { localToWorld, worldToLocal } from '../../engine/affineMath.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { gridLines } from './grid.js';
@@ -17,6 +18,7 @@ export class RigEditorOverlay {
   private readonly gridGraphics: Phaser.GameObjects.Graphics;
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly labels: Phaser.GameObjects.Text[] = [];
+  private disposed = false;
   private gridSignature = '';
   private drawSnapshot: readonly unknown[] | undefined;
 
@@ -25,9 +27,62 @@ export class RigEditorOverlay {
     private readonly puppet: Puppet,
     private readonly state: RigEditorState,
     private readonly ikChains: readonly TwoBoneIKDefinition[],
+    private readonly ownsPreviewTarget: (id: string) => boolean = () => false,
   ) {
     this.gridGraphics = scene.add.graphics().setScrollFactor(0).setDepth(-10000);
     this.graphics = scene.add.graphics().setScrollFactor(0).setDepth(10000);
+  }
+
+  private get chains(): readonly TwoBoneIKDefinition[] {
+    const authored = this.state.workingCopy.ik ?? [];
+    return [...authored, ...this.ikChains.filter((chain) => !authored.some((entry) => entry.name === chain.name))];
+  }
+
+  /** Requested rig targets stay visible even when the solver clamps or a runtime owner overrides them. */
+  getIKTargets() {
+    if (this.disposed) return [];
+    const matrix = this.puppet.container.getWorldTransformMatrix();
+    return (this.state.workingCopy.ik ?? []).flatMap((definition) => {
+      const constraint = this.puppet.getIK(definition.name);
+      const endpoint = localToWorld(
+        definition.endOffset ?? { x: 0, y: 0 },
+        this.puppet.getBone(definition.endBone).container.getWorldTransformMatrix(),
+      );
+      const target = definition.target ?? worldToLocal(endpoint, matrix);
+      if (!target) return [];
+      const disabledReason =
+        constraint.targetOwnership === 'provider' ||
+        (constraint.targetOwnership === 'runtime' && !this.ownsPreviewTarget(definition.name))
+          ? 'A runtime target or provider owns this constraint. Release that owner before dragging.'
+          : !worldToLocal(endpoint, matrix)
+            ? 'The puppet transform is singular.'
+            : null;
+      return [
+        {
+          id: definition.name,
+          target,
+          world: localToWorld(target, matrix),
+          endpoint,
+          enabled: definition.enabled !== false,
+          disabledReason,
+        },
+      ];
+    });
+  }
+
+  pickIKTarget(x: number, y: number) {
+    return this.getIKTargets()
+      .filter((handle) => this.state.visibility.ik || this.state.selectedIKConstraintId === handle.id)
+      .map((handle) => ({
+        ...handle,
+        distance: Math.hypot(x - this.screen(handle.world).x, y - this.screen(handle.world).y),
+      }))
+      .filter((handle) => handle.distance <= 20)
+      .sort(
+        (a, b) =>
+          Number(b.id === this.state.selectedIKConstraintId) - Number(a.id === this.state.selectedIKConstraintId) ||
+          a.distance - b.distance,
+      )[0];
   }
 
   private gridFrame(): Phaser.GameObjects.Container {
@@ -158,6 +213,7 @@ export class RigEditorOverlay {
   }
 
   draw(): void {
+    if (this.disposed) return;
     const g = this.graphics;
     const camera = this.scene.cameras.main;
     const world = this.puppet.container.getWorldTransformMatrix();
@@ -166,6 +222,7 @@ export class RigEditorOverlay {
       this.state.workingCopy,
       this.state.selection?.type,
       this.state.selection?.id,
+      this.state.selectedIKConstraintId,
       this.state.editMode,
       this.state.gridSnap,
       this.state.ikPreview,
@@ -313,17 +370,54 @@ export class RigEditorOverlay {
         }
       }
     }
-    if (this.state.visibility.ik) {
-      for (const [index, chain] of this.ikChains.entries()) {
+    if (this.state.visibility.ik || this.state.selectedIKConstraintId) {
+      for (const [index, chain] of [...this.chains]
+        .sort(
+          (a, b) =>
+            Number(a.name === this.state.selectedIKConstraintId) - Number(b.name === this.state.selectedIKConstraintId),
+        )
+        .entries()) {
+        const selected = chain.name === this.state.selectedIKConstraintId;
+        if (!this.state.visibility.ik && !selected) continue;
         const root = this.bonePoint(chain.rootBone);
         const middle = this.bonePoint(chain.middleBone);
         const end = this.bonePoint(chain.endBone);
-        const color = [0xb78d22, 0xa257ae, 0x3e91b2, 0xc87855][index % 4]!;
+        const color = selected
+          ? 0xe45f35
+          : chain.enabled === false
+            ? 0x8b929a
+            : [0xb78d22, 0xa257ae, 0x3e91b2, 0xc87855][index % 4]!;
         g.lineStyle(3, color, 0.7)
           .lineBetween(root.x, root.y, middle.x, middle.y)
           .lineBetween(middle.x, middle.y, end.x, end.y);
-        g.strokeCircle(end.x, end.y, 9);
+        for (const point of [root, middle, end]) g.strokeCircle(point.x, point.y, selected ? 10 : 9);
         label(chain.name, end.x + 12, end.y - 10, '#76562b');
+      }
+      for (const handle of this.getIKTargets().sort(
+        (a, b) =>
+          Number(a.id === this.state.selectedIKConstraintId) - Number(b.id === this.state.selectedIKConstraintId),
+      )) {
+        const selected = handle.id === this.state.selectedIKConstraintId;
+        if (!this.state.visibility.ik && !selected) continue;
+        const point = this.screen(handle.world);
+        const end = this.screen(handle.endpoint);
+        const color = !handle.enabled || handle.disabledReason ? 0x8b929a : selected ? 0xe45f35 : 0x249fa8;
+        g.lineStyle(1, color, 0.6).lineBetween(point.x, point.y, end.x, end.y);
+        for (const stroke of [
+          { width: 6, color: 0xffffff },
+          { width: selected ? 3 : 2, color },
+        ]) {
+          g.lineStyle(stroke.width, stroke.color)
+            .strokeCircle(point.x, point.y, selected ? 12 : 10)
+            .lineBetween(point.x - 16, point.y, point.x + 16, point.y)
+            .lineBetween(point.x, point.y - 16, point.x, point.y + 16);
+        }
+        label(
+          `${handle.id} · ${handle.enabled ? 'default target' : 'disabled'}`,
+          point.x + 18,
+          point.y + 10,
+          '#76562b',
+        );
       }
       label(
         this.state.ikPreview ? 'IK preview · fixed targets' : 'IK chains · solver off',
@@ -338,6 +432,8 @@ export class RigEditorOverlay {
   }
 
   destroy(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     this.gridGraphics.destroy();
     this.graphics.destroy();
     for (const label of this.labels) label.destroy();

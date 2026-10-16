@@ -7,6 +7,7 @@ import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
 import { AttachmentPanel } from './AttachmentPanel.js';
 import { RigHelp } from './RigHelp.js';
+import { RigIKPanel } from './RigIKPanel.js';
 import { RigStructurePanel } from './RigStructurePanel.js';
 
 export function RigEditorView({
@@ -163,6 +164,7 @@ export function RigEditorView({
           <section aria-label="Rig properties">
             <div id="inspector">Loading character…</div>
           </section>
+          {attachments && <RigIKPanel controller={attachments} />}
           {attachments && <AttachmentPanel controller={attachments} />}
           {artwork && <ArtworkPanel controller={artwork} />}
           <details open>

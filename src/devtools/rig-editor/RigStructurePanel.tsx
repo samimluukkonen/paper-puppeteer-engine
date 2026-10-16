@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import type { AttachmentController } from './AttachmentController.js';
+import './attachments.css';
 import type { RigEditorState } from './RigEditorState.js';
 
 function BoneActions({
@@ -64,7 +65,7 @@ export function RigStructurePanel({ controller }: { controller: AttachmentContro
   if (!state) return null;
   const selection = state.selection;
   return (
-    <section className="attachment-panel" aria-label="Build skeleton">
+    <section className="attachment-panel rig-structure-panel" aria-label="Build skeleton">
       <fieldset disabled={!!editor.previewName}>
         <legend>Build skeleton</legend>
         <label>

@@ -11,6 +11,8 @@ import type { RigEditorSelection } from './RigEditorState.js';
 /** Owns canvas gestures, keyboard commands, and their activation lifetime. */
 export class RigEditorInputController {
   private panning = false;
+  private ikHit = false;
+  private ikDrag: { start: Point; value: Point } | undefined;
   private moved = false;
   private activePointerId: number | undefined;
   private downX = 0;
@@ -80,6 +82,10 @@ export class RigEditorInputController {
 
   /** Commit authored changes once and release pointer ownership after any gesture ending. */
   endGesture(commit = true): void {
+    const hadIKDrag = !!this.ikDrag;
+    this.ikDrag = undefined;
+    this.ikHit = false;
+    this.state.endIKTargetDrag(commit);
     const hadDrag = !!this.drag || !!this.originDrag;
     this.editor.finishArtworkGesture(commit);
     if (!commit && (this.drag || this.originDrag)) this.state.cancelOperation();
@@ -91,7 +97,7 @@ export class RigEditorInputController {
     this.characterDrag = undefined;
     this.moved = false;
     this.state.endOperation();
-    if (!commit && hadDrag) this.editor.refresh(false);
+    if (hadIKDrag || (!commit && hadDrag)) this.editor.refresh(false);
   }
 
   private interruptGesture = (): void => {
@@ -271,6 +277,18 @@ export class RigEditorInputController {
     this.drag = undefined;
     this.characterDrag = undefined;
     if (this.panning || !pointer.leftButtonDown()) return;
+    const ik = this.overlay.pickIKTarget?.(pointer.x, pointer.y);
+    this.ikHit = !!ik;
+    if (ik) {
+      this.state.selectIKConstraint(ik.id);
+      const start = this.local(pointer, this.puppet.container);
+      if (start && !ik.disabledReason) {
+        this.state.beginIKTargetDrag(ik.id);
+        this.ikDrag = { start, value: ik.target };
+      }
+      this.editor.refresh();
+      return;
+    }
     const selected = this.state.selection;
     const picked = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false);
     const aligning = this.state.editMode === 'sprite' || this.state.editMode === 'origin';
@@ -283,6 +301,7 @@ export class RigEditorInputController {
       if (start) this.characterDrag = { start, value: { x: this.puppet.container.x, y: this.puppet.container.y } };
       return;
     }
+    this.state.selectedIKConstraintId = null;
     this.state.selection = target;
     if (aligning) {
       const attachment = target.type === 'slot';
@@ -328,6 +347,26 @@ export class RigEditorInputController {
   private pointerMove(pointer: Phaser.Input.Pointer): void {
     if (pointer.id !== this.activePointerId || !pointer.isDown) return;
     if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
+    if (this.ikDrag) {
+      if (!this.moved) return;
+      const handle = this.overlay.getIKTargets().find((entry) => entry.id === this.state.ikTargetDragId);
+      if (!handle || handle.disabledReason) {
+        this.endGesture(false);
+        return;
+      }
+      const point = this.local(pointer, this.puppet.container);
+      if (!point) {
+        this.endGesture(false);
+        return;
+      }
+      const { start, value } = this.ikDrag;
+      this.state.moveIKTarget({
+        x: this.state.snapTranslation(value.x + point.x - start.x),
+        y: this.state.snapTranslation(value.y + point.y - start.y),
+      });
+      this.editor.refresh();
+      return;
+    }
     if (this.characterDrag) {
       if (!this.moved) return;
       const local = this.characterPoint(pointer);
@@ -375,7 +414,8 @@ export class RigEditorInputController {
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
     if (pointer.id !== this.activePointerId) return;
-    if (!this.panning && !this.moved && !this.drag && !this.originDrag) {
+    if (!this.panning && !this.moved && !this.drag && !this.originDrag && !this.ikHit) {
+      this.state.selectedIKConstraintId = null;
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();
       this.redraw();

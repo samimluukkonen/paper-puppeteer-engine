@@ -43,3 +43,72 @@
   height: 120px;
   object-fit: contain;
 }
+
+.rig-ik-panel {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-panel);
+}
+.rig-ik-panel h3 {
+  margin: 0;
+}
+.rig-ik-panel .action-grid {
+  gap: 8px;
+  margin: 0;
+}
+.rig-ik-panel .action-grid:empty,
+.rig-ik-panel p[role="status"]:empty {
+  display: none;
+}
+.rig-ik-panel > button {
+  justify-self: start;
+  min-height: 34px;
+  padding: 8px 12px;
+}
+.rig-ik-panel form,
+.rig-ik-panel fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+}
+.rig-ik-panel label {
+  gap: 6px;
+}
+.rig-ik-panel label:has(input[type="checkbox"]) {
+  gap: 10px;
+  padding: 4px 0;
+}
+.rig-ik-panel p,
+.rig-ik-panel label:has(input[type="checkbox"]) {
+  line-height: 1.6;
+}
+
+.rig-structure-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px 0 4px;
+}
+.rig-structure-panel fieldset {
+  gap: 12px;
+  padding: 14px;
+}
+.rig-structure-panel legend {
+  padding: 0 6px;
+}
+.rig-structure-panel p,
+.rig-structure-panel small {
+  line-height: 1.6;
+}
+.rig-structure-panel > p {
+  padding: 0 4px 4px;
+}
+.rig-structure-panel p[role="status"]:empty {
+  display: none;
+}
