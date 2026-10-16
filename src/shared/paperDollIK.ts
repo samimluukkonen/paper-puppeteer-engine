@@ -17,7 +17,7 @@ export const paperDollIK: readonly TwoBoneIKDefinition[] = [
     middleBone: 'leftForearm',
     endBone: 'leftHand',
     endOffset: { x: 0, y: 20 },
-    bendDirection: 1,
+    bendDirection: -1,
     priority: 1,
     enabled: false,
   },
