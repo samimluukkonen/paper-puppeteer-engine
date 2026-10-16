@@ -82,6 +82,7 @@ a {
 .animation-feedback {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px 16px;
   flex-basis: 100%;
   font-size: 11px;
