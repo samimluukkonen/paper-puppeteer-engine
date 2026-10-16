@@ -12,7 +12,9 @@ Export separate transparent body parts as static PNG or WebP. Keep padding delib
 
 Keep `character.json`, the rig, skins, animations, optional poses and images in one character folder. Paths are relative to `character.json`. Nested folders are supported. Use plain paths without absolute URLs, parent traversal, backslashes, percent escapes, queries, fragments or ambiguous trailing dots/spaces. Paths must also be distinct ignoring case for portable extraction. Texture keys identify image resources; bone, slot, attachment and skin identifiers identify authored objects. Keep these identifiers stable when changing filenames.
 
-Start from an existing character or create the initial version-1 rig/manifest following [character loading](characters.md). The Rig Editor adjusts an existing bone hierarchy; initial artwork files and the initial rig/manifest need manual placement in a served character directory. The editors do not create an arbitrary skeleton from empty artwork or write repository files.
+Choose **+ New Character** in the header to start from scratch, including before a character loads. Enter a name and a unique ID; the suggested ID remains editable. Creation opens an independent unsaved draft in the Rig Editor with one root bone, an empty default skin, no artwork and no animations. It does not copy an example character. See [new character workspaces](new-character-workspaces.md) for initialization, validation and lifecycle details.
+
+Use **Artwork import & replacement → Import new artwork** to add PNG/WebP files to the artwork library, then create attachments using those assets. An imported image does not automatically create bones, slots or assignments. The Rig Editor adjusts the existing hierarchy; bone/slot creation tools remain deferred. A served character directory can still supply a manually authored hierarchy following [character loading](characters.md). The editors do not write repository files.
 
 ## Rig and attachment authoring
 

@@ -1,8 +1,9 @@
 import { Clapperboard, MonitorPlay, Network } from 'lucide-react';
 import packageInfo from '../../package.json';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
-import { characterChoices, selectedCharacterId } from './characterSelection.js';
+import { characterChoices, selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
 import puppetLogo from './images/puppet-running-header.png';
+import { NewCharacterDialog } from './NewCharacterDialog.js';
 import './theme.css';
 import './viewShell.css';
 import './workspace.css';
@@ -40,7 +41,8 @@ export function ViewHeader({
   const current = views[view];
   const root = view === 'demo' ? './' : '../';
   const characterId = selectedCharacterId();
-  const characterQuery = characterId === defaultCharacterId ? '' : `?character=${characterId}`;
+  const choices = view === 'demo' ? characterChoices : workspaceCharacterChoices();
+  const characterQuery = characterId === defaultCharacterId ? '' : `?character=${encodeURIComponent(characterId)}`;
   return (
     <header className="view-header">
       <div className="view-header-top">
@@ -69,13 +71,17 @@ export function ViewHeader({
           <label className="character-choice">
             Character
             <select id={selectionId} defaultValue={characterId}>
-              {characterChoices.map(({ id, label }) => (
+              {!choices.some((entry) => entry.id === characterId) && (
+                <option value={characterId}>{characterId} (unavailable)</option>
+              )}
+              {choices.map(({ id, label }) => (
                 <option key={id} value={id}>
                   {label}
                 </option>
               ))}
             </select>
           </label>
+          <NewCharacterDialog root={root} />
         </div>
         <nav className="view-navigation" aria-label="Views">
           {Object.entries(views).map(([id, item]) => (

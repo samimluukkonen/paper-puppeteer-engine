@@ -12,8 +12,28 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
     : target?.reason;
   return (
     <details className="artwork-panel" id="artwork-panel">
-      <summary>Sprite replacement</summary>
+      <summary>Artwork import &amp; replacement</summary>
       <section aria-label="Sprite replacement">
+        <label>
+          Import new artwork
+          <input
+            type="file"
+            aria-label="Import new artwork"
+            accept=".png,.webp,image/png,image/webp"
+            disabled={!state.ready || state.importing}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void controller.importAsset(file);
+            }}
+          />
+        </label>
+        {state.ready && !state.targets.length && (
+          <p>
+            No artwork yet. Import a PNG or WebP to start your artwork library. The root bone can be edited now; bone
+            and slot creation tools are a later milestone.
+          </p>
+        )}
         <label>
           Artwork asset
           <select
@@ -22,7 +42,9 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
             disabled={!state.targets.length}
             onChange={(event) => controller.select(event.target.value)}
           >
-            {!state.targets.length && <option value="">Loading character…</option>}
+            {!state.targets.length && (
+              <option value="">{state.ready ? 'No artwork imported' : 'Loading character…'}</option>
+            )}
             {state.targets.map((entry) => (
               <option key={entry.key} value={entry.key}>
                 {entry.key} — {entry.filename}

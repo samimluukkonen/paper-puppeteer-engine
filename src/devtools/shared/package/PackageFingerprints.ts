@@ -63,6 +63,7 @@ export class PackageFingerprints {
           entry.format,
           entry.originScaleX,
           entry.originScaleY,
+          entry.newAsset,
         ]),
         () =>
           snapshot.replacements.map((entry) => {

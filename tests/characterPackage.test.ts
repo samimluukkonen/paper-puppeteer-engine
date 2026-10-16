@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, assert, expect, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
+import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import {
   buildCharacterPackage,
   capturePackage,
@@ -136,6 +137,56 @@ const zipProcessor: PackageZipProcessor = {
     return processPackageZip({ operation: 'decode', bytes }).files;
   },
 };
+
+test('new-character package checkpoints only clear after a successful complete download', async () => {
+  const draft = createNewCharacter({ name: 'Fresh', id: 'fresh' });
+  const snapshot = {
+    definition: draft.definition,
+    rig: draft.rig.recoveryDraft,
+    skins: draft.rig.standaloneSkins,
+    animations: [],
+    replacements: [],
+  };
+  const controller = new PackageController(zipProcessor);
+  controller.bind(() => snapshot, true);
+  vi.mocked(downloadBlob).mockImplementationOnce(() => {
+    throw new Error('Download blocked');
+  });
+  await controller.download();
+  assert.isTrue(controller.hasUnsavedCharacter);
+  assert.match(controller.getSnapshot().message, /Download blocked/);
+  await controller.download();
+  assert.isFalse(controller.hasUnsavedCharacter);
+  assert.isFalse(controller.hasUnsavedChanges);
+  assert.equal(vi.mocked(downloadBlob).mock.calls.length, 2);
+  controller.dispose();
+});
+
+test('new artwork library images export through the existing manifest without source textures or dummy references', async () => {
+  const draft = createNewCharacter({ name: 'Fresh', id: 'fresh' });
+  const files = await buildCharacterPackage({
+    definition: draft.definition,
+    rig: draft.rig.recoveryDraft,
+    skins: draft.rig.standaloneSkins,
+    animations: [],
+    replacements: [
+      {
+        assetKey: 'first-image',
+        reference: undefined,
+        blob: new Blob([png]),
+        format: 'image/png',
+        originScaleX: 1,
+        originScaleY: 1,
+        newAsset: true,
+      },
+    ],
+  });
+  const loaded = await loadPackageDefinition(files);
+  assert.deepEqual(loaded.textures, { 'first-image': 'images/first-image.png' });
+  assert.deepEqual(files.get('images/first-image.png'), png);
+  assert.deepEqual(loaded.rig.bones, [{ id: 'root' }]);
+  assert.deepEqual(draft.definition.textures, {});
+});
 const manifest = {
   version: 1,
   id: 'test',

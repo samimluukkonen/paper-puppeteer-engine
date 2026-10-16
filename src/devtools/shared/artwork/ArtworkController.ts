@@ -37,7 +37,18 @@ interface SpriteResource {
 
 type ArtworkState = ReadonlyMap<string, SpriteResource>;
 
+export interface ArtworkExport {
+  assetKey: string;
+  reference: ArtworkReference | undefined;
+  blob: Blob;
+  format: 'image/png' | 'image/webp';
+  originScaleX: number;
+  originScaleY: number;
+  newAsset?: boolean;
+}
+
 export interface ArtworkSnapshot {
+  readonly ready: boolean;
   readonly targets: readonly ArtworkTarget[];
   readonly selectedKey: string | null;
   readonly selectedReference: ArtworkReference | null;
@@ -68,6 +79,7 @@ export class ArtworkController {
   private definition: CharacterDefinition | undefined;
   private refreshAppearance: () => void = () => {};
   private readonly listeners = new Set<() => void>();
+  private readonly importedAssets = new Map<string, ImportedSprite>();
   private applied = new Map<string, SpriteResource>();
   private rendered = new Map<string, SpriteResource>();
   private readonly resources = new Set<SpriteResource>();
@@ -77,6 +89,7 @@ export class ArtworkController {
   private readonly namespace = `__paper_artwork_${++nextNamespace}_`;
   private serial = 0;
   private snapshot: ArtworkSnapshot = {
+    ready: false,
     targets: [],
     selectedKey: null,
     selectedReference: null,
@@ -112,7 +125,7 @@ export class ArtworkController {
   };
   getSnapshot = (): ArtworkSnapshot => this.snapshot;
   get hasUnsavedChanges(): boolean {
-    return this.applied.size > 0;
+    return this.applied.size > 0 || this.importedAssets.size > 0;
   }
   get hasPendingChanges(): boolean {
     return this.hasUnsavedChanges || this.hasPendingProposal;
@@ -131,7 +144,8 @@ export class ArtworkController {
     const target = this.snapshot.targets.find((entry) => entry.key === key);
     const imported =
       (reference ? this.applied.get(identity(key, reference)) : undefined)?.sprite ??
-      this.applied.get(identity(key))?.sprite;
+      this.applied.get(identity(key))?.sprite ??
+      this.importedAssets.get(key);
     return imported
       ? { url: imported.url, filename: imported.filename, imported: true }
       : target
@@ -147,22 +161,37 @@ export class ArtworkController {
   }
 
   /** Dirty status can inspect committed artwork while a separate proposal blocks export. */
-  appliedReplacements() {
-    return [...this.applied.values()].map((entry) => ({
-      assetKey: entry.assetKey,
-      reference: entry.reference,
-      blob: entry.sprite.blob,
-      format: entry.sprite.format,
-      originScaleX: entry.originScaleX,
-      originScaleY: entry.originScaleY,
-    }));
+  appliedReplacements(): ArtworkExport[] {
+    const additions = [...this.importedAssets]
+      .filter(([key]) => !this.applied.has(identity(key)))
+      .map(([assetKey, sprite]) => ({
+        assetKey,
+        reference: undefined,
+        blob: sprite.blob,
+        format: sprite.format,
+        originScaleX: 1,
+        originScaleY: 1,
+        newAsset: true,
+      }));
+    return [
+      ...additions,
+      ...[...this.applied.values()].map((entry) => ({
+        assetKey: entry.assetKey,
+        reference: entry.reference,
+        blob: entry.sprite.blob,
+        format: entry.sprite.format,
+        originScaleX: entry.originScaleX,
+        originScaleY: entry.originScaleY,
+        newAsset: this.importedAssets.has(entry.assetKey) && !entry.reference,
+      })),
+    ];
   }
 
   private publish(update: Partial<ArtworkSnapshot>): void {
     const next = { ...this.snapshot, ...update };
     this.snapshot = {
       ...next,
-      pendingCount: this.applied.size,
+      pendingCount: this.applied.size + this.importedAssets.size,
       applied: this.applied.get(identity(next.selectedKey ?? '', next.selectedReference ?? undefined))?.sprite ?? null,
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
@@ -192,6 +221,7 @@ export class ArtworkController {
     const usages = puppet.getArtworkUsages();
     const keys = new Set([
       ...Object.keys(definition.textures),
+      ...this.importedAssets.keys(),
       ...usages.map((entry) => entry.texture),
       ...[...this.applied.values()].map((entry) => entry.assetKey),
     ]);
@@ -209,7 +239,7 @@ export class ArtworkController {
         references.push(...entry.slots.map((slot) => `Slot: ${slot}`), ...entry.skins.map((skin) => `Skin: ${skin}`));
       targets.push({
         key,
-        filename: assetFilename(definition.textures[key], key),
+        filename: this.importedAssets.get(key)?.filename ?? assetFilename(definition.textures[key], key),
         url: Object.hasOwn(definition.textures, key) ? definition.textureUrl(key) : 'src' in source ? source.src : '',
         width: frame.width,
         height: frame.height,
@@ -264,6 +294,7 @@ export class ArtworkController {
     this.refreshAppearance = refreshAppearance;
     this.rendered = rendered;
     this.publish({
+      ready: true,
       targets,
       selectedKey: this.targetSelection(targets),
       message: 'Choose shared artwork or one logical attachment/bone, then import a PNG or WebP.',
@@ -346,7 +377,7 @@ export class ArtworkController {
         return;
       }
       // Include retained undo data in the budget, not just textures currently visible.
-      const resources = [...this.resources].map((entry) => entry.sprite);
+      const resources = [...this.resources].map((entry) => entry.sprite).concat([...this.importedAssets.values()]);
       if (
         resources.reduce((sum, entry) => sum + entry.bytes, sprite.bytes) > limits.maxTotalImageBytes ||
         resources.reduce((sum, entry) => sum + entry.width * entry.height, sprite.width * sprite.height) >
@@ -376,6 +407,56 @@ export class ArtworkController {
     } catch (error) {
       sprite?.dispose();
       if (!request.signal.aborted && this.request === request) this.report(error, { importing: false });
+    } finally {
+      if (this.request === request) this.request = undefined;
+    }
+  }
+
+  /** Add real artwork to an empty character without inventing a rig reference or placeholder image. */
+  async importAsset(file: File): Promise<void> {
+    this.cancel();
+    const textures = this.textures;
+    if (!textures || !this.puppet || this.candidate) return;
+    const request = new AbortController();
+    this.request = request;
+    this.publish({ importing: true, message: 'Validating new artwork...' });
+    let sprite: ImportedSprite | undefined;
+    let key: string | undefined;
+    try {
+      sprite = await this.decode(file, request.signal);
+      request.signal.throwIfAborted();
+      const retained = [...this.resources].map((entry) => entry.sprite).concat([...this.importedAssets.values()]);
+      if (
+        retained.reduce((sum, entry) => sum + entry.bytes, sprite.bytes) > limits.maxTotalImageBytes ||
+        retained.reduce((sum, entry) => sum + entry.width * entry.height, sprite.width * sprite.height) >
+          limits.maxTotalImagePixels
+      )
+        throw new Error('Artwork and undo data exceed the session image budget. Import a smaller image.');
+      const stem =
+        file.name
+          .replace(/\.[^.]+$/, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9-]+/g, '-') || 'artwork';
+      key = stem;
+      let suffix = 1;
+      while (textures.exists(key)) key = `${stem}-${++suffix}`;
+      if (!textures.addImage(key, sprite.image)) throw new Error('Could not register the imported artwork.');
+      this.importedAssets.set(key, sprite);
+      this.refreshTargets();
+      this.publish({
+        selectedKey: key,
+        selectedReference: null,
+        importing: false,
+        message:
+          'Artwork added to the library. Create an attachment using this asset. Download a character ZIP to include its image.',
+      });
+    } catch (error) {
+      if (key) {
+        this.importedAssets.delete(key);
+        if (textures.exists(key)) textures.remove(key);
+      }
+      sprite?.dispose();
+      if (!request.signal.aborted) this.report(error, { importing: false });
     } finally {
       if (this.request === request) this.request = undefined;
     }
@@ -610,6 +691,11 @@ export class ArtworkController {
       resource.sprite.dispose();
     }
     this.resources.clear();
+    for (const [key, sprite] of this.importedAssets) {
+      if (this.textures?.exists(key)) this.textures.remove(key);
+      sprite.dispose();
+    }
+    this.importedAssets.clear();
     this.applied.clear();
     this.rendered.clear();
     this.candidate = undefined;
@@ -619,6 +705,7 @@ export class ArtworkController {
     this.definition = undefined;
     this.refreshAppearance = () => {};
     this.publish({
+      ready: false,
       targets: [],
       selectedKey: null,
       selectedReference: null,

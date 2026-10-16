@@ -27,6 +27,7 @@ export class PackageController {
   private snapshot = {
     ready: false,
     busy: false,
+    unsavedCharacter: false,
     message: 'Load a character to export a package.',
     modified: [] as string[],
     preview: null as PackageFiles | null,
@@ -37,14 +38,17 @@ export class PackageController {
   };
   getSnapshot = () => this.snapshot;
   get hasUnsavedChanges(): boolean {
-    return this.snapshot.modified.length > 0;
+    return this.snapshot.unsavedCharacter || this.snapshot.modified.length > 0;
+  }
+  get hasUnsavedCharacter(): boolean {
+    return this.snapshot.unsavedCharacter;
   }
 
   private publish(update: Partial<typeof this.snapshot> = {}): void {
     this.snapshot = { ...this.snapshot, ...update };
     notifySubscribers(this.listeners, 'Package subscribers failed.');
   }
-  bind(source: () => PackageSnapshot): void {
+  bind(source: () => PackageSnapshot, unsavedCharacter = false): void {
     this.request?.abort();
     this.request = undefined;
     this.source = source;
@@ -62,7 +66,10 @@ export class PackageController {
       ready: true,
       busy: false,
       preview: null,
-      message: 'Export includes all character files and images.',
+      unsavedCharacter,
+      message: unsavedCharacter
+        ? 'New / Unsaved character. Download a character ZIP to save the complete draft.'
+        : 'Export includes all character files and images.',
     });
   }
   refresh = (): void => {
@@ -103,6 +110,7 @@ export class PackageController {
       this.baseline = checkpoint;
       this.refresh();
       this.publish({
+        unsavedCharacter: false,
         message: 'Package download started. Checkpoint recorded for these bytes; source files were not overwritten.',
       });
     } catch (error) {
@@ -154,7 +162,7 @@ export class PackageController {
     this.source = undefined;
     this.lastFiles = null;
     this.fingerprints.clear();
-    this.publish({ ready: false, busy: false, preview: null, modified: [] });
+    this.publish({ ready: false, busy: false, unsavedCharacter: false, preview: null, modified: [] });
   }
   dispose(): void {
     this.unbind();

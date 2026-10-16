@@ -1,9 +1,20 @@
+import { browserCharacterDrafts } from '../devtools/shared/newCharacter.js';
 import { characterCatalog, defaultCharacterId } from '../shared/characterCatalog.js';
 
 export const characterChoices = characterCatalog;
 
+export function workspaceCharacterChoices() {
+  try {
+    return [...characterChoices, ...browserCharacterDrafts().choices()];
+  } catch {
+    return characterChoices;
+  }
+}
+
 export function selectedCharacterId(): string {
   const id = new URLSearchParams(globalThis.location?.search ?? '').get('character');
+  // Unknown editor identities must fail visibly instead of silently opening an example.
+  if (id && /\/(?:rig|animation)-editor\/?$/.test(globalThis.location?.pathname ?? '')) return id;
   return characterChoices.find((character) => character.id === id)?.id ?? defaultCharacterId;
 }
 

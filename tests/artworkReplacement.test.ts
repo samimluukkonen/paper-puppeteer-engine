@@ -125,6 +125,51 @@ function fixture(frame?: string | number, overrideRig?: Rig) {
 }
 const file = () => new File(['image'], 'replacement.png', { type: 'image/png' });
 
+test('new artwork imports without a replacement target, stays independent and releases its resources', async () => {
+  const f = fixture();
+  const before = JSON.stringify(f.rig);
+  const imported = f.next;
+  await f.controller.importAsset(file());
+  assert.isTrue(f.controller.getSnapshot().ready);
+  assert.isTrue(f.controller.hasUnsavedChanges);
+  assert.isTrue(f.textures.has('replacement'));
+  assert.equal(f.controller.getSnapshot().selectedKey, 'replacement');
+  assert.deepEqual(f.controller.getSnapshot().targets.find((entry) => entry.key === 'replacement')!.references, []);
+  assert.deepEqual(
+    f.controller.appliedReplacements().map((entry) => [entry.assetKey, entry.newAsset]),
+    [['replacement', true]],
+  );
+  assert.equal(JSON.stringify(f.rig), before);
+  f.controller.unbind();
+  assert.isFalse(f.textures.has('replacement'));
+  assert.isTrue(f.textures.has('shared'));
+  assert.equal(vi.mocked(imported.dispose).mock.calls.length, 1);
+});
+
+test('failed and canceled new artwork imports leave the library and original textures unchanged', async () => {
+  const f = fixture();
+  f.add.mockImplementationOnce(() => {
+    throw new Error('Texture allocation failed');
+  });
+  await f.controller.importAsset(file());
+  assert.isFalse(f.controller.hasUnsavedChanges);
+  assert.equal(f.controller.appliedReplacements().length, 0);
+  assert.equal(f.textures.size, 1);
+  let resolve!: (value: ImportedSprite) => void;
+  const pending = new Promise<ImportedSprite>((done) => {
+    resolve = done;
+  });
+  f.decode.mockReturnValueOnce(pending);
+  const next = sprite('late.png');
+  const importing = f.controller.importAsset(file());
+  f.controller.cancel();
+  resolve(next);
+  await importing;
+  assert.equal(f.textures.size, 1);
+  assert.equal(vi.mocked(next.dispose).mock.calls.length, 1);
+  f.controller.dispose();
+});
+
 afterEach(() => vi.unstubAllGlobals());
 
 test('throwing subscribers cannot dispose accepted proposals or interrupt artwork history', async () => {

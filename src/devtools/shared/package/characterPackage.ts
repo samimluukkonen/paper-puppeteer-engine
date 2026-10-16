@@ -7,6 +7,7 @@ import type { RigJsonDefinition } from '../../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
 import type { DeepReadonly } from '../../../engine/readonlyData.js';
+import { identifierSchema } from '../../../engine/schemas.js';
 import type { SkinDefinition, SpriteDefinition, SpriteAttachmentDefinition } from '../../../engine/types.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
@@ -216,10 +217,13 @@ export async function buildCharacterPackage(
   const textures = new Map<string, Uint8Array<ArrayBuffer>>();
   let serial = 0;
   for (const replacement of snapshot.replacements) {
-    if (!Object.hasOwn(manifest.textures, replacement.assetKey))
-      throw new Error(`Replacement references unknown texture "${replacement.assetKey}".`);
-    let key = replacement.assetKey;
+    let key = identifierSchema.parse(replacement.assetKey);
     const extension = replacement.format === 'image/png' ? '.png' : '.webp';
+    if (!Object.hasOwn(manifest.textures, key)) {
+      if (!replacement.newAsset || replacement.reference)
+        throw new Error(`Replacement references unknown texture "${key}".`);
+      manifest.textures[key] = allocatePath('images', key, extension);
+    }
     if (replacement.reference) {
       do {
         key = `${replacement.assetKey}_replacement_${++serial}`;

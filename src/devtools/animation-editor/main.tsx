@@ -4,12 +4,13 @@ import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterS
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
-import '../rig-editor/style.css';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
+import '../rig-editor/style.css';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { browserCharacterDrafts } from '../shared/newCharacter.js';
 import { PackageController } from '../shared/package/PackageController.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { bindWorkspaceNavigation, workspaceView } from '../shared/WorkspaceNavigation.js';
@@ -32,6 +33,13 @@ import './style.css';
 const host = document.querySelector<HTMLElement>('#animation-editor-app, #editor-app');
 if (!host) throw new Error('Missing character workspace host.');
 host.id = 'character-workspace';
+const initialDraft = (() => {
+  try {
+    return browserCharacterDrafts().get(selectedCharacterId());
+  } catch {
+    return undefined;
+  } // Loading fails visibly; the creation dialog stays available.
+})();
 const initialRigView = workspaceView(new URL(window.location.href)) === 'rig';
 let movePreview: (() => void) | undefined;
 let scene: AnimationEditorScene | undefined;
@@ -49,10 +57,18 @@ const ikBake = new IKBakeController(
 );
 function CharacterWorkspace() {
   const snapshot = useSyncExternalStore(rigTweak.subscribe, rigTweak.getSnapshot);
+  const packageState = useSyncExternalStore(packages.subscribe, packages.getSnapshot);
   const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
   useLayoutEffect(() => movePreview?.(), [rigView]);
   return (
     <>
+      {initialDraft && (
+        <p className="workspace-caption" role="status" aria-label="Character draft">
+          {initialDraft.identity.name} · {initialDraft.identity.id} ·{' '}
+          {packageState.unsavedCharacter || !packageState.ready ? 'New / Unsaved' : 'Package downloaded'}. Start by
+          selecting the root bone or importing artwork. Download a character ZIP to keep the complete character.
+        </p>
+      )}
       <div id="editor-app" className="view-shell workspace-shell rig-workspace" hidden={!rigView} inert={!rigView}>
         <RigEditorView header={rigView} {...(rigView ? { packages, artwork, attachments } : {})} />
       </div>
@@ -96,6 +112,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const inspector = new BoneInspectorController(app);
   const releaseNavigationGuard = protectUnsavedChanges(
     () =>
+      (!!initialDraft && (!packages.getSnapshot().ready || packages.hasUnsavedCharacter)) ||
       timeline.hasUnsavedChanges ||
       !!stateOwner?.hasPendingAnimationEdits ||
       rigTweak.hasUnsavedChanges ||
@@ -148,7 +165,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
         selectedKeys = state.selectedKeys;
       });
       recovery.bind(state, id);
-      packages.bind(() => editorScene.packageSnapshot());
+      packages.bind(() => editorScene.packageSnapshot(), !!initialDraft);
       releaseAnimationPackage?.();
       releaseAnimationPackage = state.subscribe(packages.refresh);
       if (initialRigView) state.setEditorMode('rig');
@@ -173,7 +190,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       timeline.showError(message);
     },
     {
-      characterUrl: `../characters/${selectedCharacterId()}/character.json`,
+      characterUrl: `../characters/${encodeURIComponent(selectedCharacterId())}/character.json`,
+      ...(initialDraft ? { definition: initialDraft.definition } : {}),
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
     },
     artwork,

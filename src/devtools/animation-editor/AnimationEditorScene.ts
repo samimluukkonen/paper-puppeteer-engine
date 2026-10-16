@@ -9,16 +9,17 @@ import { Rig } from '../../engine/Rig.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import { RigEditor } from '../rig-editor/RigEditor.js';
-import { RigEditorState } from '../rig-editor/RigEditorState.js';
+import type { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
+import { createCharacterDocuments } from '../shared/newCharacter.js';
 import type { PackageSnapshot } from '../shared/package/characterPackage.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
-import { AnimationEditorState } from './AnimationEditorState.js';
+import type { AnimationEditorState } from './AnimationEditorState.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
 import { getCompiledPreviewClip } from './previewClip.js';
 import { toSeconds } from './timeUnits.js';
@@ -26,6 +27,7 @@ import { toSeconds } from './timeUnits.js';
 export interface AnimationEditorSceneOptions {
   /** Resolved relative to the editor document, including when served under a base path. */
   readonly characterUrl?: string;
+  readonly definition?: CharacterDefinition;
   readonly ikChains?: readonly TwoBoneIKDefinition[];
 }
 
@@ -124,7 +126,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     private readonly onRigChange: () => void = () => {},
   ) {
     super('AnimationEditorScene');
-    this.options = structuredClone(options);
+    this.options = { ...options, ...(options.ikChains ? { ikChains: structuredClone(options.ikChains) } : {}) };
   }
 
   create(): void {
@@ -370,11 +372,14 @@ export class AnimationEditorScene extends Phaser.Scene {
         this.options.characterUrl ?? '../characters/demo-puppet/character.json',
         window.location.href,
       );
-      const definition = await loadSceneCharacter(this, url.href);
+      const definition = await (this.options.definition
+        ? loadSceneCharacter(this, url.href, { definition: this.options.definition })
+        : loadSceneCharacter(this, url.href));
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
-      const state = new AnimationEditorState(definition.rig, definition.animations, {
-        animationPaths: definition.animationPaths,
+      const documents = createCharacterDocuments(definition, {
+        artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
       });
+      const state = documents.animation;
       state.selectAnimation(state.animationIds[0] ?? null);
       puppet = new Puppet(this, {
         rig: definition.rig,
@@ -399,12 +404,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.preview = preview;
       this.state = state;
       this.definition = definition;
-      const file = definition.rigFile;
-      const rigState = new RigEditorState(new Rig(definition.rig, file?.skins ?? []), file, {
-        defaultSkin: definition.defaultSkin,
-        standaloneSkins: definition.standaloneSkins,
-        artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
-      });
+      const rigState = documents.rig;
       this.rigEditor = new RigEditor(
         this,
         puppet,
