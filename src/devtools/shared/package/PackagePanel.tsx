@@ -100,9 +100,11 @@ function PackageRuntimePreview({ files, close }: { files: PackageFiles; close: (
             Animation{' '}
             <select
               aria-label="Animation"
+              disabled={!definition.animations.length}
               defaultValue={definition.animations[0]?.name}
               onChange={(event) => scene.current?.puppet?.play(event.target.value)}
             >
+              {!definition.animations.length && <option>No animations</option>}
               {definition.animations.map((clip) => (
                 <option key={clip.name}>{clip.name}</option>
               ))}
@@ -156,6 +158,26 @@ export function PackagePanel({ controller }: { controller: PackageController }) 
         </small>
       </summary>
       <div className="package-tools-content">
+        {snapshot.ready && (
+          <div aria-label="Character readiness">
+            <p>
+              {snapshot.draftWarnings.length
+                ? 'Incomplete draft — valid drafts can still be exported.'
+                : 'Ready for export validation.'}
+            </p>
+            {snapshot.draftWarnings.length > 0 && (
+              <ul>
+                {snapshot.draftWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            )}
+            <small>
+              Download validates the rig, skins, animations, paths and image files. Resolve any reported errors and
+              retry.
+            </small>
+          </div>
+        )}
         <p>
           Package checkpoint:{' '}
           {['Rig', 'Animations', 'Assets', 'Skins']

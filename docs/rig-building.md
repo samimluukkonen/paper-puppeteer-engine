@@ -63,6 +63,6 @@ The runtime schema, package API, sample characters, dependencies and CI configur
 
 The demo build retains the existing two non-fatal `lucide-react` module-level `use client` directive warnings. Browser checks remain local-only and use installed Chrome; no browser setup or tests were added to CI.
 
-## Deferred v0.6.6.3 work
+## Complete character workflow
 
-No v0.6.6.3 plan is defined in this repository. Durable image/project persistence, ZIP import into an editable workspace, and coordinated migration of existing animation/IK references when renaming bones remain follow-up work. Automatic rigging/joint detection, AI artwork, meshes, new IK solver types and scene choreography remain outside this plan.
+[Creating Your First Character](creating-your-first-character.md) continues this workflow through first-animation authoring, complete package export and loading in another application. The [workflow verification report](first-character-verification.md) records v0.6.6.3 coverage. Durable image/project persistence, ZIP import into an editable workspace, and coordinated migration of existing animation/IK references when renaming bones remain follow-up work. Automatic rigging/joint detection, AI artwork, meshes, new IK solver types and scene choreography remain outside this plan.

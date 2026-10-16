@@ -2,12 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { loadPackageDefinition } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
-import { test } from './fixtures.js';
+import { animationHierarchy, test } from './fixtures.js';
 
-test('build an arbitrary skeleton, import artwork, align its default skin and export a usable character', async ({
+test('build a new character, import and align artwork, animate, export and reload runtime playback', async ({
   page,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await page.goto('rig-editor/');
   await page.getByRole('button', { name: '+ New Character', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Create new character', exact: true });
@@ -111,7 +111,35 @@ test('build an arbitrary skeleton, import artwork, align its default skin and ex
 
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await expect(page.locator('#animation-selection')).toContainText('No animation');
+  await expect(page.locator('#animation-new')).toBeEnabled();
+  await page.locator('#animation-new').click();
+  const animationDialog = page.getByRole('dialog', { name: 'Create new animation', exact: true });
+  await animationDialog.getByLabel('Animation name / ID', { exact: true }).fill('idle');
+  await animationDialog.getByRole('button', { name: 'Create Animation', exact: true }).click();
+  await expect(page.locator('.timeline-keyframe')).toHaveCount(0);
+  await (await animationHierarchy(page)).getByRole('button', { name: 'branch', exact: true }).click();
+  for (const [time, rotation] of [
+    ['0', '0'],
+    ['0.5', '90'],
+    ['1', '0'],
+  ]) {
+    await page.locator('#timeline-time-input').fill(time!);
+    await page.locator('#timeline-time-input').press('Enter');
+    await page.locator('#animation-bone-fields input[data-property="rotation"]').fill(rotation!);
+    await page.getByRole('button', { name: 'Set Rotation (°) key', exact: true }).click();
+  }
+  await page.locator('#animation-undo').click();
+  await page.locator('#animation-redo').click();
+  await page.locator('#play-pause').click();
+  await expect(page.locator('#play-pause')).toHaveAttribute('aria-label', 'Pause');
+  await page.locator('#play-pause').click();
+  await expect(page.locator('#animation-dirty')).toHaveText('New / Unsaved');
+  const animationDownload = page.waitForEvent('download');
+  await page.locator('#animation-download').click();
+  const animationJson = JSON.parse(await readFile(await (await animationDownload).path(), 'utf8')) as unknown;
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
+  await expect(page.locator('#dirty-status')).toHaveText('Unsaved changes *');
   await expect(page.locator('#hierarchy [role=treeitem]')).toHaveText([
     'base',
     'trunk',
@@ -121,6 +149,7 @@ test('build an arbitrary skeleton, import artwork, align its default skin and ex
   ]);
   const packages = page.locator('#editor-app .package-tools');
   await packages.locator(':scope > summary').click();
+  await expect(packages.getByLabel('Character readiness')).toContainText('Ready for export validation.');
   const downloading = page.waitForEvent('download');
   await packages.getByRole('button', { name: 'Download character ZIP', exact: true }).click();
   const download = await downloading;
@@ -140,4 +169,32 @@ test('build an arbitrary skeleton, import artwork, align its default skin and ex
   });
   expect(definition.rig.skins[0]!.slots['branch-visual']).toBe('leaf-appearance');
   expect(Buffer.from(files.get('images/my-leaf.png')!)).toEqual(Buffer.from(png, 'base64'));
+  expect(definition.animations).toHaveLength(1);
+  expect(definition.animations[0]!.tracks.branch?.map((key) => key.time)).toEqual([0, 500, 1000]);
+  expect(JSON.parse(new TextDecoder().decode(files.get('animations/idle.json')))).toEqual(animationJson);
+  for (const [path, bytes] of files) {
+    if (path.endsWith('.json'))
+      expect(new TextDecoder().decode(bytes)).not.toMatch(/demo-puppet|random-paperdoll-sketch|blob:|__paper_artwork_/);
+  }
+  const archive = Buffer.from(await readFile(await download.path()));
+  // Exercise both exact exported bytes and a saved ZIP, with a fresh game and URL lease each time.
+  for (const mode of ['reload', 'import', 'reload']) {
+    if (mode === 'import')
+      await packages
+        .getByLabel('Import ZIP for runtime preview')
+        .setInputFiles({ name: 'branch-creature.zip', mimeType: 'application/zip', buffer: archive });
+    else await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
+    const preview = page.getByRole('dialog', { name: 'Package runtime preview', exact: true });
+    await expect(preview).toContainText('runtime playback ready');
+    await expect(preview.getByLabel('Animation', { exact: true })).toHaveValue('idle');
+    const canvas = preview.locator('canvas');
+    const frame = await canvas.screenshot();
+    await expect.poll(async () => (await canvas.screenshot()).equals(frame)).toBe(false);
+    await preview.getByRole('button', { name: 'Close preview', exact: true }).click();
+    await expect(page.locator('#package-runtime-stage')).toHaveCount(0);
+  }
+  await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
+  await expect(page.locator('#animation-selection')).toHaveValue('idle');
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(page.locator('#animation-undo')).toBeEnabled();
 });

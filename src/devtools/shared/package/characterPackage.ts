@@ -1,6 +1,6 @@
 import type { AnimationClip } from '../../../engine/AnimationClip.js';
 import { canonicalJson } from '../../../engine/authoredSerialization.js';
-import type { CharacterDefinition, CharacterManifest } from '../../../engine/CharacterDefinition.js';
+import { CharacterDefinition, type CharacterManifest } from '../../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../../engine/CharacterLoader.js';
 import { CharacterTextureBudget, DEFAULT_CHARACTER_TEXTURE_LIMITS } from '../../../engine/characterTextureLimits.js';
 import type { RigJsonDefinition } from '../../../engine/externalData.js';
@@ -189,6 +189,9 @@ export async function buildCharacterPackage(
   const snapshot = capturePackage(input);
   const { definition, rig } = snapshot;
   if (!definition.manifest) throw new Error('Character has no source manifest.');
+  const skinNames = snapshot.skins.map((skin) => skin.name);
+  if (new Set(skinNames).size !== skinNames.length)
+    throw new Error('Duplicate standalone skin names. Rename the duplicate skin before export.');
   const manifest = structuredClone(definition.manifest) as CharacterManifest;
   for (const path of manifestPaths(manifest)) packagePath(path);
   // Reserve source paths before generating any names, even when their files are added later.
@@ -280,6 +283,16 @@ export async function buildCharacterPackage(
     return path;
   });
   for (const [index, path] of (manifest.poses ?? []).entries()) json(path, definition.poses[index]);
+  json('character.json', manifest);
+  // Reject authored reference errors before fetching any source artwork. Use the same
+  // cross-file validator as CharacterLoader, with the actual generated paths/documents.
+  CharacterDefinition.fromData({
+    manifest,
+    rig: packageJson(files, manifest.rig),
+    skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, packageJson(files, path)])),
+    animations: Object.fromEntries(manifest.animations.map((path) => [path, packageJson(files, path)])),
+    poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, packageJson(files, path)])),
+  });
   // Sequential fetching bounds memory and gives every failure a precise resource name.
   let includedImageBytes = 0;
   for (const [key, path] of Object.entries(manifest.textures)) {
@@ -294,7 +307,6 @@ export async function buildCharacterPackage(
       throw new Error('Package images exceed 50 MiB.');
     add(path, bytes);
   }
-  json('character.json', manifest);
   await validatePackage(files, signal);
   return files;
 }

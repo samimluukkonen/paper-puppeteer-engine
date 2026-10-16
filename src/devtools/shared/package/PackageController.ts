@@ -7,6 +7,7 @@ import {
   type PackageSnapshot,
   validatePackage,
 } from './characterPackage.js';
+import { packageDraftWarnings } from './packageDraftWarnings.js';
 import { PackageFingerprints, type PackageDomains } from './PackageFingerprints.js';
 import { PACKAGE_MAX_BYTES } from './packageZip.js';
 import { type PackageZipProcessor, packageZipWorker } from './packageZipWorkerClient.js';
@@ -20,6 +21,7 @@ export class PackageController {
 
   private source: (() => PackageSnapshot) | undefined;
   private baseline: PackageDomains = clean;
+  private assessed: PackageDomains | undefined;
   private readonly fingerprints = new PackageFingerprints();
   private listeners = new Set<() => void>();
   private request: AbortController | undefined;
@@ -30,6 +32,7 @@ export class PackageController {
     unsavedCharacter: false,
     message: 'Load a character to export a package.',
     modified: [] as string[],
+    draftWarnings: [] as string[],
     preview: null as PackageFiles | null,
   };
   subscribe = (listener: () => void): (() => void) => {
@@ -52,6 +55,7 @@ export class PackageController {
     this.request?.abort();
     this.request = undefined;
     this.source = source;
+    this.assessed = undefined;
     const current = source();
     this.baseline = this.fingerprints.compute({
       ...current,
@@ -75,16 +79,27 @@ export class PackageController {
   refresh = (): void => {
     if (!this.source) return;
     try {
-      const domains = this.fingerprints.compute(this.source());
+      const source = this.source();
+      const domains = this.fingerprints.compute(source);
+      // Playback notifications must not re-assess or re-render authored content.
+      if (
+        this.assessed &&
+        (Object.keys(domains) as (keyof PackageDomains)[]).every((key) => domains[key] === this.assessed![key])
+      )
+        return;
+      this.assessed = domains;
       const modified = (Object.keys(domains) as (keyof PackageDomains)[]).filter(
         (key) => domains[key] !== this.baseline[key],
       );
+      const draftWarnings = packageDraftWarnings(source);
       if (
         modified.length === this.snapshot.modified.length &&
-        modified.every((domain, index) => domain === this.snapshot.modified[index])
+        modified.every((domain, index) => domain === this.snapshot.modified[index]) &&
+        draftWarnings.length === this.snapshot.draftWarnings.length &&
+        draftWarnings.every((warning, index) => warning === this.snapshot.draftWarnings[index])
       )
         return;
-      this.publish({ modified });
+      this.publish({ modified, draftWarnings });
     } catch {
       // An uncommitted artwork proposal blocks export but does not replace the last authored dirty state.
     }
@@ -108,6 +123,7 @@ export class PackageController {
       );
       this.lastFiles = exportedFiles;
       this.baseline = checkpoint;
+      this.assessed = undefined;
       this.refresh();
       this.publish({
         unsavedCharacter: false,
@@ -162,7 +178,15 @@ export class PackageController {
     this.source = undefined;
     this.lastFiles = null;
     this.fingerprints.clear();
-    this.publish({ ready: false, busy: false, unsavedCharacter: false, preview: null, modified: [] });
+    this.assessed = undefined;
+    this.publish({
+      ready: false,
+      busy: false,
+      unsavedCharacter: false,
+      preview: null,
+      modified: [],
+      draftWarnings: [],
+    });
   }
   dispose(): void {
     this.unbind();

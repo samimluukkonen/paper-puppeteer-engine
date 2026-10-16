@@ -67,6 +67,109 @@ const png = new Uint8Array(
 );
 const fetchImage: typeof fetch = () => Promise.resolve(new Response(png));
 
+type MutablePackageSnapshot = { -readonly [K in keyof PackageSnapshot]: PackageSnapshot[K] };
+
+test.each([
+  {
+    name: 'duplicate bones',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.rig.bones = [...snapshot.rig.bones, { id: 'root' }];
+    },
+    error: /Duplicate bone/,
+  },
+  {
+    name: 'missing parent',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.rig.bones[1]!.parent = 'absent';
+    },
+    error: /parent/,
+  },
+  {
+    name: 'invalid slot bone',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.rig.slots![0]!.bone = 'absent';
+    },
+    error: /bone/,
+  },
+  {
+    name: 'missing attachment',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.skins = [{ version: 1, name: 'default', slots: { slot: 'absent' } }];
+    },
+    error: /attachment/,
+  },
+  {
+    name: 'missing texture',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.rig.attachments![0]!.texture = 'absent';
+    },
+    error: /Missing texture asset/,
+  },
+  {
+    name: 'missing default skin',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.skins = [];
+    },
+    error: /Unknown default skin/,
+  },
+  {
+    name: 'invalid animation bone',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.animations = [{ name: 'bad', duration: 1000, loop: true, tracks: { absent: [{ time: 0, x: 1 }] } }];
+    },
+    error: /bone/,
+  },
+  {
+    name: 'duplicate new skins',
+    change: (snapshot: MutablePackageSnapshot) => {
+      snapshot.skins = [
+        ...snapshot.skins,
+        { version: 1, name: 'new', slots: {} },
+        { version: 1, name: 'new', slots: {} },
+      ];
+    },
+    error: /Duplicate standalone skin names/,
+  },
+])('invalid metadata rejects $name before fetching images or modifying the snapshot', async ({ change, error }) => {
+  const snapshot = fixture();
+  change(snapshot);
+  const before = JSON.stringify(snapshot);
+  const fetcher = vi.fn(fetchImage);
+  await rejected(buildCharacterPackage(snapshot, fetcher), error);
+  assert.equal(fetcher.mock.calls.length, 0);
+  assert.equal(JSON.stringify(snapshot), before);
+});
+
+test('draft guidance refreshes within an already modified domain and ignores playback-only notifications', () => {
+  const draft = createNewCharacter({ name: 'Fresh', id: 'fresh' });
+  const source = (): PackageSnapshot => ({
+    definition: draft.definition,
+    rig: draft.rig.recoveryDraft,
+    skins: draft.rig.standaloneSkins,
+    animations: draft.animation.packageAnimations(),
+    replacements: [],
+  });
+  const controller = new PackageController();
+  controller.bind(source, true);
+  assert.lengthOf(controller.getSnapshot().draftWarnings, 3);
+  draft.rig.createBone('body');
+  controller.refresh();
+  assert.lengthOf(controller.getSnapshot().draftWarnings, 2);
+  draft.rig.createSlot('visual', 'body');
+  controller.refresh();
+  assert.match(controller.getSnapshot().draftWarnings.join('\n'), /unassigned slots: visual/);
+  draft.rig.assignAttachment('visual', null);
+  controller.refresh();
+  assert.notMatch(controller.getSnapshot().draftWarnings.join('\n'), /unassigned/);
+  const listener = vi.fn();
+  const release = controller.subscribe(listener);
+  controller.refresh();
+  assert.equal(listener.mock.calls.length, 0);
+  release();
+  controller.dispose();
+  assert.deepEqual(controller.getSnapshot().draftWarnings, []);
+});
+
 test.each(['first', 'second'])('replacing aliased texture %s exports independent image files', async (assetKey) => {
   const definition = CharacterDefinition.fromData(
     {

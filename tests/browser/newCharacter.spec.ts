@@ -130,4 +130,12 @@ test('first artwork imports into an empty draft and exports as a real image with
     attachments: [],
   });
   await expect(page.getByLabel('Character draft', { exact: true })).toContainText('Package downloaded');
+  await expect(packages.getByLabel('Character readiness')).toContainText('Incomplete draft');
+  await expect(packages.getByLabel('Character readiness')).toContainText('No animations yet');
+  await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: 'Package runtime preview', exact: true });
+  await expect(preview).toContainText('runtime playback ready');
+  await expect(preview.getByLabel('Animation', { exact: true })).toBeDisabled();
+  await expect(preview.getByLabel('Animation', { exact: true })).toHaveText('No animations');
+  await preview.getByRole('button', { name: 'Close preview', exact: true }).click();
 });
