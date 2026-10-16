@@ -18,6 +18,13 @@ export type {
   SampleAnimationOptions,
 } from './AnimationPlayer.js';
 export { AnimationPlayer } from './AnimationPlayer.js';
+export type {
+  PlaybackInstanceId,
+  PlaybackOutcome,
+  PlaybackState,
+  PlaybackStatus,
+  PlaybackLifecycleEvent,
+} from './PlaybackLifecycle.js';
 export type { AnimationPose } from './AnimationPose.js';
 export { blendPose, evaluateClip, lerpProperty } from './AnimationPose.js';
 export type { CharacterData, CharacterManifest } from './CharacterDefinition.js';

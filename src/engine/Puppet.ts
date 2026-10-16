@@ -16,6 +16,7 @@ import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
 import { throwNotificationErrors } from './notifications.js';
+import type { PlaybackLifecycleEvent, PlaybackStatus } from './PlaybackLifecycle.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
 import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
@@ -343,6 +344,14 @@ export class Puppet {
     return this.animationPlayer.onAnimationComplete(listener);
   }
 
+  getPlaybackStatus(layer = 'base'): PlaybackStatus | undefined {
+    return this.animationPlayer.getPlaybackStatus(layer);
+  }
+
+  onPlaybackLifecycle(listener: (event: PlaybackLifecycleEvent) => void): () => void {
+    return this.animationPlayer.onPlaybackLifecycle(listener);
+  }
+
   pauseAnimation(): this {
     this.animationPlayer.pause();
     return this;
@@ -374,8 +383,7 @@ export class Puppet {
     return this;
   }
   clearLayer(name: string): this {
-    this.animationPlayer.clearLayer(name, this.prepareAnimationPose);
-    this.syncPose();
+    this.animationPlayer.clearLayer(name, this.prepareAnimationPose, this.synchronizeAnimationPose);
     return this;
   }
 
@@ -649,7 +657,6 @@ export class Puppet {
     if (this.destroyed) return;
     this.destroyed = true;
     this.ikAnimationSource = undefined;
-    this.animationPlayer.dispose();
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
@@ -664,6 +671,7 @@ export class Puppet {
         errors.push(error);
       }
     };
+    release(() => this.animationPlayer.dispose());
     release(() => this.debugView?.destroy());
     release(() => this.ikDebugView?.destroy());
     release(() => this.slotDebugView?.destroy());

@@ -78,7 +78,7 @@ scene.load.start();
 
 v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
 
-v0.6.5 prepares the v0.6 Production Authoring release with [explicit release gates and regression results](docs/release-readiness.md), repeated package/lifecycle checks and [release notes](docs/release-notes-v0.6.md). Check the report's verdict and remaining verification gaps before adopting the release.
+v0.7.1 adds [runtime playback lifecycle and completion](docs/playback-lifecycle.md): per-instance identity, layer status queries, and removable subscriptions for starts, pause/resume and terminal outcomes. The [v0.6 release gates and regression results](docs/release-readiness.md) retain the production authoring assessment and its remaining verification gaps.
 
 ## Guides
 

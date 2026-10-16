@@ -3,10 +3,13 @@ import { quantizePlaybackTime } from './animationMath.js';
 import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer } from './AnimationPose.js';
 import { AnimationIKEvaluator, type IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
+import type { PlaybackInstanceId, PlaybackOutcome } from './PlaybackLifecycle.js';
 import type { Rig } from './Rig.js';
 import { type TransformProperty, transformProperties } from './types.js';
 
 export interface AnimationState {
+  playbackId: PlaybackInstanceId;
+  outcome?: PlaybackOutcome;
   clip: CompiledClip;
   time: number;
   speed: number;

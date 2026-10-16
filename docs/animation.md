@@ -89,6 +89,8 @@ A crossfade evaluates the outgoing and incoming clips at their own advancing tim
 
 `animationPlayer.playbackSpeed` exposes the global multiplier; `animationPlayer.currentAnimationSpeed` exposes the active base clip's multiplier from `play()` (1 without an active clip). The demo's walking body sway follows both multipliers, including zero speed, so it stays in step with foot contacts.
 
+`puppet.getPlaybackStatus(layer?)` returns a detached snapshot with a player-local `playbackId` and `status` (`playing`, `paused`, `completed`, `interrupted`, `stopped`, or `disposed`). `puppet.onPlaybackLifecycle(listener)` returns an unsubscribe function and reports `started`, `paused`, `resumed`, and each terminal outcome separately from authored markers. The same methods are available on `AnimationPlayer`. Every real start/restart gets a new identity, including repeated starts of the same clip. Crossfade replacement interrupts the outgoing instance immediately while retaining its visual blend. See the [playback lifecycle contract](playback-lifecycle.md) for ordering, layer, completion and disposal semantics.
+
 ```ts
 const walk: AnimationClip = {
   name: 'walk', duration: 1000, loop: true,

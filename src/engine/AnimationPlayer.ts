@@ -15,6 +15,7 @@ import {
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
+import type { PlaybackLifecycleEvent, PlaybackOutcome, PlaybackStatus } from './PlaybackLifecycle.js';
 import type { Rig } from './Rig.js';
 import { assertFinite } from './types.js';
 
@@ -40,6 +41,12 @@ export interface AnimationCompletion {
   layer: string;
 }
 
+type PlaybackListener = (event: PlaybackLifecycleEvent) => void;
+type PlaybackNotification =
+  | { kind: 'lifecycle'; event: PlaybackLifecycleEvent; listeners?: ReadonlySet<PlaybackListener> }
+  | { kind: 'events'; events: readonly FiredAnimationEvent[] }
+  | { kind: 'complete'; event: AnimationCompletion };
+
 function validateSpeed(speed: number): void {
   assertFinite(speed, 'Animation speed');
   if (speed < 0) throw new Error('Animation speed cannot be negative.');
@@ -53,6 +60,12 @@ export class AnimationPlayer {
   ]);
   private readonly eventListeners = new Set<(event: FiredAnimationEvent) => void>();
   private readonly completionListeners = new Set<(event: AnimationCompletion) => void>();
+  private readonly lifecycleListeners = new Set<PlaybackListener>();
+  private disposalListeners: Set<PlaybackListener> | undefined;
+  private readonly notifications: PlaybackNotification[] = [];
+  private notifying = false;
+  private notifyingLifecycle = false;
+  private nextPlaybackId = 1;
   private readonly poseEvaluator: AnimationLayerEvaluator;
   private playback: AnimationPlaybackMode = { mode: 'smooth' };
   private speed = 1;
@@ -136,6 +149,21 @@ export class AnimationPlayer {
     return this.layers.get(name)?.weight ?? 0;
   }
 
+  /** Current or held terminal playback for a layer; absent before play, after clear, or after disposal. */
+  getPlaybackStatus(layer = 'base'): PlaybackStatus | undefined {
+    const state = this.layers.get(layer)?.state;
+    return state ? this.playbackStatus(state, layer) : undefined;
+  }
+
+  onPlaybackLifecycle(listener: PlaybackListener): () => void {
+    this.assertActive();
+    this.lifecycleListeners.add(listener);
+    return () => {
+      this.lifecycleListeners.delete(listener);
+      this.disposalListeners?.delete(listener);
+    };
+  }
+
   addAnimation(clip: AnimationClip): void {
     this.assertActive();
     if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
@@ -179,22 +207,28 @@ export class AnimationPlayer {
       else if (layerName !== 'base') source = new Map();
     }
     if (layerName !== 'base' && !source) this.poseEvaluator.resetLayerProperties(layer);
-    layer.state = { clip, time: 0, speed, playing: true };
+    const lifecycle: PlaybackLifecycleEvent[] = [];
+    // The outgoing clock may survive as a visual fade source, but its playback ends now.
+    if (layer.state) this.finishPlayback(layer.state, layerName, 'interrupted', lifecycle);
+    layer.state = { playbackId: this.nextPlaybackId++, clip, time: 0, speed, playing: true };
+    lifecycle.push({ ...this.playbackStatus(layer.state, layerName), type: 'started' });
     layer.transition = source ? { source, elapsed: 0, duration: fade, ...(ikSource ? { ikSource } : {}) } : undefined;
     layer.stopped = false;
     this.poseEvaluator.invalidate();
     if (layerName === 'base' && !source) this.resetPose();
     this.applyCurrentPose();
     synchronizePose?.();
-    this.dispatchNotifications(events, []);
+    this.dispatchNotifications(events, [], lifecycle);
   }
 
   stop(): void {
     this.assertActive();
-    for (const layer of this.layers.values()) {
-      if (layer.state) layer.state.playing = false;
+    const lifecycle: PlaybackLifecycleEvent[] = [];
+    for (const [name, layer] of this.layers) {
+      if (layer.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
       layer.stopped = true;
     }
+    this.dispatchNotifications([], [], lifecycle);
   }
   /** Restart every selected layer together, preserving speeds, masks, weights, and pause state. */
   restart(preparePose?: () => void, synchronizePose?: () => void): void {
@@ -212,9 +246,13 @@ export class AnimationPlayer {
     preparePose?.();
     this.resetPose();
     const events: FiredAnimationEvent[] = [];
+    const lifecycle: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {
       if (!layer.state) continue;
-      layer.state = { ...layer.state, time: 0, playing: true };
+      const { clip, speed } = layer.state;
+      this.finishPlayback(layer.state, name, 'interrupted', lifecycle);
+      layer.state = { playbackId: this.nextPlaybackId++, clip, time: 0, speed, playing: true };
+      lifecycle.push({ ...this.playbackStatus(layer.state, name), type: 'started' });
       layer.transition = undefined;
       layer.stopped = false;
       for (const event of collectAnimationStartEvents(layer.state.clip, name)) events.push(event);
@@ -222,15 +260,19 @@ export class AnimationPlayer {
     this.poseEvaluator.invalidate();
     this.applyCurrentPose();
     synchronizePose?.();
-    this.dispatchNotifications(events, []);
+    this.dispatchNotifications(events, [], lifecycle);
   }
   pause(): void {
     this.assertActive();
+    if (this.paused) return;
     this.paused = true;
+    this.notifyPauseChange('paused');
   }
   resume(): void {
     this.assertActive();
+    if (!this.paused) return;
     this.paused = false;
+    this.notifyPauseChange('resumed');
   }
   setSpeed(speed: number): void {
     this.assertActive();
@@ -276,25 +318,34 @@ export class AnimationPlayer {
     this.applyCurrentPose();
   }
 
-  clearLayer(name: string, preparePose?: () => void): void {
+  clearLayer(name: string, preparePose?: () => void, synchronizePose?: () => void): void {
     this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot be cleared.');
     preparePose?.();
     const layer = this.layers.get(name);
+    const lifecycle: PlaybackLifecycleEvent[] = [];
+    if (layer?.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
     if (layer) this.poseEvaluator.resetLayerProperties(layer);
     this.layers.delete(name);
     this.poseEvaluator.invalidate();
     this.applyCurrentPose();
+    synchronizePose?.();
+    this.dispatchNotifications([], [], lifecycle);
   }
 
   /** Remove clip and layer state without changing registered clips. */
   clearAllLayers(): void {
     this.assertActive();
+    const lifecycle: PlaybackLifecycleEvent[] = [];
+    for (const [name, layer] of this.layers) {
+      if (layer.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
+    }
     this.layers.clear();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
     this.poseEvaluator.ikEvaluator.clear();
     this.poseEvaluator.invalidate();
+    this.dispatchNotifications([], [], lifecycle);
   }
 
   onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
@@ -348,7 +399,7 @@ export class AnimationPlayer {
     }
     preparePose?.();
     const events: FiredAnimationEvent[] = [];
-    const completions: AnimationCompletion[] = [];
+    const completions: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {
       if (!layer.state) continue;
       const state = layer.state;
@@ -397,7 +448,7 @@ export class AnimationPlayer {
     delta: number,
     layer?: string,
     events?: FiredAnimationEvent[],
-    completions?: AnimationCompletion[],
+    completions?: PlaybackLifecycleEvent[],
   ): void {
     const previous = state.time;
     const end = advanceAnimationTime(state, delta, this.speed);
@@ -408,31 +459,128 @@ export class AnimationPlayer {
     state.time = state.clip.loop ? wrapAnimationTime(state.clip, end) : end;
     if (!state.clip.loop && end >= state.clip.duration) {
       state.playing = false;
-      if (layer && completions) completions.push({ clip: state.clip.name, layer });
+      if (layer && completions) this.finishPlayback(state, layer, 'completed', completions);
     }
   }
 
-  /** Listener failures must not prevent other markers or completion notifications. */
+  private playbackStatus(state: AnimationState, layer: string): PlaybackStatus {
+    return {
+      playbackId: state.playbackId,
+      clip: state.clip.name,
+      layer,
+      status: state.outcome ?? (this.paused ? 'paused' : 'playing'),
+      elapsedTime: state.time,
+      duration: state.clip.duration,
+      loop: state.clip.loop,
+    };
+  }
+
+  private finishPlayback(
+    state: AnimationState,
+    layer: string,
+    outcome: PlaybackOutcome,
+    events: PlaybackLifecycleEvent[],
+  ): void {
+    if (state.outcome) return;
+    state.outcome = outcome;
+    state.playing = false;
+    events.push({ ...this.playbackStatus(state, layer), type: outcome });
+  }
+
+  private notifyPauseChange(type: 'paused' | 'resumed'): void {
+    const lifecycle: PlaybackLifecycleEvent[] = [];
+    for (const [name, layer] of this.layers) {
+      if (layer.state && !layer.state.outcome) lifecycle.push({ ...this.playbackStatus(layer.state, name), type });
+    }
+    this.dispatchNotifications([], [], lifecycle);
+  }
+
+  /** Queue lifecycle-driven requests, while retaining synchronous nested authored/legacy callbacks. */
   private dispatchNotifications(
     events: readonly FiredAnimationEvent[],
-    completions: readonly AnimationCompletion[],
+    completions: readonly PlaybackLifecycleEvent[],
+    lifecycle: readonly PlaybackLifecycleEvent[] = [],
   ): void {
-    const errors = dispatchAnimationEvents(events, this.eventListeners, () => !this.disposed);
+    const notifications: PlaybackNotification[] = [];
+    for (const event of lifecycle) notifications.push({ kind: 'lifecycle', event });
+    if (events.length) notifications.push({ kind: 'events', events });
     for (const event of completions) {
-      for (const error of dispatchListeners(
-        this.completionListeners,
-        (listener) => listener({ ...event }),
-        () => !this.disposed,
-      ))
-        errors.push(error);
+      notifications.push({ kind: 'lifecycle', event });
+      // Keep the legacy completion payload and its ordering after authored events.
+      notifications.push({ kind: 'complete', event: { clip: event.clip, layer: event.layer } });
+    }
+    if (this.notifying && !this.notifyingLifecycle) {
+      throwNotificationErrors(this.deliverNotifications(notifications), 'Animation listeners failed.');
+      return;
+    }
+    for (const notification of notifications) this.notifications.push(notification);
+    this.flushNotifications();
+  }
+
+  /** Stable snapshots, isolated payloads, and error aggregation also cover reentrant requests. */
+  private flushNotifications(): void {
+    if (this.notifying) return;
+    this.notifying = true;
+    let errors: unknown[];
+    try {
+      errors = this.deliverNotifications(this.notifications);
+    } finally {
+      this.notifying = false;
+      this.disposalListeners?.clear();
+      this.disposalListeners = undefined;
     }
     throwNotificationErrors(errors, 'Animation listeners failed.');
+  }
+
+  private deliverNotifications(notifications: PlaybackNotification[]): unknown[] {
+    const errors: unknown[] = [];
+    let notification: PlaybackNotification | undefined;
+    while ((notification = notifications.shift())) {
+      const wasNotifyingLifecycle = this.notifyingLifecycle;
+      this.notifyingLifecycle = notification.kind === 'lifecycle';
+      try {
+        if (notification.kind === 'events') {
+          errors.push(...dispatchAnimationEvents(notification.events, this.eventListeners, () => !this.disposed));
+        } else if (notification.kind === 'complete') {
+          const { event } = notification;
+          errors.push(
+            ...dispatchListeners(
+              this.completionListeners,
+              (listener) => listener({ ...event }),
+              () => !this.disposed,
+            ),
+          );
+        } else {
+          const { event, listeners } = notification;
+          errors.push(
+            ...dispatchListeners(
+              listeners ?? this.lifecycleListeners,
+              (listener) => listener({ ...event }),
+              () => event.type === 'disposed' || !this.disposed,
+            ),
+          );
+        }
+      } finally {
+        this.notifyingLifecycle = wasNotifyingLifecycle;
+      }
+    }
+    return errors;
   }
 
   /** Release listeners, clips, layers, and joint references without changing the host's held pose. */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    const lifecycle: PlaybackLifecycleEvent[] = [];
+    for (const [name, layer] of this.layers) {
+      if (layer.state) this.finishPlayback(layer.state, name, 'disposed', lifecycle);
+    }
+    // Cancel pending notifications from the old host. Only disposal delivery survives cleanup.
+    this.notifications.length = 0;
+    const listeners = new Set(this.lifecycleListeners);
+    this.disposalListeners = listeners;
+    for (const event of lifecycle) this.notifications.push({ kind: 'lifecycle', event, listeners });
+    this.lifecycleListeners.clear();
     this.eventListeners.clear();
     this.completionListeners.clear();
     this.clips.clear();
@@ -442,6 +590,7 @@ export class AnimationPlayer {
     this.playback = { mode: 'smooth' };
     this.speed = 1;
     this.paused = false;
+    this.flushNotifications();
   }
 
   private assertActive(): void {
