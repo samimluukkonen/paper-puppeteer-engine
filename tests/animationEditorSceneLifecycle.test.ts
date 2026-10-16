@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, assert, test, vi } from 'vitest';
-import { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
+import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import type { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
 
@@ -24,7 +24,7 @@ function fixture(characterUrl?: string) {
   vi.stubGlobal('window', { location: { href: 'https://example.test/rig-editor/' } });
   vi.mocked(loadSceneCharacter).mockImplementation(() => new Promise(() => {}));
   const error = vi.fn();
-  const scene = new RigEditorScene(vi.fn(), error, characterUrl === undefined ? {} : { characterUrl });
+  const scene = new AnimationEditorScene(vi.fn(), error, characterUrl === undefined ? {} : { characterUrl });
   return { scene, error };
 }
 
@@ -43,18 +43,25 @@ test('shutdown releases editor state, filename, and character even while metadat
   const disable = vi.fn();
   const destroy = vi.fn(() => assert.equal(disable.mock.calls.length, 1));
   Object.assign(scene, {
-    editor: { disable },
+    rigEditor: { disable },
     puppet: { destroy },
-    loadedFilename: 'imported.json',
+    loadedRigFilename: 'imported.json',
     definition: { id: 'old-character', rigPath: 'original.json' },
   });
+  Object.assign(scene.rigExportCheckpoint, {
+    filename: 'export.json',
+    rig: { version: 1, root: 'root', bones: [{ id: 'root' }] },
+    requestSequence: 2,
+    committedSequence: 1,
+  });
   scene.events.emit('shutdown');
-  assert.isUndefined(scene.editor);
+  assert.isUndefined(scene.rigEditor);
   assert.isUndefined(Reflect.get(scene, 'puppet'));
   assert.isUndefined(Reflect.get(scene, 'definition'));
-  assert.isUndefined(Reflect.get(scene, 'loadedFilename'));
+  assert.isUndefined(Reflect.get(scene, 'loadedRigFilename'));
   assert.equal(scene.rigFilename, 'rig.json');
   assert.equal(scene.characterId, 'unknown');
+  assert.deepEqual(scene.rigExportCheckpoint, {});
   assert.equal(destroy.mock.calls.length, 1);
 });
 
@@ -78,7 +85,7 @@ test.each(['result', 'error'] as const)('a late load %s cannot affect a restarte
   await Promise.resolve();
   assert.equal(error.mock.calls.length, 0);
   assert.equal(scene.characterId, 'unknown');
-  assert.isUndefined(scene.editor);
+  assert.isUndefined(scene.rigEditor);
 });
 
 test('current load errors still reach the active editor panel', async () => {
@@ -87,4 +94,13 @@ test('current load errors still reach the active editor panel', async () => {
   scene.create();
   await Promise.resolve();
   assert.deepEqual(error.mock.calls, [['Error: Current failure']]);
+});
+
+test('rig export filenames decode manifest URLs while imported filenames retain their literal spelling', () => {
+  const { scene } = fixture();
+  assert.equal(scene.rigFilename, 'rig.json');
+  Reflect.set(scene, 'definition', { rigPath: 'rigs/rig%20v2.json?revision=2#asset' });
+  assert.equal(scene.rigFilename, 'rig v2.json');
+  Reflect.set(scene, 'loadedRigFilename', 'imported%20rig.json');
+  assert.equal(scene.rigFilename, 'imported%20rig.json');
 });

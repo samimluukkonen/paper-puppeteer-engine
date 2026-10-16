@@ -7,6 +7,7 @@ import { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { rigDraftKey } from '../src/devtools/shared/rigDraftSession.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
+import type { RigJsonDefinition } from '../src/engine/externalData.js';
 import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
@@ -88,14 +89,13 @@ function character() {
   });
 }
 
-async function session() {
+async function session(definition = character()) {
   const browser = {
     location: { href: 'https://example.test/animation-editor/', pathname: '/animation-editor/' },
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   };
   vi.stubGlobal('window', browser);
-  const definition = character();
   vi.mocked(loadSceneCharacter).mockResolvedValue(definition);
   const ready = vi.fn();
   const error = vi.fn();
@@ -112,6 +112,51 @@ async function session() {
   const puppet = Reflect.get(scene, 'puppet') as Puppet;
   return { scene, state, puppet, editor: scene.rigEditor!, definition, browser, ready };
 }
+
+test.each(['matching', 'rig-only', 'absent'] as const)(
+  'shared rig view merges standalone skins with %s embedded skins without changing exported ownership',
+  async (kind) => {
+    const rig: RigJsonDefinition = {
+      version: 1,
+      root: 'root',
+      bones: [{ id: 'root' }],
+      slots: [{ id: 'visual', bone: 'root' }],
+      attachments: [{ id: 'art', texture: 'part' }],
+      ...(kind === 'absent'
+        ? {}
+        : { skins: [{ version: 1, name: kind === 'matching' ? 'default' : 'embedded', slots: { visual: null } }] }),
+    };
+    const definition = CharacterDefinition.fromData({
+      manifest: {
+        version: 1,
+        id: 'skins',
+        rig: 'rig.json',
+        defaultSkin: 'default',
+        skins: { default: 'skin.json' },
+        textures: { part: 'part.png' },
+        animations: [],
+      },
+      rig,
+      skins: { 'skin.json': { version: 1, name: 'default', slots: { visual: 'art' } } },
+    });
+    const { scene, state, editor, puppet } = await session(definition);
+    try {
+      state.setEditorMode('rig');
+      for (const reload of [() => scene.reloadRig(definition.rigFile!), () => scene.reloadOriginal()]) {
+        reload();
+        assert.strictEqual(scene.rigEditor, editor);
+        assert.equal(puppet.getAttachment('visual'), 'art');
+        assert.deepEqual(editor.state.skins, definition.rig.skins);
+        assert.deepEqual(editor.exportRig(false).skins, rig.skins);
+      }
+      const before = editor.state.workingCopy;
+      assert.throws(() => scene.reloadRig({ ...definition.rigFile!, attachments: [] }), /same hierarchy/);
+      assert.strictEqual(editor.state.workingCopy, before);
+    } finally {
+      scene.events.emit('shutdown');
+    }
+  },
+);
 
 test('full rig and animation routes use one document and bounded scene listeners across repeated transitions', async () => {
   const { scene, state, puppet, editor } = await session();

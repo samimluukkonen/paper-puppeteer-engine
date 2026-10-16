@@ -118,7 +118,6 @@ Normal and onion playback each produced **zero timeline-track DOM mutations** in
 - `src/devtools/animation-editor/style.css`
 - `src/devtools/rig-editor/ControlsController.ts`
 - `src/devtools/rig-editor/RigEditor.ts`
-- `src/devtools/rig-editor/RigEditorScene.ts`
 - `src/devtools/rig-editor/RigEditorState.ts`
 - `src/devtools/rig-editor/RigWorkspaceController.ts`
 - `src/devtools/rig-editor/SessionController.ts`

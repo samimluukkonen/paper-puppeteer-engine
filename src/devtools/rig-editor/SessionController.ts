@@ -4,21 +4,27 @@ import { JsonWorkloadBudget, type JsonWorkloadLimitOptions } from '../../engine/
 import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { RigEditor } from './RigEditor.js';
-import type { RigEditorScene } from './RigEditorScene.js';
 import { serializeRigJson } from './rigSerialization.js';
+
+/** Scene capabilities used by either rig view; document ownership stays with the shared workspace. */
+export interface RigSessionHost {
+  readonly characterId: string;
+  readonly rigFilename: string;
+  readonly rigSessionRevision?: number;
+  readonly rigExportCheckpoint?: {
+    rig?: RigJsonDefinition;
+    filename?: string;
+    requestSequence?: number;
+    committedSequence?: number;
+  };
+  reloadRig(file: RigJsonDefinition, filename?: string, reason?: 'import' | 'reload-export'): void;
+  reloadOriginal(): void;
+}
 
 /** Session status, history actions, validation, export completion, and rig reload/import. */
 export function createSessionController(
   app: HTMLElement,
-  getScene: () => Pick<RigEditorScene, 'characterId' | 'rigFilename' | 'reloadRig' | 'reloadOriginal'> & {
-    readonly rigSessionRevision?: number;
-    readonly rigExportCheckpoint?: {
-      rig?: RigJsonDefinition;
-      filename?: string;
-      requestSequence?: number;
-      committedSequence?: number;
-    };
-  },
+  getScene: () => RigSessionHost,
   onStateChange: (editor: RigEditor) => void = () => {},
   inputLimits: JsonWorkloadLimitOptions = {},
   presentation: {

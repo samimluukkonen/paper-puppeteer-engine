@@ -1,8 +1,7 @@
 import { afterEach, assert, test, vi } from 'vitest';
 import type { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
-import type { RigEditorScene } from '../src/devtools/rig-editor/RigEditorScene.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
-import { createSessionController } from '../src/devtools/rig-editor/SessionController.js';
+import { createSessionController, type RigSessionHost } from '../src/devtools/rig-editor/SessionController.js';
 import { parseRigDefinition, type RigJsonDefinition } from '../src/engine/externalData.js';
 import { DEFAULT_MAX_JSON_BYTES } from '../src/engine/jsonInput.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -48,7 +47,7 @@ async function fixture() {
     rigExportCheckpoint: {} as { rig?: RigJsonDefinition; filename?: string },
     characterId: 'test-character',
     rigFilename: 'rig.json',
-    reloadRig: vi.fn<RigEditorScene['reloadRig']>(),
+    reloadRig: vi.fn<RigSessionHost['reloadRig']>(),
     reloadOriginal: vi.fn(),
   };
   vi.stubGlobal('window', { confirm: () => true });

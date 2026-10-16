@@ -121,7 +121,7 @@ src/devtools/rig-editor/
   HierarchyController.ts  Cached tree rendering and selection
   ControlsController.ts   Editing, snapping, visibility, and preview controls
   SessionController.ts    Status, validation, history actions, export, reload, and import
-  RigEditorScene.ts    Character loading and preview session lifecycle
+  RigWorkspaceController.ts  Rig view controllers over the shared AnimationEditorScene document
   RigEditor.ts         Editor activation and working-rig preview synchronization
   RigEditorInputController.ts  Dragging, keyboard commands, and input listener lifecycle
   RigEditorState.ts    Working rig, validation, bounded history, and serialization
