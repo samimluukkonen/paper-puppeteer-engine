@@ -61,12 +61,18 @@ function stable(value: unknown, original: unknown, field?: string, artwork = fal
   return value;
 }
 
+/** Structural edits can shift array positions; untouched values still belong to the same authored ID. */
+function baselineById<T extends { id: string }>(current: readonly T[] | undefined, original: readonly T[] | undefined) {
+  const entries = new Map((original ?? []).map((entry) => [entry.id, entry]));
+  return current?.map((entry) => entries.get(entry.id));
+}
+
 export function serializeRigData(candidate: RigJsonDefinition, initial: RigDefinition): RigJsonDefinition {
   return stable(candidate, {
     ...candidate,
-    bones: initial.bones,
-    slots: initial.slots,
-    attachments: initial.attachments,
+    bones: baselineById(candidate.bones, initial.bones),
+    slots: baselineById(candidate.slots, initial.slots),
+    attachments: baselineById(candidate.attachments, initial.attachments),
     skins: initial.skins,
   }) as RigJsonDefinition;
 }

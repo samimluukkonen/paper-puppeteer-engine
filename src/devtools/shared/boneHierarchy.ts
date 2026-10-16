@@ -1,4 +1,17 @@
 import type { Rig } from '../../engine/Rig.js';
+import type { RigDefinition } from '../../engine/types.js';
+
+/** Runtime rigs sort parents first; authored arrays keep their own stable order. */
+export function sameRigTopology(a: RigDefinition, b: RigDefinition): boolean {
+  if (a.root !== b.root || a.bones.length !== b.bones.length || (a.slots?.length ?? 0) !== (b.slots?.length ?? 0))
+    return false;
+  const bones = new Map(a.bones.map((bone) => [bone.id, bone.parent]));
+  const slots = new Map((a.slots ?? []).map((slot) => [slot.id, slot.bone]));
+  return (
+    b.bones.every((bone) => bones.has(bone.id) && bones.get(bone.id) === bone.parent) &&
+    (b.slots ?? []).every((slot) => slots.has(slot.id) && slots.get(slot.id) === slot.bone)
+  );
+}
 
 /** Parent-first depth-first rows shared by the rig and animation selection views. */
 export function boneHierarchy(rig: Rig): readonly { id: string; depth: number }[] {

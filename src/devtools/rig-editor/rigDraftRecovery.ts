@@ -14,7 +14,7 @@ export type RigEditorRecoverySnapshot = ReadonlyEditorData<{
   standaloneSkins?: readonly SkinDefinition[];
 }>;
 const recoveryDraftSchema = z.strictObject({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   rig: z.unknown(),
   directions: z.array(z.tuple([z.string(), z.strictObject({ x: z.number(), y: z.number() })])),
   standaloneSkins: skinFileSchema.array().optional(),
@@ -24,9 +24,10 @@ const recoveryDraftSchema = z.strictObject({
 export function inspectRigDraft(
   input: unknown,
   initial: ReadonlyEditorData<RigDefinition>,
-  rig: Rig,
+  _rig: Rig,
   standaloneSkins: readonly SkinDefinition[] = [],
   defaultSkin = '',
+  compatible: ReadonlyEditorData<RigDefinition> = initial,
 ): RigEditorRecoverySnapshot | undefined {
   const issues: ValidationIssue[] = [];
   if (!checkJson(input, '', issues) || issues.length) return undefined;
@@ -40,27 +41,29 @@ export function inspectRigDraft(
   }
   const { data } = inspectRigDefinition(candidate);
   if (!data) return undefined;
-  // Attachment/skin authoring may change artwork catalogs, but never joint or slot topology.
+  // Version 2 envelopes explicitly support structural editing. Raw imports retain workspace compatibility.
   if (
-    data.root !== initial.root ||
-    data.bones.length !== initial.bones.length ||
-    data.bones.some((bone, index) => {
-      const before = initial.bones[index]!;
-      return (
-        bone.id !== before.id ||
-        bone.parent !== before.parent ||
-        Boolean(bone.sprite) !== Boolean(before.sprite) ||
-        bone.sprite?.texture !== before.sprite?.texture ||
-        bone.sprite?.frame !== before.sprite?.frame
-      );
-    }) ||
-    (data.slots ?? []).length !== (initial.slots ?? []).length ||
-    (data.slots ?? []).some(
-      (slot, index) => slot.id !== initial.slots![index]!.id || slot.bone !== initial.slots![index]!.bone,
-    ) ||
-    !equalEditorData(data.ik ?? [], initial.ik ?? [])
+    !(recovery.success && recovery.data.version === 2) &&
+    (data.root !== compatible.root ||
+      data.bones.length !== compatible.bones.length ||
+      data.bones.some((bone, index) => {
+        const before = compatible.bones[index]!;
+        return (
+          bone.id !== before.id ||
+          bone.parent !== before.parent ||
+          Boolean(bone.sprite) !== Boolean(before.sprite) ||
+          bone.sprite?.texture !== before.sprite?.texture ||
+          bone.sprite?.frame !== before.sprite?.frame
+        );
+      }) ||
+      (data.slots ?? []).length !== (compatible.slots ?? []).length ||
+      (data.slots ?? []).some(
+        (slot, index) => slot.id !== compatible.slots![index]!.id || slot.bone !== compatible.slots![index]!.bone,
+      ) ||
+      !equalEditorData(data.ik ?? [], compatible.ik ?? []))
   )
     return undefined;
+  if (!equalEditorData(data.ik ?? [], initial.ik ?? [])) return undefined;
   const external = recovery.success ? (recovery.data.standaloneSkins ?? standaloneSkins) : standaloneSkins;
   if (defaultSkin && ![...(data.skins ?? []), ...external].some((skin) => skin.name === defaultSkin)) return undefined;
   if (
@@ -74,16 +77,17 @@ export function inspectRigDraft(
   if (issues.some((issue) => issue.severity === 'error')) return undefined;
   const directions = recovery.success
     ? recovery.data.directions
-    : initial.bones.flatMap((bone): [string, { x: number; y: number }][] => {
+    : compatible.bones.flatMap((bone): [string, { x: number; y: number }][] => {
         const direction = normalizeBoneDirection(bone.x ?? 0, bone.y ?? 0);
         return bone.parent !== undefined && direction ? [[bone.id, direction]] : [];
       });
+  const bones = new Map(data.bones.map((bone) => [bone.id, bone]));
   const seen = new Set<string>();
   for (const [id, direction] of directions) {
     if (
       seen.has(id) ||
-      !rig.hasBone(id) ||
-      rig.getBone(id).parent === undefined ||
+      !bones.has(id) ||
+      bones.get(id)!.parent === undefined ||
       Math.abs(Math.hypot(direction.x, direction.y) - 1) > 1e-12
     )
       return undefined;

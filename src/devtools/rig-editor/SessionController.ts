@@ -53,6 +53,7 @@ export function createSessionController(
     if (editor !== current || rigRevision !== nextRevision) requests.invalidate();
     rigRevision = nextRevision;
     editor = current;
+    if (current.actionError) feedback.textContent = current.actionError;
     onStateChange(current);
     const isDirty = current.state.rigDirty;
     dirty.textContent = presentation.dirtyLabel

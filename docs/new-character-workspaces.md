@@ -18,7 +18,7 @@ The normal rig, manifest, skin, cross-file and package validators accept the min
 
 Regression coverage is in `tests/newCharacter.test.ts`, the artwork/package tests and local-only `tests/browser/newCharacter.spec.ts`. These cover empty creation, creation alongside an edited source, duplicates, invalid input, independent documents/history, recovery, character switching, unsaved guards, transactional failures, first artwork import and package round trips. Required verification is `npm run typecheck`, `npm run test`, and `npm run build`. Browser checks use the local commands in the [development guide](development.md#local-browser-checks).
 
-Deferred follow-up work for v0.6.6.2 includes bone/slot creation and assigning artwork onto newly created structure. Automatic skeleton generation, templates, AI artwork generation, new animation systems and scene choreography remain outside this change. Durable project persistence and importing ZIPs as editable workspaces are also separate work; ZIP import continues to open an isolated runtime preview.
+The [v0.6.6.2 rig-building workflow](rig-building.md) adds bone/slot creation and artwork assignment onto newly created structure. Automatic skeleton generation, templates, AI artwork generation, new animation systems and scene choreography remain outside this workflow. Durable project persistence and importing ZIPs as editable workspaces are separate work; ZIP import continues to open an isolated runtime preview.
 
 ## Changed files and APIs
 

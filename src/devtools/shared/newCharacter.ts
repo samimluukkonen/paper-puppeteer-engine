@@ -44,12 +44,20 @@ export function suggestCharacterId(name: string, existingIds: readonly string[] 
 /** One owner per editing domain, used by both loaded characters and new drafts. */
 export function createCharacterDocuments(definition: CharacterDefinition, options: RigEditorStateOptions = {}) {
   const file = definition.rigFile;
+  const animation = new AnimationEditorState(definition.rig, definition.animations, {
+    animationPaths: definition.animationPaths,
+  });
   return {
-    animation: new AnimationEditorState(definition.rig, definition.animations, {
-      animationPaths: definition.animationPaths,
-    }),
+    animation,
     rig: new RigEditorState(new Rig(definition.rig, file?.skins ?? []), file, {
       ...options,
+      boneReferences: (id) => [
+        ...animation
+          .packageAnimations()
+          .filter((clip) => Object.hasOwn(clip.tracks, id))
+          .map((clip) => `animation "${clip.name}"`),
+        ...(options.boneReferences?.(id) ?? []),
+      ],
       defaultSkin: definition.defaultSkin,
       standaloneSkins: definition.standaloneSkins,
     }),

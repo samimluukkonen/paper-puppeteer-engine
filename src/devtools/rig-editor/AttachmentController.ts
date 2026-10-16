@@ -26,18 +26,86 @@ export class AttachmentController {
     this.snapshot = { ...this.snapshot, editor: this.editor, revision: this.snapshot.revision + 1 };
     for (const listener of this.listeners) listener();
   }
-  private run(action: (editor: RigEditor) => void, message: string): void {
+  private run(action: (editor: RigEditor) => void | false, message: string): void {
     const editor = this.editor;
     if (!editor) return;
     try {
       editor.cancelGesture();
       editor.state.endOperation();
-      action(editor);
-      this.snapshot = { ...this.snapshot, message };
+      const result = action(editor);
+      this.snapshot = { ...this.snapshot, message: result === false ? 'Operation cancelled.' : message };
     } catch (error) {
       this.snapshot = { ...this.snapshot, message: error instanceof Error ? error.message : String(error) };
     }
     this.refresh();
+  }
+  createBone(id: string): void {
+    this.run((editor) => {
+      editor.state.createBone(id.trim());
+      editor.refresh();
+    }, 'Bone added. Drag its joint in Joint Editing mode or edit its local transform.');
+  }
+  renameBone(id: string): void {
+    this.run((editor) => {
+      const selection = editor.state.selection;
+      if (selection?.type !== 'bone') throw new Error('Select a bone first.');
+      editor.state.renameBone(selection.id, id.trim());
+      editor.refresh();
+    }, 'Bone renamed. Child and slot references updated.');
+  }
+  reparentBone(parent: string): void {
+    this.run((editor) => {
+      const selection = editor.state.selection;
+      if (selection?.type !== 'bone') throw new Error('Select a bone first.');
+      const affected: string[] = [];
+      const pending = [selection.id];
+      while (pending.length) {
+        const id = pending.pop()!;
+        affected.push(...editor.state.boneDependencies(id));
+        pending.push(...editor.state.childrenOf(id));
+      }
+      if (
+        !window.confirm(
+          `Change parent of "${selection.id}" to "${parent}"? Local transforms are retained; world placement changes.\nDependent authored data is retained: ${affected.join(', ') || 'none'}.`,
+        )
+      )
+        return false;
+      editor.state.reparentBone(selection.id, parent);
+      editor.refresh();
+    }, 'Hierarchy updated.');
+  }
+  removeBone(): void {
+    this.run((editor) => {
+      const selection = editor.state.selection;
+      if (selection?.type !== 'bone') throw new Error('Select a bone first.');
+      const dependencies = editor.state.boneDependencies(selection.id);
+      if (dependencies.length)
+        throw new Error(
+          `Cannot remove "${selection.id}": ${dependencies.join(', ')}. Reparent children and remove dependent references first.`,
+        );
+      if (!window.confirm(`Remove bone "${selection.id}"?`)) return false;
+      editor.state.removeBone(selection.id);
+      editor.refresh();
+    }, 'Bone removal finished.');
+  }
+  createSlot(id: string): void {
+    this.run((editor) => {
+      const selection = editor.state.selection;
+      if (!selection) throw new Error('Select the bone that should carry the artwork.');
+      editor.state.createSlot(
+        id.trim(),
+        selection.type === 'bone' ? selection.id : editor.state.getSlot(selection.id).bone,
+      );
+      editor.refresh();
+    }, 'Empty slot created. Create an attachment from imported artwork, then assign it in the default skin.');
+  }
+  removeSlot(): void {
+    this.run((editor) => {
+      const selection = editor.state.selection;
+      if (selection?.type !== 'slot') throw new Error('Select a slot first.');
+      editor.state.removeSlot(selection.id);
+      editor.refresh();
+    }, 'Empty slot removed.');
   }
   selectSlot(id: string): void {
     this.run((editor) => {

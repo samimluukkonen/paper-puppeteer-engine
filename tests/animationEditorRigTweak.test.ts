@@ -113,6 +113,57 @@ async function session(definition = character()) {
   return { scene, state, puppet, editor: scene.rigEditor!, definition, browser, ready };
 }
 
+test('structural rig edits rebuild shared runtime consumers without replacing animation documents or leaking listeners', async () => {
+  const { scene, state, editor, puppet } = await session();
+  try {
+    state.setCurrentTime(0.5);
+    const animation = state.workingAnimation;
+    const history = state.historyLength;
+    state.setEditorMode('rig');
+    const listeners = scene.input.listenerCount('pointerdown');
+    const subscribers = (Reflect.get(state, 'listeners') as Set<unknown>).size;
+    editor.state.createBone('branch', 'root');
+    editor.refresh();
+    assert.isTrue(Reflect.get(puppet.container, 'isDestroyed'));
+    editor.state.createSlot('branch-art', 'branch');
+    editor.refresh();
+    editor.state.createAttachment({ id: 'branch-image', texture: 'art' });
+    editor.state.assignAttachment('branch-art', 'branch-image');
+    editor.refresh();
+    const current = Reflect.get(scene, 'puppet') as Puppet;
+    assert.equal(current.getSlotImage('branch-art')!.texture.key, 'art');
+    state.setEditorMode('animation');
+    assert.closeTo(current.getBone('root').pose.rotation, 0.2, 1e-10);
+    assert.strictEqual(state.workingAnimation, animation);
+    assert.equal(state.historyLength, history);
+    assert.equal(state.currentTime, 0.5);
+    state.selectBone('branch');
+    state.setEditorMode('rig');
+    for (let index = 0; index < 4; index++) {
+      editor.state.createBone(`twig-${index}`, 'branch');
+      editor.refresh();
+      editor.undo();
+      editor.redo();
+      assert.strictEqual(scene.rigEditor, editor);
+      assert.equal(scene.input.listenerCount('pointerdown'), listeners);
+      assert.equal((Reflect.get(state, 'listeners') as Set<unknown>).size, subscribers);
+    }
+    editor.state.assignAttachment('branch-art', undefined);
+    editor.state.removeSlot('branch-art');
+    editor.refresh();
+    for (let index = 0; index < 4; index++) editor.state.removeBone(`twig-${index}`);
+    editor.state.removeBone('branch');
+    editor.refresh();
+    assert.isNull(state.selectedBoneId);
+    state.setEditorMode('animation');
+    assert.strictEqual(state.workingAnimation, animation);
+    assert.equal(state.historyLength, history);
+    assert.equal(scene.packageSnapshot().rig.bones.length, 4);
+  } finally {
+    scene.events.emit('shutdown');
+  }
+});
+
 test.each(['matching', 'rig-only', 'absent'] as const)(
   'shared rig view merges standalone skins with %s embedded skins without changing exported ownership',
   async (kind) => {

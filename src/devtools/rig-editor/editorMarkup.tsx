@@ -7,6 +7,7 @@ import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
 import { AttachmentPanel } from './AttachmentPanel.js';
 import { RigHelp } from './RigHelp.js';
+import { RigStructurePanel } from './RigStructurePanel.js';
 
 export function RigEditorView({
   artwork,
@@ -157,6 +158,7 @@ export function RigEditorView({
           <details className="workspace-hierarchy" open>
             <summary>Hierarchy</summary>
             <div id="hierarchy" role="tree" />
+            {attachments && <RigStructurePanel controller={attachments} />}
           </details>
           <section aria-label="Rig properties">
             <div id="inspector">Loading character…</div>

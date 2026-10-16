@@ -6,12 +6,13 @@ export function createHierarchyController(hierarchy: HTMLElement) {
   let lifetime = new AbortController();
   let disposed = false;
   let hierarchyEditor: RigEditor | undefined;
+  let hierarchyRig: RigEditor['state']['rig'] | undefined;
   const hierarchyButtons = new Map<string, HTMLButtonElement>();
   const hierarchyEntries: HierarchyEntry[] = [];
   let selectedHierarchyButton: HTMLButtonElement | undefined;
   function buildHierarchy(current: RigEditor): void {
-    // Bind edits and history preserve topology; reloads create a new editor.
-    if (hierarchyEditor === current) return;
+    if (hierarchyEditor === current && hierarchyRig === current.state.rig) return;
+    hierarchyRig = current.state.rig;
     lifetime.abort();
     lifetime = new AbortController();
     hierarchyEditor = current;
@@ -80,6 +81,7 @@ export function createHierarchyController(hierarchy: HTMLElement) {
       disposed = true;
       lifetime.abort();
       hierarchyEditor = undefined;
+      hierarchyRig = undefined;
       hierarchyButtons.clear();
       hierarchyEntries.length = 0;
       selectedHierarchyButton = undefined;

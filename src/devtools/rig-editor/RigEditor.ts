@@ -4,9 +4,10 @@ import { evaluateClip } from '../../engine/AnimationPose.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import type { Puppet } from '../../engine/Puppet.js';
-import { computeBonePosition, computeRenderOrder } from '../../engine/Rig.js';
+import { Puppet } from '../../engine/Puppet.js';
+import { computeBonePosition, computeRenderOrder, Rig } from '../../engine/Rig.js';
 import { createTransform, type RigDefinition } from '../../engine/types.js';
+import { sameRigTopology } from '../shared/boneHierarchy.js';
 import { equalEditorData } from '../shared/editorData.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { RigEditorInputController } from './RigEditorInputController.js';
@@ -26,10 +27,12 @@ export class RigEditor {
   private appliedCatalog: RigDefinition | undefined;
   private appliedSkins: readonly import('../../engine/types.js').SkinDefinition[] | undefined;
   previewTime = 0;
+  actionError = '';
+  private resumeAfterRebuild = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly puppet: Puppet,
+    private puppet: Puppet,
     private readonly onChange: () => void,
     state?: RigEditorState,
     ikChains: readonly TwoBoneIKDefinition[] = [],
@@ -37,6 +40,8 @@ export class RigEditor {
     /** Embedded editors supply the evaluated animation/IK pose after rig projection. */
     private readonly evaluateContext?: () => void,
     private readonly currentPreviewClips?: () => readonly CompiledClip[],
+    /** Rebind shared preview consumers after editor-owned topology reconstruction. */
+    private readonly onRebuild?: (puppet: Puppet) => void,
   ) {
     this.state = state ?? new RigEditorState(puppet.rig);
     // Authored definitions own same-name preview chains, including their endpoint offsets.
@@ -99,6 +104,11 @@ export class RigEditor {
 
   refresh(notify = true): void {
     const rig = this.state.workingCopy;
+    if (rig !== this.appliedRig) this.syncTopology(rig);
+    if (this.resumeAfterRebuild) {
+      this.resumeAfterRebuild = false;
+      this.enable();
+    }
     this.syncAttachments();
     if (rig !== this.appliedRig) {
       if (
@@ -115,6 +125,47 @@ export class RigEditor {
     this.overlay?.invalidate();
     this.update();
     if (notify) this.onChange();
+  }
+
+  private syncTopology(rig: RigDefinition): void {
+    const before = this.puppet.rig;
+    if (sameRigTopology(before, rig)) return;
+    const previous = this.puppet;
+    const container = previous.container;
+    const next = new Puppet(this.scene, {
+      rig: new Rig(rig, this.state.skins),
+      ...(this.state.defaultSkin ? { skin: this.state.defaultSkin } : {}),
+      x: container.x,
+      y: container.y,
+      autoUpdate: false,
+      facing: this.state.facing,
+      ik: this.ikChains.map((chain) => ({ ...chain, enabled: this.state.ikPreview })),
+    });
+    next.container
+      .setScale(container.scaleX, container.scaleY)
+      .setRotation(container.rotation)
+      .setDepth(container.depth)
+      .setAlpha(container.alpha)
+      .setVisible(container.visible);
+    const enabled = !!this.overlay;
+    this.disable();
+    this.puppet = next;
+    this.appliedRig = undefined;
+    this.appliedCatalog = undefined;
+    this.appliedSkins = undefined;
+    this.registeredIK.clear();
+    try {
+      this.onRebuild?.(next);
+    } catch (error) {
+      this.puppet = previous;
+      next.destroy();
+      // The old overlay cannot draw a newly authored skeleton. Retry activation only
+      // after a successful rebuild or an undo back to the retained preview topology.
+      this.resumeAfterRebuild ||= enabled;
+      throw error;
+    }
+    previous.destroy();
+    if (enabled) this.enable();
   }
 
   /** Appearance selection never seeks the player or restores bone transforms. */
@@ -200,7 +251,7 @@ export class RigEditor {
 
   private updateRenderOrder(rig: RigDefinition): void {
     const previous = this.appliedRig;
-    // Editor sessions preserve topology; only authored depths affect draw order.
+    // A rebuilt preview invalidates the cached order; geometry-only edits retain it.
     const boneDepthChanged =
       !previous ||
       rig.bones.some((bone, index) => {
@@ -373,12 +424,20 @@ export class RigEditor {
   }
 
   undo(): void {
-    this.inputController?.endGesture();
-    if (this.state.undo()) this.refresh();
+    this.restoreHistory('undo');
   }
   redo(): void {
+    this.restoreHistory('redo');
+  }
+  private restoreHistory(action: 'undo' | 'redo'): void {
     this.inputController?.endGesture();
-    if (this.state.redo()) this.refresh();
+    this.actionError = '';
+    try {
+      if (this.state[action]()) this.refresh();
+    } catch (error) {
+      this.actionError = error instanceof Error ? error.message : String(error);
+      this.onChange();
+    }
   }
   resetSelected(): void {
     const selection = this.state.selection;

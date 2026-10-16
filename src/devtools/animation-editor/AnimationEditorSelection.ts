@@ -183,6 +183,7 @@ export class AnimationEditorSelection {
 
   updateRig(rig: Rig): void {
     this.rig = rig;
+    if (this.bone && !rig.hasBone(this.bone)) this.selectBone(null);
     this.rowsDirty = true;
     this.visibilityInputs = undefined;
     this.visibilityResult = undefined;

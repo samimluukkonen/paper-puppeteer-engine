@@ -14,7 +14,7 @@ Keep `character.json`, the rig, skins, animations, optional poses and images in 
 
 Choose **+ New Character** in the header to start from scratch, including before a character loads. Enter a name and a unique ID; the suggested ID remains editable. Creation opens an independent unsaved draft in the Rig Editor with one root bone, an empty default skin, no artwork and no animations. It does not copy an example character. See [new character workspaces](new-character-workspaces.md) for initialization, validation and lifecycle details.
 
-Use **Artwork import & replacement → Import new artwork** to add PNG/WebP files to the artwork library, then create attachments using those assets. An imported image does not automatically create bones, slots or assignments. The Rig Editor adjusts the existing hierarchy; bone/slot creation tools remain deferred. A served character directory can still supply a manually authored hierarchy following [character loading](characters.md). The editors do not write repository files.
+Use **Hierarchy → Build skeleton** to name the root, add child bones and create slots. Use **Artwork import & replacement → Import new artwork** to add PNG/WebP files to the artwork library, then create attachments using those assets and assign them in the default skin. An imported image does not automatically create bones, slots or assignments. The entire [rig-building workflow](rig-building.md) works through the editor without writing JSON. The editors do not write repository files.
 
 ## Rig and attachment authoring
 

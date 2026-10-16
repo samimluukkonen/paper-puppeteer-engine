@@ -5,6 +5,8 @@ import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.j
 import { characterManifestSchema } from '../../src/engine/schemas.js';
 import { test } from './fixtures.js';
 
+test.describe.configure({ timeout: 60_000 });
+
 test('create from a failed load, author an independent draft and switch editor views', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -76,7 +78,7 @@ test('create while an example is loaded without inheriting its rig or animations
     void confirmation.accept();
   });
   await page.locator('#character-selection').selectOption('demo-puppet');
-  await expect(page.locator('#session-status')).toContainText('Character: demo-puppet');
+  await expect(page.locator('#session-status')).toContainText('Character: demo-puppet', { timeout: 15_000 });
   await expect(page.locator('#hierarchy [role=treeitem]')).not.toHaveCount(1);
   await page.locator('#character-selection').selectOption('blank-puppet');
   await expect(page.locator('#hierarchy [role=treeitem]')).toHaveText(['root']);

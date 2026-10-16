@@ -113,6 +113,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
   private selectionOverlay: Phaser.GameObjects.Graphics | undefined;
+  private rebuildingRig = false;
   private facing: Facing = 'right';
   private bonesVisible = true;
   private ikPreviewEnabled = false;
@@ -206,7 +207,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
   private refreshArtwork(): void {
     const puppet = this.puppet;
-    if (!puppet) return;
+    if (!puppet || this.rebuildingRig) return;
     this.rigEditor?.cancelGesture();
     this.rigEditor?.refresh(false);
     this.ghosts?.refreshArtwork();
@@ -378,6 +379,10 @@ export class AnimationEditorScene extends Phaser.Scene {
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
       const documents = createCharacterDocuments(definition, {
         artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
+        boneReferences: (id) =>
+          (this.options.ikChains ?? [])
+            .filter((chain) => [chain.rootBone, chain.middleBone, chain.endBone].includes(id))
+            .map((chain) => `preview IK constraint "${chain.name}"`),
       });
       const state = documents.animation;
       state.selectAnimation(state.animationIds[0] ?? null);
@@ -435,6 +440,33 @@ export class AnimationEditorScene extends Phaser.Scene {
           if (state.editorMode !== 'rig') preview?.refresh(true);
         },
         () => state.packageAnimations().map((clip) => getCompiledPreviewClip(clip, state.rig!)),
+        (next) => {
+          // Keep documents, histories and camera; replace only consumers of the old runtime skeleton.
+          this.rebuildingRig = true;
+          try {
+            this.artwork?.bind(this, next, definition, () => this.refreshArtwork());
+            this.ikHandles?.dispose();
+            this.clearMirrorPreview();
+            this.clearBakePreview();
+            ghosts?.dispose();
+            preview?.dispose();
+            puppet = next;
+            this.puppet = next;
+            state.updatePreviewRig(new Rig(rigState.workingCopy, rigState.skins));
+            this.appliedWorkingRig = rigState.workingCopy;
+            preview = new AnimationEditorPreview(state, next);
+            ghosts = new AnimationEditorGhostLayer(this, state, next);
+            ghosts.setSettings(this.onionSkinSettings);
+            this.preview = preview;
+            this.ghosts = ghosts;
+            next.setDebug(this.bonesVisible && !this.rigMode);
+            this.ikHandles = new AnimationEditorIKHandles(this, state, next);
+            this.ikHandles.setVisible(this.ikHandlesVisible && !this.rigMode);
+            this.ikHandles.setInteractive(this.ikHandlesInteractive && !this.rigMode);
+          } finally {
+            this.rebuildingRig = false;
+          }
+        },
       );
       let previousMode = state.editorMode;
       this.releaseMode = state.subscribe(() => {
