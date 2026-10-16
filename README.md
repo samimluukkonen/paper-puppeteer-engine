@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, a developer pose inspector, pose JSON export, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The demo and editor display the version from `package.json`.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, a developer pose inspector, pose JSON export, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The demo and editor display the version from `package.json`.
 
 **Live demo:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
@@ -78,7 +78,7 @@ scene.load.start();
 
 v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
 
-v0.7.1 adds [runtime playback lifecycle and completion](docs/playback-lifecycle.md): per-instance identity, layer status queries, and removable subscriptions for starts, pause/resume and terminal outcomes. The [v0.6 release gates and regression results](docs/release-readiness.md) retain the production authoring assessment and its remaining verification gaps.
+v0.7.2 adds [animation queues](docs/animation-queues.md): typed base-channel FIFO requests, completion-triggered crossfades, and explicit clearing, cancellation and replacement. It builds on [runtime playback lifecycle and completion](docs/playback-lifecycle.md). The [v0.6 release gates and regression results](docs/release-readiness.md) retain the production authoring assessment and its remaining verification gaps.
 
 ## Guides
 
@@ -98,6 +98,7 @@ v0.7.1 adds [runtime playback lifecycle and completion](docs/playback-lifecycle.
 | [React mirroring tools](docs/react-mirroring-tools.md)             | Bone-pair configuration, persistence, preview, directions and React/editor integration                     |
 | [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection           |
 | [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                     |
+| [Animation queues](docs/animation-queues.md)                       | FIFO requests, completion transitions, loop rejection, interruption and cleanup                            |
 | [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |
 | [React IK authoring](docs/react-ik-authoring.md)                   | IK timeline tracks, numeric target/influence keys, selection, history, and local verification              |
 | [IK production authoring](docs/ik-animation-authoring.md)          | Reaching workflow, operation limits, compatibility, lifecycle and regression coverage                      |

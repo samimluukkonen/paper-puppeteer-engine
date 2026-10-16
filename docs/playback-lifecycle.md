@@ -79,4 +79,4 @@ Verification on 2026-10-16, after the final runtime and test changes:
 
 Runtime dependency-boundary tests and the library's core import check continue enforcing React-free runtime and renderer-independent `/core` behavior. Browser tests, optional profiling and packed-consumer checks were not run for this milestone. No CI or browser-installation changes were made.
 
-Animation queues, animation states/state machines, `playAndWait()` and promise-based playback remain deferred to later v0.7 milestones, starting with v0.7.2. Scene choreography, movement helpers and new interpolation/IK systems are outside this change.
+The subsequent v0.7.2 [animation queues](animation-queues.md) milestone uses these lifecycle outcomes to advance base-channel FIFO requests after completion callbacks. Animation states/state machines, `playAndWait()` and promise-based playback remain deferred. Scene choreography, movement helpers and new interpolation/IK systems are outside this change.

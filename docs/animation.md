@@ -68,7 +68,17 @@ Version 1 supports only linear interpolation. The optional clip-level `interpola
 
 Clip `playback` settings are authored data. A player's default playback mode is runtime configuration, and editor preview speed/loop settings are transient preferences. Per-key or per-track interpolation would require an explicit extension to the schema, compiler, and runtime evaluator before authoring APIs could expose it.
 
-`stop()` freezes every layer. `restart()` resets every selected layer to time zero and clears its fade, retaining clip speeds, masks, weights, the global speed, playback mode, and pause state. Time-zero events fire after all restarted layers have been synchronized. To restart only one layer, call `play(name, { layer, speed })` with its desired settings.
+`stop()` freezes every layer and discards pending queue requests. `restart()` also discards pending requests. `restart()` resets every selected layer to time zero and clears its fade, retaining clip speeds, masks, weights, the global speed, playback mode, and pause state. Time-zero events fire after all restarted layers have been synchronized. To restart only one layer, call `play(name, { layer, speed })` with its desired settings.
+
+## Animation queues
+
+```ts
+puppet.queue('draw-weapon');
+puppet.queue('attack', { speed: 1.5, fadeDuration: 100 });
+puppet.queue('sheath-weapon');
+```
+
+The base-channel FIFO starts immediately when idle and advances after natural completion and its callbacks. Queued fades start at completion; large updates start the next clip at time zero without carrying excess delta. `getQueue()` returns frozen pending requests, `clearQueue()` discards pending requests, `stopQueue()` also freezes the base, and `replaceQueue(requests)` validates an entire replacement before interrupting playback. Successful ordinary base `play()` calls discard pending requests, including `restart: false` calls. Overlay playback leaves the queue alone. Looping requests and queueing behind an active base loop throw; stop or replace the loop first. See the [queue contract](animation-queues.md) for examples, interruption rules and lifecycle ordering.
 
 ## Playback, events and layers
 

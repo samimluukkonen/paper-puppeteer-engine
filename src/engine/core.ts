@@ -18,6 +18,7 @@ export type {
   SampleAnimationOptions,
 } from './AnimationPlayer.js';
 export { AnimationPlayer } from './AnimationPlayer.js';
+export type { AnimationQueueRequest, QueueAnimationOptions } from './AnimationQueue.js';
 export type {
   PlaybackInstanceId,
   PlaybackOutcome,

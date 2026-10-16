@@ -8,6 +8,7 @@ import {
   type PlayAnimationOptions,
   type SampleAnimationOptions,
 } from './AnimationPlayer.js';
+import type { AnimationQueueRequest, QueueAnimationOptions } from './AnimationQueue.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import { Bone } from './Bone.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
@@ -333,6 +334,32 @@ export class Puppet {
 
   play(name: string, options?: PlayAnimationOptions): this {
     this.animationPlayer.play(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    return this;
+  }
+
+  /** Append a nonlooping request on the base channel; starts immediately when idle. */
+  queue(name: string, options?: QueueAnimationOptions): this {
+    this.animationPlayer.queue(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    return this;
+  }
+
+  getQueue(): readonly AnimationQueueRequest[] {
+    return this.animationPlayer.getQueue();
+  }
+
+  clearQueue(): this {
+    this.animationPlayer.clearQueue();
+    return this;
+  }
+
+  /** Cancel base playback and pending requests without stopping unrelated layers. */
+  stopQueue(): this {
+    this.animationPlayer.stopQueue();
+    return this;
+  }
+
+  replaceQueue(requests: readonly AnimationQueueRequest[]): this {
+    this.animationPlayer.replaceQueue(requests, this.prepareAnimationPose, this.synchronizeAnimationPose);
     return this;
   }
 
