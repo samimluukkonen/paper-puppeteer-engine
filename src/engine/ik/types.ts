@@ -14,6 +14,8 @@ export interface TwoBoneIKDefinition {
   endBone: string;
   /** Point on the end bone to place at the target, in end-bone local coordinates. Defaults to its joint origin. */
   endOffset?: IKTarget;
+  /** Default target in rig/puppet-local coordinates, before facing and host placement. */
+  target?: IKTarget;
   /** Signed turn from the first segment to the second, in rig space. */
   bendDirection?: BendDirection;
   mix?: number;

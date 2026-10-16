@@ -250,3 +250,62 @@ test.each([false, true])('activation restores edited state and IK preview (%s) w
   assert.equal(onChange.mock.calls.length, 0, 'activation happens before the scene installs the new editor');
   editor.disable();
 });
+
+test('controller authors and rebuilds current IK definitions through edits, removal and history', () => {
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const rig = new Rig({
+    root: 'body',
+    bones: [
+      { id: 'body', x: 5, y: 10 },
+      { id: 'upper', parent: 'body', rotation: 0.2 },
+      { id: 'lower', parent: 'upper', y: 40, rotation: -0.4 },
+      { id: 'hand', parent: 'lower', y: 30 },
+    ],
+  });
+  const scene = puppetScene();
+  Reflect.set(scene, 'input', { on() {}, off() {} });
+  let active = new Puppet(scene, { rig, x: 100, y: 200, scale: 1.5, autoUpdate: false });
+  const editor = new RigEditor(
+    scene,
+    active,
+    () => {},
+    undefined,
+    [],
+    [],
+    undefined,
+    undefined,
+    (next) => {
+      active = next;
+    },
+  );
+  try {
+    editor.enable();
+    const endpoint = localToWorld({ x: 0, y: 0 }, active.getBone('hand').container.getWorldTransformMatrix());
+    editor.createIKConstraint({ name: 'reach', rootBone: 'upper', middleBone: 'lower', endBone: 'hand' });
+    assert.isFalse(active.getIK('reach').enabled);
+    assert.equal(active.getIK('reach').bendDirection, -1);
+    editor.setIKPreview(true);
+    const current = localToWorld({ x: 0, y: 0 }, active.getBone('hand').container.getWorldTransformMatrix());
+    assert.approximately(current.x, endpoint.x, 1e-8);
+    assert.approximately(current.y, endpoint.y, 1e-8);
+    assert.approximately(active.getBone('upper').pose.rotation, 0.2, 1e-8);
+    assert.approximately(active.getBone('lower').pose.rotation, -0.4, 1e-8);
+    editor.updateIKConstraint('reach', { target: { x: 30, y: 55 }, mix: 0.4, enabled: false });
+    assert.equal(active.getIK('reach').mix, 0.4);
+    assert.isFalse(active.getIK('reach').enabled);
+    assert.deepEqual(active.rig.ik![0]!.target, { x: 30, y: 55 });
+    editor.undo();
+    assert.equal(active.getIK('reach').mix, 1);
+    editor.removeIKConstraint('reach');
+    assert.throws(() => active.getIK('reach'), /Unknown IK/);
+    editor.undo();
+    assert.equal(active.getIK('reach').name, 'reach');
+    editor.redo();
+    assert.throws(() => active.getIK('reach'), /Unknown IK/);
+    assert.isUndefined(rig.ik);
+    assert.isEmpty(editor.actionError);
+  } finally {
+    editor.disable();
+    active.destroy();
+  }
+});

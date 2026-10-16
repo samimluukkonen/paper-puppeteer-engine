@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { CompiledClip } from '../../engine/AnimationClip.js';
 import { evaluateClip } from '../../engine/AnimationPose.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
+import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
@@ -21,7 +22,11 @@ export class RigEditor {
   private appliedRig: RigDefinition | undefined;
   private renderOrder: readonly string[] = [];
   private inputController: RigEditorInputController | undefined;
-  private readonly ikChains: readonly TwoBoneIKDefinition[];
+  private readonly hostIKChains: readonly TwoBoneIKDefinition[];
+  private get ikChains(): readonly TwoBoneIKDefinition[] {
+    const authored = this.state.workingCopy.ik ?? [];
+    return [...authored, ...this.hostIKChains.filter((chain) => !authored.some((entry) => entry.name === chain.name))];
+  }
   private artworkDraft: { id: string; attachment: boolean; values: Partial<Record<SpriteField, number>> } | undefined;
   private previewClip: CompiledClip | undefined;
   private appliedCatalog: RigDefinition | undefined;
@@ -43,9 +48,21 @@ export class RigEditor {
     /** Rebind shared preview consumers after editor-owned topology reconstruction. */
     private readonly onRebuild?: (puppet: Puppet) => void,
   ) {
-    this.state = state ?? new RigEditorState(puppet.rig);
+    this.state =
+      state ??
+      new RigEditorState(puppet.rig, undefined, {
+        ikReferences: (id) => [
+          ...this.previewClips.flatMap((clip) => [
+            ...(clip.ikTracks?.some((track) => track.constraint === id) ? [`animation "${clip.name}" IK track`] : []),
+            ...(clip.disabledIKConstraints?.includes(id) ? [`animation "${clip.name}" baked IK metadata`] : []),
+          ]),
+          ...this.hostIKChains
+            .filter((chain) => chain.name === id)
+            .map((chain) => `preview IK constraint "${chain.name}"`),
+        ],
+      });
     // Authored definitions own same-name preview chains, including their endpoint offsets.
-    this.ikChains = ikChains.map((chain) => puppet.rig.ik?.find((authored) => authored.name === chain.name) ?? chain);
+    this.hostIKChains = ikChains.filter((chain) => !puppet.rig.ik?.some((authored) => authored.name === chain.name));
   }
 
   get previewClips(): readonly CompiledClip[] {
@@ -83,8 +100,8 @@ export class RigEditor {
     if (this.state.ikPreview && !this.evaluateContext) {
       for (const chain of this.ikChains) {
         const constraint = this.puppet.getIK(chain.name);
-        if (!constraint.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
-        constraint.enabled = true;
+        if (!chain.target && !constraint.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
+        constraint.enabled = chain.enabled !== false;
       }
       this.puppet.syncPose();
       this.overlay.invalidate();
@@ -129,7 +146,7 @@ export class RigEditor {
 
   private syncTopology(rig: RigDefinition): void {
     const before = this.puppet.rig;
-    if (sameRigTopology(before, rig)) return;
+    if (sameRigTopology(before, rig) && equalEditorData(before.ik, rig.ik)) return;
     const previous = this.puppet;
     const container = previous.container;
     const next = new Puppet(this.scene, {
@@ -139,7 +156,10 @@ export class RigEditor {
       y: container.y,
       autoUpdate: false,
       facing: this.state.facing,
-      ik: this.ikChains.map((chain) => ({ ...chain, enabled: this.state.ikPreview })),
+      ik: this.ikChains.map((chain) => ({
+        ...chain,
+        enabled: this.evaluateContext ? (chain.enabled ?? true) : this.state.ikPreview && chain.enabled !== false,
+      })),
     });
     next.container
       .setScale(container.scaleX, container.scaleY)
@@ -408,6 +428,27 @@ export class RigEditor {
     this.onChange();
   }
 
+  createIKConstraint(options: CreateIKConstraintOptions): void {
+    this.cancelGesture();
+    this.state.createIKConstraint(
+      options,
+      new Map(this.state.workingCopy.bones.map((bone) => [bone.id, this.puppet.getBone(bone.id).pose])),
+    );
+    this.refresh();
+  }
+
+  updateIKConstraint(id: string, patch: IKConstraintPatch): void {
+    this.cancelGesture();
+    this.state.updateIKConstraint(id, patch);
+    this.refresh();
+  }
+
+  removeIKConstraint(id: string): void {
+    this.cancelGesture();
+    this.state.removeIKConstraint(id);
+    this.refresh();
+  }
+
   editBone(id: string, field: BoneField, value: number | undefined, notify = true): void {
     this.state.editBone(id, field, value);
     this.refresh(notify);
@@ -461,8 +502,8 @@ export class RigEditor {
     this.puppet.preparePose();
     for (const chain of this.ikChains) {
       const constraint = this.puppet.getIK(chain.name);
-      if (enabled) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
-      constraint.enabled = enabled;
+      if (enabled && !chain.target) constraint.setTarget(ikPreviewTarget(this.puppet, constraint));
+      constraint.enabled = enabled && chain.enabled !== false;
     }
     this.puppet.syncPose();
     this.refresh();

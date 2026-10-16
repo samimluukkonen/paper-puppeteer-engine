@@ -647,3 +647,44 @@ test('actual foot planting and secondary katana grips retain targets and influen
   puppet.destroy();
   katana.container.destroy();
 });
+
+test.each(['left', 'right'] as const)(
+  'rig default targets project through %s facing and yield to animation and host targets',
+  (facing) => {
+    const source = rig();
+    const authored = new Rig({
+      root: source.root,
+      bones: source.bones,
+      ik: [{ ...source.ik![0]!, target: { x: 40, y: 70 } }],
+    });
+    const puppet = new Puppet(puppetScene(), {
+      rig: authored,
+      x: 280,
+      y: -35,
+      scale: 1.5,
+      facing,
+      autoUpdate: false,
+      animations: [{ name: 'sparse', duration: 100, loop: false, tracks: {}, ikTracks: { arm: [{ time: 0, x: 20 }] } }],
+    });
+    puppet.container.setRotation(0.4);
+    puppet.syncPose();
+    reaches(puppet, { x: 40, y: 70 });
+    assert.equal(puppet.getIK('arm').targetOwnership, 'animation');
+    puppet.play('sparse');
+    puppet.sampleAnimation(0);
+    reaches(puppet, { x: 20, y: 70 });
+    const world = localToWorld({ x: 50, y: 60 }, puppet.container.getWorldTransformMatrix());
+    puppet.getIK('arm').setTarget(world);
+    puppet.syncPose();
+    reaches(puppet, { x: 50, y: 60 });
+    puppet
+      .getIK('arm')
+      .setTargetProvider(() => localToWorld({ x: 30, y: 80 }, puppet.container.getWorldTransformMatrix()));
+    puppet.syncPose();
+    reaches(puppet, { x: 30, y: 80 });
+    puppet.getIK('arm').target = undefined;
+    puppet.syncPose();
+    reaches(puppet, { x: 20, y: 70 });
+    puppet.destroy();
+  },
+);

@@ -6,12 +6,23 @@ import {
   type ValidationIssue,
   validateRigDefinition,
 } from '../../engine/externalData.js';
+import {
+  assertIKConstraintChangesAllowed,
+  createIKConstraint,
+  getIKConstraint,
+  ikConstraintDependencies,
+  removeIKConstraint,
+  updateIKConstraint,
+  type CreateIKConstraintOptions,
+  type IKConstraintPatch,
+} from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Rig } from '../../engine/Rig.js';
 import { identifierSchema, spriteAttachmentSchema } from '../../engine/schemas.js';
 import type {
   BoneDefinition,
+  JointTransform,
   RigDefinition,
   SkinDefinition,
   SlotDefinition,
@@ -43,6 +54,8 @@ export interface RigEditorStateOptions {
   artworkIssue?: (texture: string, frame?: string | number) => string | undefined;
   /** Live references from every animation session and host-provided preview IK chain. */
   boneReferences?: (id: string) => readonly string[];
+  /** Live IK track, baked metadata and specialized host references. Also reserves host-owned IDs. */
+  ikReferences?: (id: string) => readonly string[];
 }
 
 export type { RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
@@ -81,6 +94,7 @@ export class RigEditorState {
     return this.topologyRig;
   }
   selection: RigEditorSelection = null;
+  selectedIKConstraintId: string | null = null;
   editMode: EditMode = 'joint';
   dimUnselected = false;
   ikPreview = false;
@@ -119,6 +133,7 @@ export class RigEditorState {
   private selectedSkin: string;
   private readonly artworkIssue: RigEditorStateOptions['artworkIssue'];
   private readonly boneReferences: RigEditorStateOptions['boneReferences'];
+  private readonly ikReferences: RigEditorStateOptions['ikReferences'];
 
   constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
     this.history = new SnapshotHistory(
@@ -131,6 +146,7 @@ export class RigEditorState {
     this.source = source;
     this.artworkIssue = options.artworkIssue;
     this.boneReferences = options.boneReferences;
+    this.ikReferences = options.ikReferences;
     this.externalSkins = freezeData(structuredClone(options.standaloneSkins ?? []));
     this.initialExternalSkins = this.externalSkins;
     for (const skin of this.externalSkins) this.savedExternalSkins.set(skin.name, skin);
@@ -290,11 +306,14 @@ export class RigEditorState {
 
   private syncTopologyRig(): void {
     // Numeric drafts may be temporarily invalid; retain the last validated topology in that case.
-    if (sameRigTopology(this.topologyRig, this.workingCopy)) return;
+    if (sameRigTopology(this.topologyRig, this.workingCopy) && equalEditorData(this.topologyRig.ik, this.data.ik))
+      return;
     this.topologyRig = new Rig(this.workingCopy);
   }
 
   private reconcileSelection(): void {
+    if (this.selectedIKConstraintId && !this.data.ik?.some((entry) => entry.name === this.selectedIKConstraintId))
+      this.selectedIKConstraintId = null;
     if (
       this.selection &&
       !(this.selection.type === 'bone' ? this.boneIndices : this.slotIndices).has(this.selection.id)
@@ -303,6 +322,9 @@ export class RigEditorState {
   }
 
   private assertRetainedReferences(candidate: RigDefinition): void {
+    assertIKConstraintChangesAllowed(this.workingCopy, candidate, {
+      references: (id) => this.ikReferences?.(id) ?? [],
+    });
     const ids = new Set(candidate.bones.map((bone) => bone.id));
     for (const bone of this.data.bones) {
       if (ids.has(bone.id)) continue;
@@ -678,6 +700,41 @@ export class RigEditorState {
     });
   }
 
+  getIKConstraint(id: string): ReadonlyRigData<TwoBoneIKDefinition> {
+    return getIKConstraint(this.workingCopy, id);
+  }
+
+  selectIKConstraint(id: string): void {
+    this.getIKConstraint(id);
+    this.selection = null;
+    this.selectedIKConstraintId = id;
+  }
+
+  ikConstraintDependencies(id: string): readonly string[] {
+    return ikConstraintDependencies(this.workingCopy, id, { references: (name) => this.ikReferences?.(name) ?? [] });
+  }
+
+  createIKConstraint(options: CreateIKConstraintOptions, pose?: ReadonlyMap<string, Readonly<JointTransform>>): void {
+    if (!this.data.ik?.some((entry) => entry.name === options.name) && this.ikReferences?.(options.name).length)
+      throw new Error(`IK name "${options.name}" is reserved by external references. Choose another ID.`);
+    this.installStructure(createIKConstraint(this.workingCopy, options, pose));
+    this.selectIKConstraint(options.name);
+  }
+
+  updateIKConstraint(id: string, patch: IKConstraintPatch): void {
+    this.installStructure(
+      updateIKConstraint(this.workingCopy, id, patch, {
+        references: (name) => this.ikReferences?.(name) ?? [],
+      }),
+    );
+  }
+
+  removeIKConstraint(id: string): void {
+    this.installStructure(
+      removeIKConstraint(this.workingCopy, id, { references: (name) => this.ikReferences?.(name) ?? [] }),
+    );
+  }
+
   createBone(id: string, parent = this.selection?.type === 'bone' ? this.selection.id : this.data.root): void {
     identifierSchema.parse(id);
     if (this.boneIndices.has(id)) throw new Error(`Duplicate bone ID "${id}".`);
@@ -853,15 +910,18 @@ export class RigEditorState {
 
   selectBone(id: string): void {
     this.getBone(id);
+    this.selectedIKConstraintId = null;
     this.selection = { type: 'bone', id };
   }
 
   selectSlot(id: string): void {
     this.getSlot(id);
+    this.selectedIKConstraintId = null;
     this.selection = { type: 'slot', id };
   }
 
   clearSelection(): void {
+    this.selectedIKConstraintId = null;
     this.selection = null;
   }
 

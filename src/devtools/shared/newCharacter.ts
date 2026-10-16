@@ -58,6 +58,15 @@ export function createCharacterDocuments(definition: CharacterDefinition, option
           .map((clip) => `animation "${clip.name}"`),
         ...(options.boneReferences?.(id) ?? []),
       ],
+      ikReferences: (id) => [
+        ...animation
+          .packageAnimations()
+          .flatMap((clip) => [
+            ...(clip.ikTracks && Object.hasOwn(clip.ikTracks, id) ? [`animation "${clip.name}" IK track`] : []),
+            ...(clip.disabledIKConstraints?.includes(id) ? [`animation "${clip.name}" baked IK metadata`] : []),
+          ]),
+        ...(options.ikReferences?.(id) ?? []),
+      ],
       defaultSkin: definition.defaultSkin,
       standaloneSkins: definition.standaloneSkins,
     }),

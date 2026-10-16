@@ -64,3 +64,7 @@ The DOM panel controllers expose `dispose()` for hosts that unmount or replace e
 ## Shared character workspace
 
 Rig Editor and Animation Editor tabs now retain one live rig, skin catalog, applied artwork and animation document owner. Rig Tweak uses the same rig history at a paused animation pose. Editor tabs retain committed edits; character changes and leaving/reloading the workspace use the browser's unsaved-change prompt where supported. Compatible rig JSON imports retain all clips and replacement images; changing hierarchy, bone artwork identities or IK definitions requires opening another character. Downloads establish document or package checkpoints and do not overwrite served files. See the [artist workflow](artist-workflow.md) for the complete sequence.
+
+## IK constraint authoring APIs
+
+The [IK constraint foundation](ik-constraint-authoring.md) adds typed model/controller commands for creating, selecting, configuring and deleting constraints, with live animation/host dependency checks, Undo/Redo and rig JSON round trips. Authored default targets remain puppet-local; IK Preview uses these targets when present and pins the current endpoint for older targetless constraints. React authoring controls and draggable rig handles remain deferred.

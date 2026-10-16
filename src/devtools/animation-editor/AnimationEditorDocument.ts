@@ -158,6 +158,12 @@ export class AnimationEditorDocument {
       this.issues = entry?.issues ?? [{ severity: 'error', message: `Animation "${id}" is missing.` }];
       return false;
     }
+    const next =
+      options.discardChanges && id === this.selectedId
+        ? (entry?.saved ?? null)
+        : (entry?.working ?? entry?.saved ?? null);
+    if (next && !this.inspect(next)) return false;
+    if (options.discardChanges && this.saved && !this.inspect(this.saved)) return false;
     const previous = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
     if (previous) {
       previous.working = options.discardChanges ? this.saved : this.working;
@@ -166,10 +172,7 @@ export class AnimationEditorDocument {
     }
     this.source = entry?.source ?? null;
     // Edits replace immutable snapshots; retain their identity for validation and preview caches.
-    this.working =
-      options.discardChanges && id === this.selectedId
-        ? (entry?.saved ?? null)
-        : (entry?.working ?? entry?.saved ?? null);
+    this.working = next;
     this.selectedId = id;
     this.issues = [];
     this.saved = entry?.saved ?? null;
@@ -258,6 +261,7 @@ export class AnimationEditorDocument {
   /** Restore the immutable loaded/imported source locally, even after an export checkpoint. */
   revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
     if (!this.source || (this.dirty && !options.discardChanges)) return false;
+    if (!this.inspect(this.source)) return false;
     this.working = this.source;
     // Reverting an unexported document keeps its New / Unsaved status.
     if (!this.isNewAnimation()) this.markSaved();
@@ -323,6 +327,10 @@ export class AnimationEditorDocument {
     return new SnapshotHistory(
       () => this.working,
       (entry) => {
+        if (entry && !this.inspect(entry))
+          throw new Error(
+            'Cannot restore animation references after rig changes. Restore the required rig constraints/bones first.',
+          );
         this.working = entry;
         this.cachedDirty = undefined;
       },
@@ -337,8 +345,13 @@ export class AnimationEditorDocument {
     return this.restoreHistory(() => this.history.redo());
   }
   private restoreHistory(restore: () => boolean): boolean {
-    const changed = restore();
-    if (changed) this.issues = [];
-    return changed;
+    try {
+      const changed = restore();
+      if (changed) this.issues = [];
+      return changed;
+    } catch (error) {
+      this.reportError(error);
+      return false;
+    }
   }
 }

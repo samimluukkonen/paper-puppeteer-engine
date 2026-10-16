@@ -42,6 +42,7 @@ export class TwoBoneIKConstraint {
   private influence: number;
   private mixOverride = false;
   private bend: BendDirection;
+  private readonly defaultTarget: Readonly<IKTarget> | undefined;
   private point: Readonly<IKTarget> | undefined;
   private provider: IKTargetProvider | undefined;
   private disposed = false;
@@ -52,6 +53,7 @@ export class TwoBoneIKConstraint {
   constructor(definition: TwoBoneIKDefinition, rig: Rig, joints: ReadonlyMap<string, Joint>) {
     definition = parseTwoBoneIKDefinition(definition, rig);
     this.name = definition.name;
+    this.defaultTarget = definition.target ? Object.freeze({ ...definition.target }) : undefined;
     this.rootBone = definition.rootBone;
     this.middleBone = definition.middleBone;
     this.endBone = definition.endBone;
@@ -174,24 +176,20 @@ export class TwoBoneIKConstraint {
       // Explicit world targets own position; late-bound specialized providers also own influence.
       target = this.provider ? this.provider() : this.point;
     } else if (
-      animation &&
-      (animation.x || animation.y) &&
       context.puppetToWorld &&
-      context.worldToPuppet &&
-      context.endToWorld
+      (this.defaultTarget || ((animation?.x || animation?.y) && context.worldToPuppet && context.endToWorld))
     ) {
-      const endpoint = context.endToWorld(this.endBone, this.endOffset);
-      const fallback = context.worldToPuppet(endpoint);
+      const fallback = this.defaultTarget ?? context.worldToPuppet!(context.endToWorld!(this.endBone, this.endOffset));
       if (!fallback) {
         this.status = 'singular-transform';
         return;
       }
       target = context.puppetToWorld({
-        x: animation.x ? interpolateNumber(fallback.x, animation.x.value, animation.x.weight) : fallback.x,
-        y: animation.y ? interpolateNumber(fallback.y, animation.y.value, animation.y.weight) : fallback.y,
+        x: animation?.x ? interpolateNumber(fallback.x, animation.x.value, animation.x.weight) : fallback.x,
+        y: animation?.y ? interpolateNumber(fallback.y, animation.y.value, animation.y.weight) : fallback.y,
       });
       // When a sparse target fades away, restore ordinary authored bone control.
-      mix *= Math.max(animation.x?.weight ?? 0, animation.y?.weight ?? 0);
+      if (!this.defaultTarget) mix *= Math.max(animation?.x?.weight ?? 0, animation?.y?.weight ?? 0);
     }
     if (!target || mix === 0) return;
     assertFinite(target.x, 'IK target.x');

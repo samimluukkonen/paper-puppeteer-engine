@@ -383,6 +383,10 @@ export class AnimationEditorScene extends Phaser.Scene {
           (this.options.ikChains ?? [])
             .filter((chain) => [chain.rootBone, chain.middleBone, chain.endBone].includes(id))
             .map((chain) => `preview IK constraint "${chain.name}"`),
+        ikReferences: (id) =>
+          (this.options.ikChains ?? [])
+            .filter((chain) => chain.name === id)
+            .map((chain) => `preview IK constraint "${chain.name}" (target/provider ownership)`),
       });
       const state = documents.animation;
       state.selectAnimation(state.animationIds[0] ?? null);
@@ -463,6 +467,12 @@ export class AnimationEditorScene extends Phaser.Scene {
             this.ikHandles = new AnimationEditorIKHandles(this, state, next);
             this.ikHandles.setVisible(this.ikHandlesVisible && !this.rigMode);
             this.ikHandles.setInteractive(this.ikHandlesInteractive && !this.rigMode);
+            if (state.editorMode === 'rig') {
+              for (const chain of [...(next.rig.ik ?? []), ...(this.options.ikChains ?? [])]) {
+                const authored = next.rig.ik?.find((entry) => entry.name === chain.name) ?? chain;
+                next.getIK(chain.name).enabled = rigState.ikPreview && authored.enabled !== false;
+              }
+            } else this.setIKPreview(this.ikPreviewEnabled);
           } finally {
             this.rebuildingRig = false;
           }
@@ -483,8 +493,10 @@ export class AnimationEditorScene extends Phaser.Scene {
         this.puppet?.setDebug(this.bonesVisible && !tweaking);
         this.rigEditor?.cancelGesture();
         if (state.editorMode === 'rig') {
-          for (const chain of [...(definition.rig.ik ?? []), ...(this.options.ikChains ?? [])])
-            puppet!.getIK(chain.name).enabled = rigState.ikPreview;
+          for (const chain of [...(rigState.workingCopy.ik ?? []), ...(this.options.ikChains ?? [])])
+            puppet!.getIK(chain.name).enabled =
+              rigState.ikPreview &&
+              (rigState.workingCopy.ik?.find((entry) => entry.name === chain.name) ?? chain).enabled !== false;
         } else if (leavingBindPose) this.setIKPreview(this.ikPreviewEnabled);
         this.rigEditor?.setPreviewPose('');
         if (tweaking) {

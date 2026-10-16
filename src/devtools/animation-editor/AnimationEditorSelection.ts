@@ -184,6 +184,10 @@ export class AnimationEditorSelection {
   updateRig(rig: Rig): void {
     this.rig = rig;
     if (this.bone && !rig.hasBone(this.bone)) this.selectBone(null);
+    if (this.ik && !rig.ik?.some((entry) => entry.name === this.ik!.constraintId)) {
+      this.clearIK();
+      this.ikTemporary = Object.freeze({});
+    }
     this.rowsDirty = true;
     this.visibilityInputs = undefined;
     this.visibilityResult = undefined;

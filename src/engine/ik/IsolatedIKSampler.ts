@@ -79,7 +79,9 @@ export class IsolatedIKSampler {
     const channels = evaluateIKClip(clip, time);
     const targets = new Map<string, IKTargetValues>();
     for (const constraint of this.constraints) {
-      const fallback = this.context.endToWorld!(constraint.endBone, constraint.endOffset);
+      const fallback =
+        this.rig.ik?.find((entry) => entry.name === constraint.name)?.target ??
+        this.context.endToWorld!(constraint.endBone, constraint.endOffset);
       const authored = channels.get(constraint.name);
       targets.set(
         constraint.name,

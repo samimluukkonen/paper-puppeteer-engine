@@ -63,7 +63,8 @@ export function inspectRigDraft(
       !equalEditorData(data.ik ?? [], compatible.ik ?? []))
   )
     return undefined;
-  if (!equalEditorData(data.ik ?? [], initial.ik ?? [])) return undefined;
+  if (!(recovery.success && recovery.data.version === 2) && !equalEditorData(data.ik ?? [], initial.ik ?? []))
+    return undefined;
   const external = recovery.success ? (recovery.data.standaloneSkins ?? standaloneSkins) : standaloneSkins;
   if (defaultSkin && ![...(data.skins ?? []), ...external].some((skin) => skin.name === defaultSkin)) return undefined;
   if (

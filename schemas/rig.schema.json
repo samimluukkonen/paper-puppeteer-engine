@@ -252,6 +252,19 @@
             "required": ["x", "y"],
             "additionalProperties": false
           },
+          "target": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
           "bendDirection": {
             "anyOf": [
               {

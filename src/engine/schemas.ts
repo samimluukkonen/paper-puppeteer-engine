@@ -94,6 +94,7 @@ export const twoBoneIKDefinitionSchema = z.object({
   middleBone: identifierSchema,
   endBone: identifierSchema,
   endOffset: z.object({ x: finiteNumber, y: finiteNumber }).exactOptional(),
+  target: z.object({ x: finiteNumber, y: finiteNumber }).exactOptional(),
   bendDirection: z.union([z.literal(1), z.literal(-1)]).exactOptional(),
   mix: ikMixSchema.exactOptional(),
   enabled: z.boolean().exactOptional(),
@@ -155,7 +156,10 @@ export const rigFileSchema = rigDefinitionSchema
     ik: z
       .array(
         twoBoneIKDefinitionSchema
-          .extend({ endOffset: twoBoneIKDefinitionSchema.shape.endOffset.unwrap().strict().exactOptional() })
+          .extend({
+            endOffset: twoBoneIKDefinitionSchema.shape.endOffset.unwrap().strict().exactOptional(),
+            target: twoBoneIKDefinitionSchema.shape.target.unwrap().strict().exactOptional(),
+          })
           .strict(),
       )
       .exactOptional(),

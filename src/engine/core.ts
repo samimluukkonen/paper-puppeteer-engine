@@ -161,3 +161,12 @@ export {
   serializeSkinDefinition,
   serializeCharacterManifest,
 } from './authoredSerialization.js';
+
+export {
+  createIKConstraint,
+  updateIKConstraint,
+  removeIKConstraint,
+  getIKConstraint,
+  ikConstraintDependencies,
+} from './ik/ikAuthoring.js';
+export type { CreateIKConstraintOptions, IKConstraintPatch, IKConstraintDependencies } from './ik/ikAuthoring.js';

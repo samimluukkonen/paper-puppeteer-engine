@@ -7,16 +7,16 @@ import { roundEditorNumber } from '../shared/editorData.js';
 const exactNumberFields = new Set(['scaleX', 'scaleY', 'length', 'depth', 'frame', 'originX', 'originY']);
 
 /** Order authoring fields consistently without changing array order or untouched numbers. */
-function stable(value: unknown, original: unknown, field?: string, artwork = false): unknown {
+function stable(value: unknown, original: unknown, field?: string, exactNumbers = false): unknown {
   if (typeof value === 'number') {
-    if (artwork || value === original || (field !== undefined && exactNumberFields.has(field))) return value;
+    if (exactNumbers || value === original || (field !== undefined && exactNumberFields.has(field))) return value;
     const rounded = roundEditorNumber(value);
     // A small authored offset or angle must not silently become exactly zero either.
     return rounded === 0 && value !== 0 ? value : rounded;
   }
   if (Array.isArray(value))
     return value.map((entry, index) =>
-      stable(entry, Array.isArray(original) ? original[index] : undefined, undefined, artwork),
+      stable(entry, Array.isArray(original) ? original[index] : undefined, undefined, exactNumbers),
     );
   if (value && typeof value === 'object') {
     const source = value as Record<string, unknown>;
@@ -54,7 +54,12 @@ function stable(value: unknown, original: unknown, field?: string, artwork = fal
         })
         .map((key) => [
           key,
-          stable(source[key], baseline[key], key, artwork || key === 'sprite' || key === 'attachments'),
+          stable(
+            source[key],
+            baseline[key],
+            key,
+            exactNumbers || key === 'sprite' || key === 'attachments' || key === 'ik',
+          ),
         ]),
     );
   }

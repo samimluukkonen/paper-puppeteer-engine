@@ -637,3 +637,65 @@ test('mirror commits refresh active/previous/next authored poses while arm and l
     scene.events.emit('shutdown');
   }
 });
+
+test('shared scene rebinds newly authored IK for animation keying, safe deletion and rig undo', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  const character = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'new-ik',
+      rig: 'rig.json',
+      textures: {},
+      skins: { basic: 'skin.json' },
+      defaultSkin: 'basic',
+      animations: ['motion.json'],
+    },
+    rig: {
+      version: 1,
+      root: 'root',
+      bones: [{ id: 'root' }, { id: 'middle', parent: 'root', y: 40 }, { id: 'tip', parent: 'middle', y: 30 }],
+    },
+    skins: { 'skin.json': { version: 1, name: 'basic', slots: {} } },
+    animations: { 'motion.json': { version: 1, name: 'motion', duration: 1000, loop: false, tracks: {} } },
+  });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(character);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const editor = scene.rigEditor!;
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const original = Reflect.get(scene, 'puppet') as Puppet;
+    editor.createIKConstraint({ name: 'tendrilIK', rootBone: 'root', middleBone: 'middle', endBone: 'tip' });
+    let current = Reflect.get(scene, 'puppet') as Puppet;
+    assert.notStrictEqual(current, original);
+    assert.isTrue(original.isDestroyed);
+    assert.isTrue(current.getIK('tendrilIK').enabled);
+    assert.equal(state.rig!.ik![0]!.name, 'tendrilIK');
+    assert.isTrue(state.setIKPropertyKeyframe('tendrilIK', 'x', 20, 0));
+    assert.isTrue(state.setIKPropertyKeyframe('tendrilIK', 'y', 55, 0));
+    const actual = localToWorld({ x: 0, y: 0 }, current.getBone('tip').container.getWorldTransformMatrix());
+    const expected = localToWorld({ x: 20, y: 55 }, current.container.getWorldTransformMatrix());
+    assert.approximately(actual.x, expected.x, 1e-8);
+    assert.approximately(actual.y, expected.y, 1e-8);
+    assert.throws(() => editor.removeIKConstraint('tendrilIK'), /animation "motion" IK track/);
+    state.removeIKPropertyKeyframe('tendrilIK', 'x', 0);
+    state.removeIKPropertyKeyframe('tendrilIK', 'y', 0);
+    editor.removeIKConstraint('tendrilIK');
+    current = Reflect.get(scene, 'puppet') as Puppet;
+    assert.throws(() => current.getIK('tendrilIK'), /Unknown IK/);
+    assert.isEmpty(state.rig!.ik);
+    editor.undo();
+    current = Reflect.get(scene, 'puppet') as Puppet;
+    assert.equal(current.getIK('tendrilIK').name, 'tendrilIK');
+    assert.isEmpty(editor.actionError);
+    assert.isUndefined(character.rig.ik);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
+});

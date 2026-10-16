@@ -24,3 +24,5 @@ export type { PoseDefinition } from './Pose.js';
 export type { DeepReadonly } from './readonlyData.js';
 export type { BendDirection, IKTarget, IKTargetProvider, TwoBoneIKDefinition } from './ik/types.js';
 export type { IKAnimationProperty, IKAnimationTrack, IKKeyframe } from './ik/animationKeyframes.js';
+
+export type { CreateIKConstraintOptions, IKConstraintPatch, IKConstraintDependencies } from './ik/ikAuthoring.js';
