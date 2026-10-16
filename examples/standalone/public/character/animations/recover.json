@@ -1,0 +1,24 @@
+{
+  "duration": 300,
+  "events": [
+    {
+      "name": "recovered",
+      "time": 300
+    }
+  ],
+  "loop": false,
+  "name": "recover",
+  "tracks": {
+    "rightUpperArm": [
+      {
+        "rotation": -0.7,
+        "time": 0
+      },
+      {
+        "rotation": 0,
+        "time": 300
+      }
+    ]
+  },
+  "version": 1
+}

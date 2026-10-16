@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { AnimationPlayer, CharacterLoader, Joint, evaluateClip } from 'paper-puppeteer-engine/core';
+import {
+  AnimationPlayer,
+  AnimationStateController,
+  CharacterLoader,
+  Joint,
+  evaluateClip,
+} from 'paper-puppeteer-engine/core';
 
 const base = new URL('../public/character/', import.meta.url);
 const fetcher = async (input) => new Response(await readFile(new URL(String(input))));
@@ -40,4 +46,48 @@ await test('installed runtime loads the extracted export, evaluates authored mot
   player.update(1000);
   assert.equal(events.length, delivered);
   assert.equal(player.isDisposed, true);
+});
+
+await test('installed controller, queues and async results share the exported character clock', async () => {
+  const definition = await CharacterLoader.load(new URL('character.json', base).href, fetcher);
+  const joints = new Map(definition.rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+  const player = new AnimationPlayer(definition.rig, joints, definition.compiledAnimations);
+  const controller = new AnimationStateController(player, {
+    initialState: 'idle',
+    defaultFadeDuration: 150,
+    states: {
+      idle: { animation: 'idle' },
+      walking: { animation: 'walk' },
+      running: { animation: 'run' },
+      attack: { animation: 'attack' },
+    },
+  });
+  try {
+    controller.setState('walking');
+    controller.setState('running');
+    assert.equal(player.currentAnimation, 'run');
+    controller.playAction('attack');
+    const action = player.waitForPlayback();
+    player.queue('recover', { fadeDuration: 100 });
+    player.update(400);
+    assert.equal((await action).status, 'completed');
+    assert.equal(player.currentAnimation, 'recover');
+    assert.equal(controller.isActive, false);
+    controller.setState('idle');
+    const abort = new AbortController();
+    const cancelled = player.playAndWait('attack', { signal: abort.signal });
+    abort.abort();
+    assert.equal((await cancelled).status, 'cancelled');
+    assert.equal(player.isPlaying, true);
+    const completed = player.waitForPlayback();
+    player.update(400);
+    assert.equal((await completed).status, 'completed');
+    const disposed = player.playAndWait('attack');
+    controller.dispose();
+    player.dispose();
+    assert.equal((await disposed).status, 'disposed');
+  } finally {
+    controller.dispose();
+    player.dispose();
+  }
 });

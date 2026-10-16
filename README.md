@@ -78,7 +78,7 @@ scene.load.start();
 
 v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
 
-v0.7.4 adds [async animation playback](docs/async-animation.md): await exact playback instances with typed outcomes, wait-only cancellation and disposal cleanup. v0.7.3 adds [named animation states](docs/animation-states.md): reusable runtime state definitions, idempotent requests, configurable crossfades and temporary actions that return to a persistent state. It builds on v0.7.2 [animation queues](docs/animation-queues.md) and [runtime playback lifecycle and completion](docs/playback-lifecycle.md). The [v0.6 release gates and regression results](docs/release-readiness.md) retain the production authoring assessment and its remaining verification gaps.
+v0.7.5 completes [runtime controller production hardening](docs/runtime-controller-readiness.md), with a playback interaction matrix, standalone controls, crossfade/layer/IK regressions, cleanup stress tests and measured CPU profiles. v0.7.4 adds [async animation playback](docs/async-animation.md): await exact playback instances with typed outcomes, wait-only cancellation and disposal cleanup. v0.7.3 adds [named animation states](docs/animation-states.md): reusable runtime state definitions, idempotent requests, configurable crossfades and temporary actions that return to a persistent state. It builds on v0.7.2 [animation queues](docs/animation-queues.md) and [runtime playback lifecycle and completion](docs/playback-lifecycle.md). The [v0.6 release gates and regression results](docs/release-readiness.md) retain the earlier production authoring assessment.
 
 ## Guides
 
@@ -86,35 +86,36 @@ v0.7.4 adds [async animation playback](docs/async-animation.md): await exact pla
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Schema inventory, compatibility policy and canonical serialization](docs/schema-compatibility.md)
 
-| Guide                                                              | Contents                                                                                                   |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| [Demo controls](docs/demo.md)                                      | Keyboard controls, playback examples, facing, skins, and pose authoring                                    |
-| [Rig editor](docs/rig-editor.md)                                   | Editing, snapping, undo/redo, validation, imports, exports, and embedding                                  |
-| [Animation editor](docs/animation-editor.md)                       | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview    |
-| [Timeline snapping](docs/timeline-snapping.md)                     | Frame/key/event/playhead alignment, zoom-aware tolerance, temporary guides and group timing                |
-| [Keyframe retiming](docs/keyframe-retiming.md)                     | Proportional selected-key timing, anchors, numerical preview and atomic Undo/Redo                          |
-| [Bone symmetry mapping](docs/bone-symmetry-mapping.md)             | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle            |
-| [Pose mirroring core](docs/pose-mirroring.md)                      | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures       |
-| [React mirroring tools](docs/react-mirroring-tools.md)             | Bone-pair configuration, persistence, preview, directions and React/editor integration                     |
-| [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md) | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection           |
-| [Character assets and rigs](docs/characters.md)                    | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                     |
-| [Animation queues](docs/animation-queues.md)                       | FIFO requests, completion transitions, loop rejection, interruption and cleanup                            |
-| [Async animation](docs/async-animation.md)                         | Awaitable playback, typed outcomes, cancellation, looping policy and disposal                              |
-| [Animation states](docs/animation-states.md)                       | Named states, transition fades, one-shot returns, playback ownership and disposal                          |
-| [Animation and poses](docs/animation.md)                           | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |
-| [React IK authoring](docs/react-ik-authoring.md)                   | IK timeline tracks, numeric target/influence keys, selection, history, and local verification              |
-| [IK production authoring](docs/ik-animation-authoring.md)          | Reaching workflow, operation limits, compatibility, lifecycle and regression coverage                      |
-| [Visual IK targets](docs/visual-ik-targets.md)                     | Phaser crosshairs, dragging, explicit target commitment, coordinate conversion, ownership and verification |
-| [Runtime IK animation](docs/ik-animation-runtime.md)               | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                       |
-| [IK bake sampling](docs/ik-bake-sampling.md)                       | Read-only whole-animation samples, frame times, local transforms and supported constraint scope            |
-| [IK bone-key generation](docs/ik-bake-generation.md)               | Pure key proposals, replacement reporting, playback policy and local-pose fidelity tolerances              |
-| [Atomic IK bake commit](docs/ik-bake-commit.md)                    | Whole-clip key replacement, runtime constraint deactivation, validation and exact Undo/Redo                |
-| [IK bake production fidelity](docs/ik-bake-hardening.md)           | Key/midpoint/endpoint tolerances, sampling quality, runtime transitions, editing and loader regressions    |
-| [IK and object attachments](docs/ik.md)                            | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
-| [Development and package usage](docs/development.md)               | Checks, browser tests, architecture, packaging, and Node APIs                                              |
-| [Performance profiling](docs/profiling.md)                         | Local CPU/browser profiles, workloads, and historical measurements                                         |
-| [v0.6 release readiness](docs/release-readiness.md)                | Release gates, regression results, resource and performance observations, outstanding risks                |
-| [v0.6 release notes](docs/release-notes-v0.6.md)                   | Public API summary, supported formats, migration and known limitations                                     |
+| Guide                                                                | Contents                                                                                                   |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [Demo controls](docs/demo.md)                                        | Keyboard controls, playback examples, facing, skins, and pose authoring                                    |
+| [Rig editor](docs/rig-editor.md)                                     | Editing, snapping, undo/redo, validation, imports, exports, and embedding                                  |
+| [Animation editor](docs/animation-editor.md)                         | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview    |
+| [Timeline snapping](docs/timeline-snapping.md)                       | Frame/key/event/playhead alignment, zoom-aware tolerance, temporary guides and group timing                |
+| [Keyframe retiming](docs/keyframe-retiming.md)                       | Proportional selected-key timing, anchors, numerical preview and atomic Undo/Redo                          |
+| [Bone symmetry mapping](docs/bone-symmetry-mapping.md)               | Editor-only pairing candidates, manual overrides, validation, lookup, and rig-session lifecycle            |
+| [Pose mirroring core](docs/pose-mirroring.md)                        | Pure authored-pose reflection, bind frames, hierarchy, supported transforms, and structured failures       |
+| [React mirroring tools](docs/react-mirroring-tools.md)               | Bone-pair configuration, persistence, preview, directions and React/editor integration                     |
+| [Mirrored keyframe authoring](docs/mirrored-keyframe-authoring.md)   | Current-pose/selected-key commands, sparse properties, timing, collisions, history and selection           |
+| [Character assets and rigs](docs/characters.md)                      | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                     |
+| [Animation queues](docs/animation-queues.md)                         | FIFO requests, completion transitions, loop rejection, interruption and cleanup                            |
+| [Async animation](docs/async-animation.md)                           | Awaitable playback, typed outcomes, cancellation, looping policy and disposal                              |
+| [Runtime controller readiness](docs/runtime-controller-readiness.md) | Complete public API, interaction matrix, compatibility, cleanup, measurements and v0.7 verification        |
+| [Animation states](docs/animation-states.md)                         | Named states, transition fades, one-shot returns, playback ownership and disposal                          |
+| [Animation and poses](docs/animation.md)                             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |
+| [React IK authoring](docs/react-ik-authoring.md)                     | IK timeline tracks, numeric target/influence keys, selection, history, and local verification              |
+| [IK production authoring](docs/ik-animation-authoring.md)            | Reaching workflow, operation limits, compatibility, lifecycle and regression coverage                      |
+| [Visual IK targets](docs/visual-ik-targets.md)                       | Phaser crosshairs, dragging, explicit target commitment, coordinate conversion, ownership and verification |
+| [Runtime IK animation](docs/ik-animation-runtime.md)                 | Animated targets and influence, runtime precedence, scrubbing, crossfades, and masks                       |
+| [IK bake sampling](docs/ik-bake-sampling.md)                         | Read-only whole-animation samples, frame times, local transforms and supported constraint scope            |
+| [IK bone-key generation](docs/ik-bake-generation.md)                 | Pure key proposals, replacement reporting, playback policy and local-pose fidelity tolerances              |
+| [Atomic IK bake commit](docs/ik-bake-commit.md)                      | Whole-clip key replacement, runtime constraint deactivation, validation and exact Undo/Redo                |
+| [IK bake production fidelity](docs/ik-bake-hardening.md)             | Key/midpoint/endpoint tolerances, sampling quality, runtime transitions, editing and loader regressions    |
+| [IK and object attachments](docs/ik.md)                              | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
+| [Development and package usage](docs/development.md)                 | Checks, browser tests, architecture, packaging, and Node APIs                                              |
+| [Performance profiling](docs/profiling.md)                           | Local CPU/browser profiles, workloads, and historical measurements                                         |
+| [v0.6 release readiness](docs/release-readiness.md)                  | Release gates, regression results, resource and performance observations, outstanding risks                |
+| [v0.6 release notes](docs/release-notes-v0.6.md)                     | Public API summary, supported formats, migration and known limitations                                     |
 
 ## Development checks
 

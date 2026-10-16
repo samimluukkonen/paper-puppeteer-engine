@@ -17,8 +17,19 @@
       <button id="skin" disabled>Switch skin</button>
       <button id="dispose">Clean up</button>
     </nav>
+    <nav aria-label="Animation controller">
+      <button data-state="idle" disabled>Idle state</button>
+      <button data-state="walking" disabled>Walking state</button>
+      <button data-state="running" disabled>Running state</button>
+      <button data-command="queue" disabled>Queue attack + recover</button>
+      <button data-command="action" disabled>Attack action</button>
+      <button data-command="async" disabled>Await attack</button>
+      <button data-command="cancel" disabled>Cancel wait</button>
+      <button data-command="stop" disabled>Stop base</button>
+    </nav>
     <p id="status" role="status">Loading character…</p>
     <p id="event" aria-live="polite">Waiting for animation event…</p>
+    <p id="lifecycle" aria-live="polite">Waiting for playback lifecycle…</p>
     <div id="stage"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

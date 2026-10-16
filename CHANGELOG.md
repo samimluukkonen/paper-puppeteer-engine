@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.7.5
+
+Runtime controller production hardening adds deterministic crossfade/overlay, callback precedence, exported IK/baked clip, cancellation and repeated scene-shutdown regressions. Disposed state controllers release their host reference; malformed play restart/layer values reject before changing playback or queues. The standalone packed consumer demonstrates direct playback, FIFO requests, named states, temporary actions and safely handled async results using valid attack/recover/run clips. Local CPU profiles and the [v0.7 readiness report](docs/runtime-controller-readiness.md) record measured performance, API contracts, cleanup, authoring/data regression coverage and verification results. Existing Puppet APIs and version-1 authored formats remain compatible; controller features remain opt-in.
+
 ## 0.7.4
 
 Async animation adds `playAndWait(name, options?)` and `waitForPlayback(options?)` to Puppet and the renderer-independent AnimationPlayer. Promises bind to exact playback instances and return typed lifecycle outcomes: completed, interrupted, stopped or disposed, plus wait-only cancellation. AbortSignal cancellation removes listeners without stopping playback or changing queue/controller policy; an already-aborted signal skips playback entirely. Indefinite loops reject with an actionable error; `loop: false` awaits one pass. Completion remains tied to the clip endpoint, and disposal drains waits even when callback-driven destruction suppresses queued notifications. Queue advancement and state-action returns reuse their existing lifecycle handling. Public types are exported through `/core`, `/runtime` and the package root. See the [async API and verification](docs/async-animation.md). Package version is `0.7.4`; authored formats remain version 1. Future queue-request promises, event waits, finite repeats and gameplay scheduling remain deferred.

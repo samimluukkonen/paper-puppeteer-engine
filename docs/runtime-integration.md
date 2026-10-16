@@ -2,6 +2,8 @@
 
 [All guides](../README.md#guides)
 
+For direct playback, FIFO requests, named states, one-shot actions, safe async handling and disposal, see the [v0.7 runtime controller guide and readiness report](runtime-controller-readiness.md). The standalone consumer now demonstrates all of these APIs against an installed package with valid attack, recovery and run clips.
+
 v0.6.4 verifies the existing editor export and runtime loading pipeline in a separate application. Follow the [artist workflow](artist-workflow.md) to prepare transparent pieces, align artwork and pivots, rig, animate, replace artwork and download the complete character ZIP. Extract the ZIP with a standard ZIP tool into your application's served assets. Production playback needs the runtime package and Phaser; React, timeline controllers, Rig Tweak and editor asset managers are unnecessary.
 
 ## Build and install

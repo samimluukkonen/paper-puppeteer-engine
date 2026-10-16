@@ -5,7 +5,10 @@
     "animations/combat-idle.json",
     "animations/guard-upper-body.json",
     "animations/reach.json",
-    "animations/baked.json"
+    "animations/baked.json",
+    "animations/attack.json",
+    "animations/recover.json",
+    "animations/run.json"
   ],
   "defaultSkin": "default",
   "id": "demo-puppet",

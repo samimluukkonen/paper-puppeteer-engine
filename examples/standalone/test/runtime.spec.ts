@@ -1,6 +1,40 @@
 import { resolve, sep } from 'node:path';
 import { expect, test } from '@playwright/test';
 
+test('runtime controls demonstrate FIFO, state/action returns, async completion, cancellation and shutdown', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('./');
+  await expect(page.getByRole('status')).toHaveText('Ready: demo-puppet / idle');
+  await page.getByRole('button', { name: 'Walking state', exact: true }).click();
+  await expect(page.locator('#lifecycle')).toContainText('walk / started');
+  await page.getByRole('button', { name: 'Running state', exact: true }).click();
+  await expect(page.locator('#lifecycle')).toContainText('run / started');
+  await page.getByRole('button', { name: 'Attack action', exact: true }).click();
+  await expect(page.locator('#event')).toContainText('attack: attack-hit');
+  await expect(page.locator('#lifecycle')).toContainText('run / started');
+  await page.getByRole('button', { name: 'Queue attack + recover', exact: true }).click();
+  await expect(page.locator('#event')).toContainText('recover: recovered');
+  await expect(page.locator('#lifecycle')).toContainText('recover / completed');
+  await page.getByRole('button', { name: 'Await attack', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Async attack: completed');
+  await expect(page.locator('#lifecycle')).toContainText('idle / started');
+  await page.getByRole('button', { name: 'Await attack', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel wait', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Async attack: cancelled');
+  await expect(page.locator('#lifecycle')).toContainText('attack / completed');
+  await page.getByRole('button', { name: 'Stop base', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Base stopped');
+  await page.getByRole('button', { name: 'Await attack', exact: true }).click();
+  await page.getByRole('button', { name: 'Clean up', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Disposed');
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Await attack', exact: true })).toBeDisabled();
+  expect(errors).toEqual([]);
+});
+
 test('exported character plays, emits events, switches appearance and cleans up in another app', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));

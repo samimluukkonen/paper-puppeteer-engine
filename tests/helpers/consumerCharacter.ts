@@ -6,6 +6,53 @@ import { type AnimationClip, commitIKBake, generateBakedBoneKeys, sampleIKBake }
 import { Rig } from '../../src/engine/Rig.js';
 import { demoCharacter } from './demoCharacter.js';
 
+/** Finite action/queue clips and a looping locomotion state for the standalone controls. */
+export const controllerAnimations: readonly AnimationClip[] = [
+  {
+    name: 'attack',
+    duration: 400,
+    loop: false,
+    tracks: {
+      rightUpperArm: [
+        { time: 0, rotation: -0.4 },
+        { time: 200, rotation: -1.6 },
+        { time: 400, rotation: -0.7 },
+      ],
+    },
+    events: [{ time: 200, name: 'attack-hit' }],
+  },
+  {
+    name: 'recover',
+    duration: 300,
+    loop: false,
+    tracks: {
+      rightUpperArm: [
+        { time: 0, rotation: -0.7 },
+        { time: 300, rotation: 0 },
+      ],
+    },
+    events: [{ time: 300, name: 'recovered' }],
+  },
+  {
+    name: 'run',
+    duration: 500,
+    loop: true,
+    tracks: {
+      leftThigh: [
+        { time: 0, rotation: -0.5 },
+        { time: 250, rotation: 0.5 },
+        { time: 500, rotation: -0.5 },
+      ],
+      rightThigh: [
+        { time: 0, rotation: 0.5 },
+        { time: 250, rotation: -0.5 },
+        { time: 500, rotation: 0.5 },
+      ],
+    },
+    events: [{ time: 250, name: 'run-footstep' }],
+  },
+];
+
 /** Representative editor-authored snapshot used to produce the standalone consumer's extracted package. */
 export function consumerCharacter(): PackageSnapshot {
   const rig = new RigEditorState(new Rig(demoCharacter.rig, []), structuredClone(demoCharacter.rigFile!), {
@@ -39,7 +86,12 @@ export function consumerCharacter(): PackageSnapshot {
     definition: demoCharacter,
     rig: structuredClone(rig.recoveryDraft),
     skins: demoCharacter.standaloneSkins,
-    animations: [...animations.packageAnimations(), reach, { ...baked.animation, name: 'baked' }],
+    animations: [
+      ...animations.packageAnimations(),
+      reach,
+      { ...baked.animation, name: 'baked' },
+      ...controllerAnimations,
+    ],
     replacements: [
       {
         assetKey: 'paper-head',

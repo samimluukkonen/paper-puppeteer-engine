@@ -1,4 +1,4 @@
-import { loadSceneCharacter, Puppet } from 'paper-puppeteer-engine/runtime';
+import { AnimationStateController, loadSceneCharacter, Puppet } from 'paper-puppeteer-engine/runtime';
 import Phaser from 'phaser';
 import './style.css';
 
@@ -7,6 +7,8 @@ const eventLog = document.querySelector<HTMLParagraphElement>('#event')!;
 const clipButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-clip]')];
 const skinButton = document.querySelector<HTMLButtonElement>('#skin')!;
 const disposeButton = document.querySelector<HTMLButtonElement>('#dispose')!;
+const controllerButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-state], [data-command]')];
+const lifecycleLog = document.querySelector<HTMLParagraphElement>('#lifecycle')!;
 
 class CharacterScene extends Phaser.Scene {
   constructor() {
@@ -31,6 +33,71 @@ class CharacterScene extends Phaser.Scene {
     status.textContent = `Ready: ${definition.id} / idle`;
 
     const listeners = new AbortController();
+    let pendingWait: AbortController | undefined;
+    // Custom exports can omit these optional example clips; basic playback still works.
+    const hasControllerClips = ['idle', 'walk', 'run', 'attack', 'recover'].every((name) => puppet.hasAnimation(name));
+    const controller = hasControllerClips
+      ? new AnimationStateController(puppet, {
+          initialState: 'idle',
+          defaultFadeDuration: 150,
+          states: {
+            idle: { animation: 'idle' },
+            walking: { animation: 'walk' },
+            running: { animation: 'run' },
+            attack: { animation: 'attack' },
+          },
+        })
+      : undefined;
+    const releaseLifecycle = puppet.onPlaybackLifecycle((event) => {
+      lifecycleLog.textContent = `${event.layer}: ${event.clip} / ${event.type} (#${event.playbackId})`;
+    });
+    const playAsync = async (): Promise<void> => {
+      pendingWait?.abort();
+      const operation = new AbortController();
+      pendingWait = operation;
+      status.textContent = 'Awaiting attack…';
+      try {
+        const result = await puppet.playAndWait('attack', { fadeDuration: 150, signal: operation.signal });
+        if (listeners.signal.aborted || pendingWait !== operation) return;
+        status.textContent = `Async attack: ${result.status}`;
+        if (result.status !== 'completed') return;
+        // A callback or queue may already own a newer selection by the time await resumes.
+        if (puppet.getPlaybackStatus()?.playbackId === result.playback.playbackId) controller?.setState('idle');
+      } catch (error) {
+        if (!listeners.signal.aborted && pendingWait === operation)
+          status.textContent = `Playback failed: ${String(error)}`;
+      } finally {
+        if (pendingWait === operation) pendingWait = undefined;
+      }
+    };
+    for (const button of controllerButtons) {
+      button.disabled = !controller;
+      button.addEventListener(
+        'click',
+        () => {
+          if (!controller) return;
+          if (button.dataset.state) {
+            controller.setState(button.dataset.state);
+            status.textContent = `State: ${controller.currentState}`;
+          } else if (button.dataset.command === 'queue') {
+            // A looping idle cannot have a finite queue behind it. Stop only the base channel.
+            puppet.stopQueue().queue('attack').queue('recover', { fadeDuration: 100 });
+            status.textContent = 'Queued: attack → recover';
+          } else if (button.dataset.command === 'action') {
+            controller.playAction('attack');
+            status.textContent = `Action: attack → ${controller.currentState}`;
+          } else if (button.dataset.command === 'async') {
+            void playAsync();
+          } else if (button.dataset.command === 'cancel') {
+            pendingWait?.abort(); // Cancels the wait; the clip keeps playing.
+          } else if (button.dataset.command === 'stop') {
+            puppet.stopQueue();
+            status.textContent = 'Base stopped';
+          }
+        },
+        { signal: listeners.signal },
+      );
+    }
     for (const button of clipButtons) {
       const clip = button.dataset.clip!;
       button.disabled = !definition.animations.some((animation) => animation.name === clip);
@@ -59,9 +126,12 @@ class CharacterScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       listeners.abort();
+      pendingWait?.abort();
+      controller?.dispose();
+      releaseLifecycle();
       unsubscribe();
       puppet.destroy();
-      for (const button of [...clipButtons, skinButton]) button.disabled = true;
+      for (const button of [...clipButtons, ...controllerButtons, skinButton]) button.disabled = true;
       // This example owns the entire game. Game destruction below releases its texture manager.
       status.textContent = 'Disposed';
     });

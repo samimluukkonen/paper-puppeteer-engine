@@ -341,7 +341,9 @@ export class AnimationPlayer {
         ? registered
         : Object.freeze({ ...registered, loop: options.loop });
     const layerName = options.layer ?? 'base';
-    if (!layerName) throw new Error('Layer name cannot be empty.');
+    if (typeof layerName !== 'string' || !layerName.trim()) throw new Error('Layer name must be a nonempty string.');
+    if (options.restart !== undefined && typeof options.restart !== 'boolean')
+      throw new Error('Animation restart must be a boolean.');
     const fade = options.fadeDuration ?? 0;
     assertFinite(fade, 'Fade duration');
     if (fade < 0) throw new Error('Fade duration cannot be negative.');

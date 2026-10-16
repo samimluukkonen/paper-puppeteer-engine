@@ -35,7 +35,7 @@ test.each(['destroy', 'shutdown'] as const)(
       const bytes = files.get(decodeURIComponent(url.slice(base.length)));
       return Promise.resolve(bytes ? new Response(bytes) : new Response(null, { status: 404 }));
     });
-    assert.equal(requests.length, 12); // manifest, rig, three skins, six clips, one pose
+    assert.equal(requests.length, 15); // manifest, rig, three skins, nine clips, one pose
     for (const [key, path] of Object.entries(definition.textures)) {
       assert.equal(definition.textureUrl(key), `${base}${path}`);
       assert.isTrue(files.has(path));

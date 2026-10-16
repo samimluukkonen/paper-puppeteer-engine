@@ -4,6 +4,8 @@
 
 Use the Node version and dependencies described in the development guide. All profiles below are local diagnostics: CPU fixtures exclude browser/GPU costs, browser profiles include layout, and neither uses pass/fail timing thresholds. Normal unit runs skip optional measurements. Browser profiling remains excluded from CI.
 
+The [v0.7 runtime controller report](runtime-controller-readiness.md#cleanup-and-performance) documents `VITE_PROFILE=1 npx vitest run tests/runtimeController.profile.test.ts --reporter=verbose`: one/twenty Puppets, continuous state changes, FIFO, crossfades, active IK and repeated async operations. Run it separately from browser suites for CPU observations without GPU costs or timing thresholds.
+
 Measurements below record earlier implementation comparisons on individual machines. They explain the corresponding changes and are not performance baselines for the current checkout. Rerun the commands to measure your workload and hardware.
 
 The [v0.6.5 release report](release-readiness.md#performance-observations) records current candidate observations for small/complex characters, multiple Puppets, dense timelines, onion skinning, IK, scrubbing and replacement decoding. Run CPU and browser diagnostics separately, without other test suites competing for the machine. The repeated package/runtime lifetime diagnostic is also available with `VITE_PROFILE=1 npx vitest run tests/releaseReadiness.test.ts --maxWorkers=1 --reporter=verbose`; ordinary runs still assert object/listener cleanup without timing thresholds.

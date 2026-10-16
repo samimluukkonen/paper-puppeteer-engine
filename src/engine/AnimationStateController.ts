@@ -71,12 +71,11 @@ export class AnimationStateController {
   private persistentState: string;
   private intent: StateIntent | undefined;
   private unsubscribe: (() => void) | undefined;
+  private host: AnimationStateHost | undefined;
   private disposed = false;
 
-  constructor(
-    private readonly host: AnimationStateHost,
-    options: AnimationStateControllerOptions,
-  ) {
+  constructor(host: AnimationStateHost, options: AnimationStateControllerOptions) {
+    this.host = host;
     checkObject(options, ['initialState', 'states', 'defaultFadeDuration', 'transitions'], 'state controller options');
     if (!options.states || typeof options.states !== 'object' || Array.isArray(options.states))
       throw new Error('States must be an object.');
@@ -142,10 +141,12 @@ export class AnimationStateController {
 
   /** Whether the selected base playback still belongs to this controller (including a held completion). */
   get isActive(): boolean {
-    const status = this.host.getPlaybackStatus();
+    const host = this.host;
+    if (!host) return false;
+    const status = host.getPlaybackStatus();
     return (
       !this.disposed &&
-      !this.host.isPlaybackStopped() &&
+      !host.isPlaybackStopped() &&
       this.intent?.playbackId !== undefined &&
       status?.playbackId === this.intent.playbackId &&
       (status.status === 'playing' || status.status === 'paused' || status.status === 'completed')
@@ -195,6 +196,7 @@ export class AnimationStateController {
     this.intent = undefined;
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.host = undefined;
     this.states.clear();
     this.transitions.clear();
   }
@@ -207,11 +209,12 @@ export class AnimationStateController {
   }
 
   private start(persistent: string, action?: string, options: Readonly<QueueAnimationOptions> = {}): void {
+    const host = this.host!;
     const id = action ?? persistent;
     const state = this.getState(id);
     const previousIntent = this.intent;
     const previousState = this.persistentState;
-    const previousPlayback = this.host.getPlaybackStatus()?.playbackId;
+    const previousPlayback = host.getPlaybackStatus()?.playbackId;
     const from = previousIntent ? (previousIntent.action ?? previousState) : undefined;
     const fadeDuration =
       options.fadeDuration ??
@@ -222,7 +225,7 @@ export class AnimationStateController {
     this.persistentState = persistent;
     this.intent = intent;
     try {
-      this.host.play(state.animation, {
+      host.play(state.animation, {
         ...state.options,
         ...options,
         fadeDuration,
@@ -232,7 +235,7 @@ export class AnimationStateController {
       });
     } catch (error) {
       // Preflight failures preserve intent. Listener errors after a committed start keep the new identity.
-      if (this.intent === intent && this.host.getPlaybackStatus()?.playbackId === previousPlayback) {
+      if (this.intent === intent && host.getPlaybackStatus()?.playbackId === previousPlayback) {
         this.persistentState = previousState;
         this.intent = previousIntent;
       }
@@ -240,7 +243,7 @@ export class AnimationStateController {
     } finally {
       // Starts requested inside lifecycle delivery commit before their notifications are drained.
       if (this.intent === intent && intent.playbackId === undefined) {
-        const status = this.host.getPlaybackStatus();
+        const status = host.getPlaybackStatus();
         if (status?.clip === state.animation && status.playbackId !== previousPlayback)
           intent.playbackId = status.playbackId;
       }
@@ -254,10 +257,11 @@ export class AnimationStateController {
       return;
     }
     if (event.layer !== 'base') return;
+    const host = this.host!;
     const intent = this.intent;
     if (!intent) return;
     if (event.type === 'started') {
-      const current = this.host.getPlaybackStatus();
+      const current = host.getPlaybackStatus();
       if (intent.playbackId === undefined && event.clip === intent.animation) intent.playbackId = event.playbackId;
       else if (intent.playbackId !== event.playbackId && current?.playbackId === event.playbackId)
         this.intent = undefined;
@@ -267,12 +271,12 @@ export class AnimationStateController {
     if (event.type === 'interrupted' || event.type === 'stopped') {
       this.intent = undefined;
     } else if (event.type === 'completed' && intent.action !== undefined) {
-      const current = this.host.getPlaybackStatus();
+      const current = host.getPlaybackStatus();
       if (
         current?.playbackId !== event.playbackId ||
         current.status !== 'completed' ||
-        this.host.isPlaybackStopped() ||
-        this.host.getQueue().length
+        host.isPlaybackStopped() ||
+        host.getQueue().length
       ) {
         this.intent = undefined;
         return;
