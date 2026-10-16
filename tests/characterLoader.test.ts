@@ -218,6 +218,27 @@ test('work-budget failures cancel the load before a worker acquires another file
   assert.isTrue(signals.every((signal) => signal.aborted));
 });
 
+test('compact rigs cannot bypass rendering budgets with a large slot catalog', async () => {
+  const rig = {
+    version: 1,
+    root: 'root',
+    bones: [{ id: 'root' }],
+    slots: Array.from({ length: 100_000 }, (_, index) => ({ id: `s${index}`, bone: 'root' })),
+  };
+  const metadata: Record<string, unknown> = { ...files, 'rig.json': rig };
+  const signals: AbortSignal[] = [];
+  const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+    signals.push(init!.signal!);
+    return Response.json(metadata[new URL(requestUrl(input)).pathname.slice(1)]);
+  });
+  await expect(CharacterLoader.load(url, fetcher, { concurrency: 1 })).rejects.toThrow(/4096-slot limit/);
+  assert.equal(fetcher.mock.calls.length, 2);
+  assert.isTrue(signals.every((signal) => signal.aborted));
+  rig.slots.length = 2;
+  await expect(CharacterLoader.load(url, fetcher, { maxSlots: 1 })).rejects.toThrow(/1-slot limit/);
+  assert.equal((await CharacterLoader.load(url, fetcher, { maxSlots: 2 })).rig.slots.length, 2);
+});
+
 test('repeated metadata paths cannot amplify assembly past the resource budget', async () => {
   const fetcher = vi
     .fn<typeof fetch>()

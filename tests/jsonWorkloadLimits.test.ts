@@ -6,9 +6,25 @@ function chain(length: number) {
   return Array.from({ length }, (_, index) => ({ id: `b${index}`, ...(index ? { parent: `b${index - 1}` } : {}) }));
 }
 
-test.each(['maxBones', 'maxBoneDepth', 'maxKeyframes', 'maxEvents'] as const)('%s rejects invalid limits', (name) => {
+test.each(Object.keys(DEFAULT_JSON_WORKLOAD_LIMITS))('%s rejects invalid limits', (name) => {
   for (const value of [0, -1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1])
     assert.throws(() => new JsonWorkloadBudget({ [name]: value }), /positive safe integer/);
+});
+
+test.each([
+  ['slots', 'maxSlots', 'slot'],
+  ['attachments', 'maxAttachments', 'attachment'],
+  ['ik', 'maxIKConstraints', 'IK constraint'],
+] as const)('%s are bounded before reading entries, even with a malformed skeleton', (field, option, label) => {
+  const entries = Array.from({ length: DEFAULT_JSON_WORKLOAD_LIMITS[option] + 1 }, () => ({}));
+  Object.defineProperty(entries, '0', { get: () => assert.fail('Oversized catalogs must not be inspected') });
+  const input = { [field]: entries };
+  assert.throws(() => new JsonWorkloadBudget().checkRig(input), new RegExp(`${label} limit`));
+  assert.doesNotThrow(() => new JsonWorkloadBudget({ [option]: entries.length }).checkRig(input));
+  assert.throws(() => new JsonWorkloadBudget({ [option]: 1 }).checkRig({ [field]: [{}, {}] }));
+  assert.doesNotThrow(() => new JsonWorkloadBudget({ [option]: 2 }).checkRig({ [field]: [{}, {}] }));
+  const unsafe = Object.defineProperty({}, field, { get: () => assert.fail('Do not invoke catalog getters') });
+  assert.doesNotThrow(() => new JsonWorkloadBudget().checkRig(unsafe));
 });
 
 test('event budgets accumulate across clips independently of keyframes and precede event reads', () => {

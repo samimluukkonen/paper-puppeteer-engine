@@ -4,6 +4,9 @@ import { JsonInputLimitError, validateInputLimit } from './jsonInput.js';
 export const DEFAULT_JSON_WORKLOAD_LIMITS = Object.freeze({
   maxBones: 4096,
   maxBoneDepth: 256,
+  maxSlots: 4096,
+  maxAttachments: 4096,
+  maxIKConstraints: 256,
   maxKeyframes: 100_000,
   maxEvents: 10_000,
 });
@@ -13,6 +16,12 @@ export interface JsonWorkloadLimitOptions {
   maxBones?: number;
   /** Maximum hierarchy levels, including the root. Defaults to 256. */
   maxBoneDepth?: number;
+  /** Maximum render slots per externally loaded rig. Defaults to 4096. */
+  maxSlots?: number;
+  /** Maximum attachment definitions per externally loaded rig. Defaults to 4096. */
+  maxAttachments?: number;
+  /** Maximum IK constraints per externally loaded rig. Defaults to 256. */
+  maxIKConstraints?: number;
   /** Maximum bone and IK keyframe rows combined, across all loaded clips. Defaults to 100000. */
   maxKeyframes?: number;
   /** Maximum authored events combined across all loaded clips. Defaults to 10000. */
@@ -38,6 +47,15 @@ export class JsonWorkloadBudget {
         options.maxBoneDepth ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxBoneDepth,
         'maxBoneDepth',
       ),
+      maxSlots: validateInputLimit(options.maxSlots ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxSlots, 'maxSlots'),
+      maxAttachments: validateInputLimit(
+        options.maxAttachments ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxAttachments,
+        'maxAttachments',
+      ),
+      maxIKConstraints: validateInputLimit(
+        options.maxIKConstraints ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxIKConstraints,
+        'maxIKConstraints',
+      ),
       maxKeyframes: validateInputLimit(
         options.maxKeyframes ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxKeyframes,
         'maxKeyframes',
@@ -47,6 +65,16 @@ export class JsonWorkloadBudget {
   }
 
   checkRig(input: unknown): void {
+    // Bound render allocation and solver/catalog work before inspecting any entries.
+    for (const [field, limit, label] of [
+      ['slots', this.limits.maxSlots, 'slot'],
+      ['attachments', this.limits.maxAttachments, 'attachment'],
+      ['ik', this.limits.maxIKConstraints, 'IK constraint'],
+    ] as const) {
+      const entries = ownValue(input, field);
+      if (Array.isArray(entries) && entries.length > limit)
+        throw new JsonInputLimitError(`Rig exceeds the ${limit}-${label} limit.`);
+    }
     const bones = ownValue(input, 'bones');
     if (!Array.isArray(bones)) return;
     if (bones.length > this.limits.maxBones)
