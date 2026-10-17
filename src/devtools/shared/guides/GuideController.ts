@@ -108,7 +108,7 @@ export class GuideController {
     return this.activate(held.currentGuide, held.stepIndex - 1);
   }
 
-  /** The future guide view calls this explicitly after mounting the correct editor. Navigation never clicks controls. */
+  /** Explicit UI-only preparation after mounting the correct editor. Navigation never clicks controls. */
   prepareCurrentStep(targets: GuideTargetResolver): GuideCommandResult {
     const held = this.snapshot;
     if (held.status !== 'active') return failure('No active guide.');

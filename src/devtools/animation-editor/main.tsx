@@ -13,6 +13,7 @@ import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
+import { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { workspaceGuideHost } from '../shared/guides/workspaceGuideHost.js';
 import { browserCharacterDrafts } from '../shared/newCharacter.js';
 import { PackageController } from '../shared/package/PackageController.js';
@@ -45,6 +46,7 @@ const initialDraft = (() => {
   } // Loading fails visibly; the creation dialog stays available.
 })();
 const initialRigView = workspaceView(new URL(window.location.href)) === 'rig';
+const guideTargets = new GuideTargets(host);
 let movePreview: (() => void) | undefined;
 let scene: AnimationEditorScene | undefined;
 let stateOwner: AnimationEditorState | undefined;
@@ -75,7 +77,7 @@ function CharacterWorkspace() {
   const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
   useLayoutEffect(() => movePreview?.(), [rigView]);
   return (
-    <FeatureGuide launcher={guides}>
+    <FeatureGuide launcher={guides} targets={guideTargets}>
       {initialDraft && (
         <p className="workspace-caption" role="status" aria-label="Character draft">
           {initialDraft.identity.name} · {initialDraft.identity.id} ·{' '}

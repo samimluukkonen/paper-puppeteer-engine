@@ -148,3 +148,21 @@ test('invalid and disposed geometry fails safely without selecting a DOM fallbac
   assert.isFalse(targets.reveal('canvas'));
   releaseBroken();
 });
+
+test('DOM targets are clipped to scrolling panels and fully clipped targets are missing', () => {
+  const target = anchor('control');
+  const panel = anchor('scroll-panel');
+  target.node.parentElement = panel.element;
+  target.node.ownerDocument.defaultView.getComputedStyle = vi.fn(() => ({
+    visibility: 'visible',
+    overflowX: 'auto',
+    overflowY: 'auto',
+  }));
+  panel.node.ownerDocument.defaultView.getComputedStyle = target.node.ownerDocument.defaultView.getComputedStyle;
+  const getBoundingClientRect = vi.fn(() => ({ x: 50, y: 60, width: 100, height: 40, right: 150, bottom: 100 }));
+  Object.assign(panel.node, { getBoundingClientRect });
+  const targets = new GuideTargets(root([target.element]).parent);
+  assert.deepEqual(targets.resolve('control'), { x: 50, y: 60, width: 100, height: 40 });
+  getBoundingClientRect.mockReturnValue({ x: 500, y: 60, width: 100, height: 40, right: 600, bottom: 100 });
+  assert.isNull(targets.resolve('control'));
+});

@@ -37,7 +37,24 @@ export class GuideTargets implements GuideTargetResolver {
       if (!element || element.closest('[hidden], [inert]') || !element.getClientRects().length) return null;
       const style = element.ownerDocument.defaultView?.getComputedStyle(element);
       if (style?.visibility === 'hidden' || style?.visibility === 'collapse') return null;
-      return rectangle(element.getBoundingClientRect());
+      let bounds = rectangle(element.getBoundingClientRect());
+      // A scroll container can hide part (or all) of an otherwise laid-out DOM target.
+      for (let parent = element.parentElement; bounds && parent; parent = parent.parentElement) {
+        const overflow = parent.ownerDocument.defaultView?.getComputedStyle(parent);
+        const clipX = /^(auto|scroll|hidden|clip)$/.test(overflow?.overflowX ?? '');
+        const clipY = /^(auto|scroll|hidden|clip)$/.test(overflow?.overflowY ?? '');
+        if (!clipX && !clipY) continue;
+        const clip = parent.getBoundingClientRect();
+        const x = clipX ? Math.max(bounds.x, clip.x) : bounds.x;
+        const y = clipY ? Math.max(bounds.y, clip.y) : bounds.y;
+        bounds = rectangle({
+          x,
+          y,
+          width: (clipX ? Math.min(bounds.x + bounds.width, clip.right) : bounds.x + bounds.width) - x,
+          height: (clipY ? Math.min(bounds.y + bounds.height, clip.bottom) : bounds.y + bounds.height) - y,
+        });
+      }
+      return bounds;
     } catch {
       // Disposed providers and transient editor layout are missing targets, not tour crashes.
       return null;

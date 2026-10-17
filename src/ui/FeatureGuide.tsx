@@ -1,7 +1,8 @@
 import { GraduationCap } from 'lucide-react';
 import { createContext, useContext, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { GuideLauncher } from '../devtools/shared/guides/GuideLauncher.js';
-import type { GuideEditor } from '../devtools/shared/guides/types.js';
+import type { GuideEditor, GuideTargetResolver } from '../devtools/shared/guides/types.js';
+import { GuideSpotlight } from './GuideSpotlight.js';
 
 const OpenFeatureGuide = createContext<(() => void) | null>(null);
 const editors = { rig: 'Rig Editor', animation: 'Animation Editor' } as const;
@@ -18,7 +19,15 @@ export function FeatureGuideButton() {
   );
 }
 
-export function FeatureGuide({ launcher, children }: { launcher: GuideLauncher; children: ReactNode }) {
+export function FeatureGuide({
+  launcher,
+  targets,
+  children,
+}: {
+  launcher: GuideLauncher;
+  targets: GuideTargetResolver;
+  children: ReactNode;
+}) {
   const snapshot = useSyncExternalStore(
     launcher.controller.subscribe,
     launcher.controller.getSnapshot,
@@ -59,6 +68,7 @@ export function FeatureGuide({ launcher, children }: { launcher: GuideLauncher; 
           }
         }}
         onClose={() => {
+          if (launcher.controller.getSnapshot().status === 'active') return;
           // Cross-editor launch hides the opener; restore to the new editor's entry point instead.
           const target = opener.current;
           if (target?.isConnected && !target.closest('[hidden], [inert]')) target.focus({ preventScroll: true });
@@ -141,6 +151,9 @@ export function FeatureGuide({ launcher, children }: { launcher: GuideLauncher; 
         </ul>
         {error && <p role="alert">{error}</p>}
       </dialog>
+      {snapshot.status === 'active' && (
+        <GuideSpotlight controller={launcher.controller} snapshot={snapshot} targets={targets} />
+      )}
     </OpenFeatureGuide.Provider>
   );
 }

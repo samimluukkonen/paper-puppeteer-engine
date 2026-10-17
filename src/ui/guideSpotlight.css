@@ -1,0 +1,82 @@
+.guide-spotlight {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--fg-default);
+  cursor: default;
+}
+.guide-spotlight::backdrop {
+  background: transparent;
+}
+.guide-spotlight-hole {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--accent-fg);
+  border-radius: 8px;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 68%);
+  pointer-events: none;
+  transition:
+    left 120ms ease,
+    top 120ms ease,
+    width 120ms ease,
+    height 120ms ease;
+}
+.guide-spotlight-dimmer {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 68%);
+}
+.guide-step-card {
+  position: absolute;
+  box-sizing: border-box;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 12px;
+  background: var(--bg-overlay);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+  font-size: 14px;
+  line-height: 1.5;
+  transition:
+    left 120ms ease,
+    top 120ms ease;
+}
+.guide-step-card h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+.guide-step-card h3 {
+  font-size: 15px;
+}
+.guide-step-progress,
+.guide-step-policy {
+  color: var(--fg-muted);
+}
+.guide-step-policy {
+  font-size: 12px;
+}
+.guide-step-card nav {
+  display: flex;
+  gap: 8px;
+}
+.guide-step-card nav button:last-child {
+  margin-left: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-spotlight-hole,
+  .guide-step-card {
+    transition: none;
+  }
+}

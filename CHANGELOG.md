@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.7.6.3
+
+Add a shared guided-tour spotlight above React and Phaser with a dimmed rectangular cutout, positioned explanation card, Back/Next/Finish/Exit and Escape. Safe reveal expands only the targeted disclosures and scrolls controls into view. Live DOM/panel/provider measurements follow layout, scroll, resize and zoom; missing targets offer Skip/Exit. Explanation-only modal interaction protects editor data, contains keyboard focus and restores it on exit. Reduced-motion support, observer/listener/frame cleanup, unit coverage and local browser regressions accompany the overlay. Interactive guided practice remains deferred.
+
 ## 0.7.6.2
 
 Add the v0.7.6.2 React Feature Guide selection modal to the shared character workspace header in both editors. Editor categories and feature rows come from the existing registry, with live prerequisite reasons, guarded navigation, first-step activation, and native dialog keyboard/focus handling. Guide launches retain unsaved documents and block mode changes that would discard uncommitted previews. Unit and local browser regressions cover selection, availability, navigation, empty states, and focus; spotlight rendering and instruction cards remain deferred.

@@ -173,7 +173,11 @@ test('registry supplies modal rows, optional IK/tool reasons, and creation guide
     registry,
   );
   const markup = renderToStaticMarkup(
-    createElement(FeatureGuide, { launcher, children: createElement(FeatureGuideButton) }),
+    createElement(FeatureGuide, {
+      launcher,
+      targets: { resolve: () => null, reveal: () => false },
+      children: createElement(FeatureGuideButton),
+    }),
   );
   for (const guide of registry.getAllGuides()) assert.include(markup, guide.title);
   assert.include(markup, 'No character is loaded');
@@ -195,7 +199,13 @@ test('registry supplies modal rows, optional IK/tool reasons, and creation guide
   assert.isTrue(unloaded.launch('create').ok);
   const empty = workspace(new GuideRegistry([])).launcher;
   assert.include(
-    renderToStaticMarkup(createElement(FeatureGuide, { launcher: empty, children: null })),
+    renderToStaticMarkup(
+      createElement(FeatureGuide, {
+        launcher: empty,
+        targets: { resolve: () => null, reveal: () => false },
+        children: null,
+      }),
+    ),
     'No guides are available for this editor yet.',
   );
 });

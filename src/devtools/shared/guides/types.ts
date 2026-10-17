@@ -22,7 +22,7 @@ export interface GuideStep {
   readonly description: string;
   readonly targetId: GuideTargetId;
   readonly prerequisites?: readonly GuidePrerequisite[];
-  /** UI-only request, executed explicitly by the future guide view, never an authored command. */
+  /** UI-only reveal hint, never an authored command. The spotlight may also reveal missing targets. */
   readonly preparation?: 'reveal-target';
 }
 
