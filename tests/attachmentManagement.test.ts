@@ -1,3 +1,4 @@
+import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
 import { AttachmentController } from '../src/devtools/rig-editor/AttachmentController.js';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
@@ -310,6 +311,34 @@ test('runtime catalog edits refresh same-ID geometry while retaining mount, visi
   assert.isFalse(image.visible);
   assert.equal(image.alpha, 0.4);
   assert.equal(image.depth, 9);
+  puppet.destroy();
+});
+
+test('slot debug follows current assignments after catalog updates and failed replacements', () => {
+  const scene = puppetScene();
+  const labels = new Map<string, string>();
+  scene.add.text = (x, y) =>
+    Object.assign(scene.add.container(x, y), {
+      setText(text: string) {
+        labels.set(text.split('\n')[0]!, text);
+        return this;
+      },
+    }) as unknown as Phaser.GameObjects.Text;
+  const puppet = new Puppet(scene, { rig: definition, skin: 'default', slotDebug: true, autoUpdate: false });
+  puppet.updateSlotDefinitions(definition.attachments!, definition.skins!);
+  puppet.setAttachment('hand-art', 'grip');
+  assert.equal(labels.get('hand-art'), 'hand-art\nhand → grip');
+  puppet.clearAttachment('hand-art');
+  assert.equal(labels.get('hand-art'), 'hand-art\nhand → empty');
+  puppet.setSkin('default');
+  assert.equal(labels.get('hand-art'), 'hand-art\nhand → open');
+  const invalid = definition.attachments!.map((entry) =>
+    entry.id === 'open' ? { ...entry, texture: 'missing' } : entry,
+  );
+  scene.textures.exists = (key) => key !== 'missing';
+  assert.throws(() => puppet.updateSlotDefinitions(invalid, definition.skins!), /Missing texture/);
+  puppet.setSlotDebug(false).setAttachment('hand-art', 'grip').setSlotDebug(true);
+  assert.equal(labels.get('hand-art'), 'hand-art\nhand → grip');
   puppet.destroy();
 });
 

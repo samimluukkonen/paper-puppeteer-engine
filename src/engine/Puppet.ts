@@ -596,7 +596,7 @@ export class Puppet {
 
   setSlotDebug(enabled: boolean): this {
     if (this.destroyed) return this;
-    if (enabled) this.slotDebugView ??= new SlotDebug(this.scene, this.rig, this.renderer, this.slotState);
+    if (enabled) this.slotDebugView ??= new SlotDebug(this.scene, this.rig, this.renderer, () => this.slotState);
     this.slotDebugView?.container.setDepth(this.container.depth + 3);
     this.slotDebugView?.setVisible(enabled);
     return this;

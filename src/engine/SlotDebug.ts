@@ -13,7 +13,7 @@ export class SlotDebug {
     scene: Phaser.Scene,
     private readonly rig: Rig,
     private readonly renderer: PuppetRenderer,
-    private readonly state: SlotState,
+    private readonly getState: () => SlotState,
   ) {
     this.container = scene.add.container(0, 0).setVisible(false);
     this.graphics = scene.add.graphics();
@@ -38,6 +38,7 @@ export class SlotDebug {
 
   update(): void {
     if (!this.container.visible) return;
+    const state = this.getState();
     this.graphics.clear();
     this.graphics.fillStyle(0xfff8e9, 0.92).fillRoundedRect(8, 50, 230, this.rig.slots.length * 30 + 16, 6);
     this.graphics.lineStyle(1, 0x8a4db1, 0.9);
@@ -51,7 +52,7 @@ export class SlotDebug {
         .lineBetween(x, y - 8, x, y + 8);
       this.labels
         .get(slot.id)
-        ?.setText(`${slot.id}\n${slot.bone} → ${this.state.getAttachment(slot.id) ?? 'empty'}`)
+        ?.setText(`${slot.id}\n${slot.bone} → ${state.getAttachment(slot.id) ?? 'empty'}`)
         .setPosition(16, 58 + index * 30);
     }
   }
