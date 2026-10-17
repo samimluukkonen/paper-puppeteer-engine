@@ -78,6 +78,8 @@ scene.load.start();
 
 v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
 
+Milestone v0.7.6.6 (package `0.7.6-6`) completes the [Feature Guide](docs/feature-guide.md), with Rig Editor and Animation Editor tutorials, optional practice using real controls, prerequisite recovery and restart/navigation. See the [implementation and verification report](docs/feature-guide-verification.md).
+
 v0.7.5 completes [runtime controller production hardening](docs/runtime-controller-readiness.md), with a playback interaction matrix, standalone controls, crossfade/layer/IK regressions, cleanup stress tests and measured CPU profiles. v0.7.4 adds [async animation playback](docs/async-animation.md): await exact playback instances with typed outcomes, wait-only cancellation and disposal cleanup. v0.7.3 adds [named animation states](docs/animation-states.md): reusable runtime state definitions, idempotent requests, configurable crossfades and temporary actions that return to a persistent state. It builds on v0.7.2 [animation queues](docs/animation-queues.md) and [runtime playback lifecycle and completion](docs/playback-lifecycle.md). The [v0.6 release gates and regression results](docs/release-readiness.md) retain the earlier production authoring assessment.
 
 ## Guides

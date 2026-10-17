@@ -2,7 +2,7 @@
 
 ## Architecture and editor boundary
 
-The wizard remains frontend-only: immutable `GuideRegistry` definitions, a session-only `GuideController`, guarded `GuideLauncher`, capability facts from `workspaceGuideHost`, and `GuideTargets` for DOM/panel/provider geometry. No guide module is imported by `src/engine`; engine entry points and authored schemas are unchanged. The package version stays `0.7.5`, consistent with the preceding guide milestones.
+The wizard remains frontend-only: immutable `GuideRegistry` definitions, a session-only `GuideController`, guarded `GuideLauncher`, capability facts from `workspaceGuideHost`, and `GuideTargets` for DOM/panel/provider geometry. No guide module is imported by `src/engine`; engine entry points and authored schemas are unchanged. Milestone `0.7.6.6` is packaged as SemVer `0.7.6-6`; the manifest, lockfile, standalone tarball reference and changelog agree. The demo and editor headers read that package version.
 
 Both editors share one Feature Guide catalog. Its Rig Editor and Animation Editor categories show registry descriptions, live availability reasons, disabled launch buttons for unmet prerequisites, and related prerequisite guide links. Launch rechecks context and existing navigation guards. Restart returns to step zero; Choose another guide exits to the catalog without refreshing.
 
@@ -53,6 +53,8 @@ Principal changes:
 Local `guidePractice.spec.ts` exercises real pointer/keyboard selection and key commitment, protected unrelated controls, editor shortcut blocking, focus, Undo/Redo after exit, onion preferences, hidden/replaced targets, desktop resize, repeated Explain/practice/restart/catalog/exit, and unrestricted input after cleanup. Existing Feature Guide, Rig Guide and Animation Guide browser suites exercise catalog-wide geometry and non-destructive navigation.
 
 Final command results:
+
+After correcting package metadata to `0.7.6-6`, `npm run check:version`, `npm run check`, `npm run build` and `npm run test:package` were rerun and passed. The version check confirms agreement between the manifest, both lockfile version fields, the standalone tarball dependency and the changelog.
 
 | Command                     | Result                                                                                                                                   |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
