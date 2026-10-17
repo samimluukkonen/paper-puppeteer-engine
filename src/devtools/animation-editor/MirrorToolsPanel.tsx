@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 
@@ -86,14 +87,18 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
       }}
     >
       <summary>Mirror tools</summary>
-      <section className="animation-popover-content animation-mirror-panel" aria-label="Mirror tools">
+      <section
+        data-guide-id={GUIDE_TARGETS.animationMirror}
+        className="animation-popover-content animation-mirror-panel"
+        aria-label="Mirror tools"
+      >
         <div className="animation-tool-heading">
           <h2>Mirror tools</h2>
           <button type="button" data-close-panel aria-label="Close Mirror tools">
             Close
           </button>
         </div>
-        <details>
+        <details data-guide-id={GUIDE_TARGETS.animationMirrorPairs}>
           <summary>Configure Bone Pairs</summary>
           <p>Left and right use rig bone IDs, independently of preview facing. Changes are editor preferences.</p>
           <div className="animation-mirror-pairs">
@@ -160,7 +165,7 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
           <p>{state.persistence || 'Valid pair changes are saved in this browser for the same rig.'}</p>
         </details>
         {state.mappingErrors.length > 0 && <p role="alert">{state.mappingErrors.join(' ')}</p>}
-        <fieldset className="animation-mirror-directions">
+        <fieldset data-guide-id={GUIDE_TARGETS.animationMirrorDirection} className="animation-mirror-directions">
           <legend>Direction</legend>
           {MIRROR_DIRECTIONS.map((entry) => (
             <label key={entry.value}>
@@ -177,7 +182,7 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
         </fieldset>
         <p className="animation-mirror-destination">{direction.help}</p>
         <p>{state.scope} Only authored source properties are copied; temporary edits and IK are excluded.</p>
-        <div className="animation-mirror-actions">
+        <div data-guide-id={GUIDE_TARGETS.animationMirrorActions} className="animation-mirror-actions">
           <button
             type="button"
             disabled={!!state.poseReason && !state.preview}

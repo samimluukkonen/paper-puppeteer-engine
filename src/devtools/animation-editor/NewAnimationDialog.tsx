@@ -1,4 +1,5 @@
 import { useRef, useState, useSyncExternalStore } from 'react';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackCommands.js';
 import type { NewAnimationController } from './NewAnimationController.js';
 
@@ -14,6 +15,7 @@ export function NewAnimationDialog({ controller }: { controller: NewAnimationCon
     <>
       <button
         id="animation-new"
+        data-guide-id={GUIDE_TARGETS.animationNew}
         type="button"
         className="workspace-primary"
         disabled={!!reason}

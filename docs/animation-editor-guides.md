@@ -1,0 +1,68 @@
+# Animation Editor guided tutorials
+
+[Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
+
+Milestone v0.7.6.5 adds thirteen selectable, explanation-only tasks with 60 steps. Open **Feature Guide → Animation Editor**. Exit the tour before trying a control; Next, Back, Finish and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+
+| Guide                      | Steps | Prerequisites beyond a loaded, valid rig                                 |
+| -------------------------- | ----: | ------------------------------------------------------------------------ |
+| Create a New Animation     |     5 | None; no JSON or existing clip required                                  |
+| Create Your First Keyframe |     5 | Selected clip, including an empty clip                                   |
+| Animate a Bone             |     6 | Selected clip                                                            |
+| Timeline Navigation        |     6 | Selected clip                                                            |
+| Keyframe Editing           |     4 | Selected clip with authored bone property keys                           |
+| Interpolation              |     4 | Selected clip                                                            |
+| Onion Skinning             |     4 | Selected clip                                                            |
+| Mirrored Animation         |     4 | Selected clip; teaches mapping actual bone IDs                           |
+| IK Target Animation        |     5 | Selected clip, rig IK constraint and a selected IK target                |
+| IK Baking                  |     5 | Selected clip, rig IK constraint and authored IK position/influence keys |
+| Animation Events           |     4 | Selected clip; no existing events required                               |
+| Rig-Tweak Mode             |     4 | None; explains entering the mode without entering it for the artist      |
+| Exporting Animations       |     4 | Selected clip                                                            |
+
+IK tasks use the `ik` registry category; the other eleven use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
+
+## Target contract
+
+`animationGuides.ts` supplies the catalog; `anchors.ts` shares IDs with React markup. All steps use UI-only `reveal-target` preparation through the existing `GuideTargets` resolver and spotlight observation lifetime.
+
+| Area      | Stable `data-guide-id` anchors                                                                                                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session   | `animation-new`, `animation-selection`, `animation-settings`, `animation-editor-mode`                                                                                                                    |
+| Inspector | `animation-bones`, `animation-properties`, `animation-interpolation`, `animation-ik-inspector`                                                                                                           |
+| Timeline  | `animation-timeline`, `animation-tracks`, `animation-ruler`, `animation-current-time`, `animation-playback`, `animation-zoom`, `animation-track-navigation`, `animation-key-editing`, `animation-events` |
+| Preview   | `animation-canvas`, `animation-onion`, `animation-onion-settings`, `animation-ik-options`                                                                                                                |
+| Tools     | `animation-mirror`, `animation-mirror-pairs`, `animation-mirror-direction`, `animation-mirror-actions`, `animation-bake`, `animation-bake-actions`                                                       |
+| Saving    | `animation-validation`, `animation-export`, existing `rig-character-package` on the active package panel                                                                                                 |
+
+Selection details is a stable disclosure host: instructions explain selecting a bone or event to see its conditional fields. The IK inspector is anchored to the actual selected constraint panel. New-animation dialog instructions spotlight its launch button; the tour does not open or submit a modal form. Rig-Tweak tool instructions point to the mode selector and preview because the tour does not switch into Rig Tweak. Canvas operations spotlight the real preview host with coordinate/interaction guidance, without guessed joint positions.
+
+The existing resolver remeasures real DOM rectangles, clips against scroll containers, opens disclosure ancestors and scrolls targets into view. Action anchors also scroll long mirror/bake panels to the relevant buttons. Unrelated floating animation menus and tool panels close so they cannot obscure the next target; ordinary inspector disclosures remain open. The spotlight follows layout through animation frames, scrolling and resizing. Zoomed/scrolled timeline rulers, expanded tracks, React inspector changes and a moved Phaser preview therefore use current viewport geometry. Missing or inactive targets show a fallback instead of retaining stale coordinates. No extra observers, global listeners or scene hooks are introduced.
+
+## Current feature limits taught by the catalog
+
+- Clip interpolation supports only Default (Linear) and explicit Linear. Key details is read-only; there are no per-key easing overrides. Smooth/Stepped and FPS control sampling separately.
+- Bone groups support marker dragging, clipboard and duplication. IK keys support single selection, nudging and deletion; group clipboard and marker dragging are unavailable.
+- Onion ghosts and mirroring use authored bone poses before IK. Mirror mapping and previews stay separate from explicit commit buttons.
+- Baking samples the entire clip to bone rotation keys and deactivates baked constraints for that clip. Fixed-target preview must be off; constraints and sampling options can still be rejected by the normal bake panel.
+- JSON export contains committed data. Character ZIP export includes the manifest entry for newly created clips. Downloads do not write project files.
+
+## Verification
+
+`tests/animationGuides.test.ts` checks catalog categories, declared targets, step bounds, missing/empty/existing clips, arbitrary rig IDs, optional IK prerequisites, live clip changes and read-only navigation. It checks every exit position plus Back/Finish, immutable documents, history, dirty flags, selections, playhead, playback and temporary drafts. `tests/guideSpotlightLifecycle.test.ts` checks modal closure, focus restoration, target-observer teardown and ResizeObserver disconnection. Shared resolver tests also cover closing unrelated floating menus without closing the target or its ancestors.
+
+Local-only `tests/browser/animationGuides.spec.ts` walks every available guide against the shipped representative rig with existing/empty clips. It checks actual anchor availability, spotlight geometry, card overlap, focus restoration, Escape, no downloads, preserved JSON and Undo/Redo. A layout scenario exercises zoom, scroll, expanded tracks, clip switching, inspector reveal, desktop resizing, moved preview geometry and leaving the React workspace. Existing feature-picker tests now account for optional IK prerequisites and creation guides without clips.
+
+Screenshots from the existing-clip walkthrough are saved under the Playwright test output directory for visual review. Browser tests are local-only; no browser setup or smoke-test CI changes are included.
+
+### Recorded command results — 2026-10-17
+
+| Command                                                                                                                  | Result                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                                                                                                      | Exit 0; no TypeScript diagnostics                                                              |
+| `npm run test`                                                                                                           | Exit 0; 166 test files passed, 4 skipped; 2,829 tests passed, 44 skipped                       |
+| `npm run build`                                                                                                          | Exit 0; demo and library builds passed, including the plain-Node core/serialization/data check |
+| `npm run check`                                                                                                          | Exit 0; formatting, lint and type checking passed                                              |
+| `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationGuides.spec.ts tests/browser/featureGuide.spec.ts` | Exit 0; 22 passed across development and production (9.3 minutes)                              |
+
+Visual review covered representative screenshots from all thirteen guides on `demo-puppet` at a 1440 × 1000 desktop viewport. Instructions matched the current UI, cards left highlighted controls clear, and long mirror panels scrolled to their action buttons. The browser walkthrough also checked Back, Finish, Escape, focus restoration and unchanged animation JSON/history. This was automated traversal plus screenshot review; a separate human artist practice session was not performed. Dialog forms and conditional selection fields are explained without the tour submitting forms or selecting authoring data.

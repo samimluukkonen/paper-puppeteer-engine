@@ -1,4 +1,4 @@
-import type { AnimationEditorState } from '../../animation-editor/AnimationEditorState.js';
+import type { AnimationEditorState, ReadonlyAnimation } from '../../animation-editor/AnimationEditorState.js';
 import type { RigEditorState } from '../../rig-editor/RigEditorState.js';
 import type { GuideLaunchHost } from './GuideLauncher.js';
 import type { GuideCapability, GuideEditor } from './types.js';
@@ -10,6 +10,10 @@ export function workspaceGuideHost(options: {
   getRig(): RigEditorState | undefined;
   navigate(editor: GuideEditor): boolean | 'cancel';
 }): GuideLaunchHost {
+  // Refresh also runs during playback. Inspect authored keys only when the immutable clip changes.
+  let inspectedClip: ReadonlyAnimation | null | undefined;
+  let hasBoneKeys = false;
+  let hasIKKeys = false;
   return {
     getContext: () => {
       const animation = options.getAnimation();
@@ -19,7 +23,21 @@ export function workspaceGuideHost(options: {
         capabilities.push('character');
         if (!rig.validationPending && !rig.validationIssues().some((issue) => issue.severity === 'error'))
           capabilities.push('valid-rig');
-        if (animation.workingAnimation) capabilities.push('animation');
+        const clip = animation.workingAnimation;
+        if (clip !== inspectedClip) {
+          inspectedClip = clip;
+          hasBoneKeys =
+            !!clip && Object.values(clip.tracks).some((rows) => rows.some((key) => Object.keys(key).length > 1));
+          hasIKKeys =
+            !!clip &&
+            Object.values(clip.ikTracks ?? {}).some((rows) => rows.some((key) => Object.keys(key).length > 1));
+        }
+        if (clip) {
+          capabilities.push('animation');
+          if (hasBoneKeys) capabilities.push('bone-keyframes');
+          if (hasIKKeys) capabilities.push('ik-keyframes');
+        }
+        if (animation.selectedIKConstraintId) capabilities.push('tool:selected-ik');
         if (rig.workingCopy.bones.some((bone) => bone.sprite) || rig.workingCopy.attachments?.length)
           capabilities.push('rig-artwork');
         if (rig.workingCopy.ik?.length) capabilities.push('ik-constraints');

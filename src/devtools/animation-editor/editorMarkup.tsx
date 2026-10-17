@@ -76,6 +76,7 @@ export function AnimationEditorView({
                 <span className="editor-sr-only">Editor Mode</span>
                 <select
                   id="editor-mode"
+                  data-guide-id={GUIDE_TARGETS.animationMode}
                   value={mode.mode}
                   disabled={!mode.ready}
                   title={tweaking ? 'Editing rig data · Playback paused' : 'Editor Mode'}
@@ -92,7 +93,7 @@ export function AnimationEditorView({
             )}
             {newAnimation && <NewAnimationDialog controller={newAnimation} />}
             <label inert={tweaking}>
-              Animation <select id="animation-selection"></select>
+              Animation <select id="animation-selection" data-guide-id={GUIDE_TARGETS.animationSelection}></select>
             </label>
             <div className="animation-history" inert={tweaking}>
               <button
@@ -122,7 +123,10 @@ export function AnimationEditorView({
           <div className="animation-session-actions" role="group" aria-label="Animation commands">
             <details id="animation-clip-settings" className="animation-menu" data-workspace-menu inert={tweaking}>
               <summary>Clip settings</summary>
-              <div className="animation-menu-content animation-clip-panel">
+              <div
+                className="animation-menu-content animation-clip-panel"
+                data-guide-id={GUIDE_TARGETS.animationSettings}
+              >
                 <div className="animation-settings" aria-label="Authored animation settings">
                   <label>
                     Mode{' '}
@@ -204,6 +208,7 @@ export function AnimationEditorView({
             <div className="animation-save" inert={tweaking}>
               <button
                 id="animation-download"
+                data-guide-id={GUIDE_TARGETS.animationExport}
                 type="button"
                 title="Download committed edits as JSON; move the file into your character folder"
               >
@@ -224,7 +229,7 @@ export function AnimationEditorView({
               </span>
             )}
 
-            <p id="animation-status" role="status">
+            <p id="animation-status" data-guide-id={GUIDE_TARGETS.animationValidation} role="status">
               Loading character…
             </p>
             <p id="animation-export-feedback" role="status"></p>
@@ -255,12 +260,12 @@ export function AnimationEditorView({
           {attachments && tweaking && <RigIKPanel controller={attachments} />}
           {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
-            <details className="animation-bone-list">
+            <details className="animation-bone-list" data-guide-id={GUIDE_TARGETS.animationBones}>
               <summary>Bones</summary>
               <div id="animation-bones" aria-label="Bone hierarchy"></div>
             </details>
             <IKInspectorPanel controller={ikInspector} />
-            <details className="animation-selection-details">
+            <details className="animation-selection-details" data-guide-id={GUIDE_TARGETS.animationProperties}>
               <summary>Selection details</summary>
               <section id="animation-bone-inspector" aria-label="Bone keyframing">
                 <h2 id="animation-bone-title">Select a bone</h2>
@@ -305,7 +310,7 @@ export function AnimationEditorView({
             {artwork && <ArtworkPanel controller={artwork} />}
             <details className="animation-key-details">
               <summary>Key details</summary>
-              <div className="timeline-interpolation">
+              <div className="timeline-interpolation" data-guide-id={GUIDE_TARGETS.animationInterpolation}>
                 <label>
                   Selected key interpolation{' '}
                   <select id="timeline-interpolation" aria-describedby="timeline-interpolation-help" disabled>
@@ -338,7 +343,12 @@ export function AnimationEditorView({
         >
           <div className="timeline-toolbar" aria-label="Playback and timing">
             <h2>Timeline</h2>
-            <div className="timeline-control-group" role="group" aria-label="Playback">
+            <div
+              data-guide-id={GUIDE_TARGETS.animationPlayback}
+              className="timeline-control-group"
+              role="group"
+              aria-label="Playback"
+            >
               <button
                 id="reset-time"
                 className="editor-icon-button"
@@ -446,7 +456,12 @@ export function AnimationEditorView({
                 </label>
               ))}
             </fieldset>
-            <div className="timeline-control-group timeline-zoom-controls" role="group" aria-label="Timeline zoom">
+            <div
+              data-guide-id={GUIDE_TARGETS.animationZoom}
+              className="timeline-control-group timeline-zoom-controls"
+              role="group"
+              aria-label="Timeline zoom"
+            >
               <button
                 id="timeline-zoom-out"
                 className="editor-icon-button"
@@ -486,7 +501,11 @@ export function AnimationEditorView({
             </div>
             <output id="current-time" aria-label="Current time"></output>
           </div>
-          <div className="timeline-track-controls" aria-label="Track navigation">
+          <div
+            data-guide-id={GUIDE_TARGETS.animationTrackNavigation}
+            className="timeline-track-controls"
+            aria-label="Track navigation"
+          >
             <label>
               Search tracks{' '}
               <input
@@ -504,10 +523,10 @@ export function AnimationEditorView({
                 <option value="selected">Selected Target Only</option>
               </select>
             </label>
-            <button id="timeline-add-event" type="button">
+            <button id="timeline-add-event" data-guide-id={GUIDE_TARGETS.animationEvents} type="button">
               + Event
             </button>
-            <EditorMenu id="timeline-edit-menu" label="Edit">
+            <EditorMenu id="timeline-edit-menu" label="Edit" guideTargetId={GUIDE_TARGETS.animationKeyEditing}>
               <button
                 id="timeline-copy-keys"
                 type="button"
@@ -604,6 +623,7 @@ export function AnimationEditorView({
             >
               <div
                 id="timeline-ruler"
+                data-guide-id={GUIDE_TARGETS.animationRuler}
                 role="slider"
                 tabIndex={0}
                 aria-label="Animation time"
@@ -631,10 +651,14 @@ export function AnimationEditorView({
             <label>
               <input id="animation-show-bones" type="checkbox" defaultChecked /> Show bones
             </label>
-            <label>
+            <label data-guide-id={GUIDE_TARGETS.animationOnion}>
               <input id="animation-onion-skinning" type="checkbox" /> Onion Skinning
             </label>
-            <EditorMenu id="animation-preview-menu" label="Preview options">
+            <EditorMenu
+              id="animation-preview-menu"
+              label="Preview options"
+              guideTargetId={GUIDE_TARGETS.animationIKOptions}
+            >
               <label>
                 <input id="animation-ik-preview" type="checkbox" /> IK preview (fixed targets)
               </label>
@@ -646,7 +670,11 @@ export function AnimationEditorView({
               </label>
               <details className="animation-onion-settings">
                 <summary>Onion settings</summary>
-                <section className="animation-onion-panel" aria-label="Onion Skinning settings">
+                <section
+                  data-guide-id={GUIDE_TARGETS.animationOnionSettings}
+                  className="animation-onion-panel"
+                  aria-label="Onion Skinning settings"
+                >
                   <h2>Onion Skinning</h2>
                   <label htmlFor="animation-onion-previous-count">Previous poses</label>
                   <input id="animation-onion-previous-count" type="number" min="0" max="3" step="1" />
@@ -669,7 +697,7 @@ export function AnimationEditorView({
             </EditorMenu>
           </div>
           <div className="animation-preview-viewport">
-            <div id="animation-stage" aria-label="Puppet preview"></div>
+            <div id="animation-stage" data-guide-id={GUIDE_TARGETS.animationCanvas} aria-label="Puppet preview"></div>
           </div>
         </section>
         <div

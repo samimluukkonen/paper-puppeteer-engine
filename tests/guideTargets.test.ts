@@ -91,6 +91,22 @@ test('safe DOM reveal opens only disclosures, requests the existing drawer, and 
   assert.isFalse(targets.reveal('properties'), 'do not unhide an inactive editor');
 });
 
+test('animation reveal closes unrelated floating menus while retaining the target and its ancestors', () => {
+  const item = anchor('target');
+  const unrelated = { contains: () => false, removeAttribute: vi.fn() };
+  const ancestor = { contains: () => true, removeAttribute: vi.fn() };
+  const descendant = { contains: () => false, removeAttribute: vi.fn() };
+  Object.assign(item.node, { contains: (node: unknown) => node === descendant });
+  const querySelectorAll = vi.fn(() => [unrelated, ancestor, descendant]);
+  const workspace = { querySelectorAll } as unknown as Element;
+  item.node.closest.mockImplementation((selector) => (selector === '.animation-workspace' ? workspace : null));
+  assert.isTrue(new GuideTargets(root([item.element]).parent).reveal('target'));
+  assert.deepEqual(unrelated.removeAttribute.mock.calls, [['open']]);
+  assert.lengthOf(ancestor.removeAttribute.mock.calls, 0);
+  assert.lengthOf(descendant.removeAttribute.mock.calls, 0);
+  assert.deepEqual(querySelectorAll.mock.calls, [['[data-workspace-menu][open], [data-tool-panel][open]']]);
+});
+
 test('geometry providers support canvas regions, live measurement, explicit reveal, and safe cleanup', () => {
   const host = root([]);
   const targets = new GuideTargets(host.parent);

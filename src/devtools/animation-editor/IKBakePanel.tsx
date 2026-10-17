@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { IKBakeController } from './IKBakeController.js';
 
 /** React renders controller proposals; no animation mutation or separate clock lives here. */
@@ -25,7 +26,11 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
       }}
     >
       <summary>IK Baking</summary>
-      <section className="animation-popover-content animation-bake-panel" aria-label="IK Baking">
+      <section
+        data-guide-id={GUIDE_TARGETS.animationBake}
+        className="animation-popover-content animation-bake-panel"
+        aria-label="IK Baking"
+      >
         <div className="animation-tool-heading">
           <h2>IK Baking</h2>
           <button type="button" data-close-panel aria-label="Close IK Baking">
@@ -104,7 +109,7 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
             {issue.message}
           </p>
         ))}
-        <div className="animation-bake-actions">
+        <div data-guide-id={GUIDE_TARGETS.animationBakeActions} className="animation-bake-actions">
           <button
             type="button"
             disabled={!plan}

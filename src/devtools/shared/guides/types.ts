@@ -7,6 +7,8 @@ export type GuideCapability =
   | 'character'
   | 'valid-rig'
   | 'animation'
+  | 'bone-keyframes'
+  | 'ik-keyframes'
   | 'ik-constraints'
   | 'rig-artwork'
   | `tool:${string}`;

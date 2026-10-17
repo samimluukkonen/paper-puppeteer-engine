@@ -31,7 +31,9 @@ test('feature selection uses the registry, keyboard categories, modal focus cont
     for (const guide of guideRegistry.getGuidesForEditor(editor)) {
       await expect(dialog.getByRole('heading', { name: guide.title, exact: true })).toBeVisible();
       await expect(dialog.getByText(guide.description, { exact: true })).toBeVisible();
-      await expect(dialog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true })).toBeEnabled();
+      const start = dialog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
+      if (['animation-ik-targets', 'animation-ik-baking'].includes(guide.id)) await expect(start).toBeDisabled();
+      else await expect(start).toBeEnabled();
     }
   }
   await page.keyboard.press('Escape');
@@ -148,8 +150,11 @@ test('a new character offers rig guides and explains the missing animation', asy
   await expect(dialog).toContainText('Add artwork to a bone or create a sprite attachment first.');
   await dialog.getByRole('button', { name: 'Animation Editor', exact: true }).click();
   await expect(dialog).toContainText('Create or select an animation first.');
-  for (const start of await dialog.getByRole('button', { name: /^Start Guide:/ }).all())
-    await expect(start).toBeDisabled();
+  for (const guide of guideRegistry.getGuidesForEditor('animation')) {
+    const start = dialog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
+    if (['animation-new', 'animation-rig-tweak'].includes(guide.id)) await expect(start).toBeEnabled();
+    else await expect(start).toBeDisabled();
+  }
 });
 
 test('spotlight reveals collapsed panels, contains focus, blocks editor input, navigates and finishes safely', async ({

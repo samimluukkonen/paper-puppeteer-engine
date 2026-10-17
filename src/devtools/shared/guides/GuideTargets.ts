@@ -67,6 +67,12 @@ export class GuideTargets implements GuideTargetResolver {
       if (provider) return provider.reveal?.() ?? false;
       const element = this.findElement(id);
       if (!element || element.closest('[hidden]')) return false;
+      // Floating animation menus can otherwise obscure the next spotlight, even when its geometry is valid.
+      // Only close unrelated overlays; keep the target's ancestors and ordinary inspector disclosures open.
+      const workspace = element.closest('.animation-workspace');
+      for (const panel of workspace?.querySelectorAll('[data-workspace-menu][open], [data-tool-panel][open]') ?? []) {
+        if (!panel.contains(element) && !element.contains(panel)) panel.removeAttribute('open');
+      }
       // Reuse the workspace's UI-only drawer event. React may commit it on the next render.
       const inspector = element.closest('[data-guide-inspector]');
       inspector?.closest('.workspace-shell')?.dispatchEvent(new CustomEvent('workspace:reveal-inspector'));

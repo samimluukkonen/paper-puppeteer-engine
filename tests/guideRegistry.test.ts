@@ -32,7 +32,21 @@ test('central registry has unique feature IDs, editor categories, and stable ord
   );
   assert.deepEqual(
     getGuidesForEditor('animation').map(({ id }) => id),
-    ['animation-timeline-navigation'],
+    [
+      'animation-new',
+      'animation-first-keyframe',
+      'animation-animate-bone',
+      'animation-timeline-navigation',
+      'animation-keyframe-editing',
+      'animation-interpolation',
+      'animation-onion-skinning',
+      'animation-mirroring',
+      'animation-ik-targets',
+      'animation-ik-baking',
+      'animation-events',
+      'animation-rig-tweak',
+      'animation-exporting',
+    ],
   );
   const guide = getGuideById('rig-joint-editing')!;
   assert.strictEqual(guide, getGuidesForEditor('rig')[2]);

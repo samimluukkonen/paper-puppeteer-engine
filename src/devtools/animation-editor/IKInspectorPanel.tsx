@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { EditorMenu } from './EditorMenu.js';
 import type { IKInspectorController } from './IKInspectorController.js';
 
@@ -10,7 +11,7 @@ export function IKInspectorPanel({ controller }: { controller: IKInspectorContro
   useEffect(() => () => controller.cancel(), [controller]);
   return (
     <section id="animation-ik-inspector" aria-label="IK target keyframing" hidden={!state.constraintId}>
-      <details>
+      <details data-guide-id={GUIDE_TARGETS.animationIK}>
         <summary>IK target: {state.constraintId}</summary>
         <p>Absolute puppet-local coordinates, before facing and camera projection. Influence ranges from 0 to 1.</p>
         {state.disabledReason && <p role="status">{state.disabledReason}</p>}

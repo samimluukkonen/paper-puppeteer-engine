@@ -4,7 +4,7 @@
 
 The v0.7.6.1 foundation lives in `src/devtools/shared/guides/`. Guides teach individual features, such as Editing Joint Positions or Timeline Navigation. They remain short and independent; there is no application-wide tutorial, persisted completion tracking, database, or telemetry.
 
-The v0.7.6.1 milestone provides the model, registry, targeting contract, and session controller. v0.7.6.2 adds the React feature selection modal and guarded editor navigation described below. v0.7.6.3 adds the shared spotlight and step cards. v0.7.6.4 adds the nine task-focused [Rig Editor tutorials](rig-editor-guides.md). Interactive guided practice remains a later milestone.
+The v0.7.6.1 milestone provides the model, registry, targeting contract, and session controller. v0.7.6.2 adds the React feature selection modal and guarded editor navigation described below. v0.7.6.3 adds the shared spotlight and step cards. v0.7.6.4 adds the nine task-focused [Rig Editor tutorials](rig-editor-guides.md). v0.7.6.5 adds thirteen [Animation Editor tutorials](animation-editor-guides.md). Interactive guided practice remains a later milestone.
 
 ## Feature selection and launch
 
@@ -28,12 +28,12 @@ Import the internal frontend API from `src/devtools/shared/guides/index.ts`:
 
 - `GuideDefinition`: ID, feature title/description, editor, category, optional prerequisites, and ordered steps.
 - `GuideStep`: ID, title/description, stable target ID, optional prerequisites, and optional `reveal-target` preparation.
-- `GuideContext`: active editor and capabilities (`character`, `valid-rig`, `animation`, `ik-constraints`, `rig-artwork`, or `tool:<id>`).
+- `GuideContext`: active editor and capabilities (`character`, `valid-rig`, `animation`, `ik-constraints`, `rig-artwork`, `bone-keyframes`, `ik-keyframes`, or `tool:<id>`).
 - `GuideRegistry`: validates nonempty/unique guide and step IDs, nonempty steps, and target IDs; owns deeply frozen copies of definitions.
 - `getAllGuides()`, `getGuidesForEditor(editor)`, and `getGuideById(id)`: access the shared catalog. `guideRegistry.getGuideStep(guideId, stepId)` returns an individual step. Missing lookups return `undefined`.
 - `getGuideAvailability(guide, context, step?)`: checks declared prerequisites and returns `{ available: true }` or `{ available: false, reason }`.
 
-Register feature definitions centrally in `definitions.ts`, outside React markup. `rigGuides.ts` supplies the nine Rig Editor tasks; the animation timeline example remains independent. Future guides that teach creation of a missing resource should omit that resource's prerequisite. Additional IK/tool requirements use capability facts without passing authoring objects into the guide system.
+Register feature definitions centrally in `definitions.ts`, outside React markup. `rigGuides.ts` supplies the nine Rig Editor tasks; `animationGuides.ts` supplies the thirteen Animation Editor tasks. Future guides that teach creation of a missing resource should omit that resource's prerequisite. Additional IK/tool requirements use capability facts without passing authoring objects into the guide system.
 
 Catalog availability is independent of the current editor, allowing the selection modal to show both editor categories. The controller's `getAvailability(id)` checks the guide and first step; subsequent step requirements are checked on entry. Starting additionally requires the correct editor. The launcher uses existing navigation and unsaved-change guards before starting; the guide controller never navigates by itself.
 

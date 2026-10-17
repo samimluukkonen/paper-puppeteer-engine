@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.7.6.5
+
+Add thirteen selectable [Animation Editor tutorials](docs/animation-editor-guides.md) covering clip creation, bone keys, playback/timeline navigation, key editing, interpolation, onion skins, mirroring, IK targets/baking, events, Rig Tweak and export. Stable control/panel/preview anchors use the existing spotlight resolver. Live prerequisites distinguish missing clips, bone keys, selected IK targets and authored IK keys without adding sample data or changing selection. Tours remain explanation-only; inspector sections start collapsed. Unit and local desktop browser regressions check navigation, geometry and preserved documents/history. Package version remains `0.7.5`; animation functionality and authored formats are unchanged.
+
 ## 0.7.6.4
 
 Add nine selectable [Rig Editor tutorials](docs/rig-editor-guides.md), with 44 steps covering new characters, bones, joint positions, image import/replacement, sprite alignment, slots/attachments, skins, IK defaults and rig/character export. Stable React control anchors and the existing preview-panel target follow the real UI. Live artwork and IK prerequisites explain unavailable tasks on root-only drafts. Tours reveal disclosures and scroll controls without authoring or exporting; inspector sections still start collapsed. Unit and local desktop browser coverage checks the catalog, every target, navigation, failed loads and retained documents/history. Package version remains `0.7.5`.

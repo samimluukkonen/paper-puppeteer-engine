@@ -6,11 +6,13 @@ export function EditorMenu({
   label,
   children,
   compact = false,
+  guideTargetId,
 }: {
   id: string;
   label: string;
   children: ReactNode;
   compact?: boolean;
+  guideTargetId?: string;
 }) {
   return (
     <details id={id} className="animation-menu" data-workspace-menu>
@@ -24,7 +26,12 @@ export function EditorMenu({
           label
         )}
       </summary>
-      <div className="animation-menu-content" role="group" aria-label={`${label} commands`}>
+      <div
+        data-guide-id={guideTargetId}
+        className="animation-menu-content"
+        role="group"
+        aria-label={`${label} commands`}
+      >
         {children}
       </div>
     </details>
