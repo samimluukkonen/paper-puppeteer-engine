@@ -1,0 +1,262 @@
+import type { Point } from './affineMath.js';
+import { AnimationStateController } from './AnimationStateController.js';
+import type { Puppet } from './Puppet.js';
+import { assertFinite } from './types.js';
+
+/** Animation IDs, never global conventions or state IDs. Both clips must be registered. */
+export interface ActorLocomotion {
+  readonly walk: string;
+  readonly idle: string;
+  /** Existing runtime crossfade duration in milliseconds. Defaults to zero. */
+  readonly fadeDuration?: number;
+}
+
+export interface ActorMoveOptions {
+  /** World units per second, strictly positive. Defaults to 120. */
+  readonly speed?: number;
+  /** Aborting stops this movement, including its owned locomotion. */
+  readonly signal?: AbortSignal;
+}
+
+export interface ActorWalkOptions extends ActorMoveOptions {
+  /** Overrides the Actor's mapping for this request. */
+  readonly locomotion?: ActorLocomotion;
+}
+
+export type ActorMovementOutcome = 'completed' | 'interrupted' | 'cancelled' | 'disposed';
+
+export interface ActorMovementSnapshot {
+  /** All points use the same parent coordinates as Actor.position. */
+  readonly start: Readonly<Point>;
+  readonly destination: Readonly<Point>;
+  readonly position: Readonly<Point>;
+  readonly speed: number;
+}
+
+export type ActorMovementResult =
+  | { readonly status: ActorMovementOutcome; readonly movement: ActorMovementSnapshot }
+  | { readonly status: 'cancelled'; readonly movement?: never };
+
+interface MovementRequest {
+  readonly start: Readonly<Point>;
+  readonly destination: Readonly<Point>;
+  readonly speed: number;
+  readonly resolve: (result: ActorMovementResult) => void;
+  readonly locomotion: ActorLocomotion | undefined;
+  controller?: AnimationStateController;
+  unsubscribeUpdate?: () => void;
+  unsubscribeAbort?: () => void;
+}
+
+function point(x: number, y: number): Readonly<Point> {
+  assertFinite(x, 'Movement x');
+  assertFinite(y, 'Movement y');
+  return Object.freeze({ x, y });
+}
+
+/** Internal movement policy; Puppet owns the only update loop and position. */
+export class ActorMovement {
+  private current: MovementRequest | undefined;
+
+  constructor(private readonly puppet: Puppet) {}
+
+  async start(
+    x: number,
+    y: number,
+    options: ActorMoveOptions,
+    locomotion?: ActorLocomotion,
+  ): Promise<ActorMovementResult> {
+    if (options.signal?.aborted) return { status: 'cancelled' };
+    const destination = point(x, y);
+    const speed = options.speed === undefined ? 120 : options.speed;
+    assertFinite(speed, 'Movement speed');
+    if (speed <= 0) throw new Error('Movement speed must be positive.');
+    this.distance(destination);
+    if (locomotion) {
+      for (const name of [locomotion.walk, locomotion.idle]) {
+        if (typeof name !== 'string' || !name.trim() || !this.puppet.hasAnimation(name))
+          throw new Error(`Unknown locomotion animation "${name}".`);
+      }
+      assertFinite(locomotion.fadeDuration ?? 0, 'Locomotion fade duration');
+      if ((locomotion.fadeDuration ?? 0) < 0) throw new Error('Locomotion fade duration cannot be negative.');
+      locomotion = Object.freeze({ ...locomotion });
+    }
+
+    const previousLocomotion = this.current?.controller?.isActive ? this.current.locomotion : undefined;
+    // A walking replacement suppresses the intermediate idle start.
+    this.finish('interrupted', false);
+    const start = this.position();
+    return new Promise<ActorMovementResult>((resolve, reject) => {
+      const request: MovementRequest = { start, destination, speed, resolve, locomotion };
+      this.current = request;
+      request.unsubscribeUpdate = this.puppet.onUpdate((delta) => this.update(request, delta));
+      if (options.signal) {
+        const signal = options.signal;
+        const abort = (): void => {
+          if (this.current === request) this.finish('cancelled');
+        };
+        signal.addEventListener('abort', abort, { once: true });
+        request.unsubscribeAbort = () => signal.removeEventListener('abort', abort);
+      }
+      try {
+        if ((!locomotion || (start.x === x && start.y === y)) && previousLocomotion) {
+          this.puppet.play(previousLocomotion.idle, {
+            loop: true,
+            restart: true,
+            fadeDuration: previousLocomotion.fadeDuration ?? 0,
+          });
+          if (this.current !== request) return;
+        }
+        if (start.x === x && start.y === y) {
+          this.finish('completed');
+          return;
+        }
+        if (locomotion) {
+          const controller = this.startLocomotion(request, locomotion);
+          request.controller = controller;
+          // Starting animation can synchronously abort, dispose, or replace the movement.
+          if (this.current !== request) {
+            try {
+              if (!this.current?.locomotion && controller.isActive) controller.setState('idle');
+            } finally {
+              controller.dispose();
+            }
+          }
+        }
+      } catch (error) {
+        if (this.current === request) {
+          this.release(request);
+          this.current = undefined;
+        }
+        reject(error);
+      }
+    });
+  }
+
+  cancel(): void {
+    this.finish('cancelled');
+  }
+
+  dispose(): void {
+    this.finish('disposed');
+  }
+
+  private startLocomotion(request: MovementRequest, mapping: ActorLocomotion): AnimationStateController {
+    let playbackId: number | undefined;
+    const unsubscribe = this.puppet.onPlaybackLifecycle((event) => {
+      if (event.type === 'started' && event.layer === 'base' && event.clip === mapping.walk && playbackId === undefined)
+        playbackId = event.playbackId;
+    });
+    try {
+      return new AnimationStateController(this.puppet, {
+        initialState: 'walking',
+        states: {
+          walking: { animation: mapping.walk, loop: true },
+          idle: { animation: mapping.idle, loop: true },
+        },
+        defaultFadeDuration: mapping.fadeDuration ?? 0,
+      });
+    } catch (error) {
+      // A host callback can throw after playback commits, before the constructor returns its controller.
+      if (this.current === request) {
+        this.current = undefined;
+        this.release(request);
+        if (
+          playbackId !== undefined &&
+          this.puppet.getPlaybackStatus()?.playbackId === playbackId &&
+          !this.puppet.isDestroyed &&
+          !this.puppet.animationPlayer.isDisposed
+        ) {
+          try {
+            this.puppet.play(mapping.idle, { loop: true, restart: true, fadeDuration: mapping.fadeDuration ?? 0 });
+          } catch (restoreError) {
+            throw new AggregateError([error, restoreError], 'Locomotion start and idle restoration failed.', {
+              cause: restoreError,
+            });
+          }
+        }
+      }
+      throw error;
+    } finally {
+      unsubscribe();
+    }
+  }
+
+  private position(): Readonly<Point> {
+    return point(this.puppet.container.x, this.puppet.container.y);
+  }
+
+  /** Measure in world units even when the outer container has a scaled/rotated parent. */
+  private distance(destination: Readonly<Point>): number {
+    const start = this.position();
+    let dx = destination.x - start.x;
+    let dy = destination.y - start.y;
+    const parent = this.puppet.container.parentContainer;
+    if (parent) {
+      const matrix = parent.getWorldTransformMatrix();
+      const worldX = matrix.a * dx + matrix.c * dy;
+      dy = matrix.b * dx + matrix.d * dy;
+      dx = worldX;
+    }
+    const distance = Math.hypot(dx, dy);
+    assertFinite(distance, 'Movement distance');
+    if (distance === 0 && (start.x !== destination.x || start.y !== destination.y))
+      throw new Error('Movement direction is collapsed by the parent transform.');
+    return distance;
+  }
+
+  private update(request: MovementRequest, delta: number): void {
+    if (this.current !== request) return;
+    try {
+      const distance = this.distance(request.destination);
+      const fraction = distance === 0 ? 1 : Math.min((request.speed * (delta / 1000)) / distance, 1);
+      const start = this.position();
+      const destination = request.destination;
+      this.puppet.container.setPosition(
+        fraction === 1 ? destination.x : start.x + (destination.x - start.x) * fraction,
+        fraction === 1 ? destination.y : start.y + (destination.y - start.y) * fraction,
+      );
+      this.puppet.syncPose();
+      if (fraction === 1 && this.current === request) this.finish('completed');
+    } catch (error) {
+      if (this.current === request) this.finish('cancelled');
+      throw error;
+    }
+  }
+
+  private release(request: MovementRequest): void {
+    request.unsubscribeUpdate?.();
+    request.unsubscribeAbort?.();
+    request.controller?.dispose();
+  }
+
+  private finish(status: ActorMovementOutcome, restore = true): void {
+    const request = this.current;
+    if (!request) return;
+    this.current = undefined;
+    const ownsPlayback = request.controller?.isActive;
+    const result = Object.freeze({
+      status,
+      movement: Object.freeze({
+        start: request.start,
+        destination: request.destination,
+        position: Object.freeze({ x: this.puppet.container.x, y: this.puppet.container.y }),
+        speed: request.speed,
+      }),
+    });
+    // Release subscriptions before invoking any animation callbacks.
+    this.release(request);
+    try {
+      if (restore && ownsPlayback && !this.puppet.isDestroyed && !this.puppet.animationPlayer.isDisposed) {
+        // Reuse the runtime's crossfade and identity policy; never restart walk from update().
+        this.puppet.play(request.locomotion!.idle, {
+          loop: true,
+          restart: true,
+          fadeDuration: request.locomotion!.fadeDuration ?? 0,
+        });
+      }
+    } finally {
+      request.resolve(result);
+    }
+  }
+}

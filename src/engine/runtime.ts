@@ -1,5 +1,13 @@
 /** Public Phaser runtime. Requires a browser and a host-owned Phaser scene. */
 export { Actor, type ActorOptions, type ActorPosition, type ActorPuppetOwnership } from './Actor.js';
+export type {
+  ActorLocomotion,
+  ActorMoveOptions,
+  ActorWalkOptions,
+  ActorMovementOutcome,
+  ActorMovementResult,
+  ActorMovementSnapshot,
+} from './ActorMovement.js';
 export { Bone } from './Bone.js';
 export * from './core.js';
 export type { PuppetOptions, SyncPoseOptions } from './Puppet.js';

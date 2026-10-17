@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.8.2
+
+Add deterministic Actor `moveTo()` / `walkTo()` and `cancelMovement()` using Puppet's existing millisecond updates. Movement measures world-space speed, clamps arrival, keeps the Puppet container authoritative, and settles typed completed/interrupted/cancelled/disposed outcomes with request snapshots. Explicit Actor/per-request walk and idle animation mappings reuse `AnimationStateController` and runtime crossfades; newer playback owners retain precedence while movement continues. Add `Puppet.onUpdate()`, public movement types, deterministic movement/ownership/cleanup regressions and updated [Actor documentation](docs/actors.md). Facing helpers and spatial targeting remain deferred to v0.8.3; authored formats remain version 1.
+
 ## 0.8.1
 
 Add the optional runtime [Actor foundation](docs/actors.md): host-assigned instance identity, position snapshots and updates backed by the existing Puppet container, delegated playback/async/state/appearance APIs, and explicit borrowed or owned Puppet lifecycle. Actor reuses `AnimationStateController` and playback outcomes, cancels its own borrowed waits on disposal, and destroys owned Puppets once. Add `Puppet.onDestroy()` for reliable idle and scene-shutdown cleanup, public root/runtime exports, lifecycle/ownership/spatial regressions and dependency-boundary coverage. Movement and locomotion coordination remain deferred to v0.8.2; authored formats remain version 1.

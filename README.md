@@ -104,7 +104,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 | [Character assets and rigs](docs/characters.md)                      | Manifests, JSON validation, slots, skins, artwork, and rig definitions                                     |
 | [Animation queues](docs/animation-queues.md)                         | FIFO requests, completion transitions, loop rejection, interruption and cleanup                            |
 | [Async animation](docs/async-animation.md)                           | Awaitable playback, typed outcomes, cancellation, looping policy and disposal                              |
-| [Actor foundation](docs/actors.md)                                   | Optional Puppet facade, instance identity, position, animation delegation and ownership                    |
+| [Actors and movement](docs/actors.md)                                | Optional Puppet facade, deterministic movement, locomotion, animation delegation and ownership             |
 | [Runtime controller readiness](docs/runtime-controller-readiness.md) | Complete public API, interaction matrix, compatibility, cleanup, measurements and v0.7 verification        |
 | [Animation states](docs/animation-states.md)                         | Named states, transition fades, one-shot returns, playback ownership and disposal                          |
 | [Animation and poses](docs/animation.md)                             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |

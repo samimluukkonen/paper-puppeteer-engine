@@ -93,6 +93,7 @@ export class Puppet {
   private facing: Facing;
   private destroyed = false;
   private readonly destroyListeners = new Set<() => void>();
+  private readonly updateListeners = new Set<(deltaMilliseconds: number) => void>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -179,7 +180,7 @@ export class Puppet {
     this.setIKDebug(options.ikDebug ?? false);
     this.setSlotDebug(options.slotDebug ?? false);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
-    if (options.autoUpdate !== false) scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
+    if (options.autoUpdate !== false) scene.events.on(Phaser.Scenes.Events.UPDATE, this.onSceneUpdate, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
@@ -701,8 +702,34 @@ export class Puppet {
 
   update(delta: number): void {
     if (this.destroyed) return;
-    const evaluated = this.animationPlayer.update(delta, this.prepareAnimationPose, this.synchronizeAnimationPose);
-    if (!evaluated) this.syncPose();
+    assertFinite(delta, 'Animation delta');
+    if (delta < 0) throw new Error('Animation delta cannot be negative.');
+    const errors: unknown[] = [];
+    try {
+      if (!this.destroyed) {
+        const evaluated = this.animationPlayer.update(delta, this.prepareAnimationPose, this.synchronizeAnimationPose);
+        if (!evaluated) this.syncPose();
+      }
+    } catch (error) {
+      errors.push(error);
+    }
+    errors.push(
+      ...dispatchListeners(
+        this.updateListeners,
+        (listener) => listener(delta),
+        () => !this.destroyed,
+      ),
+    );
+    throwNotificationErrors(errors, 'Puppet update failed.');
+  }
+
+  /** Run after animation evaluation, using the same millisecond delta in scene and manual updates. */
+  onUpdate(listener: (deltaMilliseconds: number) => void): () => void {
+    if (this.destroyed) throw new Error('Puppet has been destroyed.');
+    this.updateListeners.add(listener);
+    return () => {
+      this.updateListeners.delete(listener);
+    };
   }
 
   destroy(): void {
@@ -721,9 +748,10 @@ export class Puppet {
   private destroyInternal(fromScene?: boolean): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.updateListeners.clear();
     this.ikAnimationSource = undefined;
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
-    this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
+    this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onSceneUpdate, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
@@ -765,7 +793,7 @@ export class Puppet {
     throwNotificationErrors(errors, 'Puppet cleanup failed.');
   }
 
-  private onUpdate(_time: number, delta: number): void {
+  private onSceneUpdate(_time: number, delta: number): void {
     this.update(delta);
   }
 

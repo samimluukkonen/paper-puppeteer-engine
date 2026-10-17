@@ -1,3 +1,10 @@
+import {
+  ActorMovement,
+  type ActorLocomotion,
+  type ActorMoveOptions,
+  type ActorMovementResult,
+  type ActorWalkOptions,
+} from './ActorMovement.js';
 import type { Point } from './affineMath.js';
 import type { PlayAnimationOptions, PlayAndWaitOptions, WaitForPlaybackOptions } from './AnimationPlayer.js';
 import {
@@ -21,6 +28,8 @@ export interface ActorOptions {
   readonly puppetOwnership?: ActorPuppetOwnership;
   /** Optional existing state policy; constructing it starts initialState. */
   readonly animationStates?: AnimationStateControllerOptions;
+  /** Explicit animation IDs used by walkTo(); each request may override this mapping. */
+  readonly locomotion?: ActorLocomotion;
 }
 
 // Ownership follows the live Puppet, without retaining destroyed instances in a global registry.
@@ -33,6 +42,8 @@ export class Actor {
   readonly puppetOwnership: ActorPuppetOwnership;
   private readonly lifetime = new AbortController();
   private readonly states: AnimationStateController | undefined;
+  private readonly movement: ActorMovement;
+  private readonly locomotion: ActorLocomotion | undefined;
   private unsubscribeDestroy: (() => void) | undefined;
   private disposed = false;
 
@@ -47,6 +58,8 @@ export class Actor {
     this.id = options.id;
     this.puppet = puppet;
     this.puppetOwnership = ownership;
+    this.movement = new ActorMovement(puppet);
+    this.locomotion = options.locomotion ? Object.freeze({ ...options.locomotion }) : undefined;
     if (ownership === 'owned') ownedPuppets.add(puppet);
     try {
       this.states = options.animationStates ? new AnimationStateController(puppet, options.animationStates) : undefined;
@@ -78,6 +91,28 @@ export class Actor {
     this.puppet.container.setPosition(x, y);
     // World-space IK targets and debug views must observe the new outer transform immediately.
     this.puppet.syncPose();
+    return this;
+  }
+
+  /** Direct movement in position's parent coordinates, measured in world units per second. */
+  async moveTo(x: number, y: number, options: ActorMoveOptions = {}): Promise<ActorMovementResult> {
+    this.assertActive();
+    return this.movement.start(x, y, options);
+  }
+
+  /** Movement plus explicitly mapped base locomotion. External animation changes retain precedence. */
+  async walkTo(x: number, y: number, options: ActorWalkOptions = {}): Promise<ActorMovementResult> {
+    this.assertActive();
+    if (options.signal?.aborted) return { status: 'cancelled' };
+    const locomotion = options.locomotion ?? this.locomotion;
+    if (!locomotion) throw new Error('walkTo requires a locomotion mapping with walk and idle animation IDs.');
+    return this.movement.start(x, y, options, locomotion);
+  }
+
+  /** Stop movement and restore idle only while this request still owns locomotion. */
+  cancelMovement(): this {
+    this.assertActive();
+    this.movement.cancel();
     return this;
   }
 
@@ -170,7 +205,7 @@ export class Actor {
     return this;
   }
 
-  /** Release state policy and waits. Borrowed playback continues; owned Puppets are destroyed once. */
+  /** Release movement, state policy and waits; destroy owned Puppets once. */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -178,9 +213,13 @@ export class Actor {
     this.unsubscribeDestroy = undefined;
     this.states?.dispose();
     try {
-      if (this.puppetOwnership === 'owned') {
-        ownedPuppets.delete(this.puppet);
-        if (!this.puppet.isDestroyed) this.puppet.destroy();
+      try {
+        this.movement.dispose();
+      } finally {
+        if (this.puppetOwnership === 'owned') {
+          ownedPuppets.delete(this.puppet);
+          if (!this.puppet.isDestroyed) this.puppet.destroy();
+        }
       }
     } finally {
       // Puppet disposal settles its waits first. Borrowed live playback yields wait-only cancellation.
