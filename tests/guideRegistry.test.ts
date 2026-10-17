@@ -18,20 +18,30 @@ test('central registry has unique feature IDs, editor categories, and stable ord
   assert.equal(new Set(all.map(({ id }) => id)).size, all.length);
   assert.deepEqual(
     getGuidesForEditor('rig').map(({ id }) => id),
-    ['rig-joint-editing'],
+    [
+      'rig-new-character',
+      'rig-creating-bones',
+      'rig-joint-editing',
+      'rig-importing-artwork',
+      'rig-aligning-sprites',
+      'rig-slots-attachments',
+      'rig-skins',
+      'rig-ik-constraints',
+      'rig-exporting',
+    ],
   );
   assert.deepEqual(
     getGuidesForEditor('animation').map(({ id }) => id),
     ['animation-timeline-navigation'],
   );
   const guide = getGuideById('rig-joint-editing')!;
-  assert.strictEqual(guide, getGuidesForEditor('rig')[0]);
+  assert.strictEqual(guide, getGuidesForEditor('rig')[2]);
   assert.equal(guide.category, 'rigging');
   assert.deepEqual(
     guide.steps.map(({ id }) => id),
-    ['hierarchy', 'joint-properties', 'preview'],
+    ['hierarchy', 'tool', 'bind-pose', 'preview', 'joint-properties', 'history'],
   );
-  assert.strictEqual(guideRegistry.getGuideStep(guide.id, 'joint-properties'), guide.steps[1]);
+  assert.strictEqual(guideRegistry.getGuideStep(guide.id, 'joint-properties'), guide.steps[4]);
   assert.isUndefined(getGuideById('missing'));
   assert.isUndefined(guideRegistry.getGuideStep('missing', 'hierarchy'));
   assert.isUndefined(guideRegistry.getGuideStep(guide.id, 'missing'));
@@ -44,7 +54,7 @@ test('registry owns deeply immutable copies without freezing caller data', () =>
   Object.assign(input, { title: 'Changed', steps: [] });
   const guide = registry.getAllGuides()[0]!;
   assert.equal(guide.title, 'Editing Joint Positions');
-  assert.lengthOf(guide.steps, 3);
+  assert.lengthOf(guide.steps, 6);
   for (const value of [
     registry.getAllGuides(),
     registry.getGuidesForEditor('rig'),

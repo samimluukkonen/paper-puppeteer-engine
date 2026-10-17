@@ -34,14 +34,13 @@ test('start, ordered navigation, boundaries, finish, exit, and reset clear sessi
   assert.isFalse(controller.finish().ok);
   assert.strictEqual(controller.getSnapshot(), first);
   assert.isTrue(controller.next().ok);
-  assert.equal(controller.getSnapshot().currentStep?.id, 'joint-properties');
+  assert.equal(controller.getSnapshot().currentStep?.id, 'tool');
   assert.isTrue(controller.previous().ok);
   assert.strictEqual(controller.getSnapshot().currentStep, first.currentStep);
-  controller.next();
-  controller.next();
+  while (controller.getSnapshot().stepIndex! < 5) assert.isTrue(controller.next().ok);
   const last = controller.getSnapshot();
-  assert.equal(last.currentStep?.id, 'preview');
-  assert.equal(last.stepIndex, 2);
+  assert.equal(last.currentStep?.id, 'history');
+  assert.equal(last.stepIndex, 5);
   assert.isFalse(controller.next().ok);
   assert.strictEqual(controller.getSnapshot(), last);
   assert.isTrue(controller.finish().ok);
@@ -158,7 +157,18 @@ test('individual step prerequisites gate entry and recheck after capabilities ch
 });
 
 test('safe preparation is explicit, limited to reveal, and missing targets leave navigation usable', () => {
-  const controller = new GuideController(context);
+  const guide = getGuideById('rig-joint-editing')!;
+  const controller = new GuideController(
+    context,
+    new GuideRegistry([
+      {
+        ...guide,
+        steps: [guide.steps[0]!, { ...guide.steps[1]!, preparation: undefined }].map(({ preparation, ...step }) =>
+          preparation ? { ...step, preparation } : step,
+        ),
+      },
+    ]),
+  );
   const reveal = vi.fn(() => false);
   const targets: GuideTargetResolver = { resolve: () => null, reveal };
   assert.isFalse(controller.prepareCurrentStep(targets).ok);
@@ -173,7 +183,6 @@ test('safe preparation is explicit, limited to reveal, and missing targets leave
   reveal.mockReturnValue(true);
   assert.isTrue(controller.prepareCurrentStep(targets).ok);
   assert.deepEqual(reveal.mock.calls[1], ['rig-bone-hierarchy']);
-  controller.next();
   controller.next();
   assert.isTrue(controller.prepareCurrentStep(targets).ok);
   assert.lengthOf(reveal.mock.calls, 2, 'steps without preparation never reveal anything');
@@ -259,9 +268,9 @@ test.each([false, true])(
       controller.next();
       controller.prepareCurrentStep(targets);
       controller.previous();
-      controller.next();
-      controller.next();
-      controller.finish();
+      while (controller.getSnapshot().stepIndex! < controller.getSnapshot().currentGuide!.steps.length - 1)
+        assert.isTrue(controller.next().ok);
+      assert.isTrue(controller.finish().ok);
       controller.start(id);
       controller.exit();
       controller.reset();

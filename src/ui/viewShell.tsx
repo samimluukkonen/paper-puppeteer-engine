@@ -1,5 +1,6 @@
 import { Clapperboard, MonitorPlay, Network } from 'lucide-react';
 import packageInfo from '../../package.json';
+import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
 import { characterChoices, selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
 import { FeatureGuideButton } from './FeatureGuide.js';
@@ -71,7 +72,11 @@ export function ViewHeader({
           </p>
           <label className="character-choice">
             Character
-            <select id={selectionId} defaultValue={characterId}>
+            <select
+              id={selectionId}
+              data-guide-id={view === 'rig' ? GUIDE_TARGETS.rigCharacter : undefined}
+              defaultValue={characterId}
+            >
               {!choices.some((entry) => entry.id === characterId) && (
                 <option value={characterId}>{characterId} (unavailable)</option>
               )}
@@ -82,7 +87,7 @@ export function ViewHeader({
               ))}
             </select>
           </label>
-          <NewCharacterDialog root={root} />
+          <NewCharacterDialog root={root} guideTargetId={view === 'rig' ? GUIDE_TARGETS.rigNewCharacter : undefined} />
         </div>
         <nav className="view-navigation" aria-label="Views">
           {Object.entries(views).map(([id, item]) => (

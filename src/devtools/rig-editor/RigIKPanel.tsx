@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { RigDefinition } from '../../engine/types.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { AttachmentController } from './AttachmentController.js';
 import './attachments.css';
 import { rigIKChains, rigIKFormError } from './rigIKForm.js';
@@ -283,7 +284,7 @@ export function RigIKPanel({ controller }: { controller: AttachmentController })
   return (
     <details className="attachment-panel rig-ik-panel">
       <summary>IK constraints</summary>
-      <section className="rig-ik-content" aria-label="IK constraints">
+      <section data-guide-id={GUIDE_TARGETS.rigIK} className="rig-ik-content" aria-label="IK constraints">
         {!constraints.length && (
           <>
             <p>No IK constraints</p>
@@ -302,7 +303,7 @@ export function RigIKPanel({ controller }: { controller: AttachmentController })
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => setCreating(true)}>
+        <button type="button" data-guide-id={GUIDE_TARGETS.rigAddIK} onClick={() => setCreating(true)}>
           + Add IK Constraint
         </button>
         <label>

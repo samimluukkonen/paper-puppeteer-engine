@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.7.6.4
+
+Add nine selectable [Rig Editor tutorials](docs/rig-editor-guides.md), with 44 steps covering new characters, bones, joint positions, image import/replacement, sprite alignment, slots/attachments, skins, IK defaults and rig/character export. Stable React control anchors and the existing preview-panel target follow the real UI. Live artwork and IK prerequisites explain unavailable tasks on root-only drafts. Tours reveal disclosures and scroll controls without authoring or exporting; inspector sections still start collapsed. Unit and local desktop browser coverage checks the catalog, every target, navigation, failed loads and retained documents/history. Package version remains `0.7.5`.
+
 ## 0.7.6.3
 
 Add a shared guided-tour spotlight above React and Phaser with a dimmed rectangular cutout, positioned explanation card, Back/Next/Finish/Exit and Escape. Safe reveal expands only the targeted disclosures and scrolls controls into view. Live DOM/panel/provider measurements follow layout, scroll, resize and zoom; missing targets offer Skip/Exit. Explanation-only modal interaction protects editor data, contains keyboard focus and restores it on exit. Reduced-motion support, observer/listener/frame cleanup, unit coverage and local browser regressions accompany the overlay. Interactive guided practice remains deferred.

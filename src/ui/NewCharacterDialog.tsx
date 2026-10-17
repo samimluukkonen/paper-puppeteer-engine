@@ -3,7 +3,7 @@ import { browserCharacterDrafts, suggestCharacterId } from '../devtools/shared/n
 import { characterCatalog } from '../shared/characterCatalog.js';
 
 /** Available before the renderer or any character documents are ready. */
-export function NewCharacterDialog({ root }: { root: string }) {
+export function NewCharacterDialog({ root, guideTargetId }: { root: string; guideTargetId?: string | undefined }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState('');
   const [id, setId] = useState('');
@@ -21,6 +21,7 @@ export function NewCharacterDialog({ root }: { root: string }) {
       <button
         type="button"
         className="workspace-primary"
+        data-guide-id={guideTargetId}
         aria-haspopup="dialog"
         onClick={() => {
           setName('');

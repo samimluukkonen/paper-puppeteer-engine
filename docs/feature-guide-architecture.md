@@ -4,7 +4,7 @@
 
 The v0.7.6.1 foundation lives in `src/devtools/shared/guides/`. Guides teach individual features, such as Editing Joint Positions or Timeline Navigation. They remain short and independent; there is no application-wide tutorial, persisted completion tracking, database, or telemetry.
 
-The v0.7.6.1 milestone provides the model, registry, targeting contract, and session controller. v0.7.6.2 adds the React feature selection modal and guarded editor navigation described below. v0.7.6.3 adds the shared spotlight and step cards. Complete tutorial content and interactive guided practice remain later milestones.
+The v0.7.6.1 milestone provides the model, registry, targeting contract, and session controller. v0.7.6.2 adds the React feature selection modal and guarded editor navigation described below. v0.7.6.3 adds the shared spotlight and step cards. v0.7.6.4 adds the nine task-focused [Rig Editor tutorials](rig-editor-guides.md). Interactive guided practice remains a later milestone.
 
 ## Feature selection and launch
 
@@ -12,7 +12,7 @@ The shared character workspace header exposes **Feature Guide** in both editors,
 
 Feature titles, descriptions and rows come directly from `GuideRegistry`; the modal does not maintain a second catalog. Unavailable entries retain visible prerequisite reasons and disabled Start buttons. Empty categories and failed character loads have explicit messages. An active session opens the step overlay with an immediate Exit action before another guide can start.
 
-`workspaceGuideHost.ts` reads current rig validation, selected animation, authored IK constraints and UI tool availability into capability facts. State subscriptions, rig inspector changes and load failures refresh these facts. Guides that teach resource creation can omit the resource prerequisite. Optional IK/tool prerequisites use the same registry checks as the initial guides.
+`workspaceGuideHost.ts` reads current rig validation, selected animation, authored sprite/attachment presence, IK constraints and UI tool availability into capability facts. State subscriptions, rig inspector changes and load failures refresh these facts. Guides that teach resource creation can omit the resource prerequisite. Optional IK/tool prerequisites use the same registry checks as the initial guides.
 
 `GuideLauncher` revalidates live context and first-step prerequisites on every launch, asks the existing `WorkspaceNavigation` binding to navigate, refreshes context again, and starts the existing controller at step zero. The modal closes only after success; failures show an accessible message. Programmatic navigation and header links share mode switching and URL/history bookkeeping, including deployment bases and character query parameters. Committed rig/animation/artwork edits retain their live owners and histories. Mode changes that would discard uncommitted animation previews are unavailable for guide launch, without offering a discard confirmation. Ordinary navigation retains its existing guard. No guide launch reloads the page or synthesizes clicks on editor controls.
 
@@ -28,12 +28,12 @@ Import the internal frontend API from `src/devtools/shared/guides/index.ts`:
 
 - `GuideDefinition`: ID, feature title/description, editor, category, optional prerequisites, and ordered steps.
 - `GuideStep`: ID, title/description, stable target ID, optional prerequisites, and optional `reveal-target` preparation.
-- `GuideContext`: active editor and capabilities (`character`, `valid-rig`, `animation`, `ik-constraints`, or `tool:<id>`).
+- `GuideContext`: active editor and capabilities (`character`, `valid-rig`, `animation`, `ik-constraints`, `rig-artwork`, or `tool:<id>`).
 - `GuideRegistry`: validates nonempty/unique guide and step IDs, nonempty steps, and target IDs; owns deeply frozen copies of definitions.
 - `getAllGuides()`, `getGuidesForEditor(editor)`, and `getGuideById(id)`: access the shared catalog. `guideRegistry.getGuideStep(guideId, stepId)` returns an individual step. Missing lookups return `undefined`.
 - `getGuideAvailability(guide, context, step?)`: checks declared prerequisites and returns `{ available: true }` or `{ available: false, reason }`.
 
-Add feature definitions centrally in `definitions.ts`, outside React markup. The two short initial definitions exercise both editor paths and anchors; they are architecture examples, not complete editing tutorials. Future guides that teach creation of a missing resource should omit that resource's prerequisite. Additional IK/tool requirements use capability facts without passing authoring objects into the guide system.
+Register feature definitions centrally in `definitions.ts`, outside React markup. `rigGuides.ts` supplies the nine Rig Editor tasks; the animation timeline example remains independent. Future guides that teach creation of a missing resource should omit that resource's prerequisite. Additional IK/tool requirements use capability facts without passing authoring objects into the guide system.
 
 Catalog availability is independent of the current editor, allowing the selection modal to show both editor categories. The controller's `getAvailability(id)` checks the guide and first step; subsequent step requirements are checked on entry. Starting additionally requires the correct editor. The launcher uses existing navigation and unsaved-change guards before starting; the guide controller never navigates by itself.
 

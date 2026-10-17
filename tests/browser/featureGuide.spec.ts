@@ -17,7 +17,7 @@ test('feature selection uses the registry, keyboard categories, modal focus cont
   const close = dialog.getByRole('button', { name: 'Close', exact: true });
   await expect(close).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  await expect(dialog.getByRole('button', { name: /^Start Guide:/ })).toBeFocused();
+  await expect(dialog.getByRole('button', { name: /^Start Guide:/ }).last()).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(close).toBeFocused();
   for (const editor of ['animation', 'rig'] as const) {
@@ -102,7 +102,8 @@ test('pending animation previews disable cross-editor guides without discarding 
   const dialog = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
   await dialog.getByRole('button', { name: 'Rig Editor', exact: true }).click();
   await expect(dialog).toContainText('Commit or revert uncommitted animation previews');
-  await expect(dialog.getByRole('button', { name: /^Start Guide:/ })).toBeDisabled();
+  for (const start of await dialog.getByRole('button', { name: /^Start Guide:/ }).all())
+    await expect(start).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(x).toHaveValue('27');
   await expect(x).toHaveAttribute('data-temporary', 'true');
@@ -115,9 +116,14 @@ test('failed character loads leave the modal usable with explicit unavailable re
   const dialog = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
   await expect(dialog).toContainText('No character is loaded.');
   await expect(dialog).toContainText('Load or create a character first.');
-  await expect(dialog.getByRole('button', { name: /^Start Guide:/ })).toBeDisabled();
+  await expect(
+    dialog.getByRole('button', { name: 'Start Guide: Creating a New Character', exact: true }),
+  ).toBeEnabled();
+  for (const guide of guideRegistry.getGuidesForEditor('rig').filter((guide) => guide.id !== 'rig-new-character'))
+    await expect(dialog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Animation Editor', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: /^Start Guide:/ })).toBeDisabled();
+  for (const start of await dialog.getByRole('button', { name: /^Start Guide:/ }).all())
+    await expect(start).toBeDisabled();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Feature Guide', exact: true })).toBeFocused();
 });
@@ -133,10 +139,17 @@ test('a new character offers rig guides and explains the missing animation', asy
   await expect(page.locator('#validation')).toHaveText('Validation: OK', { timeout: 15_000 });
   await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
-  await expect(dialog.getByRole('button', { name: /^Start Guide:/ })).toBeEnabled();
+  for (const guide of guideRegistry.getGuidesForEditor('rig')) {
+    const start = dialog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
+    if (['rig-aligning-sprites', 'rig-ik-constraints'].includes(guide.id)) await expect(start).toBeDisabled();
+    else await expect(start).toBeEnabled();
+  }
+  await expect(dialog).toContainText('Create a chain of three connected bones');
+  await expect(dialog).toContainText('Add artwork to a bone or create a sprite attachment first.');
   await dialog.getByRole('button', { name: 'Animation Editor', exact: true }).click();
   await expect(dialog).toContainText('Create or select an animation first.');
-  await expect(dialog.getByRole('button', { name: /^Start Guide:/ })).toBeDisabled();
+  for (const start of await dialog.getByRole('button', { name: /^Start Guide:/ }).all())
+    await expect(start).toBeDisabled();
 });
 
 test('spotlight reveals collapsed panels, contains focus, blocks editor input, navigates and finishes safely', async ({
@@ -151,7 +164,7 @@ test('spotlight reveals collapsed panels, contains focus, blocks editor input, n
   const tour = page.getByRole('dialog', { name: 'Editing Joint Positions', exact: true });
   await expect(tour).toBeVisible();
   await expect(tour.getByRole('heading', { name: 'Editing Joint Positions', exact: true })).toBeFocused();
-  await expect(tour).toContainText('Step 1 of 3');
+  await expect(tour).toContainText('Step 1 of 6');
   await expect(tour).toContainText('Read-only tour');
   await expect(page.locator('.workspace-hierarchy')).toHaveAttribute('open', '');
   await expect(tour.getByRole('button', { name: 'Back', exact: true })).toBeDisabled();
@@ -170,22 +183,26 @@ test('spotlight reveals collapsed panels, contains focus, blocks editor input, n
   await expect(page.locator('#hierarchy')).toHaveAttribute('data-guide-clicks', '0');
   await expect(page.locator('#dirty-status')).not.toContainText('Unsaved changes');
   await tour.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(tour).toContainText('Step 2 of 3');
-  await expect(page.locator('.rig-selection-details')).toHaveAttribute('open', '');
+  await expect(tour).toContainText('Step 2 of 6');
+  await expect(tour).toContainText('Choose Joint Editing');
   await tour.getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(tour).toContainText('Step 1 of 3');
+  await expect(tour).toContainText('Step 1 of 6');
   await tour.getByRole('button', { name: 'Next', exact: true }).click();
   await tour.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(tour).toContainText('Step 3 of 3');
+  await tour.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(tour).toContainText('Step 4 of 6');
   const canvas = (await page.locator('#editor-stage canvas').boundingBox())!;
   await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await tour.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.locator('.rig-selection-details')).toHaveAttribute('open', '');
+  await tour.getByRole('button', { name: 'Next', exact: true }).click();
   await tour.getByRole('button', { name: 'Finish', exact: true }).click();
   await expect(tour).toHaveCount(0);
   await expect(open).toBeFocused();
   await expect(page.locator('#dirty-status')).not.toContainText('Unsaved changes');
   await open.click();
   await page.getByRole('button', { name: 'Start Guide: Editing Joint Positions', exact: true }).click();
-  await expect(tour).toContainText('Step 1 of 3');
+  await expect(tour).toContainText('Step 1 of 6');
   await page.keyboard.press('Escape');
   await expect(tour).toHaveCount(0);
   await expect(open).toBeFocused();
@@ -268,13 +285,16 @@ test('disappearing targets show Skip/Exit, recover after reveal, and never leave
     (element as HTMLElement).style.display = 'none';
   });
   await tour.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expect(tour).toContainText('Step 2 of 3');
+  await expect(tour).toContainText('Step 2 of 6');
   await expect(tour.locator('.guide-spotlight-hole')).toBeVisible();
+  await tour.getByRole('button', { name: 'Next', exact: true }).click();
   await tour.getByRole('button', { name: 'Next', exact: true }).click();
   await page.locator('#editor-stage').evaluate((element) => {
     element.setAttribute('hidden', '');
   });
-  await tour.getByRole('button', { name: 'Skip / Finish', exact: true }).click();
+  await tour.getByRole('button', { name: 'Skip', exact: true }).click();
+  await tour.getByRole('button', { name: 'Next', exact: true }).click();
+  await tour.getByRole('button', { name: 'Finish', exact: true }).click();
   await expect(tour).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Feature Guide', exact: true })).toBeFocused();
 });

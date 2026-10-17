@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { ArtworkAlignmentPolicy, ArtworkReference } from '../../../engine/artworkReplacement.js';
+import { GUIDE_TARGETS } from '../guides/anchors.js';
 import type { ArtworkController } from './ArtworkController.js';
 import './artwork.css';
 
@@ -18,6 +19,7 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
           Import new artwork
           <input
             type="file"
+            data-guide-id={GUIDE_TARGETS.rigImportArtwork}
             aria-label="Import new artwork"
             accept=".png,.webp,image/png,image/webp"
             disabled={!state.ready || state.importing}
@@ -30,13 +32,14 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
         </label>
         {state.ready && !state.targets.length && (
           <p>
-            No artwork yet. Import a PNG or WebP to start your artwork library. The root bone can be edited now; bone
-            and slot creation tools are a later milestone.
+            No artwork yet. Import a PNG or WebP to start your artwork library. In the Rig Editor, use Hierarchy to
+            build bones and slots, then create and assign attachments in Attachments &amp; skins.
           </p>
         )}
         <label>
           Artwork asset
           <select
+            data-guide-id={GUIDE_TARGETS.rigArtworkAsset}
             aria-label="Artwork asset"
             value={state.selectedKey ?? ''}
             disabled={!state.targets.length}
@@ -147,6 +150,7 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
           Import sprite
           <input
             type="file"
+            data-guide-id={GUIDE_TARGETS.rigReplaceArtwork}
             aria-label="Import sprite"
             accept=".png,.webp,image/png,image/webp"
             disabled={!target || !!reason}

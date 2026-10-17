@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { AttachmentController } from './AttachmentController.js';
 import './attachments.css';
 import type { RigEditorState } from './RigEditorState.js';
@@ -66,13 +67,18 @@ export function RigStructurePanel({ controller }: { controller: AttachmentContro
   const selection = state.selection;
   return (
     <section className="attachment-panel rig-structure-panel" aria-label="Build skeleton">
-      <fieldset disabled={!!editor.previewName}>
+      <fieldset disabled={!!editor.previewName} data-guide-id={GUIDE_TARGETS.rigBuildSkeleton}>
         <legend>Build skeleton</legend>
         <label>
           New bone ID
           <input aria-label="New bone ID" value={boneId} onChange={(event) => setBoneId(event.target.value)} />
         </label>
-        <button type="button" disabled={!boneId.trim()} onClick={() => controller.createBone(boneId)}>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.rigAddBone}
+          disabled={!boneId.trim()}
+          onClick={() => controller.createBone(boneId)}
+        >
           + Add Bone
         </button>
         <small>
@@ -85,7 +91,12 @@ export function RigStructurePanel({ controller }: { controller: AttachmentContro
           New slot ID
           <input aria-label="New slot ID" value={slotId} onChange={(event) => setSlotId(event.target.value)} />
         </label>
-        <button type="button" disabled={!selection || !slotId.trim()} onClick={() => controller.createSlot(slotId)}>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.rigAddSlot}
+          disabled={!selection || !slotId.trim()}
+          onClick={() => controller.createSlot(slotId)}
+        >
           + Add Slot
         </button>
         {selection?.type === 'slot' && (

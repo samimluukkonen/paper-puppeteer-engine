@@ -4,6 +4,7 @@ import type { CharacterDefinition } from '../../../engine/CharacterDefinition.js
 import { Puppet } from '../../../engine/Puppet.js';
 import { loadSceneCharacter } from '../../../shared/loadSceneCharacter.js';
 import { createEditorGame } from '../editorGame.js';
+import { GUIDE_TARGETS } from '../guides/anchors.js';
 import { openPackageRuntime, type PackageFiles } from './characterPackage.js';
 import type { PackageController } from './PackageController.js';
 
@@ -146,7 +147,7 @@ function PackageRuntimePreview({ files, close }: { files: PackageFiles; close: (
 export function PackagePanel({ controller }: { controller: PackageController }) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   return (
-    <details className="package-tools">
+    <details className="package-tools" data-guide-id={GUIDE_TARGETS.rigPackage}>
       <summary>
         Character package{' '}
         <small aria-label="Package document status">

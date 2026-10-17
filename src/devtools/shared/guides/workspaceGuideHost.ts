@@ -20,6 +20,8 @@ export function workspaceGuideHost(options: {
         if (!rig.validationPending && !rig.validationIssues().some((issue) => issue.severity === 'error'))
           capabilities.push('valid-rig');
         if (animation.workingAnimation) capabilities.push('animation');
+        if (rig.workingCopy.bones.some((bone) => bone.sprite) || rig.workingCopy.attachments?.length)
+          capabilities.push('rig-artwork');
         if (rig.workingCopy.ik?.length) capabilities.push('ik-constraints');
         capabilities.push('tool:rig-hierarchy', 'tool:animation-timeline');
         // Mode switching is a UI tool, unavailable while switching would discard a preview.

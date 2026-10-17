@@ -3,7 +3,13 @@ import type { WorkspaceView } from '../WorkspaceNavigation.js';
 export type GuideEditor = WorkspaceView;
 export type GuideCategory = 'rigging' | 'artwork' | 'animation' | 'ik';
 export type GuideTargetId = string;
-export type GuideCapability = 'character' | 'valid-rig' | 'animation' | 'ik-constraints' | `tool:${string}`;
+export type GuideCapability =
+  | 'character'
+  | 'valid-rig'
+  | 'animation'
+  | 'ik-constraints'
+  | 'rig-artwork'
+  | `tool:${string}`;
 
 /** Facts only: never pass editor documents, commands, playback, or history to a guide. */
 export interface GuideContext {

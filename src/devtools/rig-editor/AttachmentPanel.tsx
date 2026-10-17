@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { AttachmentController } from './AttachmentController.js';
 import './attachments.css';
 
@@ -38,6 +39,7 @@ export function AttachmentPanel({
           <label>
             Active skin
             <select
+              data-guide-id={GUIDE_TARGETS.rigActiveSkin}
               aria-label="Active skin"
               value={active}
               onChange={(event) => controller.selectSkin(event.target.value)}
@@ -60,6 +62,7 @@ export function AttachmentPanel({
           <label>
             Attachment slot
             <select
+              data-guide-id={GUIDE_TARGETS.rigAttachmentSlot}
               aria-label="Attachment slot"
               value={slot}
               onChange={(event) => controller.selectSlot(event.target.value)}
@@ -129,7 +132,7 @@ export function AttachmentPanel({
               </div>
             </>
           )}
-          <fieldset disabled={!authoring}>
+          <fieldset disabled={!authoring} data-guide-id={GUIDE_TARGETS.rigSkinAuthoring}>
             <legend>Skin authoring</legend>
             <label>
               Skin name
@@ -151,7 +154,7 @@ export function AttachmentPanel({
               </button>
             </div>
           </fieldset>
-          <fieldset disabled={!authoring}>
+          <fieldset disabled={!authoring} data-guide-id={GUIDE_TARGETS.rigCreateAttachment}>
             <legend>Create sprite attachment</legend>
             <label>
               Attachment ID

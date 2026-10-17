@@ -32,7 +32,7 @@ export function RigEditorView({
           <div className="rig-session-editing" role="group" aria-label="Rig editing controls">
             <label>
               Edit{' '}
-              <select id="edit-mode">
+              <select id="edit-mode" data-guide-id={GUIDE_TARGETS.rigEditMode}>
                 <option value="joint">Joint Editing</option>
                 <option value="sprite">Artwork Offset Editing</option>
                 <option value="origin">Sprite Origin Editing</option>
@@ -58,16 +58,19 @@ export function RigEditorView({
                 <option value="15">15°</option>
               </select>
             </label>
-            <button id="undo" type="button" aria-keyshortcuts="Control+Z Meta+Z">
-              Undo
-            </button>
-            <button id="redo" type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
-              Redo
-            </button>
+            <span className="rig-history" data-guide-id={GUIDE_TARGETS.rigHistory}>
+              <button id="undo" type="button" aria-keyshortcuts="Control+Z Meta+Z">
+                Undo
+              </button>
+              <button id="redo" type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
+                Redo
+              </button>
+            </span>
           </div>
           <div className="rig-session-actions" role="group" aria-label="Rig commands">
             <button
               id="rig-tools-open"
+              data-guide-id={GUIDE_TARGETS.rigFileTools}
               type="button"
               aria-haspopup="dialog"
               onClick={() => openWorkspaceDialog('rig-tools-dialog')}
@@ -97,14 +100,19 @@ export function RigEditorView({
               Inspector
             </button>
             <div className="workspace-save">
-              <button id="download-json" className="workspace-primary" type="button">
+              <button
+                id="download-json"
+                data-guide-id={GUIDE_TARGETS.rigDownload}
+                className="workspace-primary"
+                type="button"
+              >
                 Download rig.json
               </button>
             </div>
           </div>
           <div className="workspace-feedback">
             <span id="dirty-status" role="status" />
-            <div id="validation" role="status" />
+            <div id="validation" role="status" data-guide-id={GUIDE_TARGETS.rigValidation} />
             <div id="action-feedback" role="status" />
           </div>
           <div className="rig-recovery" role="group" aria-label="Rig draft recovery">
@@ -198,7 +206,7 @@ export function RigEditorView({
             </label>
             <label>
               Pose{' '}
-              <select id="rig-preview-pose">
+              <select id="rig-preview-pose" data-guide-id={GUIDE_TARGETS.rigPreviewPose}>
                 <option value="">Bind pose</option>
               </select>
             </label>
@@ -208,7 +216,7 @@ export function RigEditorView({
             <label>
               <input id="dim-selection" type="checkbox" /> Dim unselected artwork
             </label>
-            <label>
+            <label data-guide-id={GUIDE_TARGETS.rigIKPreview}>
               <input id="ik-preview" type="checkbox" /> IK Preview
             </label>
           </div>

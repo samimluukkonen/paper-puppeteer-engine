@@ -1,41 +1,10 @@
 import { GUIDE_TARGETS } from './anchors.js';
+import { rigGuides } from './rigGuides.js';
 import type { GuideDefinition } from './types.js';
 
-/** Small architecture examples; the complete feature catalog belongs to later guide-content milestones. */
+/** The animation catalog is extended independently of the Rig Editor task guides. */
 export const guideDefinitions: readonly GuideDefinition[] = [
-  {
-    id: 'rig-joint-editing',
-    title: 'Editing Joint Positions',
-    description: 'Find the hierarchy, joint properties, and rig preview.',
-    editor: 'rig',
-    category: 'rigging',
-    prerequisites: [
-      { capability: 'character', reason: 'Load or create a character first.' },
-      { capability: 'valid-rig', reason: 'A valid rig is needed to inspect joint positions.' },
-    ],
-    steps: [
-      {
-        id: 'hierarchy',
-        title: 'Find the bone hierarchy',
-        description: 'The hierarchy lists the bones and their parent relationships.',
-        targetId: GUIDE_TARGETS.rigHierarchy,
-        preparation: 'reveal-target',
-      },
-      {
-        id: 'joint-properties',
-        title: 'Find joint properties',
-        description: 'Selection details shows the selected bone’s local joint values.',
-        targetId: GUIDE_TARGETS.rigSelection,
-        preparation: 'reveal-target',
-      },
-      {
-        id: 'preview',
-        title: 'Find the rig preview',
-        description: 'The canvas shows the skeleton and artwork together.',
-        targetId: GUIDE_TARGETS.rigCanvas,
-      },
-    ],
-  },
+  ...rigGuides,
   {
     id: 'animation-timeline-navigation',
     title: 'Timeline Navigation',
