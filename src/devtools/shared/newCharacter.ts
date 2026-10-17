@@ -56,6 +56,7 @@ export function createCharacterDocuments(definition: CharacterDefinition, option
           .packageAnimations()
           .filter((clip) => Object.hasOwn(clip.tracks, id))
           .map((clip) => `animation "${clip.name}"`),
+        ...definition.poses.filter((pose) => Object.hasOwn(pose.bones, id)).map((pose) => `pose "${pose.name}"`),
         ...(options.boneReferences?.(id) ?? []),
       ],
       ikReferences: (id) => [

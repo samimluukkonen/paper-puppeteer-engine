@@ -7,7 +7,7 @@ import {
 } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, loadPackageDefinition } from '../src/devtools/shared/package/characterPackage.js';
 import { PackageController } from '../src/devtools/shared/package/PackageController.js';
-import { validateCharacterDefinition } from '../src/engine/CharacterDefinition.js';
+import { CharacterDefinition, validateCharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -88,6 +88,44 @@ test('new and loaded working documents, histories and immutable sources are isol
   assert.strictEqual(loaded.rig.workingCopy, loadedSnapshot);
   assert.equal(loaded.rig.getBone(source.rig.root).x, 99);
   assert.isTrue(loaded.rig.canUndo);
+});
+
+test('saved pose references protect bone deletion and rename while preserving package export', async () => {
+  const definition = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'posed-character',
+      rig: 'rig.json',
+      defaultSkin: 'default',
+      skins: { default: 'skin.json' },
+      animations: [],
+      poses: ['pose.json'],
+      textures: {},
+    },
+    rig: { version: 1, root: 'root', bones: [{ id: 'root' }, { id: 'posed', parent: 'root' }] },
+    skins: { 'skin.json': { version: 1, name: 'default', slots: {} } },
+    poses: { 'pose.json': { version: 1, name: 'ready', bones: { posed: { rotation: 1 } } } },
+  });
+  const { rig, animation } = createCharacterDocuments(definition);
+  const before = rig.workingCopy;
+  const history = rig.historyLength;
+  assert.deepEqual(rig.boneDependencies('posed'), ['pose "ready"']);
+  assert.throws(() => rig.removeBone('posed'), /pose "ready"/);
+  assert.throws(() => rig.renameBone('posed', 'renamed'), /pose "ready"/);
+  assert.strictEqual(rig.workingCopy, before);
+  assert.equal(rig.historyLength, history);
+  rig.createBone('unreferenced', 'root');
+  rig.removeBone('unreferenced');
+  const exported = await loadPackageDefinition(
+    await buildCharacterPackage({
+      definition,
+      rig: rig.recoveryDraft,
+      skins: rig.standaloneSkins,
+      animations: animation.packageAnimations(),
+      replacements: [],
+    }),
+  );
+  assert.deepEqual(exported.poses, definition.poses);
 });
 
 test.each([
