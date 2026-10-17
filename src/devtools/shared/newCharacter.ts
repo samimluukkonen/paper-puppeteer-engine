@@ -107,8 +107,12 @@ export class CharacterDraftStore {
       const key = this.storage.key(index);
       if (!key?.startsWith(draftPrefix)) continue;
       const id = key.slice(draftPrefix.length);
-      const draft = this.get(id);
-      if (draft) entries.push({ id, label: `${draft.identity.name} (draft)` });
+      try {
+        const draft = this.get(id);
+        if (draft) entries.push({ id, label: `${draft.identity.name} (draft)` });
+      } catch {
+        // An invalid or incompatible entry must not hide other drafts. Preserve its original bytes.
+      }
     }
     return entries;
   }
@@ -122,10 +126,10 @@ export class CharacterDraftStore {
   }
 
   create(options: NewCharacterOptions) {
-    const workspace = createNewCharacter(
-      options,
-      this.choices().map((entry) => entry.id),
-    );
+    const workspace = createNewCharacter(options);
+    // Invalid drafts still reserve their IDs so creation cannot overwrite retained recovery data.
+    if (this.storage.getItem(`${draftPrefix}${workspace.identity.id}`) !== null)
+      throw new Error(`Character ID "${workspace.identity.id}" already exists.`);
     // A single atomic storage write happens only after all validation and document initialization.
     this.storage.setItem(`${draftPrefix}${workspace.identity.id}`, JSON.stringify(workspace.identity));
     return workspace;

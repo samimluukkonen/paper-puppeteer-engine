@@ -192,6 +192,30 @@ test('failed validation and storage writes leave the current workspace and regis
   failure.mockRestore();
 });
 
+test('malformed drafts are isolated and retained without blocking valid drafts or new characters', () => {
+  const backing = storage();
+  const store = new CharacterDraftStore(backing);
+  store.create({ name: 'First', id: 'first' });
+  const invalid = new Map([
+    ['broken-json', '{'],
+    ['invalid-schema', JSON.stringify({ id: 'invalid-schema', name: '' })],
+    ['wrong-identity', JSON.stringify({ id: 'another-id', name: 'Mismatch' })],
+    ['demo-puppet', JSON.stringify({ id: 'demo-puppet', name: 'Catalog collision' })],
+  ]);
+  for (const [id, json] of invalid) backing.setItem(`paper-puppeteer:new-character:v1:${id}`, json);
+  store.create({ name: 'Last', id: 'last' });
+  assert.deepEqual(store.choices(), [
+    { id: 'first', label: 'First (draft)' },
+    { id: 'last', label: 'Last (draft)' },
+  ]);
+  assert.equal(store.get('first')!.identity.id, 'first');
+  for (const [id, json] of invalid) {
+    assert.throws(() => store.get(id));
+    assert.throws(() => store.create({ id, name: 'Replacement' }), /already exists/);
+    assert.equal(backing.getItem(`paper-puppeteer:new-character:v1:${id}`), json);
+  }
+});
+
 test('editing completeness is distinct from schema validity; empty drafts export without dummy assets or fetches', async () => {
   const draft = createNewCharacter({ name: 'Empty', id: 'empty' });
   assert.deepEqual(
