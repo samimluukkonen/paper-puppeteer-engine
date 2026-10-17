@@ -1,4 +1,4 @@
-# Choreography sequences (v0.8.4)
+# Choreography sequences and multi-Actor coordination (v0.8.5)
 
 [All guides](../README.md#guides)
 
@@ -70,10 +70,82 @@ Movement receives a sequence-local abort signal. Aborting stops that request and
 
 Animation uses the additive `PlayAndWaitOptions.stopOnAbort` option. Its default is false, preserving ordinary wait-only cancellation. When true, abort or a start failure stops only the fresh instance selected by this call, guarded by exact state identity. `restart: false` is rejected with owned waits so an existing host instance cannot be adopted accidentally. Replaced or naturally completed playback is preserved. Other layers and host queue requests remain untouched; stopping an instance does not itself advance a pending queue. A stop-listener error releases the wait and becomes a failed sequence result. Pre-aborted requests still skip validation and playback.
 
-The sequence claims no permanent Actor lock. External Actor/Puppet operations retain the existing interruption rules. While waiting or running a cue, the sequence owns no movement or playback and cancellation does not affect those host operations.
+Each running single-Actor sequence now holds an exclusive choreography claim on its Puppet until settlement, including during waits and cues. Another choreography sequence targeting that Puppet returns `failed` with `ChoreographyConflictError`, without interrupting the owner. Claims are shared across contexts and Actor wrappers and released on every exit. External Actor/Puppet operations retain the existing interruption rules. While waiting or running a cue, the sequence owns no movement or playback and cancellation does not affect those host operations.
+
+## Multi-Actor composition
+
+`Choreography` adds a lightweight Actor registry and a single coordinated run over the existing single-Actor runner. Import `Choreography`, `ChoreographyPlan`, `ChoreographyCoordinationResult` and `ChoreographyConflictError` from the root or `/runtime`. It owns no Actor, Puppet, scene subscription, movement evaluator or timer.
+
+```ts
+import { Choreography } from 'paper-puppeteer-engine/runtime';
+
+// actorA and actorB are live Actors with distinct IDs and explicit locomotion mappings.
+// Replace these animation names with finite responses registered on your Puppets.
+const choreography = new Choreography([actorA, actorB]);
+const plan = choreography.sequence([
+  choreography.parallel([
+    choreography.actor(actorA.id, [
+      { kind: 'walk', x: 400, y: 300, options: { speed: 160, faceMovement: true } },
+    ]),
+    choreography.actor(actorB.id, [
+      { kind: 'walk', x: 600, y: 300, options: { speed: 120, faceMovement: true } },
+    ]),
+  ]),
+  choreography.parallel([
+    choreography.actor(actorA.id, [{ kind: 'lookAt', target: actorB }]),
+    choreography.actor(actorB.id, [{ kind: 'lookAt', target: actorA }]),
+  ]),
+  choreography.actor(actorA.id, [{ kind: 'animation', name: 'bow' }]),
+  choreography.actor(actorB.id, [{ kind: 'animation', name: 'response' }]),
+  choreography.actor(actorA.id, [{ kind: 'cue', callback: () => { showDialogue(); } }]),
+]);
+
+const outcome = await choreography.run(plan);
+if (outcome.status === 'completed') advanceScene();
+// During execution: choreography.cancel() cancels only this run's active owned actions.
+choreography.dispose(); // Releases the registry, without disposing the Actors.
+```
+
+`actor(id, steps)` describes one Actor's existing `ChoreographyStep` sequence. `sequence(children)` and `parallel(children)` describe arbitrarily nested groups. These helpers return typed, lazy descriptions; they start no actions. Actor helper calls snapshot options and point targets just like `ChoreographySequence`; group helpers copy their child arrays. `run(plan)` snapshots and validates the entire tree, including raw descriptions, before any visible action. Actor targets remain live references sampled when their look step is reached. Plans are runtime-only and are not an authored scene format.
+
+`new Choreography(actors?)` registers initial Actors; `register(actor)` adds an Actor before execution and returns the context. `getActor(id)` returns the live registered Actor. Duplicate IDs, missing IDs and disposed Actors are rejected. Registry operations throw validation errors; `run()` returns them as typed outcomes. Registration closes after execution, cancellation or disposal begins. Registration never adopts the Actor's Puppet ownership. Call `dispose()` when finished with a context to release its registry references.
+
+Each context runs once. Concurrent, repeated and reentrant `run()` calls return the same promise, even if passed another plan. Create another context for a new run. Empty sequences and parallel groups complete without runtime ticks. Reusing the same Actor in successive sequential nodes is supported.
+
+### Barriers, conflicts and failure
+
+A parallel group starts its branches in input order without awaiting earlier branches. Its barrier completes only when **every** branch reports `completed`. Different arrival times are expected: an early arrival cannot release the barrier. An interrupted, stopped, cancelled, failed or disposed branch prevents all subsequent scene steps.
+
+The policy is fail-fast for the whole context: the first observed unsuccessful branch cancels all active owned siblings, including nested siblings, prevents later nodes from starting, and preserves that branch's status and original error. The context waits for sibling cancellation and listener cleanup before resolving. Detection follows promise continuations after runtime callbacks finish; it cannot undo completed synchronous cues. First explicit cancel/dispose request wins if made before a branch failure is observed; an already observed branch failure retains precedence. Settled results never change.
+
+Preflight rejects any parallel branches whose Actor sets overlap, including Actors used later inside nested sequences and distinct Actor wrappers over the same Puppet. This deliberately conservative policy reserves one Actor per parallel branch and prevents movement/base-animation races without timing guesses. Separate contexts and standalone `ChoreographySequence` runs also share exclusive claims for each active Actor leaf. Future sequential leaves do not reserve their Puppets: if another run still controls one when reached, the new leaf fails without taking over that run. Direct application Actor/Puppet commands remain authoritative and may interrupt choreography using existing runtime semantics.
+
+`ChoreographyCoordinationResult` is a discriminated union with the existing five statuses. It contains immutable `children` in input order. Actor leaves also expose `actorId` and the original `sequenceResult`, including step progress and movement/playback details. Sequential groups include only reached children. Parallel groups include an outcome for every branch; branches suppressed by cancellation before starting have empty children. Preflight failures have empty children and preserve `error` for failed validation. An Actor disposed before its leaf starts returns `disposed` when reached; active Actor disposal stops the context immediately through the existing sequence disposal subscription.
+
+Context cancellation calls only the active leaf sequences' owned cancellation. It preserves replacement movement/playback, unrelated layers, pending host queue requests and other contexts. Disposal cancels this context and clears the registry without destroying Actors or Puppets. Movement and waits still use Puppet updates. Hosts using manual updates must advance every participating Puppet with the scene's shared delta; automatic Puppets retain their existing scene update subscriptions. Promise orchestration never supplies a new clock or carries unused delta into future steps.
+
+### Animation events and application cues
+
+Animation leaves already react to the existing instance completion API. Authored events remain available through `puppet.onAnimationEvent()`; applications may react, update dialogue/sound/gameplay, or cancel the context from that callback. No event dispatcher or event clock is added. Application listeners remain application-owned and should be unsubscribed by the host:
+
+```ts
+const unsubscribe = actorA.puppet.onAnimationEvent((event) => {
+  if (event.name === 'greeting') showDialogue();
+});
+try {
+  await choreography.run(plan);
+} finally {
+  unsubscribe();
+  choreography.dispose();
+}
+```
+
+Cues remain synchronous, optional runtime callbacks. Asynchronous dialogue, sound, camera and gameplay systems remain application concerns.
 
 ## Coverage and deferred work
 
 Deterministic tests cover ordering, move/walk then play, play then face, natural completion, zero-duration actions, update-clock waits, scene and animation pause semantics, interrupted/stopped playback, movement replacement, cancellation during movement/animation/waits/start callbacks, Actor and scene disposal, invalid commands, copied data/live targets, synchronous cue failures, repeated/reentrant execution, exactly-once settlement and listener cleanup. Existing async playback regressions verify default wait behavior remains compatible.
 
-v0.8.5 work remains deferred: concurrent multi-Actor actions, synchronization barriers, sequential/parallel composition, optional Actor registration, same-Actor conflict policy and fail-fast sibling cancellation. Visual timelines, authored scene serialization, camera direction, dialogue branching, behavior trees, physics and navigation are outside this runner.
+Multi-Actor regressions additionally cover two concurrent walks on shared scene ticks, different arrival times, nested barriers and animation responses, deterministic delta partitions, group cancellation during movement/animation/waits/cues, fail-fast sibling cleanup, authored-event cancellation, external interruption, disposed Actors, registration, preflight conflicts including shared Puppet wrappers, cross-context/standalone claims, invalid future actions, cyclic plans, immutable results and reentrant execution.
+
+v0.8.6 remains deferred: the complete reusable two-character sample using shipped character packages, the wider public API/lifecycle audit, queue/state/crossfade/IK/skin integration stress tests, representative performance measurements and final v0.8 release-readiness documentation. Visual timelines, authored scene serialization, camera direction, dialogue branching, behavior trees, physics and navigation are outside this runner.

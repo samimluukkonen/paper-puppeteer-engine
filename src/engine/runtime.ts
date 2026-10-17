@@ -9,6 +9,8 @@ export type {
   ActorMovementSnapshot,
 } from './ActorMovement.js';
 export { Bone } from './Bone.js';
+export { Choreography, type ChoreographyPlan, type ChoreographyCoordinationResult } from './Choreography.js';
+export { ChoreographyConflictError } from './choreographyOwnership.js';
 export {
   ChoreographySequence,
   type ChoreographyStep,

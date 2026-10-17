@@ -88,6 +88,7 @@ src/engine/
   Actor.ts             Optional Puppet facade, instance identity, movement and explicit ownership
   ActorMovement.ts     Delta-driven point-to-point requests and explicitly mapped locomotion
   ChoreographySequence.ts  Optional ordered Actor steps, owned cancellation and update-clock waits
+  Choreography.ts       Runtime Actor registry, nested sequential/parallel groups and fail-fast barriers
   PuppetAttachments.ts  Prop wrappers, ancestry checks, detachment and destroy listeners
   PuppetPoseController.ts  Pose overrides, restoration, IK ordering and projection passes
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay

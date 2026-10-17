@@ -86,6 +86,9 @@ test('root, runtime, core, serialization and previous scene-loader imports retai
   assert.deepEqual(Object.keys(runtime).sort(), Object.keys(legacy).sort());
   for (const name of [
     'Actor',
+    'Choreography',
+    'ChoreographySequence',
+    'ChoreographyConflictError',
     'Puppet',
     'Bone',
     'AnimationPlayer',

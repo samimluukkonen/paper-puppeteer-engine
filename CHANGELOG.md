@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.8.5
+
+Add optional runtime `Choreography` contexts with a lightweight Actor registry, lazy typed Actor actions, nested sequential/parallel composition and successful-outcome synchronization barriers. Reuse `ChoreographySequence` for every Actor leaf. Fail-fast coordination cancels owned siblings and waits for cleanup while preserving the first unsuccessful outcome. Preflight parallel Actor/Puppet conflicts; share exclusive active-sequence claims across contexts and standalone sequences through `ChoreographyConflictError`. Preserve direct host operations and existing clocks, animation events and Puppet lifecycle. Add deterministic multi-Actor, interruption, cancellation, disposal, registry, conflict, event and cleanup regressions, public declaration/consumer checks and the expanded [choreography guide](docs/choreography-sequences.md). Authored formats remain version 1; the shipped-character sample, wider integration/performance audit and final v0.8 readiness report remain deferred to v0.8.6.
+
 ## 0.8.4
 
 Add the optional runtime [ChoreographySequence](docs/choreography-sequences.md) with typed move, walk, look, face, finite animation, update-clock wait and synchronous cue steps. Single-run sequences preflight commands, await successful completion, preserve interruption details and stop on cancellation, disposal or failure. Movement uses request-local abort signals; opt-in `playAndWait(..., { stopOnAbort: true })` stops only its fresh selected instance while preserving replacement playback, unrelated layers and pending queue requests. Actor exposes its existing disposal signal and immutable default locomotion mapping. Add deterministic sequencing, timing, pause, ownership, reentrancy, validation and cleanup regressions; authored formats remain version 1. Multi-Actor parallel groups, barriers and conflict coordination remain deferred to v0.8.5.

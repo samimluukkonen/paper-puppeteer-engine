@@ -4,7 +4,7 @@
 
 `Actor` is an optional runtime facade over an existing `Puppet`. It delegates animation, appearance and pose synchronization to the existing runtime. Puppet remains usable directly. Actor adds no clock, scene update subscription, evaluator, character loading or editor dependency.
 
-For ordered scripts, the optional [ChoreographySequence](choreography-sequences.md) reuses these operations. Actor exposes the frozen default `locomotion` mapping for validation and its existing `disposalSignal` for lifecycle subscriptions.
+For scripts, the optional [ChoreographySequence and multi-Actor Choreography context](choreography-sequences.md) reuse these operations with sequential/parallel composition, barriers, conflict detection and owned cancellation. Actor exposes the frozen default `locomotion` mapping for validation and its existing `disposalSignal` for lifecycle subscriptions.
 
 ```ts
 import { Actor, Puppet } from 'paper-puppeteer-engine/runtime';
@@ -153,4 +153,4 @@ Actor regressions exercise construction, distinct instances sharing a definition
 
 Facing regressions cover explicit helpers, point/Actor targeting, equal horizontal positions, stale/self/invalid targets, nested and reflected transforms, world snapshots, movement auto-facing, world and authored IK, weapon mounts, stable slot selections/hierarchy and authored animation immutability.
 
-Continuous tracking, head-only look constraints, 360-degree rotation, camera tracking, multi-Actor choreography, physics, pathfinding, collision avoidance, obstacles, navmesh, root motion and a visual scene editor remain deferred.
+Continuous tracking, head-only look constraints, 360-degree rotation, camera tracking, physics, pathfinding, collision avoidance, obstacles, navmesh, root motion and a visual scene editor remain deferred.

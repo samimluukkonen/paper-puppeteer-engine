@@ -174,15 +174,33 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
   await writeFile(
     browserEntry,
     `
-import type { ActorOptions, ActorPosition, ActorPuppetOwnership, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
+import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
 import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
-import { Actor, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
+import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
 
 if (RootPuppet !== RuntimePuppet) throw new Error('Root and /runtime must share the Puppet class.');
 if (RootActor !== Actor) throw new Error('Root and /runtime must share the Actor class.');
 export const load = loadSceneCharacter;
+
+export async function coordinate(a: Actor, b: Actor): Promise<ChoreographyCoordinationResult> {
+  const choreography = new Choreography([a, b]);
+  const plan: ChoreographyPlan = choreography.sequence([
+    choreography.parallel([
+      choreography.actor(a.id, [{ kind: 'move', x: 100, y: 0 }]),
+      choreography.actor(b.id, [{ kind: 'move', x: 200, y: 0 }]),
+    ]),
+    choreography.actor(a.id, [{ kind: 'lookAt', target: choreography.getActor(b.id) }]),
+  ]);
+  const outcome = await choreography.run(plan);
+  if (outcome.status === 'failed' && outcome.error instanceof ChoreographyConflictError)
+    console.log(outcome.error.actorId);
+  // @ts-expect-error Coordination results are immutable.
+  outcome.children.push(outcome);
+  choreography.dispose();
+  return outcome;
+}
 
 export async function useActor(puppet: Puppet): Promise<PlaybackWaitResult> {
   const puppetOwnership: ActorPuppetOwnership = 'borrowed';
