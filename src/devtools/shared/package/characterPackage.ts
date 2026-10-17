@@ -11,6 +11,7 @@ import { identifierSchema } from '../../../engine/schemas.js';
 import type { SkinDefinition, SpriteDefinition, SpriteAttachmentDefinition } from '../../../engine/types.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
+import { safeFilename } from '../assetFilename.js';
 import { PACKAGE_MAX_FILE_BYTES, packagePath, validatePackageFiles } from './packageZip.js';
 
 export interface PackageSnapshot {
@@ -25,7 +26,7 @@ export type PackageFiles = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 const packageBase = 'https://character-package.invalid/';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
-const safeName = (id: string): string => id.replace(/[^a-zA-Z0-9_-]/g, '_') || 'asset';
+const safeName = (id: string): string => safeFilename(id.replace(/[^a-zA-Z0-9_-]/g, '_') || 'asset');
 
 /** Capture once before any asynchronous I/O. Blobs and loaded definitions are immutable. */
 export function capturePackage(snapshot: PackageSnapshot): PackageSnapshot {

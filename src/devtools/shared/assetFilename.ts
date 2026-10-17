@@ -1,5 +1,5 @@
 /** Keep filenames portable without changing the authored asset identity or manifest path. */
-function safeFilename(name: string): string {
+export function safeFilename(name: string): string {
   const sanitized = Array.from(name, (character) =>
     character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 || /[<>:"/\\|?*]/.test(character) ? '_' : character,
   )

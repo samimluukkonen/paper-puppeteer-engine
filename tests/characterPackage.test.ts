@@ -588,10 +588,74 @@ for (const path of [
   'a/../b',
   'a\u0000b',
   'a./b',
+  'images/CON.png',
+  'NUL/part.png',
+  'skins/PrN.json',
+  'animations/aux.json',
+  'images/com1.png',
+  'images/COM9.backup.png',
+  'images/lpt1.png',
+  'images/LPT9',
+  'images/a|b.png',
+  'images/a<b.png',
+  'images/a>b.png',
+  'images/a"b.png',
+  'images/a*b.png',
+  'images /part.png',
 ]) {
   test(`unsafe package path rejected: ${JSON.stringify(path)}`, () =>
     assert.throws(() => packagePath(path), /Invalid package path/));
 }
+
+test('portable package paths retain spaces, Unicode and ordinary names resembling device names', () => {
+  for (const path of ['images/手 painted.PNG', 'images/console.png', 'skins/auxiliary.json', 'images/com10.png'])
+    assert.equal(packagePath(path), path);
+});
+
+test('ZIP imports reject Windows device names in both filename headers', () => {
+  const zip = encodePackageZip(new Map([['images/abc.png', new Uint8Array([1])]]));
+  const original = new TextEncoder().encode('images/abc.png');
+  const reserved = new TextEncoder().encode('images/CON.png');
+  let changed = 0;
+  for (let index = 0; index <= zip.length - original.length; index++) {
+    if (original.every((byte, offset) => zip[index + offset] === byte)) {
+      zip.set(reserved, index);
+      changed++;
+    }
+  }
+  assert.equal(changed, 2);
+  assert.throws(() => decodePackageZip(zip), /Invalid package path/);
+});
+
+test('generated package filenames remain portable without renaming authored asset identities', async () => {
+  const source = fixture();
+  const files = await buildCharacterPackage(
+    {
+      ...source,
+      skins: [...source.skins, { version: 1, name: 'NUL', slots: {} }],
+      animations: [...source.animations, { name: 'CON', duration: 100, loop: false, tracks: {} }],
+      replacements: [
+        {
+          assetKey: 'AUX',
+          reference: undefined,
+          blob: new Blob([png]),
+          format: 'image/png',
+          originScaleX: 1,
+          originScaleY: 1,
+          newAsset: true,
+        },
+      ],
+    },
+    fetchImage,
+  );
+  const exported = await loadPackageDefinition(files);
+  assert.equal(exported.manifest!.skins.NUL, 'skins/_NUL.json');
+  assert.equal(exported.animationPaths.CON, 'animations/_CON.json');
+  assert.equal(exported.textures.AUX, 'images/_AUX.png');
+  assert.isTrue(exported.animations.some((clip) => clip.name === 'CON'));
+  assert.isTrue(exported.standaloneSkins.some((skin) => skin.name === 'NUL'));
+  assert.deepEqual(decodePackageZip(encodePackageZip(files)), files);
+});
 
 test('manifest paths, missing images, invalid JSON, versions and duplicate clip IDs fail atomically', async () => {
   const files = new Map(await buildCharacterPackage(fixture(), fetchImage));

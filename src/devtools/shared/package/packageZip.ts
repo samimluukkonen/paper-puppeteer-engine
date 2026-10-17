@@ -1,3 +1,5 @@
+import { safeFilename } from '../assetFilename.js';
+
 /** Deliberately small ZIP subset: UTF-8, stored files, CRC32, no encryption/ZIP64.
  * PNG/WebP are already compressed. Imports accept exactly the archive form we export.
  */
@@ -12,7 +14,7 @@ export function packagePath(path: string): string {
     path.startsWith('/') ||
     /[\\:%?#]/.test(path) ||
     path.split('').some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) ||
-    path.split('/').some((part) => !part || part === '.' || part === '..' || /[. ]$/.test(part))
+    path.split('/').some((part) => !part || part === '.' || part === '..' || safeFilename(part) !== part)
   )
     throw new Error(`Invalid package path "${path}". Use plain relative paths within the character folder.`);
   return path;
