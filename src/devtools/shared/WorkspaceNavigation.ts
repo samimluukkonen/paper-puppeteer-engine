@@ -10,10 +10,23 @@ export function workspaceView(url: URL): WorkspaceView | null {
 export function bindWorkspaceNavigation(
   host: HTMLElement,
   navigate: (view: WorkspaceView) => boolean | 'cancel',
-): () => void {
+): { navigate(view: WorkspaceView): boolean | 'cancel'; dispose(): void } {
   const lifetime = new AbortController();
   let heldUrl = window.location.href;
   const options = { signal: lifetime.signal };
+  const commitUrl = (url: URL): void => {
+    if (url.href !== window.location.href) window.history.pushState(null, '', url.href);
+    heldUrl = url.href;
+  };
+  const request = (view: WorkspaceView): boolean | 'cancel' => {
+    const result = navigate(view);
+    if (result === true) {
+      const url = new URL(window.location.href);
+      url.pathname = url.pathname.replace(/\/(?:rig|animation)-editor\/?$/, `/${view}-editor/`);
+      commitUrl(url);
+    }
+    return result;
+  };
   host.addEventListener(
     'click',
     (event) => {
@@ -37,8 +50,7 @@ export function bindWorkspaceNavigation(
       if (!result) return;
       event.preventDefault();
       if (result === 'cancel') return;
-      if (url.href !== current.href) window.history.pushState(null, '', url.href);
-      heldUrl = url.href;
+      commitUrl(url);
     },
     options,
   );
@@ -53,5 +65,5 @@ export function bindWorkspaceNavigation(
     },
     options,
   );
-  return () => lifetime.abort();
+  return { navigate: request, dispose: () => lifetime.abort() };
 }

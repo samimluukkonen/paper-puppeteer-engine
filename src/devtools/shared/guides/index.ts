@@ -1,5 +1,6 @@
 export { GUIDE_TARGETS } from './anchors.js';
 export { GuideController, type GuideSnapshot } from './GuideController.js';
+export { GuideLauncher, type GuideLaunchHost } from './GuideLauncher.js';
 export { GuideTargets, type GuideGeometryProvider } from './GuideTargets.js';
 export {
   getAllGuides,

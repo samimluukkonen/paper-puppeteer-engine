@@ -4,14 +4,20 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
-- Establish the v0.7.6.1 [Feature Guide architecture](docs/feature-guide-architecture.md): a typed feature-specific registry, React-compatible session controller, prerequisite/status checks, stable editor anchors, explicit UI-only preparation, and shared DOM/panel/optional Phaser geometry targeting. Regression coverage verifies registry/navigation boundaries, target cleanup, and isolation from authored rig/animation data, dirty state, history, playback, and events. Selection UI, spotlight rendering, and complete tutorial content remain deferred to later v0.7.6 milestones.
-
 - Require PNG-header checks before decoding character artwork by default; trusted alternative formats can opt out with `requirePng: false`.
 
 - Publish completed Animation Editor commands in one state notification.
 - Share pending import and export guards between the editors.
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
+
+## 0.7.6.2
+
+Add the v0.7.6.2 React Feature Guide selection modal to the shared character workspace header in both editors. Editor categories and feature rows come from the existing registry, with live prerequisite reasons, guarded navigation, first-step activation, and native dialog keyboard/focus handling. Guide launches retain unsaved documents and block mode changes that would discard uncommitted previews. Unit and local browser regressions cover selection, availability, navigation, empty states, and focus; spotlight rendering and instruction cards remain deferred.
+
+## 0.7.6.1
+
+Establish the v0.7.6.1 [Feature Guide architecture](docs/feature-guide-architecture.md): a typed feature-specific registry, React-compatible session controller, prerequisite/status checks, stable editor anchors, explicit UI-only preparation, and shared DOM/panel/optional Phaser geometry targeting. Regression coverage verifies registry/navigation boundaries, target cleanup, and isolation from authored rig/animation data, dirty state, history, playback, and events. Selection UI, spotlight rendering, and complete tutorial content remain deferred to later v0.7.6 milestones.
 
 ## 0.7.5
 

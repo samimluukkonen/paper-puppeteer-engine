@@ -2,6 +2,7 @@ import { Clapperboard, MonitorPlay, Network } from 'lucide-react';
 import packageInfo from '../../package.json';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
 import { characterChoices, selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
+import { FeatureGuideButton } from './FeatureGuide.js';
 import puppetLogo from './images/puppet-running-header.png';
 import { NewCharacterDialog } from './NewCharacterDialog.js';
 import './theme.css';
@@ -90,6 +91,7 @@ export function ViewHeader({
               {item.title}
             </a>
           ))}
+          <FeatureGuideButton />
         </nav>
       </div>
     </header>

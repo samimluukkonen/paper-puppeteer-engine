@@ -4,13 +4,23 @@
 
 The v0.7.6.1 foundation lives in `src/devtools/shared/guides/`. Guides teach individual features, such as Editing Joint Positions or Timeline Navigation. They remain short and independent; there is no application-wide tutorial, persisted completion tracking, database, or telemetry.
 
-This milestone provides the model, registry, targeting contract, and session controller. It does not mount a guide UI or add a launch button. Feature selection, editor navigation for guide launch, the reusable React spotlight, instructional cards, and complete tutorial content belong to the later v0.7.6 milestones.
+The v0.7.6.1 milestone provides the model, registry, targeting contract, and session controller. v0.7.6.2 adds the React feature selection modal and guarded editor navigation described below. The reusable React spotlight, instructional cards, and complete tutorial content belong to later v0.7.6 milestones.
+
+## Feature selection and launch
+
+The shared character workspace header exposes **Feature Guide** in both editors, including before character loading succeeds. `ui/FeatureGuide.tsx` owns one native modal outside the retained editor shells. Rig Editor and Animation Editor category buttons work with Tab and Enter/Space; native dialog behavior contains focus and closes on Escape. Closing restores focus to the opening button, or to the destination editor's Feature Guide button after a cross-editor launch. Inspector sections remain collapsed.
+
+Feature titles, descriptions and rows come directly from `GuideRegistry`; the modal does not maintain a second catalog. Unavailable entries retain visible prerequisite reasons and disabled Start buttons. Empty categories and failed character loads have explicit messages. An active session is identified by title with an Exit guide action before another guide can start; step instruction cards remain deferred.
+
+`workspaceGuideHost.ts` reads current rig validation, selected animation, authored IK constraints and UI tool availability into capability facts. State subscriptions, rig inspector changes and load failures refresh these facts. Guides that teach resource creation can omit the resource prerequisite. Optional IK/tool prerequisites use the same registry checks as the initial guides.
+
+`GuideLauncher` revalidates live context and first-step prerequisites on every launch, asks the existing `WorkspaceNavigation` binding to navigate, refreshes context again, and starts the existing controller at step zero. The modal closes only after success; failures show an accessible message. Programmatic navigation and header links share mode switching and URL/history bookkeeping, including deployment bases and character query parameters. Committed rig/animation/artwork edits retain their live owners and histories. Mode changes that would discard uncommitted animation previews are unavailable for guide launch, without offering a discard confirmation. Ordinary navigation retains its existing guard. No guide launch reloads the page or synthesizes clicks on editor controls.
 
 ## Application boundaries
 
-Both editor routes mount the same React character workspace in `animation-editor/main.tsx`. `WorkspaceNavigation.ts` handles navigation between editor views while retaining their live document owners. React owns shell layout and disclosure panels; existing controllers own inspector and timeline host contents. `mountView.tsx` creates the Phaser scene/controllers after React commits their hosts and disposes them before unmounting. Native dialogs in `Workspace.tsx` and editor markup already provide the help/file dialog conventions for future selection UI.
+Both editor routes mount the same React character workspace in `animation-editor/main.tsx`. `WorkspaceNavigation.ts` handles navigation between editor views while retaining their live document owners. React owns shell layout and disclosure panels; existing controllers own inspector and timeline host contents. `mountView.tsx` creates the Phaser scene/controllers after React commits their hosts and disposes them before unmounting. The selection UI follows the native help/file dialog conventions in `Workspace.tsx` and editor markup.
 
-Guide definitions and state are frontend-only. They are not engine exports, rig/animation JSON, draft recovery data, or document history. The controller accepts a `GuideContext` containing the active editor and capability facts only. It never receives document references, authoring commands, gameplay callbacks, or playback owners. The workspace will supply those facts when the guide UI is integrated; this phase leaves the workspace lifecycle and navigation behavior intact.
+Guide definitions and state are frontend-only. They are not engine exports, rig/animation JSON, draft recovery data, or document history. The controller accepts a `GuideContext` containing the active editor and capability facts only. It never receives document references, authoring commands, gameplay callbacks, or playback owners. The workspace adapter supplies those facts while retaining the existing document lifecycle.
 
 ## Model and registry
 
@@ -25,7 +35,7 @@ Import the internal frontend API from `src/devtools/shared/guides/index.ts`:
 
 Add feature definitions centrally in `definitions.ts`, outside React markup. The two short initial definitions exercise both editor paths and anchors; they are architecture examples, not complete editing tutorials. Future guides that teach creation of a missing resource should omit that resource's prerequisite. Additional IK/tool requirements use capability facts without passing authoring objects into the guide system.
 
-Catalog availability is independent of the current editor, allowing the future selection modal to show both editor categories. The controller's `getAvailability(id)` checks the guide and first step; subsequent step requirements are checked on entry. Starting additionally requires the correct editor. The future launch UI must use existing navigation and unsaved-change guards before starting; the guide controller never navigates by itself.
+Catalog availability is independent of the current editor, allowing the selection modal to show both editor categories. The controller's `getAvailability(id)` checks the guide and first step; subsequent step requirements are checked on entry. Starting additionally requires the correct editor. The launcher uses existing navigation and unsaved-change guards before starting; the guide controller never navigates by itself.
 
 ## Controller
 
@@ -58,5 +68,7 @@ Geometry providers and reveal adapters are trusted frontend code under the same 
 ## Verification
 
 `guideRegistry.test.ts`, `guideController.test.ts`, and `guideTargets.test.ts` cover registry validation/lookup/order, prerequisite reasons, controller lifecycle/boundaries/reset, missing references, context changes, subscriber cleanup, immutable snapshots, DOM/panel/canvas geometry, safe reveal, and geometry cleanup. Real rig and animation sessions verify authored data, dirty flags, histories, playback time/state, and authored event delivery remain isolated from guide navigation and preparation.
+
+`guideLauncher.test.ts` additionally covers live workspace availability, missing/optional resources, first-step checks, guarded launch order, canceled navigation and preservation of unsaved documents. `tests/browser/featureGuide.spec.ts` covers modal opening/closing, registry rows, category keyboard controls, focus containment/restoration, cross-editor launch, preview protection and failed character loads against both local development and production builds.
 
 Run `npm run typecheck`, `npm run test`, and `npm run build`. Browser smoke tests remain local-only; this milestone adds no browser/CI installation or progress infrastructure.

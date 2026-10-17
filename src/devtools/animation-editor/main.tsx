@@ -1,6 +1,7 @@
 import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
+import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
@@ -11,6 +12,8 @@ import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutCo
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
+import { workspaceGuideHost } from '../shared/guides/workspaceGuideHost.js';
 import { browserCharacterDrafts } from '../shared/newCharacter.js';
 import { PackageController } from '../shared/package/PackageController.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
@@ -44,6 +47,16 @@ const initialDraft = (() => {
 const initialRigView = workspaceView(new URL(window.location.href)) === 'rig';
 let movePreview: (() => void) | undefined;
 let scene: AnimationEditorScene | undefined;
+let stateOwner: AnimationEditorState | undefined;
+let workspaceRoutes: ReturnType<typeof bindWorkspaceNavigation> | undefined;
+const guides = new GuideLauncher(
+  workspaceGuideHost({
+    initialEditor: initialRigView ? 'rig' : 'animation',
+    getAnimation: () => stateOwner,
+    getRig: () => scene?.rigEditor?.state,
+    navigate: (editor) => workspaceRoutes?.navigate(editor) ?? false,
+  }),
+);
 const ikInspector = new IKInspectorController();
 const packages = new PackageController();
 const artwork = new ArtworkController();
@@ -62,7 +75,7 @@ function CharacterWorkspace() {
   const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
   useLayoutEffect(() => movePreview?.(), [rigView]);
   return (
-    <>
+    <FeatureGuide launcher={guides}>
       {initialDraft && (
         <p className="workspace-caption" role="status" aria-label="Character draft">
           {initialDraft.identity.name} · {initialDraft.identity.id} ·{' '}
@@ -90,13 +103,12 @@ function CharacterWorkspace() {
           {...(!rigView ? { packages, artwork, attachments } : {})}
         />
       </div>
-    </>
+    </FeatureGuide>
   );
 }
 const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
   const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
-  let stateOwner: AnimationEditorState | undefined;
   let focusViewOnMove = false;
   const rigWorkspace = createRigWorkspaceController(
     rigApp,
@@ -106,6 +118,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       // Still notify the shared rig recovery owner used by both editor views.
       rigTweak.refresh();
       packages.refresh();
+      guides.refresh();
     },
   );
   const releaseCharacterSelection = bindCharacterSelection(app);
@@ -130,6 +143,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       stateOwner = state;
+      guides.refresh();
       newAnimation.bind(state);
       rigTweak.bind(state, editorScene.rigEditor!);
       rigWorkspace.render(editorScene.rigEditor!);
@@ -147,6 +161,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       let selectedKeys = state.selectedKeys;
       let authoringMode = state.editorMode;
       releaseWorkspaceSelection = state.subscribe(() => {
+        guides.refresh();
         if (state.editorMode !== authoringMode) {
           authoringMode = state.editorMode;
           mirrorTools.hidePreview();
@@ -170,10 +185,12 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       releaseAnimationPackage?.();
       releaseAnimationPackage = state.subscribe(packages.refresh);
       if (initialRigView) state.setEditorMode('rig');
+      guides.refresh();
       movePreview?.();
     },
     (message) => {
       stateOwner = undefined;
+      guides.refresh();
       newAnimation.unbind();
       rigWorkspace.showError(message);
       packages.unbind();
@@ -200,6 +217,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       rigTweak.refresh();
       if (editorScene.rigEditor) rigWorkspace.render(editorScene.rigEditor);
       packages.refresh();
+      guides.refresh();
     },
   );
   rigTweak.initialize(app, () => editorScene);
@@ -265,11 +283,12 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   };
   const releaseRigResize = observePreview(rigApp.querySelector<HTMLElement>('#editor-stage')!, game);
   const rigLayout = new RigWorkspaceLayoutController(rigApp);
-  const releaseRoutes = bindWorkspaceNavigation(root, (view) => {
-    if (!stateOwner) return false;
-    for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog[open]')) dialog.close();
-    packages.closePreview();
+  workspaceRoutes = bindWorkspaceNavigation(root, (view) => {
+    if (!stateOwner) return view === (initialRigView ? 'rig' : 'animation');
     if (!rigTweak.setMode(view === 'rig' ? 'rig' : 'animation')) return 'cancel';
+    for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog[open]:not(.feature-guide-dialog)'))
+      dialog.close();
+    packages.closePreview();
     focusViewOnMove = true;
     movePreview?.();
     return true;
@@ -280,7 +299,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   });
 
   return () => {
-    releaseRoutes();
+    workspaceRoutes?.dispose();
+    workspaceRoutes = undefined;
     releaseRigResize();
     rigLayout.dispose();
     rigWorkspace.dispose();

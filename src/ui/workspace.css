@@ -72,28 +72,28 @@
 .workspace-shell [hidden] {
   display: none !important;
 }
-:where(.workspace-shell) button,
+:where(.workspace-shell, .feature-guide-dialog) button,
 :where(.workspace-shell) select,
 :where(.workspace-shell) input {
   min-height: 28px;
   font: inherit;
 }
-:where(.workspace-shell) button,
+:where(.workspace-shell, .feature-guide-dialog) button,
 :where(.workspace-shell) select {
   cursor: pointer;
 }
-:where(.workspace-shell) button {
+:where(.workspace-shell, .feature-guide-dialog) button {
   padding: 4px 8px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
   color: var(--fg-default);
   background: var(--bg-hover);
 }
-:where(.workspace-shell) button:disabled {
+:where(.workspace-shell, .feature-guide-dialog) button:disabled {
   cursor: default;
   opacity: 0.5;
 }
-.workspace-shell :focus-visible {
+:is(.workspace-shell, .feature-guide-dialog) :focus-visible {
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
 }
@@ -305,6 +305,52 @@
 }
 .workspace-dialog p {
   line-height: 1.6;
+}
+.feature-guide-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.feature-guide-categories,
+.feature-guide-current {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.feature-guide-categories button[aria-pressed="true"] {
+  color: var(--accent-fg);
+  border-color: var(--accent-fg);
+}
+.feature-guide-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.feature-guide-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-panel);
+}
+.feature-guide-entry > div {
+  flex: 1 1 240px;
+}
+.feature-guide-entry h4,
+.feature-guide-entry p {
+  margin: 0 0 4px;
+}
+.feature-guide-availability {
+  color: var(--fg-muted);
 }
 @media (max-width: 1200px) {
   .workspace-shell .wordmark {
