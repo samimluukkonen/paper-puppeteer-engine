@@ -489,6 +489,111 @@ test('public movement options remain structurally usable', async () => {
   assert.equal((await pending).status, 'completed');
 });
 
+test.each([undefined, false, true])(
+  'walk auto-facing is opt-in (%s) and does not restart facing each frame',
+  async (faceMovement) => {
+    const { actor, puppet } = fixture({ locomotion });
+    const facing = vi.spyOn(puppet, 'setFacing');
+    const pending = actor.walkTo(-100, 0, { speed: 100, ...(faceMovement === undefined ? {} : { faceMovement }) });
+    assert.equal(actor.facingDirection, faceMovement ? 'left' : 'right');
+    puppet.update(250);
+    puppet.update(250);
+    puppet.update(500);
+    assert.equal((await pending).status, 'completed');
+    assert.equal(actor.facingDirection, faceMovement ? 'left' : 'right');
+    assert.equal(facing.mock.calls.length, faceMovement ? 1 : 0);
+  },
+);
+
+test('vertical, zero-distance and negligible horizontal walking preserve facing', async () => {
+  const { actor, puppet } = fixture({ locomotion });
+  actor.faceLeft();
+  const facing = vi.spyOn(puppet, 'setFacing');
+  assert.equal((await actor.walkTo(0, 0, { faceMovement: true })).status, 'completed');
+  const vertical = actor.walkTo(0, 100, { speed: 100, faceMovement: true });
+  puppet.update(1000);
+  assert.equal((await vertical).status, 'completed');
+  const nearVertical = actor.walkTo(1e-10, 200, { speed: 100, faceMovement: true });
+  puppet.update(1000);
+  assert.equal((await nearVertical).status, 'completed');
+  assert.equal(actor.facingDirection, 'left');
+  assert.equal(facing.mock.calls.length, 0);
+});
+
+test('auto-facing follows actual travel after external placement, but zero delta and pre-abort preserve facing', async () => {
+  const { actor, puppet } = fixture({ locomotion });
+  const pending = actor.walkTo(100, 0, { speed: 100, faceMovement: true });
+  actor.setPosition(150, 0);
+  puppet.update(0);
+  assert.equal(actor.facingDirection, 'right');
+  const abort = new AbortController();
+  abort.abort();
+  assert.deepEqual(await actor.walkTo(-100, 0, { faceMovement: true, signal: abort.signal }), { status: 'cancelled' });
+  assert.equal(actor.facingDirection, 'right');
+  puppet.update(250);
+  assert.equal(actor.facingDirection, 'left');
+  actor.cancelMovement();
+  assert.equal((await pending).status, 'cancelled');
+  puppet.update(1000);
+  assert.equal(actor.facingDirection, 'left');
+});
+
+test('auto-facing uses world travel under a rotated parent and leaves movement speed unchanged', async () => {
+  const { actor, puppet, scene } = fixture({ locomotion });
+  scene.add
+    .container(300, 200)
+    .setScale(2, 3)
+    .setRotation(Math.PI / 3)
+    .add(puppet.container);
+  // Local x is positive, but the diagonal destination is to the left in world coordinates.
+  const pending = actor.walkTo(10, 40, { speed: 100, faceMovement: true });
+  assert.equal(actor.facingDirection, 'left');
+  const start = actor.worldPosition;
+  puppet.update(500);
+  const end = actor.worldPosition;
+  assert.closeTo(Math.hypot(end.x - start.x, end.y - start.y), 50, 1e-8);
+  puppet.update(1000);
+  assert.equal((await pending).status, 'completed');
+  assert.deepEqual(actor.position, { x: 10, y: 40 });
+});
+
+test('walk-facing synchronizes fixed world IK and is visible to locomotion start callbacks', async () => {
+  const { actor, puppet } = fixture({ locomotion });
+  const ik = puppet.addIK({ name: 'chain', rootBone: 'root', middleBone: 'middle', endBone: 'end' });
+  puppet.setIKTarget('chain', { x: 0, y: 12 });
+  ik.enabled = true;
+  const observed: string[] = [];
+  puppet.onPlaybackLifecycle((event) => {
+    if (event.type === 'started') observed.push(actor.facingDirection);
+  });
+  const pending = actor.walkTo(-5, 0, { speed: 5, faceMovement: true });
+  assert.deepEqual(observed, ['left']);
+  puppet.update(1000);
+  assert.equal((await pending).status, 'completed');
+  const end = puppet.getBone('end').container.getWorldTransformMatrix();
+  assert.closeTo(end.tx, 0, 1e-8);
+  assert.closeTo(end.ty, 12, 1e-8);
+});
+
+test.each(['cancel', 'dispose'] as const)(
+  'IK callbacks can %s during initial walk-facing without starting locomotion',
+  async (mode) => {
+    const { actor, puppet } = fixture({ locomotion });
+    const ik = puppet.addIK({ name: 'chain', rootBone: 'root', middleBone: 'middle', endBone: 'end' });
+    ik.setTargetProvider(() => {
+      if (mode === 'cancel') actor.cancelMovement();
+      else actor.dispose();
+      return { x: 0, y: 12 };
+    });
+    ik.enabled = true;
+    const pending = actor.walkTo(-100, 0, { faceMovement: true });
+    assert.equal((await pending).status, mode === 'cancel' ? 'cancelled' : 'disposed');
+    assert.isUndefined(puppet.currentAnimation);
+    puppet.update(1000);
+    assert.deepEqual(puppet.container.x, 0);
+  },
+);
+
 test('Puppet update listeners use stable snapshots, complete delivery after errors and release on destruction', () => {
   const { puppet } = fixture();
   const seen: string[] = [];

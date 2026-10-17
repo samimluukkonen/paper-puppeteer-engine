@@ -1,3 +1,4 @@
+import { faceWorldDirection } from './ActorFacing.js';
 import type { Point } from './affineMath.js';
 import { AnimationStateController } from './AnimationStateController.js';
 import type { Puppet } from './Puppet.js';
@@ -21,6 +22,8 @@ export interface ActorMoveOptions {
 export interface ActorWalkOptions extends ActorMoveOptions {
   /** Overrides the Actor's mapping for this request. */
   readonly locomotion?: ActorLocomotion;
+  /** Orient toward horizontal world travel. Defaults to false; vertical/stationary travel preserves facing. */
+  readonly faceMovement?: boolean;
 }
 
 export type ActorMovementOutcome = 'completed' | 'interrupted' | 'cancelled' | 'disposed';
@@ -43,6 +46,7 @@ interface MovementRequest {
   readonly speed: number;
   readonly resolve: (result: ActorMovementResult) => void;
   readonly locomotion: ActorLocomotion | undefined;
+  readonly faceMovement: boolean;
   controller?: AnimationStateController;
   unsubscribeUpdate?: () => void;
   unsubscribeAbort?: () => void;
@@ -63,7 +67,7 @@ export class ActorMovement {
   async start(
     x: number,
     y: number,
-    options: ActorMoveOptions,
+    options: ActorWalkOptions,
     locomotion?: ActorLocomotion,
   ): Promise<ActorMovementResult> {
     if (options.signal?.aborted) return { status: 'cancelled' };
@@ -87,7 +91,14 @@ export class ActorMovement {
     this.finish('interrupted', false);
     const start = this.position();
     return new Promise<ActorMovementResult>((resolve, reject) => {
-      const request: MovementRequest = { start, destination, speed, resolve, locomotion };
+      const request: MovementRequest = {
+        start,
+        destination,
+        speed,
+        resolve,
+        locomotion,
+        faceMovement: !!locomotion && options.faceMovement === true,
+      };
       this.current = request;
       request.unsubscribeUpdate = this.puppet.onUpdate((delta) => this.update(request, delta));
       if (options.signal) {
@@ -112,6 +123,8 @@ export class ActorMovement {
           return;
         }
         if (locomotion) {
+          this.faceDestination(request);
+          if (this.current !== request) return;
           const controller = this.startLocomotion(request, locomotion);
           request.controller = controller;
           // Starting animation can synchronously abort, dispose, or replace the movement.
@@ -186,6 +199,15 @@ export class ActorMovement {
     return point(this.puppet.container.x, this.puppet.container.y);
   }
 
+  private faceDestination(request: MovementRequest): void {
+    if (!request.faceMovement) return;
+    const dx = request.destination.x - this.puppet.container.x;
+    const dy = request.destination.y - this.puppet.container.y;
+    const parent = this.puppet.container.parentContainer;
+    const matrix = parent?.getWorldTransformMatrix();
+    faceWorldDirection(this.puppet, matrix ? matrix.a * dx + matrix.c * dy : dx);
+  }
+
   /** Measure in world units even when the outer container has a scaled/rotated parent. */
   private distance(destination: Readonly<Point>): number {
     const start = this.position();
@@ -210,6 +232,8 @@ export class ActorMovement {
     try {
       const distance = this.distance(request.destination);
       const fraction = distance === 0 ? 1 : Math.min((request.speed * (delta / 1000)) / distance, 1);
+      if (distance > 0 && fraction > 0) this.faceDestination(request);
+      if (this.current !== request) return;
       const start = this.position();
       const destination = request.destination;
       this.puppet.container.setPosition(

@@ -1,3 +1,4 @@
+import { faceWorldDirection } from './ActorFacing.js';
 import {
   ActorMovement,
   type ActorLocomotion,
@@ -82,6 +83,15 @@ export class Actor {
   get position(): ActorPosition {
     this.assertActive();
     return Object.freeze({ x: this.puppet.container.x, y: this.puppet.container.y });
+  }
+
+  /** Frozen scene/world position, including all enclosing Phaser container transforms. */
+  get worldPosition(): ActorPosition {
+    this.assertActive();
+    const { tx: x, ty: y } = this.puppet.container.getWorldTransformMatrix();
+    assertFinite(x, 'Actor world x');
+    assertFinite(y, 'Actor world y');
+    return Object.freeze({ x, y });
   }
 
   setPosition(x: number, y: number): this {
@@ -178,6 +188,34 @@ export class Actor {
   setFacing(facing: Facing): this {
     this.assertActive();
     this.puppet.setFacing(facing);
+    return this;
+  }
+
+  get facingDirection(): Facing {
+    this.assertActive();
+    return this.puppet.facingDirection;
+  }
+
+  faceLeft(): this {
+    return this.setFacing('left');
+  }
+
+  faceRight(): this {
+    return this.setFacing('right');
+  }
+
+  /** One-time horizontal targeting in world coordinates. Self and stale Actor targets are ignored. */
+  lookAt(target: ActorPosition | Actor): this {
+    this.assertActive();
+    if (
+      target instanceof Actor &&
+      (target === this || target.disposed || target.puppet.isDestroyed || target.puppet.animationPlayer.isDisposed)
+    )
+      return this;
+    const position = target instanceof Actor ? target.worldPosition : target;
+    assertFinite(position.x, 'Look target x');
+    assertFinite(position.y, 'Look target y');
+    faceWorldDirection(this.puppet, position.x - this.worldPosition.x);
     return this;
   }
 

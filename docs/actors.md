@@ -1,4 +1,4 @@
-# Actors and movement (v0.8.2)
+# Actors, movement and facing (v0.8.3)
 
 [All guides](../README.md#guides)
 
@@ -24,13 +24,14 @@ const actor = new Actor({
   },
 });
 
-actor.setPosition(450, 400).setFacing('left');
+actor.setPosition(450, 400).faceLeft();
+actor.lookAt({ x: 500, y: 400 }); // Scene/world coordinates, including enclosing transforms.
 actor.playAction('greeting');
 actor.setState('rest');
 const result = await actor.playAndWait('wave');
 if (result.status === 'completed') actor.setState('rest');
 await actor.moveTo(500, 400); // Default speed: 120 world units per second.
-const arrival = await actor.walkTo(700, 400, { speed: 160 });
+const arrival = await actor.walkTo(700, 400, { speed: 160, faceMovement: true });
 if (arrival.status === 'completed') actor.playAction('greeting');
 actor.dispose();
 ```
@@ -46,8 +47,9 @@ Both the package root and `/runtime` export `Actor`, `ActorOptions`, `ActorPosit
 | `new Actor({ id, puppet, puppetOwnership?, animationStates?, locomotion? })`      | Wrap a live Puppet; ownership defaults to `'borrowed'`.                                     |
 | `id`, `puppet`, `puppetOwnership`, `isDisposed`                                   | Read instance identity, host reference, fixed ownership mode and lifecycle status.          |
 | `position`, `setPosition(x, y)`                                                   | Read a detached, frozen position snapshot or update the Puppet's container directly.        |
+| `worldPosition`                                                                   | Read a detached, frozen scene/world position including enclosing container transforms.      |
 | `moveTo(x, y, { speed?, signal? }?)`                                              | Await direct movement without changing animation. Replacing a walk releases its locomotion. |
-| `walkTo(x, y, { speed?, signal?, locomotion? }?)`                                 | Await movement with explicitly mapped walk and idle animations.                             |
+| `walkTo(x, y, { speed?, signal?, locomotion?, faceMovement? }?)`                  | Await movement with mapped locomotion and optional horizontal world auto-facing.            |
 | `cancelMovement()`                                                                | Stop the current movement, settling it as cancelled.                                        |
 | `currentAnimation`, `isPlaying`                                                   | Query the existing Puppet playback.                                                         |
 | `play(name, options?)`, `stop()`                                                  | Delegate existing playback, layer options and stopping behavior.                            |
@@ -55,6 +57,8 @@ Both the package root and `/runtime` export `Actor`, `ActorOptions`, `ActorPosit
 | `playAndWait(name, options?)`, `waitForPlayback(options?)`                        | Delegate exact-instance promises with the existing `PlaybackWaitResult`.                    |
 | `currentState`, `setState(id, options?)`, `playAction(id, options?)`              | Use the Actor-owned optional `AnimationStateController`.                                    |
 | `setFacing()`, `setSkin()`, `applySkin()`, `setAttachment()`, `clearAttachment()` | Delegate existing appearance operations with their normal validation.                       |
+| `facingDirection`, `faceLeft()`, `faceRight()`                                    | Read or change Puppet's existing left/right orientation.                                    |
+| `lookAt(pointOrActor)`                                                            | Face a world position or another Actor's current world origin once.                         |
 | `dispose()`                                                                       | Release movement, state policy and waits; destroy an owned Puppet once.                     |
 
 Mutating methods return the Actor for chaining, except async methods and `dispose()`. Advanced APIs, including queues, layers, IK, prop objects, events and manual updates, remain available through `actor.puppet`. Subscriptions made directly through Puppet remain the caller's responsibility.
@@ -66,6 +70,26 @@ The host supplies a nonempty instance ID and ensures uniqueness within its appli
 The Puppet container is the only position authority. `position` reads its current `x` and `y`; changing the container directly is visible in the next snapshot. Mutating a previous snapshot cannot move the character. `setPosition()` validates both coordinates before changing either, then synchronizes the pose so world-space IK and debug overlays follow immediately without advancing animation time.
 
 Coordinates follow the existing outer-container convention: pixels in scene coordinates for an unparented Puppet, or parent-local coordinates if the host reparents it. Positive Y points down. Camera transforms remain host-owned. Facing and bone animation do not change this outer position.
+
+`worldPosition` instead reads the outer container's full Phaser world transform, including every enclosing translation, rotation and scale. It returns a frozen snapshot and rejects nonfinite world coordinates. This origin is independent of animated bone positions and camera scroll/zoom.
+
+## Facing and spatial targeting
+
+`faceLeft()` and `faceRight()` delegate to `setFacing('left' | 'right')`; `facingDirection` reads the current Puppet value, including changes made directly through Puppet. The runtime supports two orientations through the sign of the outer container's X scale. It retains scale magnitude and synchronizes the existing pose/IK/render pipeline. It does not rotate the skeleton or edit animation keys, skins, attachment selections or the bone hierarchy. Existing world IK targets remain fixed; authored puppet-local IK targets mirror with the character. Props retain their bone/slot mounts and inherit the existing transforms.
+
+```ts
+actor.faceLeft();
+actor.faceRight();
+actor.lookAt({ x: 500, y: 300 });
+actor.lookAt(otherActor);
+const origin = actor.worldPosition;
+```
+
+`lookAt()` compares the target's horizontal world position with the Actor's world origin. Point targets must already be in scene/world coordinates; another Actor contributes its current `worldPosition`, even under a different parent. Screen, React viewport and raw pointer coordinates require host-side conversion first. Y must be finite but does not select orientation. Equal horizontal positions, including differences within **1e-8 world units**, preserve current facing. Repeated targeting in the same direction skips redundant pose synchronization.
+
+Facing selects the supported mirror whose transformed right axis points horizontally toward the target. Reflected or rotated enclosing transforms can reverse which mirror does this. If the facing axis is vertical (within a relative tolerance of 1e-12) or collapsed, targeting preserves orientation because neither supported mirror can face horizontally; it never introduces an arbitrary rotation.
+
+Self-targeting and disposed Actor/Puppet/player targets are no-ops. Nonfinite point positions, live target positions or source positions throw before changing facing. A disposed source Actor rejects operations as usual. Targeting samples once and retains no target reference or tracking subscription.
 
 ## Deterministic movement
 
@@ -105,6 +129,8 @@ Each Actor manages one movement request. A new request replaces the old one from
 
 Locomotion starts once per nonzero walk. If another system replaces or stops base playback, **movement continues independently**, and arrival/cancellation does not restore idle or restart walk over the newer owner. Playback identity controls ownership, so even a newer request for the same walk clip wins. Overlay layers do not take base ownership. Replacing one walk with another skips an intermediate idle; replacing walking with plain `moveTo()` releases owned locomotion to idle. A zero-distance replacement also releases the previous walk. Idle crossfades start at arrival and advance on subsequent updates.
 
+`walkTo(..., { faceMovement: true })` opts into facing at request start, before locomotion callbacks, and before subsequent nonzero movement steps. It uses the horizontal **world** travel vector derived from the destination's parent coordinates. External placement or parent changes are reflected in the next step. Zero-distance, effectively vertical and zero-delta steps preserve facing, and an unchanged direction never calls `setFacing()` repeatedly. Facing remains at its last value on arrival, cancellation or replacement. The default is false; `moveTo()` retains its existing behavior. Movement-facing applies the same supported-axis rules as `lookAt()` and does not change travel speed or animation timing.
+
 Starting walk/idle may invoke host animation callbacks. Reentrant cancellation, replacement and disposal are supported, and subscriptions are released even if a callback throws. A failed walk start rejects and restores idle only if it still owns the committed playback. An idle callback failure propagates through the update/command while the movement's terminal outcome still settles.
 
 ## Playback, cancellation and ownership
@@ -123,4 +149,6 @@ Puppet still receives scene updates automatically unless constructed with `autoU
 
 Actor regressions exercise construction, distinct instances sharing a definition, parent-coordinate transforms, immediate world-target IK synchronization, playback and state delegation, exact async outcomes, abort and disposal isolation, ownership conflicts, invalid/disposed operations, idle/completed/stopped shutdown and cleanup failures. Deterministic movement tests cover straight/diagonal travel, constant speed, delta partitions, large/zero deltas, arrival, invalid inputs, replacements, cancellation, disposal, synchronization, locomotion mapping/crossfades and external/reentrant playback ownership. Runtime dependency graph tests verify Actor's renderer/editor independence and public barrel compatibility.
 
-v0.8.3 will add facing helpers, one-time point/Actor spatial targeting and configurable movement-facing integration. Continuous tracking, choreography, physics, pathfinding, collision avoidance, obstacles, navmesh, root motion and a visual scene editor remain outside this movement release.
+Facing regressions cover explicit helpers, point/Actor targeting, equal horizontal positions, stale/self/invalid targets, nested and reflected transforms, world snapshots, movement auto-facing, world and authored IK, weapon mounts, stable slot selections/hierarchy and authored animation immutability.
+
+Continuous tracking, head-only look constraints, 360-degree rotation, camera tracking, scene sequencing, choreography, physics, pathfinding, collision avoidance, obstacles, navmesh, root motion and a visual scene editor remain deferred.

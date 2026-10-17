@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.8.3
+
+Add Actor `faceLeft()`, `faceRight()`, `facingDirection`, world-position snapshots and one-time `lookAt(point | actor)` through Puppet's existing left/right mirror. Targeting uses horizontal world positions, accounts for enclosing transforms, preserves facing for ties and ignores self/disposed Actor targets. Opt-in `walkTo(..., { faceMovement: true })` follows actual world travel without redundant facing changes. Regressions cover transformed coordinates, stationary movement, stale/invalid targets, IK, weapon mounts, slots, hierarchy and authored-data preservation. Update [Actor documentation](docs/actors.md); authored formats remain version 1. Continuous tracking and head-only/360-degree facing remain deferred.
+
 ## 0.8.2
 
 Add deterministic Actor `moveTo()` / `walkTo()` and `cancelMovement()` using Puppet's existing millisecond updates. Movement measures world-space speed, clamps arrival, keeps the Puppet container authoritative, and settles typed completed/interrupted/cancelled/disposed outcomes with request snapshots. Explicit Actor/per-request walk and idle animation mappings reuse `AnimationStateController` and runtime crossfades; newer playback owners retain precedence while movement continues. Add `Puppet.onUpdate()`, public movement types, deterministic movement/ownership/cleanup regressions and updated [Actor documentation](docs/actors.md). Facing helpers and spatial targeting remain deferred to v0.8.3; authored formats remain version 1.
