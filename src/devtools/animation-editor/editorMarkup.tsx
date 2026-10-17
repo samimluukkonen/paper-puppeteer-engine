@@ -6,6 +6,7 @@ import { AttachmentPanel } from '../rig-editor/AttachmentPanel.js';
 import { RigIKPanel } from '../rig-editor/RigIKPanel.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
@@ -239,6 +240,7 @@ export function AnimationEditorView({
         <aside
           ref={inspector.panel}
           id="animation-inspector"
+          data-guide-inspector
           className="animation-authoring workspace-inspector-sections"
           inert={inspector.narrow && !inspector.open}
           aria-label="Selection inspector"
@@ -328,7 +330,12 @@ export function AnimationEditorView({
           aria-valuenow={52}
           title="Drag to resize. Up/Down adjusts; Home/End selects the limits."
         ></div>
-        <section className="timeline-panel" aria-label="Animation timeline" inert={tweaking}>
+        <section
+          className="timeline-panel"
+          data-guide-id={GUIDE_TARGETS.animationTimeline}
+          aria-label="Animation timeline"
+          inert={tweaking}
+        >
           <div className="timeline-toolbar" aria-label="Playback and timing">
             <h2>Timeline</h2>
             <div className="timeline-control-group" role="group" aria-label="Playback">
@@ -395,7 +402,14 @@ export function AnimationEditorView({
             </div>
             <label className="timeline-time-control">
               Time (s){' '}
-              <input id="timeline-time-input" type="number" min="0" step="any" aria-label="Current time in seconds" />
+              <input
+                id="timeline-time-input"
+                data-guide-id={GUIDE_TARGETS.animationTime}
+                type="number"
+                min="0"
+                step="any"
+                aria-label="Current time in seconds"
+              />
             </label>
             <label id="timeline-frame-control" className="timeline-time-control" hidden>
               Frame <input id="timeline-frame-input" type="number" min="0" step="1" aria-label="Current frame" />
@@ -581,7 +595,13 @@ export function AnimationEditorView({
               <div className="timeline-label-heading">Events / bone / property</div>
               <div id="timeline-track-labels" aria-label="Timeline tracks"></div>
             </div>
-            <div id="timeline" role="group" tabIndex={-1} aria-label="Animation keyframes">
+            <div
+              id="timeline"
+              data-guide-id={GUIDE_TARGETS.animationTracks}
+              role="group"
+              tabIndex={-1}
+              aria-label="Animation keyframes"
+            >
               <div
                 id="timeline-ruler"
                 role="slider"

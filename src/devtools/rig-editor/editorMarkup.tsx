@@ -2,6 +2,7 @@ import { ViewHeader } from '../../ui/viewShell.js';
 import { openWorkspaceDialog, useWorkspaceInspector, WorkspaceDialog } from '../../ui/Workspace.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
@@ -116,6 +117,7 @@ export function RigEditorView({
         <aside
           ref={inspector.panel}
           id="rig-inspector"
+          data-guide-inspector
           className="workspace-inspector inspector workspace-inspector-sections"
           inert={inspector.narrow && !inspector.open}
           aria-label="Selection inspector"
@@ -131,12 +133,12 @@ export function RigEditorView({
               Close
             </button>
           </div>
-          <details className="workspace-hierarchy">
+          <details className="workspace-hierarchy" data-guide-id={GUIDE_TARGETS.rigHierarchy}>
             <summary>Hierarchy</summary>
             <div id="hierarchy" role="tree" />
             {attachments && <RigStructurePanel controller={attachments} />}
           </details>
-          <details className="rig-selection-details">
+          <details className="rig-selection-details" data-guide-id={GUIDE_TARGETS.rigSelection}>
             <summary>Selection details</summary>
             <section aria-label="Rig properties">
               <div id="inspector">Loading character…</div>
@@ -214,7 +216,7 @@ export function RigEditorView({
             Joint Editing · Wheel to zoom · Middle drag to pan
           </div>
           <div className="rig-preview-viewport">
-            <div id="editor-stage" aria-label="Rig canvas" />
+            <div id="editor-stage" data-guide-id={GUIDE_TARGETS.rigCanvas} aria-label="Rig canvas" />
           </div>
         </section>
       </main>

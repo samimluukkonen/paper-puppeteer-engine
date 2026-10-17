@@ -1,0 +1,54 @@
+import type { WorkspaceView } from '../WorkspaceNavigation.js';
+
+export type GuideEditor = WorkspaceView;
+export type GuideCategory = 'rigging' | 'artwork' | 'animation' | 'ik';
+export type GuideTargetId = string;
+export type GuideCapability = 'character' | 'valid-rig' | 'animation' | 'ik-constraints' | `tool:${string}`;
+
+/** Facts only: never pass editor documents, commands, playback, or history to a guide. */
+export interface GuideContext {
+  readonly editor: GuideEditor;
+  readonly capabilities: readonly GuideCapability[];
+}
+
+export interface GuidePrerequisite {
+  readonly capability: GuideCapability;
+  readonly reason: string;
+}
+
+export interface GuideStep {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly targetId: GuideTargetId;
+  readonly prerequisites?: readonly GuidePrerequisite[];
+  /** UI-only request, executed explicitly by the future guide view, never an authored command. */
+  readonly preparation?: 'reveal-target';
+}
+
+export interface GuideDefinition {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly editor: GuideEditor;
+  readonly category: GuideCategory;
+  readonly prerequisites?: readonly GuidePrerequisite[];
+  readonly steps: readonly GuideStep[];
+}
+
+export type GuideAvailability = { readonly available: true } | { readonly available: false; readonly reason: string };
+export type GuideCommandResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+
+/** Viewport CSS pixels, matching getBoundingClientRect (not Phaser world coordinates or device pixels). */
+export interface GuideRectangle {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface GuideTargetResolver {
+  resolve(targetId: GuideTargetId): GuideRectangle | null;
+  /** May reveal a panel/tab or scroll. Must never select/edit data or invoke an editor action. */
+  reveal(targetId: GuideTargetId): boolean;
+}

@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Establish the v0.7.6.1 [Feature Guide architecture](docs/feature-guide-architecture.md): a typed feature-specific registry, React-compatible session controller, prerequisite/status checks, stable editor anchors, explicit UI-only preparation, and shared DOM/panel/optional Phaser geometry targeting. Regression coverage verifies registry/navigation boundaries, target cleanup, and isolation from authored rig/animation data, dirty state, history, playback, and events. Selection UI, spotlight rendering, and complete tutorial content remain deferred to later v0.7.6 milestones.
+
 - Require PNG-header checks before decoding character artwork by default; trusted alternative formats can opt out with `requirePng: false`.
 
 - Publish completed Animation Editor commands in one state notification.
