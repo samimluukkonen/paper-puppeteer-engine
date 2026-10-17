@@ -44,7 +44,8 @@ export class Actor {
   private readonly lifetime = new AbortController();
   private readonly states: AnimationStateController | undefined;
   private readonly movement: ActorMovement;
-  private readonly locomotion: ActorLocomotion | undefined;
+  /** Frozen default walk/idle mapping; individual walk requests may override it. */
+  readonly locomotion: ActorLocomotion | undefined;
   private unsubscribeDestroy: (() => void) | undefined;
   private disposed = false;
 
@@ -77,6 +78,11 @@ export class Actor {
 
   get isDisposed(): boolean {
     return this.disposed;
+  }
+
+  /** Observe Actor disposal without taking ownership of its Puppet. */
+  get disposalSignal(): AbortSignal {
+    return this.lifetime.signal;
   }
 
   /** Detached snapshot in the Puppet container's parent coordinates (scene coordinates by default). */
@@ -142,7 +148,7 @@ export class Actor {
     return this;
   }
 
-  /** Same instance outcomes as Puppet. Abort cancels only this wait. */
+  /** Same instance outcomes as Puppet. Abort cancels only this wait unless stopOnAbort is enabled. */
   async playAndWait(name: string, options: PlayAndWaitOptions = {}): Promise<PlaybackWaitResult> {
     this.assertActive();
     return this.puppet.playAndWait(name, { ...options, signal: this.waitSignal(options.signal) });

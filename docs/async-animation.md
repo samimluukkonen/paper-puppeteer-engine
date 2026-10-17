@@ -46,6 +46,8 @@ const result = await resultPromise; // status: 'cancelled' while the animation k
 
 Cancellation releases only that wait. It does not stop playback, discard queues, affect other waits, or cancel a state controller's action return. Use existing `stop()`, `stopQueue()` or `clearLayer()` separately when playback itself should end; waiting callers then receive `stopped`.
 
+Since v0.8.4, `playAndWait(..., { signal, stopOnAbort: true })` opts into ownership of a fresh playback instance. Aborting stops only that exact selected instance and resolves the wait as cancelled; a start failure also stops any still-owned committed playback. Replacements, naturally completed playback, other layers and pending queue requests retain their state. Pending queues do not advance merely because this instance stopped. `restart: false` is rejected in this mode to avoid adopting existing host playback. Stop-listener failures reject after releasing wait resources. The default is false; `waitForPlayback()` remains wait-only. [ChoreographySequence](choreography-sequences.md) uses this mode for its finite animation steps.
+
 An already-aborted signal takes precedence over validation and skips playback entirely, preserving current playback and queued requests. The same policy applies to `waitForPlayback()`. Once an instance has committed a terminal lifecycle outcome, abort/disposal preserves that outcome, including abort from its endpoint marker. Later aborts cannot change a settled result.
 
 ## Loop policy

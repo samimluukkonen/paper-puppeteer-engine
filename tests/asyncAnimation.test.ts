@@ -5,6 +5,7 @@ import {
   AnimationPlayer,
   AnimationStateController,
   Joint,
+  type PlayAndWaitOptions,
   type PlaybackWaitResult,
   Rig,
 } from '../src/engine/core.js';
@@ -546,4 +547,45 @@ test('Puppet destruction still settles waits when a disposal listener throws', a
   assert.equal((await pending).status, 'disposed');
   assert.isTrue(puppet.container.isDestroyed);
   assert.deepEqual(resources(puppet.animationPlayer), [0, 0, 0]);
+});
+
+test('owned wait cancellation stops only its fresh selected layer and releases wait resources', async () => {
+  const { player } = fixture();
+  player.play('a');
+  const base = player.waitForPlayback();
+  const abort = new AbortController();
+  const own = player.playAndWait('b', { layer: 'gesture', signal: abort.signal, stopOnAbort: true });
+  player.update(25);
+  abort.abort();
+  assert.equal((await own).status, 'cancelled');
+  assert.equal(player.getPlaybackStatus('gesture')?.status, 'stopped');
+  player.update(75);
+  assert.equal((await base).status, 'completed');
+  assert.equal(player.getPlaybackStatus('gesture')?.elapsedTime, 25);
+  assert.deepEqual(resources(player), [0, 0, 0]);
+});
+
+test('owned waits reject adoption and invalid ownership options before interrupting playback', async () => {
+  const { player } = fixture();
+  player.play('a');
+  const before = player.getPlaybackStatus();
+  await rejects(player.playAndWait('a', { restart: false, stopOnAbort: true }), /fresh instance/);
+  await rejects(player.playAndWait('a', { stopOnAbort: 'yes' } as unknown as PlayAndWaitOptions), /boolean/);
+  assert.deepEqual(player.getPlaybackStatus(), before);
+  assert.deepEqual(resources(player), [0, 0, 0]);
+});
+
+test('owned abort releases resources and rejects when a stop listener throws', async () => {
+  const { player } = fixture();
+  const failure = new Error('owned stop failed');
+  const release = player.onPlaybackLifecycle((event) => {
+    if (event.type === 'stopped') throw failure;
+  });
+  const abort = new AbortController();
+  const pending = player.playAndWait('a', { signal: abort.signal, stopOnAbort: true });
+  abort.abort();
+  await rejects(pending, failure);
+  assert.equal(player.getPlaybackStatus()?.status, 'stopped');
+  release();
+  assert.deepEqual(resources(player), [0, 0, 0]);
 });

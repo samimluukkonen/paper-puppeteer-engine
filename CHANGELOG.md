@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.8.4
+
+Add the optional runtime [ChoreographySequence](docs/choreography-sequences.md) with typed move, walk, look, face, finite animation, update-clock wait and synchronous cue steps. Single-run sequences preflight commands, await successful completion, preserve interruption details and stop on cancellation, disposal or failure. Movement uses request-local abort signals; opt-in `playAndWait(..., { stopOnAbort: true })` stops only its fresh selected instance while preserving replacement playback, unrelated layers and pending queue requests. Actor exposes its existing disposal signal and immutable default locomotion mapping. Add deterministic sequencing, timing, pause, ownership, reentrancy, validation and cleanup regressions; authored formats remain version 1. Multi-Actor parallel groups, barriers and conflict coordination remain deferred to v0.8.5.
+
 ## 0.8.3
 
 Add Actor `faceLeft()`, `faceRight()`, `facingDirection`, world-position snapshots and one-time `lookAt(point | actor)` through Puppet's existing left/right mirror. Targeting uses horizontal world positions, accounts for enclosing transforms, preserves facing for ties and ignores self/disposed Actor targets. Opt-in `walkTo(..., { faceMovement: true })` follows actual world travel without redundant facing changes. Regressions cover transformed coordinates, stationary movement, stale/invalid targets, IK, weapon mounts, slots, hierarchy and authored-data preservation. Update [Actor documentation](docs/actors.md); authored formats remain version 1. Continuous tracking and head-only/360-degree facing remain deferred.

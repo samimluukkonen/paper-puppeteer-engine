@@ -105,6 +105,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 | [Animation queues](docs/animation-queues.md)                         | FIFO requests, completion transitions, loop rejection, interruption and cleanup                            |
 | [Async animation](docs/async-animation.md)                           | Awaitable playback, typed outcomes, cancellation, looping policy and disposal                              |
 | [Actors, movement and facing](docs/actors.md)                        | Optional Puppet facade, world targeting, configurable walk facing, locomotion, animation and ownership     |
+| [Choreography sequences](docs/choreography-sequences.md)             | Ordered Actor actions, deterministic waits, owned cancellation and typed outcomes                          |
 | [Runtime controller readiness](docs/runtime-controller-readiness.md) | Complete public API, interaction matrix, compatibility, cleanup, measurements and v0.7 verification        |
 | [Animation states](docs/animation-states.md)                         | Named states, transition fades, one-shot returns, playback ownership and disposal                          |
 | [Animation and poses](docs/animation.md)                             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |

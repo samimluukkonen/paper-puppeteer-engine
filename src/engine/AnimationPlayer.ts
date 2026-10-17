@@ -34,8 +34,12 @@ export interface PlayAnimationOptions extends QueueAnimationOptions {
 }
 
 export interface PlayAndWaitOptions extends PlayAnimationOptions {
-  /** Abort releases this wait without stopping playback or changing queues. */
+  /** Abort releases this wait; playback continues unless stopOnAbort is enabled. */
   signal?: AbortSignal;
+  /** Opt in to stopping only the newly selected instance on abort or a start failure.
+   * Replacements, other layers and pending queue requests retain ownership. Defaults to false.
+   */
+  stopOnAbort?: boolean;
 }
 
 export interface WaitForPlaybackOptions {
@@ -236,8 +240,15 @@ export class AnimationPlayer {
     synchronizePose?: () => void,
   ): Promise<PlaybackWaitResult> {
     return this.waitForSelection(
-      (select) => this.playAnimation(name, options, preparePose, synchronizePose, false, select),
+      (select) => {
+        if (options.stopOnAbort !== undefined && typeof options.stopOnAbort !== 'boolean')
+          throw new Error('stopOnAbort must be a boolean.');
+        if (options.stopOnAbort && options.restart === false)
+          throw new Error('Owned playback waits require a fresh instance; omit restart:false.');
+        this.playAnimation(name, options, preparePose, synchronizePose, false, select);
+      },
       options.signal,
+      options.stopOnAbort === true,
     );
   }
 
@@ -262,6 +273,7 @@ export class AnimationPlayer {
   private waitForSelection(
     start: (select: (state: AnimationState, layer: string) => void) => void,
     signal?: AbortSignal,
+    stopOnAbort = false,
   ): Promise<PlaybackWaitResult> {
     return new Promise((resolve, reject) => {
       let selected: { state: AnimationState; layer: string } | undefined;
@@ -282,7 +294,30 @@ export class AnimationPlayer {
       };
       const snapshot = (): PlaybackStatus | undefined =>
         selected ? this.playbackStatus(selected.state, selected.layer) : undefined;
-      const abort = (): void => finish(selected?.state.outcome ?? 'cancelled', snapshot());
+      const stopOwnedSelection = (): void => {
+        if (!stopOnAbort || !selected || this.disposed || selected.state.outcome) return;
+        const layer = this.layers.get(selected.layer);
+        if (layer?.state !== selected.state) return;
+        const lifecycle: PlaybackLifecycleEvent[] = [];
+        this.finishPlayback(selected.state, selected.layer, 'stopped', lifecycle);
+        layer.stopped = true;
+        this.dispatchNotifications([], [], lifecycle);
+      };
+      const abort = (): void => {
+        if (settled) return;
+        const outcome = selected?.state.outcome ?? 'cancelled';
+        const playback = snapshot();
+        // Release the wait before stopping, so its own stopped notification cannot win cancellation.
+        settled = true;
+        cleanup();
+        try {
+          stopOwnedSelection();
+          if (outcome === 'cancelled') resolve(playback ? { status: outcome, playback } : { status: outcome });
+          else if (playback) resolve({ status: outcome, playback });
+        } catch (error) {
+          reject(error);
+        }
+      };
       // Disposal can suppress queued terminal notifications (e.g. from an end-marker callback).
       // Read the same instance's committed lifecycle outcome before player cleanup drops it.
       const dispose = (): void => finish(selected!.state.outcome!, snapshot());
@@ -314,10 +349,17 @@ export class AnimationPlayer {
           });
           this.pendingWaitDisposers.add(dispose);
         });
+        // Pose preparation may abort before the instance is selected.
+        if (signal?.aborted) stopOwnedSelection();
       } catch (error) {
         settled = true;
         cleanup();
-        reject(error);
+        try {
+          stopOwnedSelection();
+          reject(error);
+        } catch (stopError) {
+          reject(new AggregateError([error, stopError], 'Playback start and owned cleanup failed.', { cause: error }));
+        }
       }
     });
   }

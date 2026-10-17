@@ -4,6 +4,8 @@
 
 `Actor` is an optional runtime facade over an existing `Puppet`. It delegates animation, appearance and pose synchronization to the existing runtime. Puppet remains usable directly. Actor adds no clock, scene update subscription, evaluator, character loading or editor dependency.
 
+For ordered scripts, the optional [ChoreographySequence](choreography-sequences.md) reuses these operations. Actor exposes the frozen default `locomotion` mapping for validation and its existing `disposalSignal` for lifecycle subscriptions.
+
 ```ts
 import { Actor, Puppet } from 'paper-puppeteer-engine/runtime';
 
@@ -135,7 +137,7 @@ Starting walk/idle may invoke host animation callbacks. Reentrant cancellation, 
 
 ## Playback, cancellation and ownership
 
-Actor does not reinterpret animation completion. `playAndWait()` and `waitForPlayback()` retain the existing completed, interrupted, stopped, disposed and cancelled results, loop rejection, layer selection and playback identities. Aborting a supplied `AbortSignal` releases only that wait; an already-aborted signal skips playback and clip validation on a live Actor. `stop()` delegates Puppet's normal stopping behavior. Named states retain the existing action-return, crossfade and direct-playback precedence rules.
+Actor does not reinterpret animation completion. `playAndWait()` and `waitForPlayback()` retain the existing completed, interrupted, stopped, disposed and cancelled results, loop rejection, layer selection and playback identities. Aborting a supplied `AbortSignal` releases only that wait by default; `playAndWait(..., { stopOnAbort: true })` opts into exact-instance stopping as described in the [async API](async-animation.md#cancellation). An already-aborted signal skips playback and clip validation on a live Actor. `stop()` delegates Puppet's normal stopping behavior. Named states retain the existing action-return, crossfade and direct-playback precedence rules.
 
 With `'borrowed'` ownership, the host keeps the Puppet. Actor disposal settles movement as disposed, restores its still-owned locomotion to idle, cancels pending Actor playback waits and removes subscriptions. Other playback, external waits, textures and wrappers remain usable. No automatic action return occurs after Actor disposal. Use `stop()` before disposal if the host wants to stop playback and retain that stopped state.
 
@@ -151,4 +153,4 @@ Actor regressions exercise construction, distinct instances sharing a definition
 
 Facing regressions cover explicit helpers, point/Actor targeting, equal horizontal positions, stale/self/invalid targets, nested and reflected transforms, world snapshots, movement auto-facing, world and authored IK, weapon mounts, stable slot selections/hierarchy and authored animation immutability.
 
-Continuous tracking, head-only look constraints, 360-degree rotation, camera tracking, scene sequencing, choreography, physics, pathfinding, collision avoidance, obstacles, navmesh, root motion and a visual scene editor remain deferred.
+Continuous tracking, head-only look constraints, 360-degree rotation, camera tracking, multi-Actor choreography, physics, pathfinding, collision avoidance, obstacles, navmesh, root motion and a visual scene editor remain deferred.

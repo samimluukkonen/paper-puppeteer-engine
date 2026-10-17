@@ -350,7 +350,7 @@ export class Puppet {
     return this;
   }
 
-  /** Await this finite playback instance; aborting cancels only the wait. */
+  /** Await this finite instance; aborting cancels only the wait unless stopOnAbort is enabled. */
   playAndWait(name: string, options?: PlayAndWaitOptions): Promise<PlaybackWaitResult> {
     return this.animationPlayer.playAndWait(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
   }

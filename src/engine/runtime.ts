@@ -9,6 +9,15 @@ export type {
   ActorMovementSnapshot,
 } from './ActorMovement.js';
 export { Bone } from './Bone.js';
+export {
+  ChoreographySequence,
+  type ChoreographyStep,
+  type ChoreographyMoveOptions,
+  type ChoreographyWalkOptions,
+  type ChoreographyOutcome,
+  type ChoreographyResult,
+  type ChoreographyActionResult,
+} from './ChoreographySequence.js';
 export * from './core.js';
 export type { PuppetOptions, SyncPoseOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
