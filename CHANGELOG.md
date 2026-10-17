@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.8.1
+
+Add the optional runtime [Actor foundation](docs/actors.md): host-assigned instance identity, position snapshots and updates backed by the existing Puppet container, delegated playback/async/state/appearance APIs, and explicit borrowed or owned Puppet lifecycle. Actor reuses `AnimationStateController` and playback outcomes, cancels its own borrowed waits on disposal, and destroys owned Puppets once. Add `Puppet.onDestroy()` for reliable idle and scene-shutdown cleanup, public root/runtime exports, lifecycle/ownership/spatial regressions and dependency-boundary coverage. Movement and locomotion coordination remain deferred to v0.8.2; authored formats remain version 1.
+
 ## 0.7.6-6
 
 Complete the Feature Guide with typed Explain/Try It steps, explicit real-control practice for selecting a bone, setting its current X key and enabling onion skinning, authoritative state-based completion without automatic advancement, protected background input and keyboard focus, restart/catalog navigation and prerequisite guide links. Normal key validation, dirty state and Undo/Redo handle intentional practice edits; guide navigation stays non-destructive. Add the short [artist guide](docs/feature-guide.md), lifecycle/state regressions and local desktop browser practice coverage. The nine Rig Editor and thirteen Animation Editor guides retain their implemented feature scope; canvas, mirroring and baking remain explanations. Milestone `0.7.6.6` is packaged as SemVer `0.7.6-6`; the production runtime and authored formats are unchanged.

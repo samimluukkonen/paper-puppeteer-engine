@@ -85,6 +85,7 @@ src/engine/
   AnimationLayerEvaluator.ts  Layer sampling, blending, pose buffers and controlled properties
   AnimationPose.ts      Pure clip evaluation and pose blending
   Puppet.ts            Hierarchy, playback API, facing, attachments and lifecycle
+  Actor.ts             Optional Puppet facade, instance identity, position and explicit ownership
   PuppetAttachments.ts  Prop wrappers, ancestry checks, detachment and destroy listeners
   PuppetPoseController.ts  Pose overrides, restoration, IK ordering and projection passes
   PuppetDebug.ts       Scene-space joint, pivot and hierarchy overlay

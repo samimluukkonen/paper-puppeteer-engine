@@ -18,7 +18,7 @@ import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
-import { throwNotificationErrors } from './notifications.js';
+import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import type {
   PlaybackLifecycleEvent,
   PlaybackLifecycleOptions,
@@ -92,6 +92,7 @@ export class Puppet {
   private ikDebugView: IKDebug | undefined;
   private facing: Facing;
   private destroyed = false;
+  private readonly destroyListeners = new Set<() => void>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -708,6 +709,15 @@ export class Puppet {
     this.destroyInternal();
   }
 
+  /** Notify after cleanup, even when no animation was selected. The returned function unsubscribes. */
+  onDestroy(listener: () => void): () => void {
+    if (this.destroyed) throw new Error('Puppet has been destroyed.');
+    this.destroyListeners.add(listener);
+    return () => {
+      this.destroyListeners.delete(listener);
+    };
+  }
+
   private destroyInternal(fromScene?: boolean): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -750,6 +760,8 @@ export class Puppet {
     for (const constraint of this.ikConstraints.values()) release(() => constraint.dispose());
     this.ikConstraints.clear();
     release(() => this.poseController.destroy());
+    errors.push(...dispatchListeners(this.destroyListeners, (listener) => listener()));
+    this.destroyListeners.clear();
     throwNotificationErrors(errors, 'Puppet cleanup failed.');
   }
 

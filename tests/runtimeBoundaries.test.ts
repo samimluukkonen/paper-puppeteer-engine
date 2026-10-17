@@ -76,7 +76,7 @@ test('every engine module stays inside the engine or uses its declared runtime d
   }
 });
 
-test.each(['core', 'serialization', 'data'])(
+test.each(['core', 'serialization', 'data', 'Actor'])(
   '/%s has no transitive runtime dependency on Phaser or editors',
   (entry) => {
     const visited = new Set<string>();

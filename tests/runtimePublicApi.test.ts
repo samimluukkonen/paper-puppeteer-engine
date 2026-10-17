@@ -85,6 +85,7 @@ function fixture() {
 test('root, runtime, core, serialization and previous scene-loader imports retain export identity', () => {
   assert.deepEqual(Object.keys(runtime).sort(), Object.keys(legacy).sort());
   for (const name of [
+    'Actor',
     'Puppet',
     'Bone',
     'AnimationPlayer',
@@ -99,6 +100,7 @@ test('root, runtime, core, serialization and previous scene-loader imports retai
   assert.equal(typeof runtime.CharacterLoader.load, 'function');
   assert.strictEqual(runtime.loadSceneCharacter, legacyLoadSceneCharacter);
   assert.strictEqual(runtime.Puppet, legacy.Puppet);
+  assert.strictEqual(runtime.Actor, legacy.Actor);
   assert.isUndefined(Reflect.get(runtime, 'PuppetRenderer'));
   assert.isUndefined(Reflect.get(runtime, 'AnimationLayerEvaluator'));
   assert.isUndefined(Reflect.get(runtime, 'AnimationEditorState'));

@@ -60,6 +60,7 @@ try {
   );
   for (const guide of [
     'animation.md',
+    'actors.md',
     'characters.md',
     'development.md',
     'ik.md',
@@ -173,14 +174,39 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
   await writeFile(
     browserEntry,
     `
-import type { Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
-import { Puppet as RootPuppet } from 'paper-puppeteer-engine';
-import { Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
+import type { ActorOptions, ActorPosition, ActorPuppetOwnership, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
+import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
+import { Actor, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
 
 if (RootPuppet !== RuntimePuppet) throw new Error('Root and /runtime must share the Puppet class.');
+if (RootActor !== Actor) throw new Error('Root and /runtime must share the Actor class.');
 export const load = loadSceneCharacter;
+
+export async function useActor(puppet: Puppet): Promise<PlaybackWaitResult> {
+  const puppetOwnership: ActorPuppetOwnership = 'borrowed';
+  const options: ActorOptions = {
+    id: 'consumer-actor', puppet, puppetOwnership,
+    animationStates: { initialState: 'rest', states: { rest: { animation: 'idle' } } },
+  };
+  const actor = new Actor(options);
+  const position: ActorPosition = actor.position;
+  // @ts-expect-error Position snapshots expose readonly coordinates.
+  position.x = 100;
+  // @ts-expect-error Identity is fixed after construction.
+  actor.id = 'replacement';
+  actor.setPosition(position.x, position.y).setState('rest').playAction('rest');
+  actor.setFacing('left').setSkin('default').applySkin('default');
+  actor.setAttachment('hand', 'prop').clearAttachment('hand');
+  actor.play('idle').pauseAnimation().resumeAnimation().stop();
+  const result = await actor.playAndWait('idle', { loop: false });
+  await actor.waitForPlayback();
+  const unsubscribe = puppet.onDestroy(() => actor.dispose());
+  unsubscribe();
+  actor.dispose();
+  return result;
+}
 
 export function sync(puppet: Puppet, options: SyncPoseOptions): void {
   puppet.syncPose(options);
