@@ -1,5 +1,35 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
+/** Follow inspector disclosures through their visible summaries before using a control. */
+export async function inspectorControl(page: Page, selector: string): Promise<Locator> {
+  const control = page.locator(selector);
+  await control.first().waitFor({ state: 'attached' });
+  for (const panel of await control.first().locator('xpath=ancestor::details').all()) {
+    if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open)))
+      await panel.locator(':scope > summary').click();
+  }
+  return control;
+}
+
+/** Rig hierarchy starts collapsed; Rig Tweak retains its existing visible tree. */
+export async function rigHierarchy(page: Page): Promise<Locator> {
+  await page.locator('#editor-app:visible, .rig-tweak-panel:visible').first().waitFor();
+  if (await page.locator('#editor-app').isVisible()) await inspectorControl(page, '#hierarchy');
+  return page.getByRole('tree');
+}
+
+/** Selecting an already selected bone would now toggle it off. */
+export async function selectRigEntry(page: Page, name: string): Promise<void> {
+  const entry = (await rigHierarchy(page)).getByRole('treeitem', { name, exact: true });
+  if ((await entry.getAttribute('aria-selected')) === 'true') await entry.focus();
+  else await entry.click();
+}
+
+export async function animationIKInspector(page: Page): Promise<Locator> {
+  await inspectorControl(page, '#animation-ik-inspector fieldset');
+  return page.locator('#animation-ik-inspector');
+}
+
 /** Expand the inspector's initially collapsed bone hierarchy before using its controls. */
 export async function animationHierarchy(page: Page): Promise<Locator> {
   const panel = page.locator('.animation-bone-list');
@@ -10,6 +40,7 @@ export async function animationHierarchy(page: Page): Promise<Locator> {
 
 /** Calibrate the fitted rig camera from visible joint references, without private scene hooks. */
 export async function rigCanvasProjection(page: Page) {
+  await inspectorControl(page, '#visibility');
   const canvas = page.locator('#editor-stage canvas');
   const visibility = await page.locator('#visibility input').evaluateAll((inputs) =>
     inputs.map((input) => ({
@@ -20,7 +51,7 @@ export async function rigCanvasProjection(page: Page) {
   await page.locator('#edit-mode').selectOption('sprite');
   for (const key of ['artwork', 'bones', 'slots']) await page.locator(`input[data-visibility="${key}"]`).uncheck();
   const reference = async (slot: string) => {
-    await page.getByRole('treeitem', { name: `◇ ${slot}`, exact: true }).click();
+    await (await rigHierarchy(page)).getByRole('treeitem', { name: `◇ ${slot}`, exact: true }).click();
     const world = (await page.locator('#inspector [data-alignment="joint"]').textContent())!.split(',').map(Number);
     const png = await canvas.screenshot();
     const screen = await page.evaluate(

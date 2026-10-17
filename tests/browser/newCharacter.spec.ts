@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { characterManifestSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { test, selectRigEntry } from './fixtures.js';
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -27,7 +27,7 @@ test('create from a failed load, author an independent draft and switch editor v
   await artwork.locator(':scope > summary').click();
   await expect(artwork.getByLabel('Import new artwork', { exact: true })).toBeEnabled();
   await expect(artwork).toContainText('No artwork yet.');
-  await page.getByRole('treeitem', { name: 'root', exact: true }).click();
+  await selectRigEntry(page, 'root');
   const x = page.locator('#inspector [data-field=x]');
   await x.fill('25');
   await x.blur();

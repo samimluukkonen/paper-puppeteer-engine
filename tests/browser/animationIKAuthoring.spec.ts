@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationMenuControl, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test, animationIKInspector } from './fixtures.js';
 
 test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview and preserves bone authoring', async ({
   page,
@@ -24,6 +24,7 @@ test('React IK inspector authors A/B/C targets, pauses edits, refreshes preview 
   const ruler = page.locator('#timeline-ruler');
   const canvas = page.locator('#animation-stage canvas');
   await page.getByRole('button', { name: 'Select IK target rightArmIK', exact: true }).click();
+  await animationIKInspector(page);
   await expect(inspector).toBeVisible();
   await expect(page.locator('#animation-bone-inspector')).toBeHidden();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');

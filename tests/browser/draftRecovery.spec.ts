@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationControl, rigFileAction, test } from './fixtures.js';
+import { animationHierarchy, animationControl, rigFileAction, test, selectRigEntry } from './fixtures.js';
 
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
@@ -44,7 +44,7 @@ for (const replacement of ['original', 'imported'] as const) {
     page,
   }) => {
     await page.goto('rig-editor/');
-    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    await selectRigEntry(page, 'head');
     const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
     await x.fill('44');
     await x.press('Tab');
@@ -68,7 +68,7 @@ for (const replacement of ['original', 'imported'] as const) {
         control.setInputFiles({ name: 'rig.json', mimeType: 'application/json', buffer: Buffer.from(json) }),
       );
     }
-    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    await selectRigEntry(page, 'head');
     await expect(x).toHaveValue('0');
     await expect(page.locator('#dirty-status')).toHaveText('No changes');
     expect(dialogs).toHaveLength(1);
@@ -143,7 +143,7 @@ test("navigating away from a clean tab preserves another tab's unsaved animation
 
 test('rig draft recovery restores unsaved numeric edits as one undoable operation after reload', async ({ page }) => {
   await page.goto('rig-editor/');
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
   await x.fill('44');
   await expect.poll(() => draftKeys(page)).toHaveLength(1);
@@ -158,7 +158,7 @@ test('rig draft recovery restores unsaved numeric edits as one undoable operatio
   await page.reload();
   await expect(page.locator('#rig-draft-status')).toContainText('Draft restored');
   await expect(page.locator('#dirty-status')).toContainText('Unsaved changes');
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await expect(x).toHaveValue('45');
   expect(dialogs).toEqual(['beforeunload', 'confirm']);
   await page.locator('#undo').click();
@@ -204,10 +204,10 @@ test('animation drafts recover committed settings, exclude temporary fields and 
 test("rig recovery retains a child's direction when its parent length was collapsed to zero", async ({ page }) => {
   await page.goto('rig-editor/');
   const field = (name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
-  await page.getByRole('treeitem', { name: 'rightForearm', exact: true }).click();
+  await selectRigEntry(page, 'rightForearm');
   await field('x').fill('20');
   await field('y').fill('0');
-  await page.getByRole('treeitem', { name: 'rightUpperArm', exact: true }).click();
+  await selectRigEntry(page, 'rightUpperArm');
   await field('length').fill('0');
   await field('length').press('Tab');
   page.on('dialog', async (dialog) => {
@@ -215,10 +215,10 @@ test("rig recovery retains a child's direction when its parent length was collap
   });
   await page.reload();
   await expect(page.locator('#rig-draft-status')).toContainText('Draft restored');
-  await page.getByRole('treeitem', { name: 'rightUpperArm', exact: true }).click();
+  await selectRigEntry(page, 'rightUpperArm');
   await field('length').fill('20');
   await field('length').press('Tab');
-  await page.getByRole('treeitem', { name: 'rightForearm', exact: true }).click();
+  await selectRigEntry(page, 'rightForearm');
   await expect(field('x')).toHaveValue('20');
   await expect(field('y')).toHaveValue('0');
 });
@@ -287,7 +287,7 @@ test('rig source changes retain unsaved edits for manual download', async ({ pag
     await route.fulfill({ json: { ...rig, ...(changed ? { name: 'Updated source' } : {}) } });
   });
   await page.goto('rig-editor/');
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
   await x.fill('44');
   await x.press('Tab');
@@ -298,7 +298,7 @@ test('rig source changes retain unsaved edits for manual download', async ({ pag
   changed = true;
   await page.reload();
   await expect(page.locator('#rig-draft-status')).toContainText('retained');
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await expect(x).toHaveValue('0');
   const stored = await page.evaluate(() => JSON.stringify(localStorage));
   const [download] = await Promise.all([

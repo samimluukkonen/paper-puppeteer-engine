@@ -53,6 +53,13 @@ export class RigEditor {
     );
   }
 
+  private hasExternalTarget(constraint: TwoBoneIKConstraint): boolean {
+    return (
+      constraint.targetOwnership === 'provider' ||
+      (constraint.targetOwnership === 'runtime' && !this.ownsPreviewTarget(constraint.name))
+    );
+  }
+
   private pinPreviewTarget(constraint: TwoBoneIKConstraint): void {
     // Hosts retain explicit runtime/provider ownership.
     if (constraint.targetOwnership !== 'animation' && !this.ownsPreviewTarget(constraint.name)) return;
@@ -96,7 +103,20 @@ export class RigEditor {
 
   enable(): void {
     if (this.overlay) return;
-    if (!this.evaluateContext) this.puppet.resetToBindPose().setFacing(this.state.facing);
+    if (!this.evaluateContext) {
+      const external = this.ikChains.flatMap((chain) => {
+        // Host-only chains may not be registered until this first activation.
+        let constraint: TwoBoneIKConstraint;
+        try {
+          constraint = this.puppet.getIK(chain.name);
+        } catch {
+          return [];
+        }
+        return this.hasExternalTarget(constraint) ? [{ constraint, enabled: constraint.enabled }] : [];
+      });
+      this.puppet.resetToBindPose().setFacing(this.state.facing);
+      for (const entry of external) entry.constraint.enabled = entry.enabled;
+    }
     this.appliedRig = undefined;
     for (const chain of this.evaluateContext ? [] : this.ikChains) {
       let constraint = this.registeredIK.get(chain.name);
@@ -106,7 +126,7 @@ export class RigEditor {
           : this.puppet.addIK({ ...chain, enabled: false });
         this.registeredIK.set(chain.name, constraint);
       }
-      constraint.enabled = false;
+      if (!this.hasExternalTarget(constraint)) constraint.enabled = false;
     }
     this.overlay = new RigEditorOverlay(this.scene, this.puppet, this.state, this.ikChains, (id) =>
       this.ownsPreviewTarget(id),
@@ -127,6 +147,7 @@ export class RigEditor {
     if (this.state.ikPreview && !this.evaluateContext) {
       for (const chain of this.ikChains) {
         const constraint = this.puppet.getIK(chain.name);
+        if (this.hasExternalTarget(constraint)) continue;
         if (!chain.target && !constraint.target) this.pinPreviewTarget(constraint);
         constraint.enabled = chain.enabled !== false;
       }
@@ -220,6 +241,23 @@ export class RigEditor {
       .setAlpha(container.alpha)
       .setVisible(container.visible);
     container.parentContainer?.add(next.container);
+    // Replacing renderer consumers must retain host target/influence ownership.
+    // Editor-pinned endpoints belong to the old preview and are recomputed instead.
+    for (const chain of this.ikChains) {
+      if (
+        !(before.ik ?? []).some((entry) => entry.name === chain.name) &&
+        !this.hostIKChains.some((entry) => entry.name === chain.name)
+      )
+        continue;
+      const source = previous.getIK(chain.name);
+      const destination = next.getIK(chain.name);
+      if (this.hasExternalTarget(source)) {
+        if (source.target) destination.setTarget(source.target);
+        destination.setTargetProvider(source.targetProvider);
+        destination.enabled = source.enabled;
+      }
+      if (source.hasMixOverride) destination.mix = source.mix;
+    }
     const enabled = !!this.overlay;
     this.disable();
     this.puppet = next;
@@ -475,10 +513,9 @@ export class RigEditor {
     const after = container.getWorldTransformMatrix();
     for (const constraint of this.registeredIK.values()) {
       const target = constraint.target;
-      if (target) {
-        const owned = this.ownsPreviewTarget(constraint.name);
+      if (target && this.ownsPreviewTarget(constraint.name) && !constraint.targetProvider) {
         constraint.setTarget(target.x + after.tx - oldX, target.y + after.ty - oldY);
-        if (owned) this.previewTargets.set(constraint.name, constraint.target!);
+        this.previewTargets.set(constraint.name, constraint.target!);
       }
     }
     this.overlay?.invalidate();
@@ -565,6 +602,7 @@ export class RigEditor {
     this.puppet.preparePose();
     for (const chain of this.ikChains) {
       const constraint = this.puppet.getIK(chain.name);
+      if (this.hasExternalTarget(constraint)) continue;
       if (enabled && !chain.target) this.pinPreviewTarget(constraint);
       constraint.enabled = enabled && chain.enabled !== false;
     }

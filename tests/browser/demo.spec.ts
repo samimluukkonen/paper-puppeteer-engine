@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { rigFileAction, test } from './fixtures.js';
+import { rigFileAction, test, selectRigEntry } from './fixtures.js';
 
 test('crossfade updates reuse controls and leave unchanged DOM untouched', async ({ page }) => {
   await page.goto('./');
@@ -120,7 +120,7 @@ test('demo and editor navigation preserves the deployment path and loads fresh s
   await expect(page.locator('#status-text')).toContainText('Current: idle');
   await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
   await expect(page).toHaveURL(new URL('rig-editor/', baseURL).href);
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-field="x"]');
   await x.fill('12');
   await rigFileAction(page, '#log-json', (control) => control.click());

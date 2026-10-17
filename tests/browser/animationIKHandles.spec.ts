@@ -1,6 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationMenuControl, animationFileAction, test } from './fixtures.js';
+import {
+  animationHierarchy,
+  animationMenuControl,
+  animationFileAction,
+  test,
+  animationIKInspector,
+} from './fixtures.js';
 
 /** Locate the selected Phaser crosshair from its rendered pixels, without runtime test hooks. */
 async function targetPoint(page: Page) {
@@ -78,6 +84,7 @@ test('hand and foot handles preview, cancel, commit two keys, animate and retain
   for (const id of ['rightArmIK', 'rightLegIK']) {
     await ruler.press('Home');
     await page.getByRole('button', { name: `Select IK target ${id}`, exact: true }).click();
+    await animationIKInspector(page);
     // Initially requested and solved points coincide, allowing pixel-based crosshair picking.
     if (id === 'rightArmIK') {
       await x.fill('22');
@@ -96,7 +103,7 @@ test('hand and foot handles preview, cancel, commit two keys, animate and retain
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
     await expect(inspector).toBeVisible();
-    await expect(inspector.locator('h2')).toContainText(id);
+    await expect(inspector.locator(':scope > details > summary')).toContainText(id);
     await page.mouse.move(start.x + 35, start.y - 25, { steps: 6 });
     await expect(x).toHaveAttribute('data-temporary', 'true');
     await expect(ruler).toHaveAttribute('aria-valuenow', '0');
@@ -185,6 +192,7 @@ test('random paperdoll sketch exposes and authors both hand and foot targets', a
   for (const [index, id] of targets.entries()) {
     if (index === 2) await page.locator('#animation-facing').selectOption('left');
     await page.getByRole('button', { name: `Select IK target ${id}`, exact: true }).click();
+    await animationIKInspector(page);
     await expect(inspector.getByRole('button', { name: 'Set Target Key', exact: true })).toBeEnabled();
     const originalX = Number(await x.inputValue());
     const originalY = Number(await y.inputValue());

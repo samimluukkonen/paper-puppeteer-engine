@@ -3,6 +3,7 @@ import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { AttachmentPanel } from '../rig-editor/AttachmentPanel.js';
+import { RigIKPanel } from '../rig-editor/RigIKPanel.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
 import type { PackageController } from '../shared/package/PackageController.js';
@@ -304,6 +305,7 @@ export function AnimationEditorView({
             </button>
           </div>
           {rigTweak && <RigTweakPanel active={tweaking} />}
+          {attachments && tweaking && <RigIKPanel controller={attachments} />}
           {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
             <details className="animation-bone-list">

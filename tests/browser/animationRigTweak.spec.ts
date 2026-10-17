@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { rigDefinitionSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { test, selectRigEntry } from './fixtures.js';
 
 test('paused elbow tweak, separate history, export/reload and continued animation preserve every key', async ({
   page,
@@ -26,7 +26,7 @@ test('paused elbow tweak, separate history, export/reload and continued animatio
   await expect(page.locator('.timeline-panel')).toHaveAttribute('inert', '');
   await page.keyboard.press('Space');
   await expect(page.locator('#timeline-time-input')).toHaveValue(time);
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   const y = page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]');
   await expect(y).toHaveValue('60');
   const canvas = page.locator('#animation-stage canvas');
@@ -78,7 +78,7 @@ test('unsaved rig tweaks survive navigation to the Rig Editor and recover into i
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('rig-tweak');
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   await page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]').fill('77');
   await page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]').press('Tab');
   const dialogs: string[] = [];
@@ -88,7 +88,7 @@ test('unsaved rig tweaks survive navigation to the Rig Editor and recover into i
   });
   await page.goto('rig-editor/');
   await expect(page.locator('#rig-draft-status')).toContainText('Draft restored');
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   await expect(page.locator('#inspector input[data-scope="bone"][data-field="y"]')).toHaveValue('77');
   expect(dialogs).toContain('beforeunload');
 });

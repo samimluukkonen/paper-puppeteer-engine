@@ -281,71 +281,79 @@ export function RigIKPanel({ controller }: { controller: AttachmentController })
     if (selected) controller.updateIK(selected.name, values);
   };
   return (
-    <section className="attachment-panel rig-ik-panel" aria-label="IK constraints">
-      <h3>IK constraints</h3>
-      {!constraints.length && (
-        <>
-          <p>No IK constraints</p>
-          <p>Create an IK constraint to control a chain of bones using a target.</p>
-        </>
-      )}
-      <div className="action-grid">
-        {constraints.map((entry) => (
-          <button
-            key={entry.name}
-            type="button"
-            aria-pressed={entry.name === selected?.name}
-            onClick={() => controller.selectIK(entry.name)}
-          >
-            {entry.name}
-          </button>
-        ))}
-      </div>
-      <button type="button" onClick={() => setCreating(true)}>
-        + Add IK Constraint
-      </button>
-      <label>
-        <input
-          type="checkbox"
-          checked={state.ikPreview}
-          onChange={(event) => controller.previewIK(event.target.checked)}
-        />
-        Live solver preview
-      </label>
-      <p>Targets edit rig defaults. Drag a crosshair or enter rig local coordinates. Escape cancels a drag.</p>
-      {creating && (
-        <RigIKCreateForm
-          key={state.name ?? 'rig'}
-          controller={controller}
-          rig={state.workingCopy}
-          onClose={() => setCreating(false)}
-        />
-      )}
-      {selected && (
-        <fieldset key={selected.name}>
-          <legend>Selected: {selected.name}</legend>
-          <ChainFields rig={state.workingCopy} definition={selected} disabled={!!dependencies.length} onPatch={patch} />
-          {selected.target ? (
-            <TargetFields target={selected.target} onCommit={(target) => patch({ target })} />
-          ) : (
-            <p>No static target. Drag the end effector crosshair to author a default target.</p>
-          )}
-          {editor.getIKTargetEditIssue(selected.name) && (
-            <p role="status">{editor.getIKTargetEditIssue(selected.name)}</p>
-          )}
-          <Settings definition={selected} protectedChain={!!dependencies.length} onPatch={patch} />
-          {!!dependencies.length && (
-            <p role="status">
-              Used by {dependencies.join(', ')}. Resolve these dependencies before deleting or changing the chain or end
-              offset.
-            </p>
-          )}
-          <button type="button" disabled={!!dependencies.length} onClick={() => controller.removeIK(selected.name)}>
-            Delete Constraint
-          </button>
-        </fieldset>
-      )}
-      <p role="status">{message}</p>
-    </section>
+    <details className="attachment-panel rig-ik-panel">
+      <summary>IK constraints</summary>
+      <section className="rig-ik-content" aria-label="IK constraints">
+        {!constraints.length && (
+          <>
+            <p>No IK constraints</p>
+            <p>Create an IK constraint to control a chain of bones using a target.</p>
+          </>
+        )}
+        <div className="action-grid">
+          {constraints.map((entry) => (
+            <button
+              key={entry.name}
+              type="button"
+              aria-pressed={entry.name === selected?.name}
+              onClick={() => controller.selectIK(entry.name)}
+            >
+              {entry.name}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={() => setCreating(true)}>
+          + Add IK Constraint
+        </button>
+        <label>
+          <input
+            type="checkbox"
+            checked={state.ikPreview}
+            onChange={(event) => controller.previewIK(event.target.checked)}
+          />
+          Live solver preview
+        </label>
+        <p>Targets edit rig defaults. Drag a crosshair or enter rig local coordinates. Escape cancels a drag.</p>
+        <p>Constraint names are stable IDs shared with animations. Renaming requires a reference migration.</p>
+        {creating && (
+          <RigIKCreateForm
+            key={state.name ?? 'rig'}
+            controller={controller}
+            rig={state.workingCopy}
+            onClose={() => setCreating(false)}
+          />
+        )}
+        {selected && (
+          <fieldset key={selected.name}>
+            <legend>Selected: {selected.name}</legend>
+            <ChainFields
+              rig={state.workingCopy}
+              definition={selected}
+              disabled={!!dependencies.length}
+              onPatch={patch}
+            />
+            {selected.target ? (
+              <TargetFields target={selected.target} onCommit={(target) => patch({ target })} />
+            ) : (
+              <p>No static target. Drag the end effector crosshair to author a default target.</p>
+            )}
+            {editor.getIKTargetEditIssue(selected.name) && (
+              <p role="status">{editor.getIKTargetEditIssue(selected.name)}</p>
+            )}
+            <Settings definition={selected} protectedChain={!!dependencies.length} onPatch={patch} />
+            {!!dependencies.length && (
+              <p role="status">
+                Used by {dependencies.join(', ')}. Resolve these dependencies before deleting or changing the chain or
+                end offset.
+              </p>
+            )}
+            <button type="button" disabled={!!dependencies.length} onClick={() => controller.removeIK(selected.name)}>
+              Delete Constraint
+            </button>
+          </fieldset>
+        )}
+        <p role="status">{message}</p>
+      </section>
+    </details>
   );
 }

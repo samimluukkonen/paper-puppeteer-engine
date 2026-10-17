@@ -1,13 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { rigFileSchema, skinFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { test, inspectorControl } from './fixtures.js';
 
 test('visual attachments and partial skins round trip with history and alignment selection', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   const panel = page.locator('#attachment-panel');
+  await inspectorControl(page, '#attachment-panel select');
   const downloadRig = async () => {
     const waiting = page.waitForEvent('download');
     await page.locator('#download-json').click();
@@ -77,7 +78,7 @@ test('skin switching during animation and rig authoring preserve animation JSON 
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   const panel = page.locator('#attachment-panel');
-  await panel.locator(':scope > summary').click();
+  await inspectorControl(page, '#attachment-panel select');
   const exportAnimation = async () => {
     const waiting = page.waitForEvent('download');
     await page.locator('#animation-download').click();

@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { animationHierarchy, animationMenuControl, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test, selectRigEntry } from './fixtures.js';
 
 for (const view of [
   { route: './', prefix: 'demo', stage: '#stage', ready: '#status-text', text: 'Current: idle' },
@@ -48,7 +48,7 @@ for (const view of [
     await expect(inspector).not.toHaveAttribute('inert');
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     if (view.prefix === 'rig') {
-      await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+      await selectRigEntry(page, 'head');
       const x = page.locator('#inspector input[data-field="x"]');
       await x.fill('12');
       await x.press('Tab');

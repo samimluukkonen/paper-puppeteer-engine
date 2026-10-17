@@ -61,6 +61,13 @@ export function assertIKConstraintChangesAllowed(
   dependencies: IKConstraintDependencies,
 ): void {
   const nextById = new Map((candidate.ik ?? []).map((entry) => [entry.name, entry]));
+  const previousIds = new Set((rig.ik ?? []).map((entry) => entry.name));
+  for (const next of candidate.ik ?? []) {
+    if (previousIds.has(next.name)) continue;
+    const references = dependencies.references?.(next.name) ?? [];
+    if (references.length)
+      throw new Error(`IK name "${next.name}" is reserved by ${references.join(', ')}. Choose another ID.`);
+  }
   for (const previous of rig.ik ?? []) {
     const next = nextById.get(previous.name);
     if (!next || ikChainChanged(previous, next)) assertUnused(rig, previous.name, dependencies);
@@ -110,6 +117,12 @@ export function updateIKConstraint(
   dependencies: IKConstraintDependencies = {},
 ): RigDefinition {
   const previous = getIKConstraint(rig, id);
+  if (Object.hasOwn(patch, 'name')) {
+    const references = ikConstraintDependencies(rig, id, dependencies);
+    throw new Error(
+      `IK constraint "${id}" has a stable ID and cannot be renamed without an atomic reference migration.${references.length ? ` Used by ${references.join(', ')}.` : ''} Keep its ID or create a separate constraint.`,
+    );
+  }
   // Strict parsing rejects attempts to smuggle an identity change or unsupported settings.
   const values = twoBoneIKDefinitionSchema.omit({ name: true }).partial().strict().parse(patch);
   const next = twoBoneIKDefinitionSchema.parse({ ...previous, ...values });

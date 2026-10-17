@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { loadPackageDefinition } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
-import { animationHierarchy, test } from './fixtures.js';
+import { animationHierarchy, test, rigHierarchy, inspectorControl, selectRigEntry } from './fixtures.js';
 
 test('build a new character, import and align artwork, animate, export and reload runtime playback', async ({
   page,
@@ -15,13 +15,16 @@ test('build a new character, import and align artwork, animate, export and reloa
   await dialog.getByRole('button', { name: 'Create Character', exact: true }).click();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   const skeleton = page.getByRole('region', { name: 'Build skeleton', exact: true });
-  await page.getByRole('treeitem', { name: 'root', exact: true }).click();
+  await selectRigEntry(page, 'root');
   await skeleton.getByLabel('Bone ID / name', { exact: true }).fill('base');
   await skeleton.getByRole('button', { name: 'Rename bone', exact: true }).click();
   for (const id of ['trunk', 'branch']) {
     await skeleton.getByLabel('New bone ID', { exact: true }).fill(id);
     await skeleton.getByRole('button', { name: '+ Add Bone', exact: true }).click();
-    await expect(page.getByRole('treeitem', { name: id, exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect((await rigHierarchy(page)).getByRole('treeitem', { name: id, exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   }
   const x = page.locator('#inspector [data-scope=bone][data-field=x]');
   await x.fill('35');
@@ -50,14 +53,13 @@ test('build a new character, import and align artwork, animate, export and reloa
   await page.reload();
   await expect(page.locator('#hierarchy [role=treeitem]')).toHaveText(['base', 'trunk', 'branch']);
   page.off('dialog', accept);
-  await page.getByRole('treeitem', { name: 'branch', exact: true }).click();
+  await selectRigEntry(page, 'branch');
   await expect(x).toHaveValue('35');
   await skeleton.getByLabel('New slot ID', { exact: true }).fill('branch-visual');
   await skeleton.getByRole('button', { name: '+ Add Slot', exact: true }).click();
-  await expect(page.getByRole('treeitem', { name: '◇ branch-visual', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(
+    (await rigHierarchy(page)).getByRole('treeitem', { name: '◇ branch-visual', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
   const artwork = page.locator('#editor-app #artwork-panel');
   await artwork.locator(':scope > summary').click();
   const png = await page.evaluate(() => {
@@ -76,6 +78,7 @@ test('build a new character, import and align artwork, animate, export and reloa
   });
   await expect(artwork).toContainText('Artwork added to the library.');
   const attachments = page.locator('#editor-app #attachment-panel');
+  await inspectorControl(page, '#editor-app #attachment-panel select');
   await attachments.getByLabel('Attachment ID', { exact: true }).fill('leaf-appearance');
   await attachments.getByRole('button', { name: 'Create attachment', exact: true }).click();
   await attachments.getByLabel('Assigned attachment', { exact: true }).selectOption('leaf-appearance');
@@ -94,17 +97,17 @@ test('build a new character, import and align artwork, animate, export and reloa
   await page.locator('#inspector [data-scope=slot][data-field=depth]').blur();
   await page.locator('#rig-facing').selectOption('left');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await page.getByRole('treeitem', { name: 'branch', exact: true }).click();
+  await selectRigEntry(page, 'branch');
   await skeleton.getByRole('button', { name: 'Remove bone', exact: true }).click();
   await expect(skeleton).toContainText('slot "branch-visual"');
-  await expect(page.getByRole('treeitem', { name: 'branch', exact: true })).toBeVisible();
+  await expect((await rigHierarchy(page)).getByRole('treeitem', { name: 'branch', exact: true })).toBeVisible();
   await skeleton.getByLabel('New bone ID', { exact: true }).fill('bud');
   await skeleton.getByRole('button', { name: '+ Add Bone', exact: true }).click();
   await page.locator('#undo').click();
-  await expect(page.getByRole('treeitem', { name: 'bud', exact: true })).toHaveCount(0);
+  await expect((await rigHierarchy(page)).getByRole('treeitem', { name: 'bud', exact: true })).toHaveCount(0);
   await page.locator('#redo').click();
-  await expect(page.getByRole('treeitem', { name: 'bud', exact: true })).toBeVisible();
-  await page.getByRole('treeitem', { name: '◇ branch-visual', exact: true }).click();
+  await expect((await rigHierarchy(page)).getByRole('treeitem', { name: 'bud', exact: true })).toBeVisible();
+  await selectRigEntry(page, '◇ branch-visual');
   await expect(attachments.getByLabel('Assigned attachment', { exact: true })).toHaveValue('leaf-appearance');
   await expect(page.locator('#inspector [data-scope=attachment][data-field=originX]').first()).toHaveValue('0.25');
   await expect(artwork.getByLabel('Artwork asset', { exact: true })).toHaveValue('my-leaf');

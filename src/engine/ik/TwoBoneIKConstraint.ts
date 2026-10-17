@@ -136,6 +136,10 @@ export class TwoBoneIKConstraint {
   get target(): Readonly<IKTarget> | undefined {
     return this.point;
   }
+  /** Current host callback, retained when an editor rebuilds its preview skeleton. */
+  get targetProvider(): IKTargetProvider | undefined {
+    return this.provider;
+  }
   set target(value: IKTarget | undefined) {
     this.assertActive();
     if (value) {

@@ -59,12 +59,11 @@ export function inspectRigDraft(
       (data.slots ?? []).length !== (compatible.slots ?? []).length ||
       (data.slots ?? []).some(
         (slot, index) => slot.id !== compatible.slots![index]!.id || slot.bone !== compatible.slots![index]!.bone,
-      ) ||
-      !equalEditorData(data.ik ?? [], compatible.ik ?? []))
+      ))
   )
     return undefined;
-  if (!(recovery.success && recovery.data.version === 2) && !equalEditorData(data.ik ?? [], initial.ik ?? []))
-    return undefined;
+  // IK authoring is additive within a compatible skeleton. RigEditorState checks
+  // live animation/host dependencies before accepting deletions or chain changes.
   const external = recovery.success ? (recovery.data.standaloneSkins ?? standaloneSkins) : standaloneSkins;
   if (defaultSkin && ![...(data.skins ?? []), ...external].some((skin) => skin.name === defaultSkin)) return undefined;
   if (

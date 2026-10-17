@@ -105,6 +105,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 | [Animation states](docs/animation-states.md)                         | Named states, transition fades, one-shot returns, playback ownership and disposal                          |
 | [Animation and poses](docs/animation.md)                             | Keyframes, static poses, playback, crossfades, events, layers, and manual updates                          |
 | [IK constraint authoring](docs/ik-constraint-authoring.md)           | Rig model/controller creation, configuration, dependency-safe deletion, history and default targets        |
+| [IK authoring integration](docs/ik-authoring-integration.md)         | New/existing character workflows, Rig Tweak, shared discovery, import safety and runtime ownership         |
 | [React IK authoring](docs/react-ik-authoring.md)                     | IK timeline tracks, numeric target/influence keys, selection, history, and local verification              |
 | [IK production authoring](docs/ik-animation-authoring.md)            | Reaching workflow, operation limits, compatibility, lifecycle and regression coverage                      |
 | [Visual IK targets](docs/visual-ik-targets.md)                       | Phaser crosshairs, dragging, explicit target commitment, coordinate conversion, ownership and verification |

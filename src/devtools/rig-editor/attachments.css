@@ -45,16 +45,16 @@
 }
 
 .rig-ik-panel {
-  display: grid;
-  gap: 14px;
   margin: 16px 0;
   padding: 16px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
   background: var(--bg-panel);
 }
-.rig-ik-panel h3 {
-  margin: 0;
+.rig-ik-panel .rig-ik-content {
+  display: grid;
+  gap: 14px;
+  padding: 14px 0 0;
 }
 .rig-ik-panel .action-grid {
   gap: 8px;
@@ -64,7 +64,7 @@
 .rig-ik-panel p[role="status"]:empty {
   display: none;
 }
-.rig-ik-panel > button {
+.rig-ik-panel .rig-ik-content > button {
   justify-self: start;
   min-height: 34px;
   padding: 8px 12px;

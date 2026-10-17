@@ -38,7 +38,8 @@ export function createHierarchyController(hierarchy: HTMLElement) {
       button.addEventListener(
         'click',
         () => {
-          if (type === 'bone') state.selectBone(id);
+          if (type === 'bone' && state.selection?.type === 'bone' && state.selection.id === id) state.clearSelection();
+          else if (type === 'bone') state.selectBone(id);
           else state.selectSlot(id);
           current.refresh();
         },

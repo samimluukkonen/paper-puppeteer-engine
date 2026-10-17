@@ -3,7 +3,7 @@ import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import type { IKTargetProvider, TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { Rig } from '../../engine/Rig.js';
 import type { Facing } from '../../engine/types.js';
@@ -75,10 +75,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   reloadRig(file: RigJsonDefinition, filename?: string, reason?: 'import' | 'reload-export'): void {
     const editor = this.rigEditor;
     if (!editor) throw new Error('No rig is loaded.');
-    if (!editor.state.canRestoreDraft(file))
-      throw new Error(
-        'Rig import requires the same hierarchy, bone artwork, IK definitions and default skin, with loaded image assets and valid frames. Open another character for a different hierarchy; this workspace retains its animation references.',
-      );
+    editor.state.assertCanRestoreDraft(file);
     editor.cancelGesture();
     this.artwork?.cancel();
     ++this.rigSessionRevision;
@@ -117,6 +114,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   private facing: Facing = 'right';
   private bonesVisible = true;
   private ikPreviewEnabled = false;
+  private readonly previewTargetProviders = new Map<string, IKTargetProvider>();
   private readonly options: AnimationEditorSceneOptions;
 
   constructor(
@@ -146,6 +144,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       delete this.rigExportCheckpoint.requestSequence;
       delete this.rigExportCheckpoint.committedSequence;
       this.rigMode = false;
+      this.previewTargetProviders.clear();
       this.state?.pause();
       this.state?.endScrub();
       this.ikHandles?.dispose();
@@ -350,12 +349,22 @@ export class AnimationEditorScene extends Phaser.Scene {
     puppet.preparePose();
     for (const chain of this.options.ikChains ?? []) {
       const constraint = puppet.getIK(chain.name);
+      // The fixed-preview control may replace only its own callbacks. Specialized
+      // providers and explicit runtime targets retain the runtime precedence model.
+      if (
+        constraint.target ||
+        (constraint.targetProvider && constraint.targetProvider !== this.previewTargetProviders.get(chain.name))
+      )
+        continue;
       if (enabled) {
         const point = ikPreviewTarget(puppet, constraint);
         const local = puppet.container.getWorldTransformMatrix().applyInverse(point.x, point.y);
-        constraint.setTargetProvider(() => puppet.container.getWorldTransformMatrix().transformPoint(local.x, local.y));
+        const provider = () => this.puppet?.container.getWorldTransformMatrix().transformPoint(local.x, local.y);
+        this.previewTargetProviders.set(chain.name, provider);
+        constraint.setTargetProvider(provider);
       } else {
         constraint.setTargetProvider(undefined);
+        this.previewTargetProviders.delete(chain.name);
       }
       const authored = puppet.rig.ik?.find((definition) => definition.name === chain.name);
       constraint.enabled = enabled || (authored ? (authored.enabled ?? true) : false);
@@ -520,6 +529,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
     } catch (error) {
+      this.previewTargetProviders.clear();
       this.releaseMode?.();
       this.releaseMode = undefined;
       this.rigEditor?.disable();

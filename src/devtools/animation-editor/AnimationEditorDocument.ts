@@ -158,9 +158,13 @@ export class AnimationEditorDocument {
       this.issues = entry?.issues ?? [{ severity: 'error', message: `Animation "${id}" is missing.` }];
       return false;
     }
+    // The active document's latest snapshot lives on this owner until navigation.
+    // Re-selecting it must not resurrect an older saved/inactive-session snapshot.
     const next =
-      options.discardChanges && id === this.selectedId
-        ? (entry?.saved ?? null)
+      id === this.selectedId
+        ? options.discardChanges
+          ? this.saved
+          : this.working
         : (entry?.working ?? entry?.saved ?? null);
     if (next && !this.inspect(next)) return false;
     if (options.discardChanges && this.saved && !this.inspect(this.saved)) return false;

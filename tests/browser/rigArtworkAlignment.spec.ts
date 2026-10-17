@@ -1,12 +1,12 @@
 import { expect } from '@playwright/test';
-import { rigFileAction, test } from './fixtures.js';
+import { rigFileAction, test, selectRigEntry, inspectorControl } from './fixtures.js';
 
 test('replacement forearm alignment, pose inspection, facing and export reload preserve placement', async ({
   page,
 }) => {
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await page.getByRole('treeitem', { name: '◇ leftForearmVisual', exact: true }).click();
+  await selectRigEntry(page, '◇ leftForearmVisual');
   const inspector = page.locator('#inspector');
   const originPx = inspector.locator('input[data-field="originX"][data-pixels]');
   const origin = inspector.locator('input[data-scope="attachment"][data-field="originX"]:not([data-pixels])');
@@ -74,7 +74,7 @@ test('replacement forearm alignment, pose inspection, facing and export reload p
   await expect(originPx).toHaveValue('13.123456789');
   await expect(slotX).toHaveValue(originalSlot);
   // A selected joint reference remains visible with neighboring bones hidden.
-  await page.locator('input[data-visibility="bones"]').uncheck();
+  await (await inspectorControl(page, 'input[data-visibility="bones"]')).uncheck();
   await page.locator('#dim-selection').check();
   await page.locator('#grid-snap').selectOption('1');
   await page.locator('#rig-mode-hint').click();
@@ -89,25 +89,25 @@ test('replacement forearm alignment, pose inspection, facing and export reload p
   await page.locator('#rig-preview-time').fill('500');
   await expect(slotX).toBeDisabled();
   await page.locator('#rig-preview-pose').selectOption('');
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   await boneRotation.fill('0.4');
   await page.locator('#rig-mode-hint').click();
   await page.locator('#undo').click();
   await page.locator('#redo').click();
-  await page.getByRole('treeitem', { name: '◇ leftForearmVisual', exact: true }).click();
+  await selectRigEntry(page, '◇ leftForearmVisual');
   await page.locator('#rig-facing').selectOption('right');
   // Reset presentation controls so the reload screenshot compares identical views.
   await page.locator('#edit-mode').selectOption('joint');
   await page.locator('#dim-selection').uncheck();
   await page.locator('#grid-snap').selectOption('0');
-  await page.locator('input[data-visibility="bones"]').check();
+  await (await inspectorControl(page, 'input[data-visibility="bones"]')).check();
   const canvas = page.locator('#editor-stage canvas');
   const before = await canvas.screenshot({ path: test.info().outputPath('aligned-forearm.png') });
   const download = page.waitForEvent('download');
   await page.locator('#download-json').click();
   expect((await download).suggestedFilename()).toBe('rig.json');
   await rigFileAction(page, '#reload-exported', (control) => control.click());
-  await page.getByRole('treeitem', { name: '◇ leftForearmVisual', exact: true }).click();
+  await selectRigEntry(page, '◇ leftForearmVisual');
   await expect(originPx).toHaveValue('13.123456789');
   await expect(offset).toHaveValue('13');
   expect((await canvas.screenshot()).equals(before)).toBe(true);

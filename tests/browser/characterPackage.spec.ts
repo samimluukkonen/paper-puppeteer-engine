@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { characterManifestSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { test, selectRigEntry } from './fixtures.js';
 
 test('package preview exposes controls only after its artwork and puppet are ready', async ({ page }) => {
   await page.goto('rig-editor/');
@@ -129,7 +129,7 @@ for (const editor of ['rig', 'animation'] as const) {
       await page.locator('#animation-selection').selectOption('walk');
       await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('rig-tweak');
     }
-    await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+    await selectRigEntry(page, 'leftForearm');
     const joint = page.locator(
       `${editor === 'animation' ? '#tweak-inspector' : '#inspector'} input[data-scope="bone"][data-field="y"]`,
     );

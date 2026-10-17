@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { parseRigDefinition } from '../../src/engine/externalData.js';
-import { rigFileAction, test } from './fixtures.js';
+import { rigFileAction, test, rigHierarchy, selectRigEntry } from './fixtures.js';
 
 for (const route of ['', 'rig-editor/', 'animation-editor/']) {
   test(`logo navigation preserves the selected character from ${route || 'demo'}`, async ({ page }) => {
@@ -25,7 +25,7 @@ test('sketch loads all parts, exports edits, and stays selected across views', a
   await page.goto('rig-editor/?character=random-paperdoll-sketch');
   await expect(page.locator('#session-status')).toContainText('Character: random-paperdoll-sketch');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await expect(page.getByRole('treeitem')).toHaveCount(34);
+  await expect((await rigHierarchy(page)).getByRole('treeitem')).toHaveCount(34);
   const rig = parseRigDefinition(await (await page.request.get('characters/random-paperdoll-sketch/rig.json')).json());
   expect(rig.attachments.find((attachment) => attachment.id === 'headDefault')!.scaleX).toBe(-0.3);
   for (const side of ['left', 'right']) {
@@ -42,11 +42,11 @@ test('sketch loads all parts, exports edits, and stays selected across views', a
     ['leftThigh', 1],
     ['rightThigh', -1],
   ] as const) {
-    await page.getByRole('treeitem', { name: bone, exact: true }).click();
+    await selectRigEntry(page, bone);
     const offset = Number(await page.locator('#inspector input[data-scope="bone"][data-field="x"]').inputValue());
     expect(offset * side).toBeGreaterThan(0);
   }
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
   await x.fill('4');
   await x.press('Tab');
@@ -54,7 +54,7 @@ test('sketch loads all parts, exports edits, and stays selected across views', a
   await page.locator('#download-json').click();
   expect((await download).suggestedFilename()).toBe('rig.json');
   await rigFileAction(page, '#reload-exported', (control) => control.click());
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await expect(x).toHaveValue('4');
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await expect(page.locator('#character-status')).toHaveText('Character: random-paperdoll-sketch');
@@ -115,7 +115,7 @@ test('character selection protects unsaved rig edits and can return to the demo 
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await page.getByRole('combobox', { name: 'Character', exact: true }).selectOption('random-paperdoll-sketch');
   await expect(page.locator('#session-status')).toContainText('Character: random-paperdoll-sketch');
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
   await x.fill('8');
   await x.press('Tab');

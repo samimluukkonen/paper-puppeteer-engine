@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { rigFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, test } from './fixtures.js';
+import { animationMenuControl, test, selectRigEntry } from './fixtures.js';
 
 for (const editor of ['rig', 'animation'] as const) {
   test(`${editor} forearm image preview, cancel, apply, invalid import and revert preserve the document`, async ({
@@ -78,7 +78,7 @@ for (const editor of ['rig', 'animation'] as const) {
       await page.locator('#play-pause').click();
       await page.locator('#animation-selection').selectOption('idle');
     } else {
-      await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+      await selectRigEntry(page, 'leftForearm');
       await expect(validation).toHaveText('Validation: OK');
     }
     await input.setInputFiles({

@@ -156,7 +156,7 @@ export function RigEditorView({
               Close
             </button>
           </div>
-          <details className="workspace-hierarchy" open>
+          <details className="workspace-hierarchy">
             <summary>Hierarchy</summary>
             <div id="hierarchy" role="tree" />
             {attachments && <RigStructurePanel controller={attachments} />}
@@ -165,9 +165,9 @@ export function RigEditorView({
             <div id="inspector">Loading character…</div>
           </section>
           {attachments && <RigIKPanel controller={attachments} />}
-          {attachments && <AttachmentPanel controller={attachments} />}
+          {attachments && <AttachmentPanel controller={attachments} defaultOpen={false} />}
           {artwork && <ArtworkPanel controller={artwork} />}
-          <details open>
+          <details>
             <summary>Visibility</summary>
             <div id="visibility" />
             <label className="opacity-label">

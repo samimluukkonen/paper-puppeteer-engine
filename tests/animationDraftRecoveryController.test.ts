@@ -1,7 +1,7 @@
 import { assert, test, vi } from 'vitest';
 import { AnimationDraftRecoveryController } from '../src/devtools/animation-editor/AnimationDraftRecoveryController.js';
 import { AnimationEditorState, type ReadonlyAnimation } from '../src/devtools/animation-editor/AnimationEditorState.js';
-import type { DraftSession } from '../src/devtools/shared/DraftRecovery.js';
+import { DraftRecovery, type DraftSession } from '../src/devtools/shared/DraftRecovery.js';
 import { draftSource } from '../src/devtools/shared/draftSource.js';
 import { Rig } from '../src/engine/Rig.js';
 
@@ -32,6 +32,66 @@ function fixture() {
   const session = () => recovery.bind.mock.lastCall![0];
   return { rig, animations, state, calls, recovery, controller, session };
 }
+
+test('multiple new clips recover every authored working copy and independent Undo/Redo', () => {
+  const stored = new Map<string, string>();
+  const storage = {
+    get length() {
+      return stored.size;
+    },
+    key: (index: number) => [...stored.keys()][index] ?? null,
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      stored.set(key, value);
+    },
+    removeItem: (key: string) => {
+      stored.delete(key);
+    },
+  };
+  vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: storage, confirm: () => true }));
+  vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }));
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const recovery = new DraftRecovery<ReadonlyAnimation | null>(() => {});
+  const controller = new AnimationDraftRecoveryController(recovery, '/animation-editor/');
+  const nextRecovery = new DraftRecovery<ReadonlyAnimation | null>(() => {});
+  const nextController = new AnimationDraftRecoveryController(nextRecovery, '/animation-editor/');
+  try {
+    const state = new AnimationEditorState(rig);
+    controller.bind(state, 'character');
+    for (const [name, x] of [
+      ['new-one', 42],
+      ['new-two', 84],
+    ] as const) {
+      assert.isTrue(state.createAnimation({ name }));
+      assert.isTrue(state.setBonePropertyKeyframe('root', 'x', x, 0));
+    }
+    controller.dispose();
+    recovery.dispose();
+    const reloaded = new AnimationEditorState(rig);
+    nextController.bind(reloaded, 'character');
+    assert.deepEqual(Object.fromEntries(reloaded.packageAnimations().map((clip) => [clip.name, clip.tracks.root])), {
+      'new-one': [{ time: 0, x: 42 }],
+      'new-two': [{ time: 0, x: 84 }],
+    });
+    for (const [name, x] of [
+      ['new-one', 42],
+      ['new-two', 84],
+    ] as const) {
+      assert.isTrue(reloaded.selectAnimation(name, { keepChanges: true }));
+      assert.equal(reloaded.getEvaluatedBonePropertyValue('root', 'x', 0), x);
+      assert.isTrue(reloaded.undo());
+      assert.equal(reloaded.getEvaluatedBonePropertyValue('root', 'x', 0), 0);
+      assert.isTrue(reloaded.redo());
+      assert.equal(reloaded.getEvaluatedBonePropertyValue('root', 'x', 0), x);
+    }
+  } finally {
+    controller.dispose();
+    recovery.dispose();
+    nextController.dispose();
+    nextRecovery.dispose();
+    vi.unstubAllGlobals();
+  }
+});
 
 test('binds source identity and updates edits/playback without replacing recovery sessions', () => {
   const { state, recovery, controller, session, rig } = fixture();

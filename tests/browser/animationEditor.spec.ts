@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationControl, test } from './fixtures.js';
+import { animationHierarchy, animationControl, test, selectRigEntry } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -17,7 +17,7 @@ test('editor routes and the demo remain linked under the deployment base', async
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
   await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
   await x.fill('12');
   await x.press('Tab');

@@ -92,6 +92,12 @@
   text-align: right;
   background: var(--bg-inset);
 }
+
+#rig-inspector > section[aria-label="Rig properties"] {
+  margin: 18px 0;
+  padding: 6px 4px;
+  line-height: 1.6;
+}
 #inspector .property input:invalid {
   border-color: var(--danger-fg);
 }

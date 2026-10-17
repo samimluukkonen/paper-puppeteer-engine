@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-The Rig Editor model and controller can create, select, edit and remove constraints for loaded characters and New Character drafts. React authoring controls and draggable rig handles are deferred. The existing two-bone solver, animation tracks and baking format remain in use.
+The Rig Editor model and controller can create, select, edit and remove constraints for loaded characters and New Character drafts. The [visual IK panel and draggable targets](rig-ik-editor.md) also work in Animation Editor's Rig Tweak mode. Follow the [artist tutorials](artist-workflow.md#creating-ik-on-a-new-character) for the complete workflow. The existing two-bone solver, animation tracks and baking format remain in use.
 
 ## Data and APIs
 
@@ -54,7 +54,7 @@ Authoring validates the complete candidate through existing schemas and `Rig`: b
 
 Removal and chain/endpoint changes inspect every working animation's IK track, including empty track placeholders, baked suppression metadata and live host references. `createCharacterDocuments` supplies all animation sessions automatically; `RigEditorStateOptions.ikReferences` supplies specialized foot/weapon/provider dependencies and reserves their names. Source data and animation keys are never cascaded or rewritten. Errors identify the dependent animation or host and require explicit resolution before retrying. Target, mix, bend, enabled and priority edits retain animation references.
 
-The same checks protect rig undo/redo, reset and recovery when new references were added after a rig edit. Animation undo/redo, source revert and saved-session restoration validate against the current rig before restoring an older reference. Restore the required rig constraint first to recover those animation snapshots. Valid current recovery envelopes preserve authored IK changes; legacy raw imports retain compatibility checks.
+The same checks protect rig undo/redo, reset and recovery when new references were added after a rig edit. Animation undo/redo, source revert and saved-session restoration validate against the current rig before restoring an older reference. Restore the required rig constraint first to recover those animation snapshots. Valid current recovery envelopes preserve authored IK changes; raw imports accept validated IK edits on a compatible skeleton, with the same live dependency checks. Rename attempts report the stable-ID restriction and affected documents; no cross-document migration is implemented.
 
 ## Serialization and verification
 

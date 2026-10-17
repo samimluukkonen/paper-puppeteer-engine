@@ -160,6 +160,53 @@ function render(controller: AttachmentController) {
   return renderToStaticMarkup(createElement(RigIKPanel, { controller }));
 }
 
+test.each(['runtime', 'provider'] as const)(
+  'rig reconstruction retains external %s ownership and influence without serializing them',
+  (owner) => {
+    const current = fixture();
+    try {
+      const source = current.puppet;
+      const target = { x: 240, y: 180 };
+      const provider = vi.fn(() => target);
+      source.getIK(chain.name).setTarget(target);
+      if (owner === 'provider') source.getIK(chain.name).setTargetProvider(provider);
+      source.getIK(chain.name).mix = 0.3;
+      const check = () => {
+        const constraint = current.puppet.getIK(chain.name);
+        assert.equal(constraint.targetOwnership, owner);
+        assert.deepEqual(constraint.target, target);
+        assert.strictEqual(constraint.targetProvider, owner === 'provider' ? provider : undefined);
+        assert.equal(constraint.mix, 0.3);
+        assert.isTrue(constraint.hasMixOverride);
+        assert.isTrue(constraint.enabled);
+        current.puppet.syncPose();
+        assert.deepEqual(constraint.resolvedTarget, target);
+      };
+      current.editor.createIKConstraint({ ...chain, name: 'additional', mix: 0, priority: -1 });
+      assert.isTrue(source.isDestroyed);
+      check();
+      current.editor.updateIKConstraint(chain.name, { target: { x: 40, y: 55 }, mix: 0.8 });
+      check();
+      current.editor.undo();
+      check();
+      current.editor.redo();
+      check();
+      current.editor.setIKPreview(false);
+      check();
+      current.editor.setIKPreview(true);
+      check();
+      current.editor.moveCharacter(220, 180);
+      check();
+      const exported = parseRigDefinition(JSON.parse(current.editor.exportJson(false)));
+      assert.deepEqual(exported.ik![0]!.target, { x: 40, y: 55 });
+      assert.equal(exported.ik![0]!.mix, 0.8);
+      assert.notMatch(JSON.stringify(exported), /targetProvider|targetOwnership|resolvedTarget/);
+    } finally {
+      current.dispose();
+    }
+  },
+);
+
 test('creation form validates real connected chains, duplicate IDs and finite supported settings', () => {
   assert.deepEqual(rigIKChains(skeleton), [{ rootBone: 'base', middleBone: 'segment', endBone: 'tip' }]);
   assert.equal(rigIKFormError(skeleton, chain), '');

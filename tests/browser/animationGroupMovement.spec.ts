@@ -188,9 +188,16 @@ test('group drag follows resize/scroll, pointer cancellation and native keyboard
   await page.locator('.timeline-inset').evaluate((element) => {
     element.scrollLeft = 70;
   });
+  // Let responsive layout and the timeline's ResizeObserver finish before picking a marker.
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
   const y = await beginDrag(page, 0.5);
   await movePointer(page, 0.7, y);
   await page.setViewportSize({ width: 1100, height: 1900 });
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
   await movePointer(page, 0.8, y);
   await expect.poll(() => time(page)).toBeCloseTo(0.8, 2);
   await expect(page.locator('.timeline-keyframe[data-dragging="true"]')).toHaveCount(5);

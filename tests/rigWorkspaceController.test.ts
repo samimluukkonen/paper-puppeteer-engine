@@ -122,7 +122,7 @@ async function panelFixture() {
 
 async function editNumber(element: ReturnType<typeof stubRigEditorDom>, bone: string, field: string, values: number[]) {
   const button = element('#hierarchy').children.find((child) => child.textContent === bone)!;
-  await button.click();
+  if (button.getAttribute('aria-selected') !== 'true') await button.click();
   const input = new EditorElement();
   input.type = 'number';
   input.dataset = { scope: 'bone', field };

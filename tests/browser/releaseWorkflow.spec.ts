@@ -3,7 +3,15 @@ import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { animationFileSchema, characterManifestSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationMenuControl, test, toggleAnimationToolPanel } from './fixtures.js';
+import {
+  animationHierarchy,
+  animationMenuControl,
+  test,
+  toggleAnimationToolPanel,
+  animationIKInspector,
+  inspectorControl,
+  selectRigEntry,
+} from './fixtures.js';
 
 test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, replacement and portable ZIP', async ({
   page,
@@ -12,7 +20,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   // Configure the shipped skeleton; arbitrary new-bone creation is outside the editor's supported controls.
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   const joint = page.locator('#inspector input[data-scope="bone"][data-field="y"]');
   await joint.fill('76');
   await joint.press('Tab');
@@ -40,11 +48,12 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   };
   await importSprite();
   await page.locator('#edit-mode').selectOption('sprite');
-  await page.getByRole('treeitem', { name: '◇ leftForearmVisual', exact: true }).click();
+  await selectRigEntry(page, '◇ leftForearmVisual');
   const offset = page.locator('#inspector input[data-scope="attachment"][data-field="x"]');
   await offset.fill('4');
   await offset.press('Tab');
   const attachments = page.locator('#attachment-panel');
+  await inspectorControl(page, '#attachment-panel select');
   await attachments.getByLabel('Attachment slot', { exact: true }).selectOption('headVisual');
   await attachments.getByLabel('Skin name', { exact: true }).fill('release-alternate');
   await attachments.getByRole('button', { name: 'Create skin', exact: true }).click();
@@ -87,6 +96,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   await page.locator('#animation-onion-skinning').check();
   await seek('0.5');
   await page.getByRole('button', { name: 'Select IK target rightArmIK', exact: true }).click();
+  await animationIKInspector(page);
   const ik = page.locator('#animation-ik-inspector');
   for (const [at, x, y] of [
     ['0', '22', '-42'],
@@ -117,7 +127,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   await importSprite();
   await page.locator('#editor-mode').selectOption('rig-tweak');
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   const tweak = page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]');
   await expect(tweak).toHaveValue('76');
   await tweak.fill('77');

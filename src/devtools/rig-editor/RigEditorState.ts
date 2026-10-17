@@ -482,7 +482,15 @@ export class RigEditorState {
     return this.inspectDraft(input) !== undefined;
   }
 
-  private inspectDraft(input: unknown): RigEditorRecoverySnapshot | undefined {
+  /** Import preflight with actionable live dependency errors; no document/history changes. */
+  assertCanRestoreDraft(input: unknown): void {
+    if (!this.inspectDraft(input, true))
+      throw new Error(
+        'Rig import requires the same hierarchy, bone artwork and default skin, with loaded image assets and valid frames. IK settings may change; referenced constraint IDs and chains must be retained. Open another character for a different hierarchy.',
+      );
+  }
+
+  private inspectDraft(input: unknown, explainDependencies = false): RigEditorRecoverySnapshot | undefined {
     const data = inspectRigDraft(
       input,
       this.initialCopy,
@@ -494,7 +502,8 @@ export class RigEditorState {
     if (!data) return undefined;
     try {
       this.assertRetainedReferences(data.rig);
-    } catch {
+    } catch (error) {
+      if (explainDependencies) throw error;
       return undefined;
     }
     for (const attachment of data.rig.attachments ?? []) {

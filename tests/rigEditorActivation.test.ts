@@ -167,7 +167,7 @@ test('editor activation reuses IK constraints and balances overlay and listener 
     assert.equal(destroyOverlay.mock.calls.length, cycle + 1);
     editor.enable();
     assert.strictEqual(puppet.getIK('armIK'), constraint);
-    assert.isFalse(constraint.enabled);
+    assert.isTrue(constraint.enabled, 'activation preserves the runtime target owner');
     assert.deepEqual(constraint.target, { x: 12, y: 34 });
     assert.equal(constraint.mix, 0.5);
   }
@@ -181,7 +181,11 @@ test('editor activation reuses IK constraints and balances overlay and listener 
 
   const exported = editor.exportJson(false);
   editor.moveCharacter(420, 455);
-  assert.deepEqual(constraint.target, { x: 52, y: 54 }, 'pinned targets follow the character translation');
+  assert.deepEqual(
+    constraint.target,
+    { x: 12, y: 34 },
+    'external world targets stay anchored when the character moves',
+  );
   assert.equal(editor.exportJson(false), exported);
   assert.isFalse(editor.state.dirty);
   assert.equal(editor.state.historyLength, 0);

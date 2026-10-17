@@ -243,7 +243,7 @@
   font-weight: 600;
 }
 .workspace-inspector-sections details:not(.animation-menu) {
-  margin: 0 0 10px;
+  margin: 0 0 16px;
 }
 :is(.workspace-inspector-sections details:not(.animation-menu), .package-tools) {
   padding: 0 10px;

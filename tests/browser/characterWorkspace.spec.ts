@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
-import { animationHierarchy, test } from './fixtures.js';
+import { animationHierarchy, test, selectRigEntry } from './fixtures.js';
 
 test('artist workflow retains one canvas, documents, artwork and history between editor routes', async ({ page }) => {
   test.setTimeout(90_000);
@@ -14,12 +14,12 @@ test('artist workflow retains one canvas, documents, artwork and history between
     dialogs.push(dialog.type());
     await dialog.dismiss();
   });
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   const joint = page.locator('#inspector input[data-scope="bone"][data-field="y"]');
   await joint.fill('77');
   await joint.press('Tab');
   await page.locator('#edit-mode').selectOption('sprite');
-  await page.getByRole('treeitem', { name: '◇ leftForearmVisual', exact: true }).click();
+  await selectRigEntry(page, '◇ leftForearmVisual');
   const offset = page.locator('#inspector input[data-scope="attachment"][data-field="x"]');
   await offset.fill('9');
   await offset.press('Tab');
@@ -54,7 +54,7 @@ test('artist workflow retains one canvas, documents, artwork and history between
   await page.locator('#animation-selection').selectOption('walk');
   await expect(page.locator('.package-tools summary')).toContainText('Animations: Modified');
   await page.locator('#editor-mode').selectOption('rig-tweak');
-  await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+  await selectRigEntry(page, 'leftForearm');
   await expect(page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]')).toHaveValue('77');
   await page.locator('#tweak-undo').click();
   await page.locator('#tweak-redo').click();
@@ -74,7 +74,7 @@ test('artist workflow retains one canvas, documents, artwork and history between
   await page.locator('#animation-redo').click();
   for (let index = 0; index < 4; ++index) {
     await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
-    await page.getByRole('treeitem', { name: 'leftForearm', exact: true }).click();
+    await selectRigEntry(page, 'leftForearm');
     await expect(joint).toHaveValue('77');
     await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
     await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');

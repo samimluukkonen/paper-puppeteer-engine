@@ -117,6 +117,21 @@ test('fixed preview uses authored endpoints with offsets while scrubbing, scalin
     assert.closeTo(puppet.getBone('root').pose.rotation, 0.5, 1e-8);
     assert.isFalse(state.dirty);
     assert.equal(state.historyLength, 0);
+    // Preview toggles and unrelated rig defaults must not take specialized ownership.
+    const provider = vi.fn(() => ({ x: 390, y: 440 }));
+    puppet.getIK(arm.name).enabled = true;
+    puppet.getIK(arm.name).setTargetProvider(provider);
+    scene.setIKPreview(true);
+    scene.setIKPreview(false);
+    assert.strictEqual(puppet.getIK(arm.name).targetProvider, provider);
+    assert.isTrue(puppet.getIK(arm.name).enabled);
+    scene.rigEditor!.updateIKConstraint(arm.name, { target: { x: 5, y: 10 } });
+    const rebuilt = Reflect.get(scene, 'puppet') as Puppet;
+    assert.isTrue(puppet.isDestroyed);
+    assert.strictEqual(rebuilt.getIK(arm.name).targetProvider, provider);
+    assert.isTrue(rebuilt.getIK(arm.name).enabled);
+    scene.setIKPreview(false);
+    assert.strictEqual(rebuilt.getIK(arm.name).targetProvider, provider);
     assert.deepEqual(error.mock.calls, []);
   } finally {
     scene.events.emit('shutdown');

@@ -158,6 +158,10 @@ test('checks every animation track, empty track, baked metadata and specialized 
   assert.lengthOf(references, 5);
   for (const dependency of ['reach', 'empty', 'baked', 'weapon grip', 'foot planting'])
     assert.isTrue(references.some((entry) => entry.includes(dependency)));
+  assert.throws(
+    () => updateIKConstraint(rig, arm.name, { name: 'renamed' } as unknown as IKConstraintPatch, dependencies),
+    /stable ID.*atomic reference migration.*reach.*empty.*baked.*weapon grip.*foot planting/,
+  );
   assert.throws(() => removeIKConstraint(rig, arm.name, dependencies), /Resolve these dependencies explicitly/);
   assert.throws(
     () => updateIKConstraint(rig, arm.name, { endOffset: { x: 2, y: 0 } }, dependencies),
@@ -230,7 +234,7 @@ test('guards deletion, chain edits, history, reset and recovery against live ref
   editor.removeIKConstraint(arm.name);
 });
 
-test('current recovery envelopes preserve authored IK while legacy raw drafts retain compatibility checks', () => {
+test('recovery envelopes and compatible raw imports preserve authored IK', () => {
   const editor = state();
   editor.createIKConstraint(arm);
   editor.updateIKConstraint(arm.name, { target: { x: 25, y: 80 } });
@@ -240,7 +244,36 @@ test('current recovery envelopes preserve authored IK while legacy raw drafts re
   assert.deepEqual(restored.workingCopy.ik, editor.workingCopy.ik);
   assert.isTrue(restored.undo());
   assert.isUndefined(restored.workingCopy.ik);
-  assert.isFalse(state().restoreDraft(editor.recoveryDraft));
+  const imported = state();
+  assert.isTrue(imported.restoreDraft(editor.recoveryDraft));
+  assert.deepEqual(imported.workingCopy.ik, editor.workingCopy.ik);
+  assert.isFalse(imported.restoreDraft({ ...editor.recoveryDraft, bones: [{ id: 'body' }] }));
+});
+
+test('raw IK imports allow settings and additions but block referenced removal, rename and chain edits atomically', () => {
+  const workspace = createCharacterDocuments(character());
+  const editor = workspace.rig;
+  const file = editor.exportRig(false);
+  const constraint = file.ik![0]!;
+  assert.isTrue(editor.restoreDraft({ ...file, ik: [{ ...constraint, target: { x: 8, y: 70 }, enabled: false }] }));
+  const before = editor.workingCopy;
+  const history = editor.historyLength;
+  for (const ik of [
+    [],
+    [{ ...constraint, name: 'renamed' }],
+    [{ ...constraint, rootBone: leg.rootBone, middleBone: leg.middleBone, endBone: leg.endBone }],
+    [{ ...constraint, endOffset: { x: 0, y: 5 } }],
+  ]) {
+    assert.isFalse(editor.canRestoreDraft({ ...file, ik }));
+    assert.throws(() => editor.assertCanRestoreDraft({ ...file, ik }), /animation "reach" IK track/);
+    assert.isFalse(editor.restoreDraft({ ...file, ik }));
+    assert.strictEqual(editor.workingCopy, before);
+    assert.equal(editor.historyLength, history);
+  }
+  assert.isTrue(editor.restoreDraft({ ...file, ik: [constraint, { ...leg, target: { x: 0, y: 80 } }] }));
+  assert.lengthOf(editor.workingCopy.ik!, 2);
+  assert.isTrue(editor.undo());
+  assert.deepEqual(editor.workingCopy, before);
 });
 
 function character() {
@@ -349,6 +382,10 @@ test('external host IDs are reserved and deleting an unused selected IK clears a
     ikReferences: (id) => (id === arm.name ? ['foot controller'] : []),
   });
   assert.throws(() => reserved.createIKConstraint(arm), /reserved/);
+  const imported = { ...reserved.exportRig(false), ik: [{ ...arm, target: { x: 0, y: 60 } }] };
+  assert.isFalse(reserved.canRestoreDraft(imported));
+  assert.throws(() => reserved.assertCanRestoreDraft(imported), /reserved.*foot controller/);
+  assert.isFalse(reserved.restoreDraft(imported));
   assert.equal(reserved.historyLength, 0);
   const workspace = createCharacterDocuments(character());
   workspace.rig.createIKConstraint(leg);

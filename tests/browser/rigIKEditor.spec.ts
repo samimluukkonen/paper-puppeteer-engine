@@ -1,8 +1,18 @@
+import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
+import { loadPackageDefinition } from '../../src/devtools/shared/package/characterPackage.js';
+import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { composeAffine, localToWorld, transformToAffine, type Affine } from '../../src/engine/affineMath.js';
 import { parseRigDefinition } from '../../src/engine/externalData.js';
 import { Joint } from '../../src/engine/Joint.js';
-import { rigCanvasProjection, rigFileAction, test } from './fixtures.js';
+import {
+  rigCanvasProjection,
+  rigFileAction,
+  test,
+  animationIKInspector,
+  inspectorControl,
+  selectRigEntry,
+} from './fixtures.js';
 
 test.setTimeout(90_000);
 
@@ -26,7 +36,7 @@ test('create, drag, cancel, configure and reload a visual rig IK constraint thro
   const projection = await rigCanvasProjection(page);
   const point = (x: number, y: number) =>
     projection.point(projection.head.x - localHead.x + x, projection.head.y - localHead.y + y);
-  const panel = page.getByRole('region', { name: 'IK constraints', exact: true });
+  const panel = await inspectorControl(page, '#rig-inspector .rig-ik-panel section');
   await panel.getByRole('button', { name: '+ Add IK Constraint', exact: true }).click();
   const form = panel.getByRole('form', { name: 'Create IK constraint' });
   await expect(form.getByRole('button', { name: 'Create IK Constraint', exact: true })).toBeDisabled();
@@ -111,12 +121,17 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   const dialog = page.getByRole('dialog', { name: 'Create new character', exact: true });
   await dialog.getByLabel('Character name', { exact: true }).fill('Tentacle');
   await dialog.getByRole('button', { name: 'Create Character', exact: true }).click();
-  const panel = page.getByRole('region', { name: 'IK constraints', exact: true });
+  await expect.poll(() => page.locator('#rig-inspector details[open]').count()).toBe(0);
+  const guidance = (await page.locator('#inspector').boundingBox())!;
+  const collapsedIK = (await page.locator('#rig-inspector .rig-ik-panel').boundingBox())!;
+  expect(collapsedIK.y - guidance.y - guidance.height).toBeGreaterThanOrEqual(18);
+  await page.screenshot({ path: test.info().outputPath('collapsed-inspector.png') });
+  const panel = await inspectorControl(page, '#rig-inspector .rig-ik-panel section');
   await expect(panel).toContainText('No IK constraints');
   await panel.getByRole('button', { name: '+ Add IK Constraint', exact: true }).click();
   await expect(panel).toContainText('Add a chain of three connected bones before creating IK.');
   await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.getByRole('treeitem', { name: 'root', exact: true }).click();
+  await selectRigEntry(page, 'root');
   const skeleton = page.getByRole('region', { name: 'Build skeleton', exact: true });
   for (const id of ['segment', 'tip']) {
     await skeleton.getByLabel('New bone ID', { exact: true }).fill(id);
@@ -134,4 +149,81 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   await page.locator('#undo').click();
   await panel.getByRole('button', { name: 'tentacleIK', exact: true }).click();
   await expect(panel.getByLabel('Target Y', { exact: true })).toHaveValue('80');
+  const downloadingRig = page.waitForEvent('download');
+  await page.locator('#download-json').click();
+  await downloadingRig;
+  await rigFileAction(page, '#reload-exported', (control) => control.click());
+  const canvas = await page.locator('#editor-stage canvas').elementHandle();
+  await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
+  await page.locator('#animation-new').click();
+  const animationDialog = page.getByRole('dialog', { name: 'Create new animation', exact: true });
+  await animationDialog.getByLabel('Animation name / ID', { exact: true }).fill('reach');
+  await animationDialog.getByRole('button', { name: 'Create Animation', exact: true }).click();
+  await page.getByRole('button', { name: 'Select IK target tentacleIK', exact: true }).click();
+  await expect(page.locator('#animation-ik-inspector > details')).not.toHaveAttribute('open');
+  await animationIKInspector(page);
+  const inspector = page.locator('#animation-ik-inspector');
+  await inspector.locator('[data-ik-property="x"]').fill('17');
+  await inspector.locator('summary').first().click();
+  await expect(inspector.locator('[data-ik-property="x"]')).toBeHidden();
+  await inspector.locator('summary').first().click();
+  await expect(inspector.locator('[data-ik-property="x"]')).toHaveValue('17');
+  for (const [time, value] of [
+    ['0', '20'],
+    ['1', '-20'],
+  ]) {
+    await page.locator('#timeline-time-input').fill(time!);
+    await page.locator('#timeline-time-input').press('Enter');
+    await inspector.locator('[data-ik-property="x"]').fill(value!);
+    await inspector.locator('[data-ik-property="y"]').fill('60');
+    await inspector.getByRole('button', { name: 'Set Target Key', exact: true }).click();
+  }
+  await inspector.locator('[data-ik-property="mix"]').fill('0.75');
+  await inspector.getByRole('button', { name: 'Set IK mix key', exact: true }).click();
+  const downloadingAnimation = page.waitForEvent('download');
+  await page.locator('#animation-download').click();
+  const animationJson = await readFile(await (await downloadingAnimation).path(), 'utf8');
+  const animationHistory = page.locator('#animation-undo');
+  await expect(animationHistory).toBeEnabled();
+  await page.locator('#editor-mode').selectOption('rig-tweak');
+  const tweakIK = await inspectorControl(page, '#animation-inspector .rig-ik-panel section');
+  await tweakIK.getByRole('button', { name: 'tentacleIK', exact: true }).click();
+  await expect(tweakIK).toContainText('animation "reach" IK track');
+  await expect(tweakIK.getByRole('button', { name: 'Delete Constraint', exact: true })).toBeDisabled();
+  await expect(tweakIK.getByLabel('Start bone', { exact: true })).toBeDisabled();
+  const targetX = tweakIK.getByLabel('Target X', { exact: true });
+  await targetX.fill('15');
+  await targetX.blur();
+  await page.locator('#tweak-undo').click();
+  await expect(targetX).toHaveValue('0');
+  await page.locator('#tweak-redo').click();
+  await expect(targetX).toHaveValue('15');
+  await tweakIK.getByLabel('Enabled', { exact: true }).uncheck();
+  await tweakIK.getByLabel('Enabled', { exact: true }).check();
+  await page.locator('#editor-mode').selectOption('animation');
+  const downloadingAgain = page.waitForEvent('download');
+  await page.locator('#animation-download').click();
+  expect(await readFile(await (await downloadingAgain).path(), 'utf8')).toBe(animationJson);
+  await page.locator('#animation-undo').click();
+  await page.locator('#animation-redo').click();
+  await page.locator('#timeline-time-input').fill('0.5');
+  await page.locator('#timeline-time-input').press('Enter');
+  expect(
+    await page.locator('#animation-stage canvas').evaluate((element, original) => element === original, canvas),
+  ).toBe(true);
+  const packages = page.locator('.package-tools');
+  await packages.locator('summary').click();
+  const downloadingPackage = page.waitForEvent('download');
+  await packages.getByRole('button', { name: 'Download character ZIP', exact: true }).click();
+  const files = decodePackageZip(await readFile(await (await downloadingPackage).path()));
+  const definition = await loadPackageDefinition(files);
+  expect(definition.rig.ik?.[0]).toMatchObject({ name: 'tentacleIK', target: { x: 15, y: 80 }, enabled: true });
+  expect(definition.animations[0]?.ikTracks?.tentacleIK).toEqual([
+    { time: 0, x: 20, y: 60 },
+    { time: 1000, x: -20, y: 60, mix: 0.75 },
+  ]);
+  await packages.getByRole('button', { name: 'Reload exported package', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: 'Package runtime preview' });
+  await expect(preview).toContainText('runtime playback ready', { timeout: 30_000 });
+  await preview.getByRole('button', { name: 'Close preview' }).click();
 });

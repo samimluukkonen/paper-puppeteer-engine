@@ -1,11 +1,18 @@
 import { expect, type Page } from '@playwright/test';
 import type { RigJsonDefinition } from '../../src/engine/externalData.js';
-import { rigCanvasProjection, rigFileAction, test } from './fixtures.js';
+import {
+  rigCanvasProjection,
+  rigFileAction,
+  test,
+  inspectorControl,
+  rigHierarchy,
+  selectRigEntry,
+} from './fixtures.js';
 
 const field = (page: Page, name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
 
 test('unsaved edits block navigation and refresh until exported', async ({ page }) => {
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await field(page, 'x').fill('12');
   const originalUrl = page.url();
   const rejectNavigation = async () => {
@@ -30,7 +37,7 @@ test('unsaved edits block navigation and refresh until exported', async ({ page 
 
 test.beforeEach(async ({ page }) => {
   await page.goto('rig-editor/');
-  await expect(page.getByRole('treeitem', { name: 'head', exact: true })).toBeVisible();
+  await expect((await rigHierarchy(page)).getByRole('treeitem', { name: 'head', exact: true })).toBeVisible();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
 });
 
@@ -43,7 +50,7 @@ for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
       }
       const original = (await (await page.request.get(`characters/${character}/rig.json`)).json()) as RigJsonDefinition;
       const projection = await rigCanvasProjection(page);
-      if (selection !== 'none') await page.getByRole('treeitem', { name: selection, exact: true }).click();
+      if (selection !== 'none') await selectRigEntry(page, selection);
       await page.locator('#edit-mode').selectOption('sprite');
       const box = await page.locator('#editor-stage canvas').boundingBox();
       if (!box) throw new Error('Missing editor canvas');
@@ -83,7 +90,7 @@ for (const character of ['demo-puppet', 'random-paperdoll-sketch']) {
 }
 
 test('numeric inputs retain precision and clearing length removes the override', async ({ page }) => {
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await field(page, 'x').fill('0.123456789');
   await page.getByRole('heading', { name: 'Rig Editor Bind Pose' }).click();
   await expect(field(page, 'x')).toHaveValue('0.123456789');
@@ -107,7 +114,7 @@ test('numeric inputs retain precision and clearing length removes the override',
 });
 
 test('a canvas drag released outside commits one undo and stops moving', async ({ page }) => {
-  const hierarchy = page.locator('#hierarchy');
+  const hierarchy = await rigHierarchy(page);
   const originalEntries = await hierarchy.getByRole('treeitem').elementHandles();
   const canvas = page.locator('#editor-stage canvas');
   const box = await canvas.boundingBox();
@@ -172,7 +179,7 @@ for (const mode of ['joint', 'sprite']) {
   test(`background dragging repositions the character without editing the rig in ${mode} mode`, async ({ page }) => {
     const projection = await rigCanvasProjection(page);
     const initialHead = await projection.point(projection.head.x, projection.head.y);
-    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    await selectRigEntry(page, 'head');
     await page.locator('#edit-mode').selectOption(mode);
     const canvas = page.locator('#editor-stage canvas');
     const box = await canvas.boundingBox();
@@ -247,10 +254,18 @@ for (const interruption of ['blur', 'hidden'] as const) {
 test('hierarchy selection retains focus, rejects incompatible imports and rebuilds for another character', async ({
   page,
 }) => {
-  const head = page.getByRole('treeitem', { name: 'head', exact: true });
-  const slot = page.getByRole('treeitem', { name: '◇ headVisual', exact: true });
+  const head = (await rigHierarchy(page)).getByRole('treeitem', { name: 'head', exact: true });
+  const slot = (await rigHierarchy(page)).getByRole('treeitem', { name: '◇ headVisual', exact: true });
   await head.click();
   await expect(head).toBeFocused();
+  await expect(head).toHaveAttribute('aria-selected', 'true');
+  await head.click();
+  await expect(head).toBeFocused();
+  await expect(head).toHaveAttribute('aria-selected', 'false');
+  await expect(page.locator('#inspector')).toContainText('Select a bone or slot');
+  await expect(page.locator('#dirty-status')).toHaveText('No changes');
+  await expect(page.locator('#undo')).toBeDisabled();
+  await head.click();
   await expect(head).toHaveAttribute('aria-selected', 'true');
   await slot.click();
   await expect(slot).toBeFocused();
@@ -273,7 +288,7 @@ test('hierarchy selection retains focus, rejects incompatible imports and rebuil
       buffer: Buffer.from(JSON.stringify(imported)),
     }),
   );
-  const hierarchy = page.locator('#hierarchy');
+  const hierarchy = await rigHierarchy(page);
   await expect(page.locator('#action-feedback')).toContainText('same hierarchy');
   await expect(hierarchy.getByRole('treeitem')).toHaveCount(original.bones.length + original.slots!.length);
   await expect(slot).toHaveAttribute('aria-selected', 'true');
@@ -283,16 +298,17 @@ test('hierarchy selection retains focus, rejects incompatible imports and rebuil
   const nextRig = (await (
     await page.request.get('characters/random-paperdoll-sketch/rig.json')
   ).json()) as RigJsonDefinition;
+  await rigHierarchy(page);
   await expect(hierarchy.getByRole('treeitem')).toHaveCount(nextRig.bones.length + nextRig.slots!.length);
   await expect(hierarchy.locator('[aria-selected="true"]')).toHaveCount(0);
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await expect(page.locator('#inspector h3')).toHaveText('Bone: head');
 });
 
 test('hierarchy keyboard navigation selects entries without authoring joint changes', async ({ page }) => {
-  const hierarchy = page.locator('#hierarchy');
-  const head = page.getByRole('treeitem', { name: 'head', exact: true });
-  const headSlot = page.getByRole('treeitem', { name: '◇ headVisual', exact: true });
+  const hierarchy = await rigHierarchy(page);
+  const head = (await rigHierarchy(page)).getByRole('treeitem', { name: 'head', exact: true });
+  const headSlot = (await rigHierarchy(page)).getByRole('treeitem', { name: '◇ headVisual', exact: true });
   await head.click();
   const before = await field(page, 'y').inputValue();
   await head.press('ArrowDown');
@@ -316,7 +332,7 @@ test('hierarchy keyboard navigation selects entries without authoring joint chan
 });
 
 test('inspector typing keeps focus and Tab groups each field into one undo', async ({ page }) => {
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   const x = field(page, 'x');
   const y = field(page, 'y');
   await x.click();
@@ -344,7 +360,7 @@ test('inspector typing keeps focus and Tab groups each field into one undo', asy
 
 for (const name of ['head', '◇ headVisual']) {
   test(`${name} degree readout updates while typing and tabbing without replacing inputs`, async ({ page }) => {
-    await page.getByRole('treeitem', { name, exact: true }).click();
+    await selectRigEntry(page, name);
     const rotation = page.locator('#inspector input[data-field="rotation"]');
     const scaleX = page.locator('#inspector input[data-field="scaleX"]');
     const degrees = page.locator('#inspector [data-derived="rotation-degrees"]');
@@ -373,7 +389,7 @@ for (const name of ['head', '◇ headVisual']) {
     await page.locator('#redo').click();
     await expect(rotation).toHaveValue('0.5');
     await expect(degrees).toHaveText('28.6479°');
-    await page.locator('input[data-visibility="artwork"]').uncheck();
+    await (await inspectorControl(page, 'input[data-visibility="artwork"]')).uncheck();
     expect(
       await originalRotation.evaluate(
         (input) => input === document.querySelector('#inspector input[data-field="rotation"]'),
@@ -391,7 +407,7 @@ test('compatible reloads retain view preferences and keep history controls attac
   page,
 }) => {
   const original = await (await page.request.get('characters/demo-puppet/rig.json')).text();
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await field(page, 'x').fill('12');
   await rigFileAction(page, '#log-json', (control) => control.click());
   await expect(page.locator('#dirty-status')).toHaveText('No changes');
@@ -400,8 +416,8 @@ test('compatible reloads retain view preferences and keep history controls attac
     await page.locator('#edit-mode').selectOption('sprite');
     await page.locator('#grid-snap').selectOption('5');
     await page.locator('#dim-selection').check();
-    await page.locator('#opacity').selectOption('0.25');
-    await page.locator('input[data-visibility="artwork"]').uncheck();
+    await (await inspectorControl(page, '#opacity')).selectOption('0.25');
+    await (await inspectorControl(page, 'input[data-visibility="artwork"]')).uncheck();
     if (source === 'imported') {
       await rigFileAction(page, '#load-json', (control) =>
         control.setInputFiles({
@@ -422,13 +438,13 @@ test('compatible reloads retain view preferences and keep history controls attac
     await expect(page.locator('#edit-mode')).toHaveValue('sprite');
     await expect(page.locator('#grid-snap')).toHaveValue('5');
     await expect(page.locator('#dim-selection')).toBeChecked();
-    await expect(page.locator('#opacity')).toHaveValue('0.25');
+    await expect(await inspectorControl(page, '#opacity')).toHaveValue('0.25');
     await page.locator('#edit-mode').selectOption('joint');
     await page.locator('#grid-snap').selectOption('0');
     await page.locator('#dim-selection').uncheck();
-    await page.locator('#opacity').selectOption('1');
+    await (await inspectorControl(page, '#opacity')).selectOption('1');
     const undoEnabled = await page.locator('#undo').isEnabled();
-    const artwork = page.locator('input[data-visibility="artwork"]');
+    const artwork = await inspectorControl(page, 'input[data-visibility="artwork"]');
     await expect(artwork).not.toBeChecked();
     await artwork.check();
     const canvas = page.locator('#editor-stage canvas');
@@ -438,7 +454,7 @@ test('compatible reloads retain view preferences and keep history controls attac
     await artwork.check();
     await expect.poll(async () => (await canvas.screenshot()).equals(visible)).toBe(true);
 
-    await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+    await selectRigEntry(page, 'head');
     const expectedX = source === 'exported' ? 12 : 0;
     await expect(field(page, 'x')).toHaveValue(String(expectedX));
     await page.getByRole('heading', { name: 'Rig Editor Bind Pose' }).click();
@@ -449,7 +465,7 @@ test('compatible reloads retain view preferences and keep history controls attac
     expect(await page.locator('#undo').isEnabled()).toBe(undoEnabled);
   }
   await page.reload();
-  await page.getByRole('treeitem', { name: 'head', exact: true }).click();
+  await selectRigEntry(page, 'head');
   await expect(field(page, 'x')).toHaveValue('0');
   await expect(page.locator('#undo')).toBeDisabled();
 });
