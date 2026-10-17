@@ -5,6 +5,8 @@ export interface GuideGeometryProvider {
   getRectangle(): GuideRectangle | null;
   /** Optional UI-only panel/tab reveal, never a scene command or authored action. */
   reveal?(): boolean;
+  /** Existing canvas/input host, only needed for opt-in interactive steps. */
+  getElement?(): Element | null;
 }
 
 function rectangle(value: GuideRectangle | null): GuideRectangle | null {
@@ -57,6 +59,15 @@ export class GuideTargets implements GuideTargetResolver {
       return bounds;
     } catch {
       // Disposed providers and transient editor layout are missing targets, not tour crashes.
+      return null;
+    }
+  }
+
+  resolveElement(id: GuideTargetId): Element | null {
+    try {
+      const provider = this.geometry.get(id)?.provider;
+      return provider ? (provider.getElement?.() ?? null) : this.findElement(id);
+    } catch {
       return null;
     }
   }

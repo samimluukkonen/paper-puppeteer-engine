@@ -17,11 +17,22 @@ const colorControls = {
 export class OnionSkinControlsController {
   private readonly abort = new AbortController();
 
-  constructor(app: HTMLElement, scene: Pick<AnimationEditorScene, 'getOnionSkinSettings' | 'setOnionSkinSettings'>) {
+  constructor(
+    app: HTMLElement,
+    scene: Pick<AnimationEditorScene, 'getOnionSkinSettings' | 'setOnionSkinSettings'>,
+    onChange: () => void = () => {},
+  ) {
     const options = { signal: this.abort.signal };
     const enable = app.querySelector<HTMLInputElement>('#animation-onion-skinning')!;
     enable.checked = scene.getOnionSkinSettings().enabled;
-    enable.addEventListener('change', () => scene.setOnionSkinSettings({ enabled: enable.checked }), options);
+    enable.addEventListener(
+      'change',
+      () => {
+        scene.setOnionSkinSettings({ enabled: enable.checked });
+        onChange();
+      },
+      options,
+    );
 
     for (const [key, id] of Object.entries(numericControls)) {
       const property = key as keyof typeof numericControls;

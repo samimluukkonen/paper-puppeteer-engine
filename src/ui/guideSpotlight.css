@@ -80,3 +80,19 @@
     transition: none;
   }
 }
+
+/* A nonmodal full-viewport host lets the real control receive native input.
+   Event capture and inert branches limit access to that control and the card. */
+.guide-spotlight-interactive {
+  pointer-events: none;
+  z-index: 10000;
+}
+.guide-spotlight-interactive .guide-step-card {
+  pointer-events: auto;
+}
+.guide-step-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}

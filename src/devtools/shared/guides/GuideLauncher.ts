@@ -33,6 +33,15 @@ export class GuideLauncher {
     return this.host.getNavigationAvailability(guide.editor);
   }
 
+  getPrerequisiteGuide(id: string) {
+    const guide = this.registry.getGuideById(id);
+    const context = this.controller.getSnapshot().context;
+    const missing = [...(guide?.prerequisites ?? []), ...(guide?.steps[0]?.prerequisites ?? [])].find(
+      (item) => !context.capabilities.includes(item.capability),
+    );
+    return missing?.guideId ? this.registry.getGuideById(missing.guideId) : undefined;
+  }
+
   launch(id: string): GuideCommandResult {
     // Always read current facts again: catalog rendering is not permission to launch later.
     this.refresh();

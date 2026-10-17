@@ -2,7 +2,7 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-Milestone v0.7.6.5 adds thirteen selectable, explanation-only tasks with 60 steps. Open **Feature Guide → Animation Editor**. Exit the tour before trying a control; Next, Back, Finish and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+The catalog contains thirteen selectable tasks with 60 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
 
 | Guide                      | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | -------------------------- | ----: | ------------------------------------------------------------------------ |
@@ -29,7 +29,7 @@ IK tasks use the `ik` registry category; the other eleven use `animation`. Avail
 | Area      | Stable `data-guide-id` anchors                                                                                                                                                                           |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Session   | `animation-new`, `animation-selection`, `animation-settings`, `animation-editor-mode`                                                                                                                    |
-| Inspector | `animation-bones`, `animation-properties`, `animation-interpolation`, `animation-ik-inspector`                                                                                                           |
+| Inspector | `animation-bones`, `animation-properties`, `animation-x-key`, `animation-interpolation`, `animation-ik-inspector`                                                                                        |
 | Timeline  | `animation-timeline`, `animation-tracks`, `animation-ruler`, `animation-current-time`, `animation-playback`, `animation-zoom`, `animation-track-navigation`, `animation-key-editing`, `animation-events` |
 | Preview   | `animation-canvas`, `animation-onion`, `animation-onion-settings`, `animation-ik-options`                                                                                                                |
 | Tools     | `animation-mirror`, `animation-mirror-pairs`, `animation-mirror-direction`, `animation-mirror-actions`, `animation-bake`, `animation-bake-actions`                                                       |
@@ -37,7 +37,7 @@ IK tasks use the `ik` registry category; the other eleven use `animation`. Avail
 
 Selection details is a stable disclosure host: instructions explain selecting a bone or event to see its conditional fields. The IK inspector is anchored to the actual selected constraint panel. New-animation dialog instructions spotlight its launch button; the tour does not open or submit a modal form. Rig-Tweak tool instructions point to the mode selector and preview because the tour does not switch into Rig Tweak. Canvas operations spotlight the real preview host with coordinate/interaction guidance, without guessed joint positions.
 
-The existing resolver remeasures real DOM rectangles, clips against scroll containers, opens disclosure ancestors and scrolls targets into view. Action anchors also scroll long mirror/bake panels to the relevant buttons. Unrelated floating animation menus and tool panels close so they cannot obscure the next target; ordinary inspector disclosures remain open. The spotlight follows layout through animation frames, scrolling and resizing. Zoomed/scrolled timeline rulers, expanded tracks, React inspector changes and a moved Phaser preview therefore use current viewport geometry. Missing or inactive targets show a fallback instead of retaining stale coordinates. No extra observers, global listeners or scene hooks are introduced.
+The existing resolver remeasures real DOM rectangles, clips against scroll containers, opens disclosure ancestors and scrolls targets into view. Action anchors also scroll long mirror/bake panels to the relevant buttons. Unrelated floating animation menus and tool panels close so they cannot obscure the next target; ordinary inspector disclosures remain open. The spotlight follows layout through animation frames, scrolling and resizing. Zoomed/scrolled timeline rulers, expanded tracks, React inspector changes and a moved Phaser preview therefore use current viewport geometry. Missing or inactive targets show a fallback instead of retaining stale coordinates. Explain mode uses native modal protection; optional practice adds scoped input containment with cleanup on each transition.
 
 ## Current feature limits taught by the catalog
 

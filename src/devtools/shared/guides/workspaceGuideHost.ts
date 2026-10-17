@@ -8,6 +8,7 @@ export function workspaceGuideHost(options: {
   initialEditor: GuideEditor;
   getAnimation(): AnimationEditorState | undefined;
   getRig(): RigEditorState | undefined;
+  getOnionEnabled?(): boolean;
   navigate(editor: GuideEditor): boolean | 'cancel';
 }): GuideLaunchHost {
   // Refresh also runs during playback. Inspect authored keys only when the immutable clip changes.
@@ -37,6 +38,11 @@ export function workspaceGuideHost(options: {
           if (hasBoneKeys) capabilities.push('bone-keyframes');
           if (hasIKKeys) capabilities.push('ik-keyframes');
         }
+        if (animation.selectedBoneId) {
+          capabilities.push('selected-bone');
+          if (animation.hasKeyframeAtTime(animation.selectedBoneId, 'x')) capabilities.push('selected-x-key');
+        }
+        if (options.getOnionEnabled?.()) capabilities.push('onion-enabled');
         if (animation.selectedIKConstraintId) capabilities.push('tool:selected-ik');
         if (rig.workingCopy.bones.some((bone) => bone.sprite) || rig.workingCopy.attachments?.length)
           capabilities.push('rig-artwork');

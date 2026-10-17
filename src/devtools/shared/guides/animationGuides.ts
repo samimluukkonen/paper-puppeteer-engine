@@ -2,16 +2,20 @@ import { GUIDE_TARGETS as targets } from './anchors.js';
 import type { GuideDefinition, GuidePrerequisite, GuideStep } from './types.js';
 
 const rig: readonly GuidePrerequisite[] = [
-  { capability: 'character', reason: 'Load or create a character first.' },
+  { capability: 'character', reason: 'Load or create a character first.', guideId: 'rig-new-character' },
   { capability: 'valid-rig', reason: 'A valid rig is needed to preview an animation.' },
 ];
 const animation: readonly GuidePrerequisite[] = [
   ...rig,
-  { capability: 'animation', reason: 'Create or select an animation first.' },
+  { capability: 'animation', reason: 'Create or select an animation first.', guideId: 'animation-new' },
 ];
 const ik: readonly GuidePrerequisite[] = [
   ...animation,
-  { capability: 'ik-constraints', reason: 'Add an IK constraint in the Rig Editor first.' },
+  {
+    capability: 'ik-constraints',
+    reason: 'Add an IK constraint in the Rig Editor first.',
+    guideId: 'rig-ik-constraints',
+  },
 ];
 const step = (id: string, title: string, description: string, targetId: string): GuideStep => ({
   id,
@@ -19,9 +23,10 @@ const step = (id: string, title: string, description: string, targetId: string):
   description,
   targetId,
   preparation: 'reveal-target',
+  mode: 'explain',
 });
 
-/** Explanation only. Reveal opens disclosures/scrolls; it never selects, seeks, previews or authors. */
+/** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
     id: 'animation-new',
@@ -71,12 +76,21 @@ export const animationGuides: readonly GuideDefinition[] = [
     category: 'animation',
     prerequisites: animation,
     steps: [
-      step(
-        'bone',
-        'Select a bone',
-        'After exiting this tour, open Bones and choose any bone in this rig. You can also select a joint in the preview. Selecting an IK target or event shows a different inspector.',
-        targets.animationBones,
-      ),
+      {
+        ...step(
+          'bone',
+          'Select a bone',
+          'Open Bones and choose any bone in this rig. Selecting an IK target or event shows a different inspector.',
+          targets.animationBones,
+        ),
+        mode: 'try-it',
+        practice: {
+          targetId: targets.animationBones,
+          instruction: 'Choose a bone in the highlighted Bones list. This changes selection only.',
+          changesProject: false,
+          completion: { capability: 'selected-bone', message: 'A bone is selected.' },
+        },
+      },
       step(
         'time',
         'Place the playhead',
@@ -89,12 +103,29 @@ export const animationGuides: readonly GuideDefinition[] = [
         'Selection details shows the selected bone’s local transform relative to its parent. Enter a position, rotation or scale value. Rotation uses degrees. Yellow fields are temporary and do not yet belong to the animation.',
         targets.animationProperties,
       ),
-      step(
-        'key',
-        'Commit the property key',
-        'Click ◇ beside the property to set a key at the playhead. ◆ updates a key already at that time. Each property is keyed separately. Cancel edits discards temporary fields; this tour never presses a diamond.',
-        targets.animationProperties,
-      ),
+      {
+        ...step(
+          'key',
+          'Commit the property key',
+          'Click ◇ beside a property to set a key at the playhead. ◆ updates an existing key. Each property is keyed separately. Optional practice uses the X key button with the current value.',
+          targets.animationProperties,
+        ),
+        mode: 'try-it',
+        practice: {
+          targetId: targets.animationXKey,
+          instruction:
+            'Click Set X key to commit the current X value at the playhead. This changes your real animation. Undo and Redo remain available after exiting the guide.',
+          changesProject: true,
+          prerequisites: [
+            {
+              capability: 'selected-bone',
+              reason: 'Select a bone first, using the first step of this guide.',
+              guideId: 'animation-first-keyframe',
+            },
+          ],
+          completion: { capability: 'selected-x-key', message: 'An X key is present at the current playhead.' },
+        },
+      },
       step(
         'track',
         'Inspect the result',
@@ -205,6 +236,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       ...animation,
       {
         capability: 'bone-keyframes',
+        guideId: 'animation-first-keyframe',
         reason: 'Create a bone property key first. Use Create Your First Keyframe, or select a clip with bone keys.',
       },
     ],
@@ -277,12 +309,21 @@ export const animationGuides: readonly GuideDefinition[] = [
     category: 'animation',
     prerequisites: animation,
     steps: [
-      step(
-        'enable',
-        'Show neighboring poses',
-        'After exiting this tour, enable Onion Skinning above the preview. Ghosts help compare poses around the current playhead without creating animation keys.',
-        targets.animationOnion,
-      ),
+      {
+        ...step(
+          'enable',
+          'Show neighboring poses',
+          'Enable Onion Skinning above the preview. Ghosts help compare poses around the current playhead without creating animation keys.',
+          targets.animationOnion,
+        ),
+        mode: 'try-it',
+        practice: {
+          targetId: targets.animationOnion,
+          instruction: 'Enable the highlighted Onion Skinning checkbox. This changes a preview preference only.',
+          changesProject: false,
+          completion: { capability: 'onion-enabled', message: 'Onion Skinning is enabled.' },
+        },
+      },
       step(
         'counts',
         'Choose previous and next poses',

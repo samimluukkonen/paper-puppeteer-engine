@@ -11,6 +11,9 @@ export type GuideCapability =
   | 'ik-keyframes'
   | 'ik-constraints'
   | 'rig-artwork'
+  | 'selected-bone'
+  | 'onion-enabled'
+  | 'selected-x-key'
   | `tool:${string}`;
 
 /** Facts only: never pass editor documents, commands, playback, or history to a guide. */
@@ -22,9 +25,23 @@ export interface GuideContext {
 export interface GuidePrerequisite {
   readonly capability: GuideCapability;
   readonly reason: string;
+  readonly guideId?: string;
 }
 
-export interface GuideStep {
+export type GuideInteraction =
+  | { readonly mode?: 'explain' }
+  | {
+      readonly mode: 'try-it';
+      readonly practice: {
+        readonly targetId: GuideTargetId;
+        readonly instruction: string;
+        readonly changesProject: boolean;
+        readonly prerequisites?: readonly GuidePrerequisite[];
+        readonly completion?: { readonly capability: GuideCapability; readonly message: string };
+      };
+    };
+
+export type GuideStep = GuideInteraction & {
   readonly id: string;
   readonly title: string;
   readonly description: string;
@@ -32,7 +49,7 @@ export interface GuideStep {
   readonly prerequisites?: readonly GuidePrerequisite[];
   /** UI-only reveal hint, never an authored command. The spotlight may also reveal missing targets. */
   readonly preparation?: 'reveal-target';
-}
+};
 
 export interface GuideDefinition {
   readonly id: string;
@@ -57,6 +74,8 @@ export interface GuideRectangle {
 
 export interface GuideTargetResolver {
   resolve(targetId: GuideTargetId): GuideRectangle | null;
+  /** Real control identity, including while hidden. Interaction must recheck visibility. Geometry alone grants no access. */
+  resolveElement?(targetId: GuideTargetId): Element | null;
   /** May reveal a panel/tab or scroll. Must never select/edit data or invoke an editor action. */
   reveal(targetId: GuideTargetId): boolean;
 }

@@ -18,6 +18,7 @@ export type {
   GuideContext,
   GuideDefinition,
   GuideEditor,
+  GuideInteraction,
   GuidePrerequisite,
   GuideRectangle,
   GuideStep,

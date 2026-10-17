@@ -121,6 +121,7 @@ export function FeatureGuide({
         <ul className="feature-guide-list">
           {guides.map((guide, index) => {
             const availability = launcher.getAvailability(guide.id);
+            const prerequisite = launcher.getPrerequisiteGuide(guide.id);
             const titleId = `${id}-guide-${index}`;
             const reasonId = `${titleId}-availability`;
             return (
@@ -132,6 +133,19 @@ export function FeatureGuide({
                     {availability.available ? 'Available' : `Unavailable: ${availability.reason}`}
                   </p>
                 </div>
+                {!availability.available && prerequisite && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditor(prerequisite.editor);
+                      setError(
+                        `Prerequisite guide: ${prerequisite.title}. Find it in this category and choose Start Guide when available.`,
+                      );
+                    }}
+                  >
+                    Show prerequisite: {prerequisite.title}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={!availability.available}
@@ -152,7 +166,15 @@ export function FeatureGuide({
         {error && <p role="alert">{error}</p>}
       </dialog>
       {snapshot.status === 'active' && (
-        <GuideSpotlight controller={launcher.controller} snapshot={snapshot} targets={targets} />
+        <GuideSpotlight
+          controller={launcher.controller}
+          snapshot={snapshot}
+          targets={targets}
+          onCatalog={() => {
+            launcher.controller.exit();
+            open();
+          }}
+        />
       )}
     </OpenFeatureGuide.Provider>
   );

@@ -29,6 +29,8 @@ export class GuideRegistry {
         if (!step.id.trim() || stepIds.has(step.id))
           throw new Error(`Invalid or duplicate step ID in ${definition.id}: ${step.id}`);
         if (!step.targetId.trim()) throw new Error(`Step ${definition.id}/${step.id} has no target.`);
+        if (step.mode === 'try-it' && (!step.practice.targetId.trim() || !step.practice.instruction.trim()))
+          throw new Error(`Step ${definition.id}/${step.id} has incomplete practice instructions or target.`);
         stepIds.add(step.id);
       }
       const guide = freezeData(structuredClone(definition));

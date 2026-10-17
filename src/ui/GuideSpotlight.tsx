@@ -2,21 +2,24 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { GuideController, GuideSnapshot } from '../devtools/shared/guides/GuideController.js';
 import type { GuideCommandResult, GuideTargetResolver } from '../devtools/shared/guides/types.js';
+import { containGuideInteraction } from './guideInteraction.js';
 import { placeGuideCard } from './guidePositioning.js';
 import { observeGuideTarget, type GuideTargetLayout } from './observeGuideTarget.js';
 import './guideSpotlight.css';
 
 const unavailableTargets: GuideTargetResolver = { resolve: () => null, reveal: () => false };
 
-/** Explanation-only tour: native modal inertness blocks editor pointer and keyboard interaction. */
+/** Explain uses native modality; opt-in practice opens only the real target and the guide card. */
 export function GuideSpotlight({
   controller,
   snapshot,
   targets,
+  onCatalog,
 }: {
   controller: GuideController;
   snapshot: Extract<GuideSnapshot, { status: 'active' }>;
   targets: GuideTargetResolver;
+  onCatalog?: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const card = useRef<HTMLElement>(null);
@@ -28,30 +31,57 @@ export function GuideSpotlight({
   });
   const [cardSize, setCardSize] = useState({ width: 360, height: 320 });
   const [error, setError] = useState('');
+  const [practicingStep, setPracticingStep] = useState<unknown>(null);
   const { currentGuide: guide, currentStep: step, stepIndex, availability } = snapshot;
+  const practice = step.mode === 'try-it' ? step.practice : null;
+  const missingPractice = practice?.prerequisites?.find(
+    (item) => !snapshot.context.capabilities.includes(item.capability),
+  );
+  const interactive = practicingStep === step && !!practice && !missingPractice && availability.available;
+  const targetId = interactive ? practice.targetId : step.targetId;
   const last = stepIndex === guide.steps.length - 1;
 
   useLayoutEffect(() => {
     const element = dialog.current!;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    element.showModal();
     heading.current?.focus({ preventScroll: true });
     return () => {
       element.close();
-      if (opener?.isConnected && !opener.closest('[hidden], [inert], dialog:not([open])'))
-        opener.focus({ preventScroll: true });
-      else
-        document
-          .querySelector<HTMLElement>('.workspace-shell:not([hidden]) .feature-guide-open')
-          ?.focus({ preventScroll: true });
+      queueMicrotask(() => {
+        if (opener?.isConnected && !opener.closest('[hidden], [inert], dialog:not([open])'))
+          opener.focus({ preventScroll: true });
+        else
+          document
+            .querySelector<HTMLElement>('.workspace-shell:not([hidden]) .feature-guide-open')
+            ?.focus({ preventScroll: true });
+      });
     };
   }, []);
 
   useLayoutEffect(() => {
-    setError('');
+    const element = dialog.current!;
+    if (interactive) element.show();
+    else element.showModal();
     heading.current?.focus({ preventScroll: true });
-    return observeGuideTarget(availability.available ? targets : unavailableTargets, step.targetId, setLayout);
-  }, [targets, step, availability]);
+    const release = interactive
+      ? containGuideInteraction(
+          element,
+          () => targets.resolveElement?.(targetId) ?? null,
+          () => controller.exit(),
+        )
+      : undefined;
+    return () => {
+      release?.();
+      element.close();
+    };
+  }, [interactive, targetId, targets, controller]);
+
+  useLayoutEffect(() => {
+    setError('');
+    if (!availability.available) setPracticingStep(null);
+    heading.current?.focus({ preventScroll: true });
+    return observeGuideTarget(availability.available ? targets : unavailableTargets, targetId, setLayout);
+  }, [targets, step, availability, targetId]);
 
   useLayoutEffect(() => {
     const element = card.current!;
@@ -67,14 +97,15 @@ export function GuideSpotlight({
 
   const navigate = (result: GuideCommandResult): void => {
     if (!result.ok) setError(result.reason);
+    else setPracticingStep(null);
   };
   const missing = !layout.rectangle;
   const position = placeGuideCard(layout.rectangle, cardSize, layout.viewport);
   return createPortal(
     <dialog
       ref={dialog}
-      className="guide-spotlight feature-guide-dialog"
-      aria-modal="true"
+      className={`guide-spotlight feature-guide-dialog${interactive ? ' guide-spotlight-interactive' : ''}`}
+      aria-modal={!interactive}
       aria-labelledby={`${id}-title`}
       aria-describedby={`${id}-explanation ${id}-policy`}
       onCancel={(event) => {
@@ -82,11 +113,11 @@ export function GuideSpotlight({
         controller.exit();
       }}
       onClose={() => {
-        if (controller.getSnapshot().status === 'active') controller.exit();
+        if (!dialog.current?.open && controller.getSnapshot().status === 'active') controller.exit();
       }}
       onKeyDown={(event) => {
         event.stopPropagation();
-        if (event.key !== 'Tab') return;
+        if (interactive || event.key !== 'Tab') return;
         const buttons = card.current!.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
         const first = buttons[0];
         const final = buttons[buttons.length - 1];
@@ -124,8 +155,41 @@ export function GuideSpotlight({
         <h3>{step.title}</h3>
         <p id={`${id}-explanation`}>{step.description}</p>
         <p id={`${id}-policy`} className="guide-step-policy">
-          Read-only tour. Editor controls are paused for interaction; exit the guide to try them.
+          {interactive
+            ? practice.instruction
+            : practice
+              ? 'Explain mode. Choose Try It to use the highlighted control, or continue with Next.'
+              : 'Read-only tour. Editor controls are paused for interaction; exit the guide to try them.'}
         </p>
+        {practice && !interactive && (
+          <div>
+            <p>
+              {practice.changesProject
+                ? 'Optional practice changes your real project using normal validation and Undo/Redo.'
+                : 'Optional practice changes selection or preview preferences only.'}
+            </p>
+            {missingPractice && <p>{missingPractice.reason}</p>}
+            <button
+              type="button"
+              disabled={!!missingPractice || !availability.available}
+              onClick={() => setPracticingStep(step)}
+            >
+              Try It
+            </button>
+          </div>
+        )}
+        {interactive && (
+          <div>
+            <p role="status" aria-live="polite">
+              {practice.completion && snapshot.context.capabilities.includes(practice.completion.capability)
+                ? practice.completion.message
+                : 'Practice is optional. Continue with Next whenever you are ready.'}
+            </p>
+            <button type="button" onClick={() => setPracticingStep(null)}>
+              Explain
+            </button>
+          </div>
+        )}
         {missing && (
           <p role="status">
             {availability.available
@@ -134,6 +198,22 @@ export function GuideSpotlight({
           </p>
         )}
         {error && <p role="alert">{error}</p>}
+        <div className="guide-step-tools">
+          <button
+            type="button"
+            onClick={() => {
+              setPracticingStep(null);
+              navigate(controller.restart());
+            }}
+          >
+            Restart guide
+          </button>
+          {onCatalog && (
+            <button type="button" onClick={onCatalog}>
+              Choose another guide
+            </button>
+          )}
+        </div>
         <nav aria-label="Guide steps">
           <button type="button" disabled={stepIndex === 0} onClick={() => navigate(controller.previous())}>
             Back

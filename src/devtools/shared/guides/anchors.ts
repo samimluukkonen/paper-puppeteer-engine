@@ -30,6 +30,7 @@ export const GUIDE_TARGETS = {
   animationSettings: 'animation-settings',
   animationMode: 'animation-editor-mode',
   animationBones: 'animation-bones',
+  animationXKey: 'animation-x-key',
   animationProperties: 'animation-properties',
   animationPlayback: 'animation-playback',
   animationRuler: 'animation-ruler',

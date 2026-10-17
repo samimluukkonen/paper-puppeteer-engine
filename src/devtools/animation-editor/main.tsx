@@ -56,6 +56,7 @@ const guides = new GuideLauncher(
     initialEditor: initialRigView ? 'rig' : 'animation',
     getAnimation: () => stateOwner,
     getRig: () => scene?.rigEditor?.state,
+    getOnionEnabled: () => scene?.getOnionSkinSettings().enabled ?? false,
     navigate: (editor) => workspaceRoutes?.navigate(editor) ?? false,
   }),
 );
@@ -252,7 +253,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       { signal: previewControls.signal },
     );
   }
-  const onionControls = new OnionSkinControlsController(app, editorScene);
+  const onionControls = new OnionSkinControlsController(app, editorScene, guides.refresh);
   app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
     'change',
     (event) => {

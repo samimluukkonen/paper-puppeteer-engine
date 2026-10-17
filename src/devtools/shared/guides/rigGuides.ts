@@ -2,7 +2,7 @@ import { GUIDE_TARGETS as targets } from './anchors.js';
 import type { GuideDefinition, GuidePrerequisite, GuideStep } from './types.js';
 
 const character: readonly GuidePrerequisite[] = [
-  { capability: 'character', reason: 'Load or create a character first.' },
+  { capability: 'character', reason: 'Load or create a character first.', guideId: 'rig-new-character' },
 ];
 const validRig: readonly GuidePrerequisite[] = [
   ...character,
@@ -14,6 +14,7 @@ const step = (id: string, title: string, description: string, targetId: string):
   description,
   targetId,
   preparation: 'reveal-target',
+  mode: 'explain',
 });
 
 /** Instructions describe existing controls. Preparation can only reveal UI; it never performs these tasks. */
@@ -181,6 +182,7 @@ export const rigGuides: readonly GuideDefinition[] = [
       ...character,
       {
         capability: 'rig-artwork',
+        guideId: 'rig-importing-artwork',
         reason:
           'Add artwork to a bone or create a sprite attachment first. Use Importing Artwork and Slots and Attachments.',
       },

@@ -1,6 +1,7 @@
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { type HierarchyEntry, navigateHierarchy, setHierarchyTabStop } from '../shared/hierarchyNavigation.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { toDisplayTransformValue, toLocalTransformValue } from './transformValues.js';
@@ -67,6 +68,7 @@ export class BoneInspectorController {
       indicator.dataset.keyedProperty = property;
       const set = document.createElement('button');
       set.type = 'button';
+      if (property === 'x') set.dataset.guideId = GUIDE_TARGETS.animationXKey;
       set.textContent = '◇';
       set.className = 'animation-key-button';
       set.setAttribute('aria-label', `Set ${labels[property]} key`);

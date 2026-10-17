@@ -176,7 +176,7 @@ test('spotlight reveals collapsed panels, contains focus, blocks editor input, n
   await page.keyboard.press('Shift+Tab');
   await expect(tour.getByRole('button', { name: 'Exit', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(tour.getByRole('button', { name: 'Next', exact: true })).toBeFocused();
+  await expect(tour.getByRole('button', { name: 'Restart guide', exact: true })).toBeFocused();
   // The visual hole must not forward a click or keyboard editing shortcut to the editor.
   await page.locator('#hierarchy').evaluate((element) => {
     element.setAttribute('data-guide-clicks', '0');

@@ -182,3 +182,27 @@ test('DOM targets are clipped to scrolling panels and fully clipped targets are 
   getBoundingClientRect.mockReturnValue({ x: 500, y: 60, width: 100, height: 40, right: 600, bottom: 100 });
   assert.isNull(targets.resolve('control'));
 });
+
+test('practice resolves fresh real element identity across hiding, replacement and provider disposal', () => {
+  const original = anchor('practice');
+  const host = root([original.element]);
+  const targets = new GuideTargets(host.parent);
+  assert.strictEqual(targets.resolveElement('practice'), original.element);
+  original.node.getClientRects.mockReturnValue([]);
+  assert.isNull(targets.resolve('practice'));
+  assert.strictEqual(targets.resolveElement('practice'), original.element, 'retain the path while hidden');
+  const replacement = anchor('practice');
+  host.querySelectorAll.mockReturnValue([replacement.element]);
+  assert.strictEqual(targets.resolveElement('practice'), replacement.element);
+  const releaseGeometry = targets.registerGeometry('practice', { getRectangle: () => bounds });
+  assert.isNull(targets.resolveElement('practice'), 'geometry alone never grants canvas input');
+  releaseGeometry();
+  const releaseInput = targets.registerGeometry('practice', {
+    getRectangle: () => bounds,
+    getElement: () => replacement.element,
+  });
+  assert.strictEqual(targets.resolveElement('practice'), replacement.element);
+  releaseInput();
+  host.querySelectorAll.mockReturnValue([]);
+  assert.isNull(targets.resolveElement('practice'));
+});

@@ -134,6 +134,11 @@ export class GuideController {
     return success;
   }
 
+  restart(): GuideCommandResult {
+    const held = this.snapshot;
+    return held.status === 'active' ? this.activate(held.currentGuide, 0) : failure('No active guide.');
+  }
+
   reset(): void {
     if (this.snapshot.status !== 'idle') this.publish(inactive('idle', this.context));
   }
