@@ -102,6 +102,10 @@ export class EventInspectorController {
     this.remove.disabled = !event;
     this.time.max = String(state.duration);
     if (event === this.event && state.selectedEvent === this.ref) return;
+    if (event && state.selectedEvent !== this.ref) {
+      const details = this.app.querySelector<HTMLDetailsElement>('.animation-selection-details');
+      if (details) details.open = true;
+    }
     this.event = event;
     this.ref = state.selectedEvent;
     this.reset(state);

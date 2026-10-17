@@ -13,6 +13,7 @@ for (const view of [
   },
 ]) {
   test(`${view.prefix} workspace fits desktop viewports and contains its canvas`, async ({ page }) => {
+    test.setTimeout(90000);
     for (const [width, height] of [
       [1280, 800],
       [1440, 900],
@@ -28,6 +29,19 @@ for (const view of [
       expect(canvas.y).toBeGreaterThanOrEqual(stage.y);
       expect(canvas.x + canvas.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
       expect(canvas.y + canvas.height).toBeLessThanOrEqual(stage.y + stage.height + 1);
+      if (view.prefix === 'rig') {
+        await expect(page.locator('#rig-inspector details[open]')).toHaveCount(0);
+        const inspector = (await page.locator('#rig-inspector').boundingBox())!;
+        const preview = (await page.locator('#editor-app .workspace-preview').boundingBox())!;
+        const header = (await page.locator('#editor-app .view-header').boundingBox())!;
+        expect(inspector.x).toBeLessThan(preview.x);
+        expect(preview.y).toBe(header.y + header.height + 8);
+        expect(preview.y + preview.height).toBeCloseTo(height! - 12, 0);
+        expect(stage.y + stage.height).toBeCloseTo(preview.y + preview.height - 1, 0);
+        expect(stage.width / stage.height).toBeCloseTo(210 / 297, 3);
+        expect(canvas.width / canvas.height).toBeCloseTo(210 / 297, 3);
+        expect(canvas.height).toBeCloseTo(stage.height, 0);
+      }
       expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     }
@@ -97,3 +111,35 @@ for (const view of [
     expect(await canvas.evaluate((element, original) => element === original, originalCanvas)).toBe(true);
   });
 }
+
+test('rig preview divider resizes by keyboard and pointer and resets without editing', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  const divider = page.getByRole('separator', { name: 'Rig preview width', exact: true });
+  const inspector = page.locator('#rig-inspector');
+  const preview = page.locator('#editor-app .workspace-preview');
+  const initial = (await preview.boundingBox())!;
+  await divider.press('ArrowLeft');
+  expect((await preview.boundingBox())!.width).toBeCloseTo(Math.round(initial.width) + 10, 0);
+  const handle = (await divider.boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 - 40, handle.y + handle.height / 2, { steps: 5 });
+  await page.mouse.up();
+  expect((await preview.boundingBox())!.width).toBeCloseTo(Math.round(initial.width) + 50, 0);
+  await divider.press('End');
+  expect((await inspector.boundingBox())!.width).toBe(320);
+  for (const selector of ['.rig-session-editing', '.rig-session-actions']) {
+    const box = (await page.locator(selector).boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual((await inspector.boundingBox())!.x + 320);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+  await divider.press('Home');
+  expect((await preview.boundingBox())!.width).toBe(280);
+  await page.locator('#rig-reset-layout').click();
+  await expect(divider).toHaveAttribute('aria-valuenow', String(Math.round(initial.width)));
+  expect((await preview.boundingBox())!.width).toBeCloseTo(initial.width, 0);
+  await expect(page.locator('#undo')).toBeDisabled();
+  await expect(page.locator('#dirty-status')).toHaveText('No changes');
+});

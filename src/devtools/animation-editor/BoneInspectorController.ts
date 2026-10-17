@@ -145,6 +145,7 @@ export class BoneInspectorController {
     this.hierarchyLifetime.abort();
     this.hierarchyLifetime = new AbortController();
     this.state = state;
+    this.bone = undefined;
     this.hierarchy.replaceChildren();
     this.buttons.clear();
     this.hierarchyEntries.length = 0;
@@ -161,7 +162,9 @@ export class BoneInspectorController {
         button.addEventListener('keydown', (event) => navigateHierarchy(event, button, this.hierarchyEntries), {
           signal: this.hierarchyLifetime.signal,
         });
-        button.addEventListener('click', () => state.selectBone(id), { signal: this.hierarchyLifetime.signal });
+        button.addEventListener('click', () => state.selectBone(state.selectedBoneId === id ? null : id), {
+          signal: this.hierarchyLifetime.signal,
+        });
         this.hierarchy.append(button);
         this.buttons.set(id, button);
       }
@@ -185,7 +188,12 @@ export class BoneInspectorController {
     const previousDraft = this.draft;
     this.draft = state?.boneTransformDraft;
     this.scrubbing = state?.isScrubbing;
+    const previousBone = this.bone;
     this.bone = state?.selectedBoneId;
+    if (this.bone && previousBone !== undefined && previousBone !== this.bone) {
+      const details = this.title.closest<HTMLDetailsElement>('.animation-selection-details');
+      if (details) details.open = true;
+    }
     this.time = state?.currentTime;
     this.animation = state?.workingAnimation;
     setText(this.title, this.bone ? `Bone: ${this.bone}` : 'Select a bone');

@@ -26,11 +26,17 @@ export function createRigWorkspaceController(
   const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#hierarchy')!);
   const controls = createControlsController(app, session.updateStatus);
   let selected: string | undefined;
+  let rendered = false;
   return {
     render(editor: RigEditor): void {
       const next = editor.state.selection?.id;
       if (next && next !== selected) app.dispatchEvent(new Event('workspace:reveal-inspector'));
+      if (rendered && !app.hidden && next && next !== selected) {
+        const details = app.querySelector<HTMLDetailsElement>('.rig-selection-details');
+        if (details) details.open = true;
+      }
       selected = next;
+      rendered = true;
       session.updateStatus(editor);
       controls.render(editor);
       hierarchy.render(editor);

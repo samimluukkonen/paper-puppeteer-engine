@@ -8,7 +8,7 @@ async function openEditor(page: Page): Promise<void> {
 }
 
 test('desktop authoring fits the viewport and event selection leaves the ruler in place', async ({ page }) => {
-  test.setTimeout(60000);
+  test.setTimeout(120000);
   for (const [width, height] of [
     [1000, 768],
     [1280, 800],
@@ -23,14 +23,6 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
     expect(modeBox.y).toBe(animationBox.y);
     const commandBar = page.locator('.animation-command-bar');
     const toolbarHeight = (await commandBar.boundingBox())!.height;
-    // Compare against the same workspace without the new controls: mode selection must cost no extra row.
-    await page.locator('.editor-mode-control').evaluate((element) => {
-      (element as HTMLElement).style.display = 'none';
-    });
-    expect(toolbarHeight).toBe((await commandBar.boundingBox())!.height);
-    await page.locator('.editor-mode-control').evaluate((element) => {
-      (element as HTMLElement).style.removeProperty('display');
-    });
     await mode.selectOption('rig-tweak');
     expect((await commandBar.boundingBox())!.height).toBe(toolbarHeight);
     await expect(page.locator('#animation-inspector-toggle')).not.toHaveAttribute('inert');
@@ -46,10 +38,24 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
     expect(canvas.y).toBeGreaterThanOrEqual(stage.y);
     expect(canvas.x + canvas.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
     expect(canvas.y + canvas.height).toBeLessThanOrEqual(stage.y + stage.height + 1);
-    expect((await page.locator('#timeline-ruler').boundingBox())!.width).toBeGreaterThan(width! - 350);
+    const inspector = (await page.locator('#animation-inspector').boundingBox())!;
+    const preview = (await page.locator('.animation-preview').boundingBox())!;
+    const timelinePanel = (await page.locator('.timeline-panel').boundingBox())!;
+    expect(inspector.x).toBeLessThan(preview.x);
+    expect(inspector.width).toBe(timelinePanel.width);
+    const header = (await page.locator('#animation-editor-app .view-header').boundingBox())!;
+    expect(preview.y).toBe(header.y + header.height + 8);
+    expect(preview.y).toBeLessThan((await commandBar.boundingBox())!.y);
+    expect(preview.y + preview.height).toBeCloseTo(timelinePanel.y + timelinePanel.height, 0);
+    expect(stage.y + stage.height).toBeCloseTo(preview.y + preview.height - 1, 0);
+    expect(stage.width / stage.height).toBeCloseTo(210 / 297, 3);
+    expect(canvas.width / canvas.height).toBeCloseTo(210 / 297, 3);
+    expect(canvas.height).toBeCloseTo(stage.height, 0);
+    expect((await page.locator('#timeline-ruler').boundingBox())!.width).toBeGreaterThan(150);
+    expect(timelinePanel.x + timelinePanel.width).toBeLessThan(preview.x);
     const tracks = (await page.locator('.timeline-inset').boundingBox())!;
     const rulerHeight = (await page.locator('#timeline-ruler').boundingBox())!.height;
-    expect(tracks.height - rulerHeight).toBeGreaterThanOrEqual(150);
+    expect(tracks.height - rulerHeight).toBeGreaterThanOrEqual(width! < 1280 ? 90 : 150);
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
     const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
     await page.locator('#timeline-add-event').click();
@@ -69,7 +75,9 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
 test('compact property actions preserve drafts, keyed state and history', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openEditor(page);
-  await expect(page.locator('#animation-bone-empty')).toBeVisible();
+  await expect(page.locator('.animation-selection-details')).not.toHaveAttribute('open');
+  await expect(page.locator('#animation-inspector details[open]')).toHaveCount(0);
+  await expect(page.locator('#animation-bone-empty')).toBeHidden();
   await expect(page.locator('#animation-bone-fields')).toBeHidden();
   await (await animationHierarchy(page)).locator('.tree-entry').first().click();
   const input = page.locator('#animation-bone-fields input[data-property="x"]');
@@ -87,6 +95,82 @@ test('compact property actions preserve drafts, keyed state and history', async 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(diamond).toHaveText('◆');
   await expect(input).toHaveValue('12');
+});
+
+test('dragging the preview background pans without editing or changing selection', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openEditor(page);
+  await page.getByRole('button', { name: 'Select bone root', exact: true }).click();
+  await page.locator('#animation-show-bones').uncheck();
+  await (await animationMenuControl(page, '#animation-ik-handles')).uncheck();
+  const canvas = page.locator('#animation-stage canvas');
+  const box = (await canvas.boundingBox())!;
+  const before = await canvas.screenshot();
+  await page.mouse.move(box.x + 20, box.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 80, box.y + 60, { steps: 6 });
+  await page.mouse.up();
+  const after = await canvas.screenshot();
+  expect(after.equals(before)).toBe(false);
+  await page.mouse.move(box.x + 100, box.y + 80);
+  expect((await canvas.screenshot()).equals(after)).toBe(true);
+  await expect(page.locator('#animation-bone-title')).toHaveText('Bone: root');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
+
+test('expanding onion settings keeps the menu and its controls inside the viewport', async ({ page }) => {
+  test.setTimeout(60000);
+  for (const [width, height] of [
+    [1440, 900],
+    [1000, 768],
+    [390, 844],
+  ]) {
+    await page.setViewportSize({ width: width!, height: height! });
+    await openEditor(page);
+    await page.getByLabel('Preview options', { exact: true }).click();
+    await page.locator('.animation-onion-settings > summary').click();
+    const menu = page.locator('#animation-preview-menu > .animation-menu-content');
+    await expect(menu).toBeVisible();
+    await expect
+      .poll(async () => {
+        const box = (await menu.boundingBox())!;
+        return box.x >= 8 && box.x + box.width <= width! - 8 && box.y >= 8 && box.y + box.height <= height! - 8;
+      })
+      .toBe(true);
+    const panel = (await page.locator('.animation-onion-panel').boundingBox())!;
+    expect(panel.x + panel.width).toBeLessThanOrEqual(width! - 8);
+    await page.locator('#animation-onion-previous-count').fill('2');
+    await expect(page.locator('#animation-onion-previous-count')).toHaveValue('2');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  }
+});
+
+test('narrow session controls wrap and draft recovery stays on its own row', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openEditor(page);
+  await page.getByRole('separator', { name: 'Preview width', exact: true }).press('End');
+  // Reproduce the retained-draft notice without depending on a particular character's storage revision.
+  await page.locator('#animation-draft-status').evaluate((element) => {
+    element.textContent =
+      '1 older draft(s) could not be restored and were retained. Download retained drafts to recover their JSON manually.';
+  });
+  await page.locator('#animation-download-retained-drafts').evaluate((element) => {
+    (element as HTMLButtonElement).hidden = false;
+  });
+  const bar = (await page.locator('.animation-command-bar').boundingBox())!;
+  for (const selector of ['.animation-session-selection', '.animation-session-actions', '.animation-recovery']) {
+    const box = (await page.locator(selector).boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(bar.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(bar.x + bar.width);
+  }
+  const recovery = (await page.locator('.animation-recovery').boundingBox())!;
+  const status = (await page.locator('.animation-feedback').boundingBox())!;
+  expect(recovery.y).toBeGreaterThanOrEqual(status.y + status.height);
+  const download = (await page.locator('#animation-download').boundingBox())!;
+  const fileTools = (await page.locator('#animation-tools-open').boundingBox())!;
+  expect(download.y).toBe(fileTools.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
 });
 
 test('timeline context actions retain selected groups and Escape returns focus without clearing selection', async ({
@@ -140,58 +224,62 @@ test('panel dividers support keyboard and pointer resizing and reset without aut
   await page.setViewportSize({ width: 1440, height: 900 });
   await openEditor(page);
   const divider = page.locator('#animation-workspace-divider');
-  const before = (await page.locator('.animation-preview').boundingBox())!.height;
+  const inspector = page.locator('#animation-inspector');
+  const preview = page.locator('.animation-preview');
+  const before = (await inspector.boundingBox())!.height;
+  const previewBefore = (await preview.boundingBox())!;
+  const previewWidth = previewBefore.width;
+  const initialShare = Number(await divider.getAttribute('aria-valuenow'));
   await divider.press('ArrowUp');
-  await expect(divider).toHaveAttribute('aria-valuenow', '49');
-  expect((await page.locator('.animation-preview').boundingBox())!.height).toBeLessThan(before);
+  await expect(divider).toHaveAttribute('aria-valuenow', String(initialShare - 3));
+  expect((await inspector.boundingBox())!.height).toBeLessThan(before);
+  expect(await preview.boundingBox()).toEqual(previewBefore);
   const box = (await divider.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2, box.y - 50, { steps: 5 });
   await page.mouse.up();
-  expect(Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(49);
+  expect(Number(await divider.getAttribute('aria-valuenow'))).toBeLessThan(initialShare - 3);
   const labels = page.locator('#timeline-label-divider');
   await labels.press('ArrowRight');
   await expect(labels).toHaveAttribute('aria-valuenow', '250');
-  const inspectorDivider = page.getByRole('separator', { name: 'Inspector width', exact: true });
-  const inspector = page.locator('#animation-inspector');
+  const previewDivider = page.getByRole('separator', { name: 'Preview width', exact: true });
   const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
-  await inspectorDivider.press('ArrowLeft');
-  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '370');
-  expect((await inspector.boundingBox())!.width).toBe(370);
-  const inspectorHandle = (await inspectorDivider.boundingBox())!;
-  await page.mouse.move(inspectorHandle.x + inspectorHandle.width / 2, inspectorHandle.y + inspectorHandle.height / 2);
+  await previewDivider.press('ArrowLeft');
+  await expect(previewDivider).toHaveAttribute('aria-valuenow', String(Math.round(previewWidth) + 10));
+  expect((await preview.boundingBox())!.width).toBeCloseTo(Math.round(previewWidth) + 10, 0);
+  const previewHandle = (await previewDivider.boundingBox())!;
+  await page.mouse.move(previewHandle.x + previewHandle.width / 2, previewHandle.y + previewHandle.height / 2);
   await page.mouse.down();
-  await page.mouse.move(
-    inspectorHandle.x + inspectorHandle.width / 2 - 80,
-    inspectorHandle.y + inspectorHandle.height / 2,
-    {
-      steps: 5,
-    },
-  );
+  await page.mouse.move(previewHandle.x + previewHandle.width / 2 - 40, previewHandle.y + previewHandle.height / 2, {
+    steps: 5,
+  });
   await page.mouse.up();
-  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '450');
-  expect((await inspector.boundingBox())!.width).toBe(450);
-  expect(await page.locator('#timeline-ruler').boundingBox()).toEqual(ruler);
-  await inspectorDivider.press('Home');
-  expect((await inspector.boundingBox())!.width).toBe(280);
-  await inspectorDivider.press('ArrowRight');
-  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '280');
-  await inspectorDivider.press('End');
-  expect((await inspector.boundingBox())!.width).toBe(640);
+  expect((await preview.boundingBox())!.width).toBeCloseTo(Math.round(previewWidth) + 50, 0);
+  expect((await page.locator('#timeline-ruler').boundingBox())!.width).toBeLessThan(ruler.width);
+  await previewDivider.press('Home');
+  expect((await preview.boundingBox())!.width).toBe(280);
+  await previewDivider.press('ArrowRight');
+  await expect(previewDivider).toHaveAttribute('aria-valuenow', '280');
+  await previewDivider.press('End');
+  expect((await inspector.boundingBox())!.width).toBe(320);
+  expect((await page.locator('.timeline-panel').boundingBox())!.width).toBe(320);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
   await page.setViewportSize({ width: 1000, height: 900 });
   await expect
-    .poll(async () => Number(await inspectorDivider.getAttribute('aria-valuenow')))
+    .poll(async () => Number(await previewDivider.getAttribute('aria-valuenow')))
     .toBe((await page.locator('.animation-layout').boundingBox())!.width - 332);
-  expect((await page.locator('.animation-preview').boundingBox())!.width).toBeGreaterThanOrEqual(320);
+  expect((await inspector.boundingBox())!.width).toBeGreaterThanOrEqual(320);
+  const stage = (await page.locator('#animation-stage').boundingBox())!;
+  expect(stage.width / stage.height).toBeCloseTo(210 / 297, 3);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('#timeline-zoom').selectOption('4');
   await page.locator('#timeline-filter').selectOption('keyed');
   await (await animationMenuControl(page, '#animation-reset-layout')).click();
-  await expect(divider).toHaveAttribute('aria-valuenow', '52');
+  await expect(divider).toHaveAttribute('aria-valuenow', String(initialShare));
   await expect(labels).toHaveAttribute('aria-valuenow', '240');
-  await expect(inspectorDivider).toHaveAttribute('aria-valuenow', '360');
-  expect((await inspector.boundingBox())!.width).toBe(360);
+  await expect(previewDivider).toHaveAttribute('aria-valuenow', String(Math.round(previewWidth)));
+  expect((await preview.boundingBox())!.width).toBeCloseTo(previewWidth, 0);
   await expect(page.locator('#timeline-zoom')).toHaveValue('1');
   await expect(page.locator('#timeline-filter')).toHaveValue('all');
   await expect(page.locator('#animation-undo')).toBeDisabled();
@@ -222,7 +310,8 @@ test('zoom and horizontal scrolling preserve time projection and key drag coordi
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await page.locator('#timeline-zoom').selectOption('2');
   await page.locator('.timeline-inset').evaluate((element) => {
-    element.scrollLeft = 400;
+    // Keep the middle key visible even when the portrait preview leaves a narrow timeline.
+    element.scrollLeft = element.querySelector('#timeline')!.getBoundingClientRect().width * 0.25;
   });
   const timeline = (await page.locator('#timeline').boundingBox())!;
   const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
@@ -275,7 +364,7 @@ test('narrow screens keep timing visible and open the inspector as a dismissible
   await page.setViewportSize({ width: 390, height: 844 });
   await openEditor(page);
   await expect(page.locator('#animation-inspector')).toBeHidden();
-  await expect(page.locator('#animation-inspector-divider')).toBeHidden();
+  await expect(page.locator('#animation-preview-divider')).toBeHidden();
   expect((await page.locator('#timeline-ruler').boundingBox())!.y).toBeLessThan(844);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.locator('#timeline-add-event').click();

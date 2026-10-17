@@ -1,9 +1,17 @@
 /** Dismiss and position disclosures without changing editor selection or document state. */
 export class EditorMenuController {
   private readonly abort = new AbortController();
+  private readonly menuResize: ResizeObserver;
   private contextSource: HTMLElement | undefined;
 
   constructor(private readonly app: HTMLElement) {
+    this.menuResize = new ResizeObserver((entries) => {
+      if (this.contextSource) return;
+      for (const entry of entries) {
+        const menu = entry.target.closest<HTMLDetailsElement>('[data-workspace-menu]');
+        if (menu?.open) this.position(menu);
+      }
+    });
     const options = { signal: this.abort.signal };
     app.addEventListener(
       'toggle',
@@ -12,6 +20,7 @@ export class EditorMenuController {
         if (!(menu instanceof HTMLDetailsElement) || !menu.matches('[data-workspace-menu]') || !menu.open) return;
         this.closeOthers(menu);
         if (!this.contextSource) this.position(menu);
+        this.menuResize.observe(menu.querySelector('.animation-menu-content')!);
       },
       { ...options, capture: true },
     );
@@ -115,6 +124,8 @@ export class EditorMenuController {
   }
 
   private close(menu: HTMLDetailsElement, restoreFocus = false): void {
+    const content = menu.querySelector('.animation-menu-content');
+    if (content) this.menuResize.unobserve(content);
     menu.open = false;
     const target = this.contextSource?.isConnected ? this.contextSource : menu.querySelector<HTMLElement>('summary');
     this.contextSource = undefined;
@@ -134,6 +145,7 @@ export class EditorMenuController {
 
   dispose(): void {
     this.abort.abort();
+    this.menuResize.disconnect();
     for (const menu of this.openMenus()) this.close(menu);
   }
 }

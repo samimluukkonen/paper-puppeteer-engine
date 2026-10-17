@@ -5,7 +5,7 @@ import './attachments.css';
 export function AttachmentPanel({
   controller,
   authoring = true,
-  defaultOpen = true,
+  defaultOpen = false,
 }: {
   controller: AttachmentController;
   authoring?: boolean;

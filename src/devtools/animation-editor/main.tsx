@@ -5,8 +5,9 @@ import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
-import '../rig-editor/style.css';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
+import '../rig-editor/style.css';
+import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
@@ -240,7 +241,10 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     },
     { signal: previewControls.signal },
   );
-  const game = createEditorGame(initialRigView ? 'editor-stage' : 'animation-stage', editorScene);
+  const game = createEditorGame(initialRigView ? 'editor-stage' : 'animation-stage', editorScene, {
+    width: 630,
+    height: 891,
+  });
   movePreview = () => {
     const rigView = stateOwner ? stateOwner.editorMode === 'rig' : initialRigView;
     const target = root.querySelector<HTMLElement>(rigView ? '#editor-stage' : '#animation-stage')!;
@@ -260,6 +264,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     }
   };
   const releaseRigResize = observePreview(rigApp.querySelector<HTMLElement>('#editor-stage')!, game);
+  const rigLayout = new RigWorkspaceLayoutController(rigApp);
   const releaseRoutes = bindWorkspaceNavigation(root, (view) => {
     if (!stateOwner) return false;
     for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog[open]')) dialog.close();
@@ -277,6 +282,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   return () => {
     releaseRoutes();
     releaseRigResize();
+    rigLayout.dispose();
     rigWorkspace.dispose();
     stateOwner = undefined;
     movePreview = undefined;

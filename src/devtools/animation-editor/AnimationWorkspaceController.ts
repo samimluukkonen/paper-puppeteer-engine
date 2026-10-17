@@ -22,27 +22,34 @@ export class AnimationWorkspaceController {
     const layout = app.querySelector<HTMLElement>('.animation-layout')!;
     const vertical = app.querySelector<HTMLElement>('#animation-workspace-divider')!;
     const horizontal = app.querySelector<HTMLElement>('#timeline-label-divider')!;
-    const inspectorDivider = app.querySelector<HTMLElement>('#animation-inspector-divider')!;
+    const previewDivider = app.querySelector<HTMLElement>('#animation-preview-divider')!;
     const inspector = app.querySelector<HTMLElement>('#animation-inspector')!;
+    const preview = app.querySelector<HTMLElement>('.animation-preview')!;
+    const previewOptions = app.querySelector<HTMLElement>('.animation-preview-options')!;
+    const commands = app.querySelector<HTMLElement>('.animation-command-bar')!;
+    const controlsHeight = (): number =>
+      commands.getBoundingClientRect().bottom + 8 - layout.getBoundingClientRect().top;
+    const authoringHeight = (): number => layout.clientHeight - controlsHeight();
     const inset = app.querySelector<HTMLElement>('.timeline-inset')!;
-    const inspectorMaximum = (): number => Math.max(280, Math.min(640, layout.clientWidth - 332));
-    const updateInspector = (value: number): void => {
-      const width = Math.max(280, Math.min(inspectorMaximum(), value));
-      layout.style.setProperty('--inspector-width', `${width}px`);
-      inspectorDivider.setAttribute('aria-valuenow', String(Math.round(width)));
+    const previewMaximum = (): number => Math.max(280, layout.clientWidth - 332);
+    const updatePreviewWidth = (value: number): void => {
+      const width = Math.max(280, Math.min(previewMaximum(), value));
+      layout.style.setProperty('--preview-width', `${width}px`);
+      previewDivider.setAttribute('aria-valuenow', String(Math.round(width)));
     };
     const limits = (): { min: number; max: number } => {
-      const height = layout.clientHeight;
-      const timelineMinimum = 320;
+      const height = authoringHeight();
+      const timelineMinimum = parseFloat(getComputedStyle(layout).getPropertyValue('--timeline-min-height'));
+      const upperMinimum = parseFloat(getComputedStyle(layout).getPropertyValue('--upper-min-height'));
       return {
-        min: Math.max(25, (240 / height) * 100),
+        min: Math.max(20, (upperMinimum / height) * 100),
         max: Math.min(70, ((height - timelineMinimum - 12) / height) * 100),
       };
     };
     const updateHeight = (value: number): void => {
       const { min, max } = limits();
       const share = Math.max(min, Math.min(max, value));
-      layout.style.setProperty('--preview-share', `${share}%`);
+      layout.style.setProperty('--upper-share', String(share));
       vertical.setAttribute('aria-valuenow', String(Math.round(share)));
     };
     const updateLabels = (value: number): void => {
@@ -55,7 +62,7 @@ export class AnimationWorkspaceController {
       'y',
       (coordinate) => {
         const bounds = layout.getBoundingClientRect();
-        updateHeight(((coordinate - bounds.top) / bounds.height) * 100);
+        updateHeight(((coordinate - bounds.top - controlsHeight()) / authoringHeight()) * 100);
       },
       (key) => {
         const held = Number(vertical.getAttribute('aria-valuenow'));
@@ -82,15 +89,15 @@ export class AnimationWorkspaceController {
       },
     );
     this.bindDivider(
-      inspectorDivider,
+      previewDivider,
       'x',
-      (coordinate) => updateInspector(layout.getBoundingClientRect().right - coordinate - 6),
+      (coordinate) => updatePreviewWidth(layout.getBoundingClientRect().right - coordinate - 6),
       (key) => {
-        const held = Number(inspectorDivider.getAttribute('aria-valuenow'));
-        if (key === 'ArrowLeft') updateInspector(held + 10);
-        else if (key === 'ArrowRight') updateInspector(held - 10);
-        else if (key === 'Home') updateInspector(280);
-        else if (key === 'End') updateInspector(inspectorMaximum());
+        const held = Number(previewDivider.getAttribute('aria-valuenow'));
+        if (key === 'ArrowLeft') updatePreviewWidth(held + 10);
+        else if (key === 'ArrowRight') updatePreviewWidth(held - 10);
+        else if (key === 'Home') updatePreviewWidth(280);
+        else if (key === 'End') updatePreviewWidth(previewMaximum());
         else return false;
         return true;
       },
@@ -98,15 +105,17 @@ export class AnimationWorkspaceController {
     app.querySelector('#animation-reset-layout')!.addEventListener(
       'click',
       () => {
-        layout.style.removeProperty('--preview-share');
+        layout.style.removeProperty('--upper-share');
         vertical.setAttribute(
           'aria-valuenow',
-          String(Math.round(parseFloat(getComputedStyle(layout).getPropertyValue('--preview-share')))),
+          String(Math.round(parseFloat(getComputedStyle(layout).getPropertyValue('--upper-share')))),
         );
         app.style.removeProperty('--timeline-label-width');
-        horizontal.setAttribute('aria-valuenow', String(Math.round(inset.clientWidth <= 600 ? 150 : 240)));
-        layout.style.removeProperty('--inspector-width');
-        inspectorDivider.setAttribute('aria-valuenow', '360');
+        horizontal.setAttribute(
+          'aria-valuenow',
+          String(Math.round(parseFloat(getComputedStyle(app).getPropertyValue('--timeline-label-width')))),
+        );
+        layout.style.removeProperty('--preview-width');
         app.querySelector<HTMLButtonElement>('#timeline-clear-filters')!.click();
         const zoom = app.querySelector<HTMLSelectElement>('#timeline-zoom')!;
         zoom.value = '1';
@@ -121,7 +130,10 @@ export class AnimationWorkspaceController {
       if (this.resizeFrame) return;
       this.resizeFrame = requestAnimationFrame(() => {
         this.resizeFrame = 0;
-        const held = layout.style.getPropertyValue('--preview-share');
+        // Hidden editor views share this controller and do not have usable geometry.
+        if (!layout.clientHeight) return;
+        layout.style.setProperty('--workspace-controls-height', `${controlsHeight()}px`);
+        const held = layout.style.getPropertyValue('--upper-share');
         if (held) updateHeight(parseFloat(held));
         const { min, max } = limits();
         vertical.setAttribute('aria-valuemin', String(Math.ceil(min)));
@@ -130,18 +142,29 @@ export class AnimationWorkspaceController {
           'aria-valuenow',
           String(
             Math.round(
-              (app.querySelector<HTMLElement>('.animation-preview')!.clientHeight / layout.clientHeight) * 100,
+              ((previewDivider.getClientRects().length ? inspector : preview).getBoundingClientRect().height /
+                authoringHeight()) *
+                100,
             ),
           ),
         );
-        if (inspectorDivider.getClientRects().length) {
-          inspectorDivider.setAttribute('aria-valuemax', String(inspectorMaximum()));
-          inspectorDivider.setAttribute('aria-valuenow', String(Math.round(inspector.getBoundingClientRect().width)));
+        if (previewDivider.getClientRects().length) {
+          // Match the stage to A4 portrait at the full available height, including toolbar and panel borders.
+          const portraitWidth = ((layout.clientHeight - previewOptions.offsetHeight - 2) * 210) / 297 + 2;
+          layout.style.setProperty('--portrait-width', `${portraitWidth}px`);
+          previewDivider.setAttribute('aria-valuemax', String(previewMaximum()));
+          previewDivider.setAttribute('aria-valuenow', String(Math.round(preview.getBoundingClientRect().width)));
         }
         refreshPreview();
       });
     });
     this.previewResize.observe(app.querySelector('#animation-stage')!);
+    this.previewResize.observe(layout);
+    this.previewResize.observe(previewOptions);
+    this.previewResize.observe(inspector);
+    this.previewResize.observe(commands);
+    const packageTools = layout.querySelector('.package-tools');
+    if (packageTools) this.previewResize.observe(packageTools);
   }
 
   private bindDivider(

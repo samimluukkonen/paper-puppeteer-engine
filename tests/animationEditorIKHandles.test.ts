@@ -372,19 +372,27 @@ test('ghost samples and exported JSON exclude drafts; hide/lock do not author, a
   }
 });
 
-test('middle-button pan and wheel zoom reuse editor camera utilities without dirtying animation', () => {
+test.each(['middle-button', 'background'] as const)('%s pan and wheel zoom do not dirty animation', (gesture) => {
   const f = fixture();
   try {
     const start = f.pointer({ x: 0, y: 0 }, 1, 1);
-    f.handles.pointerDown(start);
+    if (gesture === 'background') {
+      f.handles.setVisible(false);
+      f.handles.setInteractive(false);
+      f.handles.startPan(start);
+    } else f.handles.pointerDown(start);
     const scroll = f.camera.scrollX;
     f.input.emit('pointermove', { id: start.id, x: start.x + 17, y: start.y });
     assert.approximately(f.camera.scrollX, scroll - 10, 1e-8);
-    f.input.emit('pointerup', start);
+    f.input.emit('pointerupoutside', start);
+    const released = f.camera.scrollX;
+    f.input.emit('pointermove', { id: start.id, x: start.x + 34, y: start.y });
+    assert.equal(f.camera.scrollX, released);
     const zoom = f.camera.zoom;
     f.input.emit('wheel', start, [], 0, -200);
     assert.isAbove(f.camera.zoom, zoom);
     assert.isFalse(f.state.dirty);
+    assert.isNull(f.state.ikTargetDrag);
   } finally {
     f.dispose();
   }

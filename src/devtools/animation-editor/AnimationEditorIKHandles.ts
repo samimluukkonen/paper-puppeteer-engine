@@ -158,8 +158,7 @@ export class AnimationEditorIKHandles {
     if (this.disposed) return false;
     if (this.pointerId !== undefined) return true;
     if (pointer.button === 1) {
-      this.pointerId = pointer.id;
-      this.pan = { x: pointer.x, y: pointer.y };
+      this.startPan(pointer);
       return true;
     }
     if (!this.visible || !this.puppet.container.visible || pointer.button !== 0) return false;
@@ -184,6 +183,13 @@ export class AnimationEditorIKHandles {
     this.pointerId = pointer.id;
     this.offset = { x: target.x - start.x, y: target.y - start.y };
     return true;
+  }
+
+  /** Empty-background drags share the camera gesture lifetime with middle-button panning. */
+  startPan(pointer: Phaser.Input.Pointer): void {
+    if (this.disposed || this.pointerId !== undefined) return;
+    this.pointerId = pointer.id;
+    this.pan = { x: pointer.x, y: pointer.y };
   }
 
   private pointerMove = (pointer: Phaser.Input.Pointer): void => {

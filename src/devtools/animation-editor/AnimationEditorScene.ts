@@ -198,6 +198,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       }
     }
     if (nearest) this.state.selectBone(nearest);
+    else this.ikHandles?.startPan(pointer);
   }
 
   setIKHandlesVisible(visible: boolean): void {

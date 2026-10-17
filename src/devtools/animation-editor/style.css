@@ -40,7 +40,16 @@ a {
   flex: 0 0 auto;
   font-size: 13px;
 }
-.animation-command-bar > label,
+.animation-session-selection,
+.animation-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.animation-session-selection > label,
 .timeline-toolbar label,
 .timeline-track-controls label {
   display: flex;
@@ -56,15 +65,10 @@ a {
   gap: 8px;
 }
 .animation-save {
-  margin-left: auto;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-.animation-save small {
-  font-size: 11px;
-  color: var(--fg-muted);
 }
 #animation-download {
   background: var(--success-emphasis);
@@ -94,6 +98,29 @@ a {
 }
 .animation-feedback p:empty {
   display: none;
+}
+.animation-recovery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-basis: 100%;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-default);
+  font-size: 11px;
+}
+.animation-recovery:has(#animation-draft-status:empty):has(button[hidden]) {
+  display: none;
+}
+.animation-recovery p {
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.animation-recovery button {
+  max-width: 100%;
 }
 .animation-popover > summary {
   cursor: pointer;
@@ -131,15 +158,37 @@ a {
   min-width: 0;
 }
 .animation-layout.view-content {
-  --preview-share: 52%;
+  --upper-share: 52;
+  --upper-min-height: 120px;
+  --timeline-min-height: 340px;
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns:
     minmax(0, 1fr) 12px
-    clamp(280px, var(--inspector-width, 360px), min(640px, calc(100% - 332px)));
-  grid-template-rows: minmax(180px, min(var(--preview-share), calc(100% - 332px))) 12px minmax(320px, 1fr);
+    clamp(280px, var(--preview-width, var(--portrait-width, 40%)), calc(100% - 332px));
+  grid-template-rows:
+    auto auto
+    minmax(
+      var(--upper-min-height),
+      min(
+        calc((100% - var(--workspace-controls-height, 0px)) * var(--upper-share) / 100),
+        calc(100% - var(--workspace-controls-height, 0px) - var(--timeline-min-height) - 12px)
+      )
+    )
+    12px
+    minmax(var(--timeline-min-height), 1fr);
   padding: 0;
+}
+.animation-layout > .package-tools {
+  grid-column: 1;
+  grid-row: 1;
+  margin-bottom: 8px;
+}
+.animation-layout > .animation-command-bar {
+  grid-column: 1;
+  grid-row: 2;
+  margin-bottom: 8px;
 }
 .animation-preview,
 .animation-authoring,
@@ -151,11 +200,21 @@ a {
   border-radius: 6px;
 }
 .animation-preview {
-  grid-column: 1;
-  grid-row: 1;
+  grid-column: 3;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   overflow: visible;
+}
+.animation-preview-viewport {
+  container-type: size;
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-inset);
+  border-radius: 0 0 6px 6px;
 }
 .animation-preview-options {
   position: relative;
@@ -163,6 +222,7 @@ a {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  flex: 0 0 auto;
   padding: 8px 12px;
   font-size: 12px;
   background: var(--bg-subtle);
@@ -211,10 +271,11 @@ a {
 }
 #animation-stage {
   position: relative;
-  flex: 1;
   min-height: 0;
-  width: 100%;
-  overflow: hidden;
+  width: min(100cqw, calc(100cqh * 210 / 297));
+  height: min(100cqh, calc(100cqw * 297 / 210));
+  flex: 0 0 auto;
+  overflow: auto;
   border-radius: 0 0 6px 6px;
   background-color: var(--bg-preview);
   background-image: radial-gradient(var(--grid-color) 0.7px, transparent 0.7px);
@@ -225,8 +286,8 @@ a {
 }
 .animation-authoring {
   padding: 12px;
-  grid-column: 3;
-  grid-row: 1;
+  grid-column: 1;
+  grid-row: 3;
   overflow-y: auto;
   font-size: 12px;
 }
@@ -311,7 +372,8 @@ a {
   display: none;
 }
 #animation-workspace-divider {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  grid-row: 4;
   cursor: ns-resize;
   touch-action: none;
   position: relative;
@@ -326,14 +388,14 @@ a {
   background: var(--border-emphasis);
   border-radius: 2px;
 }
-#animation-inspector-divider {
+#animation-preview-divider {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 1 / -1;
   cursor: ew-resize;
   touch-action: none;
   position: relative;
 }
-#animation-inspector-divider::after {
+#animation-preview-divider::after {
   content: "";
   position: absolute;
   width: 3px;
@@ -343,13 +405,13 @@ a {
   background: var(--border-emphasis);
   border-radius: 2px;
 }
-#animation-inspector-divider:hover,
-#animation-inspector-divider:focus-visible {
+#animation-preview-divider:hover,
+#animation-preview-divider:focus-visible {
   background: var(--accent-muted);
 }
 .timeline-panel {
-  grid-column: 1 / -1;
-  grid-row: 3;
+  grid-column: 1;
+  grid-row: 5;
   display: flex;
   flex-direction: column;
   padding: 10px 12px 16px;
@@ -376,7 +438,7 @@ a {
   flex: 1;
   min-height: 65px;
   display: grid;
-  grid-template-columns: var(--timeline-label-width) minmax(0, 1fr);
+  grid-template-columns: min(var(--timeline-label-width), 45%) minmax(0, 1fr);
   align-items: start;
   overflow: auto;
   scrollbar-gutter: stable;
@@ -473,6 +535,9 @@ a {
   font-size: 11px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border-emphasis);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .timeline-track-label,
 .timeline-track-lane {
@@ -847,9 +912,6 @@ a {
   .animation-workspace .view-header {
     gap: 12px;
   }
-  .animation-save small {
-    display: none;
-  }
 }
 @media (max-width: 900px) {
   .animation-workspace .view-header {
@@ -867,10 +929,16 @@ a {
     width: auto;
   }
   .animation-layout.view-content {
+    --upper-min-height: 180px;
+    --timeline-min-height: 320px;
     grid-template-columns: minmax(0, 1fr);
   }
+  .animation-preview {
+    grid-column: 1;
+    grid-row: 3;
+  }
   .animation-authoring,
-  #animation-inspector-divider {
+  #animation-preview-divider {
     display: none;
   }
   #animation-inspector-toggle,
@@ -881,8 +949,8 @@ a {
     display: block;
     position: relative;
     grid-column: 1;
-    grid-row: 1;
-    justify-self: end;
+    grid-row: 3;
+    justify-self: start;
     z-index: 25;
     width: min(420px, 100%);
     box-shadow: 0 10px 40px var(--shadow-color);
@@ -907,12 +975,8 @@ a {
     gap: 6px;
     padding: 8px;
   }
-  .animation-save {
-    margin-left: 0;
-  }
   .animation-layout.view-content {
-    --preview-share: 33%;
-    grid-template-rows: minmax(180px, var(--preview-share)) 12px minmax(320px, 1fr);
+    --upper-share: 33;
   }
   .timeline-panel {
     padding: 8px 8px 14px;
@@ -1201,6 +1265,7 @@ a {
 .timeline-snapping {
   display: flex;
   flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: 6px;
   border: 0;
