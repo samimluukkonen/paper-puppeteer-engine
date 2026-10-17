@@ -15,6 +15,7 @@ export function NewAnimationDialog({ controller }: { controller: NewAnimationCon
       <button
         id="animation-new"
         type="button"
+        className="workspace-primary"
         disabled={!!reason}
         title={reason || 'Create an empty animation for this rig'}
         aria-describedby="animation-new-reason"
