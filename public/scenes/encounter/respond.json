@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "name": "respond",
+  "duration": 1400,
+  "loop": false,
+  "tracks": {
+    "torso": [
+      {
+        "time": 0,
+        "rotation": 0
+      },
+      {
+        "time": 350,
+        "rotation": 0.25
+      },
+      {
+        "time": 700,
+        "rotation": 0
+      },
+      {
+        "time": 1000,
+        "rotation": 0.15
+      },
+      {
+        "time": 1400,
+        "rotation": 0
+      }
+    ]
+  }
+}

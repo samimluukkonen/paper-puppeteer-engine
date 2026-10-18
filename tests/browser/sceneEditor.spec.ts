@@ -380,3 +380,80 @@ test('scene panel dividers resize inspector and timeline without authoring', asy
   expect(await downloadScene(page)).toEqual(original);
   expect(errors).toEqual([]);
 });
+
+test('two-character encounter playback, pause, restart, deterministic scrubbing and authored isolation', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  const failedAssets: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('response', (response) => {
+    if (response.status() >= 400) failedAssets.push(response.url());
+  });
+  const json = await readFile(new URL('../../public/scenes/encounter.scene.json', import.meta.url), 'utf8');
+  const authored = parseSceneJson(json);
+  await page.goto('scene-editor/');
+  await page
+    .getByLabel('Open scene JSON')
+    .setInputFiles({ name: 'encounter.scene.json', mimeType: 'application/json', buffer: Buffer.from(json) });
+  const play = page.getByRole('button', { name: 'Play', exact: true });
+  await expect(play).toBeEnabled();
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  const tracks = page.getByLabel('Action tracks', { exact: true });
+  await tracks.getByRole('button', { name: 'a', exact: true }).click();
+  await page.getByText('Runtime preview', { exact: true }).click();
+  const position = page.getByText('Position', { exact: true }).locator('+ dd');
+  const animation = page.getByText('Animation', { exact: true }).locator('+ dd');
+  const time = page.getByRole('spinbutton', { name: 'Playhead (s)', exact: true });
+  const status = page.getByLabel('Scene playback status', { exact: true });
+  for (const [seconds, expected] of [
+    ['0.25', '-280.000, 120.000'],
+    ['1.5', '-195.000, 120.000'],
+    ['2.5', '-110.000, 120.000'],
+    ['0.25', '-280.000, 120.000'],
+    ['1.5', '-195.000, 120.000'],
+  ]) {
+    await time.fill(seconds!);
+    await expect(position).toHaveText(expected!);
+    await expect(status).toContainText('paused');
+  }
+  await tracks.getByRole('button', { name: 'b', exact: true }).click();
+  await expect(position).toHaveText('195.000, 120.000');
+  await tracks.getByRole('button', { name: 'a', exact: true }).click();
+  await time.fill('3.4');
+  await expect(position).toHaveText('-110.000, 120.000');
+  await expect(animation).toHaveText('bow');
+  await page.screenshot({ path: test.info().outputPath('scene-encounter-bow.png') });
+  await time.fill('5');
+  await tracks.getByRole('button', { name: 'b', exact: true }).click();
+  await expect(position).toHaveText('110.000, 120.000');
+  await expect(animation).toHaveText('respond');
+  await play.click();
+  await expect(status).toContainText('playing');
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const pausedTime = await time.inputValue();
+  await page.waitForTimeout(120);
+  await expect(time).toHaveValue(pausedTime);
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await expect(status).toContainText('playing');
+  await expect.poll(async () => Number(await time.inputValue())).toBeLessThan(1);
+  await time.fill('1.5');
+  await expect(status).toContainText('paused');
+  await expect(position).toHaveText('195.000, 120.000');
+  await time.fill('6.5');
+  await expect(status).toContainText('completed');
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(status).toContainText('stopped');
+  await expect(time).toHaveValue('0');
+  await page.getByLabel('Scene playback speed', { exact: true }).selectOption('2');
+  await play.click();
+  await expect(status).toContainText('completed', { timeout: 15000 });
+  await expect(position).toHaveText('110.000, 120.000');
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(time).toHaveValue('0');
+  expect(await downloadScene(page)).toEqual(authored);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(page.getByRole('status')).toContainText('Saved');
+  expect(failedAssets).toEqual([]);
+  expect(errors).toEqual([]);
+});

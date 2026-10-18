@@ -7,6 +7,7 @@ export type {
   ActorMovementOutcome,
   ActorMovementResult,
   ActorMovementSnapshot,
+  ActorMovementStatus,
 } from './ActorMovement.js';
 export { Bone } from './Bone.js';
 export { Choreography, type ChoreographyPlan, type ChoreographyCoordinationResult } from './Choreography.js';
@@ -23,6 +24,7 @@ export {
 export * from './core.js';
 export type { PuppetOptions, SyncPoseOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
+export { SceneRunner, type SceneRunnerStatus, type SceneRunnerOptions, type SceneCue } from './SceneRunner.js';
 export {
   type CharacterTextureLoadOptions,
   CharacterTextureLimitError,

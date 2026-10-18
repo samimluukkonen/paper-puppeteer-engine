@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "name": "bow",
+  "duration": 1400,
+  "loop": false,
+  "tracks": {
+    "torso": [
+      {
+        "time": 0,
+        "rotation": 0
+      },
+      {
+        "time": 500,
+        "rotation": 0.55
+      },
+      {
+        "time": 900,
+        "rotation": 0.55
+      },
+      {
+        "time": 1400,
+        "rotation": 0
+      }
+    ],
+    "head": [
+      {
+        "time": 0,
+        "rotation": 0
+      },
+      {
+        "time": 500,
+        "rotation": 0.2
+      },
+      {
+        "time": 1400,
+        "rotation": 0
+      }
+    ]
+  }
+}

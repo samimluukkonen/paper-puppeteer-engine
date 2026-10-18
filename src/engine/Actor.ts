@@ -4,6 +4,7 @@ import {
   type ActorLocomotion,
   type ActorMoveOptions,
   type ActorMovementResult,
+  type ActorMovementStatus,
   type ActorWalkOptions,
 } from './ActorMovement.js';
 import type { Point } from './affineMath.js';
@@ -130,6 +131,11 @@ export class Actor {
     this.assertActive();
     this.movement.cancel();
     return this;
+  }
+
+  /** Latest request identity/outcome, available before its Promise continuation runs. */
+  get movementStatus(): ActorMovementStatus | undefined {
+    return this.movement.status;
   }
 
   get currentAnimation(): string | undefined {

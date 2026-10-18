@@ -28,6 +28,12 @@ export interface ActorWalkOptions extends ActorMoveOptions {
 
 export type ActorMovementOutcome = 'completed' | 'interrupted' | 'cancelled' | 'disposed';
 
+/** Synchronous ownership snapshot, independent of Promise continuation timing. */
+export interface ActorMovementStatus {
+  readonly requestId: number;
+  readonly status: 'moving' | ActorMovementOutcome;
+}
+
 export interface ActorMovementSnapshot {
   /** All points use the same parent coordinates as Actor.position. */
   readonly start: Readonly<Point>;
@@ -41,6 +47,7 @@ export type ActorMovementResult =
   | { readonly status: 'cancelled'; readonly movement?: never };
 
 interface MovementRequest {
+  readonly requestId: number;
   readonly start: Readonly<Point>;
   readonly destination: Readonly<Point>;
   readonly speed: number;
@@ -61,6 +68,12 @@ function point(x: number, y: number): Readonly<Point> {
 /** Internal movement policy; Puppet owns the only update loop and position. */
 export class ActorMovement {
   private current: MovementRequest | undefined;
+  private nextRequestId = 1;
+  private latest: ActorMovementStatus | undefined;
+
+  get status(): ActorMovementStatus | undefined {
+    return this.latest;
+  }
 
   constructor(private readonly puppet: Puppet) {}
 
@@ -94,6 +107,7 @@ export class ActorMovement {
     const start = this.position();
     return new Promise<ActorMovementResult>((resolve, reject) => {
       const request: MovementRequest = {
+        requestId: this.nextRequestId++,
         start,
         destination,
         speed,
@@ -102,6 +116,7 @@ export class ActorMovement {
         faceMovement: !!locomotion && options.faceMovement === true,
       };
       this.current = request;
+      this.latest = Object.freeze({ requestId: request.requestId, status: 'moving' });
       request.unsubscribeUpdate = this.puppet.onUpdate((delta) => this.update(request, delta));
       if (options.signal) {
         const signal = options.signal;
@@ -142,6 +157,7 @@ export class ActorMovement {
         if (this.current === request) {
           this.release(request);
           this.current = undefined;
+          this.latest = Object.freeze({ requestId: request.requestId, status: 'cancelled' });
         }
         reject(error);
       }
@@ -175,6 +191,7 @@ export class ActorMovement {
       // A host callback can throw after playback commits, before the constructor returns its controller.
       if (this.current === request) {
         this.current = undefined;
+        this.latest = Object.freeze({ requestId: request.requestId, status: 'cancelled' });
         this.release(request);
         if (
           playbackId !== undefined &&
@@ -262,6 +279,7 @@ export class ActorMovement {
     const request = this.current;
     if (!request) return;
     this.current = undefined;
+    this.latest = Object.freeze({ requestId: request.requestId, status });
     const ownsPlayback = request.controller?.isActive;
     const result = Object.freeze({
       status,

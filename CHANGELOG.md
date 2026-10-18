@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.4
+
+Add `SceneRunner` over the existing Actor/Puppet runtime with one delta-driven scene clock, exact authored action boundaries, concurrent movement, animation windows, facing and named cues. Add Scene Editor Play/Pause, Restart, Stop, speed, deterministic scrubbing and a collapsed runtime inspector. Seeking rebuilds isolated runtime instances from the initial snapshot, suppresses animation gameplay events and scene cues, and leaves scene data, character clips, saved state and Undo untouched. Detect interruption synchronously, settle waits on cancellation/disposal, and ignore obsolete requests after restart. Include a two-character encounter with bow/response clips, runtime regressions and local desktop browser coverage. Authored formats remain unchanged. See the [scene guide](docs/scene-editor.md).
+
 ## 0.9.3
 
 Add the visual Scene Editor timeline with Actor tracks, ruler/playhead, horizontal zoom/scroll, shared snapping, selection, drag/resize, duplicate/delete and collapsed React action properties. Scene format version 2 requires stable action IDs and explicit finite clip durations, with typed animation, movement, facing targets, wait and generic JSON cue declarations. Reject overlapping position/base-animation ownership and equal-time facing changes atomically; allow independent Actors and position-only movement alongside animation. Reuse snapshot history so one drag is one Undo; cancellation preserves Redo. Add a read-only future destination stage marker, timing/conflict/serialization/source-isolation tests and local desktop browser coverage. Scene playback remains deferred. Version-1 scene actions require explicit migration; character formats and Actor/Puppet APIs stay unchanged. See the [scene guide](docs/scene-editor.md).

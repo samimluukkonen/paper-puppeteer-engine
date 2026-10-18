@@ -1,4 +1,4 @@
-# Scene Editor: visual stage and action timeline (v0.9.3)
+# Scene Editor: stage, timeline and playback (v0.9.4)
 
 [All guides](../README.md#guides)
 
@@ -38,9 +38,33 @@ All authored times/durations are milliseconds; the UI displays seconds. Each act
 | `wait`      | Positive `duration`; hold/scheduling annotation. It does not freeze or override concurrent channels.                                                                                                                                                       | None.                                                                |
 | `cue`       | Nonempty `name`, optional JSON `payload`. Metadata/signals for application code, separate from animation-authored events. No built-in sound/dialogue/combat behavior.                                                                                      | None.                                                                |
 
-Movement uses explicit duration rather than storing both speed and duration. For a future v0.8 Actor adapter, travel speed is `worldDistance / (duration / 1000)` in world units per second; stationary movement is a timed hold. Sequential movements begin at the preceding destination; gaps retain position. Movement does not choose locomotion animations or change facing, so animation and facing actions may coexist with it. No pathfinding or transformed-parent runtime adapter is implemented here.
+Movement uses explicit duration rather than storing both speed and duration. The runtime Actor adapter computes travel speed as `worldDistance / (duration / 1000)` in world units per second; stationary movement is a timed hold. Sequential movements begin at the preceding destination; gaps retain position. Movement does not choose locomotion animations or change facing, so animation and facing actions may coexist with it. Parent transforms are included when calculating world distance. There is no pathfinding.
 
-Two overlapping movement clips, or two overlapping base-animation clips, for one Actor reject regardless of array order. Adjacent clips are valid. Different Actors act concurrently. Waits/cues are metadata and may overlap any channel. Facing markers are instantaneous signals, not sustained tracking. These are authored policies for a later runtime adapter; this release implements no scene playback engine.
+Two overlapping movement clips, or two overlapping base-animation clips, for one Actor reject regardless of array order. Adjacent clips are valid. Different Actors act concurrently. Waits/cues are metadata and may overlap any channel. Facing markers are instantaneous signals, not sustained tracking. The scene runner enforces these validated channel policies during playback and seeking.
+
+## Playback and scrubbing
+
+**Play** advances all Actors using Phaser's millisecond update delta. **Pause** freezes scene time, movement and animation together. **Restart** cancels the previous context and plays from zero; **Stop** restores the authored initial snapshot before time-zero actions and re-enables placement dragging. Playback speed scales the single shared scene clock. Completion holds final transforms and poses; Play from completion starts a fresh run.
+
+The ruler and numeric **Playhead (s)** field seek and pause, including while playing. Focusing the numeric field pauses before editing so clock updates cannot overwrite typed input. Seeking creates fresh Actor/Puppet instances from immutable initial data, then runs the same validated declarations up to the requested time. Updates split at every action start/end, including when a frame crosses several commands. End ownership releases before adjacent clips start; equal-time starts follow authored array order. There are no browser execution timers or asynchronous Promise barriers in the scheduler. Wait actions annotate an absolute interval; they do not delay unrelated declarations.
+
+Expand **Runtime preview** and select an Actor track to inspect its current position, facing, animation and clip time. Initial X/Y and appearance fields continue to describe authored data. Placement dragging is available after Stop; camera pan/zoom remain available during playback. Selection preserves playback; authored edits, Undo/Redo and scene switches cancel the old context and restore initial placement.
+
+Animation actions restart the existing base clip with their authored loop and speed overrides, with no implicit crossfade. A finite clip that completes before its window ends holds its terminal pose; a looping or longer clip stops at its window end and holds that pose until another animation action replaces it. Movement uses `Actor.moveTo` independently of animation; author a simultaneous walk clip when desired. Facing uses `Actor.setFacing` / `lookAt` at the scheduled time after all Actors reach that time. Initial animations use their ordinary clip settings. Scene completion stops remaining playback and settles runtime waits. Actor destruction/disposal, movement replacement/cancellation, and owned animation interruption halt future scheduling. Cleanup cancels only matching owned movement/playback IDs and preserves newer external commands. Old movement Promise continuations cannot affect a rebuilt context.
+
+Seeking suppresses named cues, authored animation events (including time zero and loop crossings) and legacy animation-completion callbacks. Playback retains runtime event ordering and completion semantics; resuming after seek delivers only future events/cues. Lifecycle settlement remains active so cancellation and disposal never strand waits. A seek discards previous instances, so runtime instance IDs and references are temporary. Shared character definitions, compiled clips and textures remain immutable and reusable. Playback and seeking create no scene commands, saved checkpoints, Undo entries or animation-file edits.
+
+### Runtime adapter
+
+`SceneRunner` is exported from the root and `/runtime` entries. Construct it with scene data and `createActor(data, depth)`, returning a fresh `Actor` with matching ID, an owned Puppet and `autoUpdate: false`. The runner validates/snapshots input and applies initial position, facing, optional skin/animation; the factory supplies the character's default skin and rendering depth. It owns and disposes these instances. Call `update(deltaMilliseconds)` once from the host Phaser update. Controls are `play`, `pause`, `restart`, `stop`, `seek`, `cancel`, `dispose` and `speed`; observations are `time`, `status`, `error` and the read-only `actors` map. `onCue` receives a detached named cue with actor/action IDs, exact scene time and optional payload during playback only.
+
+Supported seek input is the five declarative scene action types. Unknown action kinds, functions and conflicting channel ownership reject explicitly; missing animation assets report their action ID before any scene cue executes. Stateful choreography scripts, gameplay lifecycle/update listeners, animation state policies, queued commands and procedural IK target providers are unsupported in the isolated factory contract. Do not attach them and expect arbitrary-time reconstruction. Authored animation/IK tracks use the existing runtime evaluator and solver. `AnimationPlayer.setPreviewMode(true)` suppresses authored/legacy gameplay notifications during reconstruction while retaining lifecycle outcomes; it is not a sandbox for arbitrary host callbacks. `Actor.movementStatus` exposes synchronous request identity/outcome so scheduling detects interruption before Promise continuation timing can advance obsolete actions.
+
+### Two-character encounter
+
+Import the shipped [encounter scene](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/public/scenes/encounter.scene.json) into Scene Editor. Its companion manifest reuses the demo rig/artwork and adds ordinary bow/response clips without changing the demo character's animations. Actors start apart, walk toward the center from 0.5 to 2.5 s, face each other, Actor A bows from 2.7 to 4.1 s, then Actor B responds from 4.3 to 5.7 s. Scene duration is 6.5 s.
+
+Seek to 0.25 s (before movement), 1.5 s (mid-walk), 2.5 s (arrival), 3.4 s (bow), 5 s (response), and back to 1.5 s. A's X is -280, -195 and -110 before/during/after movement; B's X is 280, 195 and 110. Both remain at Y=120. Compare forward/backward seeks, pause/resume, restart during playback, and Stop. Download before/after to verify identical authored scene JSON.
 
 ## Authored contract
 
@@ -96,7 +120,7 @@ Without an asset catalog, validation checks reference syntax, actor ID uniquenes
 
 `stageCoordinates.ts` converts DOM coordinates through Phaser's camera and computes offset-preserving, optionally axis-constrained positions. Existing camera pan/zoom utilities are reused. Drag coordinates use the editors' six-decimal rounding; numeric inspector values retain authored precision. No engine module imports React or editor code, and no character rig, source package or animation track is modified by actor placement. Scene data/schema is now version 2. Version-1 scene documents reject with the existing unsupported-version error, rather than guessing ownership or the duration of an infinite loop. To migrate a scene, set `version: 2`, assign a unique `id` to every action, add explicit `duration`, `loop` and `speed` to animation actions, and replace face `facing` with `target: {type: 'direction', facing}`. Choose finite animation windows explicitly and resolve ownership conflicts before import. Character/rig/animation formats remain version 1.
 
-`SceneTimeline.tsx` owns session-only zoom, playhead, pointer capture and drag presentation. `timelineActions.ts` builds Actor tracks and adapts clip edges to the existing Animation Editor `resolveTimelineSnap`; ruler and time coordinates reuse `timeline.ts`. Animation-specific keyframe selection stays in that editor; scene selection uses stable action IDs in `SceneEditorDocument`, with no duplicated keyframe architecture. `SceneActionInspector.tsx` applies complete validated action updates, keeping draft form state separate from authored snapshots. The document uses the existing `SnapshotHistory` begin/end/cancel transactions for timeline and stage gestures.
+`SceneTimeline.tsx` owns session-only zoom, pointer capture and drag presentation; `SceneEditorPlayback` owns the shared runtime playhead. `timelineActions.ts` builds Actor tracks and adapts clip edges to the existing Animation Editor `resolveTimelineSnap`; ruler and time coordinates reuse `timeline.ts`. Animation-specific keyframe selection stays in that editor; scene selection uses stable action IDs in `SceneEditorDocument`, with no duplicated keyframe architecture. `SceneActionInspector.tsx` applies complete validated action updates, keeping draft form state separate from authored snapshots. The document uses the existing `SnapshotHistory` begin/end/cancel transactions for timeline and stage gestures.
 
 ## Verification
 
@@ -118,7 +142,7 @@ npm run check:version
 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts
 ```
 
-Deferred: runtime scene playback adapter, camera direction, dialogue, branching, physics and pathfinding. Automatic scene draft recovery is also deferred. This foundation introduces authored action declarations only; it does not execute them.
+Deferred: camera direction, dialogue, branching, physics, pathfinding and automatic scene draft recovery.
 
 ### v0.9.2 verification
 
@@ -159,3 +183,13 @@ Verified locally on 2026-10-18:
 - Existing document, placement and desktop browser workflows: eight passed across development and production. The new timeline workflow passed in both environments with `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts -g 'visual scene timeline' --timeout=60000` after correcting its dropdown selectors.
 
 Changed files for this milestone: `engine/SceneDefinition.ts` and public value exports; generated `schemas/scene.schema.json`; `SceneEditorDocument.ts`; new `SceneTimeline.tsx`, `timelineActions.ts` and `SceneActionInspector.tsx`; scene workspace/stage/bootstrap/styles; scene unit/browser tests; scene/schema/development guides, changelog and v0.9.3 package/standalone metadata. No scene playback engine or CI browser workflow was added.
+
+### v0.9.4 verification
+
+Verified locally on 2026-10-19:
+
+- `npm run typecheck`, `npm run check`, `npm run check:version` and `npm run build`: passed. Demo/library builds and renderer-independent Node entry checks passed; existing non-failing Lucide module-directive warnings remain.
+- `npm run test`: 181 files passed, 5 skipped; 3,173 tests passed, 56 skipped. The 27 new runtime/controller regressions cover deterministic stepping, scheduling, concurrent movement, animation speeds/loops/completion, facing, forward/backward seeking, reconstruction from different previous states, event/cue suppression, unchanged documents/history/character clips, cancellation/disposal, reentrant controls and newer-owner preservation.
+- `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts --timeout=90000`: 14 passed across development and production, including existing authoring/layout/history regressions and the encounter. The final encounter rerun also exercises complete playback at 2x speed against the final runtime build.
+
+The real encounter character is loaded through `CharacterLoader` in unit and browser verification. Before/during/after movement positions, the bow/response animation selections, pause/resume, restart, backward seek, completion and identical downloaded scene JSON are checked. The rendered bow was also inspected in a desktop screenshot. Numeric playhead focus pauses the clock before text editing. Browser checks remain local-only; no CI browser installation or dependency-audit configuration changed.

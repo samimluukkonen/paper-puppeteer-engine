@@ -1,13 +1,16 @@
 import Phaser from 'phaser';
 import { useLayoutEffect, useState } from 'react';
+import { Actor } from '../../engine/Actor.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
+import { Puppet } from '../../engine/Puppet.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
+import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { draggedPosition, stagePoint } from './stageCoordinates.js';
 
 type Point = { x: number; y: number };
@@ -36,6 +39,7 @@ class SceneStage extends Phaser.Scene {
   constructor(
     private readonly document: SceneEditorDocument,
     private readonly characters: SceneCharacterRegistry,
+    private readonly playback: SceneEditorPlayback,
     private readonly status: (message: string) => void,
   ) {
     super('SceneStage');
@@ -61,6 +65,21 @@ class SceneStage extends Phaser.Scene {
         .filter(Boolean)
         .join('\n');
       try {
+        this.playback.sync(
+          document,
+          document.actors.every((actor) => this.definitions.has(actor.character.manifest)),
+          (data, depth) => {
+            const definition = this.definitions.get(data.character.manifest);
+            if (!definition) throw new Error(`Character "${data.character.manifest}" is not loaded.`);
+            const puppet = new Puppet(this, { definition, autoUpdate: false, depth });
+            try {
+              return new Actor({ id: data.id, puppet, puppetOwnership: 'owned' });
+            } catch (error) {
+              puppet.destroy();
+              throw error;
+            }
+          },
+        );
         this.preview.sync(document, this.definitions);
       } catch (error) {
         message = error instanceof Error ? error.message : String(error);
@@ -86,6 +105,8 @@ class SceneStage extends Phaser.Scene {
           this.pan = { pointer: event.pointerId, x: event.clientX, y: event.clientY };
           return;
         }
+        // Runtime transforms are view-only. Stop returns to explicit initial-placement editing.
+        if (this.playback.previewing) return;
         const point = this.point(event);
         const selected = this.document.workingScene.actors.find((actor) => actor.id === this.document.selectedActorId);
         let id: string | null = null;
@@ -197,6 +218,7 @@ class SceneStage extends Phaser.Scene {
       unsubscribe();
       events.abort();
       cancel();
+      this.playback.dispose();
       this.preview.dispose();
       this.definitions.clear();
       this.requests.clear();
@@ -233,7 +255,10 @@ class SceneStage extends Phaser.Scene {
         }
       });
   }
-  update(): void {
+  update(_time: number, delta: number): void {
+    this.playback.update(delta);
+    for (const { actor } of this.preview.instances.values())
+      actor.puppet.container.setVisible(!this.playback.previewing);
     const camera = this.cameras.main;
     this.grid.clear();
     if (this.showGrid) {
@@ -252,7 +277,7 @@ class SceneStage extends Phaser.Scene {
       this.overlay.lineBetween(x - size, y, x + size, y).lineBetween(x, y - size, x, y + size);
     }
     const id = this.document.selectedActorId;
-    const actor = id && this.preview.instances.get(id)?.actor;
+    const actor = id && (this.playback.actors?.get(id) ?? this.preview.instances.get(id)?.actor);
     if (!actor) return;
     const { x, y } = actor.position;
     const bounds = actor.puppet.container.getBounds();
@@ -267,15 +292,17 @@ class SceneStage extends Phaser.Scene {
 export function SceneStageView({
   document,
   registry,
+  playback,
 }: {
   document: SceneEditorDocument;
   registry: SceneCharacterRegistry;
+  playback: SceneEditorPlayback;
 }) {
   const [error, setError] = useState('');
   const [stage, setStage] = useState<SceneStage>();
   const [grid, setGrid] = useState(true);
   useLayoutEffect(() => {
-    const scene = new SceneStage(document, registry, setError);
+    const scene = new SceneStage(document, registry, playback, setError);
     setStage(scene);
     const game = createEditorGame('scene-stage-canvas', scene, { width: 1000, height: 700 });
     const release = observePreview(window.document.querySelector<HTMLElement>('#scene-stage-canvas')!, game);
@@ -284,7 +311,7 @@ export function SceneStageView({
       document.cancelActorDrag();
       game.destroy(true);
     };
-  }, [document, registry]);
+  }, [document, registry, playback]);
   return (
     <>
       <div className="scene-stage-toolbar">

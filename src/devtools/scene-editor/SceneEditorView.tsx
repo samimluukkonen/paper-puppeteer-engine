@@ -7,6 +7,8 @@ import { SceneActionInspector } from './SceneActionInspector.js';
 import { SceneActorsPanel } from './SceneActorsPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
+import { SceneEditorPlayback } from './SceneEditorPlayback.js';
+import { ScenePlaybackInspector } from './ScenePlaybackInspector.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
 import { SceneWorkspaceLayoutController } from './SceneWorkspaceLayoutController.js';
@@ -64,6 +66,7 @@ export function SceneEditorView({
 }) {
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const scene = document.workingScene;
+  const [playback] = useState(() => new SceneEditorPlayback());
   const workspace = useRef<HTMLElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useLayoutEffect(() => {
@@ -199,7 +202,7 @@ export function SceneEditorView({
       <main ref={workspace} className="scene-workspace-body">
         <section className="scene-stage" aria-label="Scene stage">
           {scene ? (
-            <SceneStageView document={document} registry={registry} />
+            <SceneStageView document={document} registry={registry} playback={playback} />
           ) : (
             <div className="scene-empty-stage">
               <h2>No scene open</h2>
@@ -215,6 +218,11 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <ScenePlaybackInspector
+                key={`preview-${scene.id}`}
+                playback={playback}
+                actorId={document.selectedActorId}
+              />
               <SceneActionInspector key={`actions-${scene.id}`} scene={scene} document={document} registry={registry} />
               <SceneActorsPanel key={`actors-${scene.id}`} scene={scene} document={document} registry={registry} />
               <details>
@@ -255,7 +263,7 @@ export function SceneEditorView({
         />
         <section id="scene-timeline" className="scene-timeline" aria-label="Scene timeline">
           {scene ? (
-            <SceneTimeline key={scene.id} scene={scene} document={document} registry={registry} />
+            <SceneTimeline key={scene.id} scene={scene} document={document} registry={registry} playback={playback} />
           ) : (
             <p>Create a scene to arrange Actor actions.</p>
           )}

@@ -3,6 +3,7 @@ import { sceneActionDuration, type SceneActionDefinition } from '../../engine/Sc
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument, SceneActionInput } from './SceneEditorDocument.js';
+import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { buildSceneTracks, layoutSceneActions, snapSceneTime } from './timelineActions.js';
 
 type Drag = {
@@ -17,19 +18,23 @@ export function SceneTimeline({
   scene,
   document,
   registry,
+  playback,
 }: {
   scene: ReadonlyScene;
   document: SceneEditorDocument;
   registry: SceneCharacterRegistry;
+  playback: SceneEditorPlayback;
 }) {
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
+  useSyncExternalStore(playback.subscribe, playback.getSnapshot, playback.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const gesture = useRef<Drag | null>(null);
   const scrub = useRef<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(600);
   const [zoom, setZoom] = useState(1);
   const [snap, setSnap] = useState(true);
-  const [playhead, setPlayhead] = useState(0);
+  const playhead = playback.time;
+  const setPlayhead = (time: number): void => playback.seek(time);
   const [kind, setKind] = useState<SceneActionDefinition['type']>('animation');
   const width = Math.max(300, viewportWidth - 146) * zoom;
   const seconds = scene.duration / 1000;
@@ -84,6 +89,36 @@ export function SceneTimeline({
     <>
       <div className="scene-timeline-toolbar">
         <h2>Scene timeline</h2>
+        <button
+          type="button"
+          disabled={!playback.ready}
+          onClick={() => (playback.status === 'playing' ? playback.pause() : playback.play())}
+        >
+          {playback.status === 'playing' ? 'Pause' : 'Play'}
+        </button>
+        <button type="button" disabled={!playback.ready} onClick={() => playback.restart()}>
+          Restart
+        </button>
+        <button type="button" disabled={!playback.ready} onClick={() => playback.stop()}>
+          Stop
+        </button>
+        <label>
+          Speed
+          <select
+            aria-label="Scene playback speed"
+            value={playback.speed}
+            onChange={(event) => playback.setSpeed(Number(event.target.value))}
+          >
+            {[0.25, 0.5, 1, 1.5, 2].map((speed) => (
+              <option key={speed} value={speed}>
+                {speed}×
+              </option>
+            ))}
+          </select>
+        </label>
+        <span aria-label="Scene playback status">
+          {playback.status} · {(playhead / 1000).toFixed(2)} s
+        </span>
         <label>
           Action type
           <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
@@ -117,10 +152,12 @@ export function SceneTimeline({
           Playhead (s)
           <input
             type="number"
+            disabled={!playback.ready}
             min="0"
             max={seconds}
             step="any"
             value={Math.min(playhead, scene.duration) / 1000}
+            onFocus={() => playback.pause()}
             onChange={(event) => {
               const value = event.target.valueAsNumber * 1000;
               if (Number.isFinite(value)) setPlayhead(Math.max(0, Math.min(scene.duration, value)));
@@ -130,8 +167,16 @@ export function SceneTimeline({
       </div>
       <p className="workspace-caption">
         Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses snapping. Scroll
-        to pan. Stage shows initial placement.
+        to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing.
       </p>
+      {playback.error && (
+        <p role="alert" className="scene-errors">
+          {playback.error}{' '}
+          <button type="button" onClick={() => playback.retry()}>
+            Retry playback
+          </button>
+        </p>
+      )}
       <div
         ref={viewport}
         className="scene-timeline-viewport"

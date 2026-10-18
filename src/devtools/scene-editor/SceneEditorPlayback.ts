@@ -1,0 +1,125 @@
+import type { SceneRunnerOptions } from '../../engine/SceneRunner.js';
+import { SceneRunner } from '../../engine/SceneRunner.js';
+import type { ReadonlyScene } from './SceneEditorDocument.js';
+
+/** View-only playback session. Phaser binds the isolated Actor factory and supplies deltas.
+ * No document commands, history entries, or animation edits originate here.
+ */
+export class SceneEditorPlayback {
+  private runner: SceneRunner | undefined;
+  private source: ReadonlyScene | null = null;
+  private factory: SceneRunnerOptions['createActor'] | undefined;
+  private revision = 0;
+  private rate = 1;
+  private message = '';
+  private readonly listeners = new Set<() => void>();
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+  readonly getSnapshot = (): number => this.revision;
+  private notify(): void {
+    this.revision++;
+    // oxlint-disable-next-line unicorn/no-useless-spread -- Subscription changes apply to the next notification.
+    for (const listener of [...this.listeners]) listener();
+  }
+  get time(): number {
+    return this.runner?.time ?? 0;
+  }
+  get status(): string {
+    return this.runner?.status ?? 'loading';
+  }
+  get ready(): boolean {
+    return !!this.runner && this.runner.status !== 'disposed';
+  }
+  get error(): string {
+    return this.message;
+  }
+  get speed(): number {
+    return this.rate;
+  }
+  get previewing(): boolean {
+    return !!this.runner && this.runner.status !== 'stopped';
+  }
+  get actors() {
+    return this.previewing ? this.runner?.actors : undefined;
+  }
+
+  /** Selection notifications reuse the same immutable snapshot and keep playback running.
+   * Authored edits/switches reset playback to initial placement; incomplete assets disable it.
+   */
+  sync(source: ReadonlyScene | null, ready: boolean, createActor: SceneRunnerOptions['createActor']): void {
+    if (this.source === source && this.runner && ready) return;
+    if (this.source === source && !this.runner && !ready) return;
+    this.runner?.dispose();
+    this.runner = undefined;
+    this.source = source;
+    this.factory = createActor;
+    this.message = '';
+    if (source && ready)
+      this.command(() => {
+        this.runner = new SceneRunner(source, { createActor });
+        this.runner.speed = this.rate;
+        this.showAuthoring();
+      });
+    else this.notify();
+  }
+  private showAuthoring(): void {
+    if (this.runner?.status === 'stopped')
+      for (const actor of this.runner.actors.values()) actor.puppet.container.setVisible(false);
+  }
+  private command(operation: () => void): void {
+    this.message = '';
+    try {
+      operation();
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : String(error);
+    }
+    this.notify();
+  }
+  play(): void {
+    this.command(() => this.runner?.play());
+  }
+  pause(): void {
+    this.command(() => this.runner?.pause());
+  }
+  restart(): void {
+    this.command(() => this.runner?.restart());
+  }
+  stop(): void {
+    this.command(() => {
+      this.runner?.stop();
+      this.showAuthoring();
+    });
+  }
+  seek(time: number): void {
+    this.command(() => this.runner?.seek(time));
+  }
+  setSpeed(speed: number): void {
+    this.command(() => {
+      if (this.runner) this.runner.speed = speed;
+      this.rate = speed;
+    });
+  }
+  update(delta: number): void {
+    if (this.runner?.status !== 'playing') return;
+    this.command(() => {
+      this.runner!.update(delta);
+      if (this.runner!.error) throw this.runner!.error;
+    });
+  }
+  /** A failed preview can be retried after correcting/loading assets. */
+  retry(): void {
+    if (!this.source || !this.factory) return;
+    const source = this.source;
+    this.source = null;
+    this.sync(source, true, this.factory);
+  }
+  dispose(): void {
+    this.runner?.dispose();
+    this.runner = undefined;
+    this.source = null;
+    this.factory = undefined;
+    this.notify();
+  }
+}

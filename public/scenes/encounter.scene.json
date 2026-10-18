@@ -1,0 +1,125 @@
+{
+  "version": 2,
+  "id": "encounter",
+  "name": "Two-character encounter",
+  "duration": 6500,
+  "actors": [
+    {
+      "id": "a",
+      "character": {
+        "manifest": "../scenes/encounter/character.json"
+      },
+      "position": {
+        "x": -280,
+        "y": 120
+      },
+      "facing": "right",
+      "animation": "idle",
+      "skin": "default"
+    },
+    {
+      "id": "b",
+      "character": {
+        "manifest": "../scenes/encounter/character.json"
+      },
+      "position": {
+        "x": 280,
+        "y": 120
+      },
+      "facing": "left",
+      "animation": "idle",
+      "skin": "alternate"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-walk",
+      "actorId": "a",
+      "type": "animation",
+      "time": 500,
+      "duration": 2000,
+      "animation": "walk",
+      "loop": true,
+      "speed": 1
+    },
+    {
+      "id": "a-move",
+      "actorId": "a",
+      "type": "move",
+      "time": 500,
+      "duration": 2000,
+      "destination": {
+        "x": -110,
+        "y": 120
+      }
+    },
+    {
+      "id": "a-face",
+      "actorId": "a",
+      "type": "face",
+      "time": 2500,
+      "target": {
+        "type": "actor",
+        "actorId": "b"
+      }
+    },
+    {
+      "id": "b-walk",
+      "actorId": "b",
+      "type": "animation",
+      "time": 500,
+      "duration": 2000,
+      "animation": "walk",
+      "loop": true,
+      "speed": 1
+    },
+    {
+      "id": "b-move",
+      "actorId": "b",
+      "type": "move",
+      "time": 500,
+      "duration": 2000,
+      "destination": {
+        "x": 110,
+        "y": 120
+      }
+    },
+    {
+      "id": "b-face",
+      "actorId": "b",
+      "type": "face",
+      "time": 2500,
+      "target": {
+        "type": "actor",
+        "actorId": "a"
+      }
+    },
+    {
+      "id": "a-bow",
+      "actorId": "a",
+      "type": "animation",
+      "time": 2700,
+      "duration": 1400,
+      "animation": "bow",
+      "loop": false,
+      "speed": 1
+    },
+    {
+      "id": "b-respond",
+      "actorId": "b",
+      "type": "animation",
+      "time": 4300,
+      "duration": 1400,
+      "animation": "respond",
+      "loop": false,
+      "speed": 1
+    },
+    {
+      "id": "greeting-finished",
+      "actorId": "b",
+      "type": "cue",
+      "time": 5700,
+      "name": "greeting-finished"
+    }
+  ]
+}

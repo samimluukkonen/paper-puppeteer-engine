@@ -107,6 +107,16 @@ export class AnimationPlayer {
   private speed = 1;
   private paused = false;
   private disposed = false;
+  private previewMode = false;
+
+  /** Isolated preview reconstruction suppresses authored events and legacy completion
+   * callbacks. Lifecycle outcomes still settle runtime waits and ownership policies.
+   * Preview contexts must not install gameplay lifecycle listeners or scripted queues.
+   */
+  setPreviewMode(enabled: boolean): void {
+    this.assertActive();
+    this.previewMode = enabled;
+  }
 
   constructor(
     private readonly rig: Rig,
@@ -396,7 +406,7 @@ export class AnimationPlayer {
       return;
     }
     if (select) this.assertWaitable(clip);
-    const events = collectAnimationStartEvents(clip, layerName, this.eventListeners.size);
+    const events = this.previewMode ? [] : collectAnimationStartEvents(clip, layerName, this.eventListeners.size);
     if (layerName === 'base' && !fromQueue) this.discardQueue();
     preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
@@ -563,7 +573,7 @@ export class AnimationPlayer {
     const eventBudget = new AnimationEventBudget('restart');
     const events: FiredAnimationEvent[] = [];
     for (const [name, layer] of this.layers) {
-      if (!layer.state) continue;
+      if (!layer.state || this.previewMode) continue;
       eventBudget.addStartEvents(layer.state.clip, this.eventListeners.size);
       for (const event of collectAnimationStartEvents(layer.state.clip, name, this.eventListeners.size))
         events.push(event);
@@ -723,7 +733,7 @@ export class AnimationPlayer {
       const state = layer.state;
       if (state?.playing) {
         const end = advanceAnimationTime(state, delta, this.speed);
-        eventBudget.addCrossings(state.clip, state.time, end, this.eventListeners.size);
+        if (!this.previewMode) eventBudget.addCrossings(state.clip, state.time, end, this.eventListeners.size);
       }
       const source = layer.transition?.source;
       if (!layer.stopped && source && !(source instanceof Map) && source.playing)
@@ -789,7 +799,7 @@ export class AnimationPlayer {
     const previous = state.time;
     const end = advanceAnimationTime(state, delta, this.speed);
     if (end === previous) return;
-    if (layer && events) {
+    if (layer && events && !this.previewMode) {
       for (const event of collectAnimationEvents(state.clip, previous, end, layer)) events.push(event);
     }
     state.time = state.clip.loop ? wrapAnimationTime(state.clip, end) : end;
@@ -855,13 +865,16 @@ export class AnimationPlayer {
     preparePose?: () => void,
     synchronizePose?: () => void,
   ): void {
+    if (this.previewMode) {
+      events = [];
+    }
     const notifications: PlaybackNotification[] = [];
     for (const event of lifecycle) notifications.push({ kind: 'lifecycle', event });
     if (events.length) notifications.push({ kind: 'events', events });
     for (const event of completions) {
       notifications.push({ kind: 'lifecycle', event, completionPhase: 'immediate' });
       // Keep the legacy completion payload and its ordering after authored events.
-      notifications.push({ kind: 'complete', event: { clip: event.clip, layer: event.layer } });
+      if (!this.previewMode) notifications.push({ kind: 'complete', event: { clip: event.clip, layer: event.layer } });
     }
     const baseCompletion = completions.find((event) => event.layer === 'base');
     if (baseCompletion)

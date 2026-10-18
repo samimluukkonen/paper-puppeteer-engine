@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Engine release **0.9.3** supports the following authored JSON formats. Engine SemVer and JSON `version` fields are separate: upgrading the engine does not upgrade character files.
+Engine release **0.9.4** supports the following authored JSON formats. Engine SemVer and JSON `version` fields are separate: upgrading the engine does not upgrade character files.
 
 | Document                     | Supported version                | Required fields                                                          | Optional fields                                                                   |
 | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |

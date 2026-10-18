@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "encounter-puppet",
+  "rig": "../../characters/demo-puppet/rig.json",
+  "defaultSkin": "default",
+  "skins": {
+    "default": "../../characters/demo-puppet/skins/default.json",
+    "alternate": "../../characters/demo-puppet/skins/alternate.json",
+    "helmet-only": "../../characters/demo-puppet/skins/helmet-only.json"
+  },
+  "animations": [
+    "../../characters/demo-puppet/animations/idle.json",
+    "../../characters/demo-puppet/animations/walk.json",
+    "bow.json",
+    "respond.json"
+  ],
+  "poses": ["../../characters/demo-puppet/poses/combat-ready.json"],
+  "textures": {
+    "paper-pelvis": "../../characters/demo-puppet/images/paper-pelvis.png",
+    "paper-armor-pelvis": "../../characters/demo-puppet/images/paper-armor-pelvis.png",
+    "paper-torso": "../../characters/demo-puppet/images/paper-torso.png",
+    "paper-armor-torso": "../../characters/demo-puppet/images/paper-armor-torso.png",
+    "paper-head": "../../characters/demo-puppet/images/paper-head.png",
+    "paper-helmet-head": "../../characters/demo-puppet/images/paper-helmet-head.png",
+    "paper-left-upper-arm": "../../characters/demo-puppet/images/paper-left-upper-arm.png",
+    "paper-left-forearm": "../../characters/demo-puppet/images/paper-left-forearm.png",
+    "paper-left-hand": "../../characters/demo-puppet/images/paper-left-hand.png",
+    "paper-right-upper-arm": "../../characters/demo-puppet/images/paper-right-upper-arm.png",
+    "paper-right-forearm": "../../characters/demo-puppet/images/paper-right-forearm.png",
+    "paper-right-hand": "../../characters/demo-puppet/images/paper-right-hand.png",
+    "paper-left-thigh": "../../characters/demo-puppet/images/paper-left-thigh.png",
+    "paper-left-shin": "../../characters/demo-puppet/images/paper-left-shin.png",
+    "paper-left-foot": "../../characters/demo-puppet/images/paper-left-foot.png",
+    "paper-right-thigh": "../../characters/demo-puppet/images/paper-right-thigh.png",
+    "paper-right-shin": "../../characters/demo-puppet/images/paper-right-shin.png",
+    "paper-right-foot": "../../characters/demo-puppet/images/paper-right-foot.png",
+    "paper-right-grip-hand": "../../characters/demo-puppet/images/paper-right-grip-hand.png",
+    "paper-kabuto": "../../characters/demo-puppet/images/paper-kabuto.png",
+    "paper-slot-katana": "../../characters/demo-puppet/images/paper-slot-katana.png"
+  }
+}
