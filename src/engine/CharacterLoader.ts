@@ -33,6 +33,22 @@ export interface CharacterLoadOptions extends JsonWorkloadLimitOptions {
   pathPolicy?: (path: string, field: string) => void;
 }
 
+/** Bound raw collections before schema validation can allocate an issue for every malformed entry. */
+function assertManifestResourceLimit(input: unknown, maxResources: number): void {
+  if (input === null || typeof input !== 'object') return;
+  // Count the manifest and rig, plus every reference rather than just unique paths.
+  let count = 2;
+  for (const field of ['skins', 'animations', 'poses', 'textures'] as const) {
+    const entries: unknown = Object.getOwnPropertyDescriptor(input, field)?.value;
+    if (field === 'animations' || field === 'poses') {
+      if (Array.isArray(entries)) count += entries.length;
+    } else if (entries !== null && typeof entries === 'object' && !Array.isArray(entries)) {
+      count += Object.keys(entries).length;
+    }
+    if (count > maxResources) throw new JsonInputLimitError(`Character exceeds the ${maxResources}-resource limit.`);
+  }
+}
+
 /** Fetches only JSON metadata. Image decoding/loading belongs to Phaser or the host. */
 export const CharacterLoader = {
   async load(
@@ -117,20 +133,11 @@ export const CharacterLoader = {
         }
       };
       const { data: manifestData, url: manifestUrl } = await read(requestedUrl);
+      assertManifestResourceLimit(manifestData, limits.maxResources);
       const manifest = characterManifestSchema.parse(manifestData);
       const paths = [
         ...new Set([manifest.rig, ...Object.values(manifest.skins), ...manifest.animations, ...(manifest.poses ?? [])]),
       ];
-      // Bound references as well as unique requests: repeated paths must not
-      // amplify later validation/cloning while bypassing the resource budget.
-      const resourceCount =
-        2 +
-        Object.keys(manifest.skins).length +
-        manifest.animations.length +
-        (manifest.poses?.length ?? 0) +
-        Object.keys(manifest.textures).length;
-      if (resourceCount > limits.maxResources)
-        throw new JsonInputLimitError(`Character exceeds the ${limits.maxResources}-resource limit.`);
       if (options.pathPolicy) {
         const references: [string, string][] = [
           ['rig', manifest.rig],

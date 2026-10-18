@@ -1,5 +1,6 @@
 import { assert, expect, test, vi } from 'vitest';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
+import { JsonInputLimitError } from '../src/engine/jsonInput.js';
 import { requestUrl } from './helpers/requestUrl.js';
 
 const url = 'https://example.test/character.json';
@@ -245,6 +246,34 @@ test('repeated metadata paths cannot amplify assembly past the resource budget',
     .mockResolvedValue(Response.json({ ...manifest, animations: Array.from({ length: 10 }, () => 'idle.json') }));
   await expect(CharacterLoader.load(url, fetcher, { maxResources: 4 })).rejects.toThrow(/4-resource limit/);
   assert.equal(fetcher.mock.calls.length, 1);
+});
+
+test.each(['skins', 'animations', 'poses', 'textures'] as const)(
+  'oversized malformed manifest %s are rejected before per-entry validation',
+  async (field) => {
+    const entries = Array.from({ length: 500 }, () => 0);
+    const collection =
+      field === 'animations' || field === 'poses'
+        ? entries
+        : Object.fromEntries(entries.map((value, index) => [`entry${index}`, value]));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ...manifest, [field]: collection }));
+    await expect(CharacterLoader.load(url, fetcher, { maxResources: 4 })).rejects.toThrow(JsonInputLimitError);
+    assert.equal(fetcher.mock.calls.length, 1);
+  },
+);
+
+test('raw manifest resource limits count collections together and allow the exact boundary', async () => {
+  const metadata: Record<string, unknown> = {
+    ...files,
+    'character.json': { ...manifest, poses: ['pose.json'], textures: { body: 'body.png' } },
+    'pose.json': { version: 1, name: 'rest', bones: {} },
+  };
+  const fetcher = vi.fn<typeof fetch>(async (input) =>
+    Response.json(metadata[new URL(requestUrl(input)).pathname.slice(1)]),
+  );
+  await expect(CharacterLoader.load(url, fetcher, { maxResources: 5 })).rejects.toThrow(/5-resource limit/);
+  assert.equal(fetcher.mock.calls.length, 1);
+  assert.equal((await CharacterLoader.load(url, fetcher, { maxResources: 6 })).id, 'test');
 });
 
 test.each([{}, { body: 'body.png', arm: 'arm.png' }])(
