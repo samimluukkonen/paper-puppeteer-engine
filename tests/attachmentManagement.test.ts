@@ -209,6 +209,37 @@ test('new embedded skins export even when the source rig omitted skins; recovery
   assert.isTrue(restored.dirty);
 });
 
+test('hierarchy, artwork and transform commands share one undo history and recovery snapshot', () => {
+  const state = stateFixture();
+  const initial = state.workingCopy;
+  state.createBone('prop', 'root');
+  state.createSlot('prop-art', 'prop');
+  state.createAttachment({ id: 'prop-sprite', texture: 'helmet.png' });
+  state.createSkin('custom');
+  state.assignAttachment('prop-art', 'prop-sprite');
+  state.editBone('prop', 'x', 12);
+  const edited = state.workingCopy;
+  assert.equal(state.historyLength, 6);
+  assert.throws(() => state.removeSlot('prop-art'), /skin "custom"/);
+  assert.throws(() => state.removeAttachment('prop-sprite'), /custom\/prop-art/);
+  assert.strictEqual(state.workingCopy, edited);
+  assert.equal(state.historyLength, 6);
+
+  for (let index = 0; index < 6; index++) assert.isTrue(state.undo());
+  assert.deepEqual(state.workingCopy, initial);
+  assert.isFalse(state.dirty);
+  assert.isFalse(state.canUndo);
+  for (let index = 0; index < 6; index++) assert.isTrue(state.redo());
+  assert.deepEqual(state.workingCopy, edited);
+
+  const restored = stateFixture();
+  assert.isTrue(restored.restoreDraft(JSON.parse(JSON.stringify(state.createRecoveryDraft()))));
+  assert.equal(restored.historyLength, 1);
+  assert.deepEqual(restored.workingCopy, edited);
+  assert.isTrue(restored.undo());
+  assert.deepEqual(restored.workingCopy, initial);
+});
+
 test('missing assets report errors without deleting authored references and block export', () => {
   const state = new RigEditorState(new Rig(definition), undefined, {
     artworkIssue: () => 'Missing texture. Update character.json.',

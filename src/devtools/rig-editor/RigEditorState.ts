@@ -1,4 +1,3 @@
-import { serializeSkinDefinition } from '../../engine/authoredSerialization.js';
 import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import {
   RIG_FORMAT_VERSION,
@@ -19,7 +18,6 @@ import {
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Rig } from '../../engine/Rig.js';
-import { identifierSchema, spriteAttachmentSchema } from '../../engine/schemas.js';
 import type {
   BoneDefinition,
   JointTransform,
@@ -34,8 +32,10 @@ import { boneHierarchy, sameRigTopology } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { RigArtworkCommands, type RigArtworkUpdate } from './RigArtworkCommands.js';
 import { inspectRigDraft, type RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
 import { serializeRigData, serializeRigJson } from './rigSerialization.js';
+import { RigStructureCommands } from './RigStructureCommands.js';
 
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
@@ -125,6 +125,8 @@ export class RigEditorState {
   private cachedIssues: readonly ValidationIssue[] | undefined;
   private validationDirty = true;
   private readonly history: SnapshotHistory<HistoryEntry>;
+  private readonly structureCommands: RigStructureCommands;
+  private readonly artworkCommands: RigArtworkCommands;
   private readonly childDirections = new Map<string, { x: number; y: number }>();
   private readonly children = new Map<string, string[]>();
   private readonly boneIndices = new Map<string, number>();
@@ -175,6 +177,17 @@ export class RigEditorState {
     assertJsonExportSize(this.exportCandidate());
     this.saved = this.initialCopy;
     this.cachedDirty = false;
+    this.structureCommands = new RigStructureCommands(this, {
+      install: (candidate, renamed) => this.installStructure(candidate, renamed),
+      hasBone: (id) => this.boneIndices.has(id),
+      hasSlot: (id) => this.slotIndices.has(id),
+      boneReferences: (id) => this.boneReferences?.(id) ?? [],
+    });
+    this.artworkCommands = new RigArtworkCommands(this, {
+      install: (update) => this.installArtwork(update),
+      hasAttachment: (id) => this.attachmentIndices.has(id),
+      assertArtwork: (attachment) => this.assertArtwork(attachment),
+    });
   }
 
   get dirty(): boolean {
@@ -609,87 +622,45 @@ export class RigEditorState {
     return value ?? undefined;
   }
   createAttachment(input: unknown): void {
-    const attachment = spriteAttachmentSchema.strict().parse(input);
-    if (/^(blob:|__paper_artwork_)/.test(attachment.texture))
-      throw new Error('Choose a stable character texture key, not a temporary preview texture.');
-    if (this.attachmentIndices.has(attachment.id)) throw new Error(`Duplicate attachment ID "${attachment.id}".`);
-    this.assertArtwork(attachment);
-    this.endOperation();
-    this.change(() => {
-      this.data.attachments = [...(this.data.attachments ?? []), freezeData(attachment)];
-      this.rebuildIndexes();
-    });
+    this.artworkCommands.createAttachment(input);
   }
   removeAttachment(id: string): void {
-    this.getAttachment(id);
-    const references = [...(this.data.skins ?? []), ...this.externalSkins].flatMap((skin) =>
-      Object.entries(skin.slots)
-        .filter(([, value]) => value === id)
-        .map(([slot]) => `${skin.name}/${slot}`),
-    );
-    if (references.length)
-      throw new Error(`Attachment "${id}" is used by ${references.join(', ')}. Clear or replace these mappings first.`);
-    this.endOperation();
-    this.change(() => {
-      this.data.attachments = this.data.attachments!.filter((entry) => entry.id !== id);
-      this.rebuildIndexes();
-    });
+    this.artworkCommands.removeAttachment(id);
   }
   createSkin(name: string): void {
-    identifierSchema.parse(name);
-    if (this.skins.some((skin) => skin.name === name)) throw new Error(`Duplicate skin name "${name}".`);
-    this.endOperation();
-    this.change(() => {
-      this.data.skins = [...(this.data.skins ?? []), freezeData({ version: 1 as const, name, slots: {} })];
-    });
+    this.artworkCommands.createSkin(name);
     this.selectedSkin = name;
   }
   renameSkin(name: string, next: string): void {
-    const skin = this.getSkin(name);
-    identifierSchema.parse(next);
-    if (name === next) return;
-    if (name === this.defaultSkin || this.isStandaloneSkin(name))
-      throw new Error('This skin name is referenced by the character manifest. Create a new skin to use another name.');
-    if (this.skins.some((entry) => entry.name === next)) throw new Error(`Duplicate skin name "${next}".`);
-    this.endOperation();
-    this.change(() => {
-      this.data.skins = this.data.skins!.map((entry) =>
-        entry.name === name ? freezeData({ ...skin, name: next }) : entry,
-      );
-    });
+    this.artworkCommands.renameSkin(name, next);
     if (this.selectedSkin === name) this.selectedSkin = next;
   }
   /** Undefined removes an override (inherit); null explicitly hides the slot. */
   assignAttachment(slot: string, attachment: string | null | undefined, skin = this.activeSkin): void {
-    this.getSlot(slot);
-    if (attachment !== null && attachment !== undefined) this.assertArtwork(this.getAttachment(attachment));
-    const original = this.getSkin(skin);
-    const slots = { ...original.slots };
-    if (attachment === undefined) delete slots[slot];
-    else
-      Object.defineProperty(slots, slot, { value: attachment, enumerable: true, configurable: true, writable: true });
-    const next = freezeData({ ...original, slots });
-    checkSkinReferences([next], this.workingCopy, throwValidationIssue);
-    this.endOperation();
-    this.change(() => {
-      if (this.isStandaloneSkin(skin))
-        this.externalSkins = freezeData(this.externalSkins.map((entry) => (entry.name === skin ? next : entry)));
-      else this.data.skins = this.data.skins!.map((entry) => (entry.name === skin ? next : entry));
-    });
+    this.artworkCommands.assignAttachment(slot, attachment, skin);
   }
   exportSkinJson(name: string, saveBaseline = true): string {
     this.endOperation();
-    const skin = this.getSkin(name);
-    checkSkinReferences([skin], this.workingCopy, throwValidationIssue);
-    for (const id of Object.values(skin.slots)) if (id !== null) this.assertArtwork(this.getAttachment(id));
-    assertJsonExportSize(skin);
-    const json = serializeSkinDefinition(skin, this.workingCopy);
+    const json = this.artworkCommands.exportSkinJson(name);
     if (saveBaseline && this.isStandaloneSkin(name)) {
-      this.savedExternalSkins.set(name, skin);
+      this.savedExternalSkins.set(name, this.getSkin(name));
       this.cachedDirty = undefined;
       this.cachedRigDirty = undefined;
     }
     return json;
+  }
+
+  /** All artwork commands commit through the same snapshot/history boundary as joint and hierarchy edits. */
+  private installArtwork(update: RigArtworkUpdate): void {
+    this.endOperation();
+    this.change(() => {
+      if (update.attachments !== undefined) {
+        this.data.attachments = [...update.attachments];
+        this.rebuildIndexes();
+      }
+      if (update.skins !== undefined) this.data.skins = [...update.skins];
+      if (update.standaloneSkins !== undefined) this.externalSkins = freezeData(update.standaloneSkins);
+    });
   }
   private assertArtwork(attachment: SpriteAttachmentDefinition): void {
     const issue = this.artworkIssue?.(attachment.texture, attachment.frame);
@@ -776,98 +747,31 @@ export class RigEditorState {
   }
 
   createBone(id: string, parent = this.selection?.type === 'bone' ? this.selection.id : this.data.root): void {
-    identifierSchema.parse(id);
-    if (this.boneIndices.has(id)) throw new Error(`Duplicate bone ID "${id}".`);
-    // New documents start with a single editable root; no character template is assumed.
-    const bone: BoneDefinition = this.data.bones.length
-      ? { id, parent: this.getBone(parent).id, y: this.getBone(parent).length ?? 40 }
-      : { id };
-    this.installStructure({
-      ...this.workingCopy,
-      root: this.data.bones.length ? this.data.root : id,
-      bones: [...this.data.bones, bone],
-    });
-    this.selectBone(id);
+    this.structureCommands.createBone(id, parent);
   }
 
-  /** Dependencies are reported before destructive changes; nothing is cascaded or silently removed. */
   boneDependencies(id: string): readonly string[] {
-    this.getBone(id);
-    return [
-      ...this.childrenOf(id).map((child) => `child bone "${child}"`),
-      ...(this.data.slots ?? []).filter((slot) => slot.bone === id).map((slot) => `slot "${slot.id}"`),
-      ...(this.data.ik ?? [])
-        .filter((chain) => [chain.rootBone, chain.middleBone, chain.endBone].includes(id))
-        .map((chain) => `IK constraint "${chain.name}"`),
-      ...(this.getBone(id).sprite ? ['bone artwork'] : []),
-      ...(this.boneReferences?.(id) ?? []),
-    ];
+    return this.structureCommands.boneDependencies(id);
   }
 
   removeBone(id: string): void {
-    const references = this.boneDependencies(id);
-    if (id === this.data.root)
-      throw new Error('The rig requires a root bone. Rename it or remove its children individually.');
-    if (references.length)
-      throw new Error(
-        `Bone "${id}" is used by ${references.join(', ')}. Reparent children and remove dependent references first.`,
-      );
-    this.installStructure({ ...this.workingCopy, bones: this.data.bones.filter((bone) => bone.id !== id) });
+    this.structureCommands.removeBone(id);
   }
 
   renameBone(id: string, next: string): void {
-    this.getBone(id);
-    identifierSchema.parse(next);
-    if (id === next) return;
-    if (this.boneIndices.has(next)) throw new Error(`Duplicate bone ID "${next}".`);
-    // Stable animation and host IK references cannot be rewritten by the rig document.
-    const references = this.boneDependencies(id).filter(
-      (value) => !value.startsWith('child bone ') && !value.startsWith('slot '),
-    );
-    if (references.length)
-      throw new Error(`Bone "${id}" is used by ${references.join(', ')}. Remove these references before renaming.`);
-    this.installStructure(
-      {
-        ...this.workingCopy,
-        root: this.data.root === id ? next : this.data.root,
-        bones: this.data.bones.map((bone) => ({
-          ...bone,
-          id: bone.id === id ? next : bone.id,
-          ...(bone.parent === id ? { parent: next } : {}),
-        })),
-        slots: (this.data.slots ?? []).map((slot) => (slot.bone === id ? { ...slot, bone: next } : slot)),
-      },
-      { from: id, to: next },
-    );
-    this.selection = { type: 'bone', id: next };
+    this.structureCommands.renameBone(id, next);
   }
 
-  /** Local transforms are retained; the hierarchy change is visible immediately in bind preview. */
   reparentBone(id: string, parent: string): void {
-    const bone = this.getBone(id);
-    this.getBone(parent);
-    if (id === this.data.root) throw new Error('The root bone cannot have a parent.');
-    if (bone.parent === parent) return;
-    this.installStructure({
-      ...this.workingCopy,
-      bones: this.data.bones.map((entry) => (entry.id === id ? { ...entry, parent } : entry)),
-    });
+    this.structureCommands.reparentBone(id, parent);
   }
 
   createSlot(id: string, bone: string): void {
-    identifierSchema.parse(id);
-    this.getBone(bone);
-    if (this.slotIndices.has(id)) throw new Error(`Duplicate slot ID "${id}".`);
-    this.installStructure({ ...this.workingCopy, slots: [...(this.data.slots ?? []), { id, bone }] });
-    this.selectSlot(id);
+    this.structureCommands.createSlot(id, bone);
   }
 
   removeSlot(id: string): void {
-    this.getSlot(id);
-    const references = this.skins.filter((skin) => Object.hasOwn(skin.slots, id)).map((skin) => `skin "${skin.name}"`);
-    if (references.length)
-      throw new Error(`Slot "${id}" is used by ${references.join(', ')}. Remove these overrides first.`);
-    this.installStructure({ ...this.workingCopy, slots: this.data.slots!.filter((slot) => slot.id !== id) });
+    this.structureCommands.removeSlot(id);
   }
 
   private replaceBone(bone: BoneDefinition): void {
