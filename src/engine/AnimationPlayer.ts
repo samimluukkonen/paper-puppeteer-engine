@@ -427,10 +427,14 @@ export class AnimationPlayer {
     layer.stopped = false;
     select?.(layer.state, layerName);
     this.poseEvaluator.invalidate();
-    if (layerName === 'base' && !source) this.resetPose();
-    this.applyCurrentPose();
-    synchronizePose?.();
-    this.dispatchNotifications(events, [], lifecycle);
+    this.finishPoseChange(
+      () => {
+        if (layerName === 'base' && !source) this.resetPose();
+        this.applyCurrentPose();
+        synchronizePose?.();
+      },
+      () => this.dispatchNotifications(events, [], lifecycle),
+    );
   }
 
   /** Append a nonlooping base request. Idle playback starts synchronously, including while paused. */
@@ -579,9 +583,13 @@ export class AnimationPlayer {
       for (const event of collectAnimationStartEvents(layer.state.clip, name)) events.push(event);
     }
     this.poseEvaluator.invalidate();
-    this.applyCurrentPose();
-    synchronizePose?.();
-    this.dispatchNotifications(events, [], lifecycle);
+    this.finishPoseChange(
+      () => {
+        this.applyCurrentPose();
+        synchronizePose?.();
+      },
+      () => this.dispatchNotifications(events, [], lifecycle),
+    );
   }
   pause(): void {
     this.assertActive();
@@ -650,9 +658,13 @@ export class AnimationPlayer {
     if (layer) this.poseEvaluator.resetLayerProperties(layer);
     this.layers.delete(name);
     this.poseEvaluator.invalidate();
-    this.applyCurrentPose();
-    synchronizePose?.();
-    this.dispatchNotifications([], [], lifecycle);
+    this.finishPoseChange(
+      () => {
+        this.applyCurrentPose();
+        synchronizePose?.();
+      },
+      () => this.dispatchNotifications([], [], lifecycle),
+    );
   }
 
   /** Remove clip and layer state without changing registered clips. */
@@ -732,18 +744,22 @@ export class AnimationPlayer {
         layer.transition.elapsed = Math.min(layer.transition.duration, layer.transition.elapsed + delta);
       }
     }
-    this.applyCurrentPose();
-    try {
-      synchronizePose?.();
-    } finally {
-      for (const layer of this.layers.values()) {
-        if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
-          layer.transition = undefined;
-          this.poseEvaluator.invalidate();
+    this.finishPoseChange(
+      () => {
+        try {
+          this.applyCurrentPose();
+          synchronizePose?.();
+        } finally {
+          for (const layer of this.layers.values()) {
+            if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
+              layer.transition = undefined;
+              this.poseEvaluator.invalidate();
+            }
+          }
         }
-      }
-    }
-    this.dispatchNotifications(events, completions, [], preparePose, synchronizePose);
+      },
+      () => this.dispatchNotifications(events, completions, [], preparePose, synchronizePose),
+    );
     return true;
   }
 
@@ -815,6 +831,22 @@ export class AnimationPlayer {
       if (layer.state && !layer.state.outcome) lifecycle.push({ ...this.playbackStatus(layer.state, name), type });
     }
     this.dispatchNotifications([], [], lifecycle);
+  }
+
+  /** Committed playback outcomes must reach waits and queues even when rendering or IK fails. */
+  private finishPoseChange(synchronize: () => void, notify: () => void): void {
+    const errors: unknown[] = [];
+    try {
+      synchronize();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      notify();
+    } catch (error) {
+      errors.push(error);
+    }
+    throwNotificationErrors(errors, 'Animation pose synchronization and notifications failed.');
   }
 
   /** Queue lifecycle-driven requests, while retaining synchronous nested authored/legacy callbacks. */
