@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "id": "standalone-encounter",
+  "name": "Standalone encounter",
+  "duration": 3000,
+  "actors": [
+    {
+      "id": "hero",
+      "character": { "manifest": "character/character.json" },
+      "position": { "x": 180, "y": 400 },
+      "animation": "idle",
+      "skin": "default"
+    },
+    {
+      "id": "friend",
+      "character": { "manifest": "character/character.json" },
+      "position": { "x": 580, "y": 400 },
+      "animation": "idle",
+      "facing": "left"
+    }
+  ],
+  "actions": [
+    {
+      "id": "approach",
+      "type": "move",
+      "actorId": "hero",
+      "time": 0,
+      "duration": 1000,
+      "destination": { "x": 300, "y": 400 }
+    },
+    { "id": "greet", "type": "cue", "actorId": "hero", "time": 1000, "name": "greeting" },
+    {
+      "id": "respond",
+      "type": "animation",
+      "actorId": "friend",
+      "time": 1000,
+      "duration": 1000,
+      "animation": "recover",
+      "loop": false,
+      "speed": 1
+    }
+  ]
+}

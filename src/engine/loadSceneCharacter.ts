@@ -12,6 +12,8 @@ import {
 
 export interface SceneCharacterLoadOptions
   extends Omit<CharacterTextureLoadOptions, 'timeoutMs'>, JsonWorkloadLimitOptions {
+  /** Cancel this metadata/artwork session without shutting down the host scene. */
+  signal?: AbortSignal;
   /** Already loaded immutable metadata, for local package/runtime hosts. */
   definition?: CharacterDefinition;
   /** Deadline for the entire artwork phase, including queueing and image decoding. Defaults to 30 seconds. */
@@ -82,6 +84,7 @@ export function loadSceneCharacter(
       settled = true;
       if (timer !== undefined) clearTimeout(timer);
       scene.events.off(Phaser.Scenes.Events.SHUTDOWN, onShutdown);
+      options.signal?.removeEventListener('abort', onAbort);
       scene.load.off(Phaser.Loader.Events.ADD, onAdd);
       scene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
       scene.load.off(Phaser.Loader.Events.FILE_COMPLETE, onFileComplete);
@@ -108,6 +111,8 @@ export function loadSceneCharacter(
       controller.abort();
       succeed();
     };
+    const onAbort = (): void =>
+      fail(options.signal?.reason ?? new DOMException('Character load aborted.', 'AbortError'));
     const onError = (file: Phaser.Loader.File): void => {
       if (file.type === 'image' && characterImages.has(file.key)) {
         failedImages.add(file.key);
@@ -146,7 +151,9 @@ export function loadSceneCharacter(
       else succeed(definition);
     };
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, onShutdown);
+    options.signal?.addEventListener('abort', onAbort, { once: true });
     const load = async (): Promise<void> => {
+      options.signal?.throwIfAborted();
       // Scene.create() runs before Phaser marks the scene active; check after fetching instead.
       // Authoring views reload frequently after replacing rig and animation files.
       definition = await (options.definition ??

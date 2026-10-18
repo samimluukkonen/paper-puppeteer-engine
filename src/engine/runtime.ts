@@ -40,3 +40,5 @@ export type {
   ArtworkAlignmentPolicy,
 } from './artworkReplacement.js';
 export { loadSceneCharacter, type SceneCharacterLoadOptions } from './loadSceneCharacter.js';
+
+export { SceneLoader, type SceneLoadOptions, type LoadedScene } from './SceneLoader.js';

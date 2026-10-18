@@ -9,6 +9,29 @@ import type { ValidationIssue } from './validation.js';
 export const SCENE_FORMAT_VERSION = 2;
 const sceneIdentifier = identifierSchema.regex(/\S/, 'Must contain a non-whitespace character.');
 
+/** Leading parent segments support scenes stored beside a characters directory. Reject
+ * encoded aliases, internal traversal and URL credentials before URL normalization. */
+function safeSceneManifest(value: string): boolean {
+  let path = value;
+  if (/^https?:\/\//.test(value)) {
+    try {
+      const url = new URL(value);
+      if (url.username || url.password) return false;
+      path = value.slice(value.indexOf('/', value.indexOf('//') + 2));
+    } catch {
+      return false;
+    }
+    path = path.replace(/^\//, '');
+  } else {
+    path = path.replace(/^(?:\.\.\/)+/, '');
+  }
+  return (
+    !/[\s%\\:?#]/.test(path) &&
+    !Array.from(path).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) &&
+    path.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
+  );
+}
+
 /** Stable manifest paths relative to the scene JSON, or permanent HTTP(S) URLs. No temporary URLs. */
 export const sceneCharacterReferenceSchema = z.strictObject({
   manifest: z
@@ -16,7 +39,8 @@ export const sceneCharacterReferenceSchema = z.strictObject({
     .regex(
       /^(?:https?:\/\/[^\s?#\\]+|(?!(?:[a-zA-Z][a-zA-Z\d+.-]*:|\/\/))[^\s:?#\\]+)\.json$/,
       'Use a stable character manifest JSON path or HTTP(S) URL without a query or fragment.',
-    ),
+    )
+    .refine(safeSceneManifest, 'Use a safe manifest path without encoded aliases or internal traversal.'),
 });
 
 export const sceneActorDefinitionSchema = z.strictObject({

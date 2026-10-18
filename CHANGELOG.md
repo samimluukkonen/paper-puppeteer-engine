@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.5
+
+Add dependency-checked Scene Editor validation, paste/file import, clipboard export and scene ZIP downloads. Reuse canonical version-2 scene serialization and the existing stored ZIP format; package each required character once and rebase shared hosted assets into safe archive paths. Add renderer-independent dependency/package APIs and an optional runtime `SceneLoader` over `SceneRunner`, with isolated ZIP texture keys, cancellation and disposal. Add a standalone authored-scene page, JSON/ZIP playback equivalence, import isolation, path and package regressions, and local desktop browser coverage. Scene and character format versions remain unchanged. See the [scene guide](docs/scene-editor.md).
+
 ## 0.9.4
 
 Add `SceneRunner` over the existing Actor/Puppet runtime with one delta-driven scene clock, exact authored action boundaries, concurrent movement, animation windows, facing and named cues. Add Scene Editor Play/Pause, Restart, Stop, speed, deterministic scrubbing and a collapsed runtime inspector. Seeking rebuilds isolated runtime instances from the initial snapshot, suppresses animation gameplay events and scene cues, and leaves scene data, character clips, saved state and Undo untouched. Detect interruption synchronously, settle waits on cancellation/disposal, and ignore obsolete requests after restart. Include a two-character encounter with bow/response clips, runtime regressions and local desktop browser coverage. Authored formats remain unchanged. See the [scene guide](docs/scene-editor.md).

@@ -1,5 +1,6 @@
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
+import { sceneCharacterAssetPath } from '../../engine/SceneAssets.js';
 import { sceneCharacterReferenceSchema } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 
@@ -17,8 +18,16 @@ export class SceneCharacterRegistry {
   private readonly listeners = new Set<() => void>();
   private revision = 0;
   constructor(
-    private readonly loadDefinition = (manifest: string, signal: AbortSignal) =>
-      CharacterLoader.load(manifest, fetch, { signal }),
+    private readonly loadDefinition = (manifest: string, signal: AbortSignal) => {
+      const url = new URL(manifest, globalThis.location?.href);
+      return CharacterLoader.load(url.href, fetch, {
+        signal,
+        pathPolicy: (path) => {
+          sceneCharacterAssetPath(path);
+        },
+        urlPolicy: (resource) => resource.origin === url.origin && !resource.search && !resource.hash,
+      });
+    },
   ) {}
 
   readonly subscribe = (listener: () => void): (() => void) => {

@@ -13,7 +13,7 @@ npm run build
 npm run dev
 ```
 
-`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.8.6.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
+`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.9.5.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
 
 The checked-in `public/character/` folder is an extracted character export. It includes an edited idle key, walk and sword events, authored and baked IK reach clips, finite attack/recovery clips and looping run, several skins/attachments, and helmet artwork replacing the default head. The root integration test re-exports its representative editor snapshot through the existing exporter and checks these files. The Node test loads this fixture using the installed `/core` API, checks motion/events and verifies every image exists.
 
@@ -48,3 +48,11 @@ See the [developer integration guide](../../docs/runtime-integration.md) and [ar
 Open `choreography.html` on the same server. Run Scene loads two instances of the shipped exported package, starts idle, walks them together concurrently, waits for both, faces them toward each other, plays `attack` then `recover`, returns to idle and disposes the scene resources. Run it again to repeat; Cancel Scene settles active actions and Clean Up destroys the game. `src/scriptedScene.ts` is a reusable runtime-only module matching `src/examples/choreography.ts` in the repository; package checks enforce this. Supply two manifest URLs and optional `{ idle, walk, action, response }` animation mappings for other packages. Shared textures remain host-owned.
 
 The local `test:browser` suite covers repeated completion, cancellation during walking and game shutdown, as well as the existing Puppet-only controls. See the repository production guide for coordinate, ownership and interruption contracts.
+
+## Authored scenes and scene ZIPs
+
+Open `scene.html`. The page loads `public/scene.json` through the public `SceneLoader`, resolves the exported character dependencies, constructs independent Actors and advances `SceneRunner` from Phaser's delta clock. Play, Pause, Stop and the time slider use the same runner as the editor. No React or editor code is loaded.
+
+Download a scene package ZIP from Scene Editor and choose **Open scene ZIP** here. The adapter validates the archive and all dependencies, creates temporary artwork URLs with private texture keys, and releases its Actors, URLs and private textures on replacement or shutdown. Hosted character textures remain shared and host-owned. You can also extract a ZIP under `public/my-scene/` and call `SceneLoader.load(scene, 'my-scene/scene.json')`, or load a hosted ZIP with `SceneLoader.loadPackage(scene, zipUrl)`.
+
+The Node tests package and reload the shipped scene using installed `/core` exports. The optional local desktop browser test loads JSON, opens the generated ZIP, seeks, plays through its cue and cleans up. Root `npm run test:package` builds this actual page against the packed library without checkout aliases.

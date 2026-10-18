@@ -464,6 +464,14 @@ export class SceneEditorDocument {
     if (!this.workingScene) throw new Error('No scene is selected.');
     return serializeSceneDefinition(this.parse(this.workingScene), this.validation);
   }
+  validateScene(): boolean {
+    try {
+      this.exportJson();
+      return this.success();
+    } catch (error) {
+      return this.reportError(error);
+    }
+  }
   /** Checkpoint the captured download only, even if selection/edits changed while it was being saved. */
   markSaved(snapshot: ReadonlyScene | null = this.workingScene): boolean {
     const entry = snapshot && this.entries.get(snapshot.id);

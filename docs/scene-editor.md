@@ -1,4 +1,4 @@
-# Scene Editor: stage, timeline and playback (v0.9.4)
+# Scene Editor: import, export, packaging and playback (v0.9.5)
 
 [All guides](../README.md#guides)
 
@@ -193,3 +193,51 @@ Verified locally on 2026-10-19:
 - `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts --timeout=90000`: 14 passed across development and production, including existing authoring/layout/history regressions and the encounter. The final encounter rerun also exercises complete playback at 2x speed against the final runtime build.
 
 The real encounter character is loaded through `CharacterLoader` in unit and browser verification. Before/during/after movement positions, the bow/response animation selections, pause/resume, restart, backward seek, completion and identical downloaded scene JSON are checked. The rendered bow was also inspected in a desktop screenshot. Numeric playhead focus pauses the clock before text editing. Browser checks remain local-only; no CI browser installation or dependency-audit configuration changed.
+
+## Scene transfer and dependency validation
+
+**Validate Scene**, **Copy Scene JSON** and **Download scene JSON** use the canonical `serializeSceneDefinition` serializer. Object keys are sorted, arrays preserve authored order, exact numeric values are retained, and output is indented JSON ending in a newline. The scene format stays at version 2; unsupported versions and unknown fields are rejected. Zoom, selection, layouts, preview handles and history never enter exported data. Safe, bounded filenames derive from the scene ID. Clipboard export requires browser clipboard access; a denied copy reports an error and leaves the document unchanged.
+
+**Paste scene JSON** and **Open scene JSON** parse bounded JSON and load every referenced character's metadata before registering a fresh immutable working copy. Character, skin and starting/scheduled animation references must resolve. A successful replacement resets selection, history and playback to the initial scene. Dirty replacements require the existing discard confirmation. Failed or cancelled imports retain the current scene, playback source, selections and history. Copies do not checkpoint a document; successful downloads checkpoint the captured snapshot, so edits made during dependency loading remain dirty.
+
+Character manifests are stable relative JSON references or permanent HTTP(S) URLs. For editor file/paste imports, relative references resolve from the editor page URL, since the browser cannot infer a selected local file's original hosting directory. For runtime JSON, references resolve from the scene JSON URL. Save JSON beside the corresponding hosted paths, adjust references explicitly, or use a scene ZIP for portability. Leading `../` paths remain supported for the shipped shared assets; encoded aliases, internal traversal, absolute asset paths, credentials, temporary URLs, queries and fragments are rejected. Hosted character metadata/artwork stays on its manifest's origin. A custom host cache is responsible for loading complete definitions; its authored paths are still checked.
+
+**Download scene package** collects only referenced character packages, deduplicates repeated character references and image aliases, and writes this existing character layout into the existing stored ZIP format:
+
+```text
+scene.json
+characters/character-1/character.json
+characters/character-1/rig.json
+characters/character-1/animations/...
+characters/character-1/skins/...
+characters/character-1/images/...
+```
+
+Shared hosted files outside a character folder are rebased under its `shared/` directory. Each character manifest and scene reference is rewritten in a detached package copy; working scenes and source characters are unchanged. Distinct character packages retain their own asset trees. Every archived character path is confined to its folder, and archive loading has no network fallback. Metadata, image presence/headers/dimensions, static frame support and existing ZIP limits are checked before download. Browser runtime image decoding uses the existing guarded artwork loader. Limits remain 256 files, 10 MiB per file and 100 MiB per archive, plus existing per-character image budgets and a 64-character dependency limit. ZIP encoding has no added dependency.
+
+Downloads create browser files; they do not modify repository files. Extract a scene ZIP for ordinary web hosting or pass its bytes to the runtime adapter. The editor imports scene JSON; the standalone runtime also accepts scene ZIPs.
+
+## Runtime scene loading
+
+Pure `/core` and `/serialization` exports include `resolveSceneDefinition`, `sceneAssetCatalog`, `buildScenePackage`, `validateScenePackage`, `encodePackageZip` and `decodePackageZip`. Dependency resolution returns an immutable scene snapshot and a map of complete `CharacterDefinition` values keyed by authored manifest references. These APIs do not import Phaser or React.
+
+The optional `/runtime` adapter constructs exclusively owned Actors using `autoUpdate: false` Puppets and the existing `SceneRunner`:
+
+```ts
+import { SceneLoader, type LoadedScene } from 'paper-puppeteer-engine/runtime';
+
+// In a host Phaser scene; keep this lease on the host instance.
+const loaded: LoadedScene = await SceneLoader.load(scene, sceneJsonUrl, {
+  signal: abortController.signal,
+  onCue: (cue) => console.log(cue.name),
+});
+loaded.runner.play();
+// From the host's update(_time, delta), once per frame:
+loaded.runner.update(delta);
+// On replacement or when finished:
+loaded.dispose();
+```
+
+`SceneLoader.fromDefinition` accepts an unknown authored value with a `baseUrl`; `SceneLoader.loadPackage` accepts a hosted ZIP URL, ZIP bytes or decoded file map. All variants preflight dependencies before constructing Actors and cancel on host shutdown or an external abort signal. The host owns the update clock. Seeks use existing reconstruction behavior and suppress cues/gameplay events. A ZIP lease owns isolated runtime texture aliases, temporary image URLs and its private textures, and releases them on disposal. Ordinary hosted character textures stay shared and host-owned. Puppet and Actor remain usable independently.
+
+See the [standalone example](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/README.md#authored-scenes-and-scene-zips) for the independently built consumer. `tests/scenePackaging.test.ts` and `tests/sceneLoader.test.ts` cover stable JSON/ZIP output, round trips, failures, source/working-copy isolation, playback/seek equivalence, cancellation and artwork cleanup. Desktop browser checks remain local-only.
