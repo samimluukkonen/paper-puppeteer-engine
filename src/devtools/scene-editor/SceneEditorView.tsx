@@ -3,7 +3,10 @@ import { readJsonFile } from '../../engine/jsonInput.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
+import { SceneActorsPanel } from './SceneActorsPanel.js';
+import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
+import { SceneStageView } from './SceneStage.js';
 import './style.css';
 
 function SceneProperties({ scene, document }: { scene: ReadonlyScene; document: SceneEditorDocument }) {
@@ -49,7 +52,13 @@ function SceneProperties({ scene, document }: { scene: ReadonlyScene; document: 
 }
 
 /** React owns the workspace. The document and authored format have no React or Phaser dependency. */
-export function SceneEditorView({ document }: { document: SceneEditorDocument }) {
+export function SceneEditorView({
+  document,
+  registry,
+}: {
+  document: SceneEditorDocument;
+  registry: SceneCharacterRegistry;
+}) {
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const scene = document.workingScene;
   const dialog = useRef<HTMLDialogElement>(null);
@@ -181,31 +190,30 @@ export function SceneEditorView({ document }: { document: SceneEditorDocument })
       )}
       <main className="scene-workspace-body">
         <section className="scene-stage" aria-label="Scene stage">
-          <div>
-            <h2>{scene ? 'Empty stage' : 'No scene open'}</h2>
-            <p>
-              {scene
-                ? 'Actor placement will be available in a later milestone.'
-                : 'Start a scene without loading a character.'}
-            </p>
-            {!scene && (
+          {scene ? (
+            <SceneStageView document={document} registry={registry} />
+          ) : (
+            <div className="scene-empty-stage">
+              <h2>No scene open</h2>
+              <p>Start a scene without loading a character.</p>
               <button type="button" onClick={openNew}>
                 Create a scene
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </section>
         <aside className="scene-inspector" aria-label="Scene inspector">
           <h2>Inspector</h2>
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <SceneActorsPanel key={`actors-${scene.id}`} scene={scene} document={document} registry={registry} />
               <details>
                 <summary>Document contents</summary>
                 <p>
                   {scene.actors.length} actors · {scene.actions.length} scheduled actions
                 </p>
-                <p>Imported actors and actions are preserved in downloads.</p>
+                <p>Actor array order controls preview depth. Actions are preserved in downloads.</p>
               </details>
             </>
           ) : (

@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.2
+
+Add the visual Scene Editor stage with existing Phaser/Puppet rendering, independent Actor instances, package selection and permanent custom manifest references. Add stage-coordinate dragging, axis handles, zoom/pan, an optional grid, collapsed actor inspectors, initial facing/skin/animation settings, duplication, removal and array-based preview depth. Group each drag into one undo transaction with Escape cancellation. Update action references on actor renames and require explicit removal of referenced actions. Cache character definitions/artwork for the page lifetime and dispose runtime instances on removal, scene switches and shutdown. Add placement, source-isolation, coordinate, resource-lifecycle and local desktop browser coverage. Timeline authoring and scene playback remain deferred; authored formats stay at version 1.
+
 ## 0.9.1
 
 Add the React [Scene Editor foundation](docs/scene-editor.md) at `/scene-editor/`: create, open, select, inspect, download, revert and undo/redo independent scene documents without loading a character. Introduce renderer-independent version-1 scene schemas, typed animation/facing action declarations, stable scene-local actor IDs and character manifest references, optional asset-catalog validation, bounded parsing and deterministic serialization. Preserve imported actors/actions while keeping stage placement, timeline editing and runtime playback deferred. Add document isolation, validation, history, checkpoint and local desktop browser regressions. Existing Actor/Puppet APIs and character formats remain unchanged.

@@ -1,4 +1,4 @@
-# Scene Editor foundation (v0.9.1)
+# Scene Editor: visual stage and actor placement (v0.9.2)
 
 [All guides](../README.md#guides)
 
@@ -8,7 +8,17 @@ Open **Scene Editor** in the application navigation, or visit `/scene-editor/`. 
 
 **Download scene JSON** validates and serializes authored data and marks the captured snapshot saved. Later edits remain dirty. **Revert** restores the original created/imported source with confirmation when dirty; it is undoable and does not replace the saved download checkpoint. Opening another document preserves drafts. Opening a document with the same ID replaces its source/history, with confirmation if that document is dirty, including when inactive. Invalid or canceled operations retain current data and history.
 
-The empty stage and scene timeline are placeholders. Imported actors/actions are retained and can be downloaded, but are not rendered, scheduled or executed in this milestone.
+## Visual stage
+
+Click **+ Add Actor**, choose a character from the same workspace catalog used by the character editors, and click **Add actor**. You can also enter a stable manifest path or HTTP(S) URL for any compatible package. The editor loads it with `CharacterLoader`; it does not rely on demo animation names, bone IDs or presentation profiles. Browser-only new-character identities have no permanent manifest yet; export and host their package before referencing them in a scene. Paths are resolved from the Scene Editor page during preview and from the saved scene location in a future host. Keep that base location consistent or use permanent absolute URLs.
+
+Expand **Scene actors** to select, duplicate, remove, or change preview depth with **Send backward** / **Bring forward**. Later actor-array entries draw in front. Each instance gets a scene-local ID independent of its character definition and animation names. Duplicate creates a separate instance offset by 32 stage units and does not copy scheduled actions. Renaming an actor updates its action references atomically. Removing an actor with actions asks explicitly whether to remove those actions too; cancellation preserves everything. Both operations are undoable.
+
+Click an actor's artwork or origin handle to select and drag it. The colored X/Y handles constrain a move to one axis. **Actor properties** provides ID/name, read-only character manifest reference, numeric initial X/Y, facing and supported animation/skin choices. Inspector sections start collapsed. Animation selection samples its first pose without advancing a scene clock; choosing **Bind pose** restores the rig's bind pose. Facing and skin use existing runtime APIs. Character defaults remain implicit until you choose an override.
+
+Coordinates are stage/world units: (0,0) starts at the viewport center, X increases rightward and Y downward. Canvas FIT scaling, camera zoom and camera scroll are converted before calculating drag offsets. Mouse wheel zooms around the pointer. Middle/right/Alt-drag pans; **Reset view** returns to the initial camera. The optional 32-unit grid, camera and selection are editor-only. One complete drag is one history entry. Escape, pointer cancellation or window blur restores the pre-drag snapshot without consuming history or losing Redo. Switching scenes also cancels unfinished moves.
+
+The timeline remains a placeholder. Imported actions are preserved and validated; they are not scheduled or executed.
 
 ## Authored contract
 
@@ -54,11 +64,13 @@ The renderer-independent `/core` and `/serialization` entries export:
 
 `/data` also exports `SceneDefinition`, `SceneActorDefinition`, `SceneActionDefinition`, `SceneCharacterReference`, `SceneCharacterAssets` and `SceneValidationOptions` as types. The action discriminated union currently contains only `animation` and `face`. Extending the format requires updating the union/schema and validation together, with normal format-version compatibility decisions.
 
-Without an asset catalog, validation checks reference syntax, actor ID uniqueness, document IDs, finite values, supported actions, action times and actor references. It performs no network I/O. Hosts can supply `characters: ReadonlyMap<string, SceneCharacterAssets>`, keyed by the exact authored manifest reference; values contain `animations` and `skins` name arrays. Then missing characters, starting animations/skins and scheduled animation names are also rejected. The foundation workspace uses structural validation and does not load referenced characters; existence is checked when a host supplies its asset catalog.
+Without an asset catalog, validation checks reference syntax, actor ID uniqueness, document IDs, finite values, supported actions, action times and actor references. It performs no network I/O. Hosts can supply `characters: ReadonlyMap<string, SceneCharacterAssets>`, keyed by the exact authored manifest reference; values contain `animations` and `skins` name arrays. Then missing characters, starting animations/skins and scheduled animation names are also rejected. The workspace retains structural document validation, resolves character definitions for the picker and preview, and reports asset-loading and unsupported initial-property errors in the stage. Hosts may still supply an asset catalog for strict offline document validation.
 
-`src/devtools/scene-editor/SceneEditorDocument.ts` is the editor-only document owner. It reuses `SnapshotHistory`, shared JSON equality/freezing and the existing unsaved navigation guard. `replaceScene` is the validated whole-document boundary for future authored actor/action commands. The React workspace subscribes through `useSyncExternalStore`, owns only form/dialog state, cancels stale file-import completions on unmount, and displays validation issues. No engine module imports editor or React code. `generateJsonSchemas` emits `schemas/scene.schema.json` alongside the existing format schemas.
+`src/devtools/scene-editor/SceneEditorDocument.ts` owns scene documents, actor selection, validated commands and drag transactions through the existing `SnapshotHistory`. React subscribes through `useSyncExternalStore`; `SceneActorsPanel` owns dialog/form state and ignores stale asynchronous Add completions after cancellation or scene changes. `SceneStageView` creates one Phaser game in a layout effect using the shared `createEditorGame` and `observePreview` conventions. React updates reconcile instances without rebuilding the game.
 
-The separate Vite HTML entry keeps scene creation independent of character loading and Phaser initialization. The shared header adds Scene Editor navigation from the demo and both character editors. Existing rig/animation shared-document navigation remains intact. Existing animation timeline conversion, selection and playback controllers were reviewed; the empty scene timeline has no clock or interactive ruler to reuse yet.
+`SceneCharacterRegistry` caches immutable metadata and concurrent requests, and aborts metadata loads on page teardown. `SceneStage` serializes artwork loads through `loadSceneCharacter`, which uses the existing texture queue, validation and shutdown cancellation. `SceneActorPreview` creates one owned `Actor`/`Puppet` pair per scene actor and applies position, facing, skin and initial pose through the existing runtime. Actors referencing one definition share immutable rig/compiled clips and textures while retaining separate pose buffers and playback state. It disposes removed/replaced actors immediately and all instances when switching scenes or shutting down. Texture ownership belongs to the game: shared artwork remains cached across removal/Undo and scene switches and is released by game destruction, never by an individual actor. Runtime texture-key conflicts are reported using the loader's existing contract.
+
+`stageCoordinates.ts` converts DOM coordinates through Phaser's camera and computes offset-preserving, optionally axis-constrained positions. Existing camera pan/zoom utilities are reused. Drag coordinates use the editors' six-decimal rounding; numeric inspector values retain authored precision. No engine module imports React or editor code, and no character rig, source package or animation track is modified by actor placement. Scene data/schema version stays at 1; actor array order already supplies preview depth without a new authored field.
 
 ## Verification and next milestone
 
@@ -80,21 +92,32 @@ npm run check:version
 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts
 ```
 
-Deferred to v0.9.2 or later: visual actor placement and character-resolution UI, timeline clip editing, runtime scene playback adapter, camera direction, dialogue, branching, physics and pathfinding. Automatic scene draft recovery is also deferred. This foundation introduces authored action declarations only; it does not execute them.
+Deferred: timeline clip editing, runtime scene playback adapter, camera direction, dialogue, branching, physics and pathfinding. Automatic scene draft recovery is also deferred. This foundation introduces authored action declarations only; it does not execute them.
 
-### Verified command results
+### v0.9.2 verification
 
-Local verification on 2026-10-18:
+Placement unit tests cover Add, duplicate/remove/reorder, action-reference safety, unique IDs, drag history/cancellation, independent scene histories, FIT/zoom/pan coordinate conversion, facing, skins, animation pose restoration, two instances of one arbitrary character definition, source isolation, registry cancellation, instance disposal and retained shared textures. Local desktop browser coverage extends the document workflow with two visible actors, initial properties, drag, Escape, Undo/Redo, duplicate/remove and scene switching without repeated character requests.
 
-| Command                                                                                                           | Result                                                                                  |
-| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `npm run typecheck`                                                                                               | Exit 0                                                                                  |
-| `npm run test`                                                                                                    | Exit 0; 178 files passed, 5 skipped; 3,126 tests passed, 56 skipped                     |
-| `npm run build`                                                                                                   | Exit 0; demo (including Scene Editor) and library built; Node entry-point checks passed |
-| `npm run check`                                                                                                   | Exit 0; formatting, lint and typecheck passed                                           |
-| `npm run check:version`                                                                                           | Exit 0; 0.9.1 package, lockfile, consumer reference and changelog agree                 |
-| `npm run test:package`                                                                                            | Exit 0; isolated package checks plus standalone tests/typecheck/build passed            |
-| `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts`                                 | Exit 0; 6 passed across development and production                                      |
-| `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sharedWorkspace.spec.ts -g 'fits desktop viewports'` | Exit 0; 6 passed across development and production                                      |
+Verified locally on 2026-10-18:
 
-Builds retain non-failing Lucide `use client` directive warnings; the standalone consumer also reports its existing large Phaser bundle warning. No browser or dependency-audit CI configuration was changed.
+| Command                                                                                                                       | Result                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `npm run typecheck`                                                                                                           | Exit 0                                                                      |
+| `npm run test`                                                                                                                | Exit 0; 179 files passed, 5 skipped; 3,134 tests passed, 56 skipped         |
+| `npm run build`                                                                                                               | Exit 0; demo and library built; Node entry-point checks passed              |
+| `npm run check`                                                                                                               | Exit 0; formatting, lint and typecheck passed                               |
+| `npm run check:version`                                                                                                       | Exit 0; v0.9.2 package, lockfiles, standalone reference and changelog agree |
+| `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts -g 'visual actor placement' --timeout=90000` | Exit 0; both development and production placement workflows passed          |
+
+The six existing document/navigation/desktop scenarios also passed across development and production. Placement assertions allow fractional-canvas-pixel tolerance while checking exact Undo/Redo and Escape restoration.
+
+Builds retain the existing non-failing Lucide module-directive warnings. Browser checks remain local-only, and no browser/dependency-audit CI configuration changed.
+
+### Changed files
+
+- `SceneEditorDocument.ts`: actor commands, selection, action-reference safety, preview order and drag transactions.
+- `SceneEditorView.tsx`, `SceneActorsPanel.tsx`, `main.tsx`, `style.css`: React workspace, collapsed inspectors, package picker and stage mount.
+- `SceneStage.tsx`, `stageCoordinates.ts`: Phaser canvas lifetime, camera/grid, selection, pointer capture and world-coordinate translation handles.
+- `SceneCharacterRegistry.ts`, `SceneActorPreview.ts`: cached metadata/artwork loading and independent owned Actor/Puppet previews.
+- `tests/sceneActorPlacement.test.ts`, `tests/browser/sceneEditor.spec.ts`: placement, lifecycle, isolation, coordinate and desktop workflow regressions.
+- `docs/development.md`, this guide, `CHANGELOG.md`, package/standalone manifests and lockfiles: architecture and v0.9.2 release metadata.

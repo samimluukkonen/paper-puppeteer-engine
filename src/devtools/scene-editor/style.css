@@ -7,19 +7,60 @@
   gap: 12px;
 }
 .scene-stage {
-  display: grid;
-  place-items: center;
-  text-align: center;
-  background-color: var(--bg-inset);
-  background-image:
-    linear-gradient(var(--border-default) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border-default) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-.scene-stage > div {
-  padding: 24px;
-  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-inset);
+}
+.scene-empty-stage {
+  margin: auto;
+  text-align: center;
+  padding: 24px;
+}
+.scene-stage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  font-size: 11px;
+}
+#scene-stage-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+#scene-stage-canvas canvas {
+  touch-action: none;
+}
+.scene-preview-error {
+  position: absolute;
+  bottom: 0;
+  background: var(--bg-inset);
+  padding: 8px;
+  color: var(--danger-fg);
+  max-height: 90px;
+  overflow: auto;
+}
+.scene-actor-list {
+  list-style: none;
+  padding: 0;
+}
+.scene-actor-list button {
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.scene-actor-list button[aria-pressed="true"] {
+  border-color: var(--accent-fg);
+}
+.scene-actor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .scene-inspector,
 .scene-timeline,
