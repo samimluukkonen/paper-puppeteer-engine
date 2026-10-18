@@ -44,6 +44,7 @@
     "build:demo": "vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json && node scripts/check-core.mjs",
     "prepack": "npm run check:version && npm run build:lib",
+    "pack:dist": "mkdir -p dist && npm pack --pack-destination dist",
     "preview": "vite preview",
     "schemas:generate": "node scripts/generate-schemas.mjs && oxfmt schemas",
     "check": "npm run format:check && npm run lint && npm run typecheck",
