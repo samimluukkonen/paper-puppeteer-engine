@@ -53,3 +53,25 @@ export {
 export { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError } from './jsonInput.js';
 export { DEFAULT_JSON_WORKLOAD_LIMITS } from './jsonWorkloadLimits.js';
 export type { JsonWorkloadLimitOptions } from './jsonWorkloadLimits.js';
+
+export type {
+  SceneDefinition,
+  SceneActorDefinition,
+  SceneActionDefinition,
+  SceneCharacterReference,
+  SceneCharacterAssets,
+  SceneValidationOptions,
+} from './SceneDefinition.js';
+export {
+  SCENE_FORMAT_VERSION,
+  SceneValidationError,
+  sceneDefinitionSchema,
+  sceneActorDefinitionSchema,
+  sceneActionDefinitionSchema,
+  sceneCharacterReferenceSchema,
+  createEmptyScene,
+  validateSceneDefinition,
+  parseSceneDefinition,
+  parseSceneJson,
+  serializeSceneDefinition,
+} from './SceneDefinition.js';

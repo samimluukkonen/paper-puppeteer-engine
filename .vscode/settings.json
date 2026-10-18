@@ -1,6 +1,10 @@
 {
   "json.schemas": [
     {
+      "fileMatch": ["/**/*.scene.json"],
+      "url": "./schemas/scene.schema.json"
+    },
+    {
       "fileMatch": ["/public/characters/**/character.json"],
       "url": "./schemas/character.schema.json"
     },

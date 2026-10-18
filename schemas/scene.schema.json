@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "allOf": [
+        {
+          "pattern": "^(?!__proto__$)[\\s\\S]+$"
+        },
+        {
+          "pattern": "\\S"
+        }
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "allOf": [
+        {
+          "pattern": "^(?!__proto__$)[\\s\\S]+$"
+        },
+        {
+          "pattern": "\\S"
+        }
+      ]
+    },
+    "duration": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "actors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "character": {
+            "type": "object",
+            "properties": {
+              "manifest": {
+                "type": "string",
+                "pattern": "^(?:https?:\\/\\/[^\\s?#\\\\]+|(?!(?:[a-zA-Z][a-zA-Z\\d+.-]*:|\\/\\/))[^\\s:?#\\\\]+)\\.json$"
+              }
+            },
+            "required": ["manifest"],
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "facing": {
+            "type": "string",
+            "enum": ["left", "right"]
+          },
+          "animation": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "skin": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          }
+        },
+        "required": ["id", "character", "position"],
+        "additionalProperties": false
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "animation"
+              },
+              "actorId": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "time": {
+                "type": "number",
+                "minimum": 0
+              },
+              "animation": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              }
+            },
+            "required": ["type", "actorId", "time", "animation"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "face"
+              },
+              "actorId": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "time": {
+                "type": "number",
+                "minimum": 0
+              },
+              "facing": {
+                "type": "string",
+                "enum": ["left", "right"]
+              }
+            },
+            "required": ["type", "actorId", "time", "facing"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": ["version", "id", "name", "duration", "actors", "actions"],
+  "additionalProperties": false,
+  "title": "Paper Puppeteer scene"
+}

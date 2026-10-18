@@ -63,7 +63,7 @@ export class AnimationValidationError extends Error {
 
 export class UnsupportedFormatVersionError extends Error {
   constructor(
-    readonly format: 'rig' | 'animation' | 'skin' | 'pose',
+    readonly format: 'rig' | 'animation' | 'skin' | 'pose' | 'scene',
     readonly version: unknown,
     readonly supportedVersion: number,
   ) {
@@ -92,7 +92,11 @@ export function shapeIssues(error: {
 }
 
 /** @internal Inspect only owned JSON version metadata, without invoking accessors. */
-export function inspectVersion(input: unknown, expected: number, format: 'rig' | 'animation' | 'skin' | 'pose') {
+export function inspectVersion(
+  input: unknown,
+  expected: number,
+  format: 'rig' | 'animation' | 'skin' | 'pose' | 'scene',
+) {
   const descriptor = isRecord(input) ? Object.getOwnPropertyDescriptor(input, 'version') : undefined;
   if (!descriptor)
     return {

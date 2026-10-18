@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.1
+
+Add the React [Scene Editor foundation](docs/scene-editor.md) at `/scene-editor/`: create, open, select, inspect, download, revert and undo/redo independent scene documents without loading a character. Introduce renderer-independent version-1 scene schemas, typed animation/facing action declarations, stable scene-local actor IDs and character manifest references, optional asset-catalog validation, bounded parsing and deterministic serialization. Preserve imported actors/actions while keeping stage placement, timeline editing and runtime playback deferred. Add document isolation, validation, history, checkpoint and local desktop browser regressions. Existing Actor/Puppet APIs and character formats remain unchanged.
+
 ## 0.8.6
 
 Complete v0.8 Actor/choreography production hardening: add a reusable two-character scene using the actual exported standalone package, with concurrent walks, barrier, facing, finite responses, idle return and cleanup on every exit. Add repeated-scene, queue/state/crossfade, event, live/baked IK, skin, transform and consumer browser regressions. Validate direct walk facing options consistently, remove temporary frozen movement points from frame updates and release completed sequence cue/target references and freeze pre-run cancellation/disposal results. Add optional measured one/two/twelve-Actor CPU profiles, the [production guide](docs/choreography-production.md) and [v0.8 release report](docs/release-notes-v0.8.md). Public Puppet APIs and version-1 authored formats remain compatible. No publishing, tags or remote release is part of this change.

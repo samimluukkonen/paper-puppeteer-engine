@@ -1,4 +1,4 @@
-import { Clapperboard, MonitorPlay, Network } from 'lucide-react';
+import { Clapperboard, LayoutTemplate, MonitorPlay, Network } from 'lucide-react';
 import packageInfo from '../../package.json';
 import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
@@ -29,6 +29,12 @@ const views = {
     path: 'animation-editor/',
     description: 'Loading character…',
     icon: Clapperboard,
+  },
+  scene: {
+    title: 'Scene Editor',
+    path: 'scene-editor/',
+    description: 'Create and manage scene documents.',
+    icon: LayoutTemplate,
   },
 } as const;
 
@@ -70,24 +76,31 @@ export function ViewHeader({
           <p className="view-description" id={view === 'animation' ? 'character-status' : undefined}>
             {current.description}
           </p>
-          <label className="character-choice">
-            Character
-            <select
-              id={selectionId}
-              data-guide-id={view === 'rig' ? GUIDE_TARGETS.rigCharacter : undefined}
-              defaultValue={characterId}
-            >
-              {!choices.some((entry) => entry.id === characterId) && (
-                <option value={characterId}>{characterId} (unavailable)</option>
-              )}
-              {choices.map(({ id, label }) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <NewCharacterDialog root={root} guideTargetId={view === 'rig' ? GUIDE_TARGETS.rigNewCharacter : undefined} />
+          {view !== 'scene' && (
+            <label className="character-choice">
+              Character
+              <select
+                id={selectionId}
+                data-guide-id={view === 'rig' ? GUIDE_TARGETS.rigCharacter : undefined}
+                defaultValue={characterId}
+              >
+                {!choices.some((entry) => entry.id === characterId) && (
+                  <option value={characterId}>{characterId} (unavailable)</option>
+                )}
+                {choices.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {view !== 'scene' && (
+            <NewCharacterDialog
+              root={root}
+              guideTargetId={view === 'rig' ? GUIDE_TARGETS.rigNewCharacter : undefined}
+            />
+          )}
         </div>
         <nav className="view-navigation" aria-label="Views">
           {Object.entries(views).map(([id, item]) => (

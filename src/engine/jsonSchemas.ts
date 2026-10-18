@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sceneDefinitionSchema } from './SceneDefinition.js';
 import {
   animationFileSchema,
   characterManifestSchema,
@@ -15,6 +16,7 @@ export function generateJsonSchemas() {
     skin: { schema: skinFileSchema, title: 'Paper Puppeteer skin' },
     pose: { schema: poseDefinitionSchema, title: 'Paper Puppeteer static pose' },
     character: { schema: characterManifestSchema, title: 'Paper Puppeteer character manifest' },
+    scene: { schema: sceneDefinitionSchema, title: 'Paper Puppeteer scene' },
   };
   return Object.fromEntries(
     Object.entries(definitions).map(([name, { schema, title }]) => [

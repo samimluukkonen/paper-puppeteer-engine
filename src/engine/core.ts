@@ -170,3 +170,25 @@ export {
   ikConstraintDependencies,
 } from './ik/ikAuthoring.js';
 export type { CreateIKConstraintOptions, IKConstraintPatch, IKConstraintDependencies } from './ik/ikAuthoring.js';
+
+export type {
+  SceneDefinition,
+  SceneActorDefinition,
+  SceneActionDefinition,
+  SceneCharacterReference,
+  SceneCharacterAssets,
+  SceneValidationOptions,
+} from './SceneDefinition.js';
+export {
+  SCENE_FORMAT_VERSION,
+  SceneValidationError,
+  sceneDefinitionSchema,
+  sceneActorDefinitionSchema,
+  sceneActionDefinitionSchema,
+  sceneCharacterReferenceSchema,
+  createEmptyScene,
+  validateSceneDefinition,
+  parseSceneDefinition,
+  parseSceneJson,
+  serializeSceneDefinition,
+} from './SceneDefinition.js';

@@ -10,6 +10,7 @@ export default defineConfig({
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         rigEditor: fileURLToPath(new URL('./rig-editor/index.html', import.meta.url)),
         animationEditor: fileURLToPath(new URL('./animation-editor/index.html', import.meta.url)),
+        sceneEditor: fileURLToPath(new URL('./scene-editor/index.html', import.meta.url)),
       },
       output: {
         codeSplitting: {

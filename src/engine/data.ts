@@ -26,3 +26,12 @@ export type { BendDirection, IKTarget, IKTargetProvider, TwoBoneIKDefinition } f
 export type { IKAnimationProperty, IKAnimationTrack, IKKeyframe } from './ik/animationKeyframes.js';
 
 export type { CreateIKConstraintOptions, IKConstraintPatch, IKConstraintDependencies } from './ik/ikAuthoring.js';
+
+export type {
+  SceneDefinition,
+  SceneActorDefinition,
+  SceneActionDefinition,
+  SceneCharacterReference,
+  SceneCharacterAssets,
+  SceneValidationOptions,
+} from './SceneDefinition.js';
