@@ -33,7 +33,7 @@ import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { RigArtworkCommands, type RigArtworkUpdate } from './RigArtworkCommands.js';
-import { inspectRigDraft, type RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
+import { inspectRigDraft, type AuthoredRigData, type RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
 import { serializeRigData, serializeRigJson } from './rigSerialization.js';
 import { RigStructureCommands } from './RigStructureCommands.js';
 
@@ -63,6 +63,7 @@ type HistoryEntry = RigEditorRecoverySnapshot;
 
 export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
+  name?: string;
   ik?: readonly TwoBoneIKDefinition[];
   root: string;
   bones: BoneDefinition[];
@@ -87,7 +88,7 @@ function patchFields<Field extends string>(
 export class RigEditorState {
   readonly source: Rig;
   private readonly data: WorkingRig;
-  private cachedWorkingCopy: ReadonlyRigData<RigDefinition> | undefined;
+  private cachedWorkingCopy: ReadonlyRigData<AuthoredRigData> | undefined;
   private cachedHistoryEntry: HistoryEntry | undefined;
   private topologyRig: Rig;
   get rig(): Rig {
@@ -116,10 +117,12 @@ export class RigEditorState {
   artworkOpacity = 1;
   gridSnap: GridSnap = 0;
   rotationSnap: RotationSnap = 0;
-  readonly name: string | undefined;
+  get name(): string | undefined {
+    return this.data.name;
+  }
   private readonly includeSkins: boolean;
-  private readonly initialCopy: ReadonlyRigData<RigDefinition>;
-  private saved: ReadonlyRigData<RigDefinition>;
+  private readonly initialCopy: ReadonlyRigData<AuthoredRigData>;
+  private saved: ReadonlyRigData<AuthoredRigData>;
   private cachedDirty: boolean | undefined;
   private cachedRigDirty: boolean | undefined;
   private cachedIssues: readonly ValidationIssue[] | undefined;
@@ -158,9 +161,9 @@ export class RigEditorState {
     for (const skin of this.externalSkins) this.savedExternalSkins.set(skin.name, skin);
     this.defaultSkin = options.defaultSkin ?? mergeSkins(source.skins, this.externalSkins)[0]?.name ?? '';
     this.selectedSkin = this.defaultSkin;
-    this.name = file?.name;
     this.includeSkins = file ? file.skins !== undefined : true;
     this.data = structuredClone({
+      ...(file?.name === undefined ? {} : { name: file.name }),
       root: source.root,
       bones: [...source.bones],
       slots: [...source.slots],
@@ -210,7 +213,7 @@ export class RigEditorState {
   }
 
   /** Immutable data view; edits replace only changed entries and preserve older views. */
-  get workingCopy(): ReadonlyRigData<RigDefinition> {
+  get workingCopy(): ReadonlyRigData<AuthoredRigData> {
     this.cachedWorkingCopy ??= freezeData({
       ...this.data,
       bones: [...this.data.bones],
@@ -227,7 +230,7 @@ export class RigEditorState {
   }
 
   /** Reused by history, status, and asynchronous export completion. */
-  get workingSnapshot(): ReadonlyRigData<RigDefinition> {
+  get workingSnapshot(): ReadonlyRigData<AuthoredRigData> {
     return this.workingCopy;
   }
 
@@ -304,7 +307,7 @@ export class RigEditorState {
     if (!this.history.inOperation) this.updateWarnings();
   }
 
-  private restore(copy: ReadonlyRigData<RigDefinition>): void {
+  private restore(copy: ReadonlyRigData<AuthoredRigData>): void {
     Object.assign(this.data, {
       ...copy,
       bones: [...copy.bones],
@@ -312,7 +315,7 @@ export class RigEditorState {
       ...(copy.attachments === undefined ? {} : { attachments: [...copy.attachments] }),
       ...(copy.skins === undefined ? {} : { skins: [...copy.skins] }),
     });
-    for (const key of ['slots', 'attachments', 'skins', 'ik'] as const)
+    for (const key of ['name', 'slots', 'attachments', 'skins', 'ik'] as const)
       if (copy[key] === undefined) delete this.data[key];
     this.invalidate();
     this.cachedWorkingCopy = copy;
@@ -462,7 +465,7 @@ export class RigEditorState {
   private exportCandidate(copy = this.workingCopy): RigJsonDefinition {
     return {
       version: RIG_FORMAT_VERSION,
-      ...(this.name === undefined ? {} : { name: this.name }),
+      ...(copy.name === undefined ? {} : { name: copy.name }),
       root: copy.root,
       ...(copy.ik === undefined ? {} : { ik: copy.ik }),
       bones: copy.bones,
@@ -540,7 +543,7 @@ export class RigEditorState {
     return true;
   }
 
-  markSaved(savedSnapshot: ReadonlyRigData<RigDefinition> = this.workingSnapshot): void {
+  markSaved(savedSnapshot: ReadonlyRigData<AuthoredRigData> = this.workingSnapshot): void {
     // A delayed export can save an older working copy after subsequent edits.
     this.saved = savedSnapshot;
     this.cachedDirty = undefined;

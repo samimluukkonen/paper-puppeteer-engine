@@ -129,11 +129,13 @@ export class RigTweakController {
     this.bindDraft = () => {
       const editor = this.editor;
       if (!editor) return;
+      // Older draft identities stored name beside the rig. Preserve that source fingerprint format.
+      const { name: _name, ...rig } = editor.state.workingCopy;
       recovery.bind({
         key: rigDraftKey(window.location.pathname, getScene().characterId, getScene().rigFilename),
         source: draftSource({
           name: editor.state.name,
-          rig: editor.state.workingCopy,
+          rig,
           standaloneSkins: editor.state.standaloneSkins,
         }),
         label: 'rig',

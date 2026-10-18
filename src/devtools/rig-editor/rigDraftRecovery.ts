@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { normalizeBoneDirection } from '../../engine/boneMath.js';
-import { checkJson, inspectRigDefinition, type ValidationIssue } from '../../engine/externalData.js';
+import {
+  checkJson,
+  inspectRigDefinition,
+  type RigJsonDefinition,
+  type ValidationIssue,
+} from '../../engine/externalData.js';
 import { JsonWorkloadBudget } from '../../engine/jsonWorkloadLimits.js';
 import type { Rig } from '../../engine/Rig.js';
 import { skinFileSchema } from '../../engine/schemas.js';
@@ -8,8 +13,10 @@ import type { RigDefinition, SkinDefinition } from '../../engine/types.js';
 import { checkSkinReferences } from '../../engine/validation.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 
+export type AuthoredRigData = RigDefinition & { name?: string };
+
 export type RigEditorRecoverySnapshot = ReadonlyEditorData<{
-  rig: RigDefinition;
+  rig: AuthoredRigData;
   directions: [string, { x: number; y: number }][];
   standaloneSkins?: readonly SkinDefinition[];
 }>;
@@ -41,6 +48,8 @@ export function inspectRigDraft(
   }
   const { data } = inspectRigDefinition(candidate);
   if (!data) return undefined;
+  // The runtime parser strips file metadata; retain the validated authored name in document snapshots.
+  const { name } = candidate as RigJsonDefinition;
   // Version 2 envelopes explicitly support structural editing. Raw imports retain workspace compatibility.
   if (
     !(recovery.success && recovery.data.version === 2) &&
@@ -94,7 +103,13 @@ export function inspectRigDraft(
     seen.add(id);
   }
   return freezeData({
-    rig: { ...data, slots: data.slots ?? [], attachments: data.attachments ?? [], skins: data.skins ?? [] },
+    rig: {
+      ...data,
+      ...(name === undefined ? {} : { name }),
+      slots: data.slots ?? [],
+      attachments: data.attachments ?? [],
+      skins: data.skins ?? [],
+    },
     directions,
     standaloneSkins: external,
   });
