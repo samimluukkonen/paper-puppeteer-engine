@@ -24,6 +24,11 @@ const newCharacterSchema = z.strictObject({
 export type NewCharacterOptions = z.infer<typeof newCharacterSchema>;
 export type CharacterWorkspace = ReturnType<typeof createNewCharacter>;
 
+function assertCharacterIdAvailable(id: string, existingIds: readonly string[] = []): void {
+  if ([...characterCatalog.map((entry) => entry.id), ...existingIds].some((existing) => existing.toLowerCase() === id))
+    throw new Error(`Character ID "${id}" already exists.`);
+}
+
 export function suggestCharacterId(name: string, existingIds: readonly string[] = []): string {
   const stem =
     name
@@ -77,8 +82,7 @@ export function createCharacterDocuments(definition: CharacterDefinition, option
 /** Pure, transactional factory. It never reads or clones an existing character. */
 export function createNewCharacter(options: NewCharacterOptions, existingIds: readonly string[] = []) {
   const identity = newCharacterSchema.parse(options);
-  if ([...characterCatalog.map((entry) => entry.id), ...existingIds].some((id) => id.toLowerCase() === identity.id))
-    throw new Error(`Character ID "${identity.id}" already exists.`);
+  assertCharacterIdAvailable(identity.id, existingIds);
   const definition = CharacterDefinition.fromData({
     manifest: {
       version: 1,
@@ -108,8 +112,8 @@ export class CharacterDraftStore {
       if (!key?.startsWith(draftPrefix)) continue;
       const id = key.slice(draftPrefix.length);
       try {
-        const draft = this.get(id);
-        if (draft) entries.push({ id, label: `${draft.identity.name} (draft)` });
+        const identity = this.readIdentity(id);
+        if (identity) entries.push({ id, label: `${identity.name} (draft)` });
       } catch {
         // An invalid or incompatible entry must not hide other drafts. Preserve its original bytes.
       }
@@ -117,12 +121,19 @@ export class CharacterDraftStore {
     return entries;
   }
 
-  get(id: string) {
+  /** Listing identities must not allocate rigs, editor documents or histories. */
+  private readIdentity(id: string): NewCharacterOptions | undefined {
     const json = this.storage.getItem(`${draftPrefix}${id}`);
     if (!json) return undefined;
     const options = newCharacterSchema.parse(JSON.parse(json));
     if (options.id !== id) throw new Error('Stored draft identity does not match its key.');
-    return createNewCharacter(options);
+    assertCharacterIdAvailable(options.id);
+    return options;
+  }
+
+  get(id: string) {
+    const identity = this.readIdentity(id);
+    return identity ? createNewCharacter(identity) : undefined;
   }
 
   create(options: NewCharacterOptions) {

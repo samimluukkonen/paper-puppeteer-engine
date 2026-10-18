@@ -174,6 +174,31 @@ test('draft switching reloads independent identities and integrates existing rec
   assert.throws(() => store.create({ name: 'Duplicate', id: 'one' }), /already exists/);
 });
 
+test('draft choices parse identities without creating workspaces or changing storage', () => {
+  const backing = storage();
+  const store = new CharacterDraftStore(backing);
+  backing.setItem('paper-puppeteer:new-character:v1:first', JSON.stringify({ id: 'first', name: ' First ' }));
+  backing.setItem('paper-puppeteer:new-character:v1:second', JSON.stringify({ id: 'second', name: 'Second' }));
+  const construct = vi.spyOn(CharacterDefinition, 'fromData');
+  const write = vi.spyOn(backing, 'setItem');
+  try {
+    const expected = [
+      { id: 'first', label: 'First (draft)' },
+      { id: 'second', label: 'Second (draft)' },
+    ];
+    assert.deepEqual(store.choices(), expected);
+    assert.deepEqual(store.choices(), expected);
+    assert.equal(construct.mock.calls.length, 0);
+    assert.equal(write.mock.calls.length, 0);
+    assert.equal(backing.length, 2);
+    assert.equal(store.get('first')!.identity.name, 'First');
+    assert.equal(construct.mock.calls.length, 1, 'opening a draft still creates its workspace');
+  } finally {
+    construct.mockRestore();
+    write.mockRestore();
+  }
+});
+
 test('failed validation and storage writes leave the current workspace and registry unchanged', () => {
   const backing = storage();
   const store = new CharacterDraftStore(backing);
