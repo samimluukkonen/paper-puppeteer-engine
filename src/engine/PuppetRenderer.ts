@@ -247,6 +247,20 @@ export class PuppetRenderer {
   }
 
   getArtworkUsages(): readonly ArtworkUsage[] {
+    // Index each mapping once; scanning every skin for every attachment multiplies
+    // work across otherwise bounded catalogs. Sets retain the authored lookup order.
+    const assignments = new Map(
+      this.artworkDefinitions.map((entry) => [entry.id, { slots: new Set<string>(), skins: new Set<string>() }]),
+    );
+    for (const skin of this.artworkSkins) {
+      for (const [slot, attachment] of Object.entries(skin.slots)) {
+        if (attachment === null) continue;
+        const usage = assignments.get(attachment);
+        usage?.slots.add(slot);
+        usage?.skins.add(skin.name);
+      }
+    }
+    for (const [slot, definition] of this.slotArtwork) assignments.get(definition.id)?.slots.add(slot);
     return [
       ...this.rig.bones.flatMap((bone): ArtworkUsage[] =>
         bone.sprite
@@ -265,19 +279,8 @@ export class PuppetRenderer {
         reference: `attachment:${entry.id}`,
         texture: entry.texture,
         frame: entry.frame,
-        slots: [
-          ...new Set([
-            ...this.artworkSkins.flatMap((skin) =>
-              Object.entries(skin.slots)
-                .filter(([, id]) => id === entry.id)
-                .map(([slot]) => slot),
-            ),
-            ...[...this.slotArtwork].filter(([, definition]) => definition.id === entry.id).map(([slot]) => slot),
-          ]),
-        ],
-        skins: this.artworkSkins
-          .filter((skin) => Object.values(skin.slots).includes(entry.id))
-          .map((skin) => skin.name),
+        slots: [...assignments.get(entry.id)!.slots],
+        skins: [...assignments.get(entry.id)!.skins],
       })),
     ];
   }

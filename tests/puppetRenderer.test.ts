@@ -10,6 +10,71 @@ import { rendererFixture } from './helpers/rendererFixture.js';
 
 vi.mock('phaser', () => ({ default: {} }));
 
+test('artwork usages retain ordered skin and live slot references across catalog changes', () => {
+  const { renderer, rig } = rendererFixture({
+    root: 'root',
+    bones: [{ id: 'root', sprite: { texture: 'body' } }],
+    slots: ['first', 'second', 'extra'].map((id) => ({ id, bone: 'root' })),
+    attachments: [
+      { id: 'alpha', texture: 'parts', frame: 'alpha' },
+      { id: 'beta', texture: 'parts' },
+      { id: 'unused', texture: 'unused' },
+    ],
+    skins: [
+      { version: 1, name: 'one', slots: { second: 'beta', first: 'alpha', extra: null } },
+      { version: 1, name: 'two', slots: { first: 'alpha', second: 'alpha' } },
+    ],
+  });
+  renderer.setSlotAttachment('extra', rig.getAttachment('alpha'));
+  const initial = renderer.getArtworkUsages();
+  assert.deepEqual(initial, [
+    { reference: 'bone:root', texture: 'body', frame: undefined, slots: [], skins: [] },
+    {
+      reference: 'attachment:alpha',
+      texture: 'parts',
+      frame: 'alpha',
+      slots: ['first', 'second', 'extra'],
+      skins: ['one', 'two'],
+    },
+    { reference: 'attachment:beta', texture: 'parts', frame: undefined, slots: ['second'], skins: ['one'] },
+    { reference: 'attachment:unused', texture: 'unused', frame: undefined, slots: [], skins: [] },
+  ]);
+  renderer.updateArtworkDefinitions(rig.attachments.slice(0, 2), [
+    { version: 1, name: 'updated', slots: { first: 'beta', extra: null } },
+  ]);
+  assert.deepEqual(renderer.getArtworkUsages().slice(1), [
+    { reference: 'attachment:alpha', texture: 'parts', frame: 'alpha', slots: ['extra'], skins: [] },
+    { reference: 'attachment:beta', texture: 'parts', frame: undefined, slots: ['first'], skins: ['updated'] },
+  ]);
+  renderer.setSlotAttachment('extra', rig.getAttachment('beta'));
+  assert.deepEqual(renderer.getArtworkUsages()[2]!.slots, ['first', 'extra']);
+  renderer.setSlotAttachment('extra', undefined);
+  assert.deepEqual(renderer.getArtworkUsages()[2]!.slots, ['first']);
+  assert.deepEqual(initial[1]!.slots, ['first', 'second', 'extra'], 'earlier results remain detached');
+  renderer.destroy();
+});
+
+test('dense skin catalogs retain complete artwork usages', () => {
+  const count = 1024;
+  const slots = Object.fromEntries(Array.from({ length: count }, (_, index) => [`slot${index}`, `part${index}`]));
+  const { renderer } = rendererFixture({
+    root: 'root',
+    bones: [{ id: 'root' }],
+    slots: Array.from({ length: count }, (_, index) => ({ id: `slot${index}`, bone: 'root' })),
+    attachments: Array.from({ length: count }, (_, index) => ({ id: `part${index}`, texture: 'shared' })),
+    skins: Array.from({ length: 64 }, (_, index) => ({ version: 1, name: `skin${index}`, slots: { ...slots } })),
+  });
+  const usages = renderer.getArtworkUsages();
+  assert.lengthOf(usages, count);
+  const skins = Array.from({ length: 64 }, (_, index) => `skin${index}`);
+  for (const [index, usage] of usages.entries()) {
+    assert.equal(usage.reference, `attachment:part${index}`);
+    assert.deepEqual(usage.slots, [`slot${index}`]);
+    assert.deepEqual(usage.skins, skins);
+  }
+  renderer.destroy();
+});
+
 test('deep slot rigs allocate two affine factors per drawable and reuse lazy prop mounts', () => {
   const count = 128;
   const { renderer, allocations } = rendererFixture({
