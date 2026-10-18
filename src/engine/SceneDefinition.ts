@@ -6,7 +6,7 @@ import { assertJsonInputSize } from './jsonInput.js';
 import { identifierSchema } from './schemas.js';
 import type { ValidationIssue } from './validation.js';
 
-export const SCENE_FORMAT_VERSION = 1;
+export const SCENE_FORMAT_VERSION = 2;
 const sceneIdentifier = identifierSchema.regex(/\S/, 'Must contain a non-whitespace character.');
 
 /** Stable manifest paths relative to the scene JSON, or permanent HTTP(S) URLs. No temporary URLs. */
@@ -28,19 +28,45 @@ export const sceneActorDefinitionSchema = z.strictObject({
   skin: sceneIdentifier.exactOptional(),
 });
 
-/** Scheduled declarations only. Runtime adapters will interpret these in a later milestone. */
+const actionTiming = {
+  id: sceneIdentifier,
+  actorId: sceneIdentifier,
+  /** Milliseconds; editor labels display seconds. */
+  time: z.number().nonnegative(),
+};
+const pointSchema = z.strictObject({ x: z.number(), y: z.number() });
+
+/** Authored declarations only. All clips have an explicit finite ownership window. */
 export const sceneActionDefinitionSchema = z.discriminatedUnion('type', [
   z.strictObject({
+    ...actionTiming,
     type: z.literal('animation'),
-    actorId: sceneIdentifier,
-    time: z.number().nonnegative(),
     animation: sceneIdentifier,
+    duration: z.number().positive(),
+    loop: z.boolean(),
+    speed: z.number().positive(),
   }),
   z.strictObject({
+    ...actionTiming,
+    type: z.literal('move'),
+    destination: pointSchema,
+    duration: z.number().positive(),
+  }),
+  z.strictObject({
+    ...actionTiming,
     type: z.literal('face'),
-    actorId: sceneIdentifier,
-    time: z.number().nonnegative(),
-    facing: z.enum(['left', 'right']),
+    target: z.discriminatedUnion('type', [
+      z.strictObject({ type: z.literal('direction'), facing: z.enum(['left', 'right']) }),
+      z.strictObject({ type: z.literal('actor'), actorId: sceneIdentifier }),
+      z.strictObject({ type: z.literal('point'), ...pointSchema.shape }),
+    ]),
+  }),
+  z.strictObject({ ...actionTiming, type: z.literal('wait'), duration: z.number().positive() }),
+  z.strictObject({
+    ...actionTiming,
+    type: z.literal('cue'),
+    name: sceneIdentifier,
+    payload: z.unknown().exactOptional(),
   }),
 ]);
 
@@ -86,7 +112,8 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
     issues.push(...shapeIssues(result.error).filter(({ path }) => path !== 'version' || !versionIssues.length));
     return { issues, versionError };
   }
-  const scene = result.data;
+  // Payloads use the same unknown + checkJson contract as animation events. Own them deeply.
+  const scene = structuredClone(result.data);
   const report = (path: string, message: string): void => {
     issues.push({ severity: 'error', path, message });
   };
@@ -103,14 +130,62 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
     if (assets && actor.skin !== undefined && !assets.skins.includes(actor.skin))
       report(`${path}.skin`, `Unknown skin "${actor.skin}".`);
   }
+  const identities = new Set<string>();
+  const ownership = new Map<string, { action: SceneActionDefinition; index: number }[]>();
   for (const [index, action] of scene.actions.entries()) {
     const path = `actions[${index}]`;
+    if (identities.has(action.id)) report(`${path}.id`, `Duplicate action ID "${action.id}".`);
+    identities.add(action.id);
     const actor = actors.get(action.actorId);
     if (!actor) report(`${path}.actorId`, `Unknown actor "${action.actorId}".`);
     if (action.time > scene.duration) report(`${path}.time`, 'Action time must stay within the scene duration.');
+    const end = action.time + sceneActionDuration(action);
+    if (!Number.isFinite(end) || end > scene.duration)
+      report(`${path}.duration`, 'Action end must stay within the scene duration.');
     const assets = actor && options.characters?.get(actor.character.manifest);
     if (assets && action.type === 'animation' && !assets.animations.includes(action.animation))
       report(`${path}.animation`, `Unknown animation "${action.animation}".`);
+    if (action.type === 'face' && action.target.type === 'actor') {
+      if (!actors.has(action.target.actorId))
+        report(`${path}.target.actorId`, `Unknown target actor "${action.target.actorId}".`);
+      if (action.target.actorId === action.actorId) report(`${path}.target.actorId`, 'An actor cannot look at itself.');
+    }
+    const channel =
+      action.type === 'animation'
+        ? 'animation'
+        : action.type === 'move'
+          ? 'position'
+          : action.type === 'face'
+            ? 'facing'
+            : null;
+    if (channel) {
+      const key = JSON.stringify([action.actorId, channel]);
+      const group = ownership.get(key) ?? [];
+      group.push({ action, index });
+      ownership.set(key, group);
+    }
+  }
+  // Half-open intervals allow adjacent clips. Equal-time facing markers are ambiguous.
+  for (const group of ownership.values()) {
+    group.sort((a, b) => a.action.time - b.action.time || a.index - b.index);
+    let previous: (typeof group)[number] | undefined;
+    for (const current of group) {
+      if (
+        previous &&
+        (current.action.time < previous.action.time + sceneActionDuration(previous.action) ||
+          (current.action.type === 'face' && current.action.time === previous.action.time))
+      )
+        report(
+          `actions[${current.index}].time`,
+          `Conflicting ${current.action.type} ownership with action "${previous.action.id}".`,
+        );
+      if (
+        !previous ||
+        current.action.time + sceneActionDuration(current.action) >=
+          previous.action.time + sceneActionDuration(previous.action)
+      )
+        previous = current;
+    }
   }
   return issues.length ? { issues, versionError } : { issues, data: scene };
 }
@@ -148,4 +223,11 @@ export function createEmptyScene(options: { id: string; name?: string; duration?
     actors: [],
     actions: [],
   });
+}
+
+/** Markers own no interval; wait is scheduling metadata and owns no Actor channel. */
+export function sceneActionDuration(
+  action: Pick<SceneActionDefinition, 'type'> & { readonly duration?: number },
+): number {
+  return action.type === 'face' || action.type === 'cue' ? 0 : (action.duration ?? 0);
 }

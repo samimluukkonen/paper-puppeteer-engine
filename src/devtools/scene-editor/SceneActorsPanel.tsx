@@ -127,6 +127,7 @@ export function SceneActorsPanel({
     <>
       <button
         type="button"
+        className="scene-add-actor"
         onClick={() => {
           setError('');
           dialog.current?.showModal();

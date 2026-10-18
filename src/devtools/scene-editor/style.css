@@ -1,12 +1,22 @@
 .scene-workspace-body {
   display: grid;
-  grid-template-columns: minmax(560px, 1fr) 300px;
-  grid-template-rows: minmax(320px, 1fr) 150px;
+  grid-template-columns: minmax(560px, 1fr) 12px clamp(
+      260px,
+      var(--scene-inspector-width, 300px),
+      max(260px, calc(100% - 572px))
+    );
+  grid-template-rows: minmax(200px, 1fr) 12px clamp(
+      240px,
+      var(--scene-timeline-height, 35%),
+      max(240px, calc(100% - 212px))
+    );
   flex: 1;
   min-height: 0;
-  gap: 12px;
+  gap: 0;
 }
 .scene-stage {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -32,6 +42,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: var(--bg-preview);
 }
 #scene-stage-canvas canvas {
   touch-action: none;
@@ -57,6 +68,9 @@
 .scene-actor-list button[aria-pressed="true"] {
   border-color: var(--accent-fg);
 }
+.scene-add-actor {
+  margin-bottom: 12px;
+}
 .scene-actor-actions {
   display: flex;
   flex-wrap: wrap;
@@ -66,7 +80,7 @@
 .scene-timeline,
 .scene-stage {
   border: 1px solid var(--border-default);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 .scene-inspector,
 .scene-timeline {
@@ -74,8 +88,8 @@
   background: var(--bg-inset);
 }
 .scene-inspector {
-  grid-column: 2;
-  grid-row: 1 / 3;
+  grid-column: 3;
+  grid-row: 1 / -1;
   overflow: auto;
 }
 .scene-workspace h2 {
@@ -122,4 +136,182 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.scene-timeline {
+  grid-column: 1;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+.scene-timeline-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+.scene-timeline-toolbar h2 {
+  margin: 0;
+}
+.scene-timeline-toolbar input[type="number"] {
+  width: 75px;
+}
+.scene-timeline-toolbar input[type="range"] {
+  width: 90px;
+}
+.scene-timeline-viewport {
+  overflow: auto;
+  flex: 1;
+  min-height: 90px;
+  outline-color: var(--accent-fg);
+}
+.scene-timeline-content {
+  position: relative;
+  min-height: 100%;
+  padding-right: 16px;
+  box-sizing: content-box;
+}
+.scene-track-row {
+  display: flex;
+  border-bottom: 1px solid var(--border-default);
+  height: 84px;
+}
+.scene-track-label {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 146px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: var(--bg-inset);
+  text-align: left;
+  padding: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scene-track-label[aria-pressed="true"] {
+  color: var(--accent-fg);
+  border-color: var(--accent-fg);
+}
+.scene-track-lane {
+  position: relative;
+  flex-shrink: 0;
+  background: repeating-linear-gradient(to bottom, transparent 0 25px, var(--border-default) 25px 26px);
+}
+.scene-ruler-row {
+  height: 30px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--bg-inset);
+}
+.scene-ruler {
+  cursor: crosshair;
+  background: var(--bg-inset);
+}
+.scene-ruler-tick {
+  position: absolute;
+  border-left: 1px solid var(--border-default);
+  height: 8px;
+  bottom: 0;
+  font-size: 10px;
+  padding-left: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.scene-ruler-tick.major {
+  height: 26px;
+}
+.scene-action {
+  position: absolute;
+  height: 23px;
+  padding: 2px 10px 2px 5px;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: grab;
+  border-radius: 3px;
+  touch-action: none;
+}
+.scene-action-animation {
+  background: var(--accent-muted);
+}
+.scene-action-move {
+  border-color: #85bf9b;
+}
+.scene-action[aria-pressed="true"] {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: -2px;
+}
+.scene-action.marker {
+  transform: translateX(-50%);
+  padding: 0;
+  z-index: 1;
+}
+.scene-action-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: ew-resize;
+  background: var(--bg-inset);
+}
+.scene-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--accent-fg);
+  pointer-events: none;
+  z-index: 2;
+}
+.scene-inspector textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#scene-inspector-divider,
+#scene-timeline-divider {
+  position: relative;
+  touch-action: none;
+}
+#scene-inspector-divider {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  cursor: ew-resize;
+}
+#scene-timeline-divider {
+  grid-column: 1;
+  grid-row: 2;
+  cursor: ns-resize;
+}
+#scene-inspector-divider::after,
+#scene-timeline-divider::after {
+  content: "";
+  position: absolute;
+  background: var(--border-emphasis);
+  border-radius: 2px;
+}
+#scene-inspector-divider::after {
+  width: 3px;
+  left: 4px;
+  top: 45%;
+  bottom: 45%;
+}
+#scene-timeline-divider::after {
+  height: 3px;
+  top: 4px;
+  left: 45%;
+  right: 45%;
+}
+#scene-inspector-divider:hover,
+#scene-inspector-divider:focus-visible,
+#scene-timeline-divider:hover,
+#scene-timeline-divider:focus-visible {
+  background: var(--accent-muted);
 }

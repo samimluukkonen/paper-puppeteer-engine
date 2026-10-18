@@ -86,7 +86,7 @@ test('rename updates action references atomically; referenced removal requires e
   const { document, id } = fixture();
   document.replaceScene({
     ...document.workingScene,
-    actions: [{ type: 'face', actorId: id, time: 0, facing: 'left' }],
+    actions: [{ id: 'face', type: 'face', actorId: id, time: 0, target: { type: 'direction', facing: 'left' } }],
   });
   document.updateActor(id, { id: 'hero' });
   assert.equal(document.actorReferences('hero').length, 1);

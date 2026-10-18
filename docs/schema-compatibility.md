@@ -2,15 +2,16 @@
 
 [All guides](../README.md#guides)
 
-Engine release **0.6.2** supports the following authored JSON formats. Engine SemVer and JSON `version` fields are separate: upgrading the engine does not upgrade character files.
+Engine release **0.9.3** supports the following authored JSON formats. Engine SemVer and JSON `version` fields are separate: upgrading the engine does not upgrade character files.
 
-| Document                     | Supported version                | Required fields                                                          | Optional fields                                                            |
-| ---------------------------- | -------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Rig                          | `1` (`RIG_FORMAT_VERSION`)       | `version`, `root`, `bones`                                               | `name`, `slots`, `attachments`, `skins`, `ik`                              |
-| Animation                    | `1` (`ANIMATION_FORMAT_VERSION`) | `version`, `name`, `duration`, `loop`, `tracks`                          | `interpolation`, `playback`, `events`, `ikTracks`, `disabledIKConstraints` |
-| Skin, embedded or standalone | `1`                              | `version`, `name`, `slots`                                               | None                                                                       |
-| Static pose                  | `1` (`POSE_FORMAT_VERSION`)      | `version`, `name`, `bones`                                               | None                                                                       |
-| Character manifest           | `1` (`CHARACTER_FORMAT_VERSION`) | `version`, `id`, `rig`, `defaultSkin`, `skins`, `animations`, `textures` | `poses`                                                                    |
+| Document                     | Supported version                | Required fields                                                          | Optional fields                                                                   |
+| ---------------------------- | -------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Scene                        | `2` (`SCENE_FORMAT_VERSION`)     | `version`, `id`, `name`, `duration`, `actors`, `actions`                 | See [scene actions and version-1 migration](scene-editor.md#timing-and-ownership) |
+| Rig                          | `1` (`RIG_FORMAT_VERSION`)       | `version`, `root`, `bones`                                               | `name`, `slots`, `attachments`, `skins`, `ik`                                     |
+| Animation                    | `1` (`ANIMATION_FORMAT_VERSION`) | `version`, `name`, `duration`, `loop`, `tracks`                          | `interpolation`, `playback`, `events`, `ikTracks`, `disabledIKConstraints`        |
+| Skin, embedded or standalone | `1`                              | `version`, `name`, `slots`                                               | None                                                                              |
+| Static pose                  | `1` (`POSE_FORMAT_VERSION`)      | `version`, `name`, `bones`                                               | None                                                                              |
+| Character manifest           | `1` (`CHARACTER_FORMAT_VERSION`) | `version`, `id`, `rig`, `defaultSkin`, `skins`, `animations`, `textures` | `poses`                                                                           |
 
 The authoritative runtime validators are Zod definitions in `src/engine/schemas.ts`, plus reference/timeline checks in `validation.ts`, `externalData.ts`, `Pose.ts` and `CharacterDefinition.ts`. The editor JSON Schemas in `schemas/` are generated from these same file shapes with `npm run schemas:generate`. JSON Schemas describe structure and scalar constraints; loading still requires semantic validation. The TypeScript contracts are `RigJsonDefinition`, `AnimationJsonDefinition`, `SkinDefinition`, `PoseDefinition` and `CharacterManifest`, available through `/data` and the relevant runtime/serialization entry points. TypeScript-defined runtime rigs and clips omit file-level version metadata; this does not make unversioned imported JSON valid.
 

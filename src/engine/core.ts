@@ -187,6 +187,7 @@ export {
   sceneActionDefinitionSchema,
   sceneCharacterReferenceSchema,
   createEmptyScene,
+  sceneActionDuration,
   validateSceneDefinition,
   parseSceneDefinition,
   parseSceneJson,

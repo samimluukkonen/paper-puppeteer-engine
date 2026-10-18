@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.3
+
+Add the visual Scene Editor timeline with Actor tracks, ruler/playhead, horizontal zoom/scroll, shared snapping, selection, drag/resize, duplicate/delete and collapsed React action properties. Scene format version 2 requires stable action IDs and explicit finite clip durations, with typed animation, movement, facing targets, wait and generic JSON cue declarations. Reject overlapping position/base-animation ownership and equal-time facing changes atomically; allow independent Actors and position-only movement alongside animation. Reuse snapshot history so one drag is one Undo; cancellation preserves Redo. Add a read-only future destination stage marker, timing/conflict/serialization/source-isolation tests and local desktop browser coverage. Scene playback remains deferred. Version-1 scene actions require explicit migration; character formats and Actor/Puppet APIs stay unchanged. See the [scene guide](docs/scene-editor.md).
+
 ## 0.9.2
 
 Add the visual Scene Editor stage with existing Phaser/Puppet rendering, independent Actor instances, package selection and permanent custom manifest references. Add stage-coordinate dragging, axis handles, zoom/pan, an optional grid, collapsed actor inspectors, initial facing/skin/animation settings, duplication, removal and array-based preview depth. Group each drag into one undo transaction with Escape cancellation. Update action references on actor renames and require explicit removal of referenced actions. Cache character definitions/artwork for the page lifetime and dispose runtime instances on removal, scene switches and shutdown. Add placement, source-isolation, coordinate, resource-lifecycle and local desktop browser coverage. Timeline authoring and scene playback remain deferred; authored formats stay at version 1.

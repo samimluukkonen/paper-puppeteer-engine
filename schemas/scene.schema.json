@@ -4,7 +4,7 @@
   "properties": {
     "version": {
       "type": "number",
-      "const": 1
+      "const": 2
     },
     "id": {
       "type": "string",
@@ -115,9 +115,17 @@
           {
             "type": "object",
             "properties": {
-              "type": {
+              "id": {
                 "type": "string",
-                "const": "animation"
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
               },
               "actorId": {
                 "type": "string",
@@ -134,6 +142,10 @@
               "time": {
                 "type": "number",
                 "minimum": 0
+              },
+              "type": {
+                "type": "string",
+                "const": "animation"
               },
               "animation": {
                 "type": "string",
@@ -146,17 +158,36 @@
                     "pattern": "\\S"
                   }
                 ]
+              },
+              "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "loop": {
+                "type": "boolean"
+              },
+              "speed": {
+                "type": "number",
+                "exclusiveMinimum": 0
               }
             },
-            "required": ["type", "actorId", "time", "animation"],
+            "required": ["id", "actorId", "time", "type", "animation", "duration", "loop", "speed"],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "type": {
+              "id": {
                 "type": "string",
-                "const": "face"
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
               },
               "actorId": {
                 "type": "string",
@@ -174,12 +205,222 @@
                 "type": "number",
                 "minimum": 0
               },
-              "facing": {
+              "type": {
                 "type": "string",
-                "enum": ["left", "right"]
+                "const": "move"
+              },
+              "destination": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              },
+              "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0
               }
             },
-            "required": ["type", "actorId", "time", "facing"],
+            "required": ["id", "actorId", "time", "type", "destination", "duration"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "actorId": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "time": {
+                "type": "number",
+                "minimum": 0
+              },
+              "type": {
+                "type": "string",
+                "const": "face"
+              },
+              "target": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "direction"
+                      },
+                      "facing": {
+                        "type": "string",
+                        "enum": ["left", "right"]
+                      }
+                    },
+                    "required": ["type", "facing"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "actor"
+                      },
+                      "actorId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "allOf": [
+                          {
+                            "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                          },
+                          {
+                            "pattern": "\\S"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["type", "actorId"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "point"
+                      },
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["type", "x", "y"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": ["id", "actorId", "time", "type", "target"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "actorId": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "time": {
+                "type": "number",
+                "minimum": 0
+              },
+              "type": {
+                "type": "string",
+                "const": "wait"
+              },
+              "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": ["id", "actorId", "time", "type", "duration"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "actorId": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "time": {
+                "type": "number",
+                "minimum": 0
+              },
+              "type": {
+                "type": "string",
+                "const": "cue"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "payload": {}
+            },
+            "required": ["id", "actorId", "time", "type", "name"],
             "additionalProperties": false
           }
         ]

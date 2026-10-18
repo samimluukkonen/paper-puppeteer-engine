@@ -6,8 +6,8 @@ import { SceneEditorView } from './SceneEditorView.js';
 const host = document.querySelector<HTMLElement>('#scene-editor-app');
 if (!host) throw new Error('Missing scene editor host.');
 host.classList.add('view-shell', 'workspace-shell', 'scene-workspace');
-const scenes = new SceneEditorDocument();
 const registry = new SceneCharacterRegistry();
+const scenes = new SceneEditorDocument({}, (manifest) => registry.get(manifest)?.animations.map((clip) => clip.name));
 const unmount = mountView(
   host,
   <SceneEditorView document={scenes} registry={registry} />,

@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { readJsonFile } from '../../engine/jsonInput.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
+import { SceneActionInspector } from './SceneActionInspector.js';
 import { SceneActorsPanel } from './SceneActorsPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneStageView } from './SceneStage.js';
+import { SceneTimeline } from './SceneTimeline.js';
+import { SceneWorkspaceLayoutController } from './SceneWorkspaceLayoutController.js';
 import './style.css';
 
 function SceneProperties({ scene, document }: { scene: ReadonlyScene; document: SceneEditorDocument }) {
@@ -61,7 +64,12 @@ export function SceneEditorView({
 }) {
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const scene = document.workingScene;
+  const workspace = useRef<HTMLElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
+  useLayoutEffect(() => {
+    const layout = new SceneWorkspaceLayoutController(workspace.current!);
+    return () => layout.dispose();
+  }, []);
   const newId = useRef<HTMLInputElement>(null);
   const importRequest = useRef(0);
   const [loading, setLoading] = useState(false);
@@ -188,7 +196,7 @@ export function SceneEditorView({
           ))}
         </div>
       )}
-      <main className="scene-workspace-body">
+      <main ref={workspace} className="scene-workspace-body">
         <section className="scene-stage" aria-label="Scene stage">
           {scene ? (
             <SceneStageView document={document} registry={registry} />
@@ -202,11 +210,12 @@ export function SceneEditorView({
             </div>
           )}
         </section>
-        <aside className="scene-inspector" aria-label="Scene inspector">
+        <aside id="scene-inspector" className="scene-inspector" aria-label="Scene inspector">
           <h2>Inspector</h2>
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <SceneActionInspector key={`actions-${scene.id}`} scene={scene} document={document} registry={registry} />
               <SceneActorsPanel key={`actors-${scene.id}`} scene={scene} document={document} registry={registry} />
               <details>
                 <summary>Document contents</summary>
@@ -220,9 +229,36 @@ export function SceneEditorView({
             <p>Select a scene to inspect its properties.</p>
           )}
         </aside>
-        <section className="scene-timeline" aria-label="Scene timeline">
-          <h2>Scene timeline</h2>
-          <p>Timeline editing and playback will be available in a later milestone.</p>
+        <div
+          id="scene-inspector-divider"
+          role="separator"
+          tabIndex={0}
+          aria-label="Scene inspector width"
+          aria-controls="scene-inspector"
+          aria-orientation="vertical"
+          aria-valuemin={260}
+          aria-valuemax={600}
+          aria-valuenow={300}
+          title="Drag to resize. Left/Right adjusts; Home/End selects the limits."
+        />
+        <div
+          id="scene-timeline-divider"
+          role="separator"
+          tabIndex={0}
+          aria-label="Scene timeline height"
+          aria-controls="scene-timeline"
+          aria-orientation="horizontal"
+          aria-valuemin={240}
+          aria-valuemax={600}
+          aria-valuenow={300}
+          title="Drag to resize. Up/Down adjusts; Home/End selects the limits."
+        />
+        <section id="scene-timeline" className="scene-timeline" aria-label="Scene timeline">
+          {scene ? (
+            <SceneTimeline key={scene.id} scene={scene} document={document} registry={registry} />
+          ) : (
+            <p>Create a scene to arrange Actor actions.</p>
+          )}
         </section>
       </main>
       <dialog ref={dialog} className="workspace-dialog" aria-labelledby="new-scene-title">

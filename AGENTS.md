@@ -1,5 +1,6 @@
 # Repository preferences
 
+- Use the animator editor's visual style consistently in every view, especially the new scene editor.
 - Inspector sections in both editors must start collapsed by default.
 - Target desktop views only. Do not add or suggest mobile layout support or mobile-specific verification unless the user explicitly changes this preference.
 - Browser smoke tests (Playwright) are local-only. You may run them locally when useful.

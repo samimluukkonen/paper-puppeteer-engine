@@ -76,7 +76,7 @@ test('empty creation, multiple documents, properties, history, downloads and uns
 test('imports retain authored actors/actions and guard dirty replacement and source revert', async ({ page }) => {
   await page.goto('scene-editor/');
   const input = {
-    version: 1,
+    version: 2,
     id: 'imported',
     name: 'Imported scene',
     duration: 10000,
@@ -89,7 +89,7 @@ test('imports retain authored actors/actions and guard dirty replacement and sou
         facing: 'right',
       },
     ],
-    actions: [{ type: 'face', actorId: 'hero', time: 2000, facing: 'left' }],
+    actions: [{ id: 'look', type: 'face', actorId: 'hero', time: 2000, target: { type: 'direction', facing: 'left' } }],
   };
   const upload = async (value: unknown) => {
     await page.getByLabel('Open scene JSON').setInputFiles({
@@ -216,5 +216,167 @@ test('visual actor placement, appearance, duplication, cancellation and document
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
   expect((await downloadScene(page)).actors).toHaveLength(2);
   expect(assetRequests.length).toBe(requestCount);
+  expect(errors).toEqual([]);
+});
+
+test('visual scene timeline edits clips, markers, properties, grouped history and serialized actions', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('scene-editor/');
+  await page.getByLabel('Open scene JSON').setInputFiles({
+    name: 'timeline.scene.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 2,
+        id: 'timeline',
+        name: 'Timeline',
+        duration: 10000,
+        actors: ['a', 'b'].map((id, index) => ({
+          id,
+          character: { manifest: '../characters/demo-puppet/character.json' },
+          position: { x: index * 200, y: 0 },
+        })),
+        actions: [],
+      }),
+    ),
+  });
+  await expect(page.locator('.scene-track-row')).toHaveCount(3);
+  const tracks = page.getByLabel('Action tracks', { exact: true });
+  await tracks.getByRole('button', { name: 'a', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('move');
+  await page.getByRole('button', { name: 'Add action', exact: true }).click();
+  const movement = page.getByRole('button', { name: 'a: move action-1', exact: true });
+  await expect(movement).toBeVisible();
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await page.getByText('Action properties · move', { exact: true }).click();
+  await page.getByLabel('Destination X', { exact: true }).fill('400');
+  await page.getByLabel('Action duration (seconds)', { exact: true }).fill('2');
+  await page.getByRole('button', { name: 'Apply action properties' }).click();
+  const before = await downloadScene(page);
+  expect(before.actors[0]!.position).toEqual({ x: 0, y: 0 });
+  expect(before.actions[0]).toMatchObject({ type: 'move', time: 0, duration: 2000, destination: { x: 400, y: 0 } });
+  const box = await movement.boundingBox();
+  if (!box) throw new Error('Missing movement clip');
+  const lane = await page.getByLabel('a actions', { exact: true }).boundingBox();
+  if (!lane) throw new Error('Missing timeline lane');
+  await page.mouse.move(box.x + 15, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 15 + lane.width * 0.2, box.y + 10, { steps: 6 });
+  await page.mouse.up();
+  expect((await downloadScene(page)).actions[0]!.time).toBeCloseTo(2000, 5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await downloadScene(page)).actions[0]!.time).toBe(0);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  expect((await downloadScene(page)).actions[0]!.time).toBeCloseTo(2000, 5);
+  // Resize is independently undoable; Escape cancels without consuming the redo branch.
+  const resize = movement.locator('[data-resize]');
+  const edge = await resize.boundingBox();
+  if (!edge) throw new Error('Missing duration handle');
+  await page.mouse.move(edge.x + edge.width / 2, edge.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + edge.width / 2 + lane.width * 0.1, edge.y + 10, { steps: 4 });
+  await page.mouse.up();
+  expect((await downloadScene(page)).actions[0]).toMatchObject({ time: 2000, duration: 3000 });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const current = await movement.boundingBox();
+  if (!current) throw new Error('Missing movement clip');
+  await page.mouse.move(current.x + 15, current.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(current.x + 65, current.y + 10);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+  expect((await downloadScene(page)).actions[0]).toMatchObject({ time: 2000, duration: 2000 });
+  await page.getByLabel('Duplicate at (seconds)', { exact: true }).fill('5');
+  await page.getByRole('button', { name: 'Duplicate action', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'a: move action-2', exact: true })).toBeVisible();
+  // A second Actor can own the same channel at the same time.
+  await tracks.getByRole('button', { name: 'b', exact: true }).click();
+  await page.getByRole('button', { name: 'Add action', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'b: move action-3', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('animation');
+  await expect(page.getByRole('button', { name: 'Add action', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add action', exact: true }).click();
+  await page.getByText('Action properties · animation', { exact: true }).click();
+  expect(
+    await page.getByRole('combobox', { name: 'Animation ID', exact: true }).locator('option').allTextContents(),
+  ).toEqual(['idle', 'walk', 'sword', 'guardUpperBody']);
+  await page.getByRole('combobox', { name: 'Animation ID', exact: true }).selectOption('walk');
+  await page.getByLabel('Loop within duration', { exact: true }).check();
+  await page.getByRole('button', { name: 'Apply action properties' }).click();
+  await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('cue');
+  await page.getByRole('button', { name: 'Add action', exact: true }).click();
+  await page.getByText('Action properties · cue', { exact: true }).click();
+  await page.getByLabel('Cue name', { exact: true }).fill('arrived');
+  await page.getByLabel('Payload (JSON, optional)', { exact: true }).fill('{"location":"door"}');
+  await page.getByRole('button', { name: 'Apply action properties' }).click();
+  const result = await downloadScene(page);
+  expect(result.actions).toHaveLength(5);
+  expect(result.actions[3]).toMatchObject({ type: 'animation', animation: 'walk', loop: true });
+  expect(result.actions[4]).toMatchObject({ type: 'cue', name: 'arrived', payload: { location: 'door' } });
+  await page.getByRole('button', { name: 'Delete action', exact: true }).click();
+  expect((await downloadScene(page)).actions).toHaveLength(4);
+  await page.getByLabel('Timeline zoom', { exact: true }).fill('4');
+  expect(await tracks.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('scene panel dividers resize inspector and timeline without authoring', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('scene-editor/');
+  await createScene(page, 'resizing');
+  const original = await downloadScene(page);
+  const inspector = page.getByRole('complementary', { name: 'Scene inspector', exact: true });
+  const timeline = page.getByRole('region', { name: 'Scene timeline', exact: true });
+  const widthDivider = page.getByRole('separator', { name: 'Scene inspector width', exact: true });
+  const heightDivider = page.getByRole('separator', { name: 'Scene timeline height', exact: true });
+  const originalWidth = (await inspector.boundingBox())!.width;
+  const originalHeight = (await timeline.boundingBox())!.height;
+  const vertical = (await widthDivider.boundingBox())!;
+  await page.mouse.move(vertical.x + vertical.width / 2, vertical.y + 50);
+  await page.mouse.down();
+  await page.mouse.move(vertical.x + vertical.width / 2 - 100, vertical.y + 50, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await inspector.boundingBox())!.width).toBeCloseTo(originalWidth + 100, 0);
+  const horizontal = (await heightDivider.boundingBox())!;
+  await page.mouse.move(horizontal.x + 50, horizontal.y + horizontal.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(horizontal.x + 50, horizontal.y + horizontal.height / 2 - 80, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await timeline.boundingBox())!.height).toBeCloseTo(originalHeight + 80, 0);
+  await widthDivider.press('Home');
+  await expect.poll(async () => (await inspector.boundingBox())!.width).toBe(260);
+  await widthDivider.press('ArrowLeft');
+  await expect.poll(async () => (await inspector.boundingBox())!.width).toBe(270);
+  await heightDivider.press('Home');
+  await expect.poll(async () => (await timeline.boundingBox())!.height).toBe(240);
+  await heightDivider.press('ArrowUp');
+  await expect.poll(async () => (await timeline.boundingBox())!.height).toBe(260);
+  await widthDivider.press('End');
+  await heightDivider.press('End');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const layout = page.locator('.scene-workspace-body');
+  await expect
+    .poll(async () => (await inspector.boundingBox())!.width)
+    .toBeLessThanOrEqual((await layout.boundingBox())!.width - 572);
+  await expect
+    .poll(async () => (await timeline.boundingBox())!.height)
+    .toBeLessThanOrEqual((await layout.boundingBox())!.height - 212);
+  await expect
+    .poll(async () => {
+      const host = (await page.locator('#scene-stage-canvas').boundingBox())!;
+      const canvas = (await page.locator('#scene-stage-canvas canvas').boundingBox())!;
+      return canvas.width <= host.width + 1 && canvas.height <= host.height + 1;
+    })
+    .toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(800);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  expect(await downloadScene(page)).toEqual(original);
   expect(errors).toEqual([]);
 });

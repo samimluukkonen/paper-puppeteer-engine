@@ -20,8 +20,17 @@ function fixture(): SceneDefinition {
       { id: 'friend', character: { manifest: '../characters/hero/character.json' }, position: { x: 120, y: 40 } },
     ],
     actions: [
-      { type: 'animation', actorId: 'hero', time: 0, animation: 'walk' },
-      { type: 'face', actorId: 'friend', time: 2000, facing: 'left' },
+      {
+        id: 'walk',
+        type: 'animation',
+        actorId: 'hero',
+        time: 0,
+        animation: 'walk',
+        duration: 1000,
+        loop: false,
+        speed: 1,
+      },
+      { id: 'face', type: 'face', actorId: 'friend', time: 2000, target: { type: 'direction', facing: 'left' } },
     ],
   };
 }
@@ -29,7 +38,7 @@ function fixture(): SceneDefinition {
 test('empty scenes need no character, rig, JSON or renderer and get independent arrays', () => {
   const scene = createEmptyScene({ id: 'empty' });
   assert.deepEqual(scene, {
-    version: 1,
+    version: 2,
     id: 'empty',
     name: 'Untitled Scene',
     duration: 10000,
@@ -121,8 +130,9 @@ test('optional catalog checks character existence, starting animation/skin, and 
 });
 
 test('version errors use the existing version contract, while JSON parsing remains bounded', () => {
-  assert.ok(validateSceneDefinition({ ...fixture(), version: 2 }).some(({ path }) => path === 'version'));
-  assert.throws(() => parseSceneDefinition({ ...fixture(), version: 2 }), UnsupportedFormatVersionError);
+  assert.ok(validateSceneDefinition({ ...fixture(), version: 3 }).some(({ path }) => path === 'version'));
+  assert.throws(() => parseSceneDefinition({ ...fixture(), version: 3 }), UnsupportedFormatVersionError);
+  assert.throws(() => parseSceneDefinition({ ...fixture(), version: 1 }), UnsupportedFormatVersionError);
   assert.throws(() => parseSceneDefinition({ ...fixture(), version: undefined }), SceneValidationError);
   assert.throws(() => parseSceneJson('{'), SyntaxError);
   assert.throws(() => parseSceneJson(' '.repeat(10 * 1024 * 1024 + 1)), /size limit/);

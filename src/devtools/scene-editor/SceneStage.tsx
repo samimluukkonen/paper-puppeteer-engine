@@ -244,6 +244,13 @@ class SceneStage extends Phaser.Scene {
       for (let y = Math.floor(top.y / 32) * 32; y <= bottom.y; y += 32) this.grid.lineBetween(top.x, y, bottom.x, y);
     }
     this.overlay.clear();
+    const action = this.document.workingScene?.actions.find((entry) => entry.id === this.document.selectedActionId);
+    if (action?.type === 'move') {
+      const { x, y } = action.destination;
+      const size = 10 / camera.zoom;
+      this.overlay.lineStyle(2 / camera.zoom, 0x85bf9b).strokeCircle(x, y, size);
+      this.overlay.lineBetween(x - size, y, x + size, y).lineBetween(x, y - size, x, y + size);
+    }
     const id = this.document.selectedActorId;
     const actor = id && this.preview.instances.get(id)?.actor;
     if (!actor) return;

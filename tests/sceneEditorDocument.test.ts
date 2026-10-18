@@ -6,7 +6,15 @@ import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 const source = () => ({
   ...createEmptyScene({ id: 'opening' }),
   actors: [{ id: 'hero', character: { manifest: '../characters/hero/character.json' }, position: { x: 1, y: 2 } }],
-  actions: [{ type: 'face' as const, actorId: 'hero', time: 500, facing: 'left' as const }],
+  actions: [
+    {
+      id: 'face',
+      type: 'face' as const,
+      actorId: 'hero',
+      time: 500,
+      target: { type: 'direction' as const, facing: 'left' as const },
+    },
+  ],
 });
 
 test('new scenes are independent unsaved drafts, including after undo or revert to their initial source', () => {
