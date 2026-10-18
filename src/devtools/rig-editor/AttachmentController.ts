@@ -1,6 +1,7 @@
 import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import type { RigEditor } from './RigEditor.js';
 
 /** React adapter. Slot/attachment selection belongs exclusively to RigEditorState. */
@@ -25,7 +26,7 @@ export class AttachmentController {
   }
   refresh(): void {
     this.snapshot = { ...this.snapshot, editor: this.editor, revision: this.snapshot.revision + 1 };
-    for (const listener of this.listeners) listener();
+    notifySubscribers(this.listeners, 'Attachment subscribers failed.');
   }
   private run(action: (editor: RigEditor) => void | false, message: string): void {
     const editor = this.editor;
