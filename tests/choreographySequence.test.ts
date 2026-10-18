@@ -544,3 +544,18 @@ test('owned animation cancellation preserves pending queue requests on its own c
   assert.equal(puppet.getPlaybackStatus()?.status, 'stopped');
   assert.equal(puppet.getQueue()[0]?.name, 'attack');
 });
+
+test.each(['complete', 'cancel', 'dispose'] as const)(
+  'sequence %s releases captured cue and target references',
+  async (mode) => {
+    const { actor } = fixture();
+    const sequence = new ChoreographySequence(actor).cue(() => {}).lookAt({ x: 10, y: 0 });
+    if (mode === 'cancel') sequence.cancel();
+    if (mode === 'dispose') sequence.dispose();
+    const result = await sequence.run();
+    assert.isTrue(Object.isFrozen(result));
+    assert.equal(result.status, mode === 'complete' ? 'completed' : mode === 'cancel' ? 'cancelled' : 'disposed');
+    const steps: unknown = Reflect.get(sequence, 'steps');
+    assert.deepEqual(steps, []);
+  },
+);

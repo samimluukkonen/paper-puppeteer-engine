@@ -75,6 +75,8 @@ export class ActorMovement {
     const speed = options.speed === undefined ? 120 : options.speed;
     assertFinite(speed, 'Movement speed');
     if (speed <= 0) throw new Error('Movement speed must be positive.');
+    if (options.faceMovement !== undefined && typeof options.faceMovement !== 'boolean')
+      throw new Error('faceMovement must be a boolean.');
     this.distance(destination);
     if (locomotion) {
       for (const name of [locomotion.walk, locomotion.idle]) {
@@ -210,9 +212,10 @@ export class ActorMovement {
 
   /** Measure in world units even when the outer container has a scaled/rotated parent. */
   private distance(destination: Readonly<Point>): number {
-    const start = this.position();
-    let dx = destination.x - start.x;
-    let dy = destination.y - start.y;
+    const x = this.puppet.container.x;
+    const y = this.puppet.container.y;
+    let dx = destination.x - x;
+    let dy = destination.y - y;
     const parent = this.puppet.container.parentContainer;
     if (parent) {
       const matrix = parent.getWorldTransformMatrix();
@@ -222,7 +225,7 @@ export class ActorMovement {
     }
     const distance = Math.hypot(dx, dy);
     assertFinite(distance, 'Movement distance');
-    if (distance === 0 && (start.x !== destination.x || start.y !== destination.y))
+    if (distance === 0 && (x !== destination.x || y !== destination.y))
       throw new Error('Movement direction is collapsed by the parent transform.');
     return distance;
   }
@@ -234,11 +237,12 @@ export class ActorMovement {
       const fraction = distance === 0 ? 1 : Math.min((request.speed * (delta / 1000)) / distance, 1);
       if (distance > 0 && fraction > 0) this.faceDestination(request);
       if (this.current !== request) return;
-      const start = this.position();
+      const x = this.puppet.container.x;
+      const y = this.puppet.container.y;
       const destination = request.destination;
       this.puppet.container.setPosition(
-        fraction === 1 ? destination.x : start.x + (destination.x - start.x) * fraction,
-        fraction === 1 ? destination.y : start.y + (destination.y - start.y) * fraction,
+        fraction === 1 ? destination.x : x + (destination.x - x) * fraction,
+        fraction === 1 ? destination.y : y + (destination.y - y) * fraction,
       );
       this.puppet.syncPose();
       if (fraction === 1 && this.current === request) this.finish('completed');

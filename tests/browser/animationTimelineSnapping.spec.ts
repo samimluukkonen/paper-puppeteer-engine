@@ -102,8 +102,21 @@ for (const zoom of ['1', '2', '4']) {
       await expect(guide(page)).toBeHidden();
       await page.keyboard.up('Shift');
       await expect(guide(page)).toBeVisible();
-      await move(page, time, y, 12);
-      await expect(guide(page)).toBeHidden();
+      if (mode === 'frames') {
+        const bounds = (await page.locator('#timeline').boundingBox())!;
+        const framePixels = bounds.width / 20; // Two seconds, ten authored frames per second.
+        if (framePixels > 20) {
+          await move(page, time, y, framePixels / 2);
+          await expect(guide(page)).toBeHidden();
+        } else {
+          // Dense frame ranges overlap; moving one frame should select the adjacent candidate.
+          await move(page, time, y, framePixels);
+          await expect(guide(page)).toHaveAttribute('data-time', String(time + 0.1));
+        }
+      } else {
+        await move(page, time, y, 12);
+        await expect(guide(page)).toBeHidden();
+      }
       await page.keyboard.press('Escape');
       await page.mouse.up();
       await expect(key(page, 0.2)).toHaveCount(1);

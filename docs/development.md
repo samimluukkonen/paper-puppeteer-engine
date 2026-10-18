@@ -36,6 +36,8 @@ The command builds the demo, then runs every scenario against both the Vite deve
 
 See the [profiling guide](profiling.md) for optional CPU and browser profiles, workload descriptions, and historical measurements. Profiles are local diagnostics and have no timing thresholds.
 
+The [v0.8 Actor/choreography report](release-notes-v0.8.md) records the additional production-scene gates and measurements. The standalone consumer also builds `choreography.html` for local two-Actor completion/cancellation/shutdown checks. `PPE_PACKAGE_BROWSER=1 PLAYWRIGHT_CHANNEL=chrome npm run test:package` opts into its desktop browser suite against an isolated packed install; normal package/CI checks do not run browsers.
+
 ## Tooling
 
 Use `npm run format` / `npm run format:check` for formatting, and `npm run lint` / `npm run lint:fix` for linting. Oxfmt's root `.oxfmtrc.json` keeps two-space indentation, single quotes in JavaScript/TypeScript, double quotes in CSS, semicolons, trailing commas, 120-column lines, and sorted imports. Side-effect imports retain their order; embedded code snippets and package fields are not reorganized. Oxfmt covers TypeScript, JavaScript, JSON/JSONC, CSS, HTML, Markdown, and YAML. Dependency/build/coverage/browser-test outputs, caches, temporary directories, and the npm lockfile are excluded. `plans/` holds historical and in-progress design notes and is excluded from formatting to avoid rewriting those records.

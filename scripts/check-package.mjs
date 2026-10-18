@@ -179,6 +179,7 @@ import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine
 import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
+export { createScriptedScene } from './choreography-example.js';
 
 if (RootPuppet !== RuntimePuppet) throw new Error('Root and /runtime must share the Puppet class.');
 if (RootActor !== Actor) throw new Error('Root and /runtime must share the Actor class.');
@@ -240,9 +241,21 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
     join(consumer, 'runtime-example.ts'),
     example.replace('../engine/runtime.js', 'paper-puppeteer-engine/runtime'),
   );
+  const choreographyExample = (
+    await readFile(new URL('../src/examples/choreography.ts', import.meta.url), 'utf8')
+  ).replace('../engine/runtime.js', 'paper-puppeteer-engine/runtime');
+  assert.equal(
+    (await readFile(new URL('../examples/standalone/src/scriptedScene.ts', import.meta.url), 'utf8')).replace(
+      "import type Phaser from 'phaser';\n",
+      '',
+    ),
+    choreographyExample.replace("import type Phaser from 'phaser';\n", ''),
+    'The standalone scene must match the reusable runtime example.',
+  );
+  await writeFile(join(consumer, 'choreography-example.ts'), choreographyExample);
   // Match the repository's skipLibCheck for the browser entry's third-party Phaser declarations.
   config.compilerOptions.skipLibCheck = true;
-  config.include = ['browser.ts'];
+  config.include = ['browser.ts', 'choreography-example.ts'];
   await writeFile(join(consumer, 'tsconfig.json'), JSON.stringify(config));
   typecheck();
   const browserBuild = await build({
@@ -281,6 +294,16 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
   npm(['run', 'test'], standalone);
   npm(['run', 'build'], standalone);
   await readFile(join(standalone, 'dist/character/character.json'));
+  // Explicitly opt in locally; regular release/CI checks do not install or launch browsers.
+  if (process.env.PPE_PACKAGE_BROWSER === '1') {
+    await mkdir(join(consumer, 'node_modules/@playwright'), { recursive: true });
+    await symlink(
+      dirname(installed.resolve('@playwright/test/package.json')),
+      join(consumer, 'node_modules/@playwright/test'),
+      'dir',
+    );
+    npm(['run', 'test:browser'], standalone);
+  }
   console.log(
     'Packed package works in an isolated consumer: documentation, Node entry points, public declarations, runtime example, compatibility, browser isolation, and standalone test/build.',
   );

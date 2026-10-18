@@ -624,3 +624,12 @@ test('Puppet destruction stops the current update listener snapshot', () => {
   puppet.update(10);
   assert.equal(later.mock.calls.length, 0);
 });
+
+test.each([null, 'yes', 1])('invalid direct walk facing option %s preserves the current movement', async (value) => {
+  const { actor, puppet } = fixture({ locomotion });
+  const current = actor.moveTo(100, 0, { speed: 100 });
+  await expect(actor.walkTo(200, 0, { faceMovement: value as unknown as boolean })).rejects.toThrow(/boolean/);
+  puppet.update(1000);
+  assert.equal((await current).status, 'completed');
+  assert.equal(actor.position.x, 100);
+});

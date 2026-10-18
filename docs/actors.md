@@ -1,4 +1,4 @@
-# Actors, movement and facing (v0.8.3)
+# Actors, movement and facing (v0.8.6)
 
 [All guides](../README.md#guides)
 
@@ -39,6 +39,10 @@ actor.dispose();
 ```
 
 Animation names in this example must exist in the supplied character. `animationStates` is optional; supplying it constructs the existing `AnimationStateController` and starts its initial state. Without it, use `play()` directly. `setState()`, `playAction()` and `currentState` require this configuration. Initial state playback may invoke the host's existing animation callbacks.
+
+See the [production scene guide](choreography-production.md) for a complete exported-character example, integration semantics and cleanup.
+
+See the [production scene guide](choreography-production.md) for a complete exported-character example, integration semantics and cleanup.
 
 ## Public API
 

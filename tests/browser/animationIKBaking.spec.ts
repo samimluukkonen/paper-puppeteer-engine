@@ -2,7 +2,8 @@ import { expect } from '@playwright/test';
 import { animationFileSchema, rigFileSchema } from '../../src/engine/schemas.js';
 import { animationMenuControl, toggleAnimationToolPanel, test } from './fixtures.js';
 
-test.describe.configure({ timeout: 60000 });
+// These full preview/bake/Undo workflows include several rendered canvas comparisons.
+test.describe.configure({ timeout: 180_000 });
 
 test('dense bake planning keeps timeline navigation responsive and closing terminates its worker', async ({ page }) => {
   await page.route('**/demo-puppet/rig.json', async (route) => {

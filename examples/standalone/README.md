@@ -13,7 +13,7 @@ npm run build
 npm run dev
 ```
 
-`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.7.6-6.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
+`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.8.6.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
 
 The checked-in `public/character/` folder is an extracted character export. It includes an edited idle key, walk and sword events, authored and baked IK reach clips, finite attack/recovery clips and looping run, several skins/attachments, and helmet artwork replacing the default head. The root integration test re-exports its representative editor snapshot through the existing exporter and checks these files. The Node test loads this fixture using the installed `/core` API, checks motion/events and verifies every image exists.
 
@@ -31,7 +31,7 @@ npm run test:browser
 PLAYWRIGHT_CHANNEL=chrome npm run test:browser
 ```
 
-These tests serve the production build under `/consumer/`, exercise clips, events, appearance and disposal, and cancel an unfinished load. Controller scenarios verify FIFO, one-shot return, async completion/cancellation and disposal while waiting. They remain local-only. Root `npm run test:package` runs this example's actual `test` and `build` commands in a temporary directory against the packed library, reusing installed build tools offline; it does not run browser tests.
+These tests serve the production build under `/consumer/`, exercise clips, events, appearance and disposal, and cancel an unfinished load. Controller scenarios verify FIFO, one-shot return, async completion/cancellation and disposal while waiting. They remain local-only. Root `npm run test:package` runs this example's actual `test` and `build` commands in a temporary directory against the packed library, reusing installed build tools offline. To opt into its local browser suite against that same isolated install, run `PPE_PACKAGE_BROWSER=1 PLAYWRIGHT_CHANNEL=chrome npm run test:package` from the repository root. The default package/CI checks do not run browsers.
 
 The root local `tests/browser/releaseWorkflow.spec.ts` scenario saves `release-character.zip` in its test output. Extract that exact ZIP into a temporary directory, then enable the optional handoff scenario:
 
@@ -39,6 +39,12 @@ The root local `tests/browser/releaseWorkflow.spec.ts` scenario saves `release-c
 PPE_WORKFLOW_CHARACTER_DIR=/absolute/path/to/extracted-character PLAYWRIGHT_CHANNEL=chrome npm run test:browser
 ```
 
-This additional scenario expects the workflow's `reach` clip, `release-cue` event and `release-alternate` skin. It serves the extracted files to the independently built app, verifies motion before/after sparse skin switching, events and disposal. Without the environment variable, only this optional handoff scenario is skipped; the three standard consumer scenarios still run. No editor source is imported into the consumer.
+This additional scenario expects the workflow's `reach` clip, `release-cue` event and `release-alternate` skin. It serves the extracted files to the independently built app, verifies motion before/after sparse skin switching, events and disposal. Without the environment variable, only this optional handoff scenario is skipped; the four standard consumer scenarios still run. No editor source is imported into the consumer.
 
 See the [developer integration guide](../../docs/runtime-integration.md) and [artist workflow](../../docs/artist-workflow.md).
+
+## Two Actor choreography
+
+Open `choreography.html` on the same server. Run Scene loads two instances of the shipped exported package, starts idle, walks them together concurrently, waits for both, faces them toward each other, plays `attack` then `recover`, returns to idle and disposes the scene resources. Run it again to repeat; Cancel Scene settles active actions and Clean Up destroys the game. `src/scriptedScene.ts` is a reusable runtime-only module matching `src/examples/choreography.ts` in the repository; package checks enforce this. Supply two manifest URLs and optional `{ idle, walk, action, response }` animation mappings for other packages. Shared textures remain host-owned.
+
+The local `test:browser` suite covers repeated completion, cancellation during walking and game shutdown, as well as the existing Puppet-only controls. See the repository production guide for coordinate, ownership and interruption contracts.

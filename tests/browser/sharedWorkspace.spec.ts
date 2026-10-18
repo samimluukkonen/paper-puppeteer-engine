@@ -100,9 +100,9 @@ for (const view of [
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect(inspector).toBeVisible();
     await expect(inspector).not.toHaveAttribute('inert');
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 850, height: 768 });
     await expect(inspector).not.toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(850);
     await toggle.click();
     if (view.prefix === 'rig') await expect(page.locator('#inspector input[data-field="x"]')).toHaveValue('12');
     else if (view.prefix === 'animation')

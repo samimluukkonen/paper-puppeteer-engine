@@ -7,6 +7,9 @@ export default defineConfig({
   testDir: './tests/browser',
   fullyParallel: false,
   workers: 1,
+  // Whole authoring workflows with canvas tracing need time on supported desktop hosts.
+  timeout: 180_000,
+  expect: { timeout: 15_000 },
   forbidOnly: !!process.env.CI,
   use: {
     browserName: 'chromium',

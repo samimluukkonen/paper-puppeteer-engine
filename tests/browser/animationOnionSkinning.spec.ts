@@ -58,7 +58,8 @@ test('onion skins render through scrubbing, facing, playback and boundaries with
 test('artist controls render multiple directions, spacing, opacity and tint while preserving clean authored state', async ({
   page,
 }) => {
-  test.setTimeout(60000);
+  // This workflow compares multiple rendered ghost configurations and authored edits.
+  test.setTimeout(180_000);
   await page.route('**/animations/idle.json', async (route) => {
     const response = await route.fetch();
     await route.fulfill({

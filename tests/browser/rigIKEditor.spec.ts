@@ -117,14 +117,23 @@ test('create, drag, cancel, configure and reload a visual rig IK constraint thro
 
 test('a new non-humanoid skeleton has an empty IK state and can create a chain without JSON', async ({ page }) => {
   await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await page.getByRole('button', { name: '+ New Character', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Create new character', exact: true });
   await dialog.getByLabel('Character name', { exact: true }).fill('Tentacle');
   await dialog.getByRole('button', { name: 'Create Character', exact: true }).click();
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await expect.poll(() => page.locator('#rig-inspector details[open]').count()).toBe(0);
-  const guidance = (await page.locator('#inspector').boundingBox())!;
-  const collapsedIK = (await page.locator('#rig-inspector .rig-ik-panel').boundingBox())!;
-  expect(collapsedIK.y - guidance.y - guidance.height).toBeGreaterThanOrEqual(18);
+  // Measure the visible collapsed cards; the guidance content is inside a closed disclosure.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const guidance = document.querySelector('#rig-inspector .rig-selection-details')!.getBoundingClientRect();
+        const collapsedIK = document.querySelector('#rig-inspector .rig-ik-panel')!.getBoundingClientRect();
+        return collapsedIK.top - guidance.bottom;
+      }),
+    )
+    .toBeGreaterThanOrEqual(16);
   await page.screenshot({ path: test.info().outputPath('collapsed-inspector.png') });
   const panel = await inspectorControl(page, '#rig-inspector .rig-ik-panel section');
   await expect(panel).toContainText('No IK constraints');

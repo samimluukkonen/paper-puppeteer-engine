@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.8.6
+
+Complete v0.8 Actor/choreography production hardening: add a reusable two-character scene using the actual exported standalone package, with concurrent walks, barrier, facing, finite responses, idle return and cleanup on every exit. Add repeated-scene, queue/state/crossfade, event, live/baked IK, skin, transform and consumer browser regressions. Validate direct walk facing options consistently, remove temporary frozen movement points from frame updates and release completed sequence cue/target references and freeze pre-run cancellation/disposal results. Add optional measured one/two/twelve-Actor CPU profiles, the [production guide](docs/choreography-production.md) and [v0.8 release report](docs/release-notes-v0.8.md). Public Puppet APIs and version-1 authored formats remain compatible. No publishing, tags or remote release is part of this change.
+
 ## 0.8.5
 
 Add optional runtime `Choreography` contexts with a lightweight Actor registry, lazy typed Actor actions, nested sequential/parallel composition and successful-outcome synchronization barriers. Reuse `ChoreographySequence` for every Actor leaf. Fail-fast coordination cancels owned siblings and waits for cleanup while preserving the first unsuccessful outcome. Preflight parallel Actor/Puppet conflicts; share exclusive active-sequence claims across contexts and standalone sequences through `ChoreographyConflictError`. Preserve direct host operations and existing clocks, animation events and Puppet lifecycle. Add deterministic multi-Actor, interruption, cancellation, disposal, registry, conflict, event and cleanup regressions, public declaration/consumer checks and the expanded [choreography guide](docs/choreography-sequences.md). Authored formats remain version 1; the shipped-character sample, wider integration/performance audit and final v0.8 readiness report remain deferred to v0.8.6.

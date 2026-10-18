@@ -32,10 +32,20 @@ export async function animationIKInspector(page: Page): Promise<Locator> {
 
 /** Expand the inspector's initially collapsed bone hierarchy before using its controls. */
 export async function animationHierarchy(page: Page): Promise<Locator> {
+  const settings = page.locator('#animation-clip-settings');
+  if (await settings.evaluate((element) => (element as HTMLDetailsElement).open))
+    await settings.locator(':scope > summary').click();
   const panel = page.locator('.animation-bone-list');
   if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open)))
     await panel.locator(':scope > summary').click();
   return page.locator('#animation-bones');
+}
+
+/** Select for editing while preserving an existing selection instead of toggling it off. */
+export async function selectAnimationBone(page: Page, name: string): Promise<void> {
+  const entry = (await animationHierarchy(page)).getByRole('button', { name, exact: true });
+  if ((await entry.getAttribute('aria-pressed')) === 'true') await entry.focus();
+  else await entry.click();
 }
 
 /** Calibrate the fitted rig camera from visible joint references, without private scene hooks. */
@@ -86,7 +96,9 @@ export async function rigCanvasProjection(page: Page) {
   const head = await reference('headVisual');
   const torso = await reference('torsoVisual');
   const scaleY = (head.screen.y - torso.screen.y) / (head.world.y - torso.world.y);
-  const scaleX = (scaleY * 640) / 760;
+  const canvasBounds = await canvas.boundingBox();
+  if (!canvasBounds) throw new Error('Missing rig canvas.');
+  const scaleX = (scaleY * canvasBounds.height) / canvasBounds.width;
   for (const { key, checked } of visibility) await page.locator(`input[data-visibility="${key}"]`).setChecked(checked);
   await page.locator('#edit-mode').selectOption('joint');
   await canvas.click({ position: { x: 4, y: 4 } });

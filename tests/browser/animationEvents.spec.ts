@@ -259,7 +259,12 @@ test('event drag uses shared snap policy, follows playhead, nudges, cancels and 
     // Endpoint marker centers lie on clipped lane edges; start in the visible hit area.
     const startX = Math.max(bounds.x + 2, Math.min(bounds.x + bounds.width - 2, box.x + box.width / 2));
     // Overshoot the lane within the viewport so Chrome still delivers pointer events.
-    const targetX = Math.max(1, Math.min(page.viewportSize()!.width - 1, bounds.x + (bounds.width * target) / 2));
+    // Preserve the grab offset, including a clipped endpoint's visible hit area.
+    const current = Number(await marker.getAttribute('data-time'));
+    const targetX = Math.max(
+      1,
+      Math.min(page.viewportSize()!.width - 1, startX + (bounds.width * (target - current)) / 2),
+    );
     await page.mouse.move(startX, box.y + box.height / 2);
     await page.mouse.down();
     if (bypass) await page.keyboard.down('Shift');

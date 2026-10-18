@@ -1,4 +1,4 @@
-# Choreography sequences and multi-Actor coordination (v0.8.5)
+# Choreography sequences and multi-Actor coordination (v0.8.6)
 
 [All guides](../README.md#guides)
 
@@ -148,4 +148,4 @@ Deterministic tests cover ordering, move/walk then play, play then face, natural
 
 Multi-Actor regressions additionally cover two concurrent walks on shared scene ticks, different arrival times, nested barriers and animation responses, deterministic delta partitions, group cancellation during movement/animation/waits/cues, fail-fast sibling cleanup, authored-event cancellation, external interruption, disposed Actors, registration, preflight conflicts including shared Puppet wrappers, cross-context/standalone claims, invalid future actions, cyclic plans, immutable results and reentrant execution.
 
-v0.8.6 remains deferred: the complete reusable two-character sample using shipped character packages, the wider public API/lifecycle audit, queue/state/crossfade/IK/skin integration stress tests, representative performance measurements and final v0.8 release-readiness documentation. Visual timelines, authored scene serialization, camera direction, dialogue branching, behavior trees, physics and navigation are outside this runner.
+The [v0.8.6 production guide](choreography-production.md) supplies the complete reusable two-character sample using exported packages, the API/lifecycle audit and integration semantics. The [v0.8 release report](release-notes-v0.8.md) records verification, cleanup and measured performance. Visual timelines, authored scene serialization, camera direction, dialogue branching, behavior trees, physics and navigation are outside this runner.

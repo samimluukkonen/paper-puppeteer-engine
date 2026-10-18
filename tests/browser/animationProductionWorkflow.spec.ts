@@ -1,8 +1,15 @@
 import { expect, type Page } from '@playwright/test';
-import { animationHierarchy, animationMenuControl, animationControl, animationFileAction, test } from './fixtures.js';
+import {
+  selectAnimationBone,
+  animationHierarchy,
+  animationMenuControl,
+  animationControl,
+  animationFileAction,
+  test,
+} from './fixtures.js';
 
 async function editRoot(page: Page, value: string) {
-  await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+  await selectAnimationBone(page, 'root');
   await page.locator('#animation-bone-fields input[data-property="x"]').fill(value);
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
 }
@@ -77,8 +84,8 @@ for (const mode of ['smooth', 'stepped']) {
   test(`${mode} rendered poses at keys, between keys and endpoints survive export/reload with facing and IK preview`, async ({
     page,
   }) => {
-    // Sixteen canvas captures plus import/reload can exceed 30 seconds with software rendering.
-    test.setTimeout(60000);
+    // Sixteen canvas captures plus import/reload need a full workflow budget with software rendering.
+    test.setTimeout(180_000);
     await page.goto('animation-editor/');
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
     await animationFileAction(page, '#animation-import-paste', (control) => control.click());

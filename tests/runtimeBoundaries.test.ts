@@ -124,3 +124,32 @@ test('the minimal runtime example imports only the public runtime barrel and Pha
     { specifier: './style.css', typeOnly: false },
   ]);
 });
+
+test('the two-Actor example uses only public runtime APIs and matches the standalone consumer', () => {
+  const source = readFileSync(new URL('../src/examples/choreography.ts', import.meta.url), 'utf8');
+  assert.deepEqual(dependencies(source), [
+    { specifier: 'phaser', typeOnly: true },
+    { specifier: '../engine/runtime.js', typeOnly: false },
+  ]);
+  assert.equal(
+    readFileSync(new URL('../examples/standalone/src/scriptedScene.ts', import.meta.url), 'utf8').replace(
+      "import type Phaser from 'phaser';\n",
+      '',
+    ),
+    source
+      .replace('../engine/runtime.js', 'paper-puppeteer-engine/runtime')
+      .replace("import type Phaser from 'phaser';\n", ''),
+  );
+});
+
+test('Puppet remains usable without a transitive dependency on Actor or choreography', () => {
+  const visited = new Set<string>();
+  const visit = (file: string): void => {
+    if (visited.has(file)) return;
+    visited.add(file);
+    assert.notMatch(relative(engine, file), /Actor|[Cc]horeography/);
+    for (const { specifier, typeOnly } of graph.get(file) ?? [])
+      if (!typeOnly && specifier.startsWith('.')) visit(dependencyFile(file, specifier));
+  };
+  visit(resolve(engine, 'Puppet.ts'));
+});

@@ -45,6 +45,8 @@ The animation format supports clip-level linear interpolation. Smooth and steppe
 
 The v0.5.4 [mirrored animation tools](docs/mirroring-hardening-verification.md) combine [bone pairing](docs/bone-symmetry-mapping.md), [bind-relative pose reflection](docs/pose-mirroring.md), [sparse keyframe authoring](docs/mirrored-keyframe-authoring.md), and [React controls](docs/react-mirroring-tools.md). Browser-local pair preferences and a read-only overlay support artist review before atomic, undoable commits. The completed hardening phase covers asymmetric rigs, lifecycle cleanup, runtime/serialization regressions and an [artist walkthrough](docs/animation-editor.md#mirror-a-left-arm-movement).
 
+The v0.8 [Actor and choreography layer](docs/choreography-production.md) supports direct movement, walk animation, spatial facing and synchronized sequential/parallel scenes with cancellation and ownership. See the [v0.8 release report](docs/release-notes-v0.8.md) for verification and limitations.
+
 ## Quick start
 
 v0.6.3 unifies the [React editor production workflow](docs/react-editor-workflow-verification.md): shared character ownership, retained clip sessions, independent dirty domains and safe editor navigation.

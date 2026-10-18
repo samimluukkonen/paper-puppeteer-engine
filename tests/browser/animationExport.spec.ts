@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationControl, animationFileAction, test } from './fixtures.js';
+import { selectAnimationBone, animationControl, animationFileAction, test } from './fixtures.js';
 
 async function editRoot(page: Page, value: string): Promise<void> {
-  await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+  await selectAnimationBone(page, 'root');
   await page.locator('#animation-bone-fields input[data-property="x"]').fill(value);
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');

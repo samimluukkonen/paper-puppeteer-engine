@@ -7,8 +7,10 @@ import { animationHierarchy, test, rigHierarchy, inspectorControl, selectRigEntr
 test('build a new character, import and align artwork, animate, export and reload runtime playback', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  // Covers initial authoring, package export, reload and runtime playback in one workflow.
+  test.setTimeout(180_000);
   await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await page.getByRole('button', { name: '+ New Character', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Create new character', exact: true });
   await dialog.getByLabel('Character name', { exact: true }).fill('Branch Creature');

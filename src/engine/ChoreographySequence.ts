@@ -121,8 +121,9 @@ export class ChoreographySequence {
     this.requested = status;
     this.cancellation.abort();
     if (!this.promise) {
+      this.steps.length = 0;
       this.settled = true;
-      this.promise = Promise.resolve({ status, completedSteps: 0 });
+      this.promise = Promise.resolve(Object.freeze({ status, completedSteps: 0 }));
     }
   }
 
@@ -162,6 +163,8 @@ export class ChoreographySequence {
     } finally {
       unsubscribeDispose?.();
       releaseOwnership?.();
+      // Completed scripts no longer retain cue closures or look-target Actors.
+      this.steps.length = 0;
     }
     this.settled = true;
     this.resolve!(Object.freeze(result));

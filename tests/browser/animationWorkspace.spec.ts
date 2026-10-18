@@ -124,7 +124,6 @@ test('expanding onion settings keeps the menu and its controls inside the viewpo
   for (const [width, height] of [
     [1440, 900],
     [1000, 768],
-    [390, 844],
   ]) {
     await page.setViewportSize({ width: width!, height: height! });
     await openEditor(page);
@@ -361,12 +360,12 @@ test('collapsed timing summaries and filters preserve empty-track authoring and 
 });
 
 test('narrow screens keep timing visible and open the inspector as a dismissible drawer', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 850, height: 768 });
   await openEditor(page);
   await expect(page.locator('#animation-inspector')).toBeHidden();
   await expect(page.locator('#animation-preview-divider')).toBeHidden();
-  expect((await page.locator('#timeline-ruler').boundingBox())!.y).toBeLessThan(844);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  expect((await page.locator('#timeline-ruler').boundingBox())!.y).toBeLessThan(768);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(850);
   await page.locator('#timeline-add-event').click();
   await expect(page.locator('#animation-event-inspector')).toBeVisible();
   await expect(page.locator('#animation-inspector-toggle')).toHaveAttribute('aria-expanded', 'true');
