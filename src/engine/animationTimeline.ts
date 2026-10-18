@@ -1,15 +1,48 @@
 import type { AnimationEvent, CompiledClip } from './AnimationClip.js';
+import { jsonDataCopyWork } from './jsonData.js';
 import { assertFinite } from './types.js';
 
 export const MAXIMUM_ANIMATION_EVENTS_PER_UPDATE = 10_000;
+export const MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK = 1_000_000;
+
+/** One operation budgets all layers, loop crossings and per-listener JSON copies before mutation. */
+export class AnimationEventBudget {
+  private count = 0;
+  private payloadWork = 0;
+
+  constructor(private readonly operation: 'update' | 'start' | 'restart' = 'update') {}
+
+  addEvent(event: AnimationEvent, occurrences = 1, listeners = 1): void {
+    if (occurrences <= 0) return;
+    this.count += occurrences;
+    assertAnimationEventBudget(this.count, this.operation);
+    this.payloadWork += occurrences * Math.max(1, listeners) * jsonDataCopyWork(event.data);
+    if (this.payloadWork > MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK)
+      throw new Error(
+        `Animation ${this.operation} exceeds the ${MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK}-unit event payload copy budget. Reduce payload sizes, listeners, or catch-up work.`,
+      );
+  }
+
+  addStartEvents(clip: CompiledClip, listeners = 1): void {
+    for (const event of clip.events) if (event.time === 0) this.addEvent(event, 1, listeners);
+  }
+
+  addCrossings(clip: CompiledClip, previous: number, end: number, listeners = 1): void {
+    if (end === previous) return;
+    for (const event of clip.events) {
+      const [first, last] = eventCycles(clip, previous, end, event.time);
+      this.addEvent(event, Math.max(0, last - first + 1), listeners);
+    }
+  }
+}
 
 export function countAnimationStartEvents(clip: CompiledClip): number {
   return clip.events.reduce((count, marker) => count + Number(marker.time === 0), 0);
 }
 
 /** Runtime start/restart convention, separate from the exclusive lower bound used by crossings. */
-export function collectAnimationStartEvents(clip: CompiledClip, layer: string) {
-  assertAnimationEventBudget(countAnimationStartEvents(clip), 'start');
+export function collectAnimationStartEvents(clip: CompiledClip, layer: string, listeners = 1) {
+  new AnimationEventBudget('start').addStartEvents(clip, listeners);
   return clip.events.filter((marker) => marker.time === 0).map((marker) => ({ ...marker, clip: clip.name, layer }));
 }
 

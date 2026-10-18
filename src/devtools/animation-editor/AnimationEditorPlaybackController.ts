@@ -120,6 +120,7 @@ export class AnimationEditorPlaybackController {
           this.playback.currentTimeMilliseconds,
           deltaSeconds,
           this.playback.playbackSpeed,
+          this.eventListeners.size,
         );
       } catch (error) {
         this.document.reportError(error);
@@ -146,7 +147,11 @@ export class AnimationEditorPlaybackController {
     const rig = this.document.rig;
     if (!required || !animation?.events?.length || !rig) return [];
     try {
-      return collectAnimationStartEvents(getEditorEventClip(animation, rig, this.playback.previewLoop), 'base');
+      return collectAnimationStartEvents(
+        getEditorEventClip(animation, rig, this.playback.previewLoop),
+        'base',
+        this.eventListeners.size,
+      );
     } catch (error) {
       this.document.reportError(error);
       this.actions.notify();

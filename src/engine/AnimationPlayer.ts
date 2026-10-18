@@ -6,11 +6,9 @@ import type { AnimationPose } from './AnimationPose.js';
 import type { AnimationQueueRequest, QueueAnimationOptions } from './AnimationQueue.js';
 import {
   advanceAnimationTime,
-  assertAnimationEventBudget,
+  AnimationEventBudget,
   collectAnimationEvents,
   collectAnimationStartEvents,
-  countAnimationEvents,
-  countAnimationStartEvents,
   wrapAnimationTime,
 } from './animationTimeline.js';
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
@@ -398,7 +396,7 @@ export class AnimationPlayer {
       return;
     }
     if (select) this.assertWaitable(clip);
-    const events = collectAnimationStartEvents(clip, layerName);
+    const events = collectAnimationStartEvents(clip, layerName, this.eventListeners.size);
     if (layerName === 'base' && !fromQueue) this.discardQueue();
     preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
@@ -518,7 +516,7 @@ export class AnimationPlayer {
     if (fadeDuration < 0) throw new Error('Fade duration cannot be negative.');
     const speed = options.speed === undefined ? 1 : options.speed;
     validateSpeed(speed);
-    assertAnimationEventBudget(countAnimationStartEvents(clip), 'start');
+    new AnimationEventBudget('start').addStartEvents(clip, this.eventListeners.size);
     return Object.freeze({ name: clip.name, options: Object.freeze({ fadeDuration, speed }) });
   }
 
@@ -562,15 +560,17 @@ export class AnimationPlayer {
       return;
     }
     // Restart is one notification boundary, including every selected layer.
-    let eventCount = 0;
-    for (const layer of this.layers.values()) {
-      if (layer.state) eventCount += countAnimationStartEvents(layer.state.clip);
-      assertAnimationEventBudget(eventCount, 'restart');
+    const eventBudget = new AnimationEventBudget('restart');
+    const events: FiredAnimationEvent[] = [];
+    for (const [name, layer] of this.layers) {
+      if (!layer.state) continue;
+      eventBudget.addStartEvents(layer.state.clip, this.eventListeners.size);
+      for (const event of collectAnimationStartEvents(layer.state.clip, name, this.eventListeners.size))
+        events.push(event);
     }
     this.discardQueue();
     preparePose?.();
     this.resetPose();
-    const events: FiredAnimationEvent[] = [];
     const lifecycle: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {
       if (!layer.state) continue;
@@ -580,7 +580,6 @@ export class AnimationPlayer {
       lifecycle.push({ ...this.playbackStatus(layer.state, name), type: 'started' });
       layer.transition = undefined;
       layer.stopped = false;
-      for (const event of collectAnimationStartEvents(layer.state.clip, name)) events.push(event);
     }
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
@@ -719,13 +718,12 @@ export class AnimationPlayer {
     }
     if (!advancing) return false;
     // Validate every clock and the total catch-up work before mutating any layer.
-    let eventCount = 0;
+    const eventBudget = new AnimationEventBudget();
     for (const layer of this.layers.values()) {
       const state = layer.state;
       if (state?.playing) {
         const end = advanceAnimationTime(state, delta, this.speed);
-        eventCount += countAnimationEvents(state.clip, state.time, end);
-        assertAnimationEventBudget(eventCount);
+        eventBudget.addCrossings(state.clip, state.time, end, this.eventListeners.size);
       }
       const source = layer.transition?.source;
       if (!layer.stopped && source && !(source instanceof Map) && source.playing)

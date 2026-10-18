@@ -1,10 +1,5 @@
 import { compileValidatedClip, type CompiledClip } from '../../engine/AnimationClip.js';
-import {
-  advanceAnimationTime,
-  assertAnimationEventBudget,
-  collectAnimationEvents,
-  countAnimationEvents,
-} from '../../engine/animationTimeline.js';
+import { advanceAnimationTime, AnimationEventBudget, collectAnimationEvents } from '../../engine/animationTimeline.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import { toMilliseconds, type Milliseconds, type Seconds } from './timeUnits.js';
@@ -32,13 +27,19 @@ export function getEditorEventClip(animation: ReadonlyAnimation, rig: Rig, loop:
 }
 
 /** Preflight runtime crossings before the editor clock changes; never reduce a delta before event traversal. */
-export function collectEditorPlaybackEvents(clip: CompiledClip, previous: Milliseconds, delta: Seconds, speed: number) {
+export function collectEditorPlaybackEvents(
+  clip: CompiledClip,
+  previous: Milliseconds,
+  delta: Seconds,
+  speed: number,
+  listeners = 1,
+) {
   const start = previous;
   // Clamp non-looping updates before unit conversion to retain safe endpoint behavior for huge finite deltas.
   const end =
     !clip.loop && delta * speed >= (clip.duration - previous) / 1000
       ? clip.duration
       : advanceAnimationTime({ clip, time: start, speed: 1 }, toMilliseconds(delta), speed);
-  assertAnimationEventBudget(countAnimationEvents(clip, start, end));
+  new AnimationEventBudget().addCrossings(clip, start, end, listeners);
   return collectAnimationEvents(clip, start, end, 'base');
 }

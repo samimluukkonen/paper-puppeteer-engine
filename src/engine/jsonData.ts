@@ -1,3 +1,4 @@
+import { isFullyFrozen } from './readonlyData.js';
 import type { ValidationIssue } from './validation.js';
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
@@ -106,8 +107,48 @@ function inspectJson(
   return safeToInspect;
 }
 
-/** Copy JSON payloads while retaining reference semantics for arbitrary runtime values. */
-export function copyJsonData<Value>(value: Value): Value {
+interface JsonCopyProfile {
+  readonly clone: boolean;
+  readonly work: number;
+}
+const immutableCopyProfiles = new WeakMap<object, JsonCopyProfile>();
+
+/** JSON nodes and string/key code units approximate repeated traversal and allocation work. */
+function copyWork(value: unknown): number {
+  if (typeof value === 'string') return 1 + value.length;
+  if (value === null || typeof value !== 'object') return 1;
+  return Object.entries(value).reduce(
+    (work, [key, child]) => work + (Array.isArray(value) ? 0 : key.length) + copyWork(child),
+    1,
+  );
+}
+
+function copyProfile(value: unknown): JsonCopyProfile {
+  if (value === null || typeof value !== 'object') {
+    const work =
+      typeof value === 'string'
+        ? 1 + value.length
+        : value === null || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
+          ? 1
+          : 0;
+    return { clone: false, work };
+  }
+  const cached = immutableCopyProfiles.get(value);
+  if (cached) return cached;
   const issues: ValidationIssue[] = [];
-  return checkJson(value, '', issues) && issues.length === 0 ? structuredClone(value) : value;
+  const json = checkJson(value, '', issues) && issues.length === 0;
+  const profile = { clone: json, work: json ? copyWork(value) : 0 };
+  // A shallow freeze is insufficient: nested runtime payloads may still change shape.
+  if (isFullyFrozen(value)) immutableCopyProfiles.set(value, profile);
+  return profile;
+}
+
+/** @internal Non-JSON runtime data is passed by reference and does not incur JSON-copy work. */
+export function jsonDataCopyWork(value: unknown): number {
+  return copyProfile(value).work;
+}
+
+/** Copy JSON payloads; only deeply immutable inputs can reuse their validation result. */
+export function copyJsonData<Value>(value: Value): Value {
+  return copyProfile(value).clone ? structuredClone(value) : value;
 }
