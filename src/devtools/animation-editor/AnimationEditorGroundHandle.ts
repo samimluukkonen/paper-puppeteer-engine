@@ -4,7 +4,7 @@ import { groundGuideHandleHit } from '../shared/groundGuide.js';
 import type { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 
-/** Owns only the ground-label gesture. Neither the clock nor animation drafts are modified. */
+/** Shared character-workspace ground-label gesture. Rig/animation drafts and the clock stay untouched. */
 export class AnimationEditorGroundHandle {
   private pointerId: number | undefined;
   private offset = 0;
@@ -26,15 +26,13 @@ export class AnimationEditorGroundHandle {
     window.addEventListener?.('visibilitychange', this.visibilityChanged, true);
     let animation = state.selectedAnimationId;
     let revision = state.sessionRevision;
+    let mode = state.editorMode;
     this.unsubscribe = state.subscribe(() => {
-      if (
-        state.editorMode !== 'animation' ||
-        animation !== state.selectedAnimationId ||
-        revision !== state.sessionRevision
-      )
+      if (mode !== state.editorMode || animation !== state.selectedAnimationId || revision !== state.sessionRevision)
         this.cancel();
       animation = state.selectedAnimationId;
       revision = state.sessionRevision;
+      mode = state.editorMode;
     });
     this.unsubscribeGuide = workspace.subscribe(() => {
       if (!workspace.getSnapshot().dragging) this.pointerId = undefined;
@@ -57,7 +55,6 @@ export class AnimationEditorGroundHandle {
     if (this.pointerId !== undefined) return true;
     if (
       pointer.button !== 0 ||
-      this.state.editorMode !== 'animation' ||
       this.state.ikTargetDrag ||
       this.state.keyframeDrag ||
       this.state.eventDrag ||

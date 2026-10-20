@@ -89,7 +89,7 @@ function CharacterWorkspace() {
         </p>
       )}
       <div id="editor-app" className="view-shell workspace-shell rig-workspace" hidden={!rigView} inert={!rigView}>
-        <RigEditorView header={rigView} {...(rigView ? { packages, artwork, attachments } : {})} />
+        <RigEditorView header={rigView} {...(rigView ? { packages, artwork, attachments, groundGuide } : {})} />
       </div>
       <div
         id="animation-editor-app"

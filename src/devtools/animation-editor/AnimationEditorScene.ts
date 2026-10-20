@@ -191,7 +191,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.ikHandles?.render();
     if (this.groundOverlay) {
       const guide = this.groundGuide.getSnapshot().guide;
-      this.groundOverlay.render(this.rigMode ? { ...guide, enabled: false } : guide);
+      this.groundOverlay.render(guide);
     }
     const overlay = this.selectionOverlay;
     overlay?.clear();
@@ -544,6 +544,7 @@ export class AnimationEditorScene extends Phaser.Scene {
             this.rebuildingRig = false;
           }
         },
+        (pointer) => this.groundHandle?.pointerDown(pointer) ?? false,
       );
       let previousMode = state.editorMode;
       this.releaseMode = state.subscribe(() => {

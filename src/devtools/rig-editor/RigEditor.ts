@@ -79,6 +79,8 @@ export class RigEditor {
     private readonly currentPreviewClips?: () => readonly CompiledClip[],
     /** Rebind shared preview consumers after editor-owned topology reconstruction. */
     private readonly onRebuild?: (puppet: Puppet) => void,
+    /** Shared host overlays may claim a pointer before rig gizmos begin a gesture. */
+    private readonly claimPointer?: (pointer: Phaser.Input.Pointer) => boolean,
   ) {
     this.state =
       state ??
@@ -138,6 +140,7 @@ export class RigEditor {
       this.overlay,
       this.onChange,
       () => this.update(),
+      this.claimPointer,
     );
     this.inputController.enable();
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.

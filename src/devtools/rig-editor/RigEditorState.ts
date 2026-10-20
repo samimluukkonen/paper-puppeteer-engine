@@ -5,6 +5,7 @@ import {
   type ValidationIssue,
   validateRigDefinition,
 } from '../../engine/externalData.js';
+import { createFootContactMarker, type CreateFootContactMarkerOptions } from '../../engine/footContactMarkers.js';
 import {
   assertIKConstraintChangesAllowed,
   createIKConstraint,
@@ -18,6 +19,7 @@ import {
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Rig } from '../../engine/Rig.js';
+import { footContactMarkerSchema } from '../../engine/schemas.js';
 import type {
   BoneDefinition,
   FootContactMarker,
@@ -39,7 +41,15 @@ import { serializeRigData, serializeRigJson } from './rigSerialization.js';
 import { RigStructureCommands } from './RigStructureCommands.js';
 
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
-export type VisibilityKey = 'artwork' | 'bones' | 'boneNames' | 'boneLengths' | 'slots' | 'spriteOrigins' | 'ik';
+export type VisibilityKey =
+  | 'artwork'
+  | 'bones'
+  | 'boneNames'
+  | 'boneLengths'
+  | 'slots'
+  | 'spriteOrigins'
+  | 'ik'
+  | 'footContacts';
 export type EditMode = 'joint' | 'sprite' | 'origin' | 'slot';
 export type BoneField = TransformProperty | 'length' | 'depth';
 export type SlotField = TransformProperty | 'depth';
@@ -57,6 +67,8 @@ export interface RigEditorStateOptions {
   boneReferences?: (id: string) => readonly string[];
   /** Live IK track, baked metadata and specialized host references. Also reserves host-owned IDs. */
   ikReferences?: (id: string) => readonly string[];
+  /** Live persisted marker references, including host Scene Editor grounding selections. */
+  footContactReferences?: (id: string) => readonly string[];
 }
 
 export type { RigEditorRecoverySnapshot } from './rigDraftRecovery.js';
@@ -98,6 +110,7 @@ export class RigEditorState {
   }
   selection: RigEditorSelection = null;
   selectedIKConstraintId: string | null = null;
+  selectedFootContactMarkerId: string | null = null;
   private targetDragId: string | undefined;
   get ikTargetDragId(): string | undefined {
     return this.targetDragId;
@@ -115,6 +128,7 @@ export class RigEditorState {
     slots: true,
     spriteOrigins: false,
     ik: false,
+    footContacts: true,
   };
   artworkOpacity = 1;
   gridSnap: GridSnap = 0;
@@ -145,6 +159,7 @@ export class RigEditorState {
   private readonly artworkIssue: RigEditorStateOptions['artworkIssue'];
   private readonly boneReferences: RigEditorStateOptions['boneReferences'];
   private readonly ikReferences: RigEditorStateOptions['ikReferences'];
+  private readonly footContactReferences: RigEditorStateOptions['footContactReferences'];
 
   constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
     this.history = new SnapshotHistory(
@@ -158,6 +173,7 @@ export class RigEditorState {
     this.artworkIssue = options.artworkIssue;
     this.boneReferences = options.boneReferences;
     this.ikReferences = options.ikReferences;
+    this.footContactReferences = options.footContactReferences;
     this.externalSkins = freezeData(structuredClone(options.standaloneSkins ?? []));
     this.initialExternalSkins = this.externalSkins;
     for (const skin of this.externalSkins) this.savedExternalSkins.set(skin.name, skin);
@@ -346,6 +362,11 @@ export class RigEditorState {
   }
 
   private reconcileSelection(): void {
+    if (
+      this.selectedFootContactMarkerId &&
+      !this.data.footContactMarkers?.some((entry) => entry.id === this.selectedFootContactMarkerId)
+    )
+      this.selectedFootContactMarkerId = null;
     if (this.selectedIKConstraintId && !this.data.ik?.some((entry) => entry.name === this.selectedIKConstraintId))
       this.selectedIKConstraintId = null;
     if (
@@ -356,6 +377,15 @@ export class RigEditorState {
   }
 
   private assertRetainedReferences(candidate: RigDefinition): void {
+    const markerIds = new Set(candidate.footContactMarkers?.map((marker) => marker.id));
+    for (const marker of this.data.footContactMarkers ?? []) {
+      if (markerIds.has(marker.id)) continue;
+      const references = this.footContactMarkerDependencies(marker.id);
+      if (references.length)
+        throw new Error(
+          `Foot contact marker "${marker.id}" is used by ${references.join(', ')}. Remove these references first.`,
+        );
+    }
     assertIKConstraintChangesAllowed(this.workingCopy, candidate, {
       references: (id) => this.ikReferences?.(id) ?? [],
     });
@@ -708,6 +738,7 @@ export class RigEditorState {
 
   selectIKConstraint(id: string): void {
     this.getIKConstraint(id);
+    this.selectedFootContactMarkerId = null;
     this.selection = null;
     this.selectedIKConstraintId = id;
   }
@@ -762,6 +793,75 @@ export class RigEditorState {
     this.installStructure(
       removeIKConstraint(this.workingCopy, id, { references: (name) => this.ikReferences?.(name) ?? [] }),
     );
+  }
+
+  getFootContactMarker(id: string): Readonly<FootContactMarker> {
+    const marker = this.data.footContactMarkers?.find((entry) => entry.id === id);
+    if (!marker) throw new Error(`Unknown foot contact marker "${id}".`);
+    return marker;
+  }
+
+  selectFootContactMarker(id: string): void {
+    this.getFootContactMarker(id);
+    this.clearSelection();
+    this.selectedFootContactMarkerId = id;
+  }
+
+  footContactMarkerDependencies(id: string): readonly string[] {
+    this.getFootContactMarker(id);
+    return this.footContactReferences?.(id) ?? [];
+  }
+
+  /** Stable IDs are generated independently of display names and never change on rename. */
+  suggestFootContactMarkerId(): string {
+    let suffix = 1;
+    let id = 'contact';
+    while (this.data.footContactMarkers?.some((entry) => entry.id === id) || this.footContactReferences?.(id).length)
+      id = `contact-${++suffix}`;
+    return id;
+  }
+
+  createFootContactMarker(options: CreateFootContactMarkerOptions): void {
+    if (
+      this.footContactReferences?.(options.id).length &&
+      !this.data.footContactMarkers?.some((entry) => entry.id === options.id)
+    )
+      throw new Error(`Foot contact marker ID "${options.id}" is reserved by external references.`);
+    const candidate = createFootContactMarker(this.workingCopy, options);
+    this.endOperation();
+    this.installFootContactMarkers(candidate);
+    this.selectFootContactMarker(options.id);
+  }
+
+  /** Group repeated local-coordinate updates with beginOperation/endOperation for one drag. */
+  updateFootContactMarker(id: string, patch: Partial<Omit<FootContactMarker, 'id'>>): void {
+    const marker = footContactMarkerSchema.parse({ ...this.getFootContactMarker(id), ...patch, id });
+    this.getBone(marker.boneId);
+    this.installFootContactMarkers({
+      ...this.workingCopy,
+      footContactMarkers: this.data.footContactMarkers!.map((entry) => (entry.id === id ? marker : entry)),
+    });
+  }
+
+  removeFootContactMarker(id: string): void {
+    this.getFootContactMarker(id);
+    const candidate = {
+      ...this.workingCopy,
+      footContactMarkers: this.data.footContactMarkers!.filter((entry) => entry.id !== id),
+    };
+    this.assertRetainedReferences(candidate);
+    this.endOperation();
+    this.installFootContactMarkers(candidate);
+    this.reconcileSelection();
+  }
+
+  private installFootContactMarkers(candidate: RigDefinition): void {
+    const rig = new Rig(candidate);
+    this.assertRetainedReferences(candidate);
+    this.change(() => {
+      this.data.footContactMarkers = freezeData(candidate.footContactMarkers!);
+      this.topologyRig = rig;
+    });
   }
 
   createBone(id: string, parent = this.selection?.type === 'bone' ? this.selection.id : this.data.root): void {
@@ -872,17 +972,20 @@ export class RigEditorState {
 
   selectBone(id: string): void {
     this.getBone(id);
+    this.selectedFootContactMarkerId = null;
     this.selectedIKConstraintId = null;
     this.selection = { type: 'bone', id };
   }
 
   selectSlot(id: string): void {
     this.getSlot(id);
+    this.selectedFootContactMarkerId = null;
     this.selectedIKConstraintId = null;
     this.selection = { type: 'slot', id };
   }
 
   clearSelection(): void {
+    this.selectedFootContactMarkerId = null;
     this.selectedIKConstraintId = null;
     this.selection = null;
   }

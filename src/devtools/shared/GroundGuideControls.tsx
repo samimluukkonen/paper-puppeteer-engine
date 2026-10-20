@@ -7,10 +7,13 @@ import './groundGuide.css';
 export function GroundGuideControls({
   workspace,
   showSnapping = false,
+  guideAnchors = true,
   children,
 }: {
   workspace: GroundGuideWorkspace;
   showSnapping?: boolean;
+  /** The character workspace mounts a second, rig-only copy without animation tour anchors. */
+  guideAnchors?: boolean;
   children?: ReactNode;
 }) {
   const { workspaceId, guide, persistenceMessage, canUndo, canRedo, dragging } = useSyncExternalStore(
@@ -34,7 +37,9 @@ export function GroundGuideControls({
       <fieldset disabled={workspaceId === null || dragging}>
         <label
           className="ground-guide-toggle"
-          data-guide-id={scene ? GUIDE_TARGETS.sceneGroundVisible : GUIDE_TARGETS.animationGroundVisible}
+          data-guide-id={
+            guideAnchors ? (scene ? GUIDE_TARGETS.sceneGroundVisible : GUIDE_TARGETS.animationGroundVisible) : undefined
+          }
           title="Show or hide the visual reference. This is not a physics floor."
         >
           <input
@@ -44,7 +49,11 @@ export function GroundGuideControls({
           />{' '}
           Show ground guide
         </label>
-        <label data-guide-id={scene ? GUIDE_TARGETS.sceneGroundY : GUIDE_TARGETS.animationGroundY}>
+        <label
+          data-guide-id={
+            guideAnchors ? (scene ? GUIDE_TARGETS.sceneGroundY : GUIDE_TARGETS.animationGroundY) : undefined
+          }
+        >
           Ground Y
           <input
             type="number"
@@ -68,7 +77,9 @@ export function GroundGuideControls({
         </label>
         <button
           type="button"
-          data-guide-id={scene ? GUIDE_TARGETS.sceneGroundReset : GUIDE_TARGETS.animationGroundReset}
+          data-guide-id={
+            guideAnchors ? (scene ? GUIDE_TARGETS.sceneGroundReset : GUIDE_TARGETS.animationGroundReset) : undefined
+          }
           title="Restore the guide's default Y without moving the character or Actors."
           onClick={() => workspace.resetY()}
         >

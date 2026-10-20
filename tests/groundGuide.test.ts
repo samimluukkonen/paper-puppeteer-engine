@@ -242,6 +242,8 @@ test('shared controls start collapsed, have no-workspace guards and keep snappin
   for (const id of [GUIDE_TARGETS.sceneGroundVisible, GUIDE_TARGETS.sceneGroundY, GUIDE_TARGETS.sceneGroundReset])
     assert.include(markup, `data-guide-id="${id}"`);
   assert.notInclude(markup, 'data-guide-id="animation-ground-');
+  markup = renderToStaticMarkup(createElement(GroundGuideControls, { workspace, guideAnchors: false }));
+  assert.notInclude(markup, 'data-guide-id=');
 });
 
 test('playback-sized render loops reuse overlay objects and redraw only for visible geometry changes', () => {

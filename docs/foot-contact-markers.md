@@ -1,4 +1,4 @@
-# Foot contact markers (v0.9.8.1)
+# Foot contact markers (v0.9.8.2)
 
 [All guides](../README.md#guides)
 
@@ -21,7 +21,7 @@ const candidate = createFootContactMarker(rigDefinition, {
 const rig = new Rig(candidate);
 ```
 
-The caller supplies the stable ID; creating another marker with that ID fails. The helper returns a validated authored copy without modifying its input. Explicit `localX`/`localY` override the seed. Missing coordinates start at the first child's normalized bind offset; a leaf uses `(0, length)` when length exists, otherwise `(0, 0)`. Explicit bone lengths use the same normalization as `Rig`. This seed is an editing convenience: neither a joint, endpoint nor artwork edge establishes the actual sole. Edit the local numbers in rig data to place the contact precisely. Visual marker editing is outside this foundation.
+The caller supplies the stable ID; creating another marker with that ID fails. The helper returns a validated authored copy without modifying its input. Explicit `localX`/`localY` override the seed. Missing coordinates start at the first child's normalized bind offset; a leaf uses `(0, length)` when length exists, otherwise `(0, 0)`. Explicit bone lengths use the same normalization as `Rig`. This seed is an editing convenience: neither a joint, endpoint nor artwork edge establishes the actual sole. Use the visual Rig Editor controls or the local numbers to place the contact precisely.
 
 ## Coordinates and evaluated positions
 
@@ -52,31 +52,30 @@ const point = getFootContactWorldPosition(
 
 `evaluatedPose` is a readonly map of bone IDs to local transform values. It accepts final runtime joint poses or isolated IK sampler output. Omitted bones/properties use the normalized rig bind transform. Pass solved values to observe IK; sparse animation keys alone do not include the solver's rotation changes. The pure function does not evaluate a clip, run IK, synchronize rendering, advance a player or mutate data. Omitting the outer matrix returns puppet-local positions, useful for detached tools. Missing/deleted bones and nonfinite calculated positions return `undefined`; there is no fabricated origin fallback. Singular but finite transforms can still project points.
 
-The existing demo sole offsets and Scene Editor ground alignment continue to use their current attachment-based calculations. Markers are independent references: moving one does not change animation keys, an IK target/end offset, ground preferences, Actor placement or physics. This milestone adds no visual tools, snapping, planting, second solver, collision or terrain behavior.
+The existing demo sole offsets and Scene Editor ground alignment continue to use their current attachment-based calculations. Markers are independent references: moving one does not change animation keys, an IK target/end offset, ground preferences, Actor placement or physics. Marker editing adds no automatic detection, foot planting, second solver, collision or terrain behavior.
+
+## Visual Rig Editor workflow
+
+1. Select a foot or any other bone in Hierarchy. Open **Foot Contact Markers**, which starts collapsed like the other inspector sections.
+2. Check **New contact bone**, then click **+ Add Contact Marker**. The editor generates a unique stable ID and seeds the position using the creation helper above. This works for loaded characters and new single-root drafts, without assuming any leg count.
+3. Drag the square crosshair to the desired contact point. The selected handle is orange; other handles are green, outlined in white above the artwork. Each marker also has its own selectable button, even when points overlap or names repeat.
+4. Edit **Name**, **Bone**, **Local X** and **Local Y**. Enter or blur commits a field; Escape discards an unfinished field edit. Changing the bone retains local coordinates, so reposition the point if needed. IDs remain stable when display names change.
+5. Rotate or scale the bone, change facing, preview a pose, zoom or pan to check placement. Marker dragging stays available in preview poses. **Visibility > Foot contact markers** hides unselected handles when editing other gizmos.
+6. Use rig **Undo/Redo** for additions, moves, renames, bone changes and deletions. One completed drag produces one operation; a click produces none. Escape, lost focus, hidden page or editor shutdown cancels a pending drag. Pointer release outside the canvas commits it.
+7. Download/reload `rig.json`, or download the character ZIP. Marker data travels with the rig and browser recovery draft. Handles remain editor graphics and never become artwork or animation keys.
+
+Open the collapsed **Ground reference** section to show the existing guide and set **Ground Y** while placing contacts. It shares the per-character preview-world settings with Animation Editor. Drag the amber **↕ Ground** tag to move the line; release commits one guide history operation and Escape cancels it. Only the tag captures ground dragging, so the rest of the line leaves marker and bone handles available. Guide Undo/Redo stays separate from rig history. Marker editing never moves bones or ground settings, and moving the reference never moves markers. Ground preferences stay browser metadata and are excluded from rig/character exports.
+
+Canvas picking uses a fixed pixel radius. Each pointer position first passes through the camera's screen-to-world conversion, then the existing affine inverse of the referenced bone container's full world matrix. Drag deltas are stored as bone-local X/Y, with optional existing grid snapping. This includes root and ancestor transforms, nested rotated/nonuniformly scaled bones, facing reflections, camera pan and zoom. Singular transforms do not invent coordinates; a drag is cancelled if inversion becomes unavailable. Handles project the same local point through the live bone matrix, so evaluated pose changes are reflected without storing world-space coordinates.
+
+`RigEditorState` owns the authoritative marker collection, selection and bounded snapshot history. The React `AttachmentController` adapts creation, selection, updates and deletion; `FootContactMarkersPanel` owns only unfinished field text. `RigEditorInputController` groups drag updates with `beginOperation`/`endOperation` and cancels with `cancelOperation`. `RigEditorOverlay` owns drawing, picking and destruction. The numeric input component is shared with the existing IK panel.
+
+Marker deletion inspects live `RigEditorStateOptions.footContactReferences(id)` dependencies before changing data. Import, reset and history restoration enforce the same rule; referenced IDs cannot silently disappear or be reused. Hosts can supply Scene Editor grounding selections through that hook when such selections exist. The current scene format uses attachment ground contacts and stores no foot-marker IDs. Resolve dependencies before deleting a referenced marker. Bone deletion/renaming retains the existing marker dependency guards.
 
 ## Verification
 
-`tests/footContactMarkers.test.ts` covers creation and default seeds, multiple contacts on arbitrary bones, duplicate IDs, malformed structure, missing bone references, finite coordinates, nested transforms, rotation/nonuniform scale/reflection, facing and Actor ancestors, post-IK runtime and isolated poses, JSON round trips, omitted/empty legacy collections, immutable snapshots, safe stale queries, export/recovery/history preservation and dependency-safe bone edits.
+`tests/footContactMarkers.test.ts` covers the renderer-independent foundation: creation defaults, validation, transforms, IK evaluation, serialization and immutable ownership. `tests/footContactMarkerEditor.test.ts` covers editor creation/selection, names, bone reassignment, numeric edits, duplicate IDs and invalid bones, deletion/reference guards, export/recovery, grouped drag history, facing and nested transforms, zoom/pan, cancellation, unchanged animation bytes/dirty state/history, and subscription/Phaser cleanup.
 
-Implementation files:
+`tests/browser/footContactMarkers.spec.ts` exercises the desktop React/Phaser workflow locally: create two feet contacts, edit numbers/names, drag, cancel, switch facing, rotate a bone, undo/redo, change a referenced bone, delete, show the ground reference and export/reload. Browser checks remain local-only.
 
-- `src/engine/types.ts`, `schemas.ts`, `validation.ts`, `Rig.ts`: optional data, strict shape/reference validation and immutable runtime ownership.
-- `src/engine/footContactMarkers.ts`: validated creation and pure position evaluation.
-- `src/engine/core.ts`, `data.ts`, `serialization.ts`: public package exports.
-- `src/engine/Puppet.ts`: runtime rig export preservation.
-- `src/devtools/rig-editor/RigEditorState.ts`, `RigStructureCommands.ts`: snapshot/export retention and bone dependency guards.
-- `schemas/rig.schema.json`: regenerated editor schema.
-- `tests/footContactMarkers.test.ts`: 20 focused regressions.
-- `README.md`, `CHANGELOG.md`, `docs/development.md`, `docs/schema-compatibility.md`, this guide: API, coordinates and compatibility documentation.
-
-Final verification results:
-
-| Command                                           | Result                                                                                                                                 |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`                               | Passed strict TypeScript checking; also passed within `check` and `build`.                                                             |
-| `npx vitest run tests/footContactMarkers.test.ts` | Passed: 20 marker regressions.                                                                                                         |
-| `npm run test`                                    | Passed: 188 files / 3,283 tests; 5 files / 56 tests skipped (193 files / 3,339 tests total).                                           |
-| `npm run build`                                   | Passed: demo, library, declarations and plain-Node entry-point checks. Vite emitted the existing nonblocking module-directive notices. |
-| `npm run check`                                   | Passed formatting, lint and typecheck.                                                                                                 |
-| Built `/core` Node query                          | Passed: created a marker through the built public API and evaluated the expected `(12, 23)` position without a renderer.               |
-| `git diff --check`, `git diff --cached --check`   | Passed.                                                                                                                                |
+Relevant implementation files are `FootContactMarkersPanel.tsx`, `AttachmentController.ts`, `RigEditorState.ts`, `RigEditorInputController.ts`, `RigEditorOverlay.ts`, `RigWorkspaceController.ts`, `ControlsController.ts`, `editorMarkup.tsx`, and shared `InspectorNumberField.tsx`. Engine marker data and public runtime APIs are unchanged from v0.9.8.1.

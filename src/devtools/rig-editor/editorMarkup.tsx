@@ -2,11 +2,14 @@ import { ViewHeader } from '../../ui/viewShell.js';
 import { openWorkspaceDialog, useWorkspaceInspector, WorkspaceDialog } from '../../ui/Workspace.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
+import { GroundGuideControls } from '../shared/GroundGuideControls.js';
+import type { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
 import { AttachmentPanel } from './AttachmentPanel.js';
+import { FootContactMarkersPanel } from './FootContactMarkersPanel.js';
 import { RigHelp } from './RigHelp.js';
 import { RigIKPanel } from './RigIKPanel.js';
 import { RigStructurePanel } from './RigStructurePanel.js';
@@ -15,11 +18,13 @@ export function RigEditorView({
   artwork,
   attachments,
   packages,
+  groundGuide,
   header = true,
 }: {
   artwork?: ArtworkController;
   attachments?: AttachmentController;
   packages?: PackageController;
+  groundGuide?: GroundGuideWorkspace;
   header?: boolean;
 } = {}) {
   const inspector = useWorkspaceInspector();
@@ -153,6 +158,15 @@ export function RigEditorView({
             </section>
           </details>
           {attachments && <RigIKPanel controller={attachments} />}
+          {attachments && <FootContactMarkersPanel controller={attachments} />}
+          {groundGuide && (
+            <GroundGuideControls workspace={groundGuide} guideAnchors={false}>
+              <p className="workspace-caption">
+                Drag ↕ Ground in the preview to move the line. Escape cancels. Ground history is separate from rig
+                edits.
+              </p>
+            </GroundGuideControls>
+          )}
           {attachments && <AttachmentPanel controller={attachments} defaultOpen={false} />}
           {artwork && <ArtworkPanel controller={artwork} />}
           <details>

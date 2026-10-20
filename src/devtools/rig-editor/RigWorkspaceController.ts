@@ -29,10 +29,13 @@ export function createRigWorkspaceController(
   let rendered = false;
   return {
     render(editor: RigEditor): void {
-      const next = editor.state.selection?.id;
+      const marker = editor.state.selectedFootContactMarkerId;
+      const next = marker ? `contact:${marker}` : editor.state.selection?.id;
       if (next && next !== selected) app.dispatchEvent(new Event('workspace:reveal-inspector'));
       if (rendered && !app.hidden && next && next !== selected) {
-        const details = app.querySelector<HTMLDetailsElement>('.rig-selection-details');
+        const details = app.querySelector<HTMLDetailsElement>(
+          marker ? '.foot-contact-panel' : '.rig-selection-details',
+        );
         if (details) details.open = true;
       }
       selected = next;

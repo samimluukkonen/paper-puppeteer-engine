@@ -21,6 +21,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
         slots: 'Slots',
         spriteOrigins: 'Sprite Origins',
         ik: 'IK chains',
+        footContacts: 'Foot contact markers',
       } as const;
       for (const [key, title] of Object.entries(names) as [keyof typeof names, string][]) {
         const label = document.createElement('label');

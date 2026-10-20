@@ -1,69 +1,12 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { RigDefinition } from '../../engine/types.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { InspectorNumberField as NumberField } from '../shared/InspectorNumberField.js';
 import type { AttachmentController } from './AttachmentController.js';
 import './attachments.css';
 import { rigIKChains, rigIKFormError } from './rigIKForm.js';
-
-function NumberField({
-  label,
-  value,
-  min,
-  max,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  min?: number;
-  max?: number;
-  onCommit: (value: number) => void;
-}) {
-  const [text, setText] = useState(String(value));
-  const cancelled = useRef(false);
-  useEffect(() => setText(String(value)), [value]);
-  const valid =
-    text.trim() !== '' &&
-    Number.isFinite(Number(text)) &&
-    (min === undefined || Number(text) >= min) &&
-    (max === undefined || Number(text) <= max);
-  return (
-    <label>
-      {label}
-      <input
-        aria-label={label}
-        type="number"
-        step="any"
-        min={min}
-        max={max}
-        value={text}
-        aria-invalid={!valid}
-        onChange={(event) => setText(event.target.value)}
-        onBlur={() => {
-          if (cancelled.current) {
-            cancelled.current = false;
-            setText(String(value));
-            return;
-          }
-          if (valid && Number(text) !== value) onCommit(Number(text));
-          else setText(String(value));
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-          if (event.key === 'Escape') {
-            cancelled.current = true;
-            setText(String(value));
-            event.currentTarget.blur();
-          }
-        }}
-      />
-    </label>
-  );
-}
 
 function ChainFields({
   rig,

@@ -8,12 +8,16 @@ import { AnimationEditorState } from '../src/devtools/animation-editor/Animation
 import { AnimationGroundPanel } from '../src/devtools/animation-editor/AnimationGroundPanel.js';
 import { IKInspectorController } from '../src/devtools/animation-editor/IKInspectorController.js';
 import { alignIKTargetToGuide, snapIKTargetToGuide } from '../src/devtools/animation-editor/ikTargetCoordinates.js';
+import { RigEditorInputController } from '../src/devtools/rig-editor/RigEditorInputController.js';
+import type { RigEditorOverlay } from '../src/devtools/rig-editor/RigEditorOverlay.js';
+import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { editorWorldViewport } from '../src/devtools/shared/editorCamera.js';
 import { groundGuideGeometry } from '../src/devtools/shared/groundGuide.js';
 import { GroundGuideWorkspace } from '../src/devtools/shared/GroundGuideWorkspace.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { getGuideById } from '../src/devtools/shared/guides/registry.js';
 import { localToWorld, type Affine } from '../src/engine/affineMath.js';
+import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
@@ -119,6 +123,70 @@ test.each([0.5, 1, 2, 4])(
     }
   },
 );
+
+test('rig mode ground tags own the pointer without moving markers, artwork or character placement', () => {
+  const f = fixture();
+  f.state.setEditorMode('rig');
+  const rig = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [{ id: 'root' }],
+      footContactMarkers: [{ id: 'sole', name: 'Sole', boneId: 'root', localX: 12, localY: 28 }],
+    }),
+  );
+  rig.selectFootContactMarker('sole');
+  const original = rig.workingCopy;
+  const animation = f.state.packageAnimations();
+  const editor = {
+    state: rig,
+    editBone: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    refresh: vi.fn(),
+    moveCharacter: vi.fn(),
+    previewArtwork: vi.fn(),
+    finishArtworkGesture: vi.fn(),
+  };
+  const input = new RigEditorInputController(
+    f.scene,
+    {} as Puppet,
+    editor,
+    {} as RigEditorOverlay,
+    vi.fn(),
+    vi.fn(),
+    (pointer) => f.handle.pointerDown(pointer),
+  );
+  input.enable();
+  try {
+    const start = f.labelPointer();
+    f.input.emit('pointerdown', start);
+    assert.isTrue(f.handle.dragging);
+    f.input.emit('pointermove', { x: start.x, y: start.y + 40, id: start.id });
+    assert.equal(f.workspace.getSnapshot().guide.y, 520);
+    f.input.emit('pointerupoutside', { x: start.x, y: start.y + 40, id: start.id });
+    assert.isFalse(f.handle.dragging);
+    assert.strictEqual(rig.workingCopy, original);
+    assert.equal(rig.historyLength, 0);
+    assert.isFalse(rig.dirty);
+    assert.equal(editor.moveCharacter.mock.calls.length, 0);
+    assert.equal(editor.previewArtwork.mock.calls.length, 0);
+    assert.deepEqual(f.state.packageAnimations(), animation);
+    assert.equal(f.state.historyLength, 0);
+    assert.isFalse(f.state.dirty);
+    f.workspace.undo();
+    assert.equal(f.workspace.getSnapshot().guide.y, 500);
+    f.input.emit('pointerdown', f.labelPointer());
+    f.input.emit('pointermove', { x: start.x, y: start.y + 60, id: start.id });
+    const escape = new Event('keydown', { cancelable: true });
+    Object.assign(escape, { key: 'Escape' });
+    f.browser.dispatchEvent(escape);
+    assert.equal(f.workspace.getSnapshot().guide.y, 500);
+    assert.strictEqual(rig.workingCopy, original);
+  } finally {
+    input.disable();
+    f.handle.dispose();
+  }
+});
 
 test('only the dedicated handle captures ground drags, with Escape, mode/session cancellation and complete cleanup', () => {
   const f = fixture();

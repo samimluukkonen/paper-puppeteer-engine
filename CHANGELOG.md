@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.8-2
+
+Add visual [Rig Editor foot contact markers](docs/foot-contact-markers.md): collapsed React controls, bone selection, generated stable IDs, names, local coordinate fields, selectable Phaser crosshairs and direct dragging through nested transforms, scale, facing and camera navigation. Share rig Undo/Redo and recovery, cancel drags with Escape, guard persisted marker references, and preserve animation data. Reuse the ground reference line and draggable tag with collapsed visibility/height controls in Rig Editor, independently of authored rig and animation history. Add editor and local desktop browser regressions covering authoring, transforms, history, serialization, ground dragging and cleanup. Milestone `0.9.8.2` uses the changelog's SemVer form `0.9.8-2`.
+
 ## 0.9.8-1
 
 Add the [foot contact marker foundation](docs/foot-contact-markers.md): optional rig markers with stable IDs, names, bone references and finite bone-local coordinates, validated creation defaults and pure post-IK world position evaluation through bone hierarchies, scale, facing and Puppet/Actor transforms. Preserve markers through runtime/editor exports, history and recovery; guard referenced bones against deletion or renaming. Add 20 regressions covering validation, transforms, IK, JSON round trips, compatibility and immutability. Existing rigs retain format version 1, and animation and ground-alignment behavior remain unchanged. Milestone `0.9.8.1` uses the changelog's SemVer form `0.9.8-1`.

@@ -85,7 +85,36 @@ export class RigEditorOverlay {
       )[0];
   }
 
+  /** Positions come from the live bone container, including nested transforms and facing. */
+  getFootContactMarkers() {
+    if (this.disposed) return [];
+    return (this.state.workingCopy.footContactMarkers ?? []).flatMap((marker) => {
+      const world = localToWorld(
+        { x: marker.localX, y: marker.localY },
+        this.puppet.getBone(marker.boneId).container.getWorldTransformMatrix(),
+      );
+      return Number.isFinite(world.x) && Number.isFinite(world.y) ? [{ ...marker, world }] : [];
+    });
+  }
+
+  pickFootContactMarker(x: number, y: number) {
+    return this.getFootContactMarkers()
+      .filter((marker) => this.state.visibility.footContacts || marker.id === this.state.selectedFootContactMarkerId)
+      .map((marker) => ({
+        ...marker,
+        distance: Math.hypot(x - this.screen(marker.world).x, y - this.screen(marker.world).y),
+      }))
+      .filter((marker) => marker.distance <= 11)
+      .sort(
+        (a, b) =>
+          Number(b.id === this.state.selectedFootContactMarkerId) -
+            Number(a.id === this.state.selectedFootContactMarkerId) || a.distance - b.distance,
+      )[0];
+  }
+
   private gridFrame(): Phaser.GameObjects.Container {
+    const marker = this.state.selectedFootContactMarkerId;
+    if (marker) return this.puppet.getBone(this.state.getFootContactMarker(marker).boneId).container;
     const selected = this.state.selection;
     if (!selected) return this.puppet.container;
     if (selected.type === 'slot') {
@@ -223,6 +252,9 @@ export class RigEditorOverlay {
       this.state.selection?.type,
       this.state.selection?.id,
       this.state.selectedIKConstraintId,
+      this.state.selectedFootContactMarkerId,
+      // Markers follow evaluated bone poses even when only the host preview advances.
+      ...this.getFootContactMarkers().flatMap((marker) => [marker.world.x, marker.world.y]),
       this.state.editMode,
       this.state.gridSnap,
       this.state.ikPreview,
@@ -425,6 +457,25 @@ export class RigEditorOverlay {
         this.state.gridSnap ? 34 : 16,
         '#7b642b',
       );
+    }
+    for (const marker of this.getFootContactMarkers().sort(
+      (a, b) =>
+        Number(a.id === this.state.selectedFootContactMarkerId) -
+        Number(b.id === this.state.selectedFootContactMarkerId),
+    )) {
+      const selected = marker.id === this.state.selectedFootContactMarkerId;
+      if (!this.state.visibility.footContacts && !selected) continue;
+      const point = this.screen(marker.world);
+      for (const stroke of [
+        { width: 5, color: 0xffffff },
+        { width: selected ? 3 : 2, color: selected ? 0xe45f35 : 0x39845c },
+      ]) {
+        g.lineStyle(stroke.width, stroke.color)
+          .strokeRect(point.x - 5, point.y - 5, 10, 10)
+          .lineBetween(point.x - 10, point.y, point.x + 10, point.y)
+          .lineBetween(point.x, point.y - 10, point.x, point.y + 10);
+      }
+      if (selected) label(`${marker.name} · contact`, point.x + 14, point.y + 12, '#a53d21');
     }
     for (let i = labelIndex; i < this.labels.length; i += 1) this.labels[i]?.setVisible(false);
     // Cache only a completed draw so a failing renderer can be retried.

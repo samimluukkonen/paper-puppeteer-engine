@@ -106,6 +106,9 @@ class Container {
   strokeCircle() {
     return this;
   }
+  strokeRect() {
+    return this;
+  }
   fillStyle() {
     return this;
   }

@@ -1,4 +1,5 @@
 import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
+import type { FootContactMarker } from '../../engine/types.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
@@ -47,6 +48,31 @@ export class AttachmentController {
       editor.state.visibility.ik = true;
       editor.refresh();
     }, 'Rig default target selected. Drag its crosshair in the canvas.');
+  }
+  selectFootContactMarker(id: string): void {
+    this.run((editor) => {
+      editor.state.selectFootContactMarker(id);
+      editor.refresh();
+    }, 'Contact selected. Drag its green crosshair in the canvas.');
+  }
+  createFootContactMarker(boneId: string): void {
+    this.run((editor) => {
+      const id = editor.state.suggestFootContactMarkerId();
+      editor.state.createFootContactMarker({ id, name: `${boneId} contact`, boneId });
+      editor.refresh();
+    }, 'Contact marker added. Drag the crosshair to the foot contact point.');
+  }
+  updateFootContactMarker(id: string, patch: Partial<Omit<FootContactMarker, 'id'>>): void {
+    this.run((editor) => {
+      editor.state.updateFootContactMarker(id, patch);
+      editor.refresh();
+    }, 'Contact marker updated.');
+  }
+  removeFootContactMarker(id: string): void {
+    this.run((editor) => {
+      editor.state.removeFootContactMarker(id);
+      editor.refresh();
+    }, 'Contact marker deleted.');
   }
   createIK(options: CreateIKConstraintOptions): void {
     this.run((editor) => {

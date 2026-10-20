@@ -12,6 +12,8 @@ import type { RigEditorSelection } from './RigEditorState.js';
 export class RigEditorInputController {
   private panning = false;
   private ikHit = false;
+  private markerHit = false;
+  private markerDrag: { id: string; start: Point; value: Point } | undefined;
   private ikDrag: { start: Point; value: Point } | undefined;
   private moved = false;
   private activePointerId: number | undefined;
@@ -34,6 +36,7 @@ export class RigEditorInputController {
     private readonly overlay: RigEditorOverlay,
     private readonly onChange: () => void,
     private readonly redraw: () => void,
+    private readonly claimPointer?: (pointer: Phaser.Input.Pointer) => boolean,
   ) {}
 
   private get state() {
@@ -86,9 +89,11 @@ export class RigEditorInputController {
     this.ikDrag = undefined;
     this.ikHit = false;
     this.state.endIKTargetDrag(commit);
-    const hadDrag = !!this.drag || !!this.originDrag;
+    const hadDrag = !!this.drag || !!this.originDrag || !!this.markerDrag;
     this.editor.finishArtworkGesture(commit);
-    if (!commit && (this.drag || this.originDrag)) this.state.cancelOperation();
+    if (!commit && hadDrag) this.state.cancelOperation();
+    this.markerDrag = undefined;
+    this.markerHit = false;
     this.panning = false;
     this.activePointerId = undefined;
     this.drag = undefined;
@@ -269,6 +274,7 @@ export class RigEditorInputController {
 
   private pointerDown(pointer: Phaser.Input.Pointer): void {
     if (this.activePointerId !== undefined) return;
+    if (this.claimPointer?.(pointer)) return;
     this.activePointerId = pointer.id;
     this.panning = pointer.middleButtonDown();
     this.moved = false;
@@ -277,6 +283,19 @@ export class RigEditorInputController {
     this.drag = undefined;
     this.characterDrag = undefined;
     if (this.panning || !pointer.leftButtonDown()) return;
+    const marker = this.overlay.pickFootContactMarker?.(pointer.x, pointer.y);
+    this.markerHit = !!marker;
+    if (marker) {
+      this.state.selectFootContactMarker(marker.id);
+      const start = this.local(pointer, this.puppet.getBone(marker.boneId).container);
+      if (start) {
+        this.state.endOperation();
+        this.state.beginOperation();
+        this.markerDrag = { id: marker.id, start, value: { x: marker.localX, y: marker.localY } };
+      }
+      this.editor.refresh();
+      return;
+    }
     const ik = this.overlay.pickIKTarget?.(pointer.x, pointer.y);
     this.ikHit = !!ik;
     if (ik) {
@@ -302,6 +321,7 @@ export class RigEditorInputController {
       return;
     }
     this.state.selectedIKConstraintId = null;
+    this.state.selectedFootContactMarkerId = null;
     this.state.selection = target;
     if (aligning) {
       const attachment = target.type === 'slot';
@@ -347,6 +367,22 @@ export class RigEditorInputController {
   private pointerMove(pointer: Phaser.Input.Pointer): void {
     if (pointer.id !== this.activePointerId || !pointer.isDown) return;
     if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
+    if (this.markerDrag) {
+      if (!this.moved) return;
+      const { id, start, value } = this.markerDrag;
+      const marker = this.state.getFootContactMarker(id);
+      const point = this.local(pointer, this.puppet.getBone(marker.boneId).container);
+      if (!point) {
+        this.endGesture(false);
+        return;
+      }
+      this.state.updateFootContactMarker(id, {
+        localX: this.state.snapTranslation(value.x + point.x - start.x),
+        localY: this.state.snapTranslation(value.y + point.y - start.y),
+      });
+      this.editor.refresh();
+      return;
+    }
     if (this.ikDrag) {
       if (!this.moved) return;
       const handle = this.overlay.getIKTargets().find((entry) => entry.id === this.state.ikTargetDragId);
@@ -414,8 +450,9 @@ export class RigEditorInputController {
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
     if (pointer.id !== this.activePointerId) return;
-    if (!this.panning && !this.moved && !this.drag && !this.originDrag && !this.ikHit) {
+    if (!this.panning && !this.moved && !this.drag && !this.originDrag && !this.ikHit && !this.markerHit) {
       this.state.selectedIKConstraintId = null;
+      this.state.selectedFootContactMarkerId = null;
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();
       this.redraw();
