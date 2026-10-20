@@ -99,6 +99,7 @@ export { SlotState } from './SlotState.js';
 export {
   animationClipSchema,
   rigDefinitionSchema,
+  footContactMarkerSchema,
   skinDefinitionSchema,
   slotDefinitionSchema,
   spriteAttachmentSchema,
@@ -108,6 +109,7 @@ export type {
   AttachmentOptions,
   BoneDefinition,
   Facing,
+  FootContactMarker,
   JointTransform,
   RigDefinition,
   SkinDefinition,
@@ -199,3 +201,6 @@ export type { SceneAssetOptions, ResolvedScene } from './SceneAssets.js';
 export { buildScenePackage, validateScenePackage } from './ScenePackage.js';
 export type { ScenePackageFiles } from './ScenePackage.js';
 export { encodePackageZip, decodePackageZip } from './packageZip.js';
+
+export { createFootContactMarker, getFootContactWorldPosition } from './footContactMarkers.js';
+export type { CreateFootContactMarkerOptions } from './footContactMarkers.js';

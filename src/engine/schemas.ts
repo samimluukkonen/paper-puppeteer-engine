@@ -107,8 +107,18 @@ export const twoBoneIKDefinitionSchema = z.object({
   priority: finiteNumber.exactOptional(),
 });
 
+/** Strict bone-local reference point; bone existence and ID uniqueness are checked on the rig. */
+export const footContactMarkerSchema = z.strictObject({
+  id: identifierSchema,
+  name: z.string().min(1),
+  boneId: identifierSchema,
+  localX: finiteNumber,
+  localY: finiteNumber,
+});
+
 /** Shape and scalar validation for plain rig data, including data loaded from JSON. */
 export const rigDefinitionSchema = z.object({
+  footContactMarkers: z.array(footContactMarkerSchema).exactOptional(),
   root: identifierSchema,
   bones: z.array(boneDefinitionSchema),
   slots: z.array(slotDefinitionSchema).exactOptional(),

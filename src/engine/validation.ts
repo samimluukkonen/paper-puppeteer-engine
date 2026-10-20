@@ -75,6 +75,22 @@ export function checkRigReferences(definition: RigDefinition, report: ReportVali
       visited.add(id);
     }
   }
+  const markerIds = new Set<string>();
+  for (const [index, marker] of (definition.footContactMarkers ?? []).entries()) {
+    if (markerIds.has(marker.id))
+      report({
+        severity: 'error',
+        path: `footContactMarkers[${index}].id`,
+        message: `Duplicate foot contact marker id "${marker.id}".`,
+      });
+    markerIds.add(marker.id);
+    if (!ids.has(marker.boneId))
+      report({
+        severity: 'error',
+        path: `footContactMarkers[${index}].boneId`,
+        message: `Foot contact marker references unknown bone "${marker.boneId}".`,
+      });
+  }
   const slotIds = new Set<string>();
   for (const [index, slot] of (definition.slots ?? []).entries()) {
     if (slotIds.has(slot.id))

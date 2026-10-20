@@ -328,6 +328,7 @@ export class Puppet {
     return structuredClone({
       version: RIG_FORMAT_VERSION,
       root: this.rig.root,
+      ...(this.rig.footContactMarkers === undefined ? {} : { footContactMarkers: this.rig.footContactMarkers }),
       ...(this.rig.ik === undefined ? {} : { ik: this.rig.ik }),
       bones: this.rig.bones,
       slots: this.rig.slots,

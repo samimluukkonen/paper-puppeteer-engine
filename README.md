@@ -99,6 +99,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 | Guide                                                                | Contents                                                                                                   |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | [Demo controls](docs/demo.md)                                        | Keyboard controls, playback examples, facing, skins, and pose authoring                                    |
+| [Foot contact markers](docs/foot-contact-markers.md)                 | Bone-local reference data, validation and post-IK world position evaluation                                |
 | [Rig editor](docs/rig-editor.md)                                     | Editing, snapping, undo/redo, validation, imports, exports, and embedding                                  |
 | [Animation editor](docs/animation-editor.md)                         | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview    |
 | [Timeline snapping](docs/timeline-snapping.md)                       | Frame/key/event/playhead alignment, zoom-aware tolerance, temporary guides and group timing                |

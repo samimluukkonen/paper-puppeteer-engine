@@ -43,6 +43,7 @@ export {
 export {
   animationClipSchema,
   rigDefinitionSchema,
+  footContactMarkerSchema,
   skinDefinitionSchema,
   slotDefinitionSchema,
   spriteAttachmentSchema,

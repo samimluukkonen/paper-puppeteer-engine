@@ -20,6 +20,7 @@ import { mergeSkins } from '../../engine/mergeSkins.js';
 import { Rig } from '../../engine/Rig.js';
 import type {
   BoneDefinition,
+  FootContactMarker,
   JointTransform,
   RigDefinition,
   SkinDefinition,
@@ -63,6 +64,7 @@ type HistoryEntry = RigEditorRecoverySnapshot;
 
 export type ReadonlyRigData<T> = ReadonlyEditorData<T>;
 type WorkingRig = {
+  footContactMarkers?: readonly FootContactMarker[];
   name?: string;
   ik?: readonly TwoBoneIKDefinition[];
   root: string;
@@ -165,6 +167,7 @@ export class RigEditorState {
     this.data = structuredClone({
       ...(file?.name === undefined ? {} : { name: file.name }),
       root: source.root,
+      ...(source.footContactMarkers === undefined ? {} : { footContactMarkers: [...source.footContactMarkers] }),
       bones: [...source.bones],
       slots: [...source.slots],
       attachments: [...source.attachments],
@@ -225,7 +228,14 @@ export class RigEditorState {
   }
 
   private freezeEntries(): void {
-    for (const entries of [this.data.bones, this.data.slots, this.data.attachments, this.data.skins, this.data.ik])
+    for (const entries of [
+      this.data.bones,
+      this.data.slots,
+      this.data.attachments,
+      this.data.skins,
+      this.data.ik,
+      this.data.footContactMarkers,
+    ])
       for (const entry of entries ?? []) freezeData(entry);
   }
 
@@ -315,7 +325,7 @@ export class RigEditorState {
       ...(copy.attachments === undefined ? {} : { attachments: [...copy.attachments] }),
       ...(copy.skins === undefined ? {} : { skins: [...copy.skins] }),
     });
-    for (const key of ['name', 'slots', 'attachments', 'skins', 'ik'] as const)
+    for (const key of ['name', 'slots', 'attachments', 'skins', 'ik', 'footContactMarkers'] as const)
       if (copy[key] === undefined) delete this.data[key];
     this.invalidate();
     this.cachedWorkingCopy = copy;
@@ -326,7 +336,11 @@ export class RigEditorState {
 
   private syncTopologyRig(): void {
     // Numeric drafts may be temporarily invalid; retain the last validated topology in that case.
-    if (sameRigTopology(this.topologyRig, this.workingCopy) && equalEditorData(this.topologyRig.ik, this.data.ik))
+    if (
+      sameRigTopology(this.topologyRig, this.workingCopy) &&
+      equalEditorData(this.topologyRig.ik, this.data.ik) &&
+      equalEditorData(this.topologyRig.footContactMarkers, this.data.footContactMarkers)
+    )
       return;
     this.topologyRig = new Rig(this.workingCopy);
   }
@@ -467,6 +481,7 @@ export class RigEditorState {
       version: RIG_FORMAT_VERSION,
       ...(copy.name === undefined ? {} : { name: copy.name }),
       root: copy.root,
+      ...(copy.footContactMarkers === undefined ? {} : { footContactMarkers: copy.footContactMarkers }),
       ...(copy.ik === undefined ? {} : { ik: copy.ik }),
       bones: copy.bones,
       ...(copy.slots === undefined ? {} : { slots: copy.slots }),

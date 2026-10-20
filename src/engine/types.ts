@@ -65,7 +65,17 @@ export interface SkinDefinition {
   slots: Readonly<Record<string, string | null>>;
 }
 
+/** Artist-authored reference point in bone-local units, independent of artwork and IK. */
+export interface FootContactMarker {
+  id: string;
+  name: string;
+  boneId: string;
+  localX: number;
+  localY: number;
+}
+
 export interface RigDefinition {
+  footContactMarkers?: readonly FootContactMarker[];
   /** Stable constraint names are animation IK track identifiers. */
   ik?: readonly TwoBoneIKDefinition[];
   root: string;

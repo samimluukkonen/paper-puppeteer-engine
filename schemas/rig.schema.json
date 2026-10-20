@@ -2,6 +2,36 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "footContactMarkers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "boneId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!__proto__$)[\\s\\S]+$"
+          },
+          "localX": {
+            "type": "number"
+          },
+          "localY": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "name", "boneId", "localX", "localY"],
+        "additionalProperties": false
+      }
+    },
     "root": {
       "type": "string",
       "minLength": 1,

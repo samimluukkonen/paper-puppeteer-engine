@@ -43,6 +43,9 @@ export class RigStructureCommands {
       ...(rig.ik ?? [])
         .filter((chain) => [chain.rootBone, chain.middleBone, chain.endBone].includes(id))
         .map((chain) => `IK constraint "${chain.name}"`),
+      ...(rig.footContactMarkers ?? [])
+        .filter((marker) => marker.boneId === id)
+        .map((marker) => `foot contact marker "${marker.id}"`),
       ...(bone.sprite ? ['bone artwork'] : []),
       ...this.actions.boneReferences(id),
     ];

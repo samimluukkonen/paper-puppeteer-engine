@@ -5,6 +5,7 @@ import type { DeepReadonly } from './readonlyData.js';
 import { rigDefinitionSchema, skinDefinitionSchema } from './schemas.js';
 import type {
   BoneDefinition,
+  FootContactMarker,
   RigDefinition,
   SkinDefinition,
   SlotDefinition,
@@ -67,6 +68,7 @@ export function computeRenderOrder(root: string, bones: readonly BoneDefinition[
 
 /** Validates a data-only rig and orders it so parents always precede children. */
 export class Rig {
+  declare readonly footContactMarkers?: DeepReadonly<readonly FootContactMarker[]>;
   declare readonly ik?: DeepReadonly<readonly TwoBoneIKDefinition[]>;
   readonly root: string;
   readonly bones: DeepReadonly<readonly BoneDefinition[]>;
@@ -81,6 +83,7 @@ export class Rig {
   /** Existing rigs share validated immutable skeleton data; optional skins are validated independently. */
   constructor(definition: RigDefinition, skins?: readonly SkinDefinition[]) {
     if (definition instanceof Rig) {
+      if (definition.footContactMarkers !== undefined) this.footContactMarkers = definition.footContactMarkers;
       if (definition.ik !== undefined) this.ik = definition.ik;
       this.root = definition.root;
       this.bones = definition.bones;
@@ -95,6 +98,8 @@ export class Rig {
     }
     definition = rigDefinitionSchema.parse(definition);
     checkRigReferences(definition, throwValidationIssue);
+    if (definition.footContactMarkers !== undefined)
+      this.footContactMarkers = freezeData(definition.footContactMarkers);
     if (definition.ik !== undefined) this.ik = freezeData(definition.ik);
     this.root = definition.root;
     this.definitions = new Map();

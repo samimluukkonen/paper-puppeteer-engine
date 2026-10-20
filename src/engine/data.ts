@@ -3,6 +3,7 @@ export type {
   AttachmentOptions,
   BoneDefinition,
   Facing,
+  FootContactMarker,
   JointTransform,
   RigDefinition,
   SkinDefinition,
@@ -35,3 +36,5 @@ export type {
   SceneCharacterAssets,
   SceneValidationOptions,
 } from './SceneDefinition.js';
+
+export type { CreateFootContactMarkerOptions } from './footContactMarkers.js';

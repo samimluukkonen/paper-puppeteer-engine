@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.8-1
+
+Add the [foot contact marker foundation](docs/foot-contact-markers.md): optional rig markers with stable IDs, names, bone references and finite bone-local coordinates, validated creation defaults and pure post-IK world position evaluation through bone hierarchies, scale, facing and Puppet/Actor transforms. Preserve markers through runtime/editor exports, history and recovery; guard referenced bones against deletion or renaming. Add 20 regressions covering validation, transforms, IK, JSON round trips, compatibility and immutability. Existing rigs retain format version 1, and animation and ground-alignment behavior remain unchanged. Milestone `0.9.8.1` uses the changelog's SemVer form `0.9.8-1`.
+
 ## 0.9.7-4
 
 Audit and harden [ground reference integration](docs/ground-reference-readiness.md) across both editors. Add five-step Using Ground Reference and Aligning Actors to Ground tutorials through the existing Feature Guide, stable React control anchors and tooltips distinguishing guide preferences from authored edits. Document full coordinate conversion, browser-only persistence and safe Actor-origin fallback. Extend recovery, overlay reuse, tutorial isolation and authored IK export/re-import regressions; preserve collapsed inspectors and editor/runtime history boundaries.
