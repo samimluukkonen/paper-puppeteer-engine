@@ -54,6 +54,8 @@ export interface SpriteAttachmentDefinition {
   scaleY?: number;
   originX?: number;
   originY?: number;
+  /** Sole contact points in normalized image coordinates (0–1, measured from the top left). */
+  groundContacts?: readonly { readonly x: number; readonly y: number }[];
 }
 
 export interface SkinDefinition {

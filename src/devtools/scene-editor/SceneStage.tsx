@@ -66,6 +66,7 @@ class SceneStage extends Phaser.Scene {
       const document = this.document.workingScene;
       if (!document) {
         this.preview.dispose();
+        this.document.setActorGroundOffsets(new Map());
         return;
       }
       let message = [...new Set(document.actors.map((actor) => this.failures.get(actor.character.manifest)))]
@@ -91,6 +92,7 @@ class SceneStage extends Phaser.Scene {
       } catch (error) {
         message = error instanceof Error ? error.message : String(error);
       }
+      this.document.setActorGroundOffsets(this.preview.groundOffsets());
       this.status(message);
       for (const actor of document.actors) this.ensureCharacter(actor.character.manifest, sync);
     };
@@ -249,6 +251,7 @@ class SceneStage extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.alive = false;
       unsubscribe();
+      this.document.setActorGroundOffsets(new Map());
       unsubscribePlayback();
       events.abort();
       cancel();

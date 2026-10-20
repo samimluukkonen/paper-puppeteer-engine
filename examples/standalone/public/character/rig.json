@@ -76,6 +76,16 @@
       "texture": "paper-left-shin"
     },
     {
+      "groundContacts": [
+        {
+          "x": 0.04807692307692308,
+          "y": 0.9230769230769231
+        },
+        {
+          "x": 0.9519230769230769,
+          "y": 0.9230769230769231
+        }
+      ],
       "id": "leftFootDefault",
       "originX": 0.28,
       "originY": 0.3,
@@ -92,6 +102,16 @@
       "texture": "paper-right-shin"
     },
     {
+      "groundContacts": [
+        {
+          "x": 0.04807692307692308,
+          "y": 0.9230769230769231
+        },
+        {
+          "x": 0.9519230769230769,
+          "y": 0.9230769230769231
+        }
+      ],
       "id": "rightFootDefault",
       "originX": 0.28,
       "originY": 0.3,

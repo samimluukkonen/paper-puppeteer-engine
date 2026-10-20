@@ -32,7 +32,7 @@ export const sceneGuides: readonly GuideDefinition[] = [
   guide(
     'scene-ground-reference',
     'Aligning Actors to Ground',
-    'Use a scene-world reference and explicitly align Actor origins through scene Undo/Redo.',
+    'Use a scene-world reference and explicitly align Actor feet through scene Undo/Redo.',
     scene,
     [
       step(
@@ -55,9 +55,9 @@ export const sceneGuides: readonly GuideDefinition[] = [
       ),
       step(
         'snap',
-        'Snap the Actor origin to ground',
+        'Align feet to ground',
         T.sceneGroundAlign,
-        'Use Align Actor Origin to Ground to set the selected Actor’s initial Y while preserving X. Rigs have no shared foot-contact marker: this aligns the origin, not the feet. Scene Undo/Redo restores the edit. Optional Snap to Ground constrains placement drags; hold Shift to move freely.',
+        'Use Align Feet to Ground to place the lowest authored sole contact on the guide while preserving initial X. Foot artwork must define ground contact points. Scene Undo/Redo restores the edit. Optional Snap to Ground constrains placement drags; hold Shift to move freely.',
       ),
       step(
         'preview',

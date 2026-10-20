@@ -27,18 +27,23 @@ export function SceneGroundPanel({
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.sceneGroundAlign}
-        title="Set the selected Actor's initial origin Y. Scene Undo/Redo restores this edit; no foot contact is inferred."
-        disabled={!document.selectedActorId || !guide.enabled || previewing}
+        title="Place the lowest sole contact on the guide, preserving initial X. Scene Undo/Redo restores this edit."
+        disabled={!document.canAlignSelectedActorFeetToGround || !guide.enabled || previewing}
         onClick={() => {
-          if (!playback.previewing) document.alignSelectedActorOriginToGround();
+          if (!playback.previewing) document.alignSelectedActorFeetToGround();
         }}
       >
-        Align Actor Origin to Ground
+        Align Feet to Ground
       </button>
       <p className="workspace-caption">
-        Rigs have no shared foot-contact marker. Alignment places the selected Actor’s origin on the guide, not its
-        feet. Stop playback to edit initial placement. Scene Undo/Redo restores alignment.
+        Alignment and snapping place the lowest sole contact on the guide in the Actor’s initial pose. Stop playback to
+        edit placement. Scene Undo/Redo restores alignment.
       </p>
+      {document.selectedActorId && !document.canAlignSelectedActorFeetToGround && (
+        <p className="workspace-caption">
+          Feet alignment requires loaded foot artwork with authored ground contact points.
+        </p>
+      )}
     </GroundGuideControls>
   );
 }

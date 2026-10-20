@@ -35,6 +35,7 @@ export class SceneEditorDocument {
   private revision = 0;
   private dragAction: string | null = null;
   private dragActor: string | null = null;
+  private groundOffsets: ReadonlyMap<string, number> = new Map();
   private readonly listeners = new Set<() => void>();
   private issues: readonly ValidationIssue[] = [];
 
@@ -144,6 +145,7 @@ export class SceneEditorDocument {
     this.cancelActionDrag();
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
+    this.groundOffsets = new Map();
     this.entries.set(scene.id, entry);
     this.selected = scene.id;
     this.groundGuide.bind(scene.id);
@@ -167,6 +169,7 @@ export class SceneEditorDocument {
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
     this.selected = id;
+    this.groundOffsets = new Map();
     this.groundGuide.bind(id);
     return this.success();
   }
@@ -341,19 +344,36 @@ export class SceneEditorDocument {
     this.dragActor = id;
     return true;
   }
-  /** Explicit fallback: Actor position is its top-level Puppet container origin, not a sole. */
-  alignSelectedActorOriginToGround(): boolean {
+  /** Stage measurements are view state; they never enter exports or document history. */
+  setActorGroundOffsets(offsets: ReadonlyMap<string, number>): void {
+    const next = new Map([...offsets].filter(([, offset]) => Number.isFinite(offset)));
+    if (
+      next.size === this.groundOffsets.size &&
+      [...next].every(([id, y]) => Math.abs(y - (this.groundOffsets.get(id) ?? NaN)) < 1e-8)
+    )
+      return;
+    this.groundOffsets = next;
+    this.notify();
+  }
+  get canAlignSelectedActorFeetToGround(): boolean {
+    return this.selectedActorId !== null && this.groundOffsets.has(this.selectedActorId);
+  }
+  alignSelectedActorFeetToGround(): boolean {
     const actor = this.workingScene?.actors.find((actor) => actor.id === this.selectedActorId);
     const { guide, dragging } = this.groundGuide.getSnapshot();
-    if (!actor || !guide.enabled || dragging) return false;
-    return this.updateActor(actor.id, { position: { x: actor.position.x, y: guide.y } });
+    const offset = actor && this.groundOffsets.get(actor.id);
+    if (!actor || offset === undefined || !guide.enabled || dragging) return false;
+    return this.updateActor(actor.id, { position: { x: actor.position.x, y: guide.y - offset } });
   }
   moveActorDrag(position: { x: number; y: number }, options: { bypassGround?: boolean } = {}): boolean {
     const scene = this.workingScene;
     if (!scene || !this.dragActor) return false;
     const { guide } = this.groundGuide.getSnapshot();
+    const offset = this.groundOffsets.get(this.dragActor);
     const initialPosition =
-      guide.enabled && guide.snapEnabled && !options.bypassGround ? { x: position.x, y: guide.y } : position;
+      guide.enabled && guide.snapEnabled && offset !== undefined && !options.bypassGround
+        ? { x: position.x, y: guide.y - offset }
+        : position;
     return this.replaceScene({
       ...scene,
       actors: scene.actors.map((actor) =>

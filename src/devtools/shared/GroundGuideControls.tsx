@@ -101,7 +101,7 @@ export function GroundGuideControls({
         workspace. Visual reference only.
         {showSnapping &&
           (workspace.space === 'scene-world'
-            ? ' Drag ↕ Ground on the stage to adjust the guide. Escape cancels. Snapping constrains Actor origins during placement drags; hold Shift to move freely. Guide changes never move Actors or movement paths.'
+            ? ' Drag ↕ Ground on the stage to adjust the guide. Escape cancels. Snapping places feet on the ground during placement drags; hold Shift to move freely. Guide changes never move Actors or movement paths.'
             : ' Drag ↕ Ground in the preview to adjust the guide. Escape cancels. Snapping affects temporary IK target drags within 8 preview pixels; Set Target Key saves them.')}
       </p>
       {persistenceMessage && <p role="status">{persistenceMessage}</p>}

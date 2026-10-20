@@ -119,7 +119,7 @@ test('scene ground controls render, follow the camera and persist independently 
   expect(errors).toEqual([]);
 });
 
-test('scene guide dragging and two-character origin alignment preserve choreography, history and reload', async ({
+test('scene guide dragging and two-character feet alignment preserve choreography, history and reload', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -166,7 +166,7 @@ test('scene guide dragging and two-character origin alignment preserve choreogra
   const panel = page.locator('.ground-guide-controls');
   await panel.locator('summary').click();
   const y = panel.getByRole('spinbutton', { name: 'Ground Y', exact: true });
-  const align = panel.getByRole('button', { name: 'Align Actor Origin to Ground', exact: true });
+  const align = panel.getByRole('button', { name: 'Align Feet to Ground', exact: true });
   await expect(align).toBeDisabled();
   await panel.getByRole('checkbox', { name: 'Show ground guide' }).check();
   await y.fill('100');
@@ -193,37 +193,44 @@ test('scene guide dragging and two-character origin alignment preserve choreogra
   await align.click();
   await page.getByText('Actor properties', { exact: true }).click();
   const initialY = page.getByRole('spinbutton', { name: 'Initial Y', exact: true });
-  await expect(initialY).toHaveValue('100');
+  // The demo's bent bind-pose knees shorten its vertical leg reach.
+  const demoGroundY = 100 - (12 + 132 * Math.cos(0.04) + 24 - 26 * 0.3);
+  const sketchGroundY = 100 - (-35 + 1.5 + 91.5 + 78 + 72 * (1 - 20 / 72) * 0.3);
+  await expect.poll(async () => Number(await initialY.inputValue())).toBeCloseTo(demoGroundY, 3);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(initialY).toHaveValue('10');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(initialY).toHaveValue('100');
+  await expect.poll(async () => Number(await initialY.inputValue())).toBeCloseTo(demoGroundY, 3);
   await tracks.getByRole('button', { name: 'b', exact: true }).click();
   await align.click();
   // Actor properties remount collapsed on Actor changes.
   await page.getByText('Actor properties', { exact: true }).click();
-  await expect(initialY).toHaveValue('100');
+  await expect.poll(async () => Number(await initialY.inputValue())).toBeCloseTo(sketchGroundY, 3);
   await panel.getByRole('checkbox', { name: 'Snap to Ground', exact: true }).check();
   await page.getByRole('button', { name: 'Reset view', exact: true }).click();
   line = await groundLine(page);
-  const origin = { x: line.bounds.x + line.bounds.width / 2 + 180 * line.pixel, y: line.bounds.y + line.row };
+  const origin = {
+    x: line.bounds.x + line.bounds.width / 2 + 180 * line.pixel,
+    y: line.bounds.y + line.row + (sketchGroundY - 100) * line.pixel,
+  };
   await page.mouse.move(origin.x, origin.y);
   await page.mouse.down();
   await page.mouse.move(origin.x + 20 * line.pixel, origin.y - 30 * line.pixel, { steps: 3 });
   await page.mouse.up();
-  await expect(initialY).toHaveValue('100');
+  await expect.poll(async () => Number(await initialY.inputValue())).toBeCloseTo(sketchGroundY, 3);
   await page.keyboard.down('Shift');
   await page.mouse.move(origin.x + 20 * line.pixel, origin.y);
   await page.mouse.down();
   await page.mouse.move(origin.x + 40 * line.pixel, origin.y - 30 * line.pixel, { steps: 3 });
   await page.mouse.up();
   await page.keyboard.up('Shift');
-  await expect.poll(async () => Number(await initialY.inputValue())).toBeLessThan(100);
+  await expect.poll(async () => Number(await initialY.inputValue())).toBeLessThan(sketchGroundY);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(initialY).toHaveValue('100');
+  await expect.poll(async () => Number(await initialY.inputValue())).toBeCloseTo(sketchGroundY, 3);
   const aligned = await exportedScene(page);
   expect(aligned.actions).toEqual(source.actions);
-  expect(aligned.actors.map((actor) => actor.position.y)).toEqual([100, 100]);
+  expect(aligned.actors[0]!.position.y).toBeCloseTo(demoGroundY, 3);
+  expect(aligned.actors[1]!.position.y).toBeCloseTo(sketchGroundY, 3);
   // Moving the guide never changes these placements or resets the runtime context.
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(align).toBeDisabled();

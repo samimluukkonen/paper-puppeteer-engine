@@ -5,6 +5,7 @@ import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneActorDefinition } from '../../engine/SceneDefinition.js';
+import { actorGroundOffset } from './actorGrounding.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
 
 type ActorData = DeepReadonly<SceneActorDefinition>;
@@ -73,6 +74,14 @@ export class SceneActorPreview {
       actor.play(data.animation, { restart: true, fadeDuration: 0 }).pauseAnimation();
       actor.puppet.sampleAnimation(0);
     }
+  }
+  groundOffsets(): ReadonlyMap<string, number> {
+    const offsets = new Map<string, number>();
+    for (const [id, { actor }] of this.instances) {
+      const offset = actorGroundOffset(actor.puppet);
+      if (offset !== undefined) offsets.set(id, offset);
+    }
+    return offsets;
   }
   dispose(): void {
     const previous = [...this.instances.values()];

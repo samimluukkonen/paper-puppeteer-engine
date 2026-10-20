@@ -142,9 +142,7 @@ export class Rig {
     this.bones = Object.freeze(ordered);
     this.renderOrder = Object.freeze(computeRenderOrder(this.root, ordered));
     this.slots = Object.freeze((definition.slots ?? []).map((slot) => Object.freeze({ ...slot })));
-    this.attachments = Object.freeze(
-      (definition.attachments ?? []).map((attachment) => Object.freeze({ ...attachment })),
-    );
+    this.attachments = Object.freeze((definition.attachments ?? []).map((attachment) => freezeData(attachment)));
     for (const slot of this.slots) this.slotDefinitions.set(slot.id, slot);
     for (const attachment of this.attachments) this.attachmentDefinitions.set(attachment.id, attachment);
     this.skins = skins === undefined ? ownSkins(definition.skins ?? []) : skinOverrides(skins, definition);

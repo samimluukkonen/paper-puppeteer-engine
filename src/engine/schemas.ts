@@ -66,6 +66,12 @@ export const spriteAttachmentSchema = z.object({
   ...transformFields,
   originX: finiteNumber.min(0).max(1).exactOptional(),
   originY: finiteNumber.min(0).max(1).exactOptional(),
+  groundContacts: z
+    .array(z.strictObject({ x: finiteNumber.min(0).max(1), y: finiteNumber.min(0).max(1) }))
+    .min(1)
+    .max(32)
+    .readonly()
+    .exactOptional(),
 });
 
 export const skinDefinitionSchema = z.object({
