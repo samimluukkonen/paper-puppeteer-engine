@@ -4,6 +4,7 @@ import { encodePackageZip } from '../../engine/packageZip.js';
 import { buildScenePackage } from '../../engine/ScenePackage.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
+import { GroundGuideControls } from '../shared/GroundGuideControls.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
@@ -299,6 +300,7 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <GroundGuideControls key={`ground-${scene.id}`} workspace={document.groundGuide} />
               <ScenePlaybackInspector
                 key={`preview-${scene.id}`}
                 playback={playback}

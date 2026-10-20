@@ -12,6 +12,7 @@ import {
   type SceneValidationOptions,
 } from '../../engine/SceneDefinition.js';
 import type { ValidationIssue } from '../../engine/validation.js';
+import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 
@@ -28,6 +29,7 @@ interface SceneEntry {
 
 /** Independent scene sessions. Only validated, detached immutable authored snapshots enter history. */
 export class SceneEditorDocument {
+  readonly groundGuide = new GroundGuideWorkspace('scene-world');
   private readonly entries = new Map<string, SceneEntry>();
   private selected: string | null = null;
   private revision = 0;
@@ -143,6 +145,7 @@ export class SceneEditorDocument {
     this.cancelActorDrag();
     this.entries.set(scene.id, entry);
     this.selected = scene.id;
+    this.groundGuide.bind(scene.id);
   }
 
   createScene(options: Parameters<typeof createEmptyScene>[0]): boolean {
@@ -162,6 +165,7 @@ export class SceneEditorDocument {
     this.cancelActionDrag();
     this.cancelActorDrag();
     this.selected = id;
+    this.groundGuide.bind(id);
     return this.success();
   }
 

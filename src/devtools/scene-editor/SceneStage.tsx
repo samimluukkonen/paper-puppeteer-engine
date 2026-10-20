@@ -8,6 +8,7 @@ import { Puppet } from '../../engine/Puppet.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
@@ -22,6 +23,7 @@ class SceneStage extends Phaser.Scene {
   private preview!: SceneActorPreview;
   private overlay!: Phaser.GameObjects.Graphics;
   private grid!: Phaser.GameObjects.Graphics;
+  private groundOverlay!: GroundGuideOverlay;
   private gesture: Gesture | undefined;
   private pan: { pointer: number; x: number; y: number } | undefined;
   private readonly definitions = new Map<string, CharacterDefinition>();
@@ -50,6 +52,7 @@ class SceneStage extends Phaser.Scene {
     this.preview = new SceneActorPreview(this);
     this.grid = this.add.graphics().setDepth(-1000);
     this.overlay = this.add.graphics().setDepth(1_000_000);
+    this.groundOverlay = new GroundGuideOverlay(this);
     this.cameras.main.centerOn(0, 0);
     const canvas = this.game.canvas;
     canvas.tabIndex = 0;
@@ -224,7 +227,11 @@ class SceneStage extends Phaser.Scene {
       this.failures.clear();
       this.refresh = () => {};
       const errors: unknown[] = [];
-      for (const dispose of [() => this.playback.dispose(), () => this.preview.dispose()]) {
+      for (const dispose of [
+        () => this.groundOverlay.dispose(),
+        () => this.playback.dispose(),
+        () => this.preview.dispose(),
+      ]) {
         try {
           dispose();
         } catch (error) {
@@ -264,6 +271,7 @@ class SceneStage extends Phaser.Scene {
       });
   }
   update(_time: number, delta: number): void {
+    this.groundOverlay.render(this.document.groundGuide.getSnapshot().guide);
     this.playback.update(delta);
     for (const { actor } of this.preview.instances.values())
       actor.puppet.container.setVisible(!this.playback.previewing);

@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.7-1
+
+Add the [ground reference foundation](docs/ground-reference.md): separate preview/scene world settings, per-workspace browser persistence, reusable Phaser overlay and collapsed React controls. Scene Editor exposes the shared controls; dedicated Animation Editor controls and snapping remain deferred. Authored formats and history are unchanged. Milestone `0.9.7.1` uses the changelog's SemVer form `0.9.7-1`.
+
 ## 0.9.6
 
 Harden Scene Editor placement previews and teardown: suppress initial-pose gameplay events, use explicit hard cuts, and release all owned Actors even when one cleanup fails. Collapse inspector disclosures when a same-ID import installs a fresh document. Isolate playback controls and playhead subscriptions from authored timeline rows, and avoid frame subscriptions in the collapsed runtime inspector. Add eight Scene Editor tours to the existing Feature Guide, a complete two-package artist workflow and optional exact-ZIP standalone handoff, rapid-seek/lifecycle regressions, and a local real-Phaser scene profile. Add [Making Your First Scene](docs/making-your-first-scene.md) and the [v0.9 readiness report](docs/scene-editor-readiness.md). Scene format version 2 and character format version 1 remain unchanged.

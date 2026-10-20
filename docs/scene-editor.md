@@ -10,6 +10,8 @@ Open **Scene Editor** in the application navigation, or visit `/scene-editor/`. 
 
 ## Visual stage
 
+Expand **Ground reference** to show an optional horizontal guide, adjust its scene-world **Ground Y**, or reset Y to zero. Settings are saved in this browser per scene ID and survive reopening that scene; they are excluded from scene JSON/ZIPs. The guide follows camera zoom/pan and never moves Actors or changes Undo/Redo history. Snapping is deferred. See the [ground reference architecture](ground-reference.md).
+
 Click **+ Add Actor**, choose a character from the same workspace catalog used by the character editors, and click **Add actor**. You can also enter a stable manifest path or HTTP(S) URL for any compatible package. The editor loads it with `CharacterLoader`; it does not rely on demo animation names, bone IDs or presentation profiles. Browser-only new-character identities have no permanent manifest yet; export and host their package before referencing them in a scene. Paths are resolved from the Scene Editor page during preview and from the hosted scene JSON location in the runtime. Keep that base location consistent or use permanent absolute URLs.
 
 Expand **Scene actors** to select, duplicate, remove, or change preview depth with **Send backward** / **Bring forward**. Later actor-array entries draw in front. Each instance gets a scene-local ID independent of its character definition and animation names. Duplicate creates a separate instance offset by 32 stage units and does not copy scheduled actions. Renaming an actor updates its action references atomically. Removing an actor with actions asks explicitly whether to remove those actions too; cancellation preserves everything. Both operations are undoable.

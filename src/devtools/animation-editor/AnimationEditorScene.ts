@@ -13,9 +13,12 @@ import type { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
+import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
+import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { createCharacterDocuments } from '../shared/newCharacter.js';
 import type { PackageSnapshot } from '../shared/package/characterPackage.js';
+import { CHARACTER_PREVIEW_ORIGIN } from '../shared/previewPlacement.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
@@ -32,6 +35,8 @@ export interface AnimationEditorSceneOptions {
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
+  readonly groundGuide = new GroundGuideWorkspace('animation-preview-world');
+  private groundOverlay: GroundGuideOverlay | undefined;
   rigEditor: RigEditor | undefined;
   private definition: CharacterDefinition | undefined;
   private appliedWorkingRig: RigEditorState['workingCopy'] | undefined;
@@ -154,6 +159,9 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
+      this.groundOverlay?.dispose();
+      this.groundOverlay = undefined;
+      this.groundGuide.bind(null);
       this.clearMirrorPreview();
       this.clearBakePreview();
       this.ghosts?.dispose();
@@ -174,6 +182,10 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.syncMirrorPreview();
     this.syncBakePreview();
     this.ikHandles?.render();
+    if (this.groundOverlay) {
+      const guide = this.groundGuide.getSnapshot().guide;
+      this.groundOverlay.render(this.rigMode ? { ...guide, enabled: false } : guide);
+    }
     const overlay = this.selectionOverlay;
     overlay?.clear();
     if (overlay && !this.rigMode && this.puppet && this.state?.selectedBoneId) {
@@ -403,8 +415,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       puppet = new Puppet(this, {
         rig: definition.rig,
         skin: definition.defaultSkin,
-        x: 380,
-        y: 435,
+        x: CHARACTER_PREVIEW_ORIGIN.x,
+        y: CHARACTER_PREVIEW_ORIGIN.y,
         autoUpdate: false,
         facing: this.facing,
         debug: this.bonesVisible,
@@ -526,6 +538,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.ikHandles.setVisible(this.ikHandlesVisible);
       this.ikHandles.setInteractive(this.ikHandlesInteractive);
       this.selectionOverlay = this.add.graphics().setDepth(puppet.container.depth + 5);
+      this.groundGuide.bind(url.href);
+      this.groundOverlay = new GroundGuideOverlay(this);
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
@@ -541,6 +555,9 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input?.off('pointerdown', this.selectPreviewBone, this);
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
+      this.groundOverlay?.dispose();
+      this.groundOverlay = undefined;
+      this.groundGuide.bind(null);
       this.clearMirrorPreview();
       this.clearBakePreview();
       this.ikHandles?.dispose();

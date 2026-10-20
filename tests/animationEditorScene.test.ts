@@ -37,6 +37,59 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+test('ground reference stays in preview world through scaling, facing, clip switches and rig rebuilds', async () => {
+  const values = new Map<string, string>();
+  vi.stubGlobal('window', {
+    location: { href: 'https://example.test/animation-editor/' },
+    localStorage: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+      },
+    },
+  });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const rig = scene.rigEditor!.state;
+    const authored = JSON.stringify(scene.packageSnapshot());
+    const pose = puppet.getBone(puppet.rig.root).getWorldPosition();
+    scene.groundGuide.update({ enabled: true, y: 500, snapEnabled: true });
+    assert.equal(JSON.stringify(scene.packageSnapshot()), authored);
+    assert.deepEqual(puppet.getBone(puppet.rig.root).getWorldPosition(), pose);
+    assert.isFalse(state.dirty);
+    assert.equal(state.historyLength, 0);
+    assert.isFalse(rig.dirty);
+    puppet.container.setScale(1.7);
+    scene.setFacing('left');
+    const otherClip = state.animationIds.find((id) => id !== state.selectedAnimationId);
+    if (otherClip) state.selectAnimation(otherClip);
+    assert.equal(scene.groundGuide.getSnapshot().guide.y, 500);
+    scene.reloadRig(rig.recoveryDraft);
+    assert.equal(scene.groundGuide.getSnapshot().guide.y, 500);
+    assert.isTrue(scene.groundGuide.getSnapshot().guide.enabled);
+    scene.groundGuide.resetY();
+    assert.equal(scene.groundGuide.getSnapshot().guide.y, 435);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
+  assert.isNull(scene.groundGuide.getSnapshot().workspaceId);
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 2));
+  assert.equal(scene.groundGuide.getSnapshot().guide.y, 435);
+  assert.isTrue(scene.groundGuide.getSnapshot().guide.enabled);
+  scene.events.emit('shutdown');
+});
+
 test('fixed preview uses authored endpoints with offsets while scrubbing, scaling and mirroring', async () => {
   vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
   const arm = {
