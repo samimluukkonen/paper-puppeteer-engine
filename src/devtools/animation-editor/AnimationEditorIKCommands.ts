@@ -89,10 +89,18 @@ export class AnimationEditorIKCommands {
     return true;
   }
   /** Explicitly commit both target coordinates in one document/history installation. */
-  commitIKTarget(): boolean {
+  commitIKTarget(target?: Point): boolean {
     const id = this.selectedIKConstraintId;
-    const values = this.selectedIKTargetValues;
-    if (!id || !values || this.drag || this.ikManipulationDisabledReason) return false;
+    const values = target ?? this.selectedIKTargetValues;
+    if (
+      !id ||
+      !values ||
+      !Number.isFinite(values.x) ||
+      !Number.isFinite(values.y) ||
+      this.drag ||
+      this.ikManipulationDisabledReason
+    )
+      return false;
     return this.editIKKeys(
       (animation, rig) => {
         const time = this.playback.currentTimeMilliseconds;

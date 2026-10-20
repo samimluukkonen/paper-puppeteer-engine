@@ -11,7 +11,7 @@ export const groundGuideSchema = z.strictObject({
   snapEnabled: z.boolean(),
 });
 
-/** Editor metadata only. snapEnabled reserves a preference; it performs no snapping yet. */
+/** Editor metadata only. snapEnabled opts into target-Y snapping during Animation Editor IK drags. */
 export type GroundGuide = Readonly<z.infer<typeof groundGuideSchema>>;
 
 export function defaultGroundGuide(space: GroundGuideSpace): GroundGuide {
@@ -44,4 +44,20 @@ export function groundGuideGeometry(guide: GroundGuide, camera: EditorViewportCa
     labelX: view.left + 12 * pixel,
     labelY: guide.y - view.top >= 24 * pixel ? guide.y - 22 * pixel : guide.y + 4 * pixel,
   };
+}
+
+/** Only the dedicated label is draggable; the line never steals joint/IK picks. */
+export function groundGuideHandleHit(
+  guide: GroundGuide,
+  camera: EditorViewportCamera,
+  world: { x: number; y: number },
+): boolean {
+  const geometry = groundGuideGeometry(guide, camera);
+  return (
+    !!geometry &&
+    world.x >= geometry.labelX &&
+    world.x <= geometry.labelX + 80 * geometry.pixel &&
+    world.y >= geometry.labelY &&
+    world.y <= geometry.labelY + 20 * geometry.pixel
+  );
 }

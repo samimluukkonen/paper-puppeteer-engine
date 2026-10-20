@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.7-2
+
+Integrate the [ground reference](docs/ground-reference.md) into Animation Editor with collapsed controls, numeric/reset settings, a dedicated world-space drag label, Escape cancellation and separate bounded guide Undo/Redo. Keep one browser preference per character across clips. Add optional IK drag draft snapping and explicit “Align IK target Y to guide” key authoring through the existing atomic XY API. Preserve world X through full affine transforms and explain missing sole-contact metadata. Guide edits leave authored animation data and history unchanged; foot planting is unchanged. Include unit, lifecycle and local desktop browser regressions. Milestone `0.9.7.2` uses the changelog's SemVer form `0.9.7-2`.
+
 ## 0.9.7-1
 
 Add the [ground reference foundation](docs/ground-reference.md): separate preview/scene world settings, per-workspace browser persistence, reusable Phaser overlay and collapsed React controls. Scene Editor exposes the shared controls; dedicated Animation Editor controls and snapping remain deferred. Authored formats and history are unchanged. Milestone `0.9.7.1` uses the changelog's SemVer form `0.9.7-1`.

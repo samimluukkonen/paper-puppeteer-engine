@@ -12,6 +12,7 @@ import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutCo
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
 import { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { workspaceGuideHost } from '../shared/guides/workspaceGuideHost.js';
@@ -61,6 +62,7 @@ const guides = new GuideLauncher(
   }),
 );
 const ikInspector = new IKInspectorController();
+const groundGuide = new GroundGuideWorkspace('animation-preview-world');
 const packages = new PackageController();
 const artwork = new ArtworkController();
 const attachments = new AttachmentController(artwork);
@@ -99,6 +101,10 @@ function CharacterWorkspace() {
           mirrorTools={mirrorTools}
           newAnimation={newAnimation}
           ikInspector={ikInspector}
+          groundGuide={groundGuide}
+          alignGroundTarget={() => {
+            scene?.alignSelectedIKTargetToGround();
+          }}
           ikBake={ikBake}
           retiming={retiming}
           rigTweak={rigTweak}
@@ -214,6 +220,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       characterUrl: `../characters/${encodeURIComponent(selectedCharacterId())}/character.json`,
       ...(initialDraft ? { definition: initialDraft.definition } : {}),
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
+      groundGuide,
     },
     artwork,
     () => {

@@ -357,9 +357,9 @@ export class AnimationEditorState {
   cancelIKTargetDrag(): boolean {
     return this.batchNotifications(() => this.ik.cancelIKTargetDrag());
   }
-  commitIKTarget(): boolean {
+  commitIKTarget(target?: Point): boolean {
     if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.commitIKTarget());
+    return this.batchNotifications(() => this.ik.commitIKTarget(target));
   }
   get selectedBoneId(): string | null {
     return this.selection.boneId;

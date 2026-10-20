@@ -483,3 +483,32 @@ test('handle teardown is idempotent and late input/render calls never touch dest
     f.dispose();
   }
 });
+
+test('opt-in ground snapping changes only an explicit IK drag draft until Set Target Key', () => {
+  const f = fixture();
+  f.handles.dispose();
+  const guide = { enabled: true, snapEnabled: true, y: 210 };
+  const handles = new AnimationEditorIKHandles(f.scene, f.state, f.puppet, {
+    guide: () => guide,
+    dragging: () => false,
+  });
+  try {
+    f.state.selectIKConstraint('handIK');
+    const original = f.state.workingAnimation;
+    const start = handles.getHandles().find((entry) => entry.id === 'handIK')!.world;
+    assert.isTrue(handles.pointerDown(f.pointer(start)));
+    f.input.emit('pointermove', f.pointer({ x: start.x + 10, y: guide.y + 2 }));
+    const world = localToWorld(f.state.selectedIKTargetValues!, f.puppet.container.getWorldTransformMatrix());
+    assert.closeTo(world.y, guide.y, 1e-8);
+    assert.strictEqual(f.state.workingAnimation, original);
+    f.input.emit('pointerup', f.pointer({ x: start.x + 10, y: guide.y + 2 }));
+    assert.strictEqual(f.state.workingAnimation, original);
+    assert.isTrue(f.state.commitIKTarget());
+    assert.equal(f.state.historyLength, 1);
+    f.state.undo();
+    assert.strictEqual(f.state.workingAnimation, original);
+  } finally {
+    handles.dispose();
+    f.dispose();
+  }
+});

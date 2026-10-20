@@ -3,9 +3,10 @@ import { localToWorld, worldToLocal, type Point } from '../../engine/affineMath.
 import { IK_EPSILON } from '../../engine/ik/solveTwoBoneIK.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
+import type { GroundGuide } from '../shared/groundGuide.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { evaluateIKTarget } from './ikInspectorSampling.js';
-import { ikTargetToWorld, pointerToIKTarget } from './ikTargetCoordinates.js';
+import { ikTargetToWorld, pointerToIKTarget, snapIKTargetToGuide } from './ikTargetCoordinates.js';
 
 export interface IKTargetHandle {
   readonly id: string;
@@ -29,6 +30,7 @@ export class AnimationEditorIKHandles {
     private readonly scene: Phaser.Scene,
     private readonly state: AnimationEditorState,
     private readonly puppet: Puppet,
+    private readonly ground?: { guide: () => GroundGuide; dragging: () => boolean },
   ) {
     this.graphics = scene.add.graphics().setDepth(puppet.container.depth + 4);
     scene.input.on('pointermove', this.pointerMove);
@@ -154,6 +156,10 @@ export class AnimationEditorIKHandles {
   }
 
   /** Called before bone picking. Even a disabled handle consumes the click and selects its constraint. */
+  get gestureActive(): boolean {
+    return this.pointerId !== undefined;
+  }
+
   pointerDown(pointer: Phaser.Input.Pointer): boolean {
     if (this.disposed) return false;
     if (this.pointerId !== undefined) return true;
@@ -206,7 +212,17 @@ export class AnimationEditorIKHandles {
       this.cancel();
       return;
     }
-    this.state.previewIKTargetDrag({ x: target.x + this.offset.x, y: target.y + this.offset.y });
+    const draft = { x: target.x + this.offset.x, y: target.y + this.offset.y };
+    this.state.previewIKTargetDrag(
+      this.ground
+        ? snapIKTargetToGuide(
+            draft,
+            this.puppet.container.getWorldTransformMatrix(),
+            this.ground.guide(),
+            this.scene.cameras.main.zoom,
+          )
+        : draft,
+    );
   };
   private pointerUp = (pointer: Phaser.Input.Pointer): void => {
     if (pointer.id !== this.pointerId) return;
@@ -217,7 +233,7 @@ export class AnimationEditorIKHandles {
     this.release();
   };
   private wheel = (pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number): void => {
-    if (this.pointerId !== undefined) return;
+    if (this.pointerId !== undefined || this.ground?.dragging()) return;
     zoomCameraAt(this.scene.cameras.main, pointer.x, pointer.y, dy);
   };
   private release(): void {

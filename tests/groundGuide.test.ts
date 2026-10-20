@@ -236,7 +236,7 @@ test('shared controls start collapsed, have no-workspace guards and keep snappin
   assert.notInclude(markup, 'disabled=""');
   assert.include(markup, 'Ground Y');
   assert.include(markup, 'Reset Ground Y');
-  assert.include(markup, 'Enable ground snapping preference');
+  assert.include(markup, 'Enable ground snapping');
 });
 
 test('overlay hides, renders dashed/solid lines with constant pixel sizes and disposes independently', () => {

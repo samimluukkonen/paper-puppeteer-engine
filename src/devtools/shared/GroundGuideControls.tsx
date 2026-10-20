@@ -1,16 +1,18 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { GroundGuideWorkspace } from './GroundGuideWorkspace.js';
 import './groundGuide.css';
 
-/** Shared inspector disclosure. Animation-specific placement and snapping commands are separate work. */
+/** Shared collapsed inspector disclosure; commands keep guide history outside authored documents. */
 export function GroundGuideControls({
   workspace,
   showSnapping = false,
+  children,
 }: {
   workspace: GroundGuideWorkspace;
   showSnapping?: boolean;
+  children?: ReactNode;
 }) {
-  const { workspaceId, guide, persistenceMessage } = useSyncExternalStore(
+  const { workspaceId, guide, persistenceMessage, canUndo, canRedo, dragging } = useSyncExternalStore(
     workspace.subscribe,
     workspace.getSnapshot,
     workspace.getSnapshot,
@@ -25,7 +27,7 @@ export function GroundGuideControls({
   return (
     <details className="ground-guide-controls">
       <summary>Ground reference</summary>
-      <fieldset disabled={workspaceId === null}>
+      <fieldset disabled={workspaceId === null || dragging}>
         <label className="ground-guide-toggle">
           <input
             type="checkbox"
@@ -66,14 +68,26 @@ export function GroundGuideControls({
               checked={guide.snapEnabled}
               onChange={(event) => workspace.update({ snapEnabled: event.target.checked })}
             />{' '}
-            Enable ground snapping preference
+            Enable ground snapping
           </label>
         )}
+        {workspace.historyEnabled && (
+          <div className="ground-guide-history">
+            <button type="button" disabled={!canUndo} onClick={() => workspace.undo()}>
+              Undo ground change
+            </button>
+            <button type="button" disabled={!canRedo} onClick={() => workspace.redo()}>
+              Redo ground change
+            </button>
+          </div>
+        )}
+        {children}
       </fieldset>
       <p className="workspace-caption">
         {workspace.space === 'scene-world' ? 'Scene-world Y.' : 'Fixed preview-world Y.'} Saved in this browser for this
         workspace. Visual reference only.
-        {showSnapping && ' Snapping is reserved for a later integration.'}
+        {showSnapping &&
+          ' Drag ↕ Ground in the preview to adjust the guide. Escape cancels. Snapping affects temporary IK target drags within 8 preview pixels; Set Target Key saves them.'}
       </p>
       {persistenceMessage && <p role="status">{persistenceMessage}</p>}
     </details>

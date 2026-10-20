@@ -6,10 +6,12 @@ import { AttachmentPanel } from '../rig-editor/AttachmentPanel.js';
 import { RigIKPanel } from '../rig-editor/RigIKPanel.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
+import type { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
+import { AnimationGroundPanel } from './AnimationGroundPanel.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
 import type { IKBakeController } from './IKBakeController.js';
@@ -37,6 +39,8 @@ export function AnimationEditorView({
   rigTweak,
   attachments,
   packages,
+  groundGuide,
+  alignGroundTarget,
   header = true,
 }: {
   mirrorTools: MirrorToolsController;
@@ -48,6 +52,8 @@ export function AnimationEditorView({
   rigTweak?: RigTweakController;
   attachments?: AttachmentController;
   packages?: PackageController;
+  groundGuide?: GroundGuideWorkspace;
+  alignGroundTarget?: () => void;
   header?: boolean;
 }) {
   const inspector = useWorkspaceInspector();
@@ -260,6 +266,9 @@ export function AnimationEditorView({
           {attachments && tweaking && <RigIKPanel controller={attachments} />}
           {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
+            {groundGuide && alignGroundTarget && (
+              <AnimationGroundPanel workspace={groundGuide} ikInspector={ikInspector} alignTarget={alignGroundTarget} />
+            )}
             <details className="animation-bone-list" data-guide-id={GUIDE_TARGETS.animationBones}>
               <summary>Bones</summary>
               <div id="animation-bones" aria-label="Bone hierarchy"></div>

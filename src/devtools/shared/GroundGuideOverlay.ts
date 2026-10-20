@@ -10,11 +10,11 @@ export class GroundGuideOverlay {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly options: { dashed?: boolean; showLabel?: boolean } = {},
+    private readonly options: { dashed?: boolean; showLabel?: boolean; draggable?: boolean } = {},
   ) {
     this.graphics = scene.add.graphics().setDepth(9000).setVisible(false);
     this.label = scene.add
-      .text(0, 0, 'Ground', {
+      .text(0, 0, options.draggable ? '↕ Ground' : 'Ground', {
         fontFamily: 'monospace',
         fontSize: '11px',
         color: '#dba75d',

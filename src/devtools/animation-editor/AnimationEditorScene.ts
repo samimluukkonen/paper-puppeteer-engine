@@ -20,9 +20,11 @@ import { createCharacterDocuments } from '../shared/newCharacter.js';
 import type { PackageSnapshot } from '../shared/package/characterPackage.js';
 import { CHARACTER_PREVIEW_ORIGIN } from '../shared/previewPlacement.js';
 import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEditorGhostLayer.js';
+import { AnimationEditorGroundHandle } from './AnimationEditorGroundHandle.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { alignIKTargetToGuide } from './ikTargetCoordinates.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
 import { getCompiledPreviewClip } from './previewClip.js';
 import { toSeconds } from './timeUnits.js';
@@ -32,11 +34,13 @@ export interface AnimationEditorSceneOptions {
   readonly characterUrl?: string;
   readonly definition?: CharacterDefinition;
   readonly ikChains?: readonly TwoBoneIKDefinition[];
+  readonly groundGuide?: GroundGuideWorkspace;
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
-  readonly groundGuide = new GroundGuideWorkspace('animation-preview-world');
+  readonly groundGuide: GroundGuideWorkspace;
   private groundOverlay: GroundGuideOverlay | undefined;
+  private groundHandle: AnimationEditorGroundHandle | undefined;
   rigEditor: RigEditor | undefined;
   private definition: CharacterDefinition | undefined;
   private appliedWorkingRig: RigEditorState['workingCopy'] | undefined;
@@ -130,6 +134,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     private readonly onRigChange: () => void = () => {},
   ) {
     super('AnimationEditorScene');
+    this.groundGuide = options.groundGuide ?? new GroundGuideWorkspace('animation-preview-world');
     this.options = { ...options, ...(options.ikChains ? { ikChains: structuredClone(options.ikChains) } : {}) };
   }
 
@@ -154,6 +159,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state?.endScrub();
       this.ikHandles?.dispose();
       this.ikHandles = undefined;
+      this.groundHandle?.dispose();
+      this.groundHandle = undefined;
       this.state = undefined;
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
@@ -196,6 +203,11 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
     if (this.rigMode) return;
+    if (this.ikHandles?.gestureActive) {
+      this.ikHandles.pointerDown(pointer);
+      return;
+    }
+    if (this.groundHandle?.pointerDown(pointer)) return;
     if (this.ikHandles?.pointerDown(pointer)) return;
     if (!this.puppet || !this.state || pointer.button !== 0) return;
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -216,6 +228,38 @@ export class AnimationEditorScene extends Phaser.Scene {
   setIKHandlesVisible(visible: boolean): void {
     this.ikHandlesVisible = visible;
     this.ikHandles?.setVisible(visible && !this.rigMode);
+  }
+
+  /** Explicit authoring command. Guide edits themselves never call this method. */
+  alignSelectedIKTargetToGround(): boolean {
+    const state = this.state;
+    const puppet = this.puppet;
+    const { guide, dragging } = this.groundGuide.getSnapshot();
+    this.ikHandles?.refreshAvailability();
+    if (
+      !state ||
+      !puppet ||
+      this.rigMode ||
+      dragging ||
+      !guide.enabled ||
+      !state.selectedIKTargetValues ||
+      state.ikManipulationDisabledReason ||
+      state.ikTargetDrag
+    )
+      return false;
+    const target = alignIKTargetToGuide(
+      state.selectedIKTargetValues,
+      puppet.container.getWorldTransformMatrix(),
+      guide.y,
+    );
+    return !!target && state.commitIKTarget(target);
+  }
+
+  private createIKHandles(state: AnimationEditorState, puppet: Puppet): AnimationEditorIKHandles {
+    return new AnimationEditorIKHandles(this, state, puppet, {
+      guide: () => this.groundGuide.getSnapshot().guide,
+      dragging: () => this.groundHandle?.dragging ?? false,
+    });
   }
   private refreshArtwork(): void {
     const puppet = this.puppet;
@@ -471,6 +515,7 @@ export class AnimationEditorScene extends Phaser.Scene {
           this.rebuildingRig = true;
           try {
             this.artwork?.bind(this, next, definition, () => this.refreshArtwork());
+            this.groundGuide.cancelDrag();
             this.ikHandles?.dispose();
             this.clearMirrorPreview();
             this.clearBakePreview();
@@ -486,7 +531,7 @@ export class AnimationEditorScene extends Phaser.Scene {
             this.preview = preview;
             this.ghosts = ghosts;
             next.setDebug(this.bonesVisible && !this.rigMode);
-            this.ikHandles = new AnimationEditorIKHandles(this, state, next);
+            this.ikHandles = this.createIKHandles(state, next);
             this.ikHandles.setVisible(this.ikHandlesVisible && !this.rigMode);
             this.ikHandles.setInteractive(this.ikHandlesInteractive && !this.rigMode);
             if (state.editorMode === 'rig') {
@@ -534,12 +579,13 @@ export class AnimationEditorScene extends Phaser.Scene {
       });
       this.artwork?.bind(this, puppet, definition, () => this.refreshArtwork());
       if (this.ikPreviewEnabled) this.setIKPreview(true);
-      this.ikHandles = new AnimationEditorIKHandles(this, state, puppet);
+      this.ikHandles = this.createIKHandles(state, puppet);
       this.ikHandles.setVisible(this.ikHandlesVisible);
       this.ikHandles.setInteractive(this.ikHandlesInteractive);
       this.selectionOverlay = this.add.graphics().setDepth(puppet.container.depth + 5);
       this.groundGuide.bind(url.href);
-      this.groundOverlay = new GroundGuideOverlay(this);
+      this.groundOverlay = new GroundGuideOverlay(this, { draggable: true });
+      this.groundHandle = new AnimationEditorGroundHandle(this, this.groundGuide, state);
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
@@ -557,6 +603,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.selectionOverlay = undefined;
       this.groundOverlay?.dispose();
       this.groundOverlay = undefined;
+      this.groundHandle?.dispose();
+      this.groundHandle = undefined;
       this.groundGuide.bind(null);
       this.clearMirrorPreview();
       this.clearBakePreview();

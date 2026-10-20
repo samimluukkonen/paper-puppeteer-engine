@@ -767,3 +767,135 @@ test('shared scene rebinds newly authored IK for animation keying, safe deletion
     scene.events.emit('shutdown');
   }
 });
+
+test('explicit guide alignment uses fresh puppet transforms, authors one XY history action and rejects unavailable owners', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  const character = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'ground-ik',
+      rig: 'rig.json',
+      textures: {},
+      skins: { basic: 'skin.json' },
+      defaultSkin: 'basic',
+      animations: ['walk.json'],
+    },
+    rig: {
+      version: 1,
+      root: 'root',
+      bones: [
+        { id: 'root', y: 10 },
+        { id: 'upper', parent: 'root' },
+        { id: 'lower', parent: 'upper', y: 50 },
+        { id: 'foot', parent: 'lower', y: 50 },
+      ],
+      ik: [{ name: 'leg', rootBone: 'upper', middleBone: 'lower', endBone: 'foot', endOffset: { x: 0, y: 7 } }],
+    },
+    skins: { 'skin.json': { version: 1, name: 'basic', slots: {} } },
+    animations: {
+      'walk.json': {
+        version: 1,
+        name: 'walk',
+        duration: 1000,
+        loop: true,
+        tracks: {
+          root: [
+            { time: 0, y: 10 },
+            { time: 1000, y: 25 },
+          ],
+        },
+        ikTracks: { leg: [{ time: 0, x: 30, y: 80 }] },
+        events: [{ time: 500, name: 'step' }],
+      },
+    },
+  });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(character);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const original = state.workingAnimation!;
+    assert.isFalse(scene.alignSelectedIKTargetToGround());
+    scene.groundGuide.update({ enabled: true, y: 570 });
+    assert.isFalse(scene.alignSelectedIKTargetToGround());
+    state.selectIKConstraint('leg');
+    state.setCurrentTime(0.5);
+    for (const facing of ['left', 'right'] as const) {
+      scene.setFacing(facing);
+      puppet.container.setPosition(310, 420).setScale(1.5).setRotation(0.2);
+      const matrix = puppet.container.getWorldTransformMatrix();
+      const before = localToWorld(state.selectedIKTargetValues!, matrix);
+      assert.isTrue(scene.alignSelectedIKTargetToGround());
+      const after = localToWorld(state.selectedIKTargetValues!, matrix);
+      assert.closeTo(after.x, before.x, 1e-8);
+      assert.closeTo(after.y, 570, 1e-8);
+      assert.strictEqual(state.workingAnimation!.tracks, original.tracks);
+      assert.strictEqual(state.workingAnimation!.events, original.events);
+      assert.equal(state.historyLength, 1);
+      state.undo();
+      assert.strictEqual(state.workingAnimation, original);
+    }
+    puppet.getIK('leg').setTarget({ x: 200, y: 500 });
+    assert.isFalse(scene.alignSelectedIKTargetToGround());
+    assert.strictEqual(state.workingAnimation, original);
+    puppet.getIK('leg').target = undefined;
+    puppet.container.setScale(0);
+    assert.isFalse(scene.alignSelectedIKTargetToGround());
+    scene.groundGuide.update({ enabled: false });
+    assert.isFalse(scene.alignSelectedIKTargetToGround());
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
+});
+
+test('ground is available before any animation exists and persists through creating and switching empty clips', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  const character = CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: 'empty-ground',
+      rig: 'rig.json',
+      textures: {},
+      skins: { basic: 'skin.json' },
+      defaultSkin: 'basic',
+      animations: [],
+    },
+    rig: { version: 1, root: 'root', bones: [{ id: 'root' }] },
+    skins: { 'skin.json': { version: 1, name: 'basic', slots: {} } },
+    animations: {},
+  });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(character);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const overlay: unknown = Reflect.get(scene, 'groundOverlay');
+    assert.isNull(state.workingAnimation);
+    assert.isNotNull(scene.groundGuide.getSnapshot().workspaceId);
+    scene.groundGuide.update({ enabled: true, y: 520 });
+    assert.isTrue(state.createAnimation({ name: 'first' }));
+    const first = state.workingAnimation;
+    assert.isTrue(state.createAnimation({ name: 'second' }));
+    state.selectAnimation('first', { keepChanges: true });
+    assert.strictEqual(state.workingAnimation, first);
+    assert.isEmpty(state.workingAnimation!.tracks);
+    assert.equal(state.historyLength, 0);
+    assert.equal(scene.groundGuide.getSnapshot().guide.y, 520);
+    assert.strictEqual(Reflect.get(scene, 'groundOverlay'), overlay);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
+});

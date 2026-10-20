@@ -15,3 +15,9 @@
 .ground-guide-controls input[type="checkbox"] {
   width: auto;
 }
+
+.ground-guide-history {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
