@@ -2,7 +2,7 @@
 
 ## Implemented
 
-Hardened the existing interpolation model and key workflows for `plans/plan-05-02-06-03.md`. Package version is `0.5.2-6.3`. Regression coverage includes copy/paste, duplicate, group movement, collisions, deletion, exact history restoration, selection/UI reconciliation, serialization, validation, preview sampling, playback controls, FPS, IK, facing, and source immutability.
+Hardened the existing interpolation model and key workflows for `plans/archive/plan-v0.5.2.6.3.md`. Package version is `0.5.2-6.3`. Regression coverage includes copy/paste, duplicate, group movement, collisions, deletion, exact history restoration, selection/UI reconciliation, serialization, validation, preview sampling, playback controls, FPS, IK, facing, and source immutability.
 
 Three defects were reproduced before fixes: selection queries reported different unavailable reasons when terminal/missing references were reordered; paste/duplicate collapsed distinct group members within the shared key-time tolerance; and translation at large timestamps silently merged group identities through floating point rounding. Selection queries now prioritize missing identities. Multi-key paste uses the existing group mutation path to retain exact translated times and rejects merged identities atomically. Copy deduplicates repeated canonical references.
 

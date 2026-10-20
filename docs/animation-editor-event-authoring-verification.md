@@ -2,7 +2,7 @@
 
 ## Implemented
 
-Implemented `plans/plan-05-02-07-02.md` using the existing event schema, mutation API, stable session references, document history, event track and timeline coordinate/snapping policy. Package version is `0.5.2-7.2`. No dependencies or runtime formats changed.
+Implemented `plans/archive/plan-v0.5.2.7.2.md` using the existing event schema, mutation API, stable session references, document history, event track and timeline coordinate/snapping policy. Package version is `0.5.2-7.2`. No dependencies or runtime formats changed.
 
 ## Event authoring workflow
 

@@ -2,7 +2,7 @@
 
 ## Implemented
 
-The schema-compatible portion of `plans/plan-05-02-06-02.md`: a compact selected-key interpolation inspector, a separately scoped clip declaration editor, outgoing/terminal marker indicators and native titles, existing preview/history integration, and controller/runtime/browser regression coverage. Package version is `0.5.2-6.2`.
+The schema-compatible portion of `plans/archive/plan-v0.5.2.6.2.md`: a compact selected-key interpolation inspector, a separately scoped clip declaration editor, outgoing/terminal marker indicators and native titles, existing preview/history integration, and controller/runtime/browser regression coverage. Package version is `0.5.2-6.2`.
 
 The plan's full definition of done is **not satisfied**: v0.5.2.6.1 only supports clip-wide `linear` interpolation and explicitly rejects selected-key mutations. Smooth/stepped are authored playback sample-timing modes, not interpolation modes. Per-key changes, successful batch interpolation changes, mixed modes and stepped-vs-smooth authored marker shapes cannot be implemented while preserving those APIs/schema. This implementation exposes that capability boundary safely rather than serializing unsupported metadata or changing unrelated segments through a selection action.
 

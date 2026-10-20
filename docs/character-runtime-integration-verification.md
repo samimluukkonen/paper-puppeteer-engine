@@ -52,7 +52,7 @@ The [developer guide](runtime-integration.md) contains excerpts from the compile
 | `package.json`, `package-lock.json`                                                                                       | Version `0.6.4`                                                                                                           |
 | `README.md`, `CHANGELOG.md`, `docs/development.md`, `docs/artist-workflow.md`, `docs/runtime-integration.md`, this report | Workflow, architecture, verification and release documentation                                                            |
 
-The user-provided `plans/plan-06-04.md` is retained unchanged. Build outputs, local installed tarball files and browser artifacts are ignored rather than added as source.
+The user-provided `plans/archive/plan-v0.6.4.md` is retained unchanged. Build outputs, local installed tarball files and browser artifacts are ignored rather than added as source.
 
 ## Exact command results
 

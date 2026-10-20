@@ -2,7 +2,7 @@
 
 ## Implemented
 
-Implemented `plans/plan-05-02-07-01.md`: centralized event queries and immutable authored mutations, a separate Events timeline row, event markers, exclusive single-event selection, clock/preview synchronization, and a read-only event inspector. Package version is `0.5.2-7.1`; dependencies and engine behavior are unchanged.
+Implemented `plans/archive/plan-v0.5.2.7.1.md`: centralized event queries and immutable authored mutations, a separate Events timeline row, event markers, exclusive single-event selection, clock/preview synchronization, and a read-only event inspector. Package version is `0.5.2-7.1`; dependencies and engine behavior are unchanged.
 
 ## Existing event schema
 

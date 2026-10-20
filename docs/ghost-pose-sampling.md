@@ -45,7 +45,7 @@ Sampling does not modify the working/source animation, playhead, playback/scrub 
 
 ## Files and tests
 
-Created `src/devtools/animation-editor/ghostPoseSampling.ts`, `tests/ghostPoseSampling.test.ts` and this guide. Changed `animationValues.ts` for complete poses, `AnimationEditorState.ts` for working-copy APIs, the React wording in `plans/plan-05-03-01.md`, `docs/animation-editor.md`, `CHANGELOG.md`, and the package/lockfile version.
+Created `src/devtools/animation-editor/ghostPoseSampling.ts`, `tests/ghostPoseSampling.test.ts` and this guide. Changed `animationValues.ts` for complete poses, `AnimationEditorState.ts` for working-copy APIs, the React wording in `plans/archive/plan-v0.5.3.1.md`, `docs/animation-editor.md`, `CHANGELOG.md`, and the package/lockfile version.
 
 The new suite covers previous/next times, continuous off-frame times, authored/fractional/invalid FPS, optional frame spacing, start/end/short/zero-duration boundaries, missing data, numeric precision extremes, full partial-track/hierarchical poses, resolved lengths, shortest-path rotations, smooth/stepped runtime equivalence, exact endpoints, mutable input freshness, deterministic detached snapshots, active working-copy edits, and state/event/Puppet/IK isolation during paused, playing and scrubbing sessions. It also verifies normal animation events still fire afterward.
 

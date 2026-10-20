@@ -2,7 +2,7 @@
 
 ## Implemented
 
-Implemented `plans/plan-05-02-07-03.md`, completing the v0.5.2.7 event-authoring milestone. Package version is `0.5.2-7.3`. Added single-event copy/paste/duplicate, typed clipboard routing, runtime-compatible playback notifications, exact event-boundary clocks, catch-up safety, serialization/validation regressions and editor regression coverage. No dependency, JSON schema or production package export changes.
+Implemented `plans/archive/plan-v0.5.2.7.3.md`, completing the v0.5.2.7 event-authoring milestone. Package version is `0.5.2-7.3`. Added single-event copy/paste/duplicate, typed clipboard routing, runtime-compatible playback notifications, exact event-boundary clocks, catch-up safety, serialization/validation regressions and editor regression coverage. No dependency, JSON schema or production package export changes.
 
 ## Final event data model
 

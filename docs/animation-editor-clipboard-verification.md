@@ -56,7 +56,7 @@ An identical paste succeeds and selects the resulting keys without creating hist
 - `README.md`, `docs/animation-editor.md`, `docs/development.md`, this report: current behavior, architecture, APIs and verification.
 - `package.json`, `package-lock.json`: milestone version `0.5.2-5.2`.
 
-The supplied `plans/plan-05-02-05-02.md` remains unchanged.
+The supplied `plans/archive/plan-v0.5.2.5.2.md` remains unchanged.
 
 ## APIs/types changed
 
