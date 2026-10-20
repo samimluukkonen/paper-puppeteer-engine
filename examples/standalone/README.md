@@ -13,7 +13,7 @@ npm run build
 npm run dev
 ```
 
-`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.9.5.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
+`npm pack` runs the library build and creates `dist/paper-puppeteer-engine-0.9.6.tgz`, which this project's package manifest installs. Nothing is published. To move the example elsewhere, copy this directory and adjust that tarball dependency to its new location before installing.
 
 The checked-in `public/character/` folder is an extracted character export. It includes an edited idle key, walk and sword events, authored and baked IK reach clips, finite attack/recovery clips and looping run, several skins/attachments, and helmet artwork replacing the default head. The root integration test re-exports its representative editor snapshot through the existing exporter and checks these files. The Node test loads this fixture using the installed `/core` API, checks motion/events and verifies every image exists.
 
@@ -56,3 +56,11 @@ Open `scene.html`. The page loads `public/scene.json` through the public `SceneL
 Download a scene package ZIP from Scene Editor and choose **Open scene ZIP** here. The adapter validates the archive and all dependencies, creates temporary artwork URLs with private texture keys, and releases its Actors, URLs and private textures on replacement or shutdown. Hosted character textures remain shared and host-owned. You can also extract a ZIP under `public/my-scene/` and call `SceneLoader.load(scene, 'my-scene/scene.json')`, or load a hosted ZIP with `SceneLoader.loadPackage(scene, zipUrl)`.
 
 The Node tests package and reload the shipped scene using installed `/core` exports. The optional local desktop browser test loads JSON, opens the generated ZIP, seeks, plays through its cue and cleans up. Root `npm run test:package` builds this actual page against the packed library without checkout aliases.
+
+The root local `tests/browser/firstScene.spec.ts` creates a scene through the actual UI using two different character packages and retains `first-scene.zip` in its test output. Pass that exact export to the independent consumer verification (no source rewriting):
+
+```sh
+PPE_WORKFLOW_SCENE_ZIP=/absolute/path/to/first-scene.zip PPE_PACKAGE_BROWSER=1 PLAYWRIGHT_CHANNEL=chrome npm run test:package
+```
+
+Run this command from the repository root after the browser workflow. It tests the exact exported package through the separately installed runtime’s `scene.html`, including seek suppression, cue delivery, completion and disposal. Without `PPE_WORKFLOW_SCENE_ZIP`, only this additional scene handoff scenario is skipped. See [Making Your First Scene](../../docs/making-your-first-scene.md).

@@ -2,6 +2,31 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { buildScenePackage, encodePackageZip, parseSceneJson } from 'paper-puppeteer-engine/core';
 
+test('exact editor first-scene ZIP runs in the independent consumer', async ({ page }) => {
+  const artifact = process.env.PPE_WORKFLOW_SCENE_ZIP;
+  test.skip(!artifact, 'Opt in with the firstScene browser workflow artifact.');
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('scene.html');
+  await expect(page.getByRole('status')).toContainText('Ready: standalone-encounter');
+  await page.getByLabel('Open scene ZIP').setInputFiles({
+    name: 'first-scene.zip',
+    mimeType: 'application/zip',
+    buffer: await readFile(artifact!),
+  });
+  await expect(page.getByRole('status')).toContainText('Ready: first-scene / 2 Actors');
+  await page.getByLabel('Time (ms)').fill('2000');
+  await expect(page.getByRole('status')).toContainText('paused / 2000 ms');
+  await expect(page.getByLabel('Scene cues')).toHaveText('');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByLabel('Scene cues')).toContainText('arrived');
+  await expect(page.getByRole('status')).toContainText('completed / 5000 ms');
+  await page.getByRole('button', { name: 'Clean up', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Disposed');
+  await expect(page.locator('canvas')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('standalone scene page loads authored JSON, then an exported scene ZIP, plays, seeks and disposes', async ({
   page,
 }) => {

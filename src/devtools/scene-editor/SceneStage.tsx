@@ -3,6 +3,7 @@ import { useLayoutEffect, useState } from 'react';
 import { Actor } from '../../engine/Actor.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
+import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
@@ -218,12 +219,19 @@ class SceneStage extends Phaser.Scene {
       unsubscribe();
       events.abort();
       cancel();
-      this.playback.dispose();
-      this.preview.dispose();
       this.definitions.clear();
       this.requests.clear();
       this.failures.clear();
       this.refresh = () => {};
+      const errors: unknown[] = [];
+      for (const dispose of [() => this.playback.dispose(), () => this.preview.dispose()]) {
+        try {
+          dispose();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      throwNotificationErrors(errors, 'Scene stage disposal failed.');
     });
     sync();
   }

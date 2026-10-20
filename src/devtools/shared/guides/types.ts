@@ -1,7 +1,7 @@
 import type { WorkspaceView } from '../WorkspaceNavigation.js';
 
-export type GuideEditor = WorkspaceView;
-export type GuideCategory = 'rigging' | 'artwork' | 'animation' | 'ik';
+export type GuideEditor = WorkspaceView | 'scene';
+export type GuideCategory = 'rigging' | 'artwork' | 'animation' | 'ik' | 'scene';
 export type GuideTargetId = string;
 export type GuideCapability =
   | 'character'

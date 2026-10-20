@@ -570,3 +570,100 @@ test('same-clip replacement from a time-zero animation event retains its newer p
   assert.equal(runner.actors.get('a')!.currentAnimation, 'gesture');
   assert.isTrue(runner.actors.get('a')!.isPlaying);
 });
+
+test('five concurrent Actors retain deterministic windows through rapid seeks and repeated restart/stop cycles', async () => {
+  const assets = factory();
+  const data = scene();
+  data.actors = Array.from({ length: 5 }, (_, index) => ({ ...data.actors[0]!, id: `actor-${index}` }));
+  data.actions = data.actors.flatMap(({ id }, index) => [
+    move(id, 0, 1000, 100 + index * 10),
+    move(id, 1000, 1000, 200 + index * 10),
+    { ...clip(0, 2000, true), id: `${id}-clip`, actorId: id },
+  ]);
+  const runner = new SceneRunner(data, assets);
+  runners.push(runner);
+  runner.seek(1500);
+  const expected = snapshot(runner);
+  for (let iteration = 0; iteration < 12; iteration++) {
+    runner.seek(iteration % 2 ? 2900 : 0);
+    runner.seek(1500);
+    assert.deepEqual(snapshot(runner), expected);
+    assert.equal(assets.created.filter((actor) => !actor.isDisposed).length, 5);
+    runner.restart();
+    runner.update(1500);
+    assert.deepEqual(snapshot(runner), expected);
+    runner.pause();
+    runner.update(10000);
+    assert.deepEqual(snapshot(runner), expected);
+    runner.stop();
+    await Promise.resolve();
+    assert.equal(runner.status, 'stopped');
+  }
+  runner.dispose();
+  assert.isTrue(assets.created.every((actor) => actor.isDisposed && actor.puppet.isDestroyed));
+  assert.equal(assets.events.mock.calls.filter(([event]) => event.name === 'middle').length, 5 * 3 * 12);
+});
+
+test('adjacent scene clips use hard cuts and held poses at the exact boundary', () => {
+  const { runner } = fixture([clip(0, 500), { ...clip(500, 1000), animation: 'rest' }]);
+  runner.play();
+  runner.update(499);
+  assert.isUndefined(runner.actors.get('a')!.puppet.animationPlayer.transition);
+  runner.update(1);
+  const actor = runner.actors.get('a')!;
+  assert.equal(actor.currentAnimation, 'rest');
+  assert.equal(actor.puppet.getBone('root').pose.x, 0);
+  assert.isUndefined(actor.puppet.animationPlayer.transition);
+  runner.seek(500);
+  assert.equal(runner.actors.get('a')!.puppet.getBone('root').pose.x, 0);
+});
+
+test('playback disposal clears bindings and releases all Actors when one cleanup observer fails', () => {
+  const document = new SceneEditorDocument();
+  document.importJson(JSON.stringify(scene()));
+  const assets = factory();
+  const playback = new SceneEditorPlayback();
+  playback.sync(document.workingScene, true, assets.createActor);
+  const actor = assets.created[0]!;
+  const dispose = actor.dispose.bind(actor);
+  vi.spyOn(actor, 'dispose').mockImplementation(() => {
+    dispose();
+    throw new Error('cleanup observer failed');
+  });
+  const notified = vi.fn();
+  playback.subscribe(notified);
+  assert.throws(() => playback.dispose(), /cleanup observer failed/);
+  assert.isFalse(playback.ready);
+  assert.isUndefined(playback.actors);
+  assert.equal(notified.mock.calls.length, 1);
+  assert.isTrue(assets.created.every((instance) => instance.isDisposed && instance.puppet.isDestroyed));
+  const count = assets.created.length;
+  playback.retry();
+  assert.equal(assets.created.length, count);
+  assert.doesNotThrow(() => playback.dispose());
+});
+
+test('zero-delta updates and seeking exactly onto a cue do not replay consumed markers on resume', () => {
+  const { runner, onCue } = fixture([cue(0), cue(500), cue(1000)]);
+  runner.play();
+  for (let iteration = 0; iteration < 3; iteration++) runner.update(0);
+  assert.deepEqual(
+    onCue.mock.calls.map(([event]) => event.time),
+    [0],
+  );
+  runner.seek(500);
+  runner.play();
+  runner.update(0);
+  runner.update(500);
+  assert.deepEqual(
+    onCue.mock.calls.map(([event]) => event.time),
+    [0, 1000],
+  );
+  runner.seek(0);
+  runner.play();
+  runner.update(500);
+  assert.deepEqual(
+    onCue.mock.calls.map(([event]) => event.time),
+    [0, 1000, 500],
+  );
+});

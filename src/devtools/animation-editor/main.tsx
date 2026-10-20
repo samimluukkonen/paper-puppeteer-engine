@@ -57,7 +57,7 @@ const guides = new GuideLauncher(
     getAnimation: () => stateOwner,
     getRig: () => scene?.rigEditor?.state,
     getOnionEnabled: () => scene?.getOnionSkinSettings().enabled ?? false,
-    navigate: (editor) => workspaceRoutes?.navigate(editor) ?? false,
+    navigate: (editor) => editor !== 'scene' && (workspaceRoutes?.navigate(editor) ?? false),
   }),
 );
 const ikInspector = new IKInspectorController();

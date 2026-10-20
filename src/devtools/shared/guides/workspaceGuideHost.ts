@@ -57,6 +57,11 @@ export function workspaceGuideHost(options: {
       };
     },
     getNavigationAvailability: (editor) => {
+      if (editor === 'scene')
+        return {
+          available: false,
+          reason: 'Open Scene Editor from Views to use scene guides. Download unsaved character work before leaving.',
+        };
       const animation = options.getAnimation();
       if (!animation)
         return editor === options.initialEditor

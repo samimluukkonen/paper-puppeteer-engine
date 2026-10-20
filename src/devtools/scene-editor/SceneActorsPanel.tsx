@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { sceneCharacterChoices, type SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 
@@ -23,7 +24,7 @@ function ActorProperties({
     setY(String(actor.position.y));
   }, [actor]);
   return (
-    <details>
+    <details data-guide-id={GUIDE_TARGETS.sceneActorProperties}>
       <summary>Actor properties</summary>
       <form
         onSubmit={(event) => {
@@ -128,6 +129,7 @@ export function SceneActorsPanel({
       <button
         type="button"
         className="scene-add-actor"
+        data-guide-id={GUIDE_TARGETS.sceneAddActor}
         onClick={() => {
           setError('');
           dialog.current?.showModal();
@@ -135,7 +137,7 @@ export function SceneActorsPanel({
       >
         + Add Actor
       </button>
-      <details>
+      <details data-guide-id={GUIDE_TARGETS.sceneActors}>
         <summary>Scene actors ({scene.actors.length})</summary>
         <ul className="scene-actor-list">
           {scene.actors.map((actor) => (

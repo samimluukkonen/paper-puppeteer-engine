@@ -91,6 +91,8 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [Standalone character runtime integration](docs/runtime-integration.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Creating Your First Character](docs/creating-your-first-character.md)
+- [Making Your First Scene](docs/making-your-first-scene.md)
+- [v0.9 Scene Editor readiness and verification](docs/scene-editor-readiness.md)
 - [Using Feature Guide](docs/feature-guide.md)
 - [Schema inventory, compatibility policy and canonical serialization](docs/schema-compatibility.md)
 

@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { Actor } from '../../engine/Actor.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneActorDefinition } from '../../engine/SceneDefinition.js';
@@ -40,6 +41,7 @@ export class SceneActorPreview {
         let entry = this.instances.get(data.id);
         if (!entry) {
           const puppet = new Puppet(this.scene, { definition, autoUpdate: false });
+          puppet.animationPlayer.setPreviewMode(true);
           try {
             entry = { actor: new Actor({ id: data.id, puppet, puppetOwnership: 'owned' }), data };
             this.instances.set(data.id, entry);
@@ -68,13 +70,22 @@ export class SceneActorPreview {
     actor.puppet.resetToBindPose();
     actor.setSkin(data.skin ?? definition.defaultSkin);
     if (data.animation !== undefined) {
-      actor.play(data.animation).pauseAnimation();
+      actor.play(data.animation, { restart: true, fadeDuration: 0 }).pauseAnimation();
       actor.puppet.sampleAnimation(0);
     }
   }
   dispose(): void {
-    for (const entry of this.instances.values()) entry.actor.dispose();
+    const previous = [...this.instances.values()];
     this.instances.clear();
     this.sceneId = undefined;
+    const errors: unknown[] = [];
+    for (const entry of previous) {
+      try {
+        entry.actor.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    throwNotificationErrors(errors, 'Scene placement preview disposal failed.');
   }
 }

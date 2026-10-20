@@ -40,7 +40,14 @@ function character() {
       'alternate.json': { version: 1, name: 'alternate', slots: { hand: 'alternate-art' } },
     },
     animations: {
-      'wave.json': { version: 1, name: 'wave', duration: 100, loop: false, tracks: { root: [{ time: 0, x: 13 }] } },
+      'wave.json': {
+        version: 1,
+        name: 'wave',
+        duration: 100,
+        loop: false,
+        tracks: { root: [{ time: 0, x: 13 }] },
+        events: [{ time: 0, name: 'gameplay' }],
+      },
     },
   });
 }
@@ -273,5 +280,68 @@ test('invalid initial assets release stale previews while valid actors still rec
   assert.equal(preview.instances.size, 2);
   document.updateActor(id, { skin: 'missing' });
   assert.throws(() => preview.sync(document.workingScene!, definitions), /unknown skin/);
+  preview.dispose();
+});
+
+test('changing initial appearance suppresses authored animation events and leaves no crossfade', () => {
+  const { document, id } = fixture();
+  const preview = new SceneActorPreview(puppetScene());
+  const definitions = new Map([[manifest, character()]]);
+  preview.sync(document.workingScene!, definitions);
+  const actor = preview.instances.get(id)!.actor;
+  const events = vi.fn();
+  actor.puppet.onAnimationEvent(events);
+  document.setActorAppearance(id, 'animation', 'wave');
+  preview.sync(document.workingScene!, definitions);
+  assert.equal(events.mock.calls.length, 0);
+  assert.equal(actor.puppet.getBone('root').pose.x, 13);
+  assert.isUndefined(actor.puppet.animationPlayer.transition);
+  preview.dispose();
+});
+
+test('placement disposal releases every Actor and clears ownership even if one cleanup throws', () => {
+  const { document, id } = fixture();
+  document.addActor(manifest);
+  const preview = new SceneActorPreview(puppetScene());
+  preview.sync(document.workingScene!, new Map([[manifest, character()]]));
+  const actors = [...preview.instances.values()].map(({ actor }) => actor);
+  const first = preview.instances.get(id)!.actor;
+  const dispose = first.dispose.bind(first);
+  const failure = new Error('observer failed');
+  vi.spyOn(first, 'dispose').mockImplementation(() => {
+    dispose();
+    throw failure;
+  });
+  assert.throws(() => preview.dispose(), /observer failed/);
+  assert.isEmpty(preview.instances);
+  assert.isTrue(actors.every((actor) => actor.isDisposed && actor.puppet.isDestroyed));
+  assert.doesNotThrow(() => preview.dispose());
+});
+
+test('changing a character reference replaces only its Actor and retains independent source packages', () => {
+  const { document, id } = fixture();
+  document.addActor(manifest);
+  const siblingId = document.selectedActorId!;
+  const first = character();
+  const second = character();
+  const replacement = '../characters/replacement/character.json';
+  const definitions = new Map([
+    [manifest, first],
+    [replacement, second],
+  ]);
+  const source = JSON.stringify([first, second]);
+  const preview = new SceneActorPreview(puppetScene());
+  preview.sync(document.workingScene!, definitions);
+  const previous = preview.instances.get(id)!.actor;
+  const sibling = preview.instances.get(siblingId)!.actor;
+  document.updateActor(id, { character: { manifest: replacement }, animation: 'wave', skin: 'alternate' });
+  preview.sync(document.workingScene!, definitions);
+  assert.isTrue(previous.isDisposed && previous.puppet.isDestroyed);
+  const next = preview.instances.get(id)!.actor;
+  assert.notStrictEqual(next, previous);
+  assert.strictEqual(next.puppet.rig, second.rig);
+  assert.strictEqual(preview.instances.get(siblingId)!.actor, sibling);
+  assert.isFalse(sibling.isDisposed);
+  assert.equal(JSON.stringify([first, second]), source);
   preview.dispose();
 });

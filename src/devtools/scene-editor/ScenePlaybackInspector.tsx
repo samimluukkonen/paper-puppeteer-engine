@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 
 /** Runtime observations never share the authored initial-position form. */
@@ -9,12 +9,21 @@ export function ScenePlaybackInspector({
   playback: SceneEditorPlayback;
   actorId: string | null;
 }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>Runtime preview</summary>
+      {open && <PlaybackObservation playback={playback} actorId={actorId} />}
+    </details>
+  );
+}
+
+function PlaybackObservation({ playback, actorId }: { playback: SceneEditorPlayback; actorId: string | null }) {
   useSyncExternalStore(playback.subscribe, playback.getSnapshot, playback.getSnapshot);
   const actor = actorId ? playback.actors?.get(actorId) : undefined;
   const live = actor && !actor.isDisposed ? actor : undefined;
   return (
-    <details>
-      <summary>Runtime preview</summary>
+    <>
       {live ? (
         <dl>
           <dt>Actor</dt>
@@ -35,6 +44,6 @@ export function ScenePlaybackInspector({
       ) : (
         <p>Play or scrub, then select an Actor track to inspect its runtime transform and pose.</p>
       )}
-    </details>
+    </>
   );
 }

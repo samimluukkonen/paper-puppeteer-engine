@@ -1,6 +1,6 @@
 {
   "name": "paper-puppeteer-engine",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "A reusable Phaser engine for hierarchical 2D paper cutout puppets.",
   "type": "module",
   "files": [
@@ -55,6 +55,7 @@
     "test:watch": "vitest",
     "test:browser": "npm run build:demo && playwright test",
     "profile:timeline": "node scripts/profile-timeline.mjs",
+    "profile:scene": "node scripts/profile-timeline.mjs --scene",
     "test:package": "node scripts/check-package.mjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

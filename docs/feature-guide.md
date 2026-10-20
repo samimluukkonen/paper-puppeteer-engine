@@ -1,6 +1,8 @@
 # Using Feature Guide
 
-Open **Feature Guide** in either editor’s header. Choose **Rig Editor** or **Animation Editor**, find the feature you want to learn, and select **Start Guide**.
+Open **Feature Guide** in an editor’s header. Choose **Rig Editor**, **Animation Editor**, or **Scene Editor**, find the feature you want to learn, and select **Start Guide**. Rig and Animation tours can switch within their shared character workspace. Scene tours run in Scene Editor’s independent workspace; use the Views links to move between workspaces after downloading unsaved work.
+
+Scene Editor offers eight Explain tours: creating a scene, adding/positioning Actors, animation clips, movement, timing, preview and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
 
 The bright outline identifies the real control or panel. The dimmed area is protected from accidental interaction. **Explain** steps describe controls without changing your project. **Back**, **Next**, and **Finish** move through explanations; **Exit** or **Escape** closes the guide. Inspector sections start collapsed and open as their controls are explained.
 

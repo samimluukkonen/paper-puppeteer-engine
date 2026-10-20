@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument, SceneActionInput } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
+import { ScenePlaybackControls, SceneTimeInput, ScenePlayhead, ScenePlaybackError } from './ScenePlaybackControls.js';
 import { buildSceneTracks, layoutSceneActions, snapSceneTime } from './timelineActions.js';
 
 type Drag = {
@@ -26,14 +28,12 @@ export function SceneTimeline({
   playback: SceneEditorPlayback;
 }) {
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
-  useSyncExternalStore(playback.subscribe, playback.getSnapshot, playback.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const gesture = useRef<Drag | null>(null);
   const scrub = useRef<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(600);
   const [zoom, setZoom] = useState(1);
   const [snap, setSnap] = useState(true);
-  const playhead = playback.time;
   const setPlayhead = (time: number): void => playback.seek(time);
   const [kind, setKind] = useState<SceneActionDefinition['type']>('animation');
   const width = Math.max(300, viewportWidth - 146) * zoom;
@@ -60,7 +60,7 @@ export function SceneTimeline({
   }, [document]);
   const add = (): void => {
     if (!actor) return;
-    const time = Math.min(playhead, scene.duration);
+    const time = Math.min(playback.time, scene.duration);
     const duration = Math.min(1000, scene.duration - time);
     const common = { actorId: actor.id, time };
     let action: SceneActionInput;
@@ -89,39 +89,14 @@ export function SceneTimeline({
     <>
       <div className="scene-timeline-toolbar">
         <h2>Scene timeline</h2>
-        <button
-          type="button"
-          disabled={!playback.ready}
-          onClick={() => (playback.status === 'playing' ? playback.pause() : playback.play())}
-        >
-          {playback.status === 'playing' ? 'Pause' : 'Play'}
-        </button>
-        <button type="button" disabled={!playback.ready} onClick={() => playback.restart()}>
-          Restart
-        </button>
-        <button type="button" disabled={!playback.ready} onClick={() => playback.stop()}>
-          Stop
-        </button>
-        <label>
-          Speed
-          <select
-            aria-label="Scene playback speed"
-            value={playback.speed}
-            onChange={(event) => playback.setSpeed(Number(event.target.value))}
-          >
-            {[0.25, 0.5, 1, 1.5, 2].map((speed) => (
-              <option key={speed} value={speed}>
-                {speed}×
-              </option>
-            ))}
-          </select>
-        </label>
-        <span aria-label="Scene playback status">
-          {playback.status} · {(playhead / 1000).toFixed(2)} s
-        </span>
+        <ScenePlaybackControls playback={playback} />
         <label>
           Action type
-          <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+          <select
+            data-guide-id={GUIDE_TARGETS.sceneActionType}
+            value={kind}
+            onChange={(event) => setKind(event.target.value as typeof kind)}
+          >
             <option value="animation">Play animation</option>
             <option value="move">Move to position</option>
             <option value="face">Change facing</option>
@@ -129,7 +104,12 @@ export function SceneTimeline({
             <option value="cue">Scene cue</option>
           </select>
         </label>
-        <button type="button" disabled={!actor || (kind === 'animation' && !animations.length)} onClick={add}>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.sceneAddAction}
+          disabled={!actor || (kind === 'animation' && !animations.length)}
+          onClick={add}
+        >
           Add action
         </button>
         <label>
@@ -139,6 +119,7 @@ export function SceneTimeline({
         <label>
           Zoom
           <input
+            data-guide-id={GUIDE_TARGETS.sceneZoom}
             aria-label="Timeline zoom"
             type="range"
             min="1"
@@ -148,38 +129,17 @@ export function SceneTimeline({
             onChange={(event) => setZoom(Number(event.target.value))}
           />
         </label>
-        <label>
-          Playhead (s)
-          <input
-            type="number"
-            disabled={!playback.ready}
-            min="0"
-            max={seconds}
-            step="any"
-            value={Math.min(playhead, scene.duration) / 1000}
-            onFocus={() => playback.pause()}
-            onChange={(event) => {
-              const value = event.target.valueAsNumber * 1000;
-              if (Number.isFinite(value)) setPlayhead(Math.max(0, Math.min(scene.duration, value)));
-            }}
-          />
-        </label>
+        <SceneTimeInput playback={playback} duration={scene.duration} />
       </div>
       <p className="workspace-caption">
         Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses snapping. Scroll
         to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing.
       </p>
-      {playback.error && (
-        <p role="alert" className="scene-errors">
-          {playback.error}{' '}
-          <button type="button" onClick={() => playback.retry()}>
-            Retry playback
-          </button>
-        </p>
-      )}
+      <ScenePlaybackError playback={playback} />
       <div
         ref={viewport}
         className="scene-timeline-viewport"
+        data-guide-id={GUIDE_TARGETS.sceneTimeline}
         tabIndex={0}
         aria-label="Action tracks"
         onKeyDown={(event) => {
@@ -221,7 +181,7 @@ export function SceneTimeline({
               action.id,
               action.time + action.duration + delta,
               drag.width,
-              playhead,
+              playback.time,
               snap && !event.altKey,
               action.time + 0.001,
             );
@@ -232,7 +192,7 @@ export function SceneTimeline({
               action.id,
               action.time + delta,
               drag.width,
-              playhead,
+              playback.time,
               snap && !event.altKey,
               0,
               scene.duration - sceneActionDuration(action),
@@ -357,7 +317,7 @@ export function SceneTimeline({
             );
           })}
           {!scene.actors.length && <p>Add Actors to create timeline tracks.</p>}
-          <div className="scene-playhead" style={{ left: 146 + x(Math.min(playhead, scene.duration)) }} />
+          <ScenePlayhead playback={playback} duration={scene.duration} width={width} />
         </div>
       </div>
     </>

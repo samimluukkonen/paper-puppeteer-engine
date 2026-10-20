@@ -5,7 +5,7 @@ import type { GuideEditor, GuideTargetResolver } from '../devtools/shared/guides
 import { GuideSpotlight } from './GuideSpotlight.js';
 
 const OpenFeatureGuide = createContext<(() => void) | null>(null);
-const editors = { rig: 'Rig Editor', animation: 'Animation Editor' } as const;
+const editors = { rig: 'Rig Editor', animation: 'Animation Editor', scene: 'Scene Editor' } as const;
 
 /** Header entry points share one modal across both retained editor views. */
 export function FeatureGuideButton() {
@@ -98,7 +98,7 @@ export function FeatureGuide({
           ))}
         </div>
         <h3>{editors[editor]}</h3>
-        {!snapshot.context.capabilities.includes('character') && (
+        {editor !== 'scene' && !snapshot.context.capabilities.includes('character') && (
           <p role="status">
             No character is loaded. Guides that need a character will be available after loading or creating one.
           </p>

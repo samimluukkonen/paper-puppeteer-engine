@@ -4,6 +4,7 @@ import { encodePackageZip } from '../../engine/packageZip.js';
 import { buildScenePackage } from '../../engine/ScenePackage.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
 import { SceneActorsPanel } from './SceneActorsPanel.js';
@@ -25,7 +26,7 @@ function SceneProperties({ scene, document }: { scene: ReadonlyScene; document: 
     setDuration(String(scene.duration / 1000));
   }, [scene]);
   return (
-    <details>
+    <details data-guide-id={GUIDE_TARGETS.sceneProperties}>
       <summary>Scene properties</summary>
       <form
         onSubmit={(event) => {
@@ -71,6 +72,12 @@ export function SceneEditorView({
   const scene = document.workingScene;
   const [playback] = useState(() => new SceneEditorPlayback());
   const workspace = useRef<HTMLElement>(null);
+  const source = document.sourceScene;
+  useLayoutEffect(() => {
+    // A same-ID import is a fresh document too. Ordinary authored edits keep disclosure state.
+    for (const section of workspace.current?.querySelectorAll('.scene-inspector details[open]') ?? [])
+      section.removeAttribute('open');
+  }, [source]);
   const dialog = useRef<HTMLDialogElement>(null);
   useLayoutEffect(() => {
     const layout = new SceneWorkspaceLayoutController(workspace.current!);
@@ -162,7 +169,7 @@ export function SceneEditorView({
     <>
       <ViewHeader view="scene" />
       <div className="workspace-command-bar" aria-label="Scene document commands">
-        <button type="button" onClick={openNew}>
+        <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>
           New Scene
         </button>
         <label className="scene-open">
@@ -206,6 +213,7 @@ export function SceneEditorView({
         </label>
         <button
           type="button"
+          data-guide-id={GUIDE_TARGETS.sceneHistory}
           disabled={!document.canUndo}
           onClick={() => {
             document.undo();
@@ -238,10 +246,20 @@ export function SceneEditorView({
         <button type="button" disabled={!scene || loading} onClick={() => exportScene('copy')}>
           Copy Scene JSON
         </button>
-        <button type="button" disabled={!scene || loading} onClick={() => exportScene('json')}>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.sceneExport}
+          disabled={!scene || loading}
+          onClick={() => exportScene('json')}
+        >
           Download scene JSON
         </button>
-        <button type="button" disabled={!scene || loading} onClick={() => exportScene('zip')}>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.scenePackage}
+          disabled={!scene || loading}
+          onClick={() => exportScene('zip')}
+        >
           Download scene package
         </button>
       </div>
@@ -263,7 +281,7 @@ export function SceneEditorView({
         </div>
       )}
       <main ref={workspace} className="scene-workspace-body">
-        <section className="scene-stage" aria-label="Scene stage">
+        <section data-guide-id={GUIDE_TARGETS.sceneStage} className="scene-stage" aria-label="Scene stage">
           {scene ? (
             <SceneStageView document={document} registry={registry} playback={playback} />
           ) : (

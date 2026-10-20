@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 
@@ -41,7 +42,7 @@ function ActionProperties({
     </label>
   );
   return (
-    <details>
+    <details data-guide-id={GUIDE_TARGETS.sceneActionProperties}>
       <summary>Action properties · {action.type}</summary>
       <form
         onSubmit={(event) => {

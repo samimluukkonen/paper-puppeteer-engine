@@ -1,6 +1,6 @@
-# Scene Editor: import, export, packaging and playback (v0.9.5)
+# Scene Editor: visual authoring, packages and playback (v0.9.6)
 
-[All guides](../README.md#guides)
+[All guides](../README.md#guides) · [Making Your First Scene](making-your-first-scene.md) · [v0.9 readiness report](scene-editor-readiness.md)
 
 Open **Scene Editor** in the application navigation, or visit `/scene-editor/`. Use **New Scene** to choose a stable scene ID, name and duration. No character or scene JSON is required. Expand **Scene properties**, edit the name or duration in seconds, and click **Apply properties**. Inspector sections start collapsed. Scene IDs remain fixed after creation/import.
 
@@ -10,7 +10,7 @@ Open **Scene Editor** in the application navigation, or visit `/scene-editor/`. 
 
 ## Visual stage
 
-Click **+ Add Actor**, choose a character from the same workspace catalog used by the character editors, and click **Add actor**. You can also enter a stable manifest path or HTTP(S) URL for any compatible package. The editor loads it with `CharacterLoader`; it does not rely on demo animation names, bone IDs or presentation profiles. Browser-only new-character identities have no permanent manifest yet; export and host their package before referencing them in a scene. Paths are resolved from the Scene Editor page during preview and from the saved scene location in a future host. Keep that base location consistent or use permanent absolute URLs.
+Click **+ Add Actor**, choose a character from the same workspace catalog used by the character editors, and click **Add actor**. You can also enter a stable manifest path or HTTP(S) URL for any compatible package. The editor loads it with `CharacterLoader`; it does not rely on demo animation names, bone IDs or presentation profiles. Browser-only new-character identities have no permanent manifest yet; export and host their package before referencing them in a scene. Paths are resolved from the Scene Editor page during preview and from the hosted scene JSON location in the runtime. Keep that base location consistent or use permanent absolute URLs.
 
 Expand **Scene actors** to select, duplicate, remove, or change preview depth with **Send backward** / **Bring forward**. Later actor-array entries draw in front. Each instance gets a scene-local ID independent of its character definition and animation names. Duplicate creates a separate instance offset by 32 stage units and does not copy scheduled actions. Renaming an actor updates its action references atomically. Removing an actor with actions asks explicitly whether to remove those actions too; cancellation preserves everything. Both operations are undoable.
 
@@ -24,7 +24,7 @@ Every Actor has a track, even before it has actions. Click its track label, choo
 
 Drag a clip to move it; drag its right edge to resize timed actions. **Zoom** increases horizontal detail; scroll the timeline horizontally to pan. **Snap** uses the Animation Editor's nearest-target policy: clip edges/markers, playhead and the 10 fps authoring grid, within eight screen pixels. Alt bypasses snapping. Numeric fields retain exact precision. Start/end bounds are enforced. Invalid edits retain the previous snapshot and report an error; releasing a drag on an invalid position cancels the gesture. Escape, capture loss, window blur and scene changes cancel unfinished gestures. One completed drag makes one Undo entry.
 
-Use **Duplicate at (seconds)** and **Duplicate action** to copy with a new stable ID at an explicit time; conflicting copies reject without moving existing actions. **Delete action**, or Delete/Backspace while tracks are focused, removes the selection. Undo/Redo and downloads include all action edits. No timeline action advances the preview: the stage continues to show initial Actor placement. Selecting a movement clip draws a read-only green destination crosshair; edit **Destination X/Y** in the inspector to change the future position.
+Use **Duplicate at (seconds)** and **Duplicate action** to copy with a new stable ID at an explicit time; conflicting copies reject without moving existing actions. **Delete action**, or Delete/Backspace while tracks are focused, removes the selection. Undo/Redo and downloads include all action edits. Editing a timeline action resets the preview to initial Actor placement; use Play or scrubbing to see scheduled transforms. Selecting a movement clip draws a read-only green destination crosshair; edit **Destination X/Y** in the inspector to change the future position.
 
 ### Timing and ownership
 
@@ -241,3 +241,9 @@ loaded.dispose();
 `SceneLoader.fromDefinition` accepts an unknown authored value with a `baseUrl`; `SceneLoader.loadPackage` accepts a hosted ZIP URL, ZIP bytes or decoded file map. All variants preflight dependencies before constructing Actors and cancel on host shutdown or an external abort signal. The host owns the update clock. Seeks use existing reconstruction behavior and suppress cues/gameplay events. A ZIP lease owns isolated runtime texture aliases, temporary image URLs and its private textures, and releases them on disposal. Ordinary hosted character textures stay shared and host-owned. Puppet and Actor remain usable independently.
 
 See the [standalone example](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/README.md#authored-scenes-and-scene-zips) for the independently built consumer. `tests/scenePackaging.test.ts` and `tests/sceneLoader.test.ts` cover stable JSON/ZIP output, round trips, failures, source/working-copy isolation, playback/seek equivalence, cancellation and artwork cleanup. Desktop browser checks remain local-only.
+
+## v0.9 production hardening
+
+Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers eight Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
+
+Playback subscriptions are confined to clock controls, the playhead and an expanded runtime inspector. Authored clip rows no longer rebuild on every Phaser frame. Initial-placement animation sampling suppresses gameplay events and uses explicit hard cuts. Teardown clears ownership and attempts all Actor cleanup even when a callback fails. Runtime scene windows remain hard cuts, and scene/character format versions remain 2/1.

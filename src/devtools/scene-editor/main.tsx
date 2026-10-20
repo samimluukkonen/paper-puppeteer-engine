@@ -1,4 +1,8 @@
+import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
+import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
+import { GuideTargets } from '../shared/guides/GuideTargets.js';
+import { sceneGuideHost } from '../shared/guides/sceneGuideHost.js';
 import { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import { SceneEditorDocument } from './SceneEditorDocument.js';
 import { SceneEditorView } from './SceneEditorView.js';
@@ -8,9 +12,19 @@ if (!host) throw new Error('Missing scene editor host.');
 host.classList.add('view-shell', 'workspace-shell', 'scene-workspace');
 const registry = new SceneCharacterRegistry();
 const scenes = new SceneEditorDocument({}, (manifest) => registry.get(manifest)?.animations.map((clip) => clip.name));
+const guides = new GuideLauncher(sceneGuideHost(scenes));
 const unmount = mountView(
   host,
-  <SceneEditorView document={scenes} registry={registry} />,
-  () => () => registry.dispose(),
+  <FeatureGuide launcher={guides} targets={new GuideTargets(host)}>
+    <SceneEditorView document={scenes} registry={registry} />
+  </FeatureGuide>,
+  () => {
+    const unsubscribe = scenes.subscribe(guides.refresh);
+    return () => {
+      unsubscribe();
+      guides.controller.exit();
+      registry.dispose();
+    };
+  },
 );
 if (import.meta.hot) import.meta.hot.dispose(unmount);

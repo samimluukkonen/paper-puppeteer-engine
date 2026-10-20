@@ -116,10 +116,14 @@ export class SceneEditorPlayback {
     this.sync(source, true, this.factory);
   }
   dispose(): void {
-    this.runner?.dispose();
+    const runner = this.runner;
     this.runner = undefined;
     this.source = null;
     this.factory = undefined;
-    this.notify();
+    try {
+      runner?.dispose();
+    } finally {
+      this.notify();
+    }
   }
 }
