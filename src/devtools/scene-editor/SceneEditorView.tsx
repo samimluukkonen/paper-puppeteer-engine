@@ -4,7 +4,6 @@ import { encodePackageZip } from '../../engine/packageZip.js';
 import { buildScenePackage } from '../../engine/ScenePackage.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
-import { GroundGuideControls } from '../shared/GroundGuideControls.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
@@ -12,6 +11,7 @@ import { SceneActorsPanel } from './SceneActorsPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
+import { SceneGroundPanel } from './SceneGroundPanel.js';
 import { ScenePlaybackInspector } from './ScenePlaybackInspector.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
@@ -300,7 +300,7 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
-              <GroundGuideControls key={`ground-${scene.id}`} workspace={document.groundGuide} />
+              <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />
               <ScenePlaybackInspector
                 key={`preview-${scene.id}`}
                 playback={playback}

@@ -1,0 +1,363 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterEach, assert, test, vi } from 'vitest';
+import { SceneActorPreview } from '../src/devtools/scene-editor/SceneActorPreview.js';
+import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
+import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
+import { SceneGroundHandle } from '../src/devtools/scene-editor/SceneGroundHandle.js';
+import { SceneGroundPanel } from '../src/devtools/scene-editor/SceneGroundPanel.js';
+import { stagePoint } from '../src/devtools/scene-editor/stageCoordinates.js';
+import { editorWorldViewport, panCamera, zoomCameraAt } from '../src/devtools/shared/editorCamera.js';
+import { groundGuideGeometry } from '../src/devtools/shared/groundGuide.js';
+import { Actor } from '../src/engine/Actor.js';
+import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
+import { Puppet } from '../src/engine/Puppet.js';
+import { createEmptyScene } from '../src/engine/SceneDefinition.js';
+import { puppetScene } from './helpers/puppetScene.js';
+
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
+afterEach(() => vi.unstubAllGlobals());
+
+function fixture(zoom = 1) {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: vi.fn((key: string, value: string) => {
+      values.set(key, value);
+    }),
+  };
+  vi.stubGlobal('window', { localStorage: storage });
+  const document = new SceneEditorDocument();
+  const scene = {
+    ...createEmptyScene({ id: 'ground', duration: 2000 }),
+    actors: [
+      { id: 'a', character: { manifest: 'a/character.json' }, position: { x: -100, y: 20 } },
+      { id: 'b', character: { manifest: 'b/character.json' }, position: { x: 200, y: -50 }, facing: 'left' },
+    ],
+    actions: [{ id: 'walk', actorId: 'a', type: 'move', time: 0, duration: 1000, destination: { x: 100, y: -80 } }],
+  };
+  assert.isTrue(document.importJson(JSON.stringify(scene)));
+  const workspace = document.groundGuide;
+  workspace.update({ enabled: true, y: 100 });
+  const camera = {
+    width: 1000,
+    height: 700,
+    scrollX: -500,
+    scrollY: -250,
+    originX: 0.5,
+    originY: 0.5,
+    zoom,
+    setZoom(value: number) {
+      this.zoom = value;
+    },
+  };
+  const bounds = { left: 100, top: 50, width: 500, height: 350 };
+  const client = (world: { x: number; y: number }) => {
+    const view = editorWorldViewport(camera)!;
+    return {
+      x: bounds.left + ((world.x - view.left) * camera.zoom * bounds.width) / camera.width,
+      y: bounds.top + ((world.y - view.top) * camera.zoom * bounds.height) / camera.height,
+    };
+  };
+  const label = () => {
+    const geometry = groundGuideGeometry(workspace.getSnapshot().guide, camera)!;
+    return { x: geometry.labelX + 5 / camera.zoom, y: geometry.labelY + 5 / camera.zoom };
+  };
+  return { document, workspace, storage, camera, bounds, client, label };
+}
+
+test.each([0.35, 0.5, 1, 2, 4])(
+  'scene label drag uses current world coordinates at zoom %s and one guide Undo',
+  (zoom) => {
+    const f = fixture(zoom);
+    const handle = new SceneGroundHandle(f.workspace);
+    const authored = f.document.exportJson();
+    const start = f.label();
+    const writes = f.storage.setItem.mock.calls.length;
+    assert.isTrue(handle.down(1, stagePoint(f.client(start), f.bounds, f.camera), f.camera));
+    handle.move(2, { ...start, y: start.y + 70 });
+    assert.equal(f.workspace.getSnapshot().guide.y, 100);
+    handle.move(1, stagePoint(f.client({ ...start, y: start.y + 40 }), f.bounds, f.camera));
+    assert.closeTo(f.workspace.getSnapshot().guide.y, 140, 1e-9);
+    assert.equal(f.storage.setItem.mock.calls.length, writes);
+    // Camera changes between input and pre-render must not use a stale Phaser matrix.
+    panCamera(f.camera, 20, 30);
+    zoomCameraAt(f.camera, 200, 150, -50);
+    handle.up(1, stagePoint(f.client({ ...start, y: start.y + 60 }), f.bounds, f.camera));
+    assert.closeTo(f.workspace.getSnapshot().guide.y, 160, 1e-9);
+    assert.equal(f.storage.setItem.mock.calls.length, writes + 1);
+    assert.isFalse(handle.dragging);
+    f.workspace.undo();
+    assert.equal(f.workspace.getSnapshot().guide.y, 100);
+    f.workspace.redo();
+    assert.closeTo(f.workspace.getSnapshot().guide.y, 160, 1e-9);
+    assert.equal(f.document.exportJson(), authored);
+    assert.isFalse(f.document.canUndo);
+    assert.isFalse(f.document.dirty);
+    handle.dispose();
+  },
+);
+
+test('only the visible label captures ground gestures; cancellation and disposal retain data and release subscription', () => {
+  const f = fixture();
+  const handle = new SceneGroundHandle(f.workspace);
+  const label = f.label();
+  assert.isFalse(handle.down(1, { x: 0, y: 100 }, f.camera));
+  f.workspace.update({ enabled: false });
+  assert.isFalse(handle.down(1, label, f.camera));
+  f.workspace.update({ enabled: true });
+  const writes = f.storage.setItem.mock.calls.length;
+  assert.isTrue(handle.down(1, label, f.camera));
+  assert.isFalse(handle.down(2, label, f.camera));
+  handle.move(1, { ...label, y: label.y + 50 });
+  handle.up(2, label);
+  assert.isTrue(handle.dragging);
+  handle.cancel();
+  assert.equal(f.workspace.getSnapshot().guide.y, 100);
+  assert.equal(f.storage.setItem.mock.calls.length, writes);
+  const release = vi.fn();
+  const subscribe = f.workspace.subscribe;
+  vi.spyOn(f.workspace, 'subscribe').mockImplementation((listener) => {
+    const unsubscribe = subscribe(listener);
+    return () => {
+      release();
+      unsubscribe();
+    };
+  });
+  const owned = new SceneGroundHandle(f.workspace);
+  owned.down(1, label, f.camera);
+  owned.move(1, { ...label, y: label.y + 50 });
+  owned.dispose();
+  owned.dispose();
+  assert.equal(release.mock.calls.length, 1);
+  assert.equal(f.workspace.getSnapshot().guide.y, 100);
+  assert.equal(f.storage.setItem.mock.calls.length, writes);
+  assert.isFalse(owned.down(1, label, f.camera));
+  handle.dispose();
+});
+
+test('switching or replacing scenes cancels unfinished ground gestures, including same-ID import', () => {
+  const f = fixture();
+  const original = f.document.exportJson();
+  const handle = new SceneGroundHandle(f.workspace);
+  const label = f.label();
+  handle.down(1, label, f.camera);
+  handle.move(1, { ...label, y: label.y + 70 });
+  f.document.importJson(original);
+  assert.isFalse(handle.dragging);
+  assert.equal(f.workspace.getSnapshot().guide.y, 100);
+  handle.down(1, label, f.camera);
+  handle.move(1, { ...label, y: label.y + 70 });
+  f.document.createScene({ id: 'other' });
+  assert.isFalse(handle.dragging);
+  handle.up(1, { ...label, y: label.y + 90 });
+  assert.equal(f.workspace.getSnapshot().guide.y, 0);
+  f.document.selectScene('ground');
+  assert.equal(f.workspace.getSnapshot().guide.y, 100);
+  handle.dispose();
+});
+
+test('explicit origin alignment authors only selected initial Y, with scene Undo/Redo and browser persistence on import', () => {
+  const f = fixture();
+  assert.isFalse(f.document.alignSelectedActorOriginToGround());
+  f.document.selectActor('a');
+  const initial = f.document.workingScene!;
+  f.workspace.update({ enabled: false });
+  assert.isFalse(f.document.alignSelectedActorOriginToGround());
+  f.workspace.update({ enabled: true });
+  assert.isTrue(f.document.alignSelectedActorOriginToGround());
+  assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: -100, y: 100 });
+  assert.deepEqual(f.document.workingScene!.actors[1], initial.actors[1]);
+  assert.deepEqual(f.document.workingScene!.actions, initial.actions);
+  assert.isTrue(f.document.dirty);
+  f.document.undo();
+  assert.deepEqual(f.document.workingScene, initial);
+  f.workspace.update({ y: 150 });
+  assert.isTrue(f.document.canRedo);
+  f.document.redo();
+  assert.equal(
+    f.document.workingScene!.actors[0]!.position.y,
+    100,
+    'redo restores the authored Y, not the new guide Y',
+  );
+  f.document.selectActor('b');
+  f.document.alignSelectedActorOriginToGround();
+  assert.deepEqual(f.document.workingScene!.actors[1]!.position, { x: 200, y: 150 });
+  const json = f.document.exportJson();
+  assert.notInclude(json, 'snapEnabled');
+  const reopened = new SceneEditorDocument();
+  assert.isTrue(reopened.importJson(json));
+  assert.deepEqual(reopened.workingScene, f.document.workingScene);
+  assert.deepEqual(reopened.groundGuide.getSnapshot().guide, f.workspace.getSnapshot().guide);
+  assert.isFalse(reopened.canUndo);
+});
+
+test('origin drag snapping preserves X, allows Shift bypass and hidden/disabled guides, and groups scene Undo', () => {
+  const f = fixture();
+  f.workspace.update({ snapEnabled: true });
+  const initial = f.document.workingScene!;
+  assert.isTrue(f.document.beginActorDrag('a'));
+  f.document.moveActorDrag({ x: 13, y: -300 });
+  assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 13, y: 100 });
+  f.document.moveActorDrag({ x: 22, y: -250 }, { bypassGround: true });
+  assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 22, y: -250 });
+  f.document.moveActorDrag({ x: 30, y: -200 });
+  f.document.endActorDrag();
+  assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 30, y: 100 });
+  assert.deepEqual(f.document.workingScene!.actions, initial.actions);
+  f.document.undo();
+  assert.deepEqual(f.document.workingScene, initial);
+  f.document.redo();
+  assert.equal(f.document.workingScene!.actors[0]!.position.x, 30);
+  for (const patch of [{ enabled: false }, { enabled: true, snapEnabled: false }]) {
+    f.workspace.update(patch);
+    f.document.beginActorDrag('a');
+    f.document.moveActorDrag({ x: 66, y: -42 });
+    assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 66, y: -42 });
+    f.document.cancelActorDrag();
+    assert.equal(f.document.workingScene!.actors[0]!.position.x, 30);
+  }
+});
+
+function definition(rootY: number, artScale: number) {
+  return CharacterDefinition.fromData({
+    manifest: {
+      version: 1,
+      id: `character-${rootY}`,
+      rig: 'rig.json',
+      defaultSkin: 'plain',
+      textures: { art: 'art.png' },
+      skins: { plain: 'plain.json', tall: 'tall.json' },
+      animations: [],
+    },
+    rig: {
+      version: 1,
+      root: 'root',
+      bones: [{ id: 'root', y: rootY }],
+      slots: [{ id: 'body', bone: 'root' }],
+      attachments: [
+        { id: 'plain', texture: 'art', scaleX: artScale, scaleY: artScale },
+        { id: 'tall', texture: 'art', scaleX: artScale, scaleY: artScale * 2 },
+      ],
+    },
+    skins: {
+      'plain.json': { version: 1, name: 'plain', slots: { body: 'plain' } },
+      'tall.json': { version: 1, name: 'tall', slots: { body: 'tall' } },
+    },
+  });
+}
+
+test('distinct rig origins, artwork sizes, skins, facing and Puppet scales retain the clearly labelled origin fallback', () => {
+  const f = fixture();
+  const definitions = new Map([
+    ['a/character.json', definition(-60, 0.5)],
+    ['b/character.json', definition(130, 2)],
+  ]);
+  f.document.updateActor('b', { skin: 'tall' });
+  const preview = new SceneActorPreview(puppetScene());
+  preview.sync(f.document.workingScene!, definitions);
+  const original = JSON.stringify([...definitions.values()]);
+  for (const [index, id] of ['a', 'b'].entries()) {
+    const actor = preview.instances.get(id)!.actor;
+    const scale = index === 0 ? 0.75 : 2;
+    actor.puppet.container.setScale(scale);
+    f.document.selectActor(id);
+    f.document.alignSelectedActorOriginToGround();
+    preview.sync(f.document.workingScene!, definitions);
+    assert.equal(actor.worldPosition.y, 100);
+    assert.equal(actor.puppet.container.scaleY, scale);
+    const rootY = actor.puppet.getBone('root').container.getWorldTransformMatrix().ty;
+    assert.closeTo(rootY, 100 + (index === 0 ? -60 : 130) * scale, 1e-9);
+    assert.notEqual(rootY, 100, 'origin alignment deliberately makes no promise about a bone or a sole');
+    assert.equal(actor.facingDirection, index === 0 ? 'right' : 'left');
+  }
+  assert.equal(preview.instances.get('b')!.actor.puppet.getAttachment('body'), 'tall');
+  assert.equal(JSON.stringify([...definitions.values()]), original);
+  const actors = [...preview.instances.values()].map(({ actor }) => actor);
+  preview.dispose();
+  assert.isTrue(actors.every((actor) => actor.isDisposed));
+});
+
+test('guide edits and drags preserve playback, authored movement, forward/backward seeks and scene history', () => {
+  const f = fixture();
+  const playback = new SceneEditorPlayback();
+  const handle = new SceneGroundHandle(f.workspace);
+  const created: Actor[] = [];
+  const source = f.document.workingScene!;
+  const createActor = (data: { id: string }) => {
+    const actor = new Actor({
+      id: data.id,
+      puppet: new Puppet(puppetScene(), {
+        autoUpdate: false,
+        rig: { root: 'root', bones: [{ id: 'root' }] },
+      }),
+      puppetOwnership: 'owned',
+    });
+    created.push(actor);
+    return actor;
+  };
+  const sync = () => playback.sync(f.document.workingScene, true, createActor);
+  const unsubscribe = f.document.subscribe(sync);
+  sync();
+  playback.play();
+  playback.update(500);
+  assert.deepEqual(playback.actors!.get('a')!.position, { x: 0, y: -30 });
+  const runtimeActor = playback.actors!.get('a');
+  const label = f.label();
+  handle.down(1, label, f.camera);
+  handle.move(1, { ...label, y: label.y + 40 });
+  handle.up(1, { ...label, y: label.y + 40 });
+  f.workspace.update({ snapEnabled: true, y: 160 });
+  assert.equal(playback.status, 'playing');
+  assert.strictEqual(playback.actors!.get('a'), runtimeActor);
+  assert.strictEqual(f.document.workingScene, source);
+  playback.update(250);
+  assert.deepEqual(playback.actors!.get('a')!.position, { x: 50, y: -55 });
+  for (const time of [250, 900, 250]) {
+    playback.seek(time);
+    assert.closeTo(playback.actors!.get('a')!.position.y, 20 - time / 10, 1e-9);
+    assert.equal(f.workspace.getSnapshot().guide.y, 160);
+    assert.equal(groundGuideGeometry(f.workspace.getSnapshot().guide, f.camera)!.y, 160);
+  }
+  assert.isFalse(f.document.canUndo);
+  assert.isFalse(f.document.dirty);
+  unsubscribe();
+  handle.dispose();
+  playback.dispose();
+  assert.isTrue(created.every((actor) => actor.isDisposed));
+});
+
+test('scene controls start collapsed, explain origin fallback, guard selection/visibility and disable alignment in preview', () => {
+  const f = fixture();
+  const playback = new SceneEditorPlayback();
+  const markup = () => renderToStaticMarkup(createElement(SceneGroundPanel, { document: f.document, playback }));
+  assert.notInclude(markup(), 'open=""');
+  assert.include(markup(), 'Snap to Ground');
+  assert.include(markup(), 'hold Shift');
+  assert.include(markup(), 'disabled="">Align Actor Origin to Ground');
+  f.document.selectActor('a');
+  assert.notInclude(markup(), 'disabled="">Align Actor Origin to Ground');
+  f.workspace.update({ enabled: false });
+  assert.include(markup(), 'disabled="">Align Actor Origin to Ground');
+  f.workspace.update({ enabled: true });
+  playback.sync(
+    f.document.workingScene,
+    true,
+    ({ id }) =>
+      new Actor({
+        id,
+        puppet: new Puppet(puppetScene(), { rig: { root: 'root', bones: [{ id: 'root' }] }, autoUpdate: false }),
+        puppetOwnership: 'owned',
+      }),
+  );
+  playback.seek(500);
+  assert.include(markup(), 'disabled="">Align Actor Origin to Ground');
+  playback.stop();
+  assert.notInclude(markup(), 'disabled="">Align Actor Origin to Ground');
+  playback.dispose();
+});

@@ -13,6 +13,7 @@ import { SceneActorPreview } from './SceneActorPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
+import { SceneGroundHandle } from './SceneGroundHandle.js';
 import { draggedPosition, stagePoint } from './stageCoordinates.js';
 
 type Point = { x: number; y: number };
@@ -24,6 +25,7 @@ class SceneStage extends Phaser.Scene {
   private overlay!: Phaser.GameObjects.Graphics;
   private grid!: Phaser.GameObjects.Graphics;
   private groundOverlay!: GroundGuideOverlay;
+  private groundHandle!: SceneGroundHandle;
   private gesture: Gesture | undefined;
   private pan: { pointer: number; x: number; y: number } | undefined;
   private readonly definitions = new Map<string, CharacterDefinition>();
@@ -52,7 +54,8 @@ class SceneStage extends Phaser.Scene {
     this.preview = new SceneActorPreview(this);
     this.grid = this.add.graphics().setDepth(-1000);
     this.overlay = this.add.graphics().setDepth(1_000_000);
-    this.groundOverlay = new GroundGuideOverlay(this);
+    this.groundOverlay = new GroundGuideOverlay(this, { draggable: true });
+    this.groundHandle = new SceneGroundHandle(this.document.groundGuide);
     this.cameras.main.centerOn(0, 0);
     const canvas = this.game.canvas;
     canvas.tabIndex = 0;
@@ -96,12 +99,20 @@ class SceneStage extends Phaser.Scene {
     const cancel = (): void => {
       this.gesture = undefined;
       this.pan = undefined;
+      this.groundHandle.cancel();
       this.document.cancelActorDrag();
     };
+    const unsubscribePlayback = this.playback.subscribe(() => {
+      if (this.playback.previewing && this.gesture) {
+        this.gesture = undefined;
+        this.document.cancelActorDrag();
+      }
+    });
     canvas.addEventListener(
       'pointerdown',
       (event) => {
         if (!this.document.workingScene || (event.button !== 0 && event.button !== 1 && event.button !== 2)) return;
+        if (this.gesture || this.pan || this.groundHandle.dragging) return;
         event.preventDefault();
         canvas.focus();
         canvas.setPointerCapture(event.pointerId);
@@ -109,9 +120,10 @@ class SceneStage extends Phaser.Scene {
           this.pan = { pointer: event.pointerId, x: event.clientX, y: event.clientY };
           return;
         }
-        // Runtime transforms are view-only. Stop returns to explicit initial-placement editing.
-        if (this.playback.previewing) return;
         const point = this.point(event);
+        if (this.groundHandle.down(event.pointerId, point, this.cameras.main)) return;
+        // Runtime transforms are view-only. The independent guide remains draggable during preview.
+        if (this.playback.previewing) return;
         const selected = this.document.workingScene.actors.find((actor) => actor.id === this.document.selectedActorId);
         let id: string | null = null;
         let axis: Gesture['axis'] = 'both';
@@ -169,9 +181,13 @@ class SceneStage extends Phaser.Scene {
           );
           this.pan.x = event.clientX;
           this.pan.y = event.clientY;
+        } else if (this.groundHandle.dragging) {
+          this.groundHandle.move(event.pointerId, this.point(event));
         } else if (this.gesture?.pointer === event.pointerId) {
           const gesture = this.gesture;
-          this.document.moveActorDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis));
+          this.document.moveActorDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis), {
+            bypassGround: event.shiftKey,
+          });
         }
       },
       { signal: events.signal },
@@ -179,7 +195,12 @@ class SceneStage extends Phaser.Scene {
     canvas.addEventListener(
       'pointerup',
       (event) => {
+        this.groundHandle.up(event.pointerId, this.point(event));
         if (this.gesture?.pointer === event.pointerId) {
+          const gesture = this.gesture;
+          this.document.moveActorDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis), {
+            bypassGround: event.shiftKey,
+          });
           this.gesture = undefined;
           this.document.endActorDrag();
         }
@@ -195,7 +216,7 @@ class SceneStage extends Phaser.Scene {
       'wheel',
       (event) => {
         event.preventDefault();
-        if (this.gesture) return;
+        if (this.gesture || this.groundHandle.dragging) return;
         const bounds = canvas.getBoundingClientRect();
         zoomCameraAt(
           this.cameras.main,
@@ -209,7 +230,7 @@ class SceneStage extends Phaser.Scene {
     window.addEventListener(
       'keydown',
       (event) => {
-        if (event.key === 'Escape' && this.gesture) {
+        if (event.key === 'Escape' && !event.isComposing && (this.gesture || this.pan || this.groundHandle.dragging)) {
           event.preventDefault();
           cancel();
         }
@@ -217,9 +238,18 @@ class SceneStage extends Phaser.Scene {
       { signal: events.signal },
     );
     window.addEventListener('blur', cancel, { signal: events.signal });
+    window.addEventListener('pagehide', cancel, { signal: events.signal });
+    window.addEventListener(
+      'visibilitychange',
+      () => {
+        if (window.document.visibilityState === 'hidden') cancel();
+      },
+      { signal: events.signal, capture: true },
+    );
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.alive = false;
       unsubscribe();
+      unsubscribePlayback();
       events.abort();
       cancel();
       this.definitions.clear();
@@ -228,6 +258,7 @@ class SceneStage extends Phaser.Scene {
       this.refresh = () => {};
       const errors: unknown[] = [];
       for (const dispose of [
+        () => this.groundHandle.dispose(),
         () => this.groundOverlay.dispose(),
         () => this.playback.dispose(),
         () => this.preview.dispose(),
@@ -350,7 +381,7 @@ export function SceneStageView({
         >
           Reset view
         </button>
-        <span>Wheel: zoom · Middle/right/Alt-drag: pan · Escape: cancel move</span>
+        <span>Wheel: zoom · Middle/right/Alt-drag: pan · Shift: bypass ground snap · Escape: cancel drag</span>
       </div>
       <div id="scene-stage-canvas" />
       {error && (

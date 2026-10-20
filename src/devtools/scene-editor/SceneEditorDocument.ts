@@ -29,7 +29,7 @@ interface SceneEntry {
 
 /** Independent scene sessions. Only validated, detached immutable authored snapshots enter history. */
 export class SceneEditorDocument {
-  readonly groundGuide = new GroundGuideWorkspace('scene-world');
+  readonly groundGuide = new GroundGuideWorkspace('scene-world', undefined, true);
   private readonly entries = new Map<string, SceneEntry>();
   private selected: string | null = null;
   private revision = 0;
@@ -143,6 +143,7 @@ export class SceneEditorDocument {
     };
     this.cancelActionDrag();
     this.cancelActorDrag();
+    this.groundGuide.cancelDrag();
     this.entries.set(scene.id, entry);
     this.selected = scene.id;
     this.groundGuide.bind(scene.id);
@@ -164,6 +165,7 @@ export class SceneEditorDocument {
     if (!this.entries.has(id)) return this.reportError(new Error(`Unknown scene "${id}".`));
     this.cancelActionDrag();
     this.cancelActorDrag();
+    this.groundGuide.cancelDrag();
     this.selected = id;
     this.groundGuide.bind(id);
     return this.success();
@@ -339,12 +341,24 @@ export class SceneEditorDocument {
     this.dragActor = id;
     return true;
   }
-  moveActorDrag(position: { x: number; y: number }): boolean {
+  /** Explicit fallback: Actor position is its top-level Puppet container origin, not a sole. */
+  alignSelectedActorOriginToGround(): boolean {
+    const actor = this.workingScene?.actors.find((actor) => actor.id === this.selectedActorId);
+    const { guide, dragging } = this.groundGuide.getSnapshot();
+    if (!actor || !guide.enabled || dragging) return false;
+    return this.updateActor(actor.id, { position: { x: actor.position.x, y: guide.y } });
+  }
+  moveActorDrag(position: { x: number; y: number }, options: { bypassGround?: boolean } = {}): boolean {
     const scene = this.workingScene;
     if (!scene || !this.dragActor) return false;
+    const { guide } = this.groundGuide.getSnapshot();
+    const initialPosition =
+      guide.enabled && guide.snapEnabled && !options.bypassGround ? { x: position.x, y: guide.y } : position;
     return this.replaceScene({
       ...scene,
-      actors: scene.actors.map((actor) => (actor.id === this.dragActor ? { ...actor, position } : actor)),
+      actors: scene.actors.map((actor) =>
+        actor.id === this.dragActor ? { ...actor, position: initialPosition } : actor,
+      ),
     });
   }
   endActorDrag(): void {

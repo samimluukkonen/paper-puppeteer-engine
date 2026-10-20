@@ -26,7 +26,7 @@ export function GroundGuideControls({
   };
   return (
     <details className="ground-guide-controls">
-      <summary>Ground reference</summary>
+      <summary>{workspace.space === 'scene-world' ? 'Scene ground' : 'Ground reference'}</summary>
       <fieldset disabled={workspaceId === null || dragging}>
         <label className="ground-guide-toggle">
           <input
@@ -68,7 +68,7 @@ export function GroundGuideControls({
               checked={guide.snapEnabled}
               onChange={(event) => workspace.update({ snapEnabled: event.target.checked })}
             />{' '}
-            Enable ground snapping
+            {workspace.space === 'scene-world' ? 'Snap to Ground' : 'Enable ground snapping'}
           </label>
         )}
         {workspace.historyEnabled && (
@@ -87,7 +87,9 @@ export function GroundGuideControls({
         {workspace.space === 'scene-world' ? 'Scene-world Y.' : 'Fixed preview-world Y.'} Saved in this browser for this
         workspace. Visual reference only.
         {showSnapping &&
-          ' Drag ↕ Ground in the preview to adjust the guide. Escape cancels. Snapping affects temporary IK target drags within 8 preview pixels; Set Target Key saves them.'}
+          (workspace.space === 'scene-world'
+            ? ' Drag ↕ Ground on the stage to adjust the guide. Escape cancels. Snapping constrains Actor origins during placement drags; hold Shift to move freely. Guide changes never move Actors or movement paths.'
+            : ' Drag ↕ Ground in the preview to adjust the guide. Escape cancels. Snapping affects temporary IK target drags within 8 preview pixels; Set Target Key saves them.')}
       </p>
       {persistenceMessage && <p role="status">{persistenceMessage}</p>}
     </details>

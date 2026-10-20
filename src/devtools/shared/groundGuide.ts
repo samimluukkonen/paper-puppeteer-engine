@@ -11,7 +11,7 @@ export const groundGuideSchema = z.strictObject({
   snapEnabled: z.boolean(),
 });
 
-/** Editor metadata only. snapEnabled opts into target-Y snapping during Animation Editor IK drags. */
+/** Editor metadata only. snapEnabled opts into IK target (animation) or Actor origin (scene) drag snapping. */
 export type GroundGuide = Readonly<z.infer<typeof groundGuideSchema>>;
 
 export function defaultGroundGuide(space: GroundGuideSpace): GroundGuide {

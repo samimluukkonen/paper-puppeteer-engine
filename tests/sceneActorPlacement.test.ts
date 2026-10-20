@@ -150,6 +150,8 @@ test('coordinate conversion accounts for canvas FIT scale, centered zoom, pan, d
     zoom: 2,
     scrollX: -200,
     scrollY: 50,
+    originX: 0.5,
+    originY: 0.5,
     setZoom(zoom: number) {
       this.zoom = zoom;
     },

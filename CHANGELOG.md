@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.7-3
+
+Complete Scene Editor [ground reference integration](docs/ground-reference.md) with scene-world label dragging, numeric controls, separate guide Undo/Redo, opt-in Actor-origin drag snapping and Shift bypass. Add explicit “Align Actor Origin to Ground” through authored scene Undo/Redo; rigs have no reliable foot-contact marker, so the fallback is labelled clearly. Preserve scene-ID browser metadata, camera alignment, playback/scrubbing and authored movement paths. Add coordinate, multi-rig/skin/scale, persistence, lifecycle and local desktop browser regressions. Authored scene/character formats remain unchanged. Milestone `0.9.7.3` uses the changelog's SemVer form `0.9.7-3`.
+
 ## 0.9.7-2
 
 Integrate the [ground reference](docs/ground-reference.md) into Animation Editor with collapsed controls, numeric/reset settings, a dedicated world-space drag label, Escape cancellation and separate bounded guide Undo/Redo. Keep one browser preference per character across clips. Add optional IK drag draft snapping and explicit “Align IK target Y to guide” key authoring through the existing atomic XY API. Preserve world X through full affine transforms and explain missing sole-contact metadata. Guide edits leave authored animation data and history unchanged; foot planting is unchanged. Include unit, lifecycle and local desktop browser regressions. Milestone `0.9.7.2` uses the changelog's SemVer form `0.9.7-2`.

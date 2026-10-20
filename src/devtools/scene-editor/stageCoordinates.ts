@@ -1,16 +1,20 @@
 import type { Point } from '../../engine/affineMath.js';
+import { editorWorldViewport, type EditorViewportCamera } from '../shared/editorCamera.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 
 /** DOM pixels -> Phaser viewport pixels -> world units, including FIT scaling and camera zoom/pan. */
 export function stagePoint(
   client: Point,
   bounds: { left: number; top: number; width: number; height: number },
-  viewport: { width: number; height: number; getWorldPoint(x: number, y: number): Point },
+  viewport: EditorViewportCamera & { readonly x?: number; readonly y?: number },
 ): Point {
-  return viewport.getWorldPoint(
-    ((client.x - bounds.left) / bounds.width) * viewport.width,
-    ((client.y - bounds.top) / bounds.height) * viewport.height,
-  );
+  const view = editorWorldViewport(viewport);
+  if (!view || bounds.width <= 0 || bounds.height <= 0) return { x: NaN, y: NaN };
+  // Use current camera properties: Phaser's cached matrix may still describe the previous frame.
+  return {
+    x: view.left + (((client.x - bounds.left) / bounds.width) * viewport.width - (viewport.x ?? 0)) / viewport.zoom,
+    y: view.top + (((client.y - bounds.top) / bounds.height) * viewport.height - (viewport.y ?? 0)) / viewport.zoom,
+  };
 }
 
 export function draggedPosition(start: Point, origin: Point, current: Point, axis: 'x' | 'y' | 'both'): Point {

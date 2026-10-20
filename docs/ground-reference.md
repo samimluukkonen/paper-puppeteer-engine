@@ -1,20 +1,32 @@
-# Ground reference and Animation Editor IK alignment (v0.9.7.2)
+# Ground reference and editor alignment (v0.9.7.3)
 
 [All guides](../README.md#guides) · [Scene Editor](scene-editor.md)
 
-The ground guide is an optional horizontal authoring reference. It has no physics or collision behavior. Moving it does not change bones, IK targets, Actors, clips, saved checkpoints or animation/scene Undo/Redo history. Animation Editor has separate guide history and optional target-Y snapping during explicit IK drags.
+The ground guide is an optional horizontal authoring reference. It has no physics or collision behavior. Moving it does not change bones, IK targets, Actors, clips, saved checkpoints or animation/scene Undo/Redo history. Both editors have separate guide history. Explicit alignment commands and opt-in placement drags author changes through each editor's existing document history.
 
-In either editor, expand the initially collapsed **Ground reference** inspector section. Enable **Show ground guide**, enter **Ground Y**, and press Enter or leave the field to apply it. Empty and nonfinite values retain the previous valid Y. **Reset Ground Y** restores the workspace default (Animation Editor `435`, Scene Editor `0`) without changing visibility. The guide is hidden by default.
+Expand the initially collapsed **Ground reference** (Animation Editor) or **Scene ground** (Scene Editor) inspector section. Enable **Show ground guide**, enter **Ground Y**, and press Enter or leave the field to apply it. Empty and nonfinite values retain the previous valid Y. **Reset Ground Y** restores the workspace default (Animation Editor `435`, Scene Editor `0`) without changing visibility. The guide is hidden by default.
 
 In Animation Editor, drag the amber **↕ Ground** label vertically to adjust the reference. Only the label captures ground drags; the rest of the line leaves bone/IK picking available. The numeric field follows the live world Y. Release saves one preference change, including release outside the canvas. Escape, focus loss, switching animation or editor mode, rebuilding the rig, and teardown cancel an unfinished drag without storage writes. Ground dragging does not pause or otherwise change playback. The guide is also available for empty/new clips and when no animation is selected.
 
-**Undo ground change** and **Redo ground change** restore guide position, visibility and snapping preferences, independently of authored animation history. History holds at most 100 changes per character for the current session. Reload restores saved settings, not history. Scene Editor retains its existing preferences without guide history.
+**Undo ground change** and **Redo ground change** restore guide position, visibility and snapping preferences, independently of authored history. History holds at most 100 changes per character or scene for the current session. Reload restores saved settings, not history.
 
 **Enable ground snapping** opts explicit IK crosshair drags into requested-target snapping within eight preview pixels of the guide. This changes only the temporary draft; **Set Target Key** remains the explicit save command. Hidden guides never snap. Moving a guide or toggling this preference never moves a target.
 
 **Align IK target Y to guide** is a separate explicit authoring action. Select an authored IK target and show the guide, then use this button to set X/Y keys at the held playhead in one animation Undo action. It preserves requested world X, sets requested world Y to the guide, and applies the inverse full puppet transform; a rotated enclosing transform may require both local coordinates to change. Bones, events, duration and IK influence remain unchanged. Provider/runtime-owned, disabled, baked-out and singular/unsupported chains retain the existing manipulation guards. The guide's snapping checkbox does not gate this explicit alignment command.
 
 There is no general sole-contact marker in the authored rig format. `endOffset` identifies a solver endpoint, without establishing that it is a sole. Demo sole offsets and artwork bounds belong to `DemoFootPlanting` and its presentation profiles, and are not used as editor contact metadata. Alignment/snapping therefore place the **requested IK target**, with an explicit missing-contact explanation; they do not promise exact foot contact. Solver reach and influence can prevent the solved endpoint reaching the request. Foot planting is unchanged.
+
+## Scene Actor alignment
+
+Scene Editor also supports dragging the amber **↕ Ground** label vertically. The rest of the line leaves Actor picking available. The numeric field follows the live scene-world Y; release commits one guide-history entry, including outside-canvas release through pointer capture. Escape, pointer cancellation/capture loss, window blur, hiding/leaving the page, scene switching/import and stage teardown cancel an unfinished guide drag. Ground adjustment remains available during playback and scrubbing without pausing or rebuilding the runtime context.
+
+Select an Actor and use **Align Actor Origin to Ground**. Because rigs do not define a reliable foot-contact marker, this deliberately labelled fallback aligns the top-level Puppet container origin, preserving initial X. It does not calculate foot placement from root bones, skin bounds, sprite sizes, facing or scale. Different rigs may need different authored initial Y values for their visible feet to share a floor. The Scene Editor creates Actors at the scene root, so their authored positions are already scene-world positions; no parent transform is omitted. Scene format 2 has no authored Actor scale field; existing Puppet scales do not move the origin.
+
+Alignment requires a visible guide, a selected Actor and stopped playback. It updates only that Actor's authored initial position in one scene Undo/Redo entry. Redo restores the recorded position even if Ground Y has since changed. Actions, destinations, timing, rigs and character animations remain unchanged.
+
+**Snap to Ground** constrains Actor origins to Ground Y only during explicit stage placement drags. X remains free; hold **Shift** to bypass the constraint for jumping, flying or elevated placement. Hidden guides and disabled snapping leave placement free. Changing the guide or toggling snapping never moves an existing Actor. A completed placement drag remains one scene Undo entry; cancel restores the previous position. Numeric Actor properties remain explicit and unconstrained.
+
+The guide remains stable while existing choreography controls runtime movement, including vertical destinations. Forward/backward seeks reconstruct the same authored movement without consulting ground settings. The guide is editor metadata, never a runtime collision plane or exported artwork.
 
 ## Coordinate ownership
 
@@ -26,7 +38,7 @@ Animation Y is fixed in the preview world, outside the puppet transform. Scaling
 
 ## Metadata and persistence
 
-`GroundGuide` contains readonly `enabled`, finite numeric `y` and `snapEnabled`. `defaultGroundGuide` provides domain defaults; `updateGroundGuide` ignores invalid numeric/boolean patches and returns an immutable snapshot. `snapEnabled` enables only temporary Animation Editor IK drag snapping; changing the setting invokes no authoring command. Scene Editor does not expose it.
+`GroundGuide` contains readonly `enabled`, finite numeric `y` and `snapEnabled`. `defaultGroundGuide` provides domain defaults; `updateGroundGuide` ignores invalid numeric/boolean patches and returns an immutable snapshot. `snapEnabled` enables temporary Animation Editor IK drag snapping or Scene Editor Actor-origin placement snapping; changing the setting invokes no authoring command.
 
 `GroundGuideWorkspace` owns settings separately from authored documents. Use `bind(identity)` to select a workspace, `getSnapshot`/`subscribe` to observe it, `update(patch)` to edit preferences, and `resetY()` to restore the domain's default Y. `bind(null)` disables editing and hides the guide. Binding and no-op edits perform no storage writes.
 
@@ -36,9 +48,9 @@ The stored envelope is `{ version: 1, guide: { enabled, y, snapEnabled } }`, val
 
 ## Rendering and controls
 
-`GroundGuideOverlay` owns independent Phaser Graphics/Text objects and accepts `render(guide)` and idempotent `dispose()`. Its amber dashed line spans the visible viewport with constant viewport-pixel thickness and an optional **Ground** label (Animation Editor uses **↕ Ground**). Constructor options allow a solid line or no label. It has no pointer listeners, hit area, puppet parent or artwork texture writes. Unchanged geometry skips redraws. Both editor stages own and release their overlay; character and scene exports continue to use their existing authored/texture paths.
+`GroundGuideOverlay` owns independent Phaser Graphics/Text objects and accepts `render(guide)` and idempotent `dispose()`. Its amber dashed line spans the visible viewport with constant viewport-pixel thickness and an optional **Ground** label (both editors use **↕ Ground**). Constructor options allow a solid line or no label. It has no pointer listeners, hit area, puppet parent or artwork texture writes. Unchanged geometry skips redraws. Both editor stages own and release their overlay; character and scene exports continue to use their existing authored/texture paths.
 
-`GroundGuideControls` subscribes to a workspace and provides a collapsed disclosure with visibility, numeric Y and reset controls in the existing inspector style. `showSnapping` optionally exposes the IK drag snapping preference, with explanatory text; it defaults to false. Both editors mount these controls. Animation Editor adds `AnimationGroundPanel`, its explicit alignment action and separate guide Undo/Redo controls. `AnimationEditorGroundHandle` owns pointer/keyboard listeners and their teardown; `GroundGuideOverlay` continues to own rendering only.
+`GroundGuideControls` subscribes to a workspace and provides a collapsed disclosure with visibility, numeric Y and reset controls in the existing inspector style. `showSnapping` optionally exposes the domain's drag snapping preference, with explanatory text; it defaults to false. Both editor panels use it for their explicit alignment action and separate guide Undo/Redo controls. `AnimationEditorGroundHandle` owns Animation Editor pointer/keyboard listeners. `SceneGroundHandle` owns the scene label gesture and guide subscription; `SceneStage` owns DOM pointer capture, keyboard/focus listeners and their teardown. `GroundGuideOverlay` continues to own rendering only. Scene stage input uses the same current camera viewport calculation as the overlay, rather than a potentially stale Phaser projection matrix.
 
 ## Validation
 
@@ -46,7 +58,7 @@ Unit regressions cover defaults, invalid values, visibility, world/screen projec
 
 Run `npm run typecheck`, `npm run test` and `npm run build`; `npm run check` additionally covers formatting and lint. The focused browser command is `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/groundGuide.spec.ts` after `npm run build:demo`, when local Chrome is available. Browser tests remain local-only.
 
-Additional v0.9.7.2 regressions cover pointer identity, label-only picking, zoom/pan/viewport coordinate conversion, live numeric synchronization, drag cancellation and outside release, bounded per-character guide history, full affine target alignment, opt-in draft snapping, unavailable target ownership, missing-contact explanations, empty selection, lifecycle cleanup and animation data immutability. Preview playback supports positive speeds; reverse navigation is covered by backward scrubbing, with no reverse-playback feature added. Scene Actor snapping, physics/collision, terrain/slopes and automatic foot-contact detection remain separate work.
+Additional v0.9.7.2 regressions cover pointer identity, label-only picking, zoom/pan/viewport coordinate conversion, live numeric synchronization, drag cancellation and outside release, bounded per-character guide history, full affine target alignment, opt-in draft snapping, unavailable target ownership, missing-contact explanations, empty selection, lifecycle cleanup and animation data immutability. Preview playback supports positive speeds; reverse navigation is covered by backward scrubbing, with no reverse-playback feature added. Physics/collision, terrain/slopes and automatic foot-contact detection remain separate work.
 
 ## Foundation files and APIs
 
@@ -96,3 +108,25 @@ The focused local browser command is `PLAYWRIGHT_CHANNEL=chrome npx playwright t
 - `npm run build`: passed demo/library bundles, declarations and plain-Node entry-point checks. Vite emitted the existing nonblocking `lucide-react` module-directive warnings.
 - `git diff --check`: passed.
 - `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationGroundGuide.spec.ts tests/browser/groundGuide.spec.ts`: passed all 4 local desktop scenarios against development and production. The Animation Editor workflow opens the shipped walk, verifies live dragging/Escape/guide Undo, playback and scrub stability, facing/onion skins, camera zoom, clip switching, explicit alignment with animation Undo, identical authored exports and reload persistence. Local servers required sandbox escalation for localhost binding.
+
+## v0.9.7.3 implementation files
+
+- `src/devtools/scene-editor/SceneGroundPanel.tsx`, `SceneEditorView.tsx`: initially collapsed scene controls, explicit origin-alignment explanation and preview/selection guards. The panel observes playback mode without rendering on each clock tick.
+- `SceneGroundHandle.ts`, `SceneStage.tsx`: label-only world-space gesture, pointer capture, cancellation, Shift bypass, preview-safe guide adjustment and cleanup.
+- `SceneEditorDocument.ts`: explicit initial-origin alignment, opt-in placement constraint and independent scene guide history. Actor alignment and placement reuse authored snapshot Undo/Redo.
+- `stageCoordinates.ts`: current camera bounds for DOM/FIT-to-world input, matching overlay projection without waiting for Phaser pre-render.
+- `src/devtools/shared/GroundGuideControls.tsx`, `groundGuide.ts`: domain-specific control labels and snapping explanations; shared renderer and metadata persistence are reused.
+- `tests/sceneGroundGuide.test.ts`, `sceneActorPlacement.test.ts`, `groundGuide.test.ts`: world input at five zoom levels, camera changes, gesture history/cancellation, origin fallback, distinct rigs/artwork/skins/facing/scales, authored alignment Undo/Redo, drag bypass, scene-ID persistence, deterministic movement/seeks and cleanup.
+- `tests/browser/groundGuide.spec.ts`: local desktop numeric/show/hide, camera/resize, two-character alignment, canvas dragging/Escape, guide and scene Undo, Shift bypass, playback/scrubbing, export/reload and navigation cleanup.
+- `docs/ground-reference.md`, `docs/scene-editor.md`, `docs/development.md`, `CHANGELOG.md`: usage, coordinate ownership, origin fallback, persistence and verification notes.
+
+Guide settings continue to use the existing browser metadata strategy. Export/import in the same browser restores settings by scene ID. JSON/ZIPs carry authored Actor placements and actions, but do not carry guide preferences to another browser. Runtime schemas and movement remain unchanged.
+
+## v0.9.7.3 verification results
+
+- `npm run typecheck`: passed strict TypeScript checking; also passed within `check` and `build`.
+- `npm run test`: passed, 187 files / 3,258 tests; 5 files / 56 tests skipped (192 files / 3,314 tests total).
+- `npm run build`: passed demo/library bundles, declarations and plain-Node entry-point checks. Vite emitted the existing nonblocking `lucide-react` module-directive warnings.
+- `npm run check`: passed repository formatting, lint and strict TypeScript checking.
+- `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/groundGuide.spec.ts tests/browser/animationGroundGuide.spec.ts`: passed all 6 local desktop scenarios against development and production in 1.7 minutes. The scene workflow uses the shipped demo and sketch characters, verifies labelled origin alignment, independent guide/scene Undo, drag snapping and Shift bypass, unchanged choreography, playback/scrubbing, exported initial transforms, scene-ID guide persistence after reload and navigation cleanup. The existing Animation Editor workflow also passes. Local servers required sandbox escalation after an initial `EPERM` localhost-bind failure.
+- `git diff --check`: passed.
