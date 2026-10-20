@@ -102,6 +102,9 @@ export function ViewHeader({
             />
           )}
         </div>
+        <div className="view-header-guide">
+          <FeatureGuideButton />
+        </div>
         <nav className="view-navigation" aria-label="Views">
           {Object.entries(views).map(([id, item]) => (
             <a key={id} href={`${root}${item.path}${characterQuery}`} aria-current={id === view ? 'page' : undefined}>
@@ -109,7 +112,6 @@ export function ViewHeader({
               {item.title}
             </a>
           ))}
-          <FeatureGuideButton />
         </nav>
       </div>
     </header>

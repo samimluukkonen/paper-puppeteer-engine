@@ -105,6 +105,14 @@
   gap: 6px;
   font-size: 12px;
 }
+.view-header-guide {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+.view-header-guide:empty {
+  display: none;
+}
 .view-navigation a {
   position: relative;
   display: inline-flex;

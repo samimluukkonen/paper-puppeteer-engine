@@ -57,6 +57,8 @@
 }
 .workspace-shell .view-navigation {
   flex-wrap: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .workspace-shell .view-navigation a {
   padding: 6px 8px;
@@ -312,6 +314,18 @@
   justify-content: center;
   gap: 6px;
   white-space: nowrap;
+  padding: 7px 12px;
+  border-color: var(--accent-fg);
+  background: var(--accent-muted);
+  color: var(--accent-fg);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+.feature-guide-open:hover:not(:disabled) {
+  border-color: var(--accent-fg);
+  background: var(--accent-fg);
+  color: var(--bg-inset);
 }
 .feature-guide-categories,
 .feature-guide-current {
