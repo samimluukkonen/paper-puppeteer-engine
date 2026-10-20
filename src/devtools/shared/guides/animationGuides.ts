@@ -29,6 +29,46 @@ const step = (id: string, title: string, description: string, targetId: string):
 /** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
+    id: 'animation-ground-reference',
+    title: 'Using Ground Reference',
+    description: 'Inspect contact against a fixed preview reference and explicitly align an authored IK target.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: rig,
+    steps: [
+      step(
+        'enable',
+        'Enable the line',
+        'After exiting this tour, enable Show ground guide. The line is a visual reference, not a physics floor. Settings belong to this character in this browser, independently of animation keys.',
+        targets.animationGroundVisible,
+      ),
+      step(
+        'position',
+        'Position Ground Y',
+        'Enter a finite Ground Y and press Enter, or drag the amber ↕ Ground label in the preview. This uses fixed preview-world coordinates, including the character preview placement; it is not Scene Editor ground Y. Guide Undo/Redo affects preferences only.',
+        targets.animationGroundY,
+      ),
+      step(
+        'contact',
+        'Inspect foot contact',
+        'Play or scrub an animation and compare the feet or other contact points with the line. Root translation, facing and scale affect the character; the reference stays fixed. Jumping or flying poses remain free to leave the line.',
+        targets.animationCanvas,
+      ),
+      step(
+        'align',
+        'Align an IK target where supported',
+        'With an animation and authored IK target selected, Align IK target Y to guide writes X/Y keys at the playhead while preserving world X. Animation Undo/Redo restores this real edit. Without IK, use the reference visually. No sole-contact marker is inferred, and solver reach or influence can limit contact.',
+        targets.animationGroundAlign,
+      ),
+      step(
+        'reset',
+        'Hide or reset the guide',
+        'Reset Ground Y restores the preview default without moving the character. Uncheck Show ground guide to hide it. Preferences survive switching clips and reopening the character here; animation and character exports carry authored edits, without guide preferences.',
+        targets.animationGroundReset,
+      ),
+    ],
+  },
+  {
     id: 'animation-new',
     title: 'Create a New Animation',
     description: 'Start an empty clip for the loaded rig without importing JSON.',

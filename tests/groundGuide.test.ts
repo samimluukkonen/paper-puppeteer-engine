@@ -12,6 +12,7 @@ import {
 import { GroundGuideControls } from '../src/devtools/shared/GroundGuideControls.js';
 import { GroundGuideOverlay } from '../src/devtools/shared/GroundGuideOverlay.js';
 import { GroundGuideWorkspace } from '../src/devtools/shared/GroundGuideWorkspace.js';
+import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { CHARACTER_PREVIEW_ORIGIN } from '../src/devtools/shared/previewPlacement.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -237,6 +238,33 @@ test('shared controls start collapsed, have no-workspace guards and keep snappin
   assert.include(markup, 'Ground Y');
   assert.include(markup, 'Reset Ground Y');
   assert.include(markup, 'Snap to Ground');
+  assert.include(markup, 'not a physics floor');
+  for (const id of [GUIDE_TARGETS.sceneGroundVisible, GUIDE_TARGETS.sceneGroundY, GUIDE_TARGETS.sceneGroundReset])
+    assert.include(markup, `data-guide-id="${id}"`);
+  assert.notInclude(markup, 'data-guide-id="animation-ground-');
+});
+
+test('playback-sized render loops reuse overlay objects and redraw only for visible geometry changes', () => {
+  const scene = puppetScene();
+  const view = camera();
+  Object.assign(scene, { cameras: { main: view } });
+  const graphics = scene.add.graphics();
+  const addGraphics = vi.spyOn(scene.add, 'graphics').mockReturnValue(graphics);
+  const addText = vi.spyOn(scene.add, 'text');
+  const overlay = new GroundGuideOverlay(scene);
+  const clear = vi.spyOn(graphics, 'clear');
+  const guide = { enabled: true, y: 10, snapEnabled: false };
+  for (let frame = 0; frame < 120; frame++) overlay.render({ ...guide, snapEnabled: frame % 2 === 0 });
+  assert.equal(clear.mock.calls.length, 1);
+  panCamera(view, 50, 30);
+  overlay.render(guide);
+  assert.equal(clear.mock.calls.length, 2);
+  view.zoom = 2;
+  overlay.render(guide);
+  assert.equal(clear.mock.calls.length, 3);
+  assert.equal(addGraphics.mock.calls.length, 1);
+  assert.equal(addText.mock.calls.length, 1);
+  overlay.dispose();
 });
 
 test('overlay hides, renders dashed/solid lines with constant pixel sizes and disposes independently', () => {

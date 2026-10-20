@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { GroundGuideControls } from '../shared/GroundGuideControls.js';
 import type { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { IKInspectorController } from './IKInspectorController.js';
 
 export function AnimationGroundPanel({
@@ -19,6 +20,8 @@ export function AnimationGroundPanel({
     <GroundGuideControls workspace={workspace} showSnapping>
       <button
         type="button"
+        data-guide-id={GUIDE_TARGETS.animationGroundAlign}
+        title="Author IK target X/Y keys at the playhead. Animation Undo/Redo restores this edit."
         disabled={
           !guide.enabled || !ik.ready || ik.dragging || !!ik.disabledReason || ik.fields.some((field) => !field.valid)
         }

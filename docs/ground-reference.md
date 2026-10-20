@@ -1,6 +1,8 @@
-# Ground reference and editor alignment (v0.9.7.3)
+# Ground reference and editor alignment (v0.9.7.4)
 
 [All guides](../README.md#guides) · [Scene Editor](scene-editor.md)
+
+See the [v0.9.7 integration report](ground-reference-readiness.md) for the coordinate audit, regression matrix, exact verification results and remaining acceptance limits.
 
 The ground guide is an optional horizontal authoring reference. It has no physics or collision behavior. Moving it does not change bones, IK targets, Actors, clips, saved checkpoints or animation/scene Undo/Redo history. Both editors have separate guide history. Explicit alignment commands and opt-in placement drags author changes through each editor's existing document history.
 
@@ -34,6 +36,10 @@ Both editors use X rightward and Y downward, in world units. Scene guides use **
 
 Animation Y is fixed in the preview world, outside the puppet transform. Scaling, facing, rig rebuilds and clip switches do not move it. Animation and scene Y values cannot be transferred directly; a future transfer must explicitly map their workspace origins and transforms. The animation overlay is hidden in rig editing mode.
 
+For a requested IK point `p`, the full Puppet container affine transform `P` maps puppet-local coordinates into preview world: `pPreview = P × p`. Alignment computes `inverse(P) × (pPreview.x, groundPreviewY)`; this can change **both** local X and Y when the container is rotated or sheared. Root-bone translation and the IK end offset belong to pose/solver evaluation, not an extra preview-origin adjustment. Singular transforms refuse alignment.
+
+To compare that point with a scene instance, use its own world transform `A`: `pScene = A × inverse(P) × pPreview`. A horizontal preview line is not necessarily horizontal under an arbitrary change of basis. No editor transfers a scalar ground Y between these spaces. Scene Actor-origin alignment needs no bone/contact conversion: it explicitly sets the top-level Actor position Y. A future sole-contact command would need a reliable local contact point and its complete instance transform; artwork bounds and guessed bone names are insufficient.
+
 `editorWorldViewport` computes visible bounds using the current camera scroll, uniform zoom, viewport size and zoom origin. This avoids stale Phaser matrices between an input update and camera pre-render. The supported editor cameras have no rotation or external camera transform. `groundGuideGeometry` returns world-space line endpoints, label placement and inverse-zoom pixel size; it returns no geometry for hidden/offscreen guides or invalid viewports. DOM/FIT scaling continues to use the existing canvas sizing path. Camera and viewport changes never write guide settings.
 
 ## Metadata and persistence
@@ -45,6 +51,16 @@ Animation Y is fixed in the preview world, outside the puppet transform. Scaling
 The existing browser-metadata pattern is used with localStorage keys `paper-puppeteer:ground-guide:v1:<space>:<encoded identity>`. Animation identities are resolved absolute character manifest URLs; scene identities are scene IDs within this browser origin. Each domain and identity retains independent settings. Opening the same scene ID intentionally reuses its guide settings. Separate browser tabs keep their own live settings; an explicit later edit replaces the stored value.
 
 The stored envelope is `{ version: 1, guide: { enabled, y, snapEnabled } }`, validated with a strict Zod schema. Missing settings use defaults. Malformed, incompatible or unavailable storage leaves the editor usable; invalid bytes remain untouched until the user makes a valid preference change. Failed writes retain settings for the current session and expose a status message. Reopening the same document in the same browser restores settings when storage is available. Settings do not travel in JSON or character/scene ZIP exports; authored schema versions are unchanged.
+
+Animation draft recovery restores authored clips separately from guide metadata. Recovering, undoing or redoing a draft never overwrites ground preferences. Scene documents have no local authored-draft recovery; export and re-import the scene while its ID restores the browser's independent guide preferences. A character moved to a different manifest URL gets a separate guide workspace.
+
+## Feature Guide tutorials
+
+**Feature Guide → Animation Editor → Using Ground Reference** has five steps: enable, position Ground Y, inspect contact in the preview, explicitly align an IK target where supported, and hide/reset. It is available for a loaded valid rig even without a clip or IK. The alignment control remains visible and disabled until the existing authoring prerequisites are met.
+
+**Feature Guide → Scene Editor → Aligning Actors to Ground** has five steps: enable, adjust scene Y, select an Actor, explicitly align its origin, and preview movement. A scene is required; an Actor is not required to start the explanation.
+
+Both tours reuse the existing wizard and stable React `data-guide-id` anchors. Next/Back/Exit only reveal controls and never toggle a guide, write preferences, select an Actor, author keys, move Actors or start playback. The tutorials explain the missing sole marker, coordinate ownership, browser-only persistence and the difference between guide Undo and authored Undo. Shared show/hide and reset tooltips explain that the line is not a physics floor. Inspector sections still start collapsed.
 
 ## Rendering and controls
 

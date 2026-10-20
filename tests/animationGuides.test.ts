@@ -25,8 +25,8 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains thirteen bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 13);
+test('Animation Editor catalog contains fourteen bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 14);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
@@ -57,7 +57,7 @@ test('missing character, no clip, empty clip, bone keys and optional IK have liv
   for (const guide of guides)
     assert.equal(
       launcher.getAvailability(guide.id).available,
-      ['animation-new', 'animation-rig-tweak'].includes(guide.id),
+      ['animation-new', 'animation-rig-tweak', 'animation-ground-reference'].includes(guide.id),
     );
   animation.createAnimation({ name: 'empty' });
   launcher.refresh();

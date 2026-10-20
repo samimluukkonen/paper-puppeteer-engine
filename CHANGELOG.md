@@ -11,6 +11,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.7-4
+
+Audit and harden [ground reference integration](docs/ground-reference-readiness.md) across both editors. Add five-step Using Ground Reference and Aligning Actors to Ground tutorials through the existing Feature Guide, stable React control anchors and tooltips distinguishing guide preferences from authored edits. Document full coordinate conversion, browser-only persistence and safe Actor-origin fallback. Extend recovery, overlay reuse, tutorial isolation and authored IK export/re-import regressions; preserve collapsed inspectors and editor/runtime history boundaries.
+
 ## 0.9.7-3
 
 Complete Scene Editor [ground reference integration](docs/ground-reference.md) with scene-world label dragging, numeric controls, separate guide Undo/Redo, opt-in Actor-origin drag snapping and Shift bypass. Add explicit “Align Actor Origin to Ground” through authored scene Undo/Redo; rigs have no reliable foot-contact marker, so the fallback is labelled clearly. Preserve scene-ID browser metadata, camera alignment, playback/scrubbing and authored movement paths. Add coordinate, multi-rig/skin/scale, persistence, lifecycle and local desktop browser regressions. Authored scene/character formats remain unchanged. Milestone `0.9.7.3` uses the changelog's SemVer form `0.9.7-3`.

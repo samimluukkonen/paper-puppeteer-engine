@@ -9,6 +9,7 @@ import { SceneGroundPanel } from '../src/devtools/scene-editor/SceneGroundPanel.
 import { stagePoint } from '../src/devtools/scene-editor/stageCoordinates.js';
 import { editorWorldViewport, panCamera, zoomCameraAt } from '../src/devtools/shared/editorCamera.js';
 import { groundGuideGeometry } from '../src/devtools/shared/groundGuide.js';
+import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { Actor } from '../src/engine/Actor.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -339,6 +340,7 @@ test('scene controls start collapsed, explain origin fallback, guard selection/v
   assert.notInclude(markup(), 'open=""');
   assert.include(markup(), 'Snap to Ground');
   assert.include(markup(), 'hold Shift');
+  assert.include(markup(), `data-guide-id="${GUIDE_TARGETS.sceneGroundAlign}"`);
   assert.include(markup(), 'disabled="">Align Actor Origin to Ground');
   f.document.selectActor('a');
   assert.notInclude(markup(), 'disabled="">Align Actor Origin to Ground');

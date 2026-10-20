@@ -3,6 +3,7 @@ import { AnimationDraftRecoveryController } from '../src/devtools/animation-edit
 import { AnimationEditorState, type ReadonlyAnimation } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { DraftRecovery, type DraftSession } from '../src/devtools/shared/DraftRecovery.js';
 import { draftSource } from '../src/devtools/shared/draftSource.js';
+import { GroundGuideWorkspace } from '../src/devtools/shared/GroundGuideWorkspace.js';
 import { Rig } from '../src/engine/Rig.js';
 
 function fixture() {
@@ -33,7 +34,7 @@ function fixture() {
   return { rig, animations, state, calls, recovery, controller, session };
 }
 
-test('multiple new clips recover every authored working copy and independent Undo/Redo', () => {
+test('multiple new clips recover authored data and Undo/Redo independently of persisted ground preferences', () => {
   const stored = new Map<string, string>();
   const storage = {
     get length() {
@@ -58,6 +59,11 @@ test('multiple new clips recover every authored working copy and independent Und
   try {
     const state = new AnimationEditorState(rig);
     controller.bind(state, 'character');
+    const guide = new GroundGuideWorkspace('animation-preview-world');
+    guide.bind('https://example.test/characters/character.json');
+    guide.update({ enabled: true, y: -72.5, snapEnabled: true });
+    assert.isFalse(state.dirty);
+    assert.isFalse([...stored.keys()].some((key) => key.startsWith('paper-puppeteer:draft:')));
     for (const [name, x] of [
       ['new-one', 42],
       ['new-two', 84],
@@ -67,8 +73,15 @@ test('multiple new clips recover every authored working copy and independent Und
     }
     controller.dispose();
     recovery.dispose();
+    for (const [key, text] of stored) {
+      if (key.startsWith('paper-puppeteer:draft:')) assert.notInclude(text, 'snapEnabled');
+    }
     const reloaded = new AnimationEditorState(rig);
+    const reopenedGuide = new GroundGuideWorkspace('animation-preview-world');
+    reopenedGuide.bind('https://example.test/characters/character.json');
     nextController.bind(reloaded, 'character');
+    const metadata = reopenedGuide.getSnapshot();
+    assert.deepEqual(metadata.guide, guide.getSnapshot().guide);
     assert.deepEqual(Object.fromEntries(reloaded.packageAnimations().map((clip) => [clip.name, clip.tracks.root])), {
       'new-one': [{ time: 0, x: 42 }],
       'new-two': [{ time: 0, x: 84 }],
@@ -84,6 +97,7 @@ test('multiple new clips recover every authored working copy and independent Und
       assert.isTrue(reloaded.redo());
       assert.equal(reloaded.getEvaluatedBonePropertyValue('root', 'x', 0), x);
     }
+    assert.strictEqual(reopenedGuide.getSnapshot(), metadata);
   } finally {
     controller.dispose();
     recovery.dispose();

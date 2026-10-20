@@ -11,6 +11,8 @@ import { alignIKTargetToGuide, snapIKTargetToGuide } from '../src/devtools/anima
 import { editorWorldViewport } from '../src/devtools/shared/editorCamera.js';
 import { groundGuideGeometry } from '../src/devtools/shared/groundGuide.js';
 import { GroundGuideWorkspace } from '../src/devtools/shared/GroundGuideWorkspace.js';
+import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
+import { getGuideById } from '../src/devtools/shared/guides/registry.js';
 import { localToWorld, type Affine } from '../src/engine/affineMath.js';
 import { Rig } from '../src/engine/Rig.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -253,6 +255,10 @@ test('collapsed controls explain missing sole data, allow empty clips and keep a
     assert.notInclude(markup, 'open=""');
     assert.include(markup, 'No sole-contact marker');
     assert.include(markup, 'disabled="">Align IK target Y to guide');
+    for (const step of getGuideById('animation-ground-reference')!.steps) {
+      if (step.targetId !== GUIDE_TARGETS.animationCanvas) assert.include(markup, `data-guide-id="${step.targetId}"`);
+    }
+    assert.notInclude(markup, 'data-guide-id="scene-ground-');
     f.state.selectAnimation(null);
     assert.isTrue(f.handle.pointerDown(f.labelPointer()));
     f.handle.dispose();

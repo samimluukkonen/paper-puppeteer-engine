@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { GroundGuideWorkspace } from './GroundGuideWorkspace.js';
+import { GUIDE_TARGETS } from './guides/anchors.js';
 import './groundGuide.css';
 
 /** Shared collapsed inspector disclosure; commands keep guide history outside authored documents. */
@@ -18,6 +19,7 @@ export function GroundGuideControls({
     workspace.getSnapshot,
   );
   const [text, setText] = useState(String(guide.y));
+  const scene = workspace.space === 'scene-world';
   useEffect(() => setText(String(guide.y)), [workspaceId, guide.y]);
   const valid = text.trim() !== '' && Number.isFinite(Number(text));
   const commit = (): void => {
@@ -26,9 +28,15 @@ export function GroundGuideControls({
   };
   return (
     <details className="ground-guide-controls">
-      <summary>{workspace.space === 'scene-world' ? 'Scene ground' : 'Ground reference'}</summary>
+      <summary title="Visual reference only; not a physics floor. Guide changes do not edit character or Actor transforms.">
+        {scene ? 'Scene ground' : 'Ground reference'}
+      </summary>
       <fieldset disabled={workspaceId === null || dragging}>
-        <label className="ground-guide-toggle">
+        <label
+          className="ground-guide-toggle"
+          data-guide-id={scene ? GUIDE_TARGETS.sceneGroundVisible : GUIDE_TARGETS.animationGroundVisible}
+          title="Show or hide the visual reference. This is not a physics floor."
+        >
           <input
             type="checkbox"
             checked={guide.enabled}
@@ -36,7 +44,7 @@ export function GroundGuideControls({
           />{' '}
           Show ground guide
         </label>
-        <label>
+        <label data-guide-id={scene ? GUIDE_TARGETS.sceneGroundY : GUIDE_TARGETS.animationGroundY}>
           Ground Y
           <input
             type="number"
@@ -58,7 +66,12 @@ export function GroundGuideControls({
             }}
           />
         </label>
-        <button type="button" onClick={() => workspace.resetY()}>
+        <button
+          type="button"
+          data-guide-id={scene ? GUIDE_TARGETS.sceneGroundReset : GUIDE_TARGETS.animationGroundReset}
+          title="Restore the guide's default Y without moving the character or Actors."
+          onClick={() => workspace.resetY()}
+        >
           Reset Ground Y
         </button>
         {showSnapping && (

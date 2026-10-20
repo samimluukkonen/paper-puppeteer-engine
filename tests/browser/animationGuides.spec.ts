@@ -77,6 +77,11 @@ for (const existing of [true, false]) {
     const expected = existing ? { ...before, tracks: { ...before.tracks, root: [{ time: 0, x: 23 }] } } : before;
     const dirty = await page.locator('#animation-dirty').textContent();
     const undo = await page.locator('#animation-undo').isEnabled();
+    const groundMetadata = () =>
+      page.evaluate(() =>
+        Object.entries(localStorage).filter(([key]) => key.startsWith('paper-puppeteer:ground-guide:')),
+      );
+    const metadataBefore = await groundMetadata();
     const downloads: string[] = [];
     page.on('download', (download) => downloads.push(download.suggestedFilename()));
     for (const guide of guides) {
@@ -120,7 +125,7 @@ for (const existing of [true, false]) {
             card.y >= spot.y + spot.height ||
             card.y + card.height <= spot.y,
         ).toBe(true);
-        if (existing && index === Math.min(2, guide.steps.length - 1))
+        if (existing && (index === Math.min(2, guide.steps.length - 1) || guide.id === 'animation-ground-reference'))
           await page.screenshot({ path: testInfo.outputPath(`${guide.id}-${step.id}.png`) });
         if (index === 1) {
           await tour.getByRole('button', { name: 'Back', exact: true }).click();
@@ -140,6 +145,7 @@ for (const existing of [true, false]) {
       await expect(tour).toHaveCount(0);
     }
     expect(await loggedClip()).toEqual(expected);
+    expect(await groundMetadata()).toEqual(metadataBefore);
     if (existing) {
       await page.locator('#animation-undo').click();
       expect(await loggedClip()).toEqual(before);

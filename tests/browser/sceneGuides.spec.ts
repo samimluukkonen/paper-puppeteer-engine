@@ -1,9 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 
-test('scene catalog gates empty selections and all eight tours resolve real controls without authoring', async ({
-  page,
-}) => {
+test('scene catalog gates empty selections and all tours resolve real controls without authoring', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('scene-editor/');
@@ -34,6 +32,11 @@ test('scene catalog gates empty selections and all eight tours resolve real cont
     buffer: Buffer.from(JSON.stringify(data)),
   });
   await page.getByRole('button', { name: 'actor: move move', exact: true }).click();
+  const groundMetadata = () =>
+    page.evaluate(() =>
+      Object.entries(localStorage).filter(([key]) => key.startsWith('paper-puppeteer:ground-guide:')),
+    );
+  const metadataBefore = await groundMetadata();
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
   for (const guide of guideRegistry.getGuidesForEditor('scene')) {
     await open.click();
@@ -43,7 +46,12 @@ test('scene catalog gates empty selections and all eight tours resolve real cont
       await expect(tour).toContainText(`Step ${index + 1} of ${guide.steps.length}`);
       await expect(tour.getByRole('heading', { name: guide.steps[index]!.title, exact: true })).toBeVisible();
       await expect(page.locator('.guide-spotlight-hole')).toBeVisible();
+      const target = page.locator(`[data-guide-id="${guide.steps[index]!.targetId}"]`);
+      await expect(target).toHaveCount(1);
+      await expect(target).toBeVisible();
       await expect(tour).not.toContainText('Target unavailable');
+      if (guide.id === 'scene-ground-reference')
+        await page.screenshot({ path: test.info().outputPath(`${guide.id}-${guide.steps[index]!.id}.png`) });
       if (index + 1 < guide.steps.length) await tour.getByRole('button', { name: 'Next', exact: true }).click();
     }
     await tour.getByRole('button', { name: 'Exit', exact: true }).click();
@@ -58,5 +66,6 @@ test('scene catalog gates empty selections and all eight tours resolve real cont
   const chunks: Buffer[] = [];
   for await (const chunk of stream) chunks.push(Buffer.from(chunk as Uint8Array));
   expect(JSON.parse(Buffer.concat(chunks).toString('utf8'))).toEqual(data);
+  expect(await groundMetadata()).toEqual(metadataBefore);
   expect(errors).toEqual([]);
 });

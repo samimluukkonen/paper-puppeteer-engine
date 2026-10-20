@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { GroundGuideControls } from '../shared/GroundGuideControls.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 
@@ -25,6 +26,8 @@ export function SceneGroundPanel({
     <GroundGuideControls workspace={document.groundGuide} showSnapping>
       <button
         type="button"
+        data-guide-id={GUIDE_TARGETS.sceneGroundAlign}
+        title="Set the selected Actor's initial origin Y. Scene Undo/Redo restores this edit; no foot contact is inferred."
         disabled={!document.selectedActorId || !guide.enabled || previewing}
         onClick={() => {
           if (!playback.previewing) document.alignSelectedActorOriginToGround();

@@ -1,5 +1,6 @@
-import { expect, type Page } from '@playwright/test';
-import { animationIKInspector, test } from './fixtures.js';
+import { expect, type Dialog, type Page } from '@playwright/test';
+import { animationFileSchema } from '../../src/engine/schemas.js';
+import { animationFileAction, animationIKInspector, test } from './fixtures.js';
 
 async function groundHandle(page: Page) {
   const canvas = page.locator('#animation-stage canvas');
@@ -131,6 +132,14 @@ test('animation ground controls, canvas dragging, alignment and cleanup preserve
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-undo').click();
   expect(await exported(page)).toBe(original);
+  await page.locator('#animation-redo').click();
+  const aligned = await exported(page);
+  const before = animationFileSchema.parse(JSON.parse(original));
+  const after = animationFileSchema.parse(JSON.parse(aligned));
+  expect(after.tracks).toEqual(before.tracks);
+  expect(after.events).toEqual(before.events);
+  expect(after.ikTracks).not.toEqual(before.ikTracks);
+  await panel.getByRole('checkbox', { name: 'Enable ground snapping', exact: true }).check();
   await show.uncheck();
   await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
@@ -140,5 +149,19 @@ test('animation ground controls, canvas dragging, alignment and cleanup preserve
   await panel.locator('summary').click();
   await expect(y).toHaveValue(draggedY);
   await expect(show).not.toBeChecked();
+  await expect(panel.getByRole('checkbox', { name: 'Enable ground snapping', exact: true })).toBeChecked();
+  const acceptReplacement = (dialog: Dialog): void => {
+    void dialog.accept();
+  };
+  page.on('dialog', acceptReplacement);
+  try {
+    await animationFileAction(page, '#animation-import-file', (control) =>
+      control.setInputFiles({ name: 'walk.json', mimeType: 'application/json', buffer: Buffer.from(aligned) }),
+    );
+  } finally {
+    page.off('dialog', acceptReplacement);
+  }
+  expect(await exported(page)).toBe(aligned);
+  await expect(y).toHaveValue(draggedY);
   expect(errors).toEqual([]);
 });

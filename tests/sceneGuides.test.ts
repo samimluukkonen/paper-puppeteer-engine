@@ -7,13 +7,14 @@ import { sceneGuideHost } from '../src/devtools/shared/guides/sceneGuideHost.js'
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {
   const document = new SceneEditorDocument();
   const launcher = new GuideLauncher(sceneGuideHost(document));
-  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 8);
+  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 9);
   assert.deepEqual(launcher.getAvailability('scene-creating'), { available: true });
   assert.isFalse(launcher.getAvailability('scene-adding-actor').available);
   assert.equal(launcher.getPrerequisiteGuide('scene-adding-actor')?.id, 'scene-creating');
   assert.isTrue(document.createScene({ id: 'tour' }));
   launcher.refresh();
   assert.isTrue(launcher.getAvailability('scene-adding-actor').available);
+  assert.isTrue(launcher.getAvailability('scene-ground-reference').available);
   assert.isFalse(launcher.getAvailability('scene-positioning').available);
   document.addActor('../characters/demo/character.json');
   launcher.refresh();
@@ -24,6 +25,7 @@ test('scene tours gate missing documents and selections, and explain tours prese
   const original = document.workingScene;
   const json = document.exportJson();
   const history = [document.canUndo, document.canRedo];
+  const ground = document.groundGuide.getSnapshot();
   for (const guide of guideRegistry.getGuidesForEditor('scene')) {
     assert.isTrue(launcher.launch(guide.id).ok);
     for (let i = 1; i < guide.steps.length; i++) assert.isTrue(launcher.controller.next().ok);
@@ -33,6 +35,7 @@ test('scene tours gate missing documents and selections, and explain tours prese
   assert.strictEqual(document.workingScene, original);
   assert.equal(document.exportJson(), json);
   assert.deepEqual([document.canUndo, document.canRedo], history);
+  assert.strictEqual(document.groundGuide.getSnapshot(), ground);
   assert.isFalse(launcher.getAvailability('rig-new-character').available);
   assert.isFalse(launcher.launch('rig-new-character').ok);
 });

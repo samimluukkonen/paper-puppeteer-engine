@@ -30,6 +30,44 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 export const sceneGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-ground-reference',
+    'Aligning Actors to Ground',
+    'Use a scene-world reference and explicitly align Actor origins through scene Undo/Redo.',
+    scene,
+    [
+      step(
+        'enable',
+        'Enable the ground guide',
+        T.sceneGroundVisible,
+        'After exiting this tour, enable Show ground guide in Scene ground. It is a visual reference, not a physics floor. Showing or moving it does not change Actors, movement paths or scene history.',
+      ),
+      step(
+        'position',
+        'Adjust scene Ground Y',
+        T.sceneGroundY,
+        'Enter Ground Y and press Enter, or drag the amber ↕ Ground label on the stage. Values are scene-world coordinates, independent of Animation Editor preview Y. Negative coordinates are supported. Guide Undo/Redo restores preferences only.',
+      ),
+      step(
+        'select',
+        'Select an Actor',
+        T.sceneActors,
+        'Choose an Actor in the list. Different rigs and artwork sizes can have different origins. Stop playback before editing initial placement. This tour does not select an Actor for you.',
+      ),
+      step(
+        'snap',
+        'Snap the Actor origin to ground',
+        T.sceneGroundAlign,
+        'Use Align Actor Origin to Ground to set the selected Actor’s initial Y while preserving X. Rigs have no shared foot-contact marker: this aligns the origin, not the feet. Scene Undo/Redo restores the edit. Optional Snap to Ground constrains placement drags; hold Shift to move freely.',
+      ),
+      step(
+        'preview',
+        'Preview scene movement',
+        T.scenePlayback,
+        'Play and scrub to inspect movement against the fixed reference. Authored paths may leave the line; no snapping runs during playback. Stop restores initial placement. Export preserves Actor edits; guide preferences stay in this browser by scene ID. Hide or Reset Ground Y in Scene ground when finished.',
+      ),
+    ],
+  ),
+  guide(
     'scene-creating',
     'Creating a Scene',
     'Create an independent scene document with a finite timeline.',
