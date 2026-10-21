@@ -1,4 +1,4 @@
-# Foot contact markers (v0.9.8.3)
+# Foot contact markers (v0.9.8.4)
 
 [All guides](../README.md#guides)
 
@@ -70,7 +70,7 @@ Canvas picking uses a fixed pixel radius. Each pointer position first passes thr
 
 `RigEditorState` owns the authoritative marker collection, selection and bounded snapshot history. The React `AttachmentController` adapts creation, selection, updates and deletion; `FootContactMarkersPanel` owns only unfinished field text. `RigEditorInputController` groups drag updates with `beginOperation`/`endOperation` and cancels with `cancelOperation`. `RigEditorOverlay` owns drawing, picking and destruction. The numeric input component is shared with the existing IK panel.
 
-Marker deletion inspects live `RigEditorStateOptions.footContactReferences(id)` dependencies before changing data. Import, reset and history restoration enforce the same rule; referenced IDs cannot silently disappear or be reused. Hosts can supply Scene Editor grounding selections through that hook when such selections exist. The current scene format uses attachment ground contacts and stores no foot-marker IDs. Resolve dependencies before deleting a referenced marker. Bone deletion/renaming retains the existing marker dependency guards.
+Marker deletion inspects live `RigEditorStateOptions.footContactReferences(id)` dependencies before changing data. Import, reset and history restoration enforce the same rule; referenced IDs cannot silently disappear or be reused. Hosts can supply Scene Editor grounding selections through that hook when such selections exist. Scene Editor selects evaluated rig markers in temporary view state; scene format v2 stores no foot-marker IDs. Importing or switching scenes requires a fresh selection. Resolve dependencies before deleting a referenced marker. Bone deletion/renaming retains the existing marker dependency guards.
 
 ## Verification
 
@@ -79,3 +79,5 @@ Marker deletion inspects live `RigEditorStateOptions.footContactReferences(id)` 
 `tests/browser/footContactMarkers.spec.ts` exercises the desktop React/Phaser workflow locally: create two feet contacts, edit numbers/names, drag, cancel, switch facing, rotate a bone, undo/redo, change a referenced bone, delete, show the ground reference and export/reload. Browser checks remain local-only.
 
 Relevant implementation files are `FootContactMarkersPanel.tsx`, `AttachmentController.ts`, `RigEditorState.ts`, `RigEditorInputController.ts`, `RigEditorOverlay.ts`, `RigWorkspaceController.ts`, `ControlsController.ts`, `editorMarkup.tsx`, and shared `InspectorNumberField.tsx`. Engine marker data and public runtime APIs are unchanged from v0.9.8.1.
+
+See the [v0.9.8 production readiness report](foot-contact-readiness.md) for the transform/reference audit, artwork realignment limits, guides and package regressions.

@@ -32,22 +32,21 @@ export function SceneGroundPanel({
         />
         Show selected Actor contacts
       </label>
-      {document.selectedActorGroundContacts.length > 0 && (
-        <label>
-          Actor foot contact marker
-          <select
-            value={document.selectedFootContactId}
-            onChange={(event) => document.selectFootContact(event.target.value)}
-          >
-            <option value="">Choose a contact</option>
-            {document.selectedActorGroundContacts.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contact.name} ({contact.id})
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+      <label data-guide-id={GUIDE_TARGETS.sceneContactMarker}>
+        Actor foot contact marker
+        <select
+          disabled={!document.selectedActorGroundContacts.length}
+          value={document.selectedFootContactId}
+          onChange={(event) => document.selectFootContact(event.target.value)}
+        >
+          <option value="">Choose a contact</option>
+          {document.selectedActorGroundContacts.map((contact) => (
+            <option key={contact.id} value={contact.id}>
+              {contact.name} ({contact.id})
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.sceneGroundAlign}

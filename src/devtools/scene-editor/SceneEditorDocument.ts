@@ -43,6 +43,7 @@ export class SceneEditorDocument {
   private groundOffsets: ReadonlyMap<string, number> = new Map();
   private groundContacts: ReadonlyMap<string, readonly ActorGroundContact[]> = new Map();
   private readonly selectedContacts = new Map<string, string>();
+  private groundCharacters = new Map<string, string>();
   private groundPreviewing = false;
   showFootContacts = false;
   private readonly listeners = new Set<() => void>();
@@ -129,6 +130,18 @@ export class SceneEditorDocument {
     return false;
   }
   private success(): true {
+    // Ground selections and measurements belong to a particular Actor/character instance.
+    // Discard removed IDs before they can be reused by a different Actor.
+    const actors = new Map(this.workingScene?.actors.map((actor) => [actor.id, actor.character.manifest]));
+    const invalidated = new Set(
+      [...this.groundCharacters].filter(([id, manifest]) => actors.get(id) !== manifest).map(([id]) => id),
+    );
+    for (const id of invalidated) this.selectedContacts.delete(id);
+    if (invalidated.size) {
+      this.groundContacts = new Map([...this.groundContacts].filter(([id]) => !invalidated.has(id)));
+      this.groundOffsets = new Map([...this.groundOffsets].filter(([id]) => !invalidated.has(id)));
+    }
+    this.groundCharacters = actors;
     this.issues = [];
     this.notify();
     return true;

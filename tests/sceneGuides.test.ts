@@ -7,7 +7,7 @@ import { sceneGuideHost } from '../src/devtools/shared/guides/sceneGuideHost.js'
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {
   const document = new SceneEditorDocument();
   const launcher = new GuideLauncher(sceneGuideHost(document));
-  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 9);
+  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 10);
   assert.deepEqual(launcher.getAvailability('scene-creating'), { available: true });
   assert.isFalse(launcher.getAvailability('scene-adding-actor').available);
   assert.equal(launcher.getPrerequisiteGuide('scene-adding-actor')?.id, 'scene-creating');

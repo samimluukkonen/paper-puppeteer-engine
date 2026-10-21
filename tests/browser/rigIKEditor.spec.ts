@@ -36,7 +36,7 @@ test('create, drag, cancel, configure and reload a visual rig IK constraint thro
   const projection = await rigCanvasProjection(page);
   const point = (x: number, y: number) =>
     projection.point(projection.head.x - localHead.x + x, projection.head.y - localHead.y + y);
-  const panel = await inspectorControl(page, '#rig-inspector .rig-ik-panel section');
+  const panel = await inspectorControl(page, '#rig-inspector section[aria-label="IK constraints"]');
   await panel.getByRole('button', { name: '+ Add IK Constraint', exact: true }).click();
   const form = panel.getByRole('form', { name: 'Create IK constraint' });
   await expect(form.getByRole('button', { name: 'Create IK Constraint', exact: true })).toBeDisabled();
@@ -135,7 +135,7 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
     )
     .toBeGreaterThanOrEqual(16);
   await page.screenshot({ path: test.info().outputPath('collapsed-inspector.png') });
-  const panel = await inspectorControl(page, '#rig-inspector .rig-ik-panel section');
+  const panel = await inspectorControl(page, '#rig-inspector section[aria-label="IK constraints"]');
   await expect(panel).toContainText('No IK constraints');
   await panel.getByRole('button', { name: '+ Add IK Constraint', exact: true }).click();
   await expect(panel).toContainText('Add a chain of three connected bones before creating IK.');
@@ -195,7 +195,7 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   const animationHistory = page.locator('#animation-undo');
   await expect(animationHistory).toBeEnabled();
   await page.locator('#editor-mode').selectOption('rig-tweak');
-  const tweakIK = await inspectorControl(page, '#animation-inspector .rig-ik-panel section');
+  const tweakIK = await inspectorControl(page, '#animation-inspector section[aria-label="IK constraints"]');
   await tweakIK.getByRole('button', { name: 'tentacleIK', exact: true }).click();
   await expect(tweakIK).toContainText('animation "reach" IK track');
   await expect(tweakIK.getByRole('button', { name: 'Delete Constraint', exact: true })).toBeDisabled();

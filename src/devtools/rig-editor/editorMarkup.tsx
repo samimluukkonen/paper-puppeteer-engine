@@ -169,7 +169,7 @@ export function RigEditorView({
           {attachments && <RigIKPanel controller={attachments} />}
           {attachments && <FootContactMarkersPanel controller={attachments} />}
           {groundGuide && (
-            <GroundGuideControls workspace={groundGuide} guideAnchors={false}>
+            <GroundGuideControls workspace={groundGuide} guideAnchors="rig">
               <p className="workspace-caption">
                 Drag ↕ Ground in the preview to move the line. Escape cancels. Ground history is separate from rig
                 edits.

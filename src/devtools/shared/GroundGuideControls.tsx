@@ -12,8 +12,8 @@ export function GroundGuideControls({
 }: {
   workspace: GroundGuideWorkspace;
   showSnapping?: boolean;
-  /** The character workspace mounts a second, rig-only copy without animation tour anchors. */
-  guideAnchors?: boolean;
+  /** The character workspace mounts a second copy with independent rig tour anchors. */
+  guideAnchors?: boolean | 'rig';
   children?: ReactNode;
 }) {
   const { workspaceId, guide, persistenceMessage, canUndo, canRedo, dragging } = useSyncExternalStore(
@@ -38,7 +38,13 @@ export function GroundGuideControls({
         <label
           className="ground-guide-toggle"
           data-guide-id={
-            guideAnchors ? (scene ? GUIDE_TARGETS.sceneGroundVisible : GUIDE_TARGETS.animationGroundVisible) : undefined
+            guideAnchors === 'rig'
+              ? GUIDE_TARGETS.rigGroundVisible
+              : guideAnchors
+                ? scene
+                  ? GUIDE_TARGETS.sceneGroundVisible
+                  : GUIDE_TARGETS.animationGroundVisible
+                : undefined
           }
           title="Show or hide the visual reference. This is not a physics floor."
         >
@@ -51,7 +57,13 @@ export function GroundGuideControls({
         </label>
         <label
           data-guide-id={
-            guideAnchors ? (scene ? GUIDE_TARGETS.sceneGroundY : GUIDE_TARGETS.animationGroundY) : undefined
+            guideAnchors === 'rig'
+              ? GUIDE_TARGETS.rigGroundY
+              : guideAnchors
+                ? scene
+                  ? GUIDE_TARGETS.sceneGroundY
+                  : GUIDE_TARGETS.animationGroundY
+                : undefined
           }
         >
           Ground Y
@@ -78,7 +90,13 @@ export function GroundGuideControls({
         <button
           type="button"
           data-guide-id={
-            guideAnchors ? (scene ? GUIDE_TARGETS.sceneGroundReset : GUIDE_TARGETS.animationGroundReset) : undefined
+            guideAnchors === 'rig'
+              ? GUIDE_TARGETS.rigGroundReset
+              : guideAnchors
+                ? scene
+                  ? GUIDE_TARGETS.sceneGroundReset
+                  : GUIDE_TARGETS.animationGroundReset
+                : undefined
           }
           title="Restore the guide's default Y without moving the character or Actors."
           onClick={() => workspace.resetY()}

@@ -2,10 +2,11 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-The catalog contains fourteen selectable tasks with 65 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+The catalog contains fifteen selectable tasks with 70 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
 
 | Guide                      | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | -------------------------- | ----: | ------------------------------------------------------------------------ |
+| Aligning Feet to Ground    |     5 | Selected clip; explains missing markers and optional existing foot IK    |
 | Using Ground Reference     |     5 | None; IK alignment is optional and explained through its actual control  |
 | Create a New Animation     |     5 | None; no JSON or existing clip required                                  |
 | Create Your First Keyframe |     5 | Selected clip, including an empty clip                                   |
@@ -21,7 +22,7 @@ The catalog contains fourteen selectable tasks with 65 steps. Open **Feature Gui
 | Rig-Tweak Mode             |     4 | None; explains entering the mode without entering it for the artist      |
 | Exporting Animations       |     4 | Selected clip                                                            |
 
-IK tasks use the `ik` registry category; the other twelve use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
+IK tasks use the `ik` registry category; the other thirteen use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
 
 ## Target contract
 

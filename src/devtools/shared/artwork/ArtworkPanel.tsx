@@ -161,6 +161,10 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
             }}
           />
         </label>
+        <p className="workspace-caption">
+          Foot contact markers stay attached to their bones after artwork replacement or skin switching. If the new sole
+          position differs, manually realign the markers in the Rig Editor.
+        </p>
         <div className="artwork-actions">
           <button
             type="button"

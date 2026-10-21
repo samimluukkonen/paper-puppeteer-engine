@@ -614,4 +614,44 @@ export const animationGuides: readonly GuideDefinition[] = [
       ),
     ],
   },
+  {
+    id: 'animation-foot-contact-ground',
+    title: 'Aligning Feet to Ground',
+    description: 'Inspect evaluated contacts and explicitly commit a supported IK correction.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'ground',
+        'Enable the ground guide',
+        'After exiting this tour, enable Show ground guide and set Ground Y in preview-world coordinates. Guide settings are browser preferences, independent of the clip.',
+        targets.animationGroundVisible,
+      ),
+      step(
+        'show',
+        'Show contact markers',
+        'Enable Show foot contact markers. They follow the final pose after IK through playback, scrubbing, root motion and facing. Positive distance is below ground; negative is above. Create missing contacts in the Rig Editor.',
+        targets.animationContactsVisible,
+      ),
+      step(
+        'select',
+        'Select a contact and IK constraint',
+        'Choose a Foot contact marker and confirm its existing Foot IK constraint. Without an applicable constraint, use manual posing. Disabled IK, unsupported chain scales or externally owned targets cannot provide a correction.',
+        targets.animationContactSelection,
+      ),
+      step(
+        'preview',
+        'Preview the correction',
+        'Choose Align Selected Foot Contact to Ground. A tinted pose previews the result without changing keys. Review the residual and tolerance (default 0.5 world units). Unreachable or limited results cannot be applied. Changing time, facing, clip or ground discards the proposal.',
+        targets.animationContactPreview,
+      ),
+      step(
+        'commit',
+        'Commit and Undo',
+        'Apply IK target keys explicitly writes X/Y at the playhead as one animation Undo/Redo edit. Existing bone keys stay intact. Cancel alignment preview discards the proposal. Rig Tweak owns rig edits separately and does not author contact animation tracks.',
+        targets.animationContactApply,
+      ),
+    ],
+  },
 ];

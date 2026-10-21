@@ -550,3 +550,91 @@ test('animation marker controls start collapsed and support all arbitrary contac
     f.dispose();
   }
 });
+
+test('contact diagnostics throttle playback renders, flush the final sample and stay idle while hidden', () => {
+  const f = animationFixture();
+  const notify = vi.fn();
+  const release = f.contacts.subscribe(notify);
+  try {
+    f.contacts.setVisible(false);
+    f.contacts.sync(f.puppet, undefined, 0);
+    notify.mockClear();
+    for (let frame = 1; frame <= 60; frame++) {
+      f.state.setCurrentTime(frame / 100);
+      f.contacts.sync(f.puppet, undefined, frame * 16);
+    }
+    assert.equal(notify.mock.calls.length, 0, 'hidden controls do not publish every playhead change');
+    f.contacts.setVisible(true);
+    notify.mockClear();
+    for (let frame = 1; frame <= 60; frame++) {
+      f.state.setCurrentTime(frame / 100);
+      f.contacts.sync(f.puppet, undefined, 1000 + frame * 16);
+      assert.deepEqual(f.contacts.contacts, evaluatedFootContacts(f.puppet), 'canvas always gets the current pose');
+    }
+    assert.isAtMost(notify.mock.calls.length, 10);
+    const notifications = notify.mock.calls.length;
+    f.contacts.sync(f.puppet, undefined, 2100);
+    assert.equal(notify.mock.calls.length, notifications + 1, 'final pending text sample is published');
+    f.contacts.sync(f.puppet, undefined, 2200);
+    assert.equal(notify.mock.calls.length, notifications + 1, 'unchanged contacts stay idle');
+    f.contacts.unbind();
+    notify.mockClear();
+    f.state.setCurrentTime(0.8);
+    f.guide.update({ y: -200 });
+    assert.equal(notify.mock.calls.length, 0, 'unbind releases both document and guide listeners');
+    assert.isEmpty(f.contacts.contacts);
+    assert.isNull(f.contacts.plan);
+  } finally {
+    release();
+    f.dispose();
+  }
+});
+
+test('scene contact selections reset on import and cannot silently use another marker', () => {
+  const f = sceneFixture();
+  try {
+    f.document.selectActor('a');
+    f.document.selectFootContact('sole');
+    const json = f.document.exportJson();
+    assert.notInclude(json, 'sole', 'grounding selections are view state, not persisted marker references');
+    f.document.importJson(json);
+    f.sync();
+    f.document.selectActor('a');
+    assert.equal(f.document.selectedFootContactId, '');
+    assert.isFalse(f.document.alignSelectedActorFeetToGround());
+    f.document.selectFootContact('sole');
+    f.document.setActorGroundContacts(new Map([['a', [{ id: 'different', name: 'Other', offset: 50 }]]]));
+    const source = f.document.workingScene;
+    assert.isFalse(f.document.alignSelectedActorFeetToGround());
+    assert.strictEqual(f.document.workingScene, source);
+    f.document.selectFootContact('');
+    assert.isFalse(f.document.canAlignSelectedActorFeetToGround);
+  } finally {
+    f.preview.dispose();
+  }
+});
+
+test('Actor removal, ID reuse and character replacement discard stale contact selections and measurements', () => {
+  const f = sceneFixture();
+  try {
+    f.document.selectActor('b');
+    f.document.selectFootContact('sole');
+    f.document.removeActor('b');
+    f.document.undo();
+    f.document.selectActor('b');
+    assert.equal(f.document.selectedFootContactId, '');
+    assert.isFalse(f.document.canAlignSelectedActorFeetToGround);
+    f.sync();
+    f.document.selectFootContact('sole');
+    f.document.updateActor('b', { character: { manifest: 'a/character.json' } });
+    assert.equal(f.document.selectedFootContactId, '');
+    assert.isFalse(f.document.canAlignSelectedActorFeetToGround);
+    f.sync();
+    f.document.selectFootContact('sole');
+    f.document.undo();
+    assert.equal(f.document.selectedFootContactId, '');
+    assert.isFalse(f.document.canAlignSelectedActorFeetToGround);
+  } finally {
+    f.preview.dispose();
+  }
+});

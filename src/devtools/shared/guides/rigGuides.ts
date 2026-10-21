@@ -386,4 +386,44 @@ export const rigGuides: readonly GuideDefinition[] = [
       ),
     ],
   },
+  {
+    id: 'rig-foot-contact-markers',
+    title: 'Creating Foot Contact Markers',
+    description: 'Author bone-local sole points and keep them with the rig.',
+    editor: 'rig',
+    category: 'rigging',
+    prerequisites: validRig,
+    steps: [
+      step(
+        'bone',
+        'Select a foot bone',
+        'After exiting this tour, select a foot in Hierarchy or choose New contact bone. Any bone can own a contact, including non-humanoid rigs.',
+        targets.rigContactBone,
+      ),
+      step(
+        'create',
+        'Create a contact marker',
+        'Choose + Add Contact Marker. The generated ID stays stable; changing the display name preserves ID references. Repeat for the other foot.',
+        targets.rigContactCreate,
+      ),
+      step(
+        'position',
+        'Position the sole point',
+        'Drag its square crosshair on the canvas, or select the marker and enter Local X/Y. Coordinates belong to the bone, independent of sprite pixels. Escape cancels a drag; rig Undo/Redo restores edits.',
+        targets.rigContactPosition,
+      ),
+      step(
+        'ground',
+        'Align with a ground reference',
+        'Enable Show ground guide and adjust Ground Y. Visually position the marker at the sole against this reference. The guide never moves the rig. Replacing artwork or switching skins can require manual realignment when sole proportions change.',
+        targets.rigGroundVisible,
+      ),
+      step(
+        'save',
+        'Save and reload the rig',
+        'Download rig.json preserves marker definitions. Download character ZIP also includes artwork, skins and animations. Reload Current Export checks rig persistence. Marker edits belong to rig history, including in Rig Tweak; they never create animation tracks.',
+        targets.rigDownload,
+      ),
+    ],
+  },
 ];

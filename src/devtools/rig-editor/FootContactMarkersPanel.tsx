@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { FootContactMarker } from '../../engine/types.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField } from '../shared/InspectorNumberField.js';
 import type { AttachmentController } from './AttachmentController.js';
 import './attachments.css';
@@ -80,20 +81,30 @@ export function FootContactMarkersPanel({ controller }: { controller: Attachment
             </button>
           ))}
         </div>
-        <label>
+        <label data-guide-id={GUIDE_TARGETS.rigContactBone}>
           New contact bone
           <select aria-label="New contact bone" value={boneId} onChange={(event) => setNewBone(event.target.value)}>
             {boneOptions}
           </select>
         </label>
-        <button type="button" onClick={() => controller.createFootContactMarker(boneId)}>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.rigContactCreate}
+          onClick={() => controller.createFootContactMarker(boneId)}
+        >
           + Add Contact Marker
         </button>
-        <p>Drag the square crosshair to the contact point. Coordinates are local to its bone. Escape cancels a drag.</p>
+        <p data-guide-id={GUIDE_TARGETS.rigContactPosition}>
+          Drag the square crosshair to the contact point. Coordinates are local to its bone. Escape cancels a drag.
+        </p>
+        <p>
+          Artwork replacement and skin switching retain these bone-local points. If the sole position changes, manually
+          realign the markers for the new proportions.
+        </p>
         {selected && (
           <fieldset key={selected.id}>
             <legend>Selected: {selected.name}</legend>
-            <small>ID: {selected.id}</small>
+            <small>ID: {selected.id} (stable). Changing the name preserves references to this ID.</small>
             <MarkerName marker={selected} controller={controller} />
             <label>
               Bone

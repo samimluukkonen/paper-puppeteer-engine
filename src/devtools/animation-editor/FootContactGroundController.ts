@@ -24,6 +24,9 @@ export class FootContactGroundController {
   private readonly listeners = new Set<() => void>();
   private revision = 0;
   private context: readonly unknown[] = [];
+  private presentation: readonly unknown[] = [];
+  private lastContactNotification = -Infinity;
+  private pendingContactNotification = false;
   visible = false;
   markerId = '';
   constraintId = '';
@@ -56,6 +59,9 @@ export class FootContactGroundController {
     this.runtime = [];
     this.guide = undefined;
     this.context = [];
+    this.presentation = [];
+    this.lastContactNotification = -Infinity;
+    this.pendingContactNotification = false;
     this.contacts = [];
     this.markerId = '';
     this.constraintId = '';
@@ -67,6 +73,7 @@ export class FootContactGroundController {
   sync(
     puppet: Puppet,
     runtime: readonly TwoBoneIKConstraint[] = (puppet.rig.ik ?? []).map((entry) => puppet.getIK(entry.name)),
+    now = performance.now(),
   ): void {
     this.puppet = puppet;
     this.runtime = runtime;
@@ -74,6 +81,13 @@ export class FootContactGroundController {
     const contacts = this.visible ? evaluatedFootContacts(puppet, this.state?.rig) : [];
     if (JSON.stringify(contacts) !== JSON.stringify(this.contacts)) {
       this.contacts = contacts;
+      this.pendingContactNotification = true;
+    }
+    // Flush the final sample even when playback stops before the next notification interval.
+    // Canvas reads current contacts each frame; text diagnostics need at most ten updates/second.
+    if (this.pendingContactNotification && now - this.lastContactNotification >= 100) {
+      this.lastContactNotification = now;
+      this.pendingContactNotification = false;
       this.notify();
     }
   }
@@ -115,11 +129,29 @@ export class FootContactGroundController {
     if (context.length === this.context.length && context.every((value, index) => value === this.context[index]))
       return;
     this.context = context;
+    const discardedProposal = !!this.plan || !!this.feedback;
     this.plan = null;
     this.feedback = '';
     if (!this.markers.some((entry) => entry.id === this.markerId)) this.markerId = '';
     if (!this.constraints.some((entry) => entry.name === this.constraintId)) this.constraintId = '';
-    this.notify();
+    // Time and matrix changes invalidate proposals, but do not render hidden controls every frame.
+    const presentation = [
+      state?.rig,
+      state?.workingAnimation,
+      state?.editorMode,
+      state?.isPlaying,
+      this.disabledReason,
+      this.markerId,
+      this.constraintId,
+    ];
+    if (
+      discardedProposal ||
+      presentation.length !== this.presentation.length ||
+      presentation.some((value, index) => value !== this.presentation[index])
+    ) {
+      this.presentation = presentation;
+      this.notify();
+    }
   }
   get markers() {
     return this.state?.rig?.footContactMarkers ?? [];
@@ -141,6 +173,9 @@ export class FootContactGroundController {
   }
   setVisible(visible: boolean): void {
     this.visible = visible;
+    if (!visible) this.contacts = [];
+    this.lastContactNotification = -Infinity;
+    this.pendingContactNotification = false;
     this.notify();
   }
   setTolerance(value: number): void {

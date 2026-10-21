@@ -30,6 +30,44 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 export const sceneGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-grounding-characters',
+    'Grounding Characters',
+    'Snap independent Actors using their evaluated bone-local contacts.',
+    scene,
+    [
+      step(
+        'ground',
+        'Enable the ground reference',
+        T.sceneGroundVisible,
+        'After exiting this tour, enable Show ground guide and set scene Ground Y. The guide never changes placement or choreography automatically.',
+      ),
+      step(
+        'actor',
+        'Select an Actor',
+        T.sceneActors,
+        'Add a character if the scene is empty, then select its Actor. Stop playback before editing initial placement. Each character has its own proportions, facing and contacts.',
+      ),
+      step(
+        'marker',
+        'Select a foot marker',
+        T.sceneContactMarker,
+        'Choose Actor foot contact marker. The list uses that character’s rig definitions. A missing or invalid contact requires manual placement; rigs without markers can use the labeled legacy attachment sole fallback. Marker selections are temporary view state and must be chosen again after reopening a scene.',
+      ),
+      step(
+        'snap',
+        'Snap the Actor',
+        T.sceneGroundAlign,
+        'Snap Actor to Ground changes only initial Actor Y using the selected evaluated marker, including facing and scale. X and movement paths stay intact. Scene Undo/Redo restores the edit. Select and snap other Actors independently.',
+      ),
+      step(
+        'preview',
+        'Preview the scene',
+        T.scenePlayback,
+        'Play or scrub to inspect the contacts through animation and movement. Grounding sets initial placement only; it does not lock feet or compensate sliding. Stop restores placement editing. Export scene JSON or a scene package to keep the authored positions.',
+      ),
+    ],
+  ),
+  guide(
     'scene-ground-reference',
     'Aligning Actors to Ground',
     'Use a scene-world reference and explicitly align Actor feet through scene Undo/Redo.',

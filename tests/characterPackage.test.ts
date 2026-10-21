@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, assert, expect, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
+import { evaluatedFootContacts } from '../src/devtools/shared/footContactGround.js';
 import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import {
   buildCharacterPackage,
@@ -929,6 +930,15 @@ test('runtime preview leases revoke every object URL on disposal and cancellatio
 });
 
 test('all shipped animations, IK and baked IK round-trip through ZIP → CharacterLoader → Puppet in both facings', async () => {
+  const markers = ['leftFoot', 'rightFoot'].map((boneId) => ({
+    id: `${boneId}-sole`,
+    name: boneId,
+    boneId,
+    localX: 8,
+    localY: 12,
+  }));
+  const rigFile = { ...structuredClone(demoCharacter.rigFile!), footContactMarkers: markers };
+  const rig = new Rig(rigFile, demoCharacter.standaloneSkins);
   const fetcher: typeof fetch = (input) => {
     const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     return Promise.resolve(
@@ -967,7 +977,7 @@ test('all shipped animations, IK and baked IK round-trip through ZIP → Charact
   const files = await buildCharacterPackage(
     {
       definition: demoCharacter,
-      rig: structuredClone(demoCharacter.rigFile!),
+      rig: rigFile,
       skins: demoCharacter.standaloneSkins,
       animations,
       replacements: [],
@@ -976,8 +986,9 @@ test('all shipped animations, IK and baked IK round-trip through ZIP → Charact
   );
   const definition = await loadPackageDefinition(decodePackageZip(encodePackageZip(files)));
   assert.deepEqual(definition.animations, animations);
+  assert.deepEqual(definition.rig.footContactMarkers, markers);
   for (const facing of ['left', 'right'] as const) {
-    const original = new Puppet(puppetScene(), { rig: demoCharacter.rig, animations, autoUpdate: false, facing });
+    const original = new Puppet(puppetScene(), { rig, animations, autoUpdate: false, facing });
     const reloaded = new Puppet(puppetScene(), { definition, autoUpdate: false, facing });
     for (const clip of animations) {
       original.play(clip.name);
@@ -987,6 +998,7 @@ test('all shipped animations, IK and baked IK round-trip through ZIP → Charact
         reloaded.animationPlayer.sample(time);
         original.syncPose();
         reloaded.syncPose();
+        assert.deepEqual(evaluatedFootContacts(reloaded), evaluatedFootContacts(original));
         for (const bone of definition.rig.bones) {
           assert.deepEqual(reloaded.getBone(bone.id).pose, original.getBone(bone.id).pose);
           assert.deepEqual(

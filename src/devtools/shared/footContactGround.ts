@@ -16,6 +16,7 @@ export function contactGroundDistance(point: Point, groundY: number, tolerance =
 
 /** Read the final synchronized pose, after FK, pose overrides and all IK passes. */
 export function evaluatedFootContacts(puppet: Pick<Puppet, 'rig' | 'getBone' | 'container'>, rig: Rig = puppet.rig) {
+  if (!rig.footContactMarkers?.length) return [];
   const pose = new Map(rig.bones.map(({ id }) => [id, puppet.getBone(id).pose]));
   const matrix = puppet.container.getWorldTransformMatrix();
   return (rig.footContactMarkers ?? []).flatMap((marker) => {

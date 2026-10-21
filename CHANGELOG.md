@@ -13,6 +13,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.8-4
+
+Harden the [foot contact workflow](docs/foot-contact-readiness.md) across all three editors. Add Creating Foot Contact Markers, Aligning Feet to Ground and Grounding Characters through the existing Feature Guide and stable control anchors. Explain manual marker realignment after artwork/skin proportion changes and stable marker IDs. Keep hidden diagnostic controls idle, limit live text updates to ten per second while preserving frame-current canvas positions, and clear stale Actor contact selections/measurements after removal, character replacement and history transitions. Extend package, artwork, mirroring, IK, baked IK, lifecycle and local desktop artist-workflow regressions. Preserve existing authored formats, animation tracks and document ownership; record the coordinate/reference audit and actual verification limits.
+
 ## 0.9.8-3
 
 Integrate rig foot contacts with Animation Editor and Scene Editor grounding. Add optional post-FK/IK marker overlays, explicit contact/constraint selection, signed ground distances and configurable tolerance. Preview contact IK alignment on detached solver joints and a tinted overlay, then explicitly apply verified X/Y target keys as one animation Undo/Redo edit. Report limited/clamped results with residual error and reject stale proposals or external IK ownership. Scene grounding and opt-in placement snapping use the chosen evaluated rig contact, including facing and scale, and author only initial Actor Y; retain the labeled legacy attachment-contact fallback for rigs without markers. Contacts follow scene playback/scrubbing without constraining choreography. Add unit/integration and local desktop browser regressions, plus [workflow and transform documentation](docs/foot-contact-ground-integration.md). Milestone `0.9.8.3` uses SemVer heading `0.9.8-3`.

@@ -17,9 +17,10 @@ const counts = {
   'rig-skins': 5,
   'rig-ik-constraints': 6,
   'rig-exporting': 4,
+  'rig-foot-contact-markers': 5,
 };
 
-test('Rig Editor catalog covers the nine implemented tasks with bounded steps and declared targets', () => {
+test('Rig Editor catalog covers the ten implemented tasks with bounded steps and declared targets', () => {
   assert.deepEqual(Object.fromEntries(guides.map((guide) => [guide.id, guide.steps.length])), counts);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {

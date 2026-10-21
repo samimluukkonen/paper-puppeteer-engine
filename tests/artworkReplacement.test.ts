@@ -13,6 +13,7 @@ import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { ArtworkController } from '../src/devtools/shared/artwork/ArtworkController.js';
 import type { ImportedSprite } from '../src/devtools/shared/artwork/spriteImport.js';
 import { createBoneSymmetryMapping } from '../src/devtools/shared/boneSymmetry.js';
+import { evaluatedFootContacts } from '../src/devtools/shared/footContactGround.js';
 import type { Bone } from '../src/engine/Bone.js';
 import type { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { type AnimationClip, commitIKBake, generateBakedBoneKeys, sampleIKBake } from '../src/engine/core.js';
@@ -903,6 +904,7 @@ test('live catalogs include newly created attachments and skins and revalidate r
 test('idle, walk, attack, IK, baked IK and mirrored motion preserve every sampled joint and animation document', async () => {
   const rig = new Rig({
     root: 'root',
+    footContactMarkers: [{ id: 'contact', name: 'Contact', boneId: 'hand', localX: 3, localY: 5 }],
     bones: [
       { id: 'root', sprite: { texture: 'shared' } },
       { id: 'upper', parent: 'root', x: 10 },
@@ -992,12 +994,14 @@ test('idle, walk, attack, IK, baked IK and mirrored motion preserve every sample
   });
   const before = JSON.stringify(animations);
   const pose = () => rig.bones.map((bone) => ({ ...f.puppet.getBone(bone.id).pose }));
+  const contacts = new Map<string, ReturnType<typeof evaluatedFootContacts>>();
   const expected = new Map<string, ReturnType<typeof pose>>();
   for (const animation of animations)
     for (const time of [0, 0.25, 0.5, 0.999]) {
       state.selectAnimation(animation.name);
       state.setCurrentTime(time);
       expected.set(`${animation.name}:${time}`, pose());
+      contacts.set(`${animation.name}:${time}`, evaluatedFootContacts(f.puppet));
     }
   await replace(f, 'redrawn-forearm.png', 32, 96, 'pixels');
   const textureKey = f.puppet.getBone('forearm').sprite!.texture.key;
@@ -1010,6 +1014,13 @@ test('idle, walk, attack, IK, baked IK and mirrored motion preserve every sample
       for (const time of [0, 0.25, 0.5, 0.999]) {
         state.setCurrentTime(time);
         assert.deepEqual(pose(), expected.get(`${animation.name}:${time}`), `${animation.name} at ${time}`);
+        const right = contacts.get(`${animation.name}:${time}`)![0]!;
+        const left = evaluatedFootContacts(f.puppet)[0]!;
+        assert.closeTo(left.world.x, -right.world.x, 1e-8);
+        assert.closeTo(left.world.y, right.world.y, 1e-8);
+        const beforeSkin = evaluatedFootContacts(f.puppet);
+        f.puppet.setSkin(repeat % 2 ? 'a' : 'b');
+        assert.deepEqual(evaluatedFootContacts(f.puppet), beforeSkin);
         assert.equal(f.puppet.getBone('forearm').sprite!.texture.key, textureKey);
         assert.equal(f.puppet.getSlotImage('arm')!.texture.key, textureKey);
       }
@@ -1023,6 +1034,7 @@ test('idle, walk, attack, IK, baked IK and mirrored motion preserve every sample
   assert.equal(JSON.stringify(animations), before);
   assert.isFalse(state.dirty);
   assert.isFalse(state.canUndo);
+  assert.deepEqual(f.puppet.exportRig().footContactMarkers, rig.footContactMarkers);
   ghosts.setSettings({ enabled: false });
   mirrorOverlay.hide();
   bakeOverlay.hide();

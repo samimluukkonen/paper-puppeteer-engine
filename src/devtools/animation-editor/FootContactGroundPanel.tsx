@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { contactGroundDistance } from '../shared/footContactGround.js';
 import type { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { FootContactGroundController } from './FootContactGroundController.js';
 
 export function FootContactGroundPanel({
@@ -14,7 +15,7 @@ export function FootContactGroundPanel({
   const { guide } = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot, workspace.getSnapshot);
   return (
     <>
-      <label className="ground-guide-toggle">
+      <label className="ground-guide-toggle" data-guide-id={GUIDE_TARGETS.animationContactsVisible}>
         <input
           type="checkbox"
           checked={controller.visible}
@@ -22,7 +23,7 @@ export function FootContactGroundPanel({
         />
         Show foot contact markers
       </label>
-      <label>
+      <label data-guide-id={GUIDE_TARGETS.animationContactSelection}>
         Foot contact marker
         <select value={controller.markerId} onChange={(event) => controller.selectMarker(event.target.value)}>
           <option value="">Choose a contact</option>
@@ -66,11 +67,23 @@ export function FootContactGroundPanel({
           })}
         </ul>
       )}
-      <button type="button" disabled={!!controller.disabledReason} onClick={() => controller.preview()}>
+      {!controller.markers.length && (
+        <p>
+          No foot contact markers. Create them in the Rig Editor, then return here. Without foot IK, use manual posing
+          against the guide.
+        </p>
+      )}
+      <button
+        type="button"
+        data-guide-id={GUIDE_TARGETS.animationContactPreview}
+        disabled={!!controller.disabledReason}
+        onClick={() => controller.preview()}
+      >
         Align Selected Foot Contact to Ground
       </button>
       <button
         type="button"
+        data-guide-id={GUIDE_TARGETS.animationContactApply}
         disabled={!controller.plan?.success || !!controller.disabledReason}
         onClick={() => controller.apply()}
       >

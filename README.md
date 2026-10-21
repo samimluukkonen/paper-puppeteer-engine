@@ -49,6 +49,8 @@ The v0.5.4 [mirrored animation tools](docs/mirroring-hardening-verification.md) 
 
 The v0.8 [Actor and choreography layer](docs/choreography-production.md) supports direct movement, walk animation, spatial facing and synchronized sequential/parallel scenes with cancellation and ownership. See the [v0.8 release report](docs/release-notes-v0.8.md) for verification and limitations.
 
+The v0.9.8 [foot contact workflow and readiness report](docs/foot-contact-readiness.md) covers bone-local marker authoring, explicit IK alignment, Actor grounding, exports and compatibility.
+
 ## Quick start
 
 v0.6.3 unifies the [React editor production workflow](docs/react-editor-workflow-verification.md): shared character ownership, retained clip sessions, independent dirty domains and safe editor navigation.

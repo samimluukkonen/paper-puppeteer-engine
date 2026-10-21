@@ -28,6 +28,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
       'rig-skins',
       'rig-ik-constraints',
       'rig-exporting',
+      'rig-foot-contact-markers',
     ],
   );
   assert.deepEqual(
@@ -47,6 +48,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
       'animation-events',
       'animation-rig-tweak',
       'animation-exporting',
+      'animation-foot-contact-ground',
     ],
   );
   const guide = getGuideById('rig-joint-editing')!;
