@@ -1,5 +1,6 @@
 import { Clapperboard, LayoutTemplate, MonitorPlay, Network } from 'lucide-react';
 import packageInfo from '../../package.json';
+import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
 import { characterChoices, selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
@@ -47,6 +48,7 @@ export function ViewHeader({
   selectionId?: string;
 }) {
   const current = views[view];
+  const project = projectEditorContext();
   const root = view === 'demo' ? './' : '../';
   const characterId = selectedCharacterId();
   const choices = view === 'demo' ? characterChoices : workspaceCharacterChoices();
@@ -54,7 +56,19 @@ export function ViewHeader({
   return (
     <header className="view-header">
       <div className="view-header-top">
-        <a className="wordmark" href={`${root}${characterQuery}`} aria-label="Paper Puppeteer Engine">
+        <a
+          className="wordmark"
+          href={project ? `${root}project/` : `${root}${characterQuery}`}
+          aria-label="Paper Puppeteer Engine"
+          onClick={
+            project
+              ? (event) => {
+                  event.preventDefault();
+                  project.navigate('project');
+                }
+              : undefined
+          }
+        >
           <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
           <span className="wordmark-name">
             Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
@@ -76,7 +90,7 @@ export function ViewHeader({
           <p className="view-description" id={view === 'animation' ? 'character-status' : undefined}>
             {current.description}
           </p>
-          {view !== 'scene' && (
+          {view !== 'scene' && !project && (
             <label className="character-choice">
               Character
               <select
@@ -95,7 +109,7 @@ export function ViewHeader({
               </select>
             </label>
           )}
-          {view !== 'scene' && (
+          {view !== 'scene' && !project && (
             <NewCharacterDialog
               root={root}
               guideTargetId={view === 'rig' ? GUIDE_TARGETS.rigNewCharacter : undefined}
@@ -106,12 +120,27 @@ export function ViewHeader({
           <FeatureGuideButton />
         </div>
         <nav className="view-navigation" aria-label="Views">
-          {Object.entries(views).map(([id, item]) => (
-            <a key={id} href={`${root}${item.path}${characterQuery}`} aria-current={id === view ? 'page' : undefined}>
-              <item.icon size={16} aria-hidden="true" />
-              {item.title}
+          {project ? (
+            <button type="button" onClick={() => project.navigate('project')}>
+              ← Project
+            </button>
+          ) : (
+            <a href={`${root}project/`} aria-label="Project Workspace">
+              Project
             </a>
-          ))}
+          )}
+          {Object.entries(views)
+            .filter(([id]) => !project || (view !== 'scene' && (id === 'rig' || id === 'animation')))
+            .map(([id, item]) => (
+              <a
+                key={id}
+                href={`${root}${item.path}${project ? window.location.search : characterQuery}`}
+                aria-current={id === view ? 'page' : undefined}
+              >
+                <item.icon size={16} aria-hidden="true" />
+                {item.title}
+              </a>
+            ))}
         </nav>
       </div>
     </header>

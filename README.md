@@ -21,6 +21,8 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 The [Scene Editor](docs/scene-editor.md) at `/scene-editor/` provides independent scene documents, Actor placement, action timelines, Play/Pause/Restart/Stop, speed and deterministic scrubbing. Inspect runtime transforms without changing authored positions, saved state or Undo history. Download scenes before leaving the page.
 
+The [Project Workspace](docs/project-workspace.md) at `/project/` organizes characters, artwork, animations and scenes, retains editing sessions across navigation, and imports/exports complete project ZIPs. New projects start empty. Export a project ZIP to keep work after closing the tab.
+
 The completed v0.5.5 [IK authoring workflow](docs/ik-animation-authoring.md) covers reaching, influence, supported timeline operations, serialization, compatibility and production verification.
 
 The completed v0.5.6 [IK Baking workflow](docs/react-ik-baking.md) selects rig constraints, controls sampling FPS, previews the proposed baked animation while scrubbing, and reports actual key counts before a single undoable bake. [Production fidelity checks](docs/ik-bake-hardening.md) compare key-time and between-key runtime motion, including endpoint positions, with measured low-FPS feedback. It reuses [atomic IK bake commit](docs/ik-bake-commit.md), [bone-key generation](docs/ik-bake-generation.md), and [isolated sampling](docs/ik-bake-sampling.md).

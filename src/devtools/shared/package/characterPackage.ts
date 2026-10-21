@@ -316,6 +316,7 @@ export async function buildCharacterPackage(
 export async function openPackageRuntime(
   files: PackageFiles,
   signal: AbortSignal,
+  namespace?: string,
 ): Promise<{
   definition: CharacterDefinition;
   dispose: () => void;
@@ -327,14 +328,28 @@ export async function openPackageRuntime(
   };
   try {
     const manifest = structuredClone(source.manifest!) as CharacterManifest;
+    const keys = new Map<string, string>();
+    const runtimeTextures: Record<string, string> = {};
     for (const [key, path] of Object.entries(manifest.textures)) {
       const bytes = files.get(path)!;
       const { format } = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
       const url = URL.createObjectURL(new Blob([bytes], { type: format }));
       urls.push(url);
-      manifest.textures[key] = url;
+      const runtimeKey = namespace ? `${namespace}_${keys.size}` : key;
+      keys.set(key, runtimeKey);
+      runtimeTextures[runtimeKey] = url;
     }
+    manifest.textures = runtimeTextures;
     const runtimeFiles = new Map(files);
+    if (namespace) {
+      const rig = structuredClone(source.rigFile!) as RigJsonDefinition;
+      for (const sprite of [
+        ...rig.bones.flatMap((bone) => (bone.sprite ? [bone.sprite] : [])),
+        ...(rig.attachments ?? []),
+      ])
+        sprite.texture = keys.get(sprite.texture)!;
+      runtimeFiles.set(manifest.rig, encoder.encode(JSON.stringify(rig)));
+    }
     runtimeFiles.set('character.json', encoder.encode(JSON.stringify(manifest)));
     const definition = await CharacterLoader.load(
       `${packageBase}character.json`,

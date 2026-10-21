@@ -13,6 +13,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.0.1
+
+Add the desktop [Project Workspace](docs/project-workspace.md) at `/project/`: empty project/character/scene creation, existing character and scene registration, explicit scene dependency mapping, asset libraries, project settings and metadata Undo/Redo. Retain the existing character editors and scene document owners across asset/project navigation, with separate metadata/document export checkpoints and dependency-safe removal/history. Reuse character/scene validators and stored ZIP packaging for portable project import/export, shared binary artwork and stable authored IDs. Isolate runtime texture aliases and keep temporary URLs out of authored packages. Add unit compatibility, source-isolation, import/export and local desktop browser regressions. Project autosave and crash recovery remain deferred to v1.0.2; character version 1 and scene version 2 stay unchanged.
+
 ## 0.9.8-4
 
 Harden the [foot contact workflow](docs/foot-contact-readiness.md) across all three editors. Add Creating Foot Contact Markers, Aligning Feet to Ground and Grounding Characters through the existing Feature Guide and stable control anchors. Explain manual marker realignment after artwork/skin proportion changes and stable marker IDs. Keep hidden diagnostic controls idle, limit live text updates to ten per second while preserving frame-current canvas positions, and clear stale Actor contact selections/measurements after removal, character replacement and history transitions. Extend package, artwork, mirroring, IK, baked IK, lifecycle and local desktop artist-workflow regressions. Preserve existing authored formats, animation tracks and document ownership; record the coordinate/reference audit and actual verification limits.

@@ -11,6 +11,7 @@ export default defineConfig({
         rigEditor: fileURLToPath(new URL('./rig-editor/index.html', import.meta.url)),
         animationEditor: fileURLToPath(new URL('./animation-editor/index.html', import.meta.url)),
         sceneEditor: fileURLToPath(new URL('./scene-editor/index.html', import.meta.url)),
+        project: fileURLToPath(new URL('./project/index.html', import.meta.url)),
       },
       output: {
         codeSplitting: {

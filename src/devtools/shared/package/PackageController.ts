@@ -17,7 +17,10 @@ const clean: PackageDomains = { Rig: '', Skins: '', Animations: '', Assets: '' }
 
 /** Independent package checkpoints never mark source files or individual editor documents saved. */
 export class PackageController {
-  constructor(private readonly zip: PackageZipProcessor = packageZipWorker) {}
+  constructor(
+    private readonly zip: PackageZipProcessor = packageZipWorker,
+    private readonly fetcher?: typeof fetch,
+  ) {}
 
   private source: (() => PackageSnapshot) | undefined;
   private baseline: PackageDomains = clean;
@@ -114,7 +117,7 @@ export class PackageController {
       const captured = capturePackage(this.source());
       const checkpoint = this.fingerprints.compute(captured);
       const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]);
-      const files = await buildCharacterPackage(captured, fetch, signal);
+      const files = await buildCharacterPackage(captured, this.fetcher ?? fetch, signal);
       const { bytes, files: exportedFiles } = await this.zip.encode(files, signal);
       signal.throwIfAborted();
       downloadBlob(

@@ -4,6 +4,7 @@ import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterS
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
+import { projectEditorContext } from '../project/projectBridge.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
@@ -40,7 +41,9 @@ import './style.css';
 const host = document.querySelector<HTMLElement>('#animation-editor-app, #editor-app');
 if (!host) throw new Error('Missing character workspace host.');
 host.id = 'character-workspace';
+const projectContext = projectEditorContext();
 const initialDraft = (() => {
+  if (projectContext) return undefined;
   try {
     return browserCharacterDrafts().get(selectedCharacterId());
   } catch {
@@ -65,7 +68,7 @@ const guides = new GuideLauncher(
 const ikInspector = new IKInspectorController();
 const groundGuide = new GroundGuideWorkspace('animation-preview-world');
 const footContacts = new FootContactGroundController();
-const packages = new PackageController();
+const packages = new PackageController(undefined, projectContext?.fetcher);
 const artwork = new ArtworkController();
 const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
@@ -153,9 +156,18 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const releaseArtworkPackage = artwork.subscribe(packages.refresh);
   let releaseAnimationPackage: (() => void) | undefined;
   let releaseWorkspaceSelection: (() => void) | undefined;
+  let releaseProject: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       stateOwner = state;
+      releaseProject?.();
+      releaseProject = projectContext?.bindCharacter(
+        () => editorScene.packageSnapshot(),
+        () => editorScene.hasPendingArtworkProposal || artwork.getSnapshot().importing,
+        (view) => {
+          workspaceRoutes?.navigate(view);
+        },
+      );
       guides.refresh();
       newAnimation.bind(state);
       rigTweak.bind(state, editorScene.rigEditor!);
@@ -193,8 +205,16 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
         selectedEvent = state.selectedEvent;
         selectedKeys = state.selectedKeys;
       });
-      recovery.bind(state, id);
-      packages.bind(() => editorScene.packageSnapshot(), !!initialDraft);
+      if (!projectContext) recovery.bind(state, id);
+      else
+        app.querySelector<HTMLElement>('#animation-draft-status')!.textContent =
+          'Project session: export a project ZIP to keep your work.';
+      packages.bind(() => {
+        const snapshot = editorScene.packageSnapshot();
+        return projectContext?.sourceDefinition
+          ? { ...snapshot, definition: projectContext.sourceDefinition }
+          : snapshot;
+      }, !!initialDraft);
       releaseAnimationPackage?.();
       releaseAnimationPackage = state.subscribe(packages.refresh);
       if (initialRigView) state.setEditorMode('rig');
@@ -222,7 +242,11 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     },
     {
       characterUrl: `../characters/${encodeURIComponent(selectedCharacterId())}/character.json`,
-      ...(initialDraft ? { definition: initialDraft.definition } : {}),
+      ...(projectContext?.definition
+        ? { definition: projectContext.definition }
+        : initialDraft
+          ? { definition: initialDraft.definition }
+          : {}),
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
       groundGuide,
       footContacts,
@@ -315,6 +339,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
 
   return () => {
     workspaceRoutes?.dispose();
+    releaseProject?.();
     workspaceRoutes = undefined;
     releaseRigResize();
     rigLayout.dispose();

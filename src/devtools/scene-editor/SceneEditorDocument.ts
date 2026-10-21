@@ -92,6 +92,10 @@ export class SceneEditorDocument {
   get selectedSceneId(): string | null {
     return this.selected;
   }
+  /** Read another retained document without changing selection, gestures or history. */
+  scene(id: string): ReadonlyScene | undefined {
+    return this.entries.get(id)?.working;
+  }
   get sourceScene(): ReadonlyScene | null {
     return this.entry?.source ?? null;
   }

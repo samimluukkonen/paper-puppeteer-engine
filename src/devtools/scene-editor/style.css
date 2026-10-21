@@ -117,6 +117,9 @@
 .scene-open input {
   width: 200px;
 }
+.scene-transfer-commands {
+  display: contents;
+}
 .scene-inspector details {
   padding: 12px 0;
   border-top: 1px solid var(--border-default);

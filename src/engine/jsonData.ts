@@ -6,6 +6,21 @@ export type JsonValue = null | boolean | number | string | readonly JsonValue[] 
 // Bound recursion before schema parsing, cloning, freezing, or serialization can overflow.
 const maximumJsonNesting = 256;
 
+/** Same-origin editor hosts can supply another realm's Object.prototype. Inspect
+ * descriptors without invoking user accessors; class prototypes remain invalid. */
+function plainObject(value: object): boolean {
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype === null || prototype === Object.prototype) return true;
+  if (typeof prototype !== 'object' || Object.getPrototypeOf(prototype) !== null) return false;
+  const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor');
+  return (
+    !!constructor &&
+    'value' in constructor &&
+    typeof constructor.value === 'function' &&
+    Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object)
+  );
+}
+
 export function childPath(base: string, key: string | number): string {
   if (typeof key === 'number') return `${base}[${key}]`;
   return base ? `${base}.${key}` : key;
@@ -49,11 +64,7 @@ function inspectJson(
     issues.push({ severity: 'error', path, message: 'Cyclic references are not allowed.' });
     return false;
   }
-  if (
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) !== Object.prototype &&
-    Object.getPrototypeOf(value) !== null
-  ) {
+  if (!Array.isArray(value) && !plainObject(value)) {
     issues.push({ severity: 'error', path, message: 'Must be a plain JSON object (no class instances, Map, or Set).' });
     return false;
   }

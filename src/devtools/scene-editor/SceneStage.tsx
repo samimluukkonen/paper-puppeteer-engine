@@ -378,6 +378,9 @@ export function SceneStageView({
     return () => {
       release();
       document.cancelActorDrag();
+      // A project retains this document after its iframe is removed. Release scene
+      // subscriptions now; Game.destroy otherwise waits for another animation frame.
+      game.scene.stop(scene);
       game.destroy(true);
     };
   }, [document, registry, playback]);

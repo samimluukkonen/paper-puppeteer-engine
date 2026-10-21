@@ -1,4 +1,5 @@
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import { projectEditorContext } from '../project/projectBridge.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { createHierarchyController } from '../rig-editor/HierarchyController.js';
 import { createInspectorController } from '../rig-editor/InspectorController.js';
@@ -133,6 +134,7 @@ export class RigTweakController {
       app.querySelector<HTMLSelectElement>('#tweak-rotation-snap')!.value = String(editor.state.rotationSnap);
     };
     this.bindDraft = () => {
+      if (projectEditorContext()) return;
       const editor = this.editor;
       if (!editor) return;
       // Older draft identities stored name beside the rig. Preserve that source fingerprint format.

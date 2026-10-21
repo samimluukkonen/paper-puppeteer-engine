@@ -374,7 +374,7 @@
 .feature-guide-availability {
   color: var(--fg-muted);
 }
-@media (max-width: 1200px) {
+@media (max-width: 1320px) {
   .workspace-shell .wordmark {
     font-size: 0;
   }

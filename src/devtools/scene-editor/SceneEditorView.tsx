@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { readJsonFile } from '../../engine/jsonInput.js';
 import { encodePackageZip } from '../../engine/packageZip.js';
+import { serializeSceneDefinition } from '../../engine/SceneDefinition.js';
 import { buildScenePackage } from '../../engine/ScenePackage.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
+import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
@@ -71,6 +73,7 @@ export function SceneEditorView({
 }) {
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const scene = document.workingScene;
+  const project = projectEditorContext();
   const [playback] = useState(() => new SceneEditorPlayback());
   const workspace = useRef<HTMLElement>(null);
   const source = document.sourceScene;
@@ -138,8 +141,11 @@ export function SceneEditorView({
     const snapshot = document.workingScene;
     if (!snapshot) return;
     runTransfer(async (signal) => {
+      if (project) project.validateScene(snapshot);
       if (kind === 'zip') {
-        const files = await buildScenePackage(snapshot, assetOptions(signal));
+        const files = await (project
+          ? project.buildScenePackage(snapshot)
+          : buildScenePackage(snapshot, assetOptions(signal)));
         signal.throwIfAborted();
         downloadBlob(
           new Blob([encodePackageZip(files)], { type: 'application/zip' }),
@@ -152,7 +158,7 @@ export function SceneEditorView({
         );
         return;
       }
-      const json = await exportSceneJson(snapshot, assetOptions(signal));
+      const json = project ? serializeSceneDefinition(snapshot) : await exportSceneJson(snapshot, assetOptions(signal));
       signal.throwIfAborted();
       if (document.workingScene === snapshot) document.validateScene();
       if (kind === 'copy') {
@@ -170,31 +176,33 @@ export function SceneEditorView({
     <>
       <ViewHeader view="scene" />
       <div className="workspace-command-bar" aria-label="Scene document commands">
-        <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>
-          New Scene
-        </button>
-        <label className="scene-open">
-          Open scene JSON
-          <input
-            type="file"
-            accept=".json,application/json"
-            disabled={loading}
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
-              event.currentTarget.value = '';
-              if (!file) return;
-              runTransfer(async (signal) => {
-                const json = await readJsonFile(file);
-                signal.throwIfAborted();
-                await importJson(json, signal);
-              });
-            }}
-          />
-        </label>
-        <button type="button" disabled={loading} onClick={() => pasteDialog.current?.showModal()}>
-          Paste scene JSON
-        </button>
-        <label>
+        <div hidden={!!project} className="scene-transfer-commands">
+          <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>
+            New Scene
+          </button>
+          <label className="scene-open">
+            Open scene JSON
+            <input
+              type="file"
+              accept=".json,application/json"
+              disabled={loading}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = '';
+                if (!file) return;
+                runTransfer(async (signal) => {
+                  const json = await readJsonFile(file);
+                  signal.throwIfAborted();
+                  await importJson(json, signal);
+                });
+              }}
+            />
+          </label>
+          <button type="button" disabled={loading} onClick={() => pasteDialog.current?.showModal()}>
+            Paste scene JSON
+          </button>
+        </div>
+        <label hidden={!!project}>
           Scene{' '}
           <select
             aria-label="Select scene"
@@ -268,7 +276,10 @@ export function SceneEditorView({
         {scene
           ? `${scene.name} · ${scene.id} · ${scene.duration / 1000} s · ${document.isNewScene ? 'New / Unsaved' : document.dirty ? 'Unsaved changes' : 'Saved'}`
           : 'Create a new scene or open a scene JSON document.'}
-        {scene && ' Switch scenes to keep working; download each scene to keep it after leaving this page.'}
+        {scene &&
+          (project
+            ? ' Return to Project to organize assets or export the complete project.'
+            : ' Switch scenes to keep working; download each scene to keep it after leaving this page.')}
         {transferStatus && ` ${transferStatus}`}
       </p>
       {document.validationIssues.length > 0 && (

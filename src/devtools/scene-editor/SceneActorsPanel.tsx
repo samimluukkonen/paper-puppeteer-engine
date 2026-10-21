@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { sceneCharacterChoices, type SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
@@ -112,7 +113,8 @@ export function SceneActorsPanel({
 }) {
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
   const dialog = useRef<HTMLDialogElement>(null);
-  const [manifest, setManifest] = useState(sceneCharacterChoices[0]!.manifest);
+  const choices = projectEditorContext()?.choices ?? sceneCharacterChoices;
+  const [manifest, setManifest] = useState(choices[0]?.manifest ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const request = useRef(0);
@@ -242,14 +244,14 @@ export function SceneActorsPanel({
           <label>
             Workspace character
             <select
-              value={sceneCharacterChoices.some((entry) => entry.manifest === manifest) ? manifest : ''}
+              value={choices.some((entry) => entry.manifest === manifest) ? manifest : ''}
               onChange={(event) => setManifest(event.target.value)}
               disabled={loading}
             >
               <option value="" disabled>
                 Custom package
               </option>
-              {sceneCharacterChoices.map((entry) => (
+              {choices.map((entry) => (
                 <option key={entry.id} value={entry.manifest}>
                   {entry.label}
                 </option>
@@ -261,8 +263,9 @@ export function SceneActorsPanel({
             <input required value={manifest} onChange={(event) => setManifest(event.target.value)} disabled={loading} />
           </label>
           <p className="workspace-caption">
-            Choose a workspace package or enter a permanent character.json path/URL. Unsaved character drafts need an
-            exported, hosted package first.
+            {projectEditorContext()
+              ? 'Choose a registered project character. Add other characters from the project workspace.'
+              : 'Choose a workspace package or enter a permanent character.json path/URL. Unsaved character drafts need an exported, hosted package first.'}
           </p>
           {error && <p role="alert">{error}</p>}
           <div className="scene-dialog-actions">
