@@ -3,7 +3,7 @@ import { Bone } from '../../engine/Bone.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { PuppetRenderer } from '../../engine/PuppetRenderer.js';
 import type { Rig } from '../../engine/Rig.js';
-import { transformProperties } from '../../engine/types.js';
+import { transformProperties, type JointTransform } from '../../engine/types.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import type { GhostPoseSample } from './ghostPoseSampling.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
@@ -13,7 +13,7 @@ export class AnimationPoseOverlay {
   readonly container: Phaser.GameObjects.Container;
   private readonly bones = new Map<string, Bone>();
   private readonly renderer: PuppetRenderer;
-  private sample: Pick<GhostPoseSample, 'pose'> | undefined;
+  private sample: { readonly pose: ReadonlyMap<string, Readonly<Partial<JointTransform>>> } | undefined;
   private poseDirty = true;
   private appearanceRevision: number | undefined;
   private tint: number | undefined;
@@ -21,7 +21,7 @@ export class AnimationPoseOverlay {
   constructor(
     scene: Phaser.Scene,
     puppet: Puppet,
-    readonly direction: GhostPoseSample['direction'] | 'mirror' | 'bake',
+    readonly direction: GhostPoseSample['direction'] | 'mirror' | 'bake' | 'contact',
     readonly distance: number,
   ) {
     this.container = scene.add.container(0, 0).setName(`animation-ghost-${direction}-${distance}`).setVisible(false);
@@ -33,7 +33,7 @@ export class AnimationPoseOverlay {
     this.renderer = new PuppetRenderer(scene, this.container, puppet.rig, this.bones);
   }
 
-  apply(sample: Pick<GhostPoseSample, 'pose'>): void {
+  apply(sample: { readonly pose: ReadonlyMap<string, Readonly<Partial<JointTransform>>> }): void {
     if (sample === this.sample) return;
     this.sample = sample;
     for (const [id, bone] of this.bones) {
@@ -62,7 +62,7 @@ export class AnimationPoseOverlay {
     const tint = previous ? settings.previousTint : settings.nextTint;
     // Temporal ghosts stay behind the puppet; proposed authored poses overlay it.
     const depth =
-      this.direction === 'mirror' || this.direction === 'bake'
+      this.direction === 'mirror' || this.direction === 'bake' || this.direction === 'contact'
         ? source.depth + 1
         : source.depth - this.distance * 2 + (previous ? 0 : 1);
     const depthChanged = this.container.depth !== depth;

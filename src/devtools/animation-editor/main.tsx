@@ -26,6 +26,7 @@ import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorS
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { FootContactGroundController } from './FootContactGroundController.js';
 import { IKBakeController } from './IKBakeController.js';
 import { IKInspectorController } from './IKInspectorController.js';
 import { KeyframeRetimingController } from './KeyframeRetimingController.js';
@@ -63,6 +64,7 @@ const guides = new GuideLauncher(
 );
 const ikInspector = new IKInspectorController();
 const groundGuide = new GroundGuideWorkspace('animation-preview-world');
+const footContacts = new FootContactGroundController();
 const packages = new PackageController();
 const artwork = new ArtworkController();
 const attachments = new AttachmentController(artwork);
@@ -102,6 +104,7 @@ function CharacterWorkspace() {
           newAnimation={newAnimation}
           ikInspector={ikInspector}
           groundGuide={groundGuide}
+          footContacts={footContacts}
           alignGroundTarget={() => {
             scene?.alignSelectedIKTargetToGround();
           }}
@@ -222,6 +225,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       ...(initialDraft ? { definition: initialDraft.definition } : {}),
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
       groundGuide,
+      footContacts,
     },
     artwork,
     () => {

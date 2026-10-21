@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { AnimationPose } from '../../engine/AnimationPose.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import type { RigJsonDefinition } from '../../engine/externalData.js';
+import { getFootContactWorldPosition } from '../../engine/footContactMarkers.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { IKTargetProvider, TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { Puppet } from '../../engine/Puppet.js';
@@ -13,6 +14,7 @@ import type { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
+import { contactGroundDistance } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
@@ -24,6 +26,7 @@ import { AnimationEditorGroundHandle } from './AnimationEditorGroundHandle.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { FootContactGroundController } from './FootContactGroundController.js';
 import { alignIKTargetToGuide } from './ikTargetCoordinates.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
 import { getCompiledPreviewClip } from './previewClip.js';
@@ -35,10 +38,13 @@ export interface AnimationEditorSceneOptions {
   readonly definition?: CharacterDefinition;
   readonly ikChains?: readonly TwoBoneIKDefinition[];
   readonly groundGuide?: GroundGuideWorkspace;
+  readonly footContacts?: FootContactGroundController;
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
   readonly groundGuide: GroundGuideWorkspace;
+  readonly footContacts: FootContactGroundController;
+  private contactOverlay: AnimationPoseOverlay | undefined;
   private groundOverlay: GroundGuideOverlay | undefined;
   private groundHandle: AnimationEditorGroundHandle | undefined;
   rigEditor: RigEditor | undefined;
@@ -135,6 +141,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   ) {
     super('AnimationEditorScene');
     this.groundGuide = options.groundGuide ?? new GroundGuideWorkspace('animation-preview-world');
+    this.footContacts = options.footContacts ?? new FootContactGroundController();
     this.options = { ...options, ...(options.ikChains ? { ikChains: structuredClone(options.ikChains) } : {}) };
   }
 
@@ -155,6 +162,9 @@ export class AnimationEditorScene extends Phaser.Scene {
       delete this.rigExportCheckpoint.committedSequence;
       this.rigMode = false;
       this.previewTargetProviders.clear();
+      this.footContacts.unbind();
+      this.contactOverlay?.destroy();
+      this.contactOverlay = undefined;
       this.state?.pause();
       this.state?.endScrub();
       this.ikHandles?.dispose();
@@ -199,6 +209,52 @@ export class AnimationEditorScene extends Phaser.Scene {
       const point = this.puppet.getBone(this.state.selectedBoneId).getWorldPosition();
       overlay.lineStyle(3, 0xb7543a).strokeCircle(point.x, point.y, 10);
     }
+    if (!this.rigMode && this.puppet) {
+      this.footContacts.sync(this.puppet, this.getBakeRuntimeConstraints());
+      const { plan, visible, contacts, tolerance, markerId } = this.footContacts;
+      if (plan) {
+        this.contactOverlay ??= new AnimationPoseOverlay(this, this.puppet, 'contact', 0);
+        this.contactOverlay.apply(plan);
+        this.contactOverlay.syncAppearance(
+          this.puppet,
+          { ...DEFAULT_ONION_SKIN_SETTINGS, nextOpacity: 0.6, nextTint: 0xa875e8 },
+          this.puppet.getAppearanceRevision(),
+        );
+        this.contactOverlay.container.setVisible(this.puppet.container.visible);
+      } else this.contactOverlay?.hide();
+      if (visible && overlay) {
+        const zoom = this.cameras.main.zoom;
+        for (const contact of contacts) {
+          const relation = contactGroundDistance(
+            contact.world,
+            this.groundGuide.getSnapshot().guide.y,
+            tolerance,
+          ).relation;
+          const color =
+            contact.id === markerId
+              ? 0xe5b35c
+              : relation === 'on ground'
+                ? 0x85bf9b
+                : relation === 'above ground'
+                  ? 0x8fbde8
+                  : 0xef8075;
+          const { x, y } = contact.world;
+          overlay.lineStyle(2 / zoom, color).strokeCircle(x, y, 6 / zoom);
+          overlay.lineBetween(x - 9 / zoom, y, x + 9 / zoom, y).lineBetween(x, y - 9 / zoom, x, y + 9 / zoom);
+        }
+        if (plan) overlay.lineStyle(3 / zoom, 0xa875e8).strokeCircle(plan.contact.x, plan.contact.y, 8 / zoom);
+        if (this.mirrorPose)
+          for (const marker of this.state?.rig?.footContactMarkers ?? []) {
+            const point = getFootContactWorldPosition(
+              marker,
+              this.state!.rig!,
+              this.mirrorPose,
+              this.puppet.container.getWorldTransformMatrix(),
+            );
+            if (point) overlay.lineStyle(2 / zoom, 0xa875e8).strokeCircle(point.x, point.y, 6 / zoom);
+          }
+      }
+    } else this.contactOverlay?.hide();
   }
 
   private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
@@ -208,6 +264,16 @@ export class AnimationEditorScene extends Phaser.Scene {
       return;
     }
     if (this.groundHandle?.pointerDown(pointer)) return;
+    if (this.footContacts.visible && pointer.button === 0) {
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const contact = this.footContacts.contacts.find(
+        (entry) => Math.hypot(entry.world.x - world.x, entry.world.y - world.y) <= 10 / this.cameras.main.zoom,
+      );
+      if (contact) {
+        this.footContacts.selectMarker(contact.id);
+        return;
+      }
+    }
     if (this.ikHandles?.pointerDown(pointer)) return;
     if (!this.puppet || !this.state || pointer.button !== 0) return;
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -519,6 +585,9 @@ export class AnimationEditorScene extends Phaser.Scene {
             this.ikHandles?.dispose();
             this.clearMirrorPreview();
             this.clearBakePreview();
+            this.contactOverlay?.destroy();
+            this.contactOverlay = undefined;
+            this.footContacts.cancel();
             ghosts?.dispose();
             preview?.dispose();
             puppet = next;
@@ -585,12 +654,17 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.ikHandles.setInteractive(this.ikHandlesInteractive);
       this.selectionOverlay = this.add.graphics().setDepth(puppet.container.depth + 5);
       this.groundGuide.bind(url.href);
+      this.footContacts.bind(state, this.groundGuide);
+      this.footContacts.sync(puppet, this.getBakeRuntimeConstraints());
       this.groundOverlay = new GroundGuideOverlay(this, { draggable: true });
       this.groundHandle = new AnimationEditorGroundHandle(this, this.groundGuide, state);
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.onReady(state, definition.id);
     } catch (error) {
+      this.footContacts.unbind();
+      this.contactOverlay?.destroy();
+      this.contactOverlay = undefined;
       this.previewTargetProviders.clear();
       this.releaseMode?.();
       this.releaseMode = undefined;

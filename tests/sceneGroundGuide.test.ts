@@ -432,7 +432,7 @@ test('missing contacts disable alignment and leave snapping free; measurements s
   const playback = new SceneEditorPlayback();
   const markup = renderToStaticMarkup(createElement(SceneGroundPanel, { document: f.document, playback }));
   assert.include(markup, 'disabled="">Align Feet to Ground');
-  assert.include(markup, 'authored ground contact points');
+  assert.include(markup, 'No marker or legacy sole contact is available');
   f.workspace.update({ snapEnabled: true });
   f.document.beginActorDrag('a');
   f.document.moveActorDrag({ x: 15, y: -20 });

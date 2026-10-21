@@ -8,6 +8,7 @@ import { Puppet } from '../../engine/Puppet.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
@@ -67,6 +68,7 @@ class SceneStage extends Phaser.Scene {
       if (!document) {
         this.preview.dispose();
         this.document.setActorGroundOffsets(new Map());
+        this.document.setActorGroundContacts(new Map());
         return;
       }
       let message = [...new Set(document.actors.map((actor) => this.failures.get(actor.character.manifest)))]
@@ -93,6 +95,7 @@ class SceneStage extends Phaser.Scene {
         message = error instanceof Error ? error.message : String(error);
       }
       this.document.setActorGroundOffsets(this.preview.groundOffsets());
+      this.document.setActorGroundContacts(this.preview.groundContacts());
       this.status(message);
       for (const actor of document.actors) this.ensureCharacter(actor.character.manifest, sync);
     };
@@ -105,6 +108,7 @@ class SceneStage extends Phaser.Scene {
       this.document.cancelActorDrag();
     };
     const unsubscribePlayback = this.playback.subscribe(() => {
+      this.document.setGroundPreviewing(this.playback.previewing);
       if (this.playback.previewing && this.gesture) {
         this.gesture = undefined;
         this.document.cancelActorDrag();
@@ -252,6 +256,7 @@ class SceneStage extends Phaser.Scene {
       this.alive = false;
       unsubscribe();
       this.document.setActorGroundOffsets(new Map());
+      this.document.setActorGroundContacts(new Map());
       unsubscribePlayback();
       events.abort();
       cancel();
@@ -330,6 +335,20 @@ class SceneStage extends Phaser.Scene {
     const actor = id && (this.playback.actors?.get(id) ?? this.preview.instances.get(id)?.actor);
     if (!actor) return;
     const { x, y } = actor.position;
+    if (this.document.showFootContacts) {
+      for (const contact of evaluatedFootContacts(actor.puppet)) {
+        const { x: cx, y: cy } = contact.world;
+        const size = 7 / camera.zoom;
+        this.overlay.lineStyle(
+          2 / camera.zoom,
+          contact.id === this.document.selectedFootContactId ? 0xe5b35c : 0x85bf9b,
+        );
+        this.overlay
+          .strokeCircle(cx, cy, size)
+          .lineBetween(cx - size, cy, cx + size, cy)
+          .lineBetween(cx, cy - size, cx, cy + size);
+      }
+    }
     const bounds = actor.puppet.container.getBounds();
     const z = camera.zoom;
     this.overlay.lineStyle(1 / z, 0xe5b35c, 0.9).strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);

@@ -6,7 +6,7 @@ import { AnimationEditorState } from '../src/devtools/animation-editor/Animation
 import { createBoneSymmetryMapping, inferBoneSymmetryPairs } from '../src/devtools/shared/boneSymmetry.js';
 import { localToWorld } from '../src/engine/affineMath.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
-import type { Puppet } from '../src/engine/Puppet.js';
+import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { loadSceneCharacter } from '../src/shared/loadSceneCharacter.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
@@ -337,12 +337,13 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
   const state = new AnimationEditorState(rig, [{ name: 'move', duration: 2000, loop: false, tracks: {} }]);
   state.selectAnimation('move');
   const dispose = vi.fn();
-  const destroy = vi.fn();
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  const destroy = vi.spyOn(puppet, 'destroy');
   const disposeGhosts = vi.fn();
   Object.assign(scene, {
     state,
     preview: { dispose },
-    puppet: { destroy },
+    puppet,
     ghosts: { updateFrame: (update: () => void) => update(), dispose: disposeGhosts },
   });
   state.play();

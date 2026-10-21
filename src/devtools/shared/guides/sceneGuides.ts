@@ -57,7 +57,7 @@ export const sceneGuides: readonly GuideDefinition[] = [
         'snap',
         'Align feet to ground',
         T.sceneGroundAlign,
-        'Use Align Feet to Ground to place the lowest authored sole contact on the guide while preserving initial X. Foot artwork must define ground contact points. Scene Undo/Redo restores the edit. Optional Snap to Ground constrains placement drags; hold Shift to move freely.',
+        'Choose an Actor foot contact marker and use Snap Actor to Ground to translate initial Y while preserving X. Without rig markers, Align Feet to Ground retains the labeled legacy attachment sole fallback. Stop playback to edit. Scene Undo/Redo restores the edit. Optional Snap to Ground uses the selected contact during placement drags; hold Shift to move freely.',
       ),
       step(
         'preview',

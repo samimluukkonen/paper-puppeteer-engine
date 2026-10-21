@@ -14,6 +14,7 @@ import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './A
 import { AnimationGroundPanel } from './AnimationGroundPanel.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
+import type { FootContactGroundController } from './FootContactGroundController.js';
 import type { IKBakeController } from './IKBakeController.js';
 import { IKBakePanel } from './IKBakePanel.js';
 import type { IKInspectorController } from './IKInspectorController.js';
@@ -41,6 +42,7 @@ export function AnimationEditorView({
   packages,
   groundGuide,
   alignGroundTarget,
+  footContacts,
   header = true,
 }: {
   mirrorTools: MirrorToolsController;
@@ -54,6 +56,7 @@ export function AnimationEditorView({
   packages?: PackageController;
   groundGuide?: GroundGuideWorkspace;
   alignGroundTarget?: () => void;
+  footContacts?: FootContactGroundController;
   header?: boolean;
 }) {
   const inspector = useWorkspaceInspector();
@@ -276,7 +279,12 @@ export function AnimationEditorView({
           {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
             {groundGuide && alignGroundTarget && (
-              <AnimationGroundPanel workspace={groundGuide} ikInspector={ikInspector} alignTarget={alignGroundTarget} />
+              <AnimationGroundPanel
+                workspace={groundGuide}
+                ikInspector={ikInspector}
+                alignTarget={alignGroundTarget}
+                {...(footContacts ? { contacts: footContacts } : {})}
+              />
             )}
             <details className="animation-bone-list" data-guide-id={GUIDE_TARGETS.animationBones}>
               <summary>Bones</summary>

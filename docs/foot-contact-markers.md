@@ -1,4 +1,4 @@
-# Foot contact markers (v0.9.8.2)
+# Foot contact markers (v0.9.8.3)
 
 [All guides](../README.md#guides)
 
@@ -52,7 +52,7 @@ const point = getFootContactWorldPosition(
 
 `evaluatedPose` is a readonly map of bone IDs to local transform values. It accepts final runtime joint poses or isolated IK sampler output. Omitted bones/properties use the normalized rig bind transform. Pass solved values to observe IK; sparse animation keys alone do not include the solver's rotation changes. The pure function does not evaluate a clip, run IK, synchronize rendering, advance a player or mutate data. Omitting the outer matrix returns puppet-local positions, useful for detached tools. Missing/deleted bones and nonfinite calculated positions return `undefined`; there is no fabricated origin fallback. Singular but finite transforms can still project points.
 
-The existing demo sole offsets and Scene Editor ground alignment continue to use their current attachment-based calculations. Markers are independent references: moving one does not change animation keys, an IK target/end offset, ground preferences, Actor placement or physics. Marker editing adds no automatic detection, foot planting, second solver, collision or terrain behavior.
+The [Animation and Scene ground integration](foot-contact-ground-integration.md) uses explicitly selected markers for deliberate grounding edits. The demo retains its existing sole offsets; Scene Editor retains attachment contacts as a labeled fallback for rigs without markers. Moving a marker itself does not change animation keys, an IK target/end offset, ground preferences, Actor placement or physics. Marker editing adds no automatic detection, foot planting, second solver, collision or terrain behavior.
 
 ## Visual Rig Editor workflow
 

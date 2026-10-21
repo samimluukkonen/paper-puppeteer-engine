@@ -13,6 +13,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 0.9.8-3
+
+Integrate rig foot contacts with Animation Editor and Scene Editor grounding. Add optional post-FK/IK marker overlays, explicit contact/constraint selection, signed ground distances and configurable tolerance. Preview contact IK alignment on detached solver joints and a tinted overlay, then explicitly apply verified X/Y target keys as one animation Undo/Redo edit. Report limited/clamped results with residual error and reject stale proposals or external IK ownership. Scene grounding and opt-in placement snapping use the chosen evaluated rig contact, including facing and scale, and author only initial Actor Y; retain the labeled legacy attachment-contact fallback for rigs without markers. Contacts follow scene playback/scrubbing without constraining choreography. Add unit/integration and local desktop browser regressions, plus [workflow and transform documentation](docs/foot-contact-ground-integration.md). Milestone `0.9.8.3` uses SemVer heading `0.9.8-3`.
+
 ## 0.9.8-2
 
 Add visual [Rig Editor foot contact markers](docs/foot-contact-markers.md): collapsed React controls, bone selection, generated stable IDs, names, local coordinate fields, selectable Phaser crosshairs and direct dragging through nested transforms, scale, facing and camera navigation. Share rig Undo/Redo and recovery, cancel drags with Escape, guard persisted marker references, and preserve animation data. Reuse the ground reference line and draggable tag with collapsed visibility/height controls in Rig Editor, independently of authored rig and animation history. Add editor and local desktop browser regressions covering authoring, transforms, history, serialization, ground dragging and cleanup. Milestone `0.9.8.2` uses the changelog's SemVer form `0.9.8-2`.

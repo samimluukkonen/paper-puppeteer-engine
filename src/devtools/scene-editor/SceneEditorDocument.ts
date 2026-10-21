@@ -17,6 +17,11 @@ import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 
 export type ReadonlyScene = DeepReadonly<SceneDefinition>;
+export interface ActorGroundContact {
+  readonly id: string;
+  readonly name: string;
+  readonly offset: number | undefined;
+}
 interface SceneEntry {
   readonly source: ReadonlyScene;
   saved: ReadonlyScene;
@@ -36,6 +41,10 @@ export class SceneEditorDocument {
   private dragAction: string | null = null;
   private dragActor: string | null = null;
   private groundOffsets: ReadonlyMap<string, number> = new Map();
+  private groundContacts: ReadonlyMap<string, readonly ActorGroundContact[]> = new Map();
+  private readonly selectedContacts = new Map<string, string>();
+  private groundPreviewing = false;
+  showFootContacts = false;
   private readonly listeners = new Set<() => void>();
   private issues: readonly ValidationIssue[] = [];
 
@@ -146,6 +155,8 @@ export class SceneEditorDocument {
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
     this.groundOffsets = new Map();
+    this.groundContacts = new Map();
+    this.selectedContacts.clear();
     this.entries.set(scene.id, entry);
     this.selected = scene.id;
     this.groundGuide.bind(scene.id);
@@ -170,6 +181,8 @@ export class SceneEditorDocument {
     this.groundGuide.cancelDrag();
     this.selected = id;
     this.groundOffsets = new Map();
+    this.groundContacts = new Map();
+    this.selectedContacts.clear();
     this.groundGuide.bind(id);
     return this.success();
   }
@@ -356,20 +369,58 @@ export class SceneEditorDocument {
     this.notify();
   }
   get canAlignSelectedActorFeetToGround(): boolean {
-    return this.selectedActorId !== null && this.groundOffsets.has(this.selectedActorId);
+    return (
+      !this.groundPreviewing &&
+      this.selectedActorId !== null &&
+      this.actorGroundOffset(this.selectedActorId) !== undefined
+    );
+  }
+  setGroundPreviewing(previewing: boolean): void {
+    if (this.groundPreviewing === previewing) return;
+    this.groundPreviewing = previewing;
+    this.notify();
+  }
+  setActorGroundContacts(contacts: ReadonlyMap<string, readonly ActorGroundContact[]>): void {
+    if (equalJsonData([...contacts], [...this.groundContacts])) return;
+    this.groundContacts = contacts;
+    this.notify();
+  }
+  get selectedActorGroundContacts(): readonly ActorGroundContact[] {
+    return this.selectedActorId ? (this.groundContacts.get(this.selectedActorId) ?? []) : [];
+  }
+  get selectedFootContactId(): string {
+    return this.selectedActorId ? (this.selectedContacts.get(this.selectedActorId) ?? '') : '';
+  }
+  selectFootContact(id: string): void {
+    if (!this.selectedActorId || (id && !this.selectedActorGroundContacts.some((entry) => entry.id === id))) return;
+    this.selectedContacts.set(this.selectedActorId, id);
+    this.showFootContacts = true;
+    this.notify();
+  }
+  setFootContactsVisible(visible: boolean): void {
+    this.showFootContacts = visible;
+    this.notify();
+  }
+  private actorGroundOffset(id: string): number | undefined {
+    const contacts = this.groundContacts.get(id);
+    if (contacts?.length) {
+      const offset = contacts.find((contact) => contact.id === this.selectedContacts.get(id))?.offset;
+      return offset !== undefined && Number.isFinite(offset) ? offset : undefined;
+    }
+    return this.groundOffsets.get(id);
   }
   alignSelectedActorFeetToGround(): boolean {
     const actor = this.workingScene?.actors.find((actor) => actor.id === this.selectedActorId);
     const { guide, dragging } = this.groundGuide.getSnapshot();
-    const offset = actor && this.groundOffsets.get(actor.id);
-    if (!actor || offset === undefined || !guide.enabled || dragging) return false;
+    const offset = actor && this.actorGroundOffset(actor.id);
+    if (!actor || offset === undefined || !guide.enabled || dragging || this.groundPreviewing) return false;
     return this.updateActor(actor.id, { position: { x: actor.position.x, y: guide.y - offset } });
   }
   moveActorDrag(position: { x: number; y: number }, options: { bypassGround?: boolean } = {}): boolean {
     const scene = this.workingScene;
     if (!scene || !this.dragActor) return false;
     const { guide } = this.groundGuide.getSnapshot();
-    const offset = this.groundOffsets.get(this.dragActor);
+    const offset = this.actorGroundOffset(this.dragActor);
     const initialPosition =
       guide.enabled && guide.snapEnabled && offset !== undefined && !options.bypassGround
         ? { x: position.x, y: guide.y - offset }

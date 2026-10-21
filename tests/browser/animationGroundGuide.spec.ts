@@ -127,7 +127,9 @@ test('animation ground controls, canvas dragging, alignment and cleanup preserve
   }
   await page.getByRole('button', { name: 'Select IK target rightLegIK', exact: true }).click();
   await animationIKInspector(page);
-  await expect(panel.getByText('No sole-contact marker', { exact: false })).toBeVisible();
+  await expect(
+    panel.getByText('No sole-contact marker is used by this legacy command', { exact: false }),
+  ).toBeVisible();
   await panel.getByRole('button', { name: 'Align IK target Y to guide', exact: true }).click();
   await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   await page.locator('#animation-undo').click();

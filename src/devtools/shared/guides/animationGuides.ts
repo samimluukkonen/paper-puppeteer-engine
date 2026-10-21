@@ -51,7 +51,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'contact',
         'Inspect foot contact',
-        'Play or scrub an animation and compare the feet or other contact points with the line. Root translation, facing and scale affect the character; the reference stays fixed. Jumping or flying poses remain free to leave the line.',
+        'Enable Show foot contact markers to inspect rig contacts and signed ground distances while playing or scrubbing. Choose a contact and confirm its existing foot IK constraint for explicit preview/apply alignment. Root translation, facing and scale affect contacts; the reference stays fixed. Jumping or flying poses remain free to leave the line.',
         targets.animationCanvas,
       ),
       step(

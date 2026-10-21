@@ -18,6 +18,12 @@ In Rig Editor or Animation Editor, drag the amber **↕ Ground** label verticall
 
 Animation IK alignment addresses the **requested IK target**. `endOffset` identifies a solver endpoint, without establishing that it is a sole. Optional attachment `groundContacts` support Scene Editor placement (below); they do not change the animation target command. Demo sole offsets belong to `DemoFootPlanting` and its presentation profiles. IK target alignment/snapping therefore do not promise exact foot contact. Solver reach and influence can prevent the solved endpoint reaching the request. Foot planting is unchanged.
 
+## Marker-based ground alignment (v0.9.8.3)
+
+Animation Editor now offers **Align Selected Foot Contact to Ground**: choose a rig contact and confirm its existing IK constraint, preview a detached corrected pose, inspect the final marker residual, then explicitly **Apply IK target keys**. Optional contact markers follow evaluated FK/IK, facing, root motion and scrubbing. Signed distances use downward-positive world Y and a configurable tolerance (default 0.5 world units). The original pose remains intact until Apply; limited results cannot be applied. See the [complete workflow, transform calculations and limitations](foot-contact-ground-integration.md).
+
+Scene Editor uses **Snap Actor to Ground** when the selected Actor has rig contacts. Choose the marker explicitly; its evaluated world position determines the Y translation while X stays fixed. Contacts are shown only for the selected Actor when requested and follow runtime playback/scrubbing, but grounding edits require stopped playback and use the evaluated initial pose. The legacy attachment behavior below applies only to characters without rig markers. Optional placement snapping also uses the selected marker when available.
+
 ## Scene Actor alignment
 
 Scene Editor also supports dragging the amber **↕ Ground** label vertically. The rest of the line leaves Actor picking available. The numeric field follows the live scene-world Y; release commits one guide-history entry, including outside-canvas release through pointer capture. Escape, pointer cancellation/capture loss, window blur, hiding/leaving the page, scene switching/import and stage teardown cancel an unfinished guide drag. Ground adjustment remains available during playback and scrubbing without pausing or rebuilding the runtime context.

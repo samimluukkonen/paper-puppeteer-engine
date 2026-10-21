@@ -54,6 +54,8 @@ Direct dependency versions are pinned in [package.json](../package.json), and `p
 
 The optional rig [foot contact marker foundation](foot-contact-markers.md) stores bone-local reference points and evaluates them through final local joint transforms and the full Puppet/Actor world affine. Creation and evaluation are renderer independent, and markers remain separate from IK and attachment ground contacts.
 
+The [v0.9.8.3 ground integration](foot-contact-ground-integration.md) reuses these final positions for signed Animation Editor diagnostics, detached contact IK proposals and selected-marker Scene Actor grounding. Previews are view state; only explicit Apply or Snap commands enter animation/scene history. Scene playback/scrubbing projects runtime contacts without consulting the guide for motion.
+
 The [v0.6.2 schema and compatibility guide](schema-compatibility.md) inventories the version-1 authored formats, validation boundaries, deterministic serialization, existing migration behavior and historical fixture coverage.
 
 See the [v0.6.1 runtime API and architecture audit](runtime-api.md) for dependency directions, public/internal/editor contracts, entry points, lifecycle ownership and the minimal consumer example. The package root and `/runtime` share the browser API; `/core`, `/data` and `/serialization` remain renderer independent. The scene character loader lives in the engine, with its old application path retained as a re-export.

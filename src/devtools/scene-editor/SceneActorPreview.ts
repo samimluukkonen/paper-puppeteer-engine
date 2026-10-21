@@ -5,8 +5,9 @@ import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneActorDefinition } from '../../engine/SceneDefinition.js';
+import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { actorGroundOffset } from './actorGrounding.js';
-import type { ReadonlyScene } from './SceneEditorDocument.js';
+import type { ActorGroundContact, ReadonlyScene } from './SceneEditorDocument.js';
 
 type ActorData = DeepReadonly<SceneActorDefinition>;
 interface PreviewEntry {
@@ -82,6 +83,22 @@ export class SceneActorPreview {
       if (offset !== undefined) offsets.set(id, offset);
     }
     return offsets;
+  }
+  /** All rig contacts are retained, including unavailable ones, so they never fall back silently. */
+  groundContacts(): ReadonlyMap<string, readonly ActorGroundContact[]> {
+    return new Map(
+      [...this.instances].map(([id, { actor }]) => {
+        const points = new Map(evaluatedFootContacts(actor.puppet).map((contact) => [contact.id, contact.world]));
+        return [
+          id,
+          (actor.puppet.rig.footContactMarkers ?? []).map((marker) => ({
+            id: marker.id,
+            name: marker.name,
+            offset: points.has(marker.id) ? points.get(marker.id)!.y - actor.position.y : undefined,
+          })),
+        ];
+      }),
+    );
   }
   dispose(): void {
     const previous = [...this.instances.values()];
