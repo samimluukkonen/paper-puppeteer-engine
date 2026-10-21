@@ -262,52 +262,90 @@ test('animation recovery ignores reordered tracks and retains changed-source dra
   expect(download.suggestedFilename()).toBe('retained-editor-drafts.json');
   expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(stored);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await page.locator('#animation-clear-retained-drafts').click();
+  await expect.poll(() => draftKeys(page)).toHaveLength(0);
+  await expect(page.locator('#animation-clear-retained-drafts')).toBeHidden();
+  await expect(page.locator('#animation-download-retained-drafts')).toBeHidden();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
 
-test('declining animation draft recovery keeps the loaded source and preserves the stored draft', async ({ page }) => {
+test('declined animation drafts can be cleared together to stop later recovery prompts', async ({ page }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await (await animationControl(page, '#animation-mode')).selectOption('stepped');
+  await expect.poll(() => draftKeys(page)).toHaveLength(1);
+  await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((entry) => entry.startsWith('paper-puppeteer:draft:'))!;
+    const text = localStorage.getItem(key)!;
+    for (let index = 0; index < 3; ++index) localStorage.setItem(`${key}-older-${index}`, text);
+  });
+  const dialogs: string[] = [];
   page.on('dialog', async (dialog) => {
     if (dialog.type() === 'beforeunload') await dialog.accept();
-    else await dialog.dismiss();
+    else {
+      dialogs.push(dialog.message());
+      await dialog.dismiss();
+    }
   });
   await page.reload();
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
-  await expect.poll(() => draftKeys(page)).toHaveLength(1);
+  await expect.poll(() => draftKeys(page)).toHaveLength(4);
+  expect(dialogs).toHaveLength(4);
+  await page.locator('#animation-clear-retained-drafts').click();
+  await expect.poll(() => draftKeys(page)).toHaveLength(0);
+  await expect(page.locator('#animation-clear-retained-drafts')).toBeHidden();
+  await expect(page.locator('#animation-download-retained-drafts')).toBeHidden();
+  expect(dialogs).toHaveLength(4);
+  await page.reload();
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  expect(dialogs).toHaveLength(4);
 });
 
-test('rig source changes retain unsaved edits for manual download', async ({ page }) => {
-  let changed = false;
-  await page.route('**/demo-puppet/rig.json', async (route) => {
-    const response = await route.fetch();
-    const rig = rigFileSchema.parse(await response.json());
-    await route.fulfill({ json: { ...rig, ...(changed ? { name: 'Updated source' } : {}) } });
+for (const cleanupView of ['Rig Editor', 'Rig Tweak'] as const) {
+  test(`rig source changes retain drafts for download and cleanup in ${cleanupView}`, async ({ page }) => {
+    let changed = false;
+    await page.route('**/demo-puppet/rig.json', async (route) => {
+      const response = await route.fetch();
+      const rig = rigFileSchema.parse(await response.json());
+      await route.fulfill({ json: { ...rig, ...(changed ? { name: 'Updated source' } : {}) } });
+    });
+    await page.goto('rig-editor/');
+    await selectRigEntry(page, 'head');
+    const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
+    await x.fill('44');
+    await x.press('Tab');
+    await expect.poll(() => draftKeys(page)).toHaveLength(1);
+    page.on('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+    changed = true;
+    await page.reload();
+    await expect(page.locator('#rig-draft-status')).toContainText('retained');
+    await selectRigEntry(page, 'head');
+    await expect(x).toHaveValue('0');
+    const stored = await page.evaluate(() => JSON.stringify(localStorage));
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator('#rig-download-retained-drafts').click(),
+    ]);
+    const json = await readFile(await download.path(), 'utf8');
+    expect(json).toContain('"x":44');
+    expect(json).toContain('"directions"');
+    expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(stored);
+    await expect(page.locator('#dirty-status')).toHaveText('No changes');
+    if (cleanupView === 'Rig Tweak') {
+      await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
+      await page.locator('#editor-mode').selectOption('rig-tweak');
+      await page.locator('#tweak-rig-clear-retained-drafts').click();
+      await expect(page.locator('#tweak-rig-clear-retained-drafts')).toBeHidden();
+      await expect(page.locator('#tweak-rig-download-retained-drafts')).toBeHidden();
+      await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
+    } else await page.locator('#rig-clear-retained-drafts').click();
+    await expect.poll(() => draftKeys(page)).toHaveLength(0);
+    await expect(page.locator('#rig-clear-retained-drafts')).toBeHidden();
+    await expect(page.locator('#rig-download-retained-drafts')).toBeHidden();
+    await expect(page.locator('#dirty-status')).toHaveText('No changes');
   });
-  await page.goto('rig-editor/');
-  await selectRigEntry(page, 'head');
-  const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
-  await x.fill('44');
-  await x.press('Tab');
-  await expect.poll(() => draftKeys(page)).toHaveLength(1);
-  page.on('dialog', async (dialog) => {
-    await dialog.accept();
-  });
-  changed = true;
-  await page.reload();
-  await expect(page.locator('#rig-draft-status')).toContainText('retained');
-  await selectRigEntry(page, 'head');
-  await expect(x).toHaveValue('0');
-  const stored = await page.evaluate(() => JSON.stringify(localStorage));
-  const [download] = await Promise.all([
-    page.waitForEvent('download'),
-    page.locator('#rig-download-retained-drafts').click(),
-  ]);
-  const json = await readFile(await download.path(), 'utf8');
-  expect(json).toContain('"x":44');
-  expect(json).toContain('"directions"');
-  expect(await page.evaluate(() => JSON.stringify(localStorage))).toBe(stored);
-  await expect(page.locator('#dirty-status')).toHaveText('No changes');
-});
+}

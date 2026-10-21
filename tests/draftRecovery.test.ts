@@ -415,6 +415,87 @@ test('failed restoration retains the draft for manual download', () => {
   assert.include(recovery.retainedDraftsJson()!, stored);
 });
 
+test('bulk cleanup removes declined and incompatible drafts without another prompt or later recovery prompts', () => {
+  const { recovery, session, values, confirm, retainedCounts, status } = fixture();
+  for (const [id, source] of [
+    ['legacy', 'original'],
+    ['older', 'original'],
+    ['stale', 'old source'],
+  ] as const) {
+    values.set(`paper-puppeteer:draft:a:session:${id}`, JSON.stringify({ version: 1, source, data: { value: 8 } }));
+  }
+  confirm.mockReturnValue(false);
+  recovery.bind(session);
+  assert.equal(confirm.mock.calls.length, 2);
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 3);
+  recovery.clearRetainedDrafts();
+  assert.equal(values.size, 0);
+  assert.equal(confirm.mock.calls.length, 2);
+  assert.isUndefined(recovery.retainedDraftsJson());
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 0);
+  assert.include(status.mock.calls.at(-1)![0], 'Retained drafts cleared');
+  recovery.bind(session);
+  assert.equal(confirm.mock.calls.length, 2);
+  assert.isFalse(session.dirty());
+  assert.deepEqual(session.snapshot(), { value: 0 });
+});
+
+test('cleanup preserves restored edits, pending autosave, other documents and unrelated browser data', () => {
+  const { recovery, session, values } = fixture();
+  const newest = JSON.stringify({ version: 1, source: 'original', data: { value: 9 }, savedAt: '2026-10-21' });
+  values.set('paper-puppeteer:draft:a:session:newest', newest);
+  values.set('paper-puppeteer:draft:a', JSON.stringify({ version: 1, source: 'original', data: { value: 8 } }));
+  values.set('paper-puppeteer:draft:b', newest);
+  values.set('preferences', 'keep');
+  recovery.bind(session);
+  recovery.clearRetainedDrafts();
+  assert.deepEqual(
+    [...values.keys()],
+    ['paper-puppeteer:draft:a:session:newest', 'paper-puppeteer:draft:b', 'preferences'],
+  );
+  assert.deepEqual(session.snapshot(), { value: 9 });
+  assert.isTrue(session.dirty());
+  recovery.flush();
+  assert.isFalse(values.has('paper-puppeteer:draft:a:session:newest'));
+  assert.equal(values.get('paper-puppeteer:draft:b'), newest);
+  assert.equal(values.get('preferences'), 'keep');
+  assert.equal(values.size, 3);
+});
+
+test('cleanup keeps a newer revision written by another tab after retention', () => {
+  const { recovery, session, values, status } = fixture(
+    JSON.stringify({ version: 1, source: 'old source', data: { value: 8 } }),
+  );
+  recovery.bind(session);
+  const newer = JSON.stringify({ version: 1, source: 'original', data: { value: 10 } });
+  values.set('paper-puppeteer:draft:a', newer);
+  recovery.clearRetainedDrafts();
+  assert.equal(values.get('paper-puppeteer:draft:a'), newer);
+  assert.include(status.mock.calls.at(-1)![0], 'Newer drafts from other tabs were kept');
+  assert.isUndefined(recovery.retainedDraftsJson());
+});
+
+test('partial cleanup failures keep remaining drafts downloadable and allow retry', () => {
+  const stored = JSON.stringify({ version: 1, source: 'old source', data: { value: 8 } });
+  const { recovery, session, values, storage, retainedCounts, status } = fixture(stored);
+  values.set('paper-puppeteer:draft:a:session:older', stored);
+  recovery.bind(session);
+  storage.removeItem.mockImplementationOnce((key: string) => {
+    values.delete(key);
+  });
+  storage.removeItem.mockImplementationOnce(() => {
+    throw new Error('Storage disabled');
+  });
+  assert.doesNotThrow(() => recovery.clearRetainedDrafts());
+  assert.equal(values.size, 1);
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 1);
+  assert.include(status.mock.calls.at(-1)![0], 'Could not clear all');
+  assert.include(recovery.retainedDraftsJson()!, stored);
+  recovery.clearRetainedDrafts();
+  assert.equal(values.size, 0);
+  assert.equal(retainedCounts.mock.calls.at(-1)![0], 0);
+});
+
 test('replacing a source within one controller cannot overwrite its retained draft', () => {
   const { recovery, session, edit, values } = fixture();
   recovery.bind(session);

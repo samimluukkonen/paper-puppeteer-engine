@@ -122,8 +122,17 @@ export function RigEditorView({
           </div>
           <div className="rig-recovery" role="group" aria-label="Rig draft recovery">
             <p id="rig-draft-status" role="status" />
-            <button id="rig-download-retained-drafts" type="button" hidden>
+            <button id="rig-download-retained-drafts" className="workspace-primary" type="button" hidden>
               Download retained drafts
+            </button>
+            <button
+              id="rig-clear-retained-drafts"
+              className="workspace-danger"
+              type="button"
+              title="Permanently delete retained browser drafts for this rig"
+              hidden
+            >
+              Clear retained drafts
             </button>
           </div>
         </section>

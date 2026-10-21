@@ -243,8 +243,17 @@ export function AnimationEditorView({
           </div>
           <div className="animation-recovery" role="group" aria-label="Draft recovery">
             <p id="animation-draft-status" role="status"></p>
-            <button id="animation-download-retained-drafts" type="button" hidden>
+            <button id="animation-download-retained-drafts" className="workspace-primary" type="button" hidden>
               Download retained drafts
+            </button>
+            <button
+              id="animation-clear-retained-drafts"
+              className="workspace-danger"
+              type="button"
+              title="Permanently delete retained browser drafts for this animation"
+              hidden
+            >
+              Clear retained drafts
             </button>
           </div>
         </section>

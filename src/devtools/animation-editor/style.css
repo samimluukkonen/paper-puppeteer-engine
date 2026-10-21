@@ -1436,7 +1436,8 @@ a {
 .rig-tweak-panel #tweak-inspector input:invalid {
   border-color: var(--danger-fg);
 }
-.rig-tweak-panel #tweak-rig-download-retained-drafts {
+.rig-tweak-panel #tweak-rig-download-retained-drafts,
+.rig-tweak-panel #tweak-rig-clear-retained-drafts {
   margin-bottom: 16px;
 }
 .rig-tweak-panel #tweak-session-status table {

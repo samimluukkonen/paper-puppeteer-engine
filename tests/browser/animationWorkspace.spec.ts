@@ -152,11 +152,13 @@ test('narrow session controls wrap and draft recovery stays on its own row', asy
   // Reproduce the retained-draft notice without depending on a particular character's storage revision.
   await page.locator('#animation-draft-status').evaluate((element) => {
     element.textContent =
-      '1 older draft(s) could not be restored and were retained. Download retained drafts to recover their JSON manually.';
+      '1 browser draft(s) retained. Download retained drafts to recover their JSON manually, or clear them if no longer needed.';
   });
-  await page.locator('#animation-download-retained-drafts').evaluate((element) => {
-    (element as HTMLButtonElement).hidden = false;
-  });
+  await page
+    .locator('#animation-download-retained-drafts, #animation-clear-retained-drafts')
+    .evaluateAll((elements) => {
+      for (const element of elements) (element as HTMLButtonElement).hidden = false;
+    });
   const bar = (await page.locator('.animation-command-bar').boundingBox())!;
   for (const selector of ['.animation-session-selection', '.animation-session-actions', '.animation-recovery']) {
     const box = (await page.locator(selector).boundingBox())!;

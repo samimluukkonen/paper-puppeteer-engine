@@ -181,7 +181,7 @@ src/devtools/animation-editor/
   TimelineNavigationController.ts  Native scroll/zoom controls, precise jumps and optional playback follow
 src/devtools/shared/
   DraftRecovery.ts      Browser drafts, compatible restoration and retained incompatible JSON
-  DraftRecoveryControls.ts  Shared recovery feedback and manual retained-draft downloads
+  DraftRecoveryControls.ts  Shared recovery feedback, retained-draft downloads and cleanup
   SnapshotHistory.ts   Bounded snapshot history and operation grouping
   editorGame.ts        Shared Phaser rendering and scaling defaults for editor previews
   editorCamera.ts      Reusable screen-space panning and pointer-anchored camera zoom

@@ -144,6 +144,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
     app.querySelector<HTMLElement>('#animation-draft-status')!,
     app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
+    app.querySelector<HTMLButtonElement>('#animation-clear-retained-drafts')!,
   );
   const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
   const releaseArtworkPackage = artwork.subscribe(packages.refresh);

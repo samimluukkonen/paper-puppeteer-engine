@@ -88,8 +88,17 @@ export function RigTweakPanel({ active }: { active: boolean }) {
       <div id="tweak-validation" role="status" />
       <div id="tweak-action-feedback" role="status" />
       <p id="tweak-rig-draft-status" role="status" />
-      <button id="tweak-rig-download-retained-drafts" type="button" hidden>
+      <button id="tweak-rig-download-retained-drafts" className="workspace-primary" type="button" hidden>
         Download retained rig drafts
+      </button>
+      <button
+        id="tweak-rig-clear-retained-drafts"
+        className="workspace-danger"
+        type="button"
+        title="Permanently delete retained browser drafts for this rig"
+        hidden
+      >
+        Clear retained rig drafts
       </button>
       <details>
         <summary>Rig session</summary>

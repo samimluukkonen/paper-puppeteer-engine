@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Add one-click retained-draft cleanup in Animation Editor, Rig Editor and Rig Tweak, including declined recovery candidates, to prevent repeated restore prompts on later visits. Use red danger styling for cleanup and green for retained-draft downloads.
+
 - Require PNG-header checks before decoding character artwork by default; trusted alternative formats can opt out with `requirePng: false`.
 
 - Publish completed Animation Editor commands in one state notification.

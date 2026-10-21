@@ -41,7 +41,7 @@ export class DraftRecovery<Snapshot> {
   private pendingFlush = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private readonly lifetime = new AbortController();
-  private readonly retained: { text: string }[] = [];
+  private readonly retained: { key: string; text: string }[] = [];
   private readonly owners = new Map<string, { owner: string; persisted: string | null }>();
   private readonly discovered = new Map<string, { key: string; text: string }>();
 
@@ -71,7 +71,7 @@ export class DraftRecovery<Snapshot> {
 
   private reportStatus(message: string): void {
     const retained = this.retained.length
-      ? `${this.retained.length} older draft(s) could not be restored and were retained. Download retained drafts to recover their JSON manually.`
+      ? `${this.retained.length} browser draft(s) retained. Download retained drafts to recover their JSON manually, or clear them if no longer needed.`
       : '';
     this.status([message, retained].filter(Boolean).join(' '));
   }
@@ -80,6 +80,29 @@ export class DraftRecovery<Snapshot> {
   retainedDraftsJson(): string | undefined {
     if (!this.retained.length) return undefined;
     return `{\n  "version": 1,\n  "drafts": [\n${this.retained.map(({ text }) => text).join(',\n')}\n  ]\n}\n`;
+  }
+
+  /** Explicit bulk removal affects only the retained revisions of the bound document. */
+  clearRetainedDrafts(): void {
+    if (!this.retained.length) return;
+    let newerDraftsKept = false;
+    try {
+      for (let index = this.retained.length - 1; index >= 0; --index) {
+        const { key, text } = this.retained[index]!;
+        const current = window.localStorage.getItem(key);
+        if (current !== null && current !== text) newerDraftsKept = true;
+        this.removeDraft(key, text);
+        this.retained.splice(index, 1);
+      }
+      this.reportStatus(
+        newerDraftsKept
+          ? 'Retained drafts cleared. Newer drafts from other tabs were kept.'
+          : 'Retained drafts cleared.',
+      );
+    } catch {
+      this.reportStatus('Could not clear all retained browser drafts. Try again or download them to save your work.');
+    }
+    this.retainedDraftsChanged(this.retained.length);
   }
 
   /** Discover missing documents without registering them until validated restoration is accepted. */
@@ -175,7 +198,7 @@ export class DraftRecovery<Snapshot> {
         return [];
       }
       if (!sameDraftSource(parsed.data.source, session.source) || !session.validate(parsed.data.data)) {
-        this.retained.push({ text });
+        this.retained.push({ key, text });
         return [];
       }
       const timestamp = Date.parse(parsed.data.savedAt ?? '');
@@ -218,15 +241,16 @@ export class DraftRecovery<Snapshot> {
             this.recovered = { key, text };
             this.reportStatus('Draft restored. Download JSON to save your work.');
             break;
-          } else {
-            this.retained.push({ text });
-            this.reportStatus('The draft could not be restored.');
           }
         }
         // Declining restoration only skips this candidate. Its owner may still
         // be editing in another tab, so rejection must not discard its backup.
       }
-      if (this.retained.length && !this.recovered) this.reportStatus('');
+      // Keep every unselected candidate accessible for download or explicit bulk removal.
+      this.retained.push(
+        ...candidates.filter(({ key }) => key !== this.recovered?.key).map(({ key, text }) => ({ key, text })),
+      );
+      this.reportStatus(this.recovered ? 'Draft restored. Download JSON to save your work.' : '');
     } catch {
       this.reportStatus('Browser draft recovery is unavailable. Download JSON to save your work.');
     }

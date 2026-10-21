@@ -74,6 +74,12 @@ export class RigTweakController {
           app.parentElement?.querySelectorAll<HTMLButtonElement>('#editor-app #rig-download-retained-drafts') ?? [],
         ),
       ],
+      [
+        app.querySelector<HTMLButtonElement>('#tweak-rig-clear-retained-drafts')!,
+        ...Array.from(
+          app.parentElement?.querySelectorAll<HTMLButtonElement>('#editor-app #rig-clear-retained-drafts') ?? [],
+        ),
+      ],
     );
     const recovery = recoveryControls.recovery;
     const session = createSessionController(

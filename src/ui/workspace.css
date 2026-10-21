@@ -140,6 +140,14 @@
 .workspace-shell .workspace-primary:hover:not(:disabled) {
   background: var(--success-hover);
 }
+.workspace-shell .workspace-danger {
+  color: var(--danger-fg);
+}
+.workspace-shell .workspace-danger:hover:not(:disabled) {
+  color: var(--fg-on-emphasis);
+  background: var(--danger-emphasis);
+  border-color: var(--danger-fg);
+}
 .workspace-feedback {
   display: flex;
   flex-wrap: wrap;
