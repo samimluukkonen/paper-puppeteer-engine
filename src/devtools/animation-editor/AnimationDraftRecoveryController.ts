@@ -117,6 +117,7 @@ export class AnimationDraftRecoveryController {
             label: `animation "${animation}"`,
             snapshot: () => state.workingAnimation,
             dirty: () => state.dirty,
+            committed: () => !state.hasPendingAnimationEdits,
             data: (snapshot) => snapshot,
             validate: (data) => {
               try {

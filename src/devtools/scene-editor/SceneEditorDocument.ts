@@ -123,6 +123,9 @@ export class SceneEditorDocument {
   get canRedo(): boolean {
     return this.entry?.history.canRedo ?? false;
   }
+  get hasOpenOperation(): boolean {
+    return [...this.entries.values()].some((entry) => entry.history.inOperation);
+  }
 
   reportError(error: unknown): false {
     this.issues = freezeData(

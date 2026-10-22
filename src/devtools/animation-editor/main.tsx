@@ -1,4 +1,5 @@
-import { useLayoutEffect, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { canonicalJson } from '../../engine/authoredSerialization.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
@@ -11,6 +12,9 @@ import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceControll
 import '../rig-editor/style.css';
 import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
+import { buildCharacterDraft } from '../shared/autosave/editorDrafts.js';
+import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
@@ -19,6 +23,7 @@ import { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { workspaceGuideHost } from '../shared/guides/workspaceGuideHost.js';
 import { browserCharacterDrafts } from '../shared/newCharacter.js';
 import { PackageController } from '../shared/package/PackageController.js';
+import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { bindWorkspaceNavigation, workspaceView } from '../shared/WorkspaceNavigation.js';
 import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
@@ -79,13 +84,22 @@ const ikBake = new IKBakeController(
   (pose) => scene?.setBakePreview(pose),
   () => scene?.getBakeRuntimeConstraints() ?? [],
 );
+let showAutosave: ((autosave: LocalAutosave | undefined) => void) | undefined;
 function CharacterWorkspace() {
+  const [autosave, setAutosave] = useState<LocalAutosave>();
+  useLayoutEffect(() => {
+    showAutosave = setAutosave;
+    return () => {
+      showAutosave = undefined;
+    };
+  }, []);
   const snapshot = useSyncExternalStore(rigTweak.subscribe, rigTweak.getSnapshot);
   const packageState = useSyncExternalStore(packages.subscribe, packages.getSnapshot);
   const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
   useLayoutEffect(() => movePreview?.(), [rigView]);
   return (
     <FeatureGuide launcher={guides} targets={guideTargets}>
+      {!projectContext && <LocalDraftControls {...(autosave ? { autosave } : {})} />}
       {initialDraft && (
         <p className="workspace-caption" role="status" aria-label="Character draft">
           {initialDraft.identity.name} · {initialDraft.identity.id} ·{' '}
@@ -122,6 +136,7 @@ function CharacterWorkspace() {
   );
 }
 const unmount = mountView(host, <CharacterWorkspace />, (root) => {
+  let autosave: LocalAutosave | undefined;
   const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
   const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
   let focusViewOnMove = false;
@@ -133,6 +148,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       // Still notify the shared rig recovery owner used by both editor views.
       rigTweak.refresh();
       packages.refresh();
+      projectContext?.changed();
+      autosave?.update();
       guides.refresh();
     },
   );
@@ -153,17 +170,39 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     app.querySelector<HTMLButtonElement>('#animation-clear-retained-drafts')!,
   );
   const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
-  const releaseArtworkPackage = artwork.subscribe(packages.refresh);
+  const releaseArtworkPackage = artwork.subscribe(() => {
+    packages.refresh();
+    projectContext?.changed();
+    autosave?.update();
+  });
   let releaseAnimationPackage: (() => void) | undefined;
   let releaseWorkspaceSelection: (() => void) | undefined;
   let releaseProject: (() => void) | undefined;
+  let pollAutosave: ReturnType<typeof setInterval> | undefined;
+  const flushLocal = (): void => {
+    void autosave?.flush();
+  };
+  const leaveLocal = (): void => autosave?.suspend();
+  const resumeLocal = (): void => autosave?.start();
+  const hiddenLocal = (): void => {
+    if (document.visibilityState === 'hidden') flushLocal();
+  };
+  window.addEventListener('pagehide', leaveLocal);
+  window.addEventListener('pageshow', resumeLocal);
+  document.addEventListener('visibilitychange', hiddenLocal);
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       stateOwner = state;
+      autosave?.dispose();
+      clearInterval(pollAutosave);
       releaseProject?.();
       releaseProject = projectContext?.bindCharacter(
         () => editorScene.packageSnapshot(),
-        () => editorScene.hasPendingArtworkProposal || artwork.getSnapshot().importing,
+        () =>
+          editorScene.hasPendingArtworkProposal ||
+          artwork.getSnapshot().importing ||
+          !!editorScene.rigEditor?.state.validationPending ||
+          state.hasPendingAnimationEdits,
         (view) => {
           workspaceRoutes?.navigate(view);
         },
@@ -215,8 +254,36 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
           ? { ...snapshot, definition: projectContext.sourceDefinition }
           : snapshot;
       }, !!initialDraft);
+      if (!projectContext) {
+        const fingerprints = new PackageFingerprints();
+        const key = `character:${new URL('../', location.href).pathname}:${id}`;
+        const projectId = crypto.randomUUID();
+        autosave = new LocalAutosave(key, localDrafts, () => {
+          if (
+            editorScene.hasPendingArtworkProposal ||
+            artwork.getSnapshot().importing ||
+            editorScene.rigEditor?.state.validationPending ||
+            state.hasPendingAnimationEdits
+          )
+            return undefined;
+          const snapshot = editorScene.packageSnapshot();
+          return {
+            name: snapshot.rig.name ?? id,
+            revision: canonicalJson(fingerprints.compute(snapshot)),
+            dirty: packages.hasUnsavedChanges,
+            build: () => buildCharacterDraft(editorScene.packageSnapshot(), projectId),
+          };
+        });
+        autosave.start();
+        pollAutosave = setInterval(() => autosave?.update(), 500);
+        showAutosave?.(autosave);
+      }
       releaseAnimationPackage?.();
-      releaseAnimationPackage = state.subscribe(packages.refresh);
+      releaseAnimationPackage = state.subscribe(() => {
+        packages.refresh();
+        projectContext?.changed();
+        autosave?.update();
+      });
       if (initialRigView) state.setEditorMode('rig');
       guides.refresh();
       movePreview?.();
@@ -256,6 +323,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       rigTweak.refresh();
       if (editorScene.rigEditor) rigWorkspace.render(editorScene.rigEditor);
       packages.refresh();
+      projectContext?.changed();
+      autosave?.update();
       guides.refresh();
     },
   );
@@ -338,6 +407,11 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   });
 
   return () => {
+    autosave?.dispose();
+    clearInterval(pollAutosave);
+    window.removeEventListener('pagehide', leaveLocal);
+    window.removeEventListener('pageshow', resumeLocal);
+    document.removeEventListener('visibilitychange', hiddenLocal);
     workspaceRoutes?.dispose();
     releaseProject?.();
     workspaceRoutes = undefined;

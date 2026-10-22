@@ -1,8 +1,8 @@
-# Project workspace (v1.0.1)
+# Project workspace (v1.0.2)
 
 [All guides](../README.md#guides)
 
-Open **Project Workspace** from the application header, or visit `/project/`. Choose **New Project**, enter a name, and choose **Create Project**. The project starts with no characters, images, animations or scenes. Projects live in this tab until you export them.
+Open **Project Workspace** from the application header, or visit `/project/`. Choose **New Project**, enter a name, and choose **Create Project**. The project starts with no characters, images, animations or scenes. [Local autosave and crash recovery](local-autosave.md) retain complete browser drafts, including imported artwork. Export a project ZIP for a portable disk copy.
 
 ## Authoring workflow
 
@@ -75,6 +75,6 @@ PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/projectWorkspace.spe
 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/projectWorkspace.spec.ts
 ```
 
-## Deferred to v1.0.2
+## Local autosave and recovery
 
-Project autosave, IndexedDB binary persistence, startup crash recovery, storage/quota failure handling, retention policies and multiple-tab edit warnings remain deferred to [v1.0.2](../plans/plan-v1.0.2.md). Export a project ZIP before refreshing or closing the tab. Detailed dependency diagnostics/repair remain outside this milestone.
+Committed changes autosave locally after a modest debounce. Startup offers explicit recovery, discard or cancellation, with the actual save timestamp. Two complete revisions per draft are retained for at most ten local projects. The local-save status and recovery controls remain visible while a project editor is open. Concurrent tab/session writers are blocked; storage failures preserve previous drafts and prompt an explicit export/retry. See [local autosave](local-autosave.md) for the persistence format, lifecycle, failure handling and verification. Detailed dependency diagnostics/repair remain outside this milestone.

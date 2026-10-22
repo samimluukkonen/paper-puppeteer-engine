@@ -61,6 +61,21 @@ function fixture(stored?: string) {
   return { recovery, session, values, storage, confirm, status, retainedCounts, edit, windowTarget, documentTarget };
 }
 
+test('legacy JSON recovery also waits for committed operations before writing', () => {
+  const { recovery, session, edit, storage } = fixture();
+  let committed = true;
+  recovery.bind({ ...session, committed: () => committed });
+  edit(1);
+  committed = false;
+  edit(2);
+  vi.advanceTimersByTime(1000);
+  assert.equal(storage.setItem.mock.calls.length, 0);
+  committed = true;
+  recovery.update();
+  vi.advanceTimersByTime(300);
+  assert.equal(storage.setItem.mock.calls.length, 1);
+});
+
 test('authored edits debounce and unchanged playback notifications do not postpone or repeat writes', () => {
   const { recovery, session, edit, storage } = fixture();
   recovery.bind(session);

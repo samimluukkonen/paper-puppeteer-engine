@@ -62,6 +62,9 @@ export function characterFileFetcher(files: PackageFiles): typeof fetch {
 export async function buildProjectPackage(workspace: ProjectWorkspace) {
   const metadata = parseProjectDefinition(workspace.definition);
   const characters = new Map(metadata.characters.map(({ id }) => [id, workspace.captureCharacter(id)]));
+  const sources = new Map(
+    metadata.characters.map(({ id }) => [id, characterFileFetcher(workspace.character(id).files)]),
+  );
   const scenes = metadata.scenes.map(({ id }) => workspace.validateScene(workspace.scenes.scene(id)));
   const files = new Map<string, Uint8Array<ArrayBuffer>>();
   const sharedImages = new Map<string, string>();
@@ -71,7 +74,7 @@ export async function buildProjectPackage(workspace: ProjectWorkspace) {
   };
   for (const entry of metadata.characters) {
     const captured = characters.get(entry.id)!;
-    const packaged = await buildCharacterPackage(captured, characterFileFetcher(workspace.character(entry.id).files));
+    const packaged = await buildCharacterPackage(captured, sources.get(entry.id));
     const textures = new Set(Object.values(captured.definition.manifest!.textures));
     // New artwork can add new paths; inspect the exported manifest, not just its source.
     const exportedManifest = archiveCharacterManifest(packaged);

@@ -149,6 +149,7 @@ export class RigTweakController {
         label: 'rig',
         snapshot: () => editor.state.recoverySnapshot,
         dirty: () => editor.state.dirty,
+        committed: () => !editor.state.validationPending,
         data: (snapshot) => editor.state.createRecoveryDraft(snapshot),
         validate: (data) => editor.state.canRestoreDraft(data),
         restore: (data) => {

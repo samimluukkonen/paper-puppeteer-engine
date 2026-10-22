@@ -6,6 +6,9 @@ import { buildScenePackage } from '../../engine/ScenePackage.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { projectEditorContext } from '../project/projectBridge.js';
+import { sceneDraftSource } from '../shared/autosave/editorDrafts.js';
+import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
@@ -75,6 +78,37 @@ export function SceneEditorView({
   const scene = document.workingScene;
   const project = projectEditorContext();
   const [playback] = useState(() => new SceneEditorPlayback());
+  const [autosave] = useState(() => {
+    const id = crypto.randomUUID();
+    return project
+      ? undefined
+      : new LocalAutosave(`scenes:${location.pathname}`, localDrafts, () => sceneDraftSource(document, registry, id));
+  });
+  useEffect(() => {
+    if (!autosave) return;
+    autosave.start();
+    const unsubscribe = document.subscribe(autosave.update);
+    const poll = setInterval(autosave.update, 500);
+    const flush = (): void => {
+      void autosave.flush();
+    };
+    const leave = (): void => autosave.suspend();
+    const resume = (): void => autosave.start();
+    const hidden = (): void => {
+      if (globalThis.document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', leave);
+    window.addEventListener('pageshow', resume);
+    globalThis.document.addEventListener('visibilitychange', hidden);
+    return () => {
+      clearInterval(poll);
+      unsubscribe();
+      window.removeEventListener('pagehide', leave);
+      window.removeEventListener('pageshow', resume);
+      globalThis.document.removeEventListener('visibilitychange', hidden);
+      autosave.dispose();
+    };
+  }, [autosave, document]);
   const workspace = useRef<HTMLElement>(null);
   const source = document.sourceScene;
   useLayoutEffect(() => {
@@ -153,6 +187,7 @@ export function SceneEditorView({
         );
         // The package contains rebased references; a JSON checkpoint must retain this captured source.
         document.markSaved(snapshot);
+        autosave?.exported();
         setTransferStatus(
           'Scene package downloaded. Extract it for hosting or open the ZIP in the standalone runtime.',
         );
@@ -168,6 +203,7 @@ export function SceneEditorView({
       } else if (kind === 'json') {
         downloadJson(json, sceneExportFilename(snapshot.id, 'json'));
         document.markSaved(snapshot);
+        autosave?.exported();
         setTransferStatus('Scene JSON downloaded. Character references stay relative to the scene file.');
       } else setTransferStatus('Scene and character dependencies are valid.');
     });
@@ -175,6 +211,7 @@ export function SceneEditorView({
   return (
     <>
       <ViewHeader view="scene" />
+      {!project && <LocalDraftControls {...(autosave ? { autosave } : {})} />}
       <div className="workspace-command-bar" aria-label="Scene document commands">
         <div hidden={!!project} className="scene-transfer-commands">
           <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>

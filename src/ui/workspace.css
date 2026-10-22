@@ -74,28 +74,28 @@
 .workspace-shell [hidden] {
   display: none !important;
 }
-:where(.workspace-shell, .feature-guide-dialog) button,
-:where(.workspace-shell) select,
+:where(.workspace-shell, .feature-guide-dialog, .local-recovery) button,
+:where(.workspace-shell, .local-recovery) select,
 :where(.workspace-shell) input {
   min-height: 28px;
   font: inherit;
 }
-:where(.workspace-shell, .feature-guide-dialog) button,
-:where(.workspace-shell) select {
+:where(.workspace-shell, .feature-guide-dialog, .local-recovery) button,
+:where(.workspace-shell, .local-recovery) select {
   cursor: pointer;
 }
-:where(.workspace-shell, .feature-guide-dialog) button {
+:where(.workspace-shell, .feature-guide-dialog, .local-recovery) button {
   padding: 4px 8px;
   border: 1px solid var(--border-default);
   border-radius: 6px;
   color: var(--fg-default);
   background: var(--bg-hover);
 }
-:where(.workspace-shell, .feature-guide-dialog) button:disabled {
+:where(.workspace-shell, .feature-guide-dialog, .local-recovery) button:disabled {
   cursor: default;
   opacity: 0.5;
 }
-:is(.workspace-shell, .feature-guide-dialog) :focus-visible {
+:is(.workspace-shell, .feature-guide-dialog, .local-recovery) :focus-visible {
   outline: 2px solid var(--accent-fg);
   outline-offset: 2px;
 }
@@ -117,6 +117,16 @@
   align-items: center;
   gap: 6px;
 }
+.local-draft-bar > .workspace-command-bar {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.local-draft-bar .workspace-caption {
+  margin: 0;
+}
 .workspace-command-title {
   font-weight: 600;
 }
@@ -131,19 +141,19 @@
   color: var(--fg-muted);
   font-size: 11px;
 }
-.workspace-shell .workspace-primary {
+:is(.workspace-shell, .local-recovery) .workspace-primary {
   background: var(--success-emphasis);
   color: var(--fg-on-emphasis);
   border-color: #ffffff1a;
   font-weight: 600;
 }
-.workspace-shell .workspace-primary:hover:not(:disabled) {
+:is(.workspace-shell, .local-recovery) .workspace-primary:hover:not(:disabled) {
   background: var(--success-hover);
 }
-.workspace-shell .workspace-danger {
+:is(.workspace-shell, .local-recovery) .workspace-danger {
   color: var(--danger-fg);
 }
-.workspace-shell .workspace-danger:hover:not(:disabled) {
+:is(.workspace-shell, .local-recovery) .workspace-danger:hover:not(:disabled) {
   color: var(--fg-on-emphasis);
   background: var(--danger-emphasis);
   border-color: var(--danger-fg);

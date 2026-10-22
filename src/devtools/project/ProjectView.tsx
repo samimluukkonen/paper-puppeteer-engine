@@ -9,6 +9,8 @@ import type { SceneDefinition } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { downloadBlob } from '../../shared/downloadJson.js';
 import puppetLogo from '../../ui/images/puppet-running-header.png';
+import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
 import type { ProjectEditorContext } from './projectBridge.js';
@@ -27,6 +29,8 @@ import '../../ui/workspace.css';
 interface ProjectSession {
   key: string;
   workspace: ProjectWorkspace;
+  autosave: LocalAutosave;
+  releaseAutosave: () => void;
 }
 interface EditorHost {
   token: string;
@@ -82,8 +86,34 @@ export function ProjectView() {
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', guard);
+    const poll = setInterval(() => {
+      for (const session of current.current.sessions) session.autosave.update();
+    }, 500);
+    const flush = (): void => {
+      for (const session of current.current.sessions) void session.autosave.flush();
+    };
+    const leave = (): void => {
+      for (const session of current.current.sessions) session.autosave.suspend();
+    };
+    const resume = (): void => {
+      for (const session of current.current.sessions) session.autosave.start();
+    };
+    const hidden = (): void => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', leave);
+    window.addEventListener('pageshow', resume);
+    document.addEventListener('visibilitychange', hidden);
     const resources = leases.current;
     return () => {
+      clearInterval(poll);
+      window.removeEventListener('pagehide', leave);
+      window.removeEventListener('pageshow', resume);
+      document.removeEventListener('visibilitychange', hidden);
+      for (const session of current.current.sessions) {
+        session.releaseAutosave();
+        session.autosave.dispose();
+      }
       window.removeEventListener('beforeunload', guard);
       if (window.paperProjectEditor === resolve) delete window.paperProjectEditor;
       for (const lease of resources) lease.dispose();
@@ -109,7 +139,28 @@ export function ProjectView() {
     }
   };
   const addProject = (workspace: ProjectWorkspace): void => {
-    const session = { key: crypto.randomUUID(), workspace };
+    const autosave = new LocalAutosave(
+      workspace.recoveryKey ?? `project:${workspace.definition.id}`,
+      localDrafts,
+      () => {
+        const revision = workspace.autosaveRevision;
+        return revision === undefined
+          ? undefined
+          : {
+              revision,
+              name: workspace.definition.name,
+              dirty: workspace.hasUnsavedChanges,
+              build: async () => (await buildProjectPackage(workspace)).files,
+            };
+      },
+    );
+    const session = {
+      key: crypto.randomUUID(),
+      workspace,
+      autosave,
+      releaseAutosave: workspace.subscribe(autosave.update),
+    };
+    autosave.start();
     setSessions((held) => [...held, session]);
     setSelected(session);
     setActive(undefined);
@@ -153,6 +204,7 @@ export function ProjectView() {
     }));
     // Scene runtime definitions are fresh on every opening. The document remains the same owner.
     const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
+    let lastAuthoredRevision = workspace.autosaveRevision;
     const context: ProjectEditorContext = {
       ...(definition
         ? {
@@ -163,6 +215,12 @@ export function ProjectView() {
           }
         : { scenes: workspace.scenes }),
       choices,
+      changed: () => {
+        const revision = workspace.autosaveRevision;
+        if (revision === lastAuthoredRevision) return;
+        lastAuthoredRevision = revision;
+        workspace.refresh();
+      },
       bindScene: (dispose) => {
         disposeScene = dispose;
       },
@@ -194,6 +252,7 @@ export function ProjectView() {
       bindCharacter: (capture, pending, navigate) => {
         const entry = workspace.character(id);
         entry.capture = capture;
+        entry.pending = pending;
         entry.loading = false;
         const host = owners.current.get(token)!;
         host.pending = pending;
@@ -201,6 +260,7 @@ export function ProjectView() {
         workspace.refresh();
         return () => {
           delete entry.capture;
+          delete entry.pending;
           entry.loading = false;
           delete host.pending;
           delete host.openView;
@@ -275,10 +335,12 @@ export function ProjectView() {
       `${workspace.definition.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'project'}.project.zip`,
     );
     workspace.markExported(captured.metadata, captured.characters, captured.scenes);
+    selected?.autosave.exported();
     setStatus('Project ZIP download started. Repository files were not overwritten.');
   };
   return (
     <div className="view-shell workspace-shell project-workspace">
+      <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
       <div hidden={!!active}>
         <header className="view-header">
           <div className="view-header-top">

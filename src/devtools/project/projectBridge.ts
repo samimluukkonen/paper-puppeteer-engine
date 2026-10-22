@@ -10,6 +10,7 @@ export interface ProjectEditorContext {
   readonly fetcher?: typeof fetch;
   readonly scenes?: SceneEditorDocument;
   readonly choices: readonly { id: string; label: string; manifest: string }[];
+  changed(): void;
   loadCharacter(reference: string): Promise<CharacterDefinition>;
   bindScene(dispose: () => void): void;
   validateScene(scene: ReadonlyScene): void;

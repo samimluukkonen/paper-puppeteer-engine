@@ -25,6 +25,7 @@ export interface DraftSession<Snapshot> {
   readonly context?: unknown;
   snapshot(this: void): Snapshot;
   dirty(this: void): boolean;
+  committed?(this: void): boolean;
   data(this: void, snapshot: Snapshot): unknown;
   validate(this: void, data: unknown): boolean;
   restore(this: void, data: unknown): boolean;
@@ -261,7 +262,7 @@ export class DraftRecovery<Snapshot> {
   /** Snapshot identity keeps playback notifications from serializing unchanged documents. */
   update(): void {
     const session = this.session;
-    if (!session || this.lifetime.signal.aborted) return;
+    if (!session || this.lifetime.signal.aborted || session.committed?.() === false) return;
     const snapshot = session.snapshot();
     const dirty = session.dirty();
     if (snapshot === this.snapshot && dirty === this.dirty) return;
@@ -277,7 +278,7 @@ export class DraftRecovery<Snapshot> {
   flush(): void {
     this.cancelTimer();
     const session = this.session;
-    if (!session || this.dirty === undefined || !this.pendingFlush) return;
+    if (!session || this.dirty === undefined || !this.pendingFlush || session.committed?.() === false) return;
     try {
       const key = this.ownedKey(session);
       if (!this.dirty) {

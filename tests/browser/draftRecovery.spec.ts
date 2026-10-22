@@ -6,6 +6,14 @@ import { selectAnimationBone, animationControl, rigFileAction, test, selectRigEn
 const draftKeys = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('paper-puppeteer:draft:')));
 
+// Exercise the existing JSON-only fallback when IndexedDB is unavailable. Complete binary/project
+// persistence, startup recovery and tab conflicts run separately in localAutosave.spec.ts.
+test.beforeEach(async ({ page }) => {
+  await page.context().addInitScript(() => {
+    Object.defineProperty(window, 'indexedDB', { value: undefined });
+  });
+});
+
 test('new clips absent from the manifest recover after reload with their keys and unsaved status', async ({ page }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-new')).toBeEnabled();
@@ -146,10 +154,12 @@ test('rig draft recovery restores unsaved numeric edits as one undoable operatio
   await selectRigEntry(page, 'head');
   const x = page.locator('#inspector input[data-scope="bone"][data-field="x"]');
   await x.fill('44');
-  await expect.poll(() => draftKeys(page)).toHaveLength(1);
-  // Autosave must not end the field's history group while it remains focused.
+  // A focused field remains an uncommitted history operation past the legacy debounce.
+  await page.waitForTimeout(400);
+  expect(await draftKeys(page)).toHaveLength(0);
   await x.fill('45');
   await page.getByRole('heading', { name: 'Rig Editor Bind Pose' }).click();
+  await expect.poll(() => draftKeys(page)).toHaveLength(1);
   const dialogs: string[] = [];
   page.on('dialog', async (dialog) => {
     dialogs.push(dialog.type());

@@ -1,0 +1,74 @@
+# Local autosave and crash recovery (v1.0.2)
+
+The Project Workspace, Rig Editor, Animation Editor and Scene Editor retain complete local drafts in IndexedDB. This is browser storage, **not a file save or backup service**. Export a project or character ZIP for a portable disk copy. Clearing site data also clears recovery drafts.
+
+Committed authored changes are checked every 500 ms and saved after a 1-second debounce. Open rig field/drag operations, animation key/event/IK gestures, uncommitted animation transforms, artwork proposals/imports and scene Actor/action gestures block capture. Playback, scrubbing, selections, camera settings, guides, temporary textures and other preview/UI state do not change the authored fingerprint. Hidden-page flushing is best effort. An unexpected close can lose changes since the last completed local save; it cannot finish an asynchronous package build reliably during unload.
+
+## Ownership and consistent capture
+
+`ProjectWorkspace` remains the project metadata owner. The retained character editor owns its rig, skins, animations and artwork; `SceneEditorDocument` owns scene working copies. Autosave reads those owners without ending gestures, marking exports, changing Undo/Redo or installing snapshots. Switching project/editor views retains these owners and each project's autosave controller.
+
+`buildProjectPackage` captures project metadata, all character snapshots, source file fetchers and all scenes synchronously before asynchronous binary reads. Existing character/scene/package validators preflight the full detached payload. Replacement/imported artwork contributes its immutable Blob bytes. No draft references temporary Blob URLs. Standalone character drafts wrap their complete character package in a project; standalone scene drafts wrap all retained scenes and their character dependencies, rebasing references through the project packager.
+
+## Persistence format and retention
+
+Database: `paper-puppeteer-recovery`, database version **1**.
+
+- `drafts`: records keyed by a revision UUID, with a document `key` index. Each envelope has `version: 1`, `id`, `key`, `name`, an actual `savedAt` timestamp in epoch milliseconds, the authored `revision` fingerprint, and `files: [{ path, blob, digest }]`. JSON documents are canonical UTF-8 package files; image files contain actual binary data. Each digest is SHA-256.
+- `leases`: `{ key, owner, expires }` records for exclusive autosave writers.
+
+A read/write transaction checks/renews the lease, inserts the complete envelope and every Blob, and removes superseded revisions together. Interrupted or quota-failed transactions leave previous revisions intact. Validation, hashing and other asynchronous package work happen before that transaction. Existing package/path/JSON/image budgets remain in force.
+
+Keep **two complete revisions per local draft**, across at most **ten local draft keys**. New draft keys beyond that limit fail with a cleanup instruction; they do not evict someone else's newest draft. Incompatible envelopes are preserved rather than automatically pruned. The recovery dialog lists individual revisions, allowing selection of the preceding revision when the newest cannot be restored. Export never deletes recovery data.
+
+Use **Discard local draft** on the active editor/project to remove that key's revisions and pause its autosave. Use **Retry / Resume local saving** to re-enable it. The **Recovery drafts** dialog can discard obsolete projects, including drafts declined with Cancel. Discard Draft removes all revisions of the selected key. Active foreign leases prevent deletion.
+
+## Startup and recovery
+
+Each authoring route checks for recovery records on startup. The dialog shows the project name, actual local-save timestamp and revision selector, with **Recover Draft**, **Discard Draft** and **Cancel**. Cancel preserves storage and continues ordinary startup; Recovery drafts opens the dialog again.
+
+Recovery reads and verifies every file digest and validates the entire project, including scene dependencies and binary images, before installing anything. It opens a detached project working copy and marks it unexported. Original imported files are never overwritten. Standalone editor recovery navigates to the Project Workspace with the selected draft key, where the user explicitly confirms restoration. Runtime previews recreate disposable object URLs and reuse the existing Phaser texture/resource cleanup paths.
+
+Unknown envelope versions, malformed metadata, corrupt bytes, missing assets and invalid packages produce an actionable message while preserving stored data. Select the other revision or explicitly discard the obsolete draft. Storage denial/unavailability, quota errors and concurrent owners show **Autosave failed** with instructions to export, resolve the problem and retry. Local saving has independent Unsaved changes / Saving locally / Local draft saved / Autosave failed status. Successful explicit project/scene exports are labelled separately; ordinary browser autosaves never mark export checkpoints.
+
+## Multiple tabs
+
+Each autosave controller has a random owner ID. Web Locks hold exclusive browser ownership and release automatically when a document closes or crashes. An acquired browser lock permits immediate recovery over a stale IndexedDB lease after refresh. Lease claims, writes and deletes also use IndexedDB transactions. Leases renew every five seconds and expire after fifteen seconds; these leases provide the fallback in browsers without Web Locks. `pagehide` releases ownership and `pageshow` resumes monitoring. Without Web Locks, a crash that prevents release can require waiting up to fifteen seconds before retrying recovery. A resumed stale tab must re-acquire the lease before writing and reports a competing editor session instead of overwriting its draft. Project keys use stable project IDs; standalone characters share a key across the rig/animation routes; standalone scene sessions share a route key.
+
+## Verification
+
+Unit regressions cover debounce, committed-only capture, unchanged playback notifications, asynchronous revision isolation, quota failure/retry, export/discard lifecycle, unavailable storage, project switching, detached snapshot capture and recovery of rig, animation, retained scenes and actual imported binary bytes. The older JSON-only recovery remains available as a fallback and also waits for committed edits. Local Playwright regressions cover real IndexedDB retention, transaction aborts, quota rejection, cross-owner and live-tab conflicts, corrupt/incompatible records, preceding-revision recovery, refresh, recovery cancellation/discard and ZIP round trips on development/production desktop routes. Browser tests remain local-only.
+
+```bash
+npm run typecheck
+npm run test
+npm run build
+PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/localAutosave.spec.ts
+```
+
+## Implementation files
+
+| Area                                                      | Files                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Storage, scheduling, recovery UI and standalone adapters  | [LocalDraftStore.ts](../src/devtools/shared/autosave/LocalDraftStore.ts), [LocalAutosave.ts](../src/devtools/shared/autosave/LocalAutosave.ts), [RecoveryPanel.tsx](../src/devtools/shared/autosave/RecoveryPanel.tsx), [editorDrafts.ts](../src/devtools/shared/autosave/editorDrafts.ts)                       |
+| Project ownership, capture and editor bridge              | [ProjectWorkspace.ts](../src/devtools/project/ProjectWorkspace.ts), [projectPackage.ts](../src/devtools/project/projectPackage.ts), [ProjectView.tsx](../src/devtools/project/ProjectView.tsx), [projectBridge.ts](../src/devtools/project/projectBridge.ts)                                                     |
+| Rig/animation integration and legacy committed-edit gates | [main.tsx](../src/devtools/animation-editor/main.tsx), [RigTweakController.ts](../src/devtools/animation-editor/RigTweakController.ts), [AnimationDraftRecoveryController.ts](../src/devtools/animation-editor/AnimationDraftRecoveryController.ts), [DraftRecovery.ts](../src/devtools/shared/DraftRecovery.ts) |
+| Scene integration and shared appearance                   | [SceneEditorDocument.ts](../src/devtools/scene-editor/SceneEditorDocument.ts), [SceneEditorView.tsx](../src/devtools/scene-editor/SceneEditorView.tsx), [workspace.css](../src/ui/workspace.css)                                                                                                                 |
+| Regressions                                               | [localAutosave.test.ts](../tests/localAutosave.test.ts), [draftRecovery.test.ts](../tests/draftRecovery.test.ts), [localAutosave.spec.ts](../tests/browser/localAutosave.spec.ts), [draftRecovery.spec.ts](../tests/browser/draftRecovery.spec.ts)                                                               |
+| Artist/developer notes                                    | This guide, [Project Workspace](project-workspace.md), [Scene Editor](scene-editor.md), [Changelog 1.0.2](../CHANGELOG.md#102)                                                                                                                                                                                   |
+
+## Final command results
+
+| Command                                      | Exit | Result                                                                                                                                                                                        |
+| -------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                          | 0    | TypeScript passed.                                                                                                                                                                            |
+| `npm run check`                              | 0    | Formatting, lint and typecheck passed.                                                                                                                                                        |
+| `npm run test`                               | 0    | 192 test files passed, 5 skipped; 3,351 tests passed, 56 skipped.                                                                                                                             |
+| `npm run build`                              | 0    | Demo, library, declarations and Node/core boundary checks passed. Vite reported the existing lucide-react `use client` directive warnings.                                                    |
+| Final focused local Playwright command below | 0    | 11 passed, 1 skipped across development and production. The direct source-module IndexedDB harness runs on development only; production runs the real UI recovery and tab-conflict workflows. |
+
+```bash
+PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/localAutosave.spec.ts tests/browser/draftRecovery.spec.ts tests/browser/sceneEditor.spec.ts --grep 'refresh recovers|recovery cancellation|a second browser tab|IndexedDB transactions|rig draft recovery restores|scene panel dividers'
+```
+
+The desktop recovery workflow creates a project/character, imports a real PNG, changes a rig joint, authors an animation X key and a scene wait action, waits for autosave, refreshes, explicitly recovers, verifies the authored values and image bytes, then exports and re-imports the project ZIP. Additional checks cover cancellation/discard, a live competing browser tab, transactional abort/quota failures, incompatible/corrupt snapshots and timestamps, the ten-project retention cap, and the 1280 × 800 Scene Editor divider layout. These are automated local browser checks; no separate human acceptance session was performed.

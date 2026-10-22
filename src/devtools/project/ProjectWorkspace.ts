@@ -19,6 +19,7 @@ export interface ProjectCharacter {
   readonly files: PackageFiles;
   /** The mounted character editor is the sole working-copy owner. */
   capture?: () => PackageSnapshot;
+  pending?: () => boolean;
   loading: boolean;
 }
 
@@ -33,6 +34,7 @@ export class ProjectWorkspace {
   private sceneCheckpoints = new Map<string, string>();
   readonly scenes = new SceneEditorDocument();
   private revision = 0;
+  recoveryKey: string | undefined;
   private readonly listeners = new Set<() => void>();
   history: SnapshotHistory<DeepReadonly<ProjectDefinition>>;
 
@@ -54,6 +56,26 @@ export class ProjectWorkspace {
   };
   get definition(): DeepReadonly<ProjectDefinition> {
     return this.metadata;
+  }
+  /** Recovery never claims that a browser snapshot was written to disk. */
+  markRecovered(key: string): void {
+    this.recoveryKey = key;
+    this.saved = undefined;
+    this.refresh();
+  }
+  get autosaveRevision(): string | undefined {
+    if (this.scenes.hasOpenOperation) return undefined;
+    const characters: string[] = [];
+    for (const { id } of this.metadata.characters) {
+      const entry = this.character(id);
+      if (entry.loading || entry.pending?.()) return undefined;
+      characters.push(this.characterDigest(id, entry));
+    }
+    return canonicalJson({
+      metadata: this.metadata,
+      characters,
+      scenes: this.metadata.scenes.map(({ id }) => this.scenes.scene(id)),
+    });
   }
   private createHistory(): SnapshotHistory<DeepReadonly<ProjectDefinition>> {
     return new SnapshotHistory(
