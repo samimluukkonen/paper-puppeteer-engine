@@ -4,6 +4,10 @@ import type { PackageSnapshot, PackageFiles } from '../shared/package/characterP
 
 /** Same-origin retained editor hosts reuse the existing applications and their single owners. */
 export interface ProjectEditorContext {
+  readonly projectName: string;
+  readonly assetName: string;
+  subscribe: (listener: () => void) => () => void;
+  bindGuide(open: () => void): () => void;
   readonly characterId?: string;
   readonly definition?: CharacterDefinition;
   readonly sourceDefinition?: CharacterDefinition;

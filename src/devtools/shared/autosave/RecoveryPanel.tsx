@@ -58,7 +58,7 @@ export function RecoveryPanel({ onRecover }: { onRecover?: (workspace: ProjectWo
       );
       if (entries.length) dialog.current?.showModal();
     } catch (error) {
-      setStatus(storageError(error));
+      setStatus(storageError(error, 'Recovery'));
     }
   };
   useEffect(() => {
@@ -87,7 +87,7 @@ export function RecoveryPanel({ onRecover }: { onRecover?: (workspace: ProjectWo
         await localDrafts.release(draft.key, owner.current);
       }
     } catch (error) {
-      setStatus(storageError(error));
+      setStatus(storageError(error, 'Recovery'));
     } finally {
       setBusy(false);
     }
@@ -148,7 +148,7 @@ export function RecoveryPanel({ onRecover }: { onRecover?: (workspace: ProjectWo
                   setStatus('Local recovery data discarded.');
                   await refresh();
                 })
-                .catch((error: unknown) => setStatus(storageError(error)))
+                .catch((error: unknown) => setStatus(storageError(error, 'Recovery')))
                 .finally(() => setBusy(false));
             }}
           >

@@ -169,7 +169,8 @@
 .scene-timeline-viewport {
   overflow: auto;
   flex: 1;
-  min-height: 90px;
+  /* Wrapped desktop toolbars must leave the tracks free to shrink and scroll. */
+  min-height: 0;
   outline-color: var(--accent-fg);
 }
 .scene-timeline-content {

@@ -124,6 +124,7 @@ for (const existing of [true, false]) {
             card.x + card.width <= spot.x ||
             card.y >= spot.y + spot.height ||
             card.y + card.height <= spot.y,
+          JSON.stringify({ guide: guide.id, step: step.id, card, spot }),
         ).toBe(true);
         if (existing && (index === Math.min(2, guide.steps.length - 1) || guide.id === 'animation-ground-reference'))
           await page.screenshot({ path: testInfo.outputPath(`${guide.id}-${step.id}.png`) });

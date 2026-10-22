@@ -76,6 +76,23 @@ test('unhandled shortcuts still nudge, undo, and redo the selected bone', () => 
   }
 });
 
+test('Ctrl/Cmd+Y redoes and idle Escape clears rig selection without creating an edit', () => {
+  const { state, key, controller } = fixture();
+  try {
+    key({ key: 'z', ctrlKey: true });
+    key({ key: 'y', ctrlKey: true });
+    assert.equal(state.getBone('root').x, 10);
+    const history = state.historyLength;
+    key({ key: 'Escape' });
+    assert.isNull(state.selection);
+    assert.isNull(state.selectedIKConstraintId);
+    assert.isNull(state.selectedFootContactMarkerId);
+    assert.equal(state.historyLength, history);
+  } finally {
+    controller.disable();
+  }
+});
+
 test.each([{ ctrlKey: true }, { metaKey: true }])(
   'held Undo/Redo shortcuts ignore repeat with $ctrlKey/$metaKey',
   (modifier) => {

@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { Puppet } from '../../engine/Puppet.js';
-import { isDialogTarget, isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { blocksEditorShortcut, historyShortcut, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { textureOriginAt } from './artworkAlignment.js';
 import { type Affine, type Point, worldToLocal } from './coordinates.js';
@@ -178,12 +178,12 @@ export class RigEditorInputController {
   }
 
   private keyDown = (event: KeyboardEvent): void => {
-    if (event.defaultPrevented || event.isComposing || isDialogTarget(event.target)) return;
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
-      if (isTypingTarget(event.target)) return;
+    if (blocksEditorShortcut(event)) return;
+    const history = historyShortcut(event);
+    if (history) {
       event.preventDefault();
       if (!event.repeat) {
-        if (event.shiftKey) this.editor.redo();
+        if (history === 'redo') this.editor.redo();
         else this.editor.undo();
       }
       return;
@@ -195,6 +195,14 @@ export class RigEditorInputController {
       return;
     }
     if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
+    if (event.key === 'Escape') {
+      this.state.selection = null;
+      this.state.selectedIKConstraintId = null;
+      this.state.selectedFootContactMarkerId = null;
+      this.editor.refresh();
+      event.preventDefault();
+      return;
+    }
     const selection = this.state.selection;
     if (!selection) return;
     const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];

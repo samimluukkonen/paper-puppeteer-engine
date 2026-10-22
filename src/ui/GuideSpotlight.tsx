@@ -93,7 +93,8 @@ export function GuideSpotlight({
     observer.observe(element);
     measure();
     return () => observer.disconnect();
-  }, []);
+    // Step content can change card height; place it before painting the new spotlight.
+  }, [step, interactive, error, availability]);
 
   const navigate = (result: GuideCommandResult): void => {
     if (!result.ok) setError(result.reason);

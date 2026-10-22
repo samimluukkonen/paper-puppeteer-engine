@@ -105,6 +105,17 @@
   gap: 6px;
   font-size: 12px;
 }
+.editor-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  padding: 8px var(--view-gutter, 24px);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-panel);
+}
+.editor-context span {
+  overflow-wrap: anywhere;
+}
 .view-header-guide {
   display: flex;
   flex: 1;

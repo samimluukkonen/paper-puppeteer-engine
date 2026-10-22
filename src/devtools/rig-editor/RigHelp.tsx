@@ -48,7 +48,7 @@ export function RigHelp() {
             <tr>
               <td>Cancel gesture</td>
               <td>
-                <kbd>Escape</kbd>; leaving the window also cancels
+                <kbd>Escape</kbd>; leaving the window also cancels. With no gesture, Escape clears selection.
               </td>
             </tr>
             <tr>
@@ -58,7 +58,7 @@ export function RigHelp() {
             <tr>
               <td>Undo / redo</td>
               <td>
-                <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> / <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
+                <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> / <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Y</kbd>
               </td>
             </tr>
             <tr>
@@ -71,7 +71,14 @@ export function RigHelp() {
             </tr>
             <tr>
               <td>Validate / export</td>
-              <td>Use the buttons in File tools</td>
+              <td>Use the buttons in File tools; Ctrl/Cmd+S opens File tools.</td>
+            </tr>
+            <tr>
+              <td>Delete selected bone / slot</td>
+              <td>
+                Delete / Backspace reuses Remove bone or Remove empty slot, including dependency checks and
+                confirmation.
+              </td>
             </tr>
             <tr>
               <td>Zoom / pan</td>

@@ -75,6 +75,7 @@ export function RigEditorView({
           <div className="rig-session-actions" role="group" aria-label="Rig commands">
             <button
               id="rig-tools-open"
+              title="Open file tools for import and export (Ctrl/Cmd+S)"
               data-guide-id={GUIDE_TARGETS.rigFileTools}
               type="button"
               aria-haspopup="dialog"

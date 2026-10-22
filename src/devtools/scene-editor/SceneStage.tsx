@@ -5,6 +5,7 @@ import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
+import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { createEditorGame } from '../shared/editorGame.js';
@@ -236,7 +237,11 @@ class SceneStage extends Phaser.Scene {
     window.addEventListener(
       'keydown',
       (event) => {
-        if (event.key === 'Escape' && !event.isComposing && (this.gesture || this.pan || this.groundHandle.dragging)) {
+        if (
+          event.key === 'Escape' &&
+          !blocksEditorShortcut(event) &&
+          (this.gesture || this.pan || this.groundHandle.dragging)
+        ) {
           event.preventDefault();
           cancel();
         }
@@ -411,7 +416,7 @@ export function SceneStageView({
       <div id="scene-stage-canvas" />
       {error && (
         <p className="scene-preview-error" role="alert">
-          {error}{' '}
+          {error} Check the character references and required artwork, then retry preview.{' '}
           <button type="button" onClick={() => stage?.retry()}>
             Retry preview
           </button>

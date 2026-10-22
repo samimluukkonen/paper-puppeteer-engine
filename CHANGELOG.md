@@ -13,6 +13,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.0.4
+
+Unify [editor workflow and status](docs/unified-editor-workflow.md) with project/document identity, explicit checkpoint wording, per-scene project indicators and a Project Workspace entry into the existing Rig, Animation and Scene Feature Guides. Standardize history and export shortcuts, guard native fields/modals/tutorials, add scene keyboard playback and dependency-safe deletion, and cancel gestures before deselection. Keep guide cards and spotlights on the same measured layout without crossing highlighted controls. Improve empty-state guidance and actionable recovery/export/preview feedback while retaining document owners, independent selections/history, collapsed inspectors and the animator's desktop style. Add unit and local desktop browser workflow regressions; browser checks remain local-only.
+
 ## 1.0.3
 
 Add [project asset integrity and dependency inspection](docs/project-asset-integrity.md), reusing the existing character, rig, animation, IK, skin, scene and package validators. Show real draft/production diagnostics with editor navigation and debounced, cached checks after authored changes. Block project and scoped scene exports with broken required dependencies while retaining final exporter checks and diagnostics. List scene/Actor/clip and artwork dependents before shared replacements, protect referenced skin renames, and preserve existing deletion/history guards. Add source-immutability, invalid-reference, export-blocking, shared-replacement, panel and 120-character/120-scene cache/performance regressions plus local desktop browser coverage. No automatic repairs or authored format changes.

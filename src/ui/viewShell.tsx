@@ -1,4 +1,5 @@
 import { Clapperboard, LayoutTemplate, MonitorPlay, Network } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
 import packageInfo from '../../package.json';
 import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
@@ -38,6 +39,7 @@ const views = {
     icon: LayoutTemplate,
   },
 } as const;
+const noSubscribe = () => () => {};
 
 /** Shared navigation and page identity for the demo and authoring tools. */
 export function ViewHeader({
@@ -49,6 +51,11 @@ export function ViewHeader({
 }) {
   const current = views[view];
   const project = projectEditorContext();
+  const projectIdentity = useSyncExternalStore(project?.subscribe ?? noSubscribe, () =>
+    project
+      ? `Project: ${project.projectName} · ${view === 'scene' ? 'Scene' : 'Character'}: ${project.assetName}`
+      : '',
+  );
   const root = view === 'demo' ? './' : '../';
   const characterId = selectedCharacterId();
   const choices = view === 'demo' ? characterChoices : workspaceCharacterChoices();
@@ -90,6 +97,7 @@ export function ViewHeader({
           <p className="view-description" id={view === 'animation' ? 'character-status' : undefined}>
             {current.description}
           </p>
+          {projectIdentity && <p className="project-identity">{projectIdentity}</p>}
           {view !== 'scene' && !project && (
             <label className="character-choice">
               Character

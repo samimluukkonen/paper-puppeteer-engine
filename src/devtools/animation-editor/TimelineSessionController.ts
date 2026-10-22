@@ -338,7 +338,7 @@ export class TimelineSessionController {
             : !state.rig
               ? 'Load a character to begin.'
               : !state.animationIds.length
-                ? 'This character has no animations.'
+                ? 'This character has no animations. Choose + New Animation to create a clip, or use File tools to import animation JSON.'
                 : 'No animation selected.'),
     );
     this.renderedControls = controls;

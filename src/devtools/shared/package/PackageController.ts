@@ -133,7 +133,10 @@ export class PackageController {
         message: 'Package download started. Checkpoint recorded for these bytes; source files were not overwritten.',
       });
     } catch (error) {
-      if (!request.signal.aborted) this.publish({ message: String(error) });
+      if (!request.signal.aborted)
+        this.publish({
+          message: `Could not export character package: ${String(error)} Check the reported assets and try Download again.`,
+        });
     } finally {
       if (this.request === request) {
         this.request = undefined;

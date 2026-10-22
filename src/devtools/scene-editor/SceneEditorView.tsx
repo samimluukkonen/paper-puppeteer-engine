@@ -4,6 +4,8 @@ import { encodePackageZip } from '../../engine/packageZip.js';
 import { serializeSceneDefinition } from '../../engine/SceneDefinition.js';
 import { buildScenePackage } from '../../engine/ScenePackage.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
+import { bindExportShortcut } from '../../shared/keyboardShortcuts.js';
+import { EditorContext } from '../../ui/EditorContext.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { sceneDraftSource } from '../shared/autosave/editorDrafts.js';
@@ -17,6 +19,7 @@ import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneGroundPanel } from './SceneGroundPanel.js';
+import { bindSceneShortcuts } from './SceneKeyboardController.js';
 import { ScenePlaybackInspector } from './ScenePlaybackInspector.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
@@ -197,9 +200,11 @@ export function SceneEditorView({
       signal.throwIfAborted();
       if (document.workingScene === snapshot) document.validateScene();
       if (kind === 'copy') {
+        if (!navigator.clipboard?.writeText)
+          throw new Error('Clipboard is unavailable. Use Download scene JSON instead.');
         await navigator.clipboard.writeText(json);
         signal.throwIfAborted();
-        setTransferStatus('Scene JSON copied.');
+        setTransferStatus('Scene JSON copied. Download scene JSON or a scene package for a disk copy.');
       } else if (kind === 'json') {
         downloadJson(json, sceneExportFilename(snapshot.id, 'json'));
         document.markSaved(snapshot);
@@ -208,6 +213,16 @@ export function SceneEditorView({
       } else setTransferStatus('Scene and character dependencies are valid.');
     });
   };
+  useEffect(() => {
+    const releaseKeys = bindSceneShortcuts(document, playback);
+    const releaseExport = bindExportShortcut(workspace.current!, () => {
+      if (!document.hasActiveGesture) exportScene('json');
+    });
+    return () => {
+      releaseKeys();
+      releaseExport();
+    };
+  });
   return (
     <>
       <ViewHeader view="scene" />
@@ -296,6 +311,7 @@ export function SceneEditorView({
           type="button"
           data-guide-id={GUIDE_TARGETS.sceneExport}
           disabled={!scene || loading}
+          title="Download scene JSON (Ctrl/Cmd+S)"
           onClick={() => exportScene('json')}
         >
           Download scene JSON
@@ -309,16 +325,20 @@ export function SceneEditorView({
           Download scene package
         </button>
       </div>
-      <p className="workspace-caption" role="status">
-        {scene
-          ? `${scene.name} · ${scene.id} · ${scene.duration / 1000} s · ${document.isNewScene ? 'New / Unsaved' : document.dirty ? 'Unsaved changes' : 'Saved'}`
-          : 'Create a new scene or open a scene JSON document.'}
-        {scene &&
-          (project
-            ? ' Return to Project to organize assets or export the complete project.'
-            : ' Switch scenes to keep working; download each scene to keep it after leaving this page.')}
-        {transferStatus && ` ${transferStatus}`}
-      </p>
+      <EditorContext
+        {...(project ? { project: project.projectName } : {})}
+        editor="Scene"
+        ready={!!scene}
+        document={
+          <span role="status">
+            {scene
+              ? `Scene: ${scene.name} · ${scene.id} · ${scene.duration / 1000} s · ${document.isNewScene ? 'New / Unsaved' : document.dirty ? 'Unsaved changes' : 'Matches loaded / exported checkpoint'}`
+              : 'Create a new scene or open a scene JSON document.'}
+            {transferStatus && ` ${transferStatus}`}
+          </span>
+        }
+        modified={scene && document.dirty ? ['Scene'] : []}
+      />
       {document.validationIssues.length > 0 && (
         <div role="alert" className="scene-errors">
           {document.validationIssues.map((issue, index) => (

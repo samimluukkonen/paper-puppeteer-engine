@@ -8,12 +8,14 @@ import { parseSceneJson } from '../../engine/SceneDefinition.js';
 import type { SceneDefinition } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { downloadBlob } from '../../shared/downloadJson.js';
+import { bindExportShortcut, blocksEditorShortcut, historyShortcut } from '../../shared/keyboardShortcuts.js';
 import puppetLogo from '../../ui/images/puppet-running-header.png';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
 import type { ProjectEditorContext } from './projectBridge.js';
+import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
 import {
   ProjectValidationError,
   requireValidExport,
@@ -48,6 +50,8 @@ interface EditorHost {
   context: ProjectEditorContext;
   pending?: () => boolean;
   openView?: (view: 'rig' | 'animation') => void;
+  openGuide?: () => void;
+  guidePending?: boolean;
 }
 interface RuntimeLease {
   definition: CharacterDefinition;
@@ -70,6 +74,11 @@ export function ProjectView() {
     revision: number;
   }>();
   const operation = useRef(false);
+  const projectRoot = useRef<HTMLDivElement>(null);
+  const projectHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (!active) projectHeading.current?.focus({ preventScroll: true });
+  }, [active]);
   const projectDialog = useRef<HTMLDialogElement>(null);
   const characterDialog = useRef<HTMLDialogElement>(null);
   const sceneDialog = useRef<HTMLDialogElement>(null);
@@ -210,6 +219,7 @@ export function ProjectView() {
     kind: 'character' | 'scene',
     id: string,
     view: 'rig' | 'animation' = 'rig',
+    guide = false,
   ): Promise<void> => {
     if (!selected) return;
     const workspace = selected.workspace;
@@ -219,6 +229,10 @@ export function ProjectView() {
     if (existing) {
       existing.openView?.(view);
       setActive(existing.token);
+      if (guide) {
+        if (existing.openGuide) existing.openGuide();
+        else existing.guidePending = true;
+      }
       return;
     }
     const token = crypto.randomUUID();
@@ -238,6 +252,26 @@ export function ProjectView() {
     const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
     let lastAuthoredRevision = workspace.autosaveRevision;
     const context: ProjectEditorContext = {
+      get projectName() {
+        return workspace.definition.name;
+      },
+      get assetName() {
+        return kind === 'character'
+          ? (workspace.definition.characters.find((entry) => entry.id === id)?.name ?? id)
+          : (workspace.scenes.scene(id)?.name ?? id);
+      },
+      subscribe: workspace.subscribe,
+      bindGuide: (open) => {
+        const host = owners.current.get(token)!;
+        host.openGuide = open;
+        if (host.guidePending) {
+          host.guidePending = false;
+          open();
+        }
+        return () => {
+          delete host.openGuide;
+        };
+      },
       ...(definition
         ? {
             definition,
@@ -349,7 +383,7 @@ export function ProjectView() {
       url.searchParams.set('character', id);
       workspace.character(id).loading = true;
     }
-    const host: EditorHost = { token, session: selected, asset: id, kind, src: url.href, context };
+    const host: EditorHost = { token, session: selected, asset: id, kind, src: url.href, context, guidePending: guide };
     owners.current.set(token, host);
     setHosts((held) => [...held, host]);
     setActive(token);
@@ -394,8 +428,30 @@ export function ProjectView() {
     selected?.autosave.exported();
     setStatus('Project ZIP download started. Repository files were not overwritten.');
   };
+  useEffect(() => {
+    if (active) return;
+    const releaseExport = bindExportShortcut(projectRoot.current!, () => {
+      if (workspace) run(exportProject);
+    });
+    const keydown = (event: KeyboardEvent): void => {
+      if (busy || !workspace || blocksEditorShortcut(event)) return;
+      const history = historyShortcut(event);
+      if (!history) return;
+      event.preventDefault();
+      if (!event.repeat)
+        attempt(() => {
+          if (history === 'undo') workspace.undo();
+          else workspace.redo();
+        });
+    };
+    window.addEventListener('keydown', keydown);
+    return () => {
+      releaseExport();
+      window.removeEventListener('keydown', keydown);
+    };
+  });
   return (
-    <div className="view-shell workspace-shell project-workspace">
+    <div ref={projectRoot} className="view-shell workspace-shell project-workspace">
       <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
       <div hidden={!!active}>
         <header className="view-header">
@@ -410,8 +466,16 @@ export function ProjectView() {
           </div>
           <div className="view-header-main">
             <div className="view-heading">
-              <h1>Project Workspace</h1>
+              <h1 ref={projectHeading} tabIndex={-1}>
+                Project Workspace
+              </h1>
               <p className="view-description">Characters, animations, artwork and scenes in one project.</p>
+            </div>
+            <div className="view-header-guide">
+              <ProjectFeatureGuide
+                {...(workspace ? { project: workspace.definition } : {})}
+                open={(kind, id, view) => run(() => openAsset(kind, id, view, true))}
+              />
             </div>
             <nav className="view-navigation" aria-label="Views">
               <a href="../">Engine Demo</a>
@@ -468,7 +532,7 @@ export function ProjectView() {
               <button disabled={busy || !workspace.history.canRedo} onClick={() => attempt(() => workspace.redo())}>
                 Redo Project
               </button>
-              <button disabled={busy} onClick={() => run(exportProject)}>
+              <button disabled={busy} title="Export project ZIP (Ctrl/Cmd+S)" onClick={() => run(exportProject)}>
                 Export Project
               </button>
               <button disabled={busy} onClick={() => validate()}>
@@ -481,6 +545,15 @@ export function ProjectView() {
           {busy ? 'Working… ' : ''}
           {status}
         </p>
+        {!workspace && (
+          <main className="project-content project-panel">
+            <h2>No project open</h2>
+            <p>
+              Choose New Project to start empty, Import Project to open a project ZIP, or Recovery drafts to restore
+              local work.
+            </p>
+          </main>
+        )}
         {workspace && (
           <main className="project-content">
             <div className="workspace-panel-heading">
@@ -600,7 +673,9 @@ export function ProjectView() {
                   {workspace.definition.scenes.map((entry) => (
                     <li key={entry.id}>
                       <strong>{workspace.scenes.scene(entry.id)?.name}</strong>
-                      <span className="workspace-caption">{entry.id}</span>
+                      <span className="workspace-caption">
+                        {entry.id} · {workspace.sceneDirty(entry.id) ? 'Document modified' : 'Project checkpoint'}
+                      </span>
                       <div className="project-actions">
                         <button disabled={busy} onClick={() => run(() => openAsset('scene', entry.id))}>
                           Scene Editor

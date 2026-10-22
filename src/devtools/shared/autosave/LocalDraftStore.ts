@@ -47,11 +47,11 @@ async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
     b.toString(16).padStart(2, '0'),
   ).join('');
 }
-export function storageError(error: unknown): string {
+export function storageError(error: unknown, operation = 'Autosave'): string {
   const message = error instanceof Error ? error.message : String(error);
   if (error instanceof DOMException && error.name === 'QuotaExceededError')
-    return 'Autosave failed: browser storage is full. Export your work, then discard obsolete local drafts and retry.';
-  return `Autosave failed: ${message} Export your work to keep a disk copy, then retry local saving.`;
+    return `${operation} failed: browser storage is full. Export your work, then discard obsolete local drafts and retry.`;
+  return `${operation} failed: ${message} Export your work to keep a disk copy, then retry ${operation === 'Autosave' ? 'local saving' : 'recovery'}.`;
 }
 
 /** Complete packages and their Blob bytes share one transaction. Failed writes retain both previous revisions. */

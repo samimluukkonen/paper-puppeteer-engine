@@ -1,7 +1,9 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
+import { bindExportShortcut, blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';
+import { EditorContext } from '../../ui/EditorContext.js';
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
@@ -88,6 +90,7 @@ const ikBake = new IKBakeController(
   () => scene?.getBakeRuntimeConstraints() ?? [],
 );
 let showAutosave: ((autosave: LocalAutosave | undefined) => void) | undefined;
+const noProjectSubscription = () => () => {};
 function CharacterWorkspace() {
   const [autosave, setAutosave] = useState<LocalAutosave>();
   useLayoutEffect(() => {
@@ -97,12 +100,53 @@ function CharacterWorkspace() {
     };
   }, []);
   const snapshot = useSyncExternalStore(rigTweak.subscribe, rigTweak.getSnapshot);
+  const projectName = useSyncExternalStore(
+    projectContext?.subscribe ?? noProjectSubscription,
+    () => projectContext?.projectName,
+  );
   const packageState = useSyncExternalStore(packages.subscribe, packages.getSnapshot);
+  const rigCommandMessage = useSyncExternalStore(attachments.subscribe, () => attachments.getSnapshot().message);
+  // Subscribe to facts only: playback ticks must not rerender the workspace shell.
+  useSyncExternalStore(
+    (listener) => stateOwner?.subscribe(listener) ?? (() => {}),
+    () => JSON.stringify([stateOwner?.selectedAnimationId, stateOwner?.dirty, stateOwner?.hasPendingAnimationEdits]),
+  );
   const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
   useLayoutEffect(() => movePreview?.(), [rigView]);
   return (
     <FeatureGuide launcher={guides} targets={guideTargets}>
       {!projectContext && <LocalDraftControls {...(autosave ? { autosave } : {})} />}
+      {snapshot.ready && (
+        <EditorContext
+          {...(projectName ? { project: projectName } : {})}
+          editor={rigView ? 'Rig' : snapshot.mode === 'rig-tweak' ? 'Animation / Rig Tweak' : 'Animation'}
+          document={`Character: ${projectContext?.assetName ?? scene?.characterId ?? selectedCharacterId()} · Rig: ${scene?.rigFilename ?? 'none'} · Animation: ${stateOwner?.selectedAnimationId ?? 'none'}`}
+          modified={[
+            ...(snapshot.rigDirty ? ['Rig'] : []),
+            ...(stateOwner?.dirty ? ['Animation'] : []),
+            ...(stateOwner?.hasPendingAnimationEdits ? ['Uncommitted preview'] : []),
+          ]}
+        >
+          <span>
+            Character package:{' '}
+            {packageState.unsavedCharacter || packageState.modified.length
+              ? `Export needed${packageState.modified.length ? ` (${packageState.modified.join(', ')})` : ''}`
+              : 'Matches loaded / exported checkpoint'}
+          </span>
+        </EditorContext>
+      )}
+      {rigCommandMessage && (
+        <p className="workspace-caption" aria-live="polite" aria-label="Rig command feedback">
+          {rigCommandMessage}
+        </p>
+      )}
+      {snapshot.ready &&
+        !scene?.rigEditor?.state.workingCopy.bones.some((bone) => bone.sprite) &&
+        !scene?.rigEditor?.state.workingCopy.attachments?.length && (
+          <p className="workspace-caption">
+            No artwork assigned. Use Artwork to import PNG files, then assign artwork to a bone or slot.
+          </p>
+        )}
       {initialDraft && (
         <p className="workspace-caption" role="status" aria-label="Character draft">
           {initialDraft.identity.name} · {initialDraft.identity.id} ·{' '}
@@ -142,6 +186,41 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   let autosave: LocalAutosave | undefined;
   const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
   const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
+  const releaseRigExport = bindExportShortcut(rigApp, () =>
+    rigApp.querySelector<HTMLButtonElement>('#rig-tools-open')?.click(),
+  );
+  const releaseAnimationExport = bindExportShortcut(app, () => {
+    if (stateOwner?.editorMode === 'rig-tweak') {
+      app.dispatchEvent(new Event('workspace:reveal-inspector'));
+      app.querySelector<HTMLButtonElement>('#tweak-download-json')?.focus();
+    } else app.querySelector<HTMLButtonElement>('#animation-tools-open')?.click();
+  });
+  const deleteRigSelection = (event: KeyboardEvent): void => {
+    if (
+      blocksEditorShortcut(event) ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      (event.key !== 'Delete' && event.key !== 'Backspace') ||
+      stateOwner?.editorMode === 'animation'
+    )
+      return;
+    const editor = scene?.rigEditor;
+    if (
+      !editor ||
+      editor.previewName ||
+      editor.state.selectedIKConstraintId ||
+      editor.state.selectedFootContactMarkerId
+    )
+      return;
+    const selection = editor.state.selection;
+    if (!selection) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (selection.type === 'bone') attachments.removeBone();
+    else attachments.removeSlot();
+  };
+  window.addEventListener('keydown', deleteRigSelection);
   let focusViewOnMove = false;
   const rigWorkspace = createRigWorkspaceController(
     rigApp,
@@ -422,6 +501,9 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     window.removeEventListener('pageshow', resumeLocal);
     document.removeEventListener('visibilitychange', hiddenLocal);
     workspaceRoutes?.dispose();
+    releaseRigExport();
+    releaseAnimationExport();
+    window.removeEventListener('keydown', deleteRigSelection);
     releaseProject?.();
     workspaceRoutes = undefined;
     releaseRigResize();

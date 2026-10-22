@@ -1,5 +1,16 @@
 import { GraduationCap } from 'lucide-react';
-import { createContext, useContext, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import type { GuideLauncher } from '../devtools/shared/guides/GuideLauncher.js';
 import type { GuideEditor, GuideTargetResolver } from '../devtools/shared/guides/types.js';
 import { GuideSpotlight } from './GuideSpotlight.js';
@@ -39,13 +50,14 @@ export function FeatureGuide({
   const [error, setError] = useState('');
   const id = useId();
   const guides = launcher.registry.getGuidesForEditor(editor);
-  const open = (): void => {
+  const open = useCallback((): void => {
     launcher.refresh();
     setEditor(launcher.controller.getSnapshot().context.editor);
     setError('');
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.current?.showModal();
-  };
+  }, [launcher]);
+  useEffect(() => projectEditorContext()?.bindGuide(open), [open]);
   return (
     <OpenFeatureGuide.Provider value={open}>
       {children}

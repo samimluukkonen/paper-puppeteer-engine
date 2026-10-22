@@ -45,6 +45,14 @@
   margin: 0;
   font-size: 16px;
 }
+.workspace-shell .view-heading:has(.project-identity) {
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.workspace-shell .project-identity {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
 .workspace-shell #character-status {
   position: absolute;
   width: 1px;

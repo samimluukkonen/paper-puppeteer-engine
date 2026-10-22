@@ -24,11 +24,7 @@
   border-radius: 8px;
   box-shadow: 0 0 0 100vmax rgb(0 0 0 / 68%);
   pointer-events: none;
-  transition:
-    left 120ms ease,
-    top 120ms ease,
-    width 120ms ease,
-    height 120ms ease;
+  /* Keep spotlight and card on the same measured layout without crossing old targets. */
 }
 .guide-spotlight-dimmer {
   position: absolute;
@@ -49,9 +45,7 @@
   box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
   font-size: 14px;
   line-height: 1.5;
-  transition:
-    left 120ms ease,
-    top 120ms ease;
+  /* Reposition immediately: a moving card can cross the next step's spotlight. */
 }
 .guide-step-card h2 {
   margin: 0 0 8px;

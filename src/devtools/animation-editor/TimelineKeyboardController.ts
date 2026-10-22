@@ -1,4 +1,4 @@
-import { isDialogTarget, isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { blocksEditorShortcut, historyShortcut, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { TimelineNavigationActions } from './TimelineInputController.js';
 
@@ -23,15 +23,8 @@ export class TimelineKeyboardController {
     window.addEventListener(
       'keydown',
       (event) => {
-        if (
-          !this.state.animationAuthoringEnabled ||
-          event.defaultPrevented ||
-          event.isComposing ||
-          isTypingTarget(event.target) ||
-          !this.state.workingAnimation
-        )
+        if (!this.state.animationAuthoringEnabled || blocksEditorShortcut(event) || !this.state.workingAnimation)
           return;
-        if (isDialogTarget(event.target)) return;
         // Body/canvas focus supports playback; controls outside this editor own their shortcuts.
         if (event.target instanceof Element && !this.app.contains(event.target) && event.target.tagName !== 'BODY')
           return;
@@ -74,10 +67,11 @@ export class TimelineKeyboardController {
           }
         }
         // Match the Rig Editor shortcuts while leaving native text-field undo intact.
-        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+        const history = historyShortcut(event);
+        if (history) {
           event.preventDefault();
           if (!event.repeat) {
-            if (event.shiftKey) this.state.redo();
+            if (history === 'redo') this.state.redo();
             else this.state.undo();
           }
           return;

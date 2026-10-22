@@ -154,7 +154,12 @@ export function SceneActorsPanel({
             </li>
           ))}
         </ul>
-        {!scene.actors.length && <p>Add a character package to place its first instance.</p>}
+        {!scene.actors.length && (
+          <p>
+            Choose + Add Actor to place a character instance. Character artwork and animations stay in their character
+            editor.
+          </p>
+        )}
         {actor && (
           <div className="scene-actor-actions">
             <button

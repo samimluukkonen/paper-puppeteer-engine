@@ -55,7 +55,7 @@ test('empty creation, multiple documents, properties, history, downloads and uns
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   const scene = await downloadScene(page);
   expect(scene).toMatchObject({ id: 'first', name: 'Opening scene', duration: 4500, actors: [], actions: [] });
-  await expect(page.getByRole('status')).toContainText('Saved');
+  await expect(page.getByRole('status')).toContainText('Matches loaded / exported checkpoint');
   const waiting = page.waitForEvent('dialog');
   const clicking = page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
   const guard = await waiting;
@@ -103,15 +103,14 @@ test('imports retain authored actors/actions and guard dirty replacement and sou
   await page.getByText('Scene properties', { exact: true }).click();
   await page.getByRole('complementary', { name: 'Scene inspector' }).getByLabel('Name', { exact: true }).fill('Edited');
   await page.getByRole('button', { name: 'Apply properties' }).click();
-  page.once('dialog', (dialog) => {
-    void dialog.dismiss();
-  });
-  await upload(input);
+  await Promise.all([page.waitForEvent('dialog').then((dialog) => dialog.dismiss()), upload(input)]);
+  // Dependency loading is asynchronous; the old scene name alone does not mean import finished.
+  await expect(page.getByRole('status')).toContainText('Import cancelled.');
   await expect(page.getByRole('status')).toContainText('Edited');
-  page.once('dialog', (dialog) => {
-    void dialog.accept();
-  });
-  await page.getByRole('button', { name: 'Revert', exact: true }).click();
+  await Promise.all([
+    page.waitForEvent('dialog').then((dialog) => dialog.accept()),
+    page.getByRole('button', { name: 'Revert', exact: true }).click(),
+  ]);
   await expect(page.getByRole('status')).toContainText('Imported scene');
   expect(await downloadScene(page)).toEqual(input);
   await upload({ ...input, actors: [input.actors[0], input.actors[0]] });
@@ -453,7 +452,7 @@ test('two-character encounter playback, pause, restart, deterministic scrubbing 
   await expect(time).toHaveValue('0');
   expect(await downloadScene(page)).toEqual(authored);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText('Saved');
+  await expect(page.getByRole('status')).toContainText('Matches loaded / exported checkpoint');
   expect(failedAssets).toEqual([]);
   expect(errors).toEqual([]);
 });

@@ -152,7 +152,8 @@ test('a new character offers rig guides and explains the missing animation', asy
   await expect(dialog).toContainText('Create or select an animation first.');
   for (const guide of guideRegistry.getGuidesForEditor('animation')) {
     const start = dialog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
-    if (['animation-new', 'animation-rig-tweak'].includes(guide.id)) await expect(start).toBeEnabled();
+    if (['animation-new', 'animation-rig-tweak', 'animation-ground-reference'].includes(guide.id))
+      await expect(start).toBeEnabled();
     else await expect(start).toBeDisabled();
   }
 });
@@ -239,18 +240,24 @@ test('spotlight follows desktop resize, scrolling and zoom, places its card in b
   for (const width of [1280, 1920, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await aligned();
-    const card = (await tour.locator('.guide-step-card').boundingBox())!;
-    expect(card.x).toBeGreaterThanOrEqual(15);
-    expect(card.y).toBeGreaterThanOrEqual(15);
-    expect(card.x + card.width).toBeLessThanOrEqual(width - 15);
-    expect(card.y + card.height).toBeLessThanOrEqual(885);
-    const spot = (await hole.boundingBox())!;
-    expect(
-      card.x >= spot.x + spot.width ||
-        card.x + card.width <= spot.x ||
-        card.y >= spot.y + spot.height ||
-        card.y + card.height <= spot.y,
-    ).toBe(true);
+    // Resize/target observers settle on animation frames. Read both boxes in one layout snapshot.
+    await expect
+      .poll(
+        async () =>
+          tour.evaluate((element) => {
+            const card = element.querySelector('.guide-step-card')!.getBoundingClientRect();
+            const spot = element.querySelector('.guide-spotlight-hole')!.getBoundingClientRect();
+            return (
+              card.x >= 15 &&
+              card.y >= 15 &&
+              card.right <= window.innerWidth - 15 &&
+              card.bottom <= 885 &&
+              (card.x >= spot.right || card.right <= spot.x || card.y >= spot.bottom || card.bottom <= spot.y)
+            );
+          }),
+        { message: `Guide card stays in bounds and clear of its target at ${width}px` },
+      )
+      .toBe(true);
   }
   await page.locator('#rig-inspector').evaluate((element) => element.scrollBy(0, 20));
   await aligned();

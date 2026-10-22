@@ -243,6 +243,9 @@ export class SceneEditorDocument {
     const id = this.entry?.selectedActor;
     return this.workingScene?.actors.some((actor) => actor.id === id) ? id! : null;
   }
+  get hasActiveGesture(): boolean {
+    return this.dragActor !== null || this.dragAction !== null;
+  }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;
     if (id !== this.selectedActorId) this.cancelActorDrag();

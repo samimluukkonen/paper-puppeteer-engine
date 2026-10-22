@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
+import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
@@ -53,8 +54,16 @@ export function SceneTimeline({
       document.cancelActionDrag();
     };
     window.addEventListener('blur', cancel);
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !blocksEditorShortcut(event) && (gesture.current || scrub.current !== null)) {
+        event.preventDefault();
+        cancel();
+      }
+    };
+    window.addEventListener('keydown', escape);
     return () => {
       window.removeEventListener('blur', cancel);
+      window.removeEventListener('keydown', escape);
       cancel();
     };
   }, [document]);
@@ -136,24 +145,20 @@ export function SceneTimeline({
         to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing.
       </p>
       <ScenePlaybackError playback={playback} />
+      {scene.actors.length > 0 && !scene.actions.length && (
+        <p className="workspace-caption">
+          No timeline clips. Select an Actor, choose an Action type, then Add action.
+          {actor &&
+            !animations.length &&
+            ' This character has no animations; create one in Animation Editor or choose Move, Wait, Change facing or Scene cue.'}
+        </p>
+      )}
       <div
         ref={viewport}
         className="scene-timeline-viewport"
         data-guide-id={GUIDE_TARGETS.sceneTimeline}
         tabIndex={0}
         aria-label="Action tracks"
-        onKeyDown={(event) => {
-          if ((event.target as HTMLElement).closest('input, select, textarea')) return;
-          if (event.key === 'Escape') {
-            scrub.current = null;
-            gesture.current = null;
-            document.cancelActionDrag();
-          }
-          if ((event.key === 'Delete' || event.key === 'Backspace') && document.selectedActionId) {
-            event.preventDefault();
-            document.removeAction(document.selectedActionId);
-          }
-        }}
         onPointerMove={(event) => {
           if (scrub.current === event.pointerId) {
             const element = event.currentTarget;

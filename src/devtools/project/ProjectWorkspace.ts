@@ -109,7 +109,7 @@ export class ProjectWorkspace {
     return (
       this.dirty ||
       this.metadata.characters.some(({ id }) => this.characterDirty(id)) ||
-      this.metadata.scenes.some(({ id }) => canonicalJson(this.scenes.scene(id)) !== this.sceneCheckpoints.get(id))
+      this.metadata.scenes.some(({ id }) => this.sceneDirty(id))
     );
   }
   character(id: string): ProjectCharacter {
@@ -228,6 +228,9 @@ export class ProjectWorkspace {
   characterDirty(id: string): boolean {
     const entry = this.character(id);
     return this.characterDigest(id, entry) !== this.checkpoints.get(id);
+  }
+  sceneDirty(id: string): boolean {
+    return canonicalJson(this.scenes.scene(id)) !== this.sceneCheckpoints.get(id);
   }
   addScene(input: unknown): string {
     const scene = parseSceneDefinition(input);

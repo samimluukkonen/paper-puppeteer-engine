@@ -196,7 +196,13 @@ export function AnimationEditorView({
                 Editor help…
               </button>
             </EditorMenu>
-            <button id="animation-tools-open" type="button" aria-haspopup="dialog" inert={tweaking}>
+            <button
+              id="animation-tools-open"
+              type="button"
+              aria-haspopup="dialog"
+              title="Open file tools for import and export (Ctrl/Cmd+S)"
+              inert={tweaking}
+            >
               File tools
             </button>
             <button
@@ -885,8 +891,12 @@ export function AnimationEditorView({
                 <td>Play or pause / restart / seek to end outside typing controls.</td>
               </tr>
               <tr>
-                <th scope="row">Ctrl/Cmd + Z / Shift + Z</th>
+                <th scope="row">Ctrl/Cmd + Z / Shift + Z / Y</th>
                 <td>Undo / Redo one authored edit. Navigation and preview preferences do not enter history.</td>
+              </tr>
+              <tr>
+                <th scope="row">Ctrl/Cmd + S</th>
+                <td>Open File tools for explicit export. In Rig Tweak, focus Download rig JSON.</td>
               </tr>
               <tr>
                 <th scope="row">+ / − / F / [ / ]</th>
