@@ -15,6 +15,8 @@ export interface ProjectEditorContext {
   bindScene(dispose: () => void): void;
   validateScene(scene: ReadonlyScene): void;
   buildScenePackage(scene: ReadonlyScene): Promise<PackageFiles>;
+  confirmReplacement(kind: 'animation' | 'texture', id: string): boolean;
+  assetReferences(kind: 'skin', id: string): readonly string[];
   bindCharacter(
     capture: () => PackageSnapshot,
     pending: () => boolean,

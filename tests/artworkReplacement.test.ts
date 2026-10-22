@@ -43,7 +43,7 @@ function sprite(filename = 'replacement.png', width = 16, height = 48): Imported
   };
 }
 
-function fixture(frame?: string | number, overrideRig?: Rig) {
+function fixture(frame?: string | number, overrideRig?: Rig, confirmReplacement?: (key: string) => boolean) {
   const rig =
     overrideRig ??
     new Rig({
@@ -103,7 +103,7 @@ function fixture(frame?: string | number, overrideRig?: Rig) {
   } as unknown as CharacterDefinition;
   let next = sprite();
   const decode = vi.fn(() => Promise.resolve(next));
-  const controller = new ArtworkController(decode);
+  const controller = new ArtworkController(decode, confirmReplacement);
   controller.bind(scene, puppet, definition);
   return {
     rig,
@@ -125,6 +125,27 @@ function fixture(frame?: string | number, overrideRig?: Rig) {
   };
 }
 const file = () => new File(['image'], 'replacement.png', { type: 'image/png' });
+
+test('shared image replacement and source restoration preserve the proposal when dependent confirmation is declined', async () => {
+  const guard = vi.fn(() => false);
+  const f = fixture(undefined, undefined, guard);
+  await f.controller.import(file());
+  f.controller.preview();
+  f.controller.apply();
+  assert.deepEqual(guard.mock.calls, [['shared']]);
+  assert.isTrue(f.controller.hasPendingProposal);
+  assert.equal(f.controller.appliedReplacements().length, 0);
+  guard.mockReturnValue(true);
+  f.controller.apply();
+  assert.equal(f.controller.appliedReplacements().length, 1);
+  guard.mockReturnValue(false);
+  f.controller.revert();
+  assert.equal(f.controller.appliedReplacements().length, 1);
+  guard.mockReturnValue(true);
+  f.controller.revert();
+  assert.equal(f.controller.appliedReplacements().length, 0);
+  f.controller.dispose();
+});
 
 test('new artwork imports without a replacement target, stays independent and releases its resources', async () => {
   const f = fixture();

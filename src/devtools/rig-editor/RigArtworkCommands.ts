@@ -16,6 +16,7 @@ type ArtworkState = Pick<
   | 'getAttachment'
   | 'getSkin'
   | 'isStandaloneSkin'
+  | 'skinReferences'
 >;
 
 export interface RigArtworkUpdate {
@@ -70,6 +71,11 @@ export class RigArtworkCommands {
     const skin = this.state.getSkin(name);
     identifierSchema.parse(next);
     if (name === next) return;
+    const references = this.state.skinReferences?.(name) ?? [];
+    if (references.length)
+      throw new Error(
+        `Skin "${name}" is used by ${references.join('; ')}. Choose another skin in these scenes before renaming it.`,
+      );
     if (name === this.state.defaultSkin || this.state.isStandaloneSkin(name))
       throw new Error('This skin name is referenced by the character manifest. Create a new skin to use another name.');
     if (this.state.skins.some((entry) => entry.name === next)) throw new Error(`Duplicate skin name "${next}".`);

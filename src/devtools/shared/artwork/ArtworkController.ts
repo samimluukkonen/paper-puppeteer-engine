@@ -105,7 +105,10 @@ export class ArtworkController {
     message: 'Load a character to replace artwork.',
   };
 
-  constructor(private readonly decode: typeof importSprite = importSprite) {}
+  constructor(
+    private readonly decode: typeof importSprite = importSprite,
+    private readonly confirmReplacement?: (texture: string) => boolean,
+  ) {}
 
   private createHistory(): SnapshotHistory<ArtworkState> {
     return new SnapshotHistory<ArtworkState>(
@@ -566,6 +569,7 @@ export class ArtworkController {
   apply(): void {
     const candidate = this.candidate;
     if (!candidate || !this.snapshot.previewing) return;
+    if (!candidate.reference && this.confirmReplacement && !this.confirmReplacement(candidate.assetKey)) return;
     try {
       // The catalog may have changed since Preview. Commit must revalidate its current frame references.
       this.install(this.rendered);
@@ -612,6 +616,14 @@ export class ArtworkController {
   }
 
   revert(): void {
+    if (
+      !this.snapshot.selectedReference &&
+      this.snapshot.selectedKey &&
+      this.applied.has(this.selectedIdentity) &&
+      this.confirmReplacement &&
+      !this.confirmReplacement(this.snapshot.selectedKey)
+    )
+      return;
     this.cancel();
     if (this.candidate || !this.applied.has(this.selectedIdentity)) return;
     try {

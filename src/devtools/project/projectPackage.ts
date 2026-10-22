@@ -13,6 +13,7 @@ import {
   type PackageSnapshot,
 } from '../shared/package/characterPackage.js';
 import { parseProjectDefinition, projectDefinitionSchema } from './ProjectDefinition.js';
+import { packageExportFailure, requireValidExport } from './projectInspection.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
 
 const archiveSchema = z.strictObject({
@@ -60,6 +61,8 @@ export function characterFileFetcher(files: PackageFiles): typeof fetch {
 
 /** Capture all authored domains synchronously before the first image read. */
 export async function buildProjectPackage(workspace: ProjectWorkspace) {
+  const report = workspace.inspect('export', true);
+  requireValidExport(report);
   const metadata = parseProjectDefinition(workspace.definition);
   const characters = new Map(metadata.characters.map(({ id }) => [id, workspace.captureCharacter(id)]));
   const sources = new Map(
@@ -74,7 +77,9 @@ export async function buildProjectPackage(workspace: ProjectWorkspace) {
   };
   for (const entry of metadata.characters) {
     const captured = characters.get(entry.id)!;
-    const packaged = await buildCharacterPackage(captured, sources.get(entry.id));
+    const packaged = await buildCharacterPackage(captured, sources.get(entry.id)).catch((error: unknown) => {
+      throw packageExportFailure(report, { kind: 'character', owner: entry.id, id: entry.id }, error);
+    });
     const textures = new Set(Object.values(captured.definition.manifest!.textures));
     // New artwork can add new paths; inspect the exported manifest, not just its source.
     const exportedManifest = archiveCharacterManifest(packaged);
@@ -102,7 +107,11 @@ export async function buildProjectPackage(workspace: ProjectWorkspace) {
     files.set(entry.path, encoder.encode(serializeSceneDefinition(scenes[index]!)));
   });
   json('project.json', { project: metadata, characters: records });
-  validatePackageFiles(files);
+  try {
+    validatePackageFiles(files);
+  } catch (error) {
+    throw packageExportFailure(report, { kind: 'project', owner: metadata.id, id: metadata.id }, error);
+  }
   return { files, metadata, characters, scenes };
 }
 
@@ -161,6 +170,8 @@ export async function buildProjectScenePackage(
   workspace: ProjectWorkspace,
   input: ReadonlyScene,
 ): Promise<PackageFiles> {
+  const report = workspace.inspect('export', true, parseSceneJson(JSON.stringify(input)));
+  requireValidExport(report);
   const scene = workspace.validateScene(input);
   const captures = new Map(
     [...new Set(scene.actors.map((actor) => workspace.resolveCharacter(actor.character.manifest)))].map((id) => [
@@ -170,12 +181,18 @@ export async function buildProjectScenePackage(
   );
   const files = new Map<string, Uint8Array<ArrayBuffer>>();
   for (const [id, snapshot] of captures) {
-    const packaged = await buildCharacterPackage(snapshot, characterFileFetcher(workspace.character(id).files));
+    const packaged = await buildCharacterPackage(snapshot, characterFileFetcher(workspace.character(id).files)).catch(
+      (error: unknown) => {
+        throw packageExportFailure(report, { kind: 'character', owner: id, id }, error);
+      },
+    );
     const reference = workspace.characterReference(id);
     const prefix = reference.slice(0, reference.lastIndexOf('/') + 1);
     for (const [path, bytes] of packaged) files.set(`${prefix}${path}`, bytes);
   }
   files.set('scene.json', encoder.encode(serializeSceneDefinition(scene)));
-  await validateScenePackage(files);
+  await validateScenePackage(files).catch((error: unknown) => {
+    throw packageExportFailure(report, { kind: 'scene', owner: scene.id, id: scene.id }, error);
+  });
   return files;
 }

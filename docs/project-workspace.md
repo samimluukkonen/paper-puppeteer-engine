@@ -1,4 +1,4 @@
-# Project workspace (v1.0.2)
+# Project workspace (v1.0.3)
 
 [All guides](../README.md#guides)
 
@@ -13,6 +13,7 @@ Open **Project Workspace** from the application header, or visit `/project/`. Ch
 - **← Project** returns to the asset list. Reopening a character retains its rig, animation, artwork, selections and Undo/Redo histories. Changing the project selector also retains open sessions. Importing the same project twice creates independent editing instances, even though their authored project IDs match.
 - **Project Settings** changes the project name. **Undo Project** and **Redo Project** cover metadata and registration/removal. The editors retain their own document histories. Removing a character used by a registered scene is rejected. Project history also refuses to orphan dependencies introduced by subsequent scene edits.
 - **Export Project** downloads a complete project ZIP. **Import Project** validates all referenced files before installing a separate project instance. Downloads do not overwrite repository files.
+- **Validate Project** opens [asset integrity diagnostics](project-asset-integrity.md) for current working characters and scenes, with draft/export contexts, editor navigation and fresh revalidation. Project and scene exports block unresolved required dependencies; shared replacements list their dependents first.
 
 Inspector and asset-library disclosures start collapsed. The workspace follows the Animation Editor's desktop theme and controls.
 
@@ -56,7 +57,7 @@ The implementation is in `src/devtools/project/`, the new `project/index.html` r
 
 `tests/projectWorkspace.test.ts` covers empty projects, registration and lookup, duplicate rejection, independent instances, immutable sources, membership/document history, dependency guards, captured export checkpoints, image sharing, safe import, both shipped characters and standalone scene-package compatibility. `tests/browser/projectWorkspace.spec.ts` exercises actual Rig/Animation/Scene Editor navigation, retained edits, project switching and ZIP download/re-import on desktop. Browser tests remain local-only.
 
-Verified locally on 2026-10-22:
+The original workspace milestone was verified locally on 2026-10-22 as recorded below. See the [v1.0.3 integrity guide](project-asset-integrity.md#verification) for the final asset-integrity verification results.
 
 | Command                                                                                           | Result                                                                               |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -77,4 +78,4 @@ PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/projectWorkspace.spe
 
 ## Local autosave and recovery
 
-Committed changes autosave locally after a modest debounce. Startup offers explicit recovery, discard or cancellation, with the actual save timestamp. Two complete revisions per draft are retained for at most ten local projects. The local-save status and recovery controls remain visible while a project editor is open. Concurrent tab/session writers are blocked; storage failures preserve previous drafts and prompt an explicit export/retry. See [local autosave](local-autosave.md) for the persistence format, lifecycle, failure handling and verification. Detailed dependency diagnostics/repair remain outside this milestone.
+Committed changes autosave locally after a modest debounce. Startup offers explicit recovery, discard or cancellation, with the actual save timestamp. Two complete revisions per draft are retained for at most ten local projects. The local-save status and recovery controls remain visible while a project editor is open. Concurrent tab/session writers are blocked; storage failures preserve previous drafts and prompt an explicit export/retry. See [local autosave](local-autosave.md) for the persistence format, lifecycle, failure handling and verification. Asset inspection and export protection are described in the [v1.0.3 integrity guide](project-asset-integrity.md); automatic repairs remain outside scope.

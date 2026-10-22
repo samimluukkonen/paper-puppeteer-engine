@@ -13,6 +13,14 @@ import {
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { parseProjectDefinition, type ProjectDefinition } from './ProjectDefinition.js';
+import {
+  assetDependents,
+  ProjectInspector,
+  type AssetReference,
+  type ProjectInspection,
+  type InspectionCharacter,
+  type ValidationContext,
+} from './projectInspection.js';
 
 export interface ProjectCharacter {
   readonly definition: CharacterDefinition;
@@ -36,6 +44,7 @@ export class ProjectWorkspace {
   private revision = 0;
   recoveryKey: string | undefined;
   private readonly listeners = new Set<() => void>();
+  private readonly inspector = new ProjectInspector();
   history: SnapshotHistory<DeepReadonly<ProjectDefinition>>;
 
   constructor(name: string, id: string = crypto.randomUUID()) {
@@ -193,6 +202,9 @@ export class ProjectWorkspace {
   captureCharacter(id: string): PackageSnapshot {
     const entry = this.character(id);
     if (entry.loading) throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
+    return capturePackage(this.workingCharacter(entry));
+  }
+  private workingCharacter(entry: ProjectCharacter): PackageSnapshot {
     const snapshot = entry.capture?.() ?? {
       definition: entry.definition,
       rig: entry.definition.rigFile!,
@@ -201,7 +213,7 @@ export class ProjectWorkspace {
       replacements: [],
     };
     // Preview definitions can contain Blob URLs. The original package manifest owns portable paths.
-    return capturePackage({ ...snapshot, definition: entry.definition });
+    return { ...snapshot, definition: entry.definition };
   }
   private characterDigest(id: string, entry: ProjectCharacter): string {
     const snapshot = entry.capture?.() ?? {
@@ -251,14 +263,50 @@ export class ProjectWorkspace {
     );
     return parseSceneDefinition(scene, { characters });
   }
+  /** Only committed authored revisions call this; playback and selection need no validation. */
+  inspect(context: ValidationContext = 'draft', fresh = false, scene?: SceneDefinition): ProjectInspection {
+    const references = scene && new Set(scene.actors.map((actor) => actor.character.manifest));
+    const metadata = references
+      ? {
+          ...this.metadata,
+          characters: this.metadata.characters.filter((entry) => references.has(entry.manifest)),
+          scenes: [{ id: scene.id, path: 'scene.json' }],
+        }
+      : this.metadata;
+    const characters = new Map<string, InspectionCharacter>();
+    for (const { id } of metadata.characters) {
+      const entry = this.character(id);
+      try {
+        if (entry.loading) throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
+        characters.set(id, { snapshot: this.workingCharacter(entry), files: entry.files });
+      } catch (error) {
+        characters.set(id, { files: entry.files, unavailable: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return this.inspector.inspect(
+      {
+        definition: metadata,
+        characters,
+        scenes: scene
+          ? new Map([[scene.id, scene]])
+          : new Map(metadata.scenes.map(({ id }) => [id, this.scenes.scene(id)])),
+      },
+      context,
+      fresh,
+    );
+  }
+  dependents(target: AssetReference) {
+    return assetDependents(this.inspect(), target);
+  }
   remove(kind: 'characters' | 'scenes', id: string): void {
     if (kind === 'characters') {
-      const reference = this.characterReference(id);
-      const dependents = this.metadata.scenes.filter((entry) =>
-        this.scenes.scene(entry.id)?.actors.some((actor) => actor.character.manifest === reference),
+      const dependents = this.dependents({ kind: 'character', owner: id, id }).filter(
+        ({ from }) => from.kind !== 'project',
       );
       if (dependents.length)
-        throw new Error(`Character is used by scenes: ${dependents.map((entry) => entry.id).join(', ')}.`);
+        throw new Error(
+          `Character is used by scenes: ${dependents.map((entry) => `${entry.label} (scene ID: ${entry.from.owner})`).join('; ')}. Remove or replace these references first.`,
+        );
     }
     this.change({ ...this.metadata, [kind]: this.metadata[kind].filter((entry) => entry.id !== id) });
   }

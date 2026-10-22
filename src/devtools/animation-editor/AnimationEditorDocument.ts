@@ -33,6 +33,8 @@ export interface AnimationImportOptions {
 
 /** Owns validated authored snapshots, saved baselines and history independently of editor navigation. */
 export class AnimationEditorDocument {
+  /** Called after validation and before replacing a shared clip; rejection preserves every session. */
+  replacementGuard: ((name: string) => boolean) | undefined;
   private readonly animations = new Map<string, AnimationEntry>();
   private ids: readonly string[] = Object.freeze([]);
   private source: ReadonlyAnimation | null = null;
@@ -235,6 +237,10 @@ export class AnimationEditorDocument {
       replacing?.unsavedNew ||
       (replacing?.working !== undefined && !equalEditorData(replacing.working, replacing.saved));
     if ((this.dirty || replacingDirty) && options.confirmDiscard && !options.confirmDiscard()) return false;
+    if (replacing && this.replacementGuard && !this.replacementGuard(result.data.name)) {
+      this.reportIssues([{ severity: 'warning', message: 'Replacement cancelled. Referenced animation retained.' }]);
+      return false;
+    }
     if (this.selectedId !== result.data.name) {
       const current = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
       if (current) {
@@ -266,6 +272,12 @@ export class AnimationEditorDocument {
   revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
     if (!this.source || (this.dirty && !options.discardChanges)) return false;
     if (!this.inspect(this.source)) return false;
+    if (
+      this.replacementGuard &&
+      !equalEditorData(this.source, this.working) &&
+      !this.replacementGuard(this.source.name)
+    )
+      return false;
     this.working = this.source;
     // Reverting an unexported document keeps its New / Unsaved status.
     if (!this.isNewAnimation()) this.markSaved();

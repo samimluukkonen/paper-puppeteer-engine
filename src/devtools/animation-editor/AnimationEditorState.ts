@@ -90,6 +90,9 @@ export class AnimationEditorState {
   /** Loaded character rig, retained independently of restored drafts and preview tweaks. */
   readonly sourceRig: Rig | undefined;
   private readonly document: AnimationEditorDocument;
+  setReplacementGuard(guard: ((name: string) => boolean) | undefined): void {
+    this.document.replacementGuard = guard;
+  }
   private readonly listeners = new Set<() => void>();
   private readonly clipboard = new TimelineClipboard();
   private readonly playback = new AnimationEditorPlayback(

@@ -15,12 +15,19 @@ import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.j
 import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
 import type { ProjectEditorContext } from './projectBridge.js';
 import {
+  ProjectValidationError,
+  requireValidExport,
+  type ProjectInspection,
+  type ValidationContext,
+} from './projectInspection.js';
+import {
   buildProjectPackage,
   buildProjectScenePackage,
   characterFileFetcher,
   importProjectPackage,
   packageHostedCharacter,
 } from './projectPackage.js';
+import { ProjectValidationPanel } from './ProjectValidationPanel.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
 import '../../ui/theme.css';
 import '../../ui/viewShell.css';
@@ -57,6 +64,11 @@ export function ProjectView() {
   const leases = useRef(new Set<RuntimeLease>());
   const [status, setStatus] = useState('Create a project or import a project ZIP.');
   const [busy, setBusy] = useState(false);
+  const [validation, setValidation] = useState<{
+    workspace: ProjectWorkspace;
+    report: ProjectInspection;
+    revision: number;
+  }>();
   const operation = useRef(false);
   const projectDialog = useRef<HTMLDialogElement>(null);
   const characterDialog = useRef<HTMLDialogElement>(null);
@@ -72,7 +84,24 @@ export function ProjectView() {
   const current = useRef({ sessions, hosts });
   current.current = { sessions, hosts };
   const workspace = selected?.workspace;
-  useSyncExternalStore(workspace?.subscribe ?? noSubscribe, workspace?.getSnapshot ?? zero);
+  const revision = useSyncExternalStore(workspace?.subscribe ?? noSubscribe, workspace?.getSnapshot ?? zero);
+  const validationContext = validation?.workspace === workspace ? validation?.report.context : undefined;
+  const validationRevision = validation?.revision;
+  const showValidation = (owner: ProjectWorkspace, report: ProjectInspection): void => {
+    setValidation({ workspace: owner, report, revision: owner.getSnapshot() });
+  };
+  useEffect(() => {
+    if (!workspace || !validationContext || validationRevision === revision) return;
+    const timer = setTimeout(
+      () =>
+        setValidation({ workspace, report: workspace.inspect(validationContext), revision: workspace.getSnapshot() }),
+      250,
+    );
+    return () => clearTimeout(timer);
+  }, [workspace, revision, validationContext, validationRevision]);
+  const validate = (context: ValidationContext = 'draft'): void => {
+    if (workspace) showValidation(workspace, workspace.inspect(context, true));
+  };
   useEffect(() => {
     const resolve = (token: string) => owners.current.get(token)?.context;
     window.paperProjectEditor = resolve;
@@ -125,7 +154,10 @@ export function ProjectView() {
     operation.current = true;
     setBusy(true);
     void task()
-      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : String(error)))
+      .catch((error: unknown) => {
+        if (error instanceof ProjectValidationError && workspace) showValidation(workspace, error.report);
+        setStatus(error instanceof Error ? error.message : String(error));
+      })
       .finally(() => {
         operation.current = false;
         setBusy(false);
@@ -225,9 +257,32 @@ export function ProjectView() {
         disposeScene = dispose;
       },
       validateScene: (scene) => {
+        const report = workspace.inspect('export', true, parseSceneJson(JSON.stringify(scene)));
+        showValidation(workspace, report);
+        requireValidExport(report);
         workspace.validateScene(scene);
       },
-      buildScenePackage: (scene) => buildProjectScenePackage(workspace, scene),
+      confirmReplacement: (assetKind, assetId) => {
+        const dependents = workspace
+          .dependents({ kind: assetKind, owner: id, id: assetId })
+          .filter(({ from }) => from.kind !== 'character');
+        return (
+          !dependents.length ||
+          window.confirm(
+            `Replace ${assetKind} "${assetId}"? This affects:\n${dependents.map(({ label }) => label).join('\n')}\n\nReferences will be kept. Continue?`,
+          )
+        );
+      },
+      assetReferences: (kind, assetId) =>
+        workspace
+          .dependents({ kind, owner: id, id: assetId })
+          .filter(({ from }) => from.kind === 'actor')
+          .map(({ label }) => label),
+      buildScenePackage: (scene) =>
+        buildProjectScenePackage(workspace, scene).catch((error: unknown) => {
+          if (error instanceof ProjectValidationError) showValidation(workspace, error.report);
+          throw error;
+        }),
       loadCharacter: (reference) => {
         const characterId = workspace.resolveCharacter(reference);
         let request = runtimeCharacters.get(reference);
@@ -330,6 +385,7 @@ export function ProjectView() {
   const exportProject = async (): Promise<void> => {
     if (!workspace) return;
     const captured = await buildProjectPackage(workspace);
+    showValidation(workspace, workspace.inspect('export'));
     downloadBlob(
       new Blob([encodePackageZip(captured.files)], { type: 'application/zip' }),
       `${workspace.definition.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'project'}.project.zip`,
@@ -415,6 +471,9 @@ export function ProjectView() {
               <button disabled={busy} onClick={() => run(exportProject)}>
                 Export Project
               </button>
+              <button disabled={busy} onClick={() => validate()}>
+                Validate Project
+              </button>
             </>
           )}
         </div>
@@ -433,6 +492,22 @@ export function ProjectView() {
               {workspace.hasUnsavedChanges ? 'Unexported project changes' : 'Project exported'}. Documents keep their
               own editing histories and export checkpoints.
             </p>
+            {validation?.workspace === workspace && (
+              <ProjectValidationPanel
+                report={validation.report}
+                busy={busy}
+                revalidate={validate}
+                openAsset={(issue) =>
+                  run(() =>
+                    openAsset(
+                      issue.view === 'scene' ? 'scene' : 'character',
+                      issue.asset.owner,
+                      issue.view === 'animation' ? 'animation' : 'rig',
+                    ),
+                  )
+                }
+              />
+            )}
             <div className="project-columns">
               <section className="project-panel">
                 <h2>Characters</h2>

@@ -65,6 +65,12 @@
 .project-panel summary {
   cursor: pointer;
 }
+.project-validation-error {
+  color: var(--danger-fg);
+}
+.project-validation-warning {
+  color: var(--attention-fg);
+}
 .project-workspace .workspace-dialog h2 {
   margin: 0 0 16px;
 }

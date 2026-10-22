@@ -13,6 +13,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.0.3
+
+Add [project asset integrity and dependency inspection](docs/project-asset-integrity.md), reusing the existing character, rig, animation, IK, skin, scene and package validators. Show real draft/production diagnostics with editor navigation and debounced, cached checks after authored changes. Block project and scoped scene exports with broken required dependencies while retaining final exporter checks and diagnostics. List scene/Actor/clip and artwork dependents before shared replacements, protect referenced skin renames, and preserve existing deletion/history guards. Add source-immutability, invalid-reference, export-blocking, shared-replacement, panel and 120-character/120-scene cache/performance regressions plus local desktop browser coverage. No automatic repairs or authored format changes.
+
 ## 1.0.2
 
 Add complete [local autosave and crash recovery](docs/local-autosave.md) across the Project Workspace and standalone rig, animation and scene editors. Store validated portable project snapshots and actual artwork Blobs in atomic IndexedDB transactions, with debounced committed edits, two retained revisions and explicit recovery/discard controls. Keep local-save status separate from export checkpoints; preserve prior drafts on failed writes and exports. Detect competing tab/session writers with browser locks and expiring transactional leases. Add unit and local desktop browser coverage for recovery, binary artwork, interrupted writes, quota failures, retention, project switching and incompatible/corrupt snapshots.

@@ -74,7 +74,10 @@ const ikInspector = new IKInspectorController();
 const groundGuide = new GroundGuideWorkspace('animation-preview-world');
 const footContacts = new FootContactGroundController();
 const packages = new PackageController(undefined, projectContext?.fetcher);
-const artwork = new ArtworkController();
+const artwork = new ArtworkController(
+  undefined,
+  projectContext ? (key) => projectContext.confirmReplacement('texture', key) : undefined,
+);
 const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
 const newAnimation = new NewAnimationController();
@@ -193,6 +196,12 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       stateOwner = state;
+      state.setReplacementGuard(
+        projectContext ? (name) => projectContext.confirmReplacement('animation', name) : undefined,
+      );
+      editorScene.rigEditor!.state.skinReferences = projectContext
+        ? (name) => projectContext.assetReferences('skin', name)
+        : undefined;
       autosave?.dispose();
       clearInterval(pollAutosave);
       releaseProject?.();

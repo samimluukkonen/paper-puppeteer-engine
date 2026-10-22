@@ -100,6 +100,8 @@ function patchFields<Field extends string>(
 
 /** Owns editor data; the loaded rig stays untouched. */
 export class RigEditorState {
+  /** Host scene references must be resolved before changing a skin's identity. */
+  skinReferences: ((name: string) => readonly string[]) | undefined;
   readonly source: Rig;
   private readonly data: WorkingRig;
   private cachedWorkingCopy: ReadonlyRigData<AuthoredRigData> | undefined;

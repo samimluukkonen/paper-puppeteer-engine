@@ -24,6 +24,61 @@ async function reveal(frame: Frame, selector: string) {
   return control;
 }
 
+test('project validation reports broken dependencies, blocks export, opens the affected scene and refreshes after undo', async ({
+  page,
+}) => {
+  await page.goto('project/');
+  await page.getByRole('button', { name: 'New Project', exact: true }).click();
+  const create = page.getByRole('dialog', { name: 'New Project', exact: true });
+  await create.getByLabel('Project name').fill('Validation Film');
+  await create.getByRole('button', { name: 'Create Project', exact: true }).click();
+  await page.getByRole('button', { name: '+ New Character', exact: true }).click();
+  const character = page.getByRole('dialog', { name: 'New Character', exact: true });
+  await character.getByLabel('Character name').fill('Hero');
+  await character.getByRole('button', { name: 'Create Character', exact: true }).click();
+  await expect(character).not.toBeVisible();
+  await page.getByRole('button', { name: '+ New Scene', exact: true }).click();
+  const scene = page.getByRole('dialog', { name: 'New Scene', exact: true });
+  await scene.getByLabel('Scene name').fill('Training');
+  await scene.getByRole('button', { name: 'Create Scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
+  const frame = await activeEditor(page);
+  await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await frame
+    .getByRole('dialog', { name: 'Add Actor', exact: true })
+    .getByRole('button', { name: 'Add actor', exact: true })
+    .click();
+  await expect(frame.locator('#scene-stage-canvas canvas')).toBeVisible();
+  // Simulate a dependency removed by another asset owner through the public project bridge.
+  const token = new URL(frame.url()).searchParams.get('projectSession')!;
+  await page.evaluate((token) => {
+    const document = window.paperProjectEditor?.(token)?.scenes;
+    if (!document?.setActorAppearance('actor-1', 'animation', 'missing-wave'))
+      throw new Error('Could not author the fixture dependency.');
+  }, token);
+  await frame.getByRole('button', { name: '← Project', exact: true }).click();
+  await page.getByRole('button', { name: 'Validate Project', exact: true }).click();
+  const panel = page.getByRole('region', { name: 'Project validation', exact: true });
+  await expect(panel).toContainText('Unknown animation "missing-wave"');
+  await expect(panel).toContainText('1 Errors');
+  let downloads = 0;
+  page.on('download', () => downloads++);
+  await page.getByRole('button', { name: 'Export Project', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Export blocked');
+  expect(downloads).toBe(0);
+  await panel.getByRole('button', { name: /Open Affected Asset/ }).click();
+  const reopened = await activeEditor(page);
+  await expect(reopened.locator('.scene-inspector details[open]')).toHaveCount(0);
+  const reopenedToken = new URL(reopened.url()).searchParams.get('projectSession')!;
+  await page.evaluate((token) => {
+    if (!window.paperProjectEditor?.(token)?.scenes?.undo()) throw new Error('Undo failed.');
+  }, reopenedToken);
+  await reopened.getByRole('button', { name: '← Project', exact: true }).click();
+  await expect(panel).toContainText('No problems found');
+  await panel.getByRole('button', { name: 'Revalidate', exact: true }).click();
+  await expect(panel).toContainText('0 Errors');
+});
+
 test('project authoring retains editor owners, switches projects and round trips the exported ZIP', async ({
   page,
 }) => {
