@@ -42,7 +42,7 @@ test('non-PNG content claiming to be PNG is rejected and a reload can load norma
     }),
   );
   await page.goto('rig-editor/');
-  await expect(page.locator('#inspector')).toContainText('PNG header before decoding');
+  await expect(page.locator('#inspector')).toContainText('PNG or static WebP header before decoding');
   await expect(page.locator('#editor-stage canvas')).toBeVisible();
   await page.unroute(artwork);
   await page.reload();

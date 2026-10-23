@@ -1,5 +1,7 @@
 # Animation Graph Editor — v1.1.2.2
 
+See [Advanced animation workflow](advanced-animation-workflow.md) for poses, variations, cleanup and saving together. **Feature Guide → Animation Editor → Editing Bézier Handles** provides a focused five-step tour alongside the existing Graph Editor tour. It reveals actual controls without selecting keys or authoring curves.
+
 Open an animation, select a bone or IK constraint, then click **Graph Editor** beside Timeline. The same button returns to the timeline. Playback, current time, selected tracks/keys, inspectors, document, Undo/Redo and export remain shared.
 
 Choose a property: bone Translation X/Y, Rotation, Scale X/Y; or IK target X/Y and IK influence (`mix`). Empty properties explain how to set keys with the existing property inspector. Select a point to inspect its key, drag it to edit time/value, or use **Key time (s)**, **Value**, **Apply key**. Graph time edits reject collisions and crossing neighbors instead of replacing keys. Only the selected channel changes, including when other properties share its sparse row. Delete removes the shared selection; Left/Right moves the primary graph key one authored frame (ten with Shift), preserving neighbor order. Native text input shortcuts keep their normal behavior.

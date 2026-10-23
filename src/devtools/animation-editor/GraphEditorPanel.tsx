@@ -82,15 +82,7 @@ export function GraphEditorPanel() {
             (['x', 'y'] as const).map((axis) => (
               <label key={`${handle}-${axis}`}>
                 {index === 0 ? 'Outgoing' : 'Incoming'} {axis === 'x' ? 'time' : 'progress'}
-                <input
-                  id={`graph-${handle}-${axis}`}
-                  aria-label={`${handle} ${axis}`}
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="any"
-                  required
-                />
+                <input id={`graph-${handle}-${axis}`} type="number" min="0" max="1" step="any" required />
               </label>
             )),
           )}

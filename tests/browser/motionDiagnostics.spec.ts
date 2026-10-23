@@ -99,7 +99,7 @@ test('manual diagnostics, inspect, canvas comparison, cancel, explicit cleanup, 
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await expect(panel).toContainText('maximum local deviation 0.000');
   await panel.getByRole('button', { name: 'Cancel preview', exact: true }).click();
-  await expect(panel.getByRole('button', { name: 'Apply Cleanup', exact: true })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Apply Cleanup', exact: true })).toBeDisabled();
   await panel.getByRole('button', { name: 'Close Motion Diagnostics', exact: true }).click();
   expect(await exported(page)).toEqual(original);
   panel = await openDiagnostics(page);

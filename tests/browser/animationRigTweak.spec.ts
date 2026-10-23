@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { rigDefinitionSchema } from '../../src/engine/schemas.js';
 import { test, selectRigEntry } from './fixtures.js';
+import { capturePreviewFrame } from './previewFrame.js';
 
 test('paused elbow tweak, separate history, export/reload and continued animation preserve every key', async ({
   page,
@@ -30,17 +31,18 @@ test('paused elbow tweak, separate history, export/reload and continued animatio
   const y = page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]');
   await expect(y).toHaveValue('60');
   const canvas = page.locator('#animation-stage canvas');
-  const before = await canvas.screenshot();
+  const before = await capturePreviewFrame(page, canvas, test.info().outputPath('rig-tweak-before.png'));
   await y.fill('80');
   await y.press('Tab');
-  await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(false);
+  await expect.poll(async () => (await capturePreviewFrame(page, canvas)).equals(before)).toBe(false);
   await expect(page.locator('#tweak-dirty-status')).toHaveText('Rig: Modified');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await page.getByText('Editing rig data · Playback paused', { exact: true }).click();
   await page.keyboard.press('Delete');
   await page.locator('#tweak-undo').click();
   await expect(y).toHaveValue('60');
-  await expect.poll(async () => (await canvas.screenshot()).equals(before)).toBe(true);
+  await capturePreviewFrame(page, canvas, test.info().outputPath('rig-tweak-undo.png'));
+  await expect.poll(async () => (await capturePreviewFrame(page, canvas)).equals(before)).toBe(true);
   await page.locator('#tweak-redo').click();
   await expect(y).toHaveValue('80');
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('animation');

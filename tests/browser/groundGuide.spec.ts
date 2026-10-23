@@ -112,6 +112,8 @@ test('scene ground controls render, follow the camera and persist independently 
   await page.getByLabel('Select scene').selectOption('ground-second');
   await page.getByRole('button', { name: 'Download scene JSON' }).click();
   await page.reload();
+  // JSON checkpoints retain complete local drafts; inspect guide preferences without restoring the document.
+  await page.getByRole('button', { name: 'Close recovery', exact: true }).click();
   await create('ground-first');
   await panel.getByText('Scene ground', { exact: true }).click();
   await expect(y).toHaveValue('75.5');

@@ -88,9 +88,9 @@ test('project asset library is grouped and previewable, with spaced settings and
   await expect(page.getByRole('button', { name: 'Remove', exact: true })).toHaveCSS('color', 'rgb(248, 81, 73)');
   const library = page.locator('.project-asset-library');
   await library.locator(':scope > summary').click();
-  await expect(library.locator('.project-asset-group')).toHaveCount(4);
+  await expect(library.locator('.project-asset-group')).toHaveCount(5);
   await expect(library.locator('.project-asset-group[open]')).toHaveCount(0);
-  for (const category of ['Images', 'Animations', 'Skins', 'Attachments'])
+  for (const category of ['Images', 'Animations', 'Poses', 'Skins', 'Attachments'])
     await library
       .locator('.project-asset-group > summary')
       .filter({ hasText: new RegExp(`^${category}`) })

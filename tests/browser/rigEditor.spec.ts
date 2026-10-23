@@ -7,6 +7,7 @@ import {
   inspectorControl,
   rigHierarchy,
   selectRigEntry,
+  waitForPreviewPaint,
 } from './fixtures.js';
 
 const field = (page: Page, name: string) => page.locator(`#inspector input[data-scope="bone"][data-field="${name}"]`);
@@ -448,6 +449,7 @@ test('compatible reloads retain view preferences and keep history controls attac
     await expect(artwork).not.toBeChecked();
     await artwork.check();
     const canvas = page.locator('#editor-stage canvas');
+    await waitForPreviewPaint(page);
     const visible = await canvas.screenshot();
     await artwork.uncheck();
     await expect.poll(async () => (await canvas.screenshot()).equals(visible)).toBe(false);
@@ -465,6 +467,7 @@ test('compatible reloads retain view preferences and keep history controls attac
     expect(await page.locator('#undo').isEnabled()).toBe(undoEnabled);
   }
   await page.reload();
+  await page.getByRole('button', { name: 'Close recovery', exact: true }).click();
   await selectRigEntry(page, 'head');
   await expect(field(page, 'x')).toHaveValue('0');
   await expect(page.locator('#undo')).toBeDisabled();

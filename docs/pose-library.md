@@ -1,5 +1,7 @@
 # Advanced Pose Library — v1.1.1
 
+For the complete authoring path through curves, variations, cleanup and scenes, see [Advanced animation workflow](advanced-animation-workflow.md). Pose previews release any variation comparison clock, and starting playback restores the authored animation.
+
 [All guides](../README.md#guides)
 
 In Animation Editor, open **Tools → Pose Library…**. The compact panel starts closed and uses the existing animator controls and shared header. **Feature Guide → Animation Editor → Pose Library** offers a seven-step tour of capture, browsing, preview/cancel, Apply, organizing, separate histories and persistence. The tour reveals the real controls and does not author poses or keys.

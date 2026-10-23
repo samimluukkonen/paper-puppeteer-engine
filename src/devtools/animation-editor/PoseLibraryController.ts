@@ -8,6 +8,7 @@ export class PoseLibraryController {
   private revision = 0;
   private facts = '';
   private poses: unknown;
+  private rig: unknown;
   private readonly listeners = new Set<() => void>();
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -43,11 +44,13 @@ export class PoseLibraryController {
       state?.poseLibrary.canUndo,
       state?.poseLibrary.canRedo,
       state?.previewedPose?.library?.id ?? state?.previewedPose?.name,
-      state?.rig && state.poseLibrary.poses.map(({ id }) => state.poseLibrary.compatibility(id, state.rig)),
     ]);
-    if (facts === this.facts && this.poses === state?.poseLibrary.poses) return;
+    // Immutable rig/library identities invalidate compatibility. Checking every pose here
+    // would repeat the same work on every playback tick, even while the panel is closed.
+    if (facts === this.facts && this.poses === state?.poseLibrary.poses && this.rig === state?.rig) return;
     this.facts = facts;
     this.poses = state?.poseLibrary.poses;
+    this.rig = state?.rig;
     ++this.revision;
     notifySubscribers(this.listeners, 'Pose library subscribers failed.');
   }

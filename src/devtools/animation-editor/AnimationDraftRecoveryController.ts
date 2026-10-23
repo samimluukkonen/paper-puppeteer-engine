@@ -117,7 +117,8 @@ export class AnimationDraftRecoveryController {
             label: `animation "${animation}"`,
             snapshot: () => state.workingAnimation,
             dirty: () => state.dirty,
-            committed: () => !state.hasPendingAnimationEdits,
+            // Working snapshots contain committed edits only; live field/graph previews
+            // must not prevent a refresh from flushing the last authored change.
             data: (snapshot) => snapshot,
             validate: (data) => {
               try {

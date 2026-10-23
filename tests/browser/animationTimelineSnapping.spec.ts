@@ -51,6 +51,9 @@ async function start(page: Page, time = 0.2) {
   const y = box.y + box.height / 2;
   await page.mouse.move(box.x + box.width / 2, y);
   await page.mouse.down();
+  // Start a real drag before the fixture pans. At high zoom, panning can put the
+  // destination almost exactly under the press point, below the drag threshold.
+  await page.mouse.move(box.x + box.width / 2 + 6, y);
   return y;
 }
 async function move(page: Page, target: number, y: number, offsetPx = 5) {

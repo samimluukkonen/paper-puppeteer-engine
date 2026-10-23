@@ -263,7 +263,7 @@ test('a second browser tab cannot recover over a live writer and can recover aft
     page.on('dialog', (native) => {
       void native.accept();
     });
-    await page.goto('../scene-editor/');
+    await page.goto('scene-editor/');
     await dialog.getByRole('button', { name: 'Recover Draft', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect(other.getByRole('heading', { name: 'Shared Film', exact: true })).toBeVisible();

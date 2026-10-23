@@ -53,6 +53,8 @@ test('empty creation, multiple documents, properties, history, downloads and uns
     page.getByRole('complementary', { name: 'Scene inspector' }).getByLabel('Name', { exact: true }),
   ).toHaveValue('Untitled Scene');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  // Keep recovery availability deterministic before leaving the standalone editor.
+  await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
   const scene = await downloadScene(page);
   expect(scene).toMatchObject({ id: 'first', name: 'Opening scene', duration: 4500, actors: [], actions: [] });
   await expect(page.getByRole('status')).toContainText('Matches loaded / exported checkpoint');
@@ -68,7 +70,10 @@ test('empty creation, multiple documents, properties, history, downloads and uns
   expect(characterRequests).toEqual([]);
   await page.getByRole('link', { name: 'Project Workspace', exact: true }).click();
   await expect(page).not.toHaveURL(/scene-editor\//);
+  // Individual JSON checkpoints retain complete local drafts offered on each new route.
+  await page.getByRole('button', { name: 'Close recovery', exact: true }).click();
   await page.getByRole('link', { name: 'Scene Editor', exact: true }).click();
+  await page.getByRole('button', { name: 'Close recovery', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'No scene open', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });

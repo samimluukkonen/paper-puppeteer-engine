@@ -96,6 +96,8 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Advanced Pose Library](docs/pose-library.md)
+- [Advanced animation artist workflow](docs/advanced-animation-workflow.md)
+- [v1.1 internal readiness assessment](docs/advanced-animation-readiness.md)
 - [v1.0.5 internal production readiness and verification](docs/personal-production-readiness.md)
 - [Creating Your First Character](docs/creating-your-first-character.md)
 - [Making Your First Scene](docs/making-your-first-scene.md)

@@ -314,6 +314,7 @@ export class AnimationEditorState {
     return this.batchNotifications(() => {
       this.pause();
       this.cancelCleanupPreview();
+      this.cancelVariationPreview();
       this.posePreview = { pose: this.poseLibrary.get(id).pose, animation: this.working!, rig: this.rig! };
       this.notify();
       return true;
@@ -550,7 +551,7 @@ export class AnimationEditorState {
   }
   get selectedIKTargetValues() {
     const id = this.selectedIKConstraintId;
-    if ((this.graphGesture || this.variationPreview) && id && this.rig)
+    if ((this.graphGesture || this.variationPreview || this.cleanupPreviewActive) && id && this.rig)
       return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.previewTimeMilliseconds);
     return this.ik.selectedIKTargetValues;
   }
@@ -1106,7 +1107,8 @@ export class AnimationEditorState {
       (this.posePreview.animation !== this.working ||
         this.posePreview.rig !== this.rig ||
         !this.animationAuthoringEnabled ||
-        this.hasPendingAnimationEdits)
+        this.hasPendingAnimationEdits ||
+        this.isPlaying)
     )
       this.posePreview = null;
     throwNotificationErrors(

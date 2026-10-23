@@ -121,6 +121,15 @@ Summaries reuse unchanged immutable track arrays. Edits to another track or play
 
 ## Dense editor authoring
 
+For v1.1 integration measurements, run these separately from browser/regression suites:
+
+```bash
+VITE_PROFILE=1 npx vitest run tests/advancedAuthoring.profile.test.ts --maxWorkers=1 --reporter=verbose
+PLAYWRIGHT_CHANNEL=chrome npm run profile:timeline -- --advanced
+```
+
+The CPU fixture uses 33 bones, 128 keys with X/Y per bone (8,448 property keys), two clips and 250 full poses. It measures clock notifications, library filtering/compatibility, graph zoom/pan plus runtime sampling, validated curve-drag proposals, switching, diagnostics and clock playback. The browser fixture uses the shipped 16-bone rig with 128 keys per bone (4,096 property keys), 200 full poses and actual Phaser/SVG/React controls. Three fresh desktop pages measure wheel zoom including synchronous layout, pan/curve-drag/search/switch/diagnostics through the next animation frame, observed playback frame intervals and SVG drawing mutations. Browser input timings include protocol/scheduling overhead; they are observations, not pure handler costs or FPS guarantees. See [v1.1 assessment](advanced-animation-readiness.md) for measured results and limits. No timing thresholds or CI browser jobs are added.
+
 Profile dense editor authoring with `VITE_PROFILE=1 npx vitest run tests/animationAuthoring.profile.test.ts --reporter=verbose`. It measures one property-key edit plus inspector sampling on 33 bones with 512 keys per track, using five warmed batches of ten edits. An earlier local comparison measured 242 ms/edit before validation reuse and 164 ms/edit afterward; these CPU measurements exclude DOM and GPU work and are diagnostic, not CI thresholds.
 
 ## Onion-skin sampling and rendering

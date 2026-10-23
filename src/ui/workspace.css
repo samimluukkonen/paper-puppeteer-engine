@@ -33,8 +33,9 @@
 }
 .workspace-shell .view-header-main {
   flex: 1;
+  min-width: 0;
   margin: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .workspace-shell .view-heading {
   display: flex;

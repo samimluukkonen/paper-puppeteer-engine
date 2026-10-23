@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import { rigFileSchema } from '../../src/engine/schemas.js';
 import { animationMenuControl, test, selectRigEntry } from './fixtures.js';
+import { capturePreviewFrame } from './previewFrame.js';
 
 for (const editor of ['rig', 'animation'] as const) {
   test(`${editor} forearm image preview, cancel, apply, invalid import and revert preserve the document`, async ({
@@ -120,7 +121,8 @@ test('shared versus individual replacement, dimension policies and artwork histo
   await panel.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   await expect(panel).toContainText('Attachment: rightForearmDefault');
   const canvas = page.locator('#animation-stage canvas');
-  const original = await canvas.screenshot();
+  const capture = (name: string) => capturePreviewFrame(page, canvas, test.info().outputPath(`${name}.png`));
+  const original = await capture('original');
   const size = await panel.getByAltText('Original artwork').evaluate((element) => ({
     width: (element as HTMLImageElement).naturalWidth,
     height: (element as HTMLImageElement).naturalHeight,
@@ -149,7 +151,7 @@ test('shared versus individual replacement, dimension policies and artwork histo
   await expect(panel.getByLabel('Alignment policy')).toHaveValue('normalized');
   await panel.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
   await panel.getByRole('button', { name: 'Apply Replacement', exact: true }).click();
-  const shared = await canvas.screenshot();
+  const shared = await capture('shared');
   expect(shared.equals(original)).toBe(false);
   await panel.getByLabel('Replacement scope').selectOption('attachment:leftForearmDefault');
   await panel.getByLabel('Import sprite').setInputFiles({
@@ -162,26 +164,26 @@ test('shared versus individual replacement, dimension policies and artwork histo
   await expect(panel.getByRole('button', { name: 'Preview Replacement', exact: true })).toBeDisabled();
   await panel.getByLabel('Alignment policy').selectOption('pixels');
   await panel.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
-  const pixel = await canvas.screenshot();
+  const pixel = await capture('pixel-policy');
   await panel.getByLabel('Alignment policy').selectOption('normalized');
   await expect(panel.getByRole('button', { name: 'Apply Replacement', exact: true })).toBeDisabled();
   await panel.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
-  expect((await canvas.screenshot()).equals(pixel)).toBe(false);
+  expect((await capture('normalized-policy')).equals(pixel)).toBe(false);
   await panel.getByLabel('Alignment policy').selectOption('pixels');
   await panel.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
   await panel.getByRole('button', { name: 'Apply Replacement', exact: true }).click();
-  const individual = await canvas.screenshot({ path: test.info().outputPath('individual-pixel-pivot.png') });
+  const individual = await capture('individual-pixel-pivot');
   expect(individual.equals(shared)).toBe(false);
   await expect(panel.getByLabel('Artwork changes')).toHaveText('2 pending artwork change(s)');
   await panel.getByRole('button', { name: 'Undo Artwork', exact: true }).click();
-  expect((await canvas.screenshot()).equals(shared)).toBe(true);
+  expect((await capture('undo')).equals(shared)).toBe(true);
   await panel.getByRole('button', { name: 'Redo Artwork', exact: true }).click();
-  expect((await canvas.screenshot()).equals(individual)).toBe(true);
+  expect((await capture('redo')).equals(individual)).toBe(true);
   const attachments = page.locator('#attachment-panel');
   await attachments.locator(':scope > summary').click();
   await attachments.getByLabel('Active skin', { exact: true }).selectOption('alternate');
   await attachments.getByLabel('Active skin', { exact: true }).selectOption('default');
-  expect((await canvas.screenshot()).equals(individual)).toBe(true);
+  expect((await capture('skin-reset')).equals(individual)).toBe(true);
   await page.getByRole('checkbox', { name: 'Onion Skinning', exact: true }).check();
   await (await animationMenuControl(page, '#animation-ik-preview')).check();
   await page.locator('#animation-facing').selectOption('left');

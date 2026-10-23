@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationControl, test, selectRigEntry } from './fixtures.js';
+import { animationHierarchy, animationControl, test, selectRigEntry, waitForPreviewPaint } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -583,6 +583,7 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   await page.mouse.down();
   await expect(page.locator('#animation-metadata')).toContainText('Scrubbing');
   const held = await time();
+  await waitForPreviewPaint(page);
   const pose = await canvas.screenshot();
   await page.waitForTimeout(200);
   expect(await time()).toBe(held);
@@ -590,6 +591,7 @@ test('playing drag owns time and pose until release; paused drag remains paused'
   await page.mouse.move(box.x + box.width * 0.6, box.y + 18, { steps: 5 });
   const moved = await time();
   expect(moved).toBeCloseTo(1.8 * 0.6, 2);
+  await waitForPreviewPaint(page);
   expect((await canvas.screenshot()).equals(pose)).toBe(false);
   await page.waitForTimeout(150);
   expect(await time()).toBe(moved);

@@ -1,5 +1,12 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
+/** UI commands install poses synchronously; allow Phaser to paint before taking a pixel baseline. */
+export async function waitForPreviewPaint(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+}
+
 /** Follow inspector disclosures through their visible summaries before using a control. */
 export async function inspectorControl(page: Page, selector: string): Promise<Locator> {
   const control = page.locator(selector);

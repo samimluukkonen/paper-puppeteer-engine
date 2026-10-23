@@ -83,8 +83,8 @@ function channel(animation: AnimationData, boneId: string, property: TransformPr
         ],
   );
 }
-/** Linear-only comparisons include every original/candidate knot and 16 equal subdivisions per original segment.
- * Knot errors bound the continuous piecewise-linear difference; subdivisions also check angular branch changes.
+/** Linear-only comparisons include every original knot (candidate knots are a subset).
+ * Knot errors bound the continuous piecewise-linear difference; rotation subdivisions also check angular branches.
  * Work scales with authored keys rather than clip duration. Nonlinear/stepped channels never enter cleanup.
  */
 function deviation(
@@ -96,8 +96,9 @@ function deviation(
   for (let i = 0; i < before.length; i++) {
     const start = before[i]!.time;
     const end = before[i + 1]?.time ?? start;
-    for (let step = 0; step <= 16; step++) {
-      const time = start + (end - start) * (step / 16);
+    const subdivisions = property === 'rotation' ? 16 : 0;
+    for (let step = 0; step <= subdivisions; step++) {
+      const time = subdivisions ? start + (end - start) * (step / subdivisions) : start;
       maximum = Math.max(
         maximum,
         Math.abs(delta(sampleProperty(before, time, property), sampleProperty(after, time, property), property)),
@@ -199,7 +200,9 @@ export function diagnoseMotion(
         const distance = Math.abs(delta(a.value, b.value, property));
         const seconds = Math.max((b.time - a.time) / 1000, Number.MIN_VALUE);
         let peakSpeed = distance / seconds;
-        for (let step = 1; step <= 16; step++) {
+        // Linear segments have constant speed. Only nonlinear/held segments need
+        // subdivision samples; all sampling still goes through the runtime evaluator.
+        for (let step = 1; a.curve && a.curve.mode !== 'linear' && step <= 16; step++) {
           const t0 = a.time + (b.time - a.time) * ((step - 1) / 16);
           const t1 = a.time + (b.time - a.time) * (step / 16);
           peakSpeed = Math.max(

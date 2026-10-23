@@ -138,9 +138,10 @@ test('marquee coordinates follow scrolling and resize; additive union, cancel, a
   page,
 }) => {
   await openEditor(page);
-  await page.setViewportSize({ width: 620, height: 1900 });
+  await page.setViewportSize({ width: 1100, height: 1900 });
   await page.addStyleTag({
-    content: '.timeline-inset { max-height: 310px; overflow-x: auto; grid-template-columns: 160px 520px; }',
+    content:
+      '.timeline-inset { max-width: 600px; max-height: 310px; overflow-x: auto; grid-template-columns: 160px 520px; }',
   });
   await page.locator('.timeline-inset').evaluate((element) => {
     element.scrollLeft = 70;
@@ -152,7 +153,7 @@ test('marquee coordinates follow scrolling and resize; additive union, cancel, a
   await marquee(page, true);
   await expect(selected(page)).toHaveCount(4);
   expect(await time(page)).toBe(0.25);
-  await page.setViewportSize({ width: 1100, height: 1600 });
+  await page.setViewportSize({ width: 1400, height: 1600 });
   await marquee(page);
   await expect(selected(page)).toHaveCount(3);
   const x = await lane(page).boundingBox();

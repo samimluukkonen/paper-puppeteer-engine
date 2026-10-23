@@ -127,6 +127,90 @@ test('binds source identity and updates edits/playback without replacing recover
   controller.dispose();
 });
 
+test.each(['field', 'graph'] as const)(
+  'unload preserves the last committed snapshot while a %s preview is pending, before debounce',
+  (preview) => {
+    vi.useFakeTimers();
+    const stored = new Map<string, string>();
+    const browser = Object.assign(new EventTarget(), {
+      localStorage: {
+        get length() {
+          return stored.size;
+        },
+        key: (index: number) => [...stored.keys()][index] ?? null,
+        getItem: (key: string) => stored.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          stored.set(key, value);
+        },
+        removeItem: (key: string) => {
+          stored.delete(key);
+        },
+      },
+      confirm: () => true,
+    });
+    vi.stubGlobal('window', browser);
+    vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }));
+    const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+    const animations = [
+      {
+        name: 'clip',
+        duration: 1000,
+        loop: false,
+        tracks: {
+          root: [
+            { time: 0, x: 0 },
+            { time: 1000, x: 10 },
+          ],
+        },
+      },
+    ];
+    const recovery = new DraftRecovery<ReadonlyAnimation | null>(() => {});
+    const controller = new AnimationDraftRecoveryController(recovery, '/animation-editor/');
+    const nextRecovery = new DraftRecovery<ReadonlyAnimation | null>(() => {});
+    const next = new AnimationDraftRecoveryController(nextRecovery, '/animation-editor/');
+    try {
+      const state = new AnimationEditorState(rig, animations);
+      state.selectAnimation('clip');
+      controller.bind(state, 'hero');
+      state.setAuthoredPlaybackMode('stepped');
+      state.setAuthoredFPS(17);
+      const committed = state.workingAnimation;
+      if (preview === 'field') {
+        state.selectBone('root');
+        state.setTemporaryBoneProperty('x', 123);
+      } else {
+        state.beginGraphEdit({ channel: { kind: 'bone', id: 'root', property: 'x' }, time: 0 });
+        state.previewGraphEdit({ value: 123 });
+      }
+      assert.isTrue(state.hasPendingAnimationEdits);
+      assert.isEmpty(stored);
+      browser.dispatchEvent(new Event('beforeunload'));
+      assert.equal(stored.size, 1);
+      const saved = JSON.parse([...stored.values()][0]!) as { data: unknown };
+      assert.deepEqual(saved.data, committed);
+      assert.strictEqual(state.workingAnimation, committed);
+      controller.dispose();
+      recovery.dispose();
+      const reloaded = new AnimationEditorState(rig, animations);
+      reloaded.selectAnimation('clip');
+      next.bind(reloaded, 'hero');
+      assert.deepEqual(reloaded.workingAnimation, committed);
+      assert.isFalse(reloaded.hasPendingAnimationEdits);
+      assert.isTrue(reloaded.undo());
+      assert.deepEqual(reloaded.workingAnimation, reloaded.sourceAnimation);
+      assert.isTrue(reloaded.redo());
+      assert.deepEqual(reloaded.workingAnimation, committed);
+    } finally {
+      controller.dispose();
+      recovery.dispose();
+      next.dispose();
+      nextRecovery.dispose();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  },
+);
+
 test('synchronous restoration cannot recursively rebind and remains one undoable edit', () => {
   const { state, recovery, controller } = fixture();
   recovery.bind.mockImplementationOnce((session) => {

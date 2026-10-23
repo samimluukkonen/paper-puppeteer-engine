@@ -4,6 +4,8 @@
 
 Starting without character files? Follow [Creating Your First Character](creating-your-first-character.md) to build a rig, import your own sprites, make the first animation and export a portable character.
 
+For the integrated pose → graph → variation → cleanup → recovery → scene workflow, follow [Advanced animation workflow](advanced-animation-workflow.md). It includes the actual controls, separate history owners and common troubleshooting.
+
 The shared character workspace keeps rig, artwork, skins and animation documents together. Both editor views offer **Character package** above the command bar. This combines current authored data with applied artwork into a downloadable ZIP, validates the result, and provides an isolated production runtime preview.
 
 The [standalone developer guide](runtime-integration.md) takes the exported character into another Phaser application without editor code.
