@@ -1,8 +1,7 @@
-import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
-import { buildCharacterPackage, packageJson } from '../src/devtools/shared/package/characterPackage.js';
+import { buildCharacterPackage } from '../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip, encodePackageZip } from '../src/devtools/shared/package/packageZip.js';
 import { CharacterLoader, Puppet, type FiredAnimationEvent } from '../src/engine/runtime.js';
 import { consumerCharacter, consumerImageFetcher } from './helpers/consumerCharacter.js';
@@ -20,12 +19,6 @@ test.each(['destroy', 'shutdown'] as const)(
   async (cleanup) => {
     const authored = consumerCharacter();
     const files = decodePackageZip(encodePackageZip(await buildCharacterPackage(authored, consumerImageFetcher)));
-    // This is the exact extracted package served by the standalone application.
-    for (const [path, bytes] of files) {
-      const fixture = await readFile(new URL(`../examples/standalone/public/character/${path}`, import.meta.url));
-      if (path.endsWith('.json')) assert.deepEqual(JSON.parse(fixture.toString()), packageJson(files, path));
-      else assert.deepEqual(new Uint8Array(fixture), bytes);
-    }
     const base = 'https://another-app.test/nested/assets/hero/';
     const requests: string[] = [];
     const definition = await CharacterLoader.load(`${base}character.json`, (input) => {

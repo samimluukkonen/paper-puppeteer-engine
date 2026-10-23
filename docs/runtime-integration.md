@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-For direct playback, FIFO requests, named states, one-shot actions, safe async handling and disposal, see the [v0.7 runtime controller guide and readiness report](runtime-controller-readiness.md). The standalone consumer now demonstrates all of these APIs against an installed package with valid attack, recovery and run clips.
+For direct playback, FIFO requests, named states, one-shot actions, safe async handling and disposal, see the [v0.7 runtime controller guide and readiness report](runtime-controller-readiness.md).
 
 The optional [v0.8.1 Actor foundation](actors.md) wraps an existing Puppet with instance identity, position access, delegated playback/state/appearance calls and explicit borrowed or owned lifecycle management.
 
@@ -12,9 +12,9 @@ v0.6.4 verifies the existing editor export and runtime loading pipeline in a sep
 
 Use Node 24 or newer. From this repository, `npm run build` produces the demo and the library. `npm pack --pack-destination dist` also runs the prepack version check and library build, producing `dist/paper-puppeteer-engine-1.1.1.tgz`. Install that tarball into another project with `npm install /path/to/paper-puppeteer-engine-1.1.1.tgz phaser@4.2.1`.
 
-The root and `/runtime` entries expose the same browser runtime. `/core` supports metadata loading, validation, animation evaluation and IK tooling without Phaser/browser globals; `/data` provides authored types; `/serialization` exposes versioned parsers/serializers. All entries include declarations and source maps. Phaser 4.2.1 is an external peer, Zod is a package dependency, and React remains a development dependency. `npm run test:package` verifies the tarball's exports, declarations, documentation links, editor isolation and the standalone consumer's actual test/build commands.
+The root and `/runtime` entries expose the same browser runtime. `/core` supports metadata loading, validation, animation evaluation and IK tooling without Phaser/browser globals; `/data` provides authored types; `/serialization` exposes versioned parsers/serializers. All entries include declarations and source maps. Phaser 4.2.1 is an external peer, Zod is a package dependency, and React remains a development dependency. `npm run test:package` verifies the tarball's exports, declarations, documentation links, editor isolation and browser bundling.
 
-The [standalone project](https://github.com/samimluukkonen/paper-puppeteer-engine/tree/master/examples/standalone) has its own package manifest, TypeScript configuration, Vite entry and public character folder. Follow its README commands to install, test, build and serve it. Its source imports the installed public runtime by package name, without source aliases. No npm publication or remote release has been performed. Before publication, choose a license and include its license file, supply repository/author/license metadata, confirm registry/name/access and release provenance, and review the tarball with `npm pack --dry-run`. Publishing remains an explicit release action.
+The former standalone examples project has been removed. Import the installed public runtime by package name in your own Phaser application; no source aliases are needed. The snippets below describe loading, playback and cleanup.
 
 ## Project and scene handoff
 
@@ -48,7 +48,7 @@ poses/*.json                   optional static authored poses
 images/*.{png,webp}             exact sprite binaries, including replacement artwork
 ```
 
-This layout illustrates the shipped example; existing manifest directories, filenames and identifiers are retained. `character.json` is the root and every resource path is relative to it, even when a rig or skin is nested elsewhere. The manifest maps texture keys to image files, and rig sprites/attachments refer to those keys. Attachments are definitions within the rig, rather than separate documents. Baked IK uses ordinary bone keys and the existing clip-local suppression field. Authored format versions remain `1`; the package version in `package.json` is independent of file format versions.
+This layout illustrates a character export; existing manifest directories, filenames and identifiers are retained. `character.json` is the root and every resource path is relative to it, even when a rig or skin is nested elsewhere. The manifest maps texture keys to image files, and rig sprites/attachments refer to those keys. Attachments are definitions within the rig, rather than separate documents. Baked IK uses ordinary bone keys and the existing clip-local suppression field. Authored format versions remain `1`; the package version in `package.json` is independent of file format versions.
 
 Before download/import, the existing exporter checks complete file presence, metadata references, supported versions, rig/animation/skin compatibility and image headers/budgets. Browser export also decodes every distinct image, verifies decoded dimensions and releases its temporary decode URLs. Node validation checks headers/metadata without claiming full image decoding. Missing or incompatible data fails the export before success/checkpoints. Static PNG/WebP packages support only the whole-image frame (`undefined` or `__BASE`); resolve atlas/spritesheet frames to separate static images before exporting.
 
@@ -56,7 +56,7 @@ Paths use plain relative names. Validation rejects absolute paths/URLs, traversa
 
 ## Scene lifecycle and playback
 
-These excerpts are taken from the [consumer source](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/src/main.ts), which is typechecked and built against the packed package:
+Use the public runtime inside a Phaser scene:
 
 ```ts
 import { loadSceneCharacter, Puppet } from 'paper-puppeteer-engine/runtime';

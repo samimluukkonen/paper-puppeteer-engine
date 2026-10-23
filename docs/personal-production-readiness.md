@@ -1,5 +1,7 @@
 # v1.0.5 — Personal production readiness
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [Artist workflow](artist-workflow.md) · [Project Workspace](project-workspace.md) · [Developer integration](runtime-integration.md) · [Recovery](local-autosave.md)
 
 ## Verdict and scope

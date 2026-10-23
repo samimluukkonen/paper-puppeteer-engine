@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import type Phaser from 'phaser';
 import { assert, beforeAll, expect, test, vi } from 'vitest';
+import { buildCharacterPackage } from '../src/devtools/shared/package/characterPackage.js';
 import { loadSceneCharacter } from '../src/engine/loadSceneCharacter.js';
 import {
   Actor,
@@ -12,6 +12,7 @@ import {
   Puppet,
 } from '../src/engine/runtime.js';
 import { createScriptedScene } from '../src/examples/choreography.js';
+import { consumerCharacter, consumerImageFetcher } from './helpers/consumerCharacter.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -29,9 +30,11 @@ const SceneEvents = createRequire(import.meta.url)(
 ) as typeof Phaser.Events.EventEmitter;
 let definition: CharacterDefinition;
 beforeAll(async () => {
+  const files = await buildCharacterPackage(consumerCharacter(), consumerImageFetcher);
   definition = await CharacterLoader.load('https://consumer.test/character/character.json', async (input) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-    return new Response(await readFile(new URL(`../examples/standalone/public${url.pathname}`, import.meta.url)));
+    const bytes = files.get(url.pathname.slice('/character/'.length));
+    return bytes ? new Response(bytes) : new Response(null, { status: 404 });
   });
 });
 function fixture() {

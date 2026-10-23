@@ -1,5 +1,7 @@
 # First character workflow verification
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [Creating Your First Character](creating-your-first-character.md) · [Artist workflow](artist-workflow.md)
 
 This implements the v0.6.6.3 workflow plan against the current repository version. Library and authored schema versions remain unchanged. Existing character assets, dependencies and CI workflows are untouched.

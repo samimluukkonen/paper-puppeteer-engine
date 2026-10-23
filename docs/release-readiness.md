@@ -1,5 +1,7 @@
 # v0.6.5 release-readiness report
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 **Historical v0.6.5 assessment.** See the [v1.0.5 internal production readiness report](personal-production-readiness.md) for the current project workflow and verification.
 
 [All guides](../README.md#guides) · [v0.6 release notes](release-notes-v0.6.md) · [Artist workflow](artist-workflow.md) · [Developer integration](runtime-integration.md)

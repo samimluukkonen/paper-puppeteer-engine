@@ -21,7 +21,7 @@ npm run check:release
 
 `audit` checks all locked dependencies, including development tooling, and fails on advisories of any severity. CI runs it for pull requests and pushes to `master`. A separate workflow can be triggered manually; it audits the lockfile without installing packages or running dependency lifecycle scripts.
 
-`check:release` runs formatting, lint, typecheck, version validation, all normal unit regressions, both builds and the packed standalone consumer checks in sequence. It does not replace the local browser, performance and human acceptance gates in the [release-readiness report](release-readiness.md). The [v1.0.5 report](personal-production-readiness.md) covers the complete project workflow, recovery and standalone scene handoff. Run optional profiles separately from browser tests to avoid competing workloads. Browser checks stay local-only; dependency audit scheduling is unchanged.
+`check:release` runs formatting, lint, typecheck, version validation, all normal unit regressions, both builds and the packed consumer checks in sequence. It does not replace the local browser, performance and human acceptance gates in the [release-readiness report](release-readiness.md). The [v1.0.5 report](personal-production-readiness.md) covers the complete project workflow, recovery and standalone scene handoff. Run optional profiles separately from browser tests to avoid competing workloads. Browser checks stay local-only; dependency audit scheduling is unchanged.
 
 ### Local browser checks
 
@@ -36,7 +36,7 @@ The command builds the demo, then runs every scenario against both the Vite deve
 
 See the [profiling guide](profiling.md) for optional CPU and browser profiles, workload descriptions, and historical measurements. Profiles are local diagnostics and have no timing thresholds.
 
-The [v0.8 Actor/choreography report](release-notes-v0.8.md) records the additional production-scene gates and measurements. The standalone consumer also builds `choreography.html` for local two-Actor completion/cancellation/shutdown checks. `PPE_PACKAGE_BROWSER=1 PLAYWRIGHT_CHANNEL=chrome npm run test:package` opts into its desktop browser suite against an isolated packed install; normal package/CI checks do not run browsers.
+The [v0.8 Actor/choreography report](release-notes-v0.8.md) records historical production-scene gates and measurements. The former standalone examples application and its optional packed-browser command have been removed. Browser checks for the editor remain local-only.
 
 ## Tooling
 
@@ -238,7 +238,7 @@ Complete character downloads use the existing version-1 formats; see the [artist
 
 Runtime package previews lease temporary image URLs and own an independent Phaser game/texture manager. Metadata passes through `CharacterLoader`; `loadSceneCharacter` accepts an already loaded immutable definition and still yields asynchronously before checking the scene's active flag. Preview shutdown cancels texture loads and destroys puppets; game destruction releases the URL lease. Do not serialize runtime blob URLs or private artwork texture keys into a package.
 
-The [v0.6.4 standalone integration guide](runtime-integration.md) documents exported package structure, asset loading, coordinates, scene/texture ownership and the independent consumer project. `npm run test:package` also runs that project's actual Node tests and production build against the packed library; its browser smoke tests remain local-only. The root lint/typecheck scope excludes this independently installed project; its own strict TypeScript check runs in the packed consumer build without checkout aliases.
+The [runtime integration guide](runtime-integration.md) documents exported package structure, asset loading, coordinates and scene/texture ownership. `npm run test:package` verifies an isolated packed install, public declarations, runtime samples and browser bundling without an examples application.
 
 ## Use as a local package
 

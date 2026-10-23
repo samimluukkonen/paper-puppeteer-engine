@@ -6,7 +6,7 @@ import { type AnimationClip, commitIKBake, generateBakedBoneKeys, sampleIKBake }
 import { Rig } from '../../src/engine/Rig.js';
 import { demoCharacter } from './demoCharacter.js';
 
-/** Finite action/queue clips and a looping locomotion state for the standalone controls. */
+/** Finite action/queue clips and a looping locomotion state for runtime integration tests. */
 export const controllerAnimations: readonly AnimationClip[] = [
   {
     name: 'attack',
@@ -53,7 +53,7 @@ export const controllerAnimations: readonly AnimationClip[] = [
   },
 ];
 
-/** Representative editor-authored snapshot used to produce the standalone consumer's extracted package. */
+/** Representative editor-authored snapshot used by runtime integration tests. */
 export function consumerCharacter(): PackageSnapshot {
   const rig = new RigEditorState(new Rig(demoCharacter.rig, []), structuredClone(demoCharacter.rigFile!), {
     defaultSkin: demoCharacter.defaultSkin,

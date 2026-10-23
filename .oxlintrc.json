@@ -21,8 +21,7 @@
     "playwright-report/**",
     ".cache/**",
     ".tmp/**",
-    "tmp/**",
-    "examples/standalone/**"
+    "tmp/**"
   ],
   "rules": {
     "typescript/no-non-null-assertion": "off",

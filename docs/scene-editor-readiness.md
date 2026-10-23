@@ -1,5 +1,7 @@
 # v0.9 Scene Editor production readiness
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [All guides](../README.md#guides) · [Making Your First Scene](making-your-first-scene.md) · [Scene format and APIs](scene-editor.md)
 
 ## Readiness verdict

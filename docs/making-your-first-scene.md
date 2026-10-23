@@ -58,7 +58,7 @@ JSON stores references and Actor/action configuration. It does not embed or modi
 
 For a portable handoff, choose **Download scene package**. The ZIP contains `scene.json` and each referenced character package once, including artwork. Its references are rewritten inside a detached export; the working document and source packages stay unchanged.
 
-Run the [standalone consumer](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/README.md), open `scene.html`, and select your ZIP using **Open scene ZIP**. Play, Pause, Stop and **Time (ms)** use the public runtime adapter, without editor code. Alternatively, extract the archive into `public/my-scene/` and load its `scene.json` in a host Phaser scene:
+Extract the archive into your Phaser application's `public/my-scene/` folder and load its `scene.json` in a host Phaser scene:
 
 ```ts
 import { SceneLoader } from 'paper-puppeteer-engine/runtime';

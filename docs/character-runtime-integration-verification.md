@@ -1,5 +1,7 @@
 # v0.6.4 character packaging and runtime integration verification
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [All guides](../README.md#guides) · [Developer guide](runtime-integration.md) · [Artist guide](artist-workflow.md)
 
 Verified locally on 2026-10-15 using Node 24.19.0 and npm 11.17.0. Library version is `0.6.4`; authored manifest, rig, skin, animation and pose formats remain version `1`. Existing export/loading systems, relative paths and identifiers are retained. No npm publication, remote release, new runtime dependency or CI browser step was added.

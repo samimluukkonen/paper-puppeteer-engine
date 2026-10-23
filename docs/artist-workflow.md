@@ -85,7 +85,7 @@ Opening an editor in a separate browser tab or typing its URL starts a separate 
 
 Existing relative metadata/image paths are retained when possible. A shared replacement keeps its texture key and image path when the extension matches and no other texture key uses that path. Replacing an aliased source image or switching PNG/WebP generates a distinct matching image path. Individual overrides get distinct deterministic texture keys/image paths while bone/attachment/slot/skin identities remain unchanged. Generated clip, skin and image filenames receive numeric suffixes when they collide after sanitization or case folding. Conflicts between existing manifest paths still block export. Pixel-preserving pivots serialize into ordinary normalized origins; pivots outside 0..1 use an equivalent artwork offset, including attachment rotation/scale, to preserve rendering without extending the format.
 
-The verified [standalone consumer](https://github.com/samimluukkonen/paper-puppeteer-engine/tree/master/examples/standalone) uses this public API inside its Phaser scene:
+Use this public API inside your own Phaser scene; see the [runtime integration guide](runtime-integration.md) for installation and lifecycle details:
 
 ```ts
 const url = new URL('character/character.json', document.baseURI).href;

@@ -4,7 +4,7 @@
 
 ## A complete working scene
 
-The reusable [runtime example](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/examples/choreography.ts) and its [standalone copy](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/src/scriptedScene.ts) implement the entire scene. Package checks compile the example against an isolated packed install and require both copies to agree. The [standalone application](https://github.com/samimluukkonen/paper-puppeteer-engine/tree/master/examples/standalone) supplies the Phaser game, controls and extracted exported character package. Its `choreography.html` page runs the scene repeatedly, cancels it, and destroys the game.
+The reusable [runtime example](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/src/examples/choreography.ts) implements the entire scene. Package checks compile it against an isolated packed install. Runtime integration tests generate an exported character package directly and exercise repeated completion, cancellation and cleanup. Supply your own Phaser game and controls to run it in an application.
 
 The two instances load the same exported package independently and share its cached textures. Both start idle on opposite sides, walk concurrently at different speeds, wait at a barrier, face one another, play `attack` then `recover`, return to idle, and dispose. These animation names, plus `idle` and `walk`, exist in the standalone package. They are application mappings, not engine conventions. For different exports supply `animations: { idle, walk, action, response }`; missing clips fail before constructing Puppets.
 

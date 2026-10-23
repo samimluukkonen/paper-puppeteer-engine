@@ -84,7 +84,7 @@ scene.load.start();
 
 `scene` is your Phaser scene. Serve the sample folder from `public/characters/demo-puppet/` at the URL above, or use your own character manifest. The puppet updates automatically with the scene. For Node asset tooling, use the renderer-independent `paper-puppeteer-engine/core` entry point.
 
-v0.6.4 verifies [standalone runtime integration](docs/runtime-integration.md) with portable character exports, an independent Phaser consumer and packed-package test/build coverage.
+The [runtime integration guide](docs/runtime-integration.md) covers portable character exports and loading them in your own Phaser application. Packed-package checks verify public APIs and browser bundling.
 
 Milestone v0.7.6.6 (package `0.7.6-6`) completes the [Feature Guide](docs/feature-guide.md), with Rig Editor and Animation Editor tutorials, optional practice using real controls, prerequisite recovery and restart/navigation. See the [implementation and verification report](docs/feature-guide-verification.md).
 
@@ -92,7 +92,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 
 ## Guides
 
-- [Standalone character runtime integration](docs/runtime-integration.md)
+- [Character runtime integration](docs/runtime-integration.md)
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Advanced Pose Library](docs/pose-library.md)

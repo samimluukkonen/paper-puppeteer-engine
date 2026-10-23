@@ -1,5 +1,7 @@
 # Runtime animation controller — v0.7.5
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [All guides](../README.md#guides)
 
 This milestone hardens v0.7 with production regression coverage, a packed standalone example and measured CPU diagnostics. The controller remains optional: existing `puppet.play('idle')` consumers keep the same clocks, blending, authored events and pose/IK pipeline. No authored schema, editor workflow, dependency or CI policy changes are required.
@@ -36,7 +38,7 @@ The existing exported types remain additive: `PlaybackInstanceId`, `PlaybackOutc
 
 ## Basic playback, queues and states
 
-These clip names exist in the [standalone character](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/public/character/character.json):
+These clip names exist in the [standalone character](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/e7576543a5f07cdfff5c23a95c5c3e63ffd9e7f4/examples/standalone/public/character/character.json):
 
 ```ts
 puppet.play('idle');

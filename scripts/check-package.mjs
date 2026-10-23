@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -244,14 +244,6 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
   const choreographyExample = (
     await readFile(new URL('../src/examples/choreography.ts', import.meta.url), 'utf8')
   ).replace('../engine/runtime.js', 'paper-puppeteer-engine/runtime');
-  assert.equal(
-    (await readFile(new URL('../examples/standalone/src/scriptedScene.ts', import.meta.url), 'utf8')).replace(
-      "import type Phaser from 'phaser';\n",
-      '',
-    ),
-    choreographyExample.replace("import type Phaser from 'phaser';\n", ''),
-    'The standalone scene must match the reusable runtime example.',
-  );
   await writeFile(join(consumer, 'choreography-example.ts'), choreographyExample);
   // Match the repository's skipLibCheck for the browser entry's third-party Phaser declarations.
   config.compilerOptions.skipLibCheck = true;
@@ -283,29 +275,8 @@ export function sync(puppet: Puppet, options: SyncPoseOptions): void {
         );
     }
   }
-  // Run the real standalone project's commands against the packed install in a separate directory.
-  // The checkout supplies only build tools through PATH; package imports resolve the tarball above.
-  const standalone = join(temporary, 'standalone');
-  await cp(join(root, 'examples/standalone'), standalone, {
-    recursive: true,
-    filter: (path) => !['node_modules', 'dist', 'test-results', 'playwright-report'].includes(path.split('/').at(-1)),
-  });
-  await symlink(join(consumer, 'node_modules'), join(standalone, 'node_modules'), 'dir');
-  npm(['run', 'test'], standalone);
-  npm(['run', 'build'], standalone);
-  await readFile(join(standalone, 'dist/character/character.json'));
-  // Explicitly opt in locally; regular release/CI checks do not install or launch browsers.
-  if (process.env.PPE_PACKAGE_BROWSER === '1') {
-    await mkdir(join(consumer, 'node_modules/@playwright'), { recursive: true });
-    await symlink(
-      dirname(installed.resolve('@playwright/test/package.json')),
-      join(consumer, 'node_modules/@playwright/test'),
-      'dir',
-    );
-    npm(['run', 'test:browser'], standalone);
-  }
   console.log(
-    'Packed package works in an isolated consumer: documentation, Node entry points, public declarations, runtime example, compatibility, browser isolation, and standalone test/build.',
+    'Packed package works in an isolated consumer: documentation, Node entry points, public declarations, runtime example, compatibility, and browser isolation.',
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

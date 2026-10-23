@@ -1,5 +1,7 @@
 # v0.8 Actor and choreography release report
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [All guides](../README.md#guides) · [Production guide](choreography-production.md) · [Actor API](actors.md) · [Choreography API](choreography-sequences.md)
 
 Candidate: **0.8.6**. Verification date: **2026-10-18**.

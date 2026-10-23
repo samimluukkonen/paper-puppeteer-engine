@@ -1,5 +1,7 @@
 # v0.6 Production Authoring release notes
 
+Historical verification report: the standalone `examples/` application has since been removed. Its commands and results below describe the recorded release, rather than the current checkout. See the [runtime integration guide](runtime-integration.md) for current usage.
+
 [All guides](../README.md#guides) · [Release gates and current verdict](release-readiness.md)
 
 Package candidate: **0.6.5**. These notes prepare the v0.6 release; they do not announce publication. Consult the readiness report for measured results and remaining acceptance work.
@@ -24,7 +26,7 @@ The v0.6 hardening series separates runtime/editor dependencies, stabilizes publ
 
 Declarations and source maps ship with the library. Use documented exports; editor controllers, source-relative deep imports and demo presentation are internal. Runtime data snapshots are immutable. Host applications own shared texture keys and texture lifetime; `Puppet.destroy()` releases puppet objects, IK and subscriptions. `loadSceneCharacter` cancels on scene shutdown. Scene updates advance puppets automatically unless `autoUpdate: false` is selected. Stop event subscriptions and destroy owned games on teardown.
 
-See the [API audit](runtime-api.md), [integration guide](runtime-integration.md), and [standalone consumer instructions](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/README.md). Node 24+ is required for repository tooling; Phaser 4.2.1 is the exact runtime peer. React belongs to the editor/demo, not the library dependency graph.
+See the [API audit](runtime-api.md), [integration guide](runtime-integration.md), and [standalone consumer instructions](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/e7576543a5f07cdfff5c23a95c5c3e63ffd9e7f4/examples/standalone/README.md). Node 24+ is required for repository tooling; Phaser 4.2.1 is the exact runtime peer. React belongs to the editor/demo, not the library dependency graph.
 
 ## Supported data and migration
 

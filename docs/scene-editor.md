@@ -246,7 +246,7 @@ loaded.dispose();
 
 `SceneLoader.fromDefinition` accepts an unknown authored value with a `baseUrl`; `SceneLoader.loadPackage` accepts a hosted ZIP URL, ZIP bytes or decoded file map. All variants preflight dependencies before constructing Actors and cancel on host shutdown or an external abort signal. The host owns the update clock. Seeks use existing reconstruction behavior and suppress cues/gameplay events. A ZIP lease owns isolated runtime texture aliases, temporary image URLs and its private textures, and releases them on disposal. Ordinary hosted character textures stay shared and host-owned. Puppet and Actor remain usable independently.
 
-See the [standalone example](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/examples/standalone/README.md#authored-scenes-and-scene-zips) for the independently built consumer. `tests/scenePackaging.test.ts` and `tests/sceneLoader.test.ts` cover stable JSON/ZIP output, round trips, failures, source/working-copy isolation, playback/seek equivalence, cancellation and artwork cleanup. Desktop browser checks remain local-only.
+See the [runtime integration guide](runtime-integration.md#project-and-scene-handoff) for loading authored scenes in your own Phaser application. `tests/scenePackaging.test.ts` and `tests/sceneLoader.test.ts` cover stable JSON/ZIP output, round trips, failures, source/working-copy isolation, playback/seek equivalence, cancellation and artwork cleanup. Desktop browser checks remain local-only.
 
 ## v0.9 production hardening
 
