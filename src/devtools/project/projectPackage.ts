@@ -75,8 +75,12 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
   const files = new Map<string, Uint8Array<ArrayBuffer>>();
   const sharedImages = new Map<string, string>();
   const records: z.infer<typeof archiveSchema>['characters'] = [];
+  const add = (path: string, bytes: Uint8Array<ArrayBuffer>, shared = false): void => {
+    if (files.has(path) && !shared) throw new Error(`Project file collision at "${path}".`);
+    files.set(path, bytes);
+  };
   const json = (path: string, data: unknown): void => {
-    files.set(path, encoder.encode(canonicalJson(data)));
+    add(path, encoder.encode(canonicalJson(data)));
   };
   for (const entry of metadata.characters) {
     signal?.throwIfAborted();
@@ -91,24 +95,25 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
     const mapping: Record<string, string> = Object.create(null) as Record<string, string>;
     const prefix = entry.manifest.slice(0, entry.manifest.lastIndexOf('/') + 1);
     for (const [path, bytes] of packaged) {
-      let target = `${prefix}${path}`;
+      let target = path === 'character.json' ? entry.manifest : `${prefix}${path}`;
+      let shared = false;
       if (textures.has(path)) {
         const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
           byte.toString(16).padStart(2, '0'),
         ).join('');
+        const previous = sharedImages.get(digest);
+        shared = previous !== undefined;
         target =
-          sharedImages.get(digest) ??
-          `assets/image-${sharedImages.size + 1}.${path.toLowerCase().endsWith('.webp') ? 'webp' : 'png'}`;
+          previous ?? `assets/image-${sharedImages.size + 1}.${path.toLowerCase().endsWith('.webp') ? 'webp' : 'png'}`;
         sharedImages.set(digest, target);
       }
-      if (files.has(target) && !textures.has(path)) throw new Error(`Project file collision at "${target}".`);
-      files.set(target, bytes);
+      add(target, bytes, shared);
       mapping[path] = target;
     }
     records.push({ id: entry.id, files: mapping });
   }
   metadata.scenes.forEach((entry, index) => {
-    files.set(entry.path, encoder.encode(serializeSceneDefinition(scenes[index]!)));
+    add(entry.path, encoder.encode(serializeSceneDefinition(scenes[index]!)));
   });
   json('project.json', { project: metadata, characters: records });
   try {
@@ -184,6 +189,7 @@ export async function buildProjectScenePackage(
     ]),
   );
   const files = new Map<string, Uint8Array<ArrayBuffer>>();
+  const references = new Map<string, string>();
   for (const [id, snapshot] of captures) {
     const packaged = await buildCharacterPackage(snapshot, characterFileFetcher(workspace.character(id).files)).catch(
       (error: unknown) => {
@@ -191,9 +197,13 @@ export async function buildProjectScenePackage(
       },
     );
     const reference = workspace.characterReference(id);
-    const prefix = reference.slice(0, reference.lastIndexOf('/') + 1);
+    // A project may register custom manifest paths. Standalone scene ZIPs have
+    // their own confined character.json layout, independent of project storage.
+    const prefix = `characters/character-${references.size + 1}/`;
+    references.set(reference, `${prefix}character.json`);
     for (const [path, bytes] of packaged) files.set(`${prefix}${path}`, bytes);
   }
+  for (const actor of scene.actors) actor.character.manifest = references.get(actor.character.manifest)!;
   files.set('scene.json', encoder.encode(serializeSceneDefinition(scene)));
   await validateScenePackage(files).catch((error: unknown) => {
     throw packageExportFailure(report, { kind: 'scene', owner: scene.id, id: scene.id }, error);

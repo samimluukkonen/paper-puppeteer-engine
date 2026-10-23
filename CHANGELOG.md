@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Preserve custom character manifest paths through project export/import, rebase standalone scene ZIPs independently, and reject physical metadata collisions before a download can overwrite a resource.
+
 - Cache compact per-scene fingerprints for project checkpoints and both project/standalone autosave revisions, allowing multiple individually valid scenes to exceed 10 MiB in aggregate without disabling recovery.
 
 - Load guarded static WebP artwork in character and scene editors. Release failed character opening state so project export/autosave can continue, and recreate failed hosts on the next opening.

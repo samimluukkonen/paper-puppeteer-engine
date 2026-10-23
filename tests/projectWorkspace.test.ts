@@ -18,7 +18,7 @@ import {
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { checkJson } from '../src/engine/jsonData.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
-import { createEmptyScene } from '../src/engine/SceneDefinition.js';
+import { createEmptyScene, parseSceneDefinition } from '../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../src/engine/ScenePackage.js';
 import type { ValidationIssue } from '../src/engine/validation.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';
@@ -340,6 +340,67 @@ test('unsafe paths, duplicate references, missing files, wrong IDs and unsupport
     /Invalid package path/,
   );
   assert.equal(project.definition.characters.length, 1);
+});
+
+test('custom project manifest paths survive repeated project exports and standalone scene packaging', async () => {
+  const project = new ProjectWorkspace('Film');
+  await project.addCharacter(await emptyCharacter());
+  const original = project.characterReference('hero');
+  project.addScene({
+    ...createEmptyScene({ id: 'scene' }),
+    actors: [{ id: 'actor', character: { manifest: original }, position: { x: 12, y: 34 } }],
+  });
+  const files = new Map((await buildProjectPackage(project)).files);
+  const archive = JSON.parse(new TextDecoder().decode(files.get('project.json'))) as {
+    project: { characters: { manifest: string }[]; scenes: { path: string }[] };
+    characters: { files: Record<string, string> }[];
+  };
+  const custom = 'cast/hero/hero.json';
+  archive.project.characters[0]!.manifest = custom;
+  archive.characters[0]!.files['character.json'] = custom;
+  files.set(custom, files.get(original)!);
+  files.delete(original);
+  const scenePath = archive.project.scenes[0]!.path;
+  const scene = parseSceneDefinition(project.scenes.scene('scene'));
+  scene.actors[0]!.character.manifest = custom;
+  files.set(scenePath, new TextEncoder().encode(JSON.stringify(scene)));
+  files.set('project.json', new TextEncoder().encode(JSON.stringify(archive)));
+  let restored = await importProjectPackage(files);
+  for (let index = 0; index < 2; ++index) {
+    const exported = await buildProjectPackage(restored);
+    assert.isTrue(exported.files.has(custom));
+    restored = await importProjectPackage(decodePackageZip(encodePackageZip(exported.files)));
+    assert.equal(restored.characterReference('hero'), custom);
+    assert.equal(restored.scenes.scene('scene')!.actors[0]!.character.manifest, custom);
+  }
+  const standalone = await validateScenePackage(
+    await buildProjectScenePackage(restored, restored.scenes.scene('scene')!),
+  );
+  assert.equal(standalone.definition.actors[0]!.character.manifest, 'characters/character-1/character.json');
+  assert.deepEqual(standalone.definition.actors[0]!.position, { x: 12, y: 34 });
+  assert.equal(restored.scenes.scene('scene')!.actors[0]!.character.manifest, custom);
+});
+
+test('project export rejects physical scene/character collisions instead of overwriting metadata', async () => {
+  const project = new ProjectWorkspace('Film');
+  await project.addCharacter(await emptyCharacter());
+  project.createScene({ id: 'scene' });
+  const files = new Map((await buildProjectPackage(project)).files);
+  const archive = JSON.parse(new TextDecoder().decode(files.get('project.json'))) as {
+    project: { scenes: { path: string }[] };
+    characters: { files: Record<string, string> }[];
+  };
+  const mapping = archive.characters[0]!.files;
+  const rigPath = mapping['rig.json']!;
+  files.set('shared/rig.json', files.get(rigPath)!);
+  mapping['rig.json'] = 'shared/rig.json';
+  const oldScenePath = archive.project.scenes[0]!.path;
+  files.set(rigPath, files.get(oldScenePath)!);
+  files.delete(oldScenePath);
+  archive.project.scenes[0]!.path = rigPath;
+  files.set('project.json', new TextEncoder().encode(JSON.stringify(archive)));
+  const restored = await importProjectPackage(files);
+  await expect(buildProjectPackage(restored)).rejects.toThrow(/Project file collision/);
 });
 
 test.each(['demo-puppet', 'random-paperdoll-sketch'])(
