@@ -1531,3 +1531,111 @@ a {
   color: var(--fg-muted);
   white-space: nowrap;
 }
+
+/* Graph shares the timeline's document, selection and playback controls. */
+.timeline-panel.graph-active > .timeline-inset,
+.timeline-panel.graph-active > .timeline-track-controls,
+.timeline-panel.graph-active > #timeline-filter-empty,
+.timeline-panel.graph-active .timeline-zoom-controls {
+  display: none;
+}
+.graph-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  gap: 8px;
+}
+.graph-editor[hidden] {
+  display: none;
+}
+.graph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.graph-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.graph-controls input {
+  width: 88px;
+}
+.graph-controls button,
+.graph-controls select,
+.graph-controls input {
+  min-height: 28px;
+}
+#graph-canvas {
+  display: block;
+  width: 100%;
+  flex: 1 0 180px;
+  min-height: 180px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  touch-action: none;
+  user-select: none;
+}
+#graph-canvas text {
+  fill: var(--fg-muted);
+  font-size: 11px;
+}
+.graph-grid {
+  stroke: var(--border-default);
+  stroke-width: 0.5;
+}
+.graph-curve {
+  fill: none;
+  stroke: var(--accent-fg);
+  stroke-width: 2;
+}
+.graph-key {
+  fill: var(--bg-panel);
+  stroke: var(--accent-fg);
+  stroke-width: 2;
+  cursor: move;
+}
+.graph-key[aria-pressed="true"] {
+  fill: var(--accent-fg);
+  stroke: var(--fg-default);
+}
+.graph-key:focus-visible {
+  outline: none;
+  stroke: var(--fg-default);
+  stroke-width: 4;
+}
+.graph-tangent {
+  stroke: var(--fg-muted);
+  stroke-dasharray: 4 3;
+}
+.graph-handle {
+  fill: var(--fg-default);
+  stroke: var(--bg-inset);
+  stroke-width: 1;
+  cursor: move;
+}
+.graph-playhead {
+  stroke: var(--danger-fg);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.graph-tangent-details {
+  font-size: 12px;
+}
+.graph-tangent-details[open] > form {
+  margin-top: 16px;
+}
+.graph-editor p {
+  margin: 0;
+}
+.graph-help {
+  font-size: 11px;
+}
+#graph-toggle[aria-pressed="true"] {
+  border-color: var(--accent-fg);
+}

@@ -109,7 +109,7 @@ export class IKInspectorController {
   }
   private refresh(): void {
     const state = this.state;
-    const context = [state, state?.selectedTarget, state?.currentTime, state?.workingAnimation, state?.sessionRevision];
+    const context = [state, state?.selectedTarget, state?.currentTime, state?.previewAnimation, state?.sessionRevision];
     if (context.some((value, index) => value !== this.context[index])) this.text.clear();
     for (const property of ikAnimationProperties) {
       if (!this.editing && this.previousDraft[property] !== state?.ikTargetDraft[property]) this.text.delete(property);

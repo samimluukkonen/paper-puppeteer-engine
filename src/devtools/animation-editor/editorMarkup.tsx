@@ -15,6 +15,7 @@ import { AnimationGroundPanel } from './AnimationGroundPanel.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
 import type { FootContactGroundController } from './FootContactGroundController.js';
+import { GraphEditorPanel } from './GraphEditorPanel.js';
 import type { IKBakeController } from './IKBakeController.js';
 import { IKBakePanel } from './IKBakePanel.js';
 import type { IKInspectorController } from './IKInspectorController.js';
@@ -391,6 +392,15 @@ export function AnimationEditorView({
         >
           <div className="timeline-toolbar" aria-label="Playback and timing">
             <h2>Timeline</h2>
+            <button
+              id="graph-toggle"
+              type="button"
+              aria-pressed="false"
+              aria-controls="graph-editor"
+              data-guide-id={GUIDE_TARGETS.animationGraphToggle}
+            >
+              Graph Editor
+            </button>
             <div
               data-guide-id={GUIDE_TARGETS.animationPlayback}
               className="timeline-control-group"
@@ -686,6 +696,7 @@ export function AnimationEditorView({
               </div>
             </div>
           </div>
+          <GraphEditorPanel />
         </section>
         <section className="animation-preview" aria-label="Animation preview">
           <div className="animation-preview-options">

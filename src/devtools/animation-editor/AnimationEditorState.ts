@@ -53,6 +53,8 @@ import {
   sampleGhostPose,
   sampleGhostPoses,
 } from './ghostPoseSampling.js';
+import { editGraphKey, graphKeys, type GraphKeyEdit, type GraphKeyRef } from './graphEditor.js';
+import { evaluateIKTarget } from './ikInspectorSampling.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';
 import {
   getAnimationInterpolation,
@@ -94,6 +96,94 @@ export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  private graphGesture: {
+    readonly base: ReadonlyAnimation;
+    readonly ref: GraphKeyRef;
+    readonly preview: ReadonlyAnimation;
+    readonly time: number;
+  } | null = null;
+
+  /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
+  get previewAnimation(): ReadonlyAnimation | null {
+    return this.graphGesture?.preview ?? this.working;
+  }
+  get graphEditActive(): boolean {
+    return this.graphGesture !== null;
+  }
+  beginGraphEdit(ref: GraphKeyRef): boolean {
+    if (
+      !this.animationAuthoringEnabled ||
+      !this.working ||
+      !this.rig ||
+      !graphKeys(this.working, ref.channel).some((key) => key.time / 1000 === ref.time)
+    )
+      return false;
+    return this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.clearTransformDraft();
+      this.playback.pause();
+      this.graphGesture = {
+        base: this.working!,
+        ref: { channel: { ...ref.channel }, time: ref.time },
+        preview: this.working!,
+        time: ref.time,
+      };
+      this.notify();
+      return true;
+    });
+  }
+  previewGraphEdit(edit: GraphKeyEdit): boolean {
+    const gesture = this.graphGesture;
+    if (!gesture || !this.rig || gesture.base !== this.working || !this.animationAuthoringEnabled) return false;
+    const preview = editGraphKey(gesture.base, this.rig, gesture.ref, edit);
+    this.graphGesture = { ...gesture, preview, time: edit.time ?? gesture.ref.time };
+    this.notify();
+    return true;
+  }
+  cancelGraphEdit(): boolean {
+    if (!this.graphGesture) return false;
+    this.graphGesture = null;
+    this.notify();
+    return true;
+  }
+  commitGraphEdit(): boolean {
+    const gesture = this.graphGesture;
+    if (!gesture) return false;
+    return this.batchNotifications(() => {
+      this.graphGesture = null;
+      if (gesture.base !== this.working) {
+        this.notify();
+        return false;
+      }
+      const channel = gesture.ref.channel;
+      const changed = this.installWorkingAnimation(
+        gesture.preview,
+        false,
+        channel.kind === 'bone' ? [{ boneId: channel.id, property: channel.property, time: gesture.time }] : undefined,
+      );
+      if (changed && channel.kind === 'ik')
+        this.selection.setIKKey({
+          kind: 'ik',
+          constraintId: channel.id,
+          property: channel.property,
+          time: gesture.time,
+        });
+      return changed;
+    });
+  }
+  editGraphKey(ref: GraphKeyRef, edit: GraphKeyEdit): boolean {
+    return this.batchNotifications(() => {
+      if (!this.beginGraphEdit(ref)) return false;
+      try {
+        this.previewGraphEdit(edit);
+        return this.commitGraphEdit();
+      } catch (error) {
+        this.cancelGraphEdit();
+        throw error;
+      }
+    });
+  }
+
   readonly poseLibrary: PoseLibrary;
   private posePreview: { pose: DeepReadonly<PoseDefinition>; animation: ReadonlyAnimation; rig: Rig } | null = null;
 
@@ -256,7 +346,7 @@ export class AnimationEditorState {
     this.playbackController = new AnimationEditorPlaybackController(this.document, this.selection, this.playback, {
       notify: () => this.notify(),
       navigate: (time) => this.setCurrentTime(time),
-      isDragging: () => !!(this.keyframeDrag || this.eventDrag || this.ikTargetDrag),
+      isDragging: () => !!(this.keyframeDrag || this.eventDrag || this.ikTargetDrag || this.graphEditActive),
     });
     this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, {
       install: (animation) => this.installWorkingAnimation(animation),
@@ -304,6 +394,7 @@ export class AnimationEditorState {
   /** Same-topology rig edits invalidate sampling, without installing animation snapshots. */
   updatePreviewRig(rig: Rig): void {
     if (rig === this.rig) return;
+    this.cancelGraphEdit();
     this.document.rig = rig;
     this.selection.updateRig(rig);
     this.symmetry = createBoneSymmetryMapping(rig, { manualPairs: this.symmetry?.pairs ?? [] }).mapping;
@@ -364,6 +455,9 @@ export class AnimationEditorState {
     return this.ik.ikTargetDraft;
   }
   get selectedIKTargetValues() {
+    const id = this.selectedIKConstraintId;
+    if (this.graphGesture && id && this.rig)
+      return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.currentTimeMilliseconds);
     return this.ik.selectedIKTargetValues;
   }
   selectIKConstraint(id: string, property: IKAnimationProperty | null = null): boolean {
@@ -566,9 +660,10 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
+    const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event || ik;
+    return this.cancelKeyframeDrag() || event || ik || graph;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -844,7 +939,8 @@ export class AnimationEditorState {
       Object.keys(this.ikTargetDraft).length > 0 ||
       !!this.keyframeDrag ||
       !!this.eventDrag ||
-      !!this.ikTargetDrag
+      !!this.ikTargetDrag ||
+      this.graphEditActive
     );
   }
 
@@ -1077,9 +1173,9 @@ export class AnimationEditorState {
     property: TransformProperty,
     timeSeconds = this.currentTime,
   ): number | undefined {
-    return this.working && this.rig
+    return this.previewAnimation && this.rig
       ? getEvaluatedBonePropertyValue(
-          this.working,
+          this.previewAnimation,
           this.rig,
           boneId,
           property,
@@ -1089,8 +1185,13 @@ export class AnimationEditorState {
   }
 
   getEvaluatedBoneTransform(boneId: string, timeSeconds = this.currentTime): JointTransform | undefined {
-    return this.working && this.rig
-      ? getEvaluatedBoneTransform(this.working, this.rig, boneId, this.playback.resolveTimeMilliseconds(timeSeconds))
+    return this.previewAnimation && this.rig
+      ? getEvaluatedBoneTransform(
+          this.previewAnimation,
+          this.rig,
+          boneId,
+          this.playback.resolveTimeMilliseconds(timeSeconds),
+        )
       : undefined;
   }
 
@@ -1214,6 +1315,7 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.cancelGraphEdit();
     this.posePreview = null;
     this.cancelIKTargetDrag();
     ++this.animationSessions;

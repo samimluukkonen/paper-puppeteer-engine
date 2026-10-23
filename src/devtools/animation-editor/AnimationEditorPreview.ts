@@ -37,7 +37,7 @@ export class AnimationEditorPreview {
       this.puppet.setIKAnimationSource(undefined);
       return;
     }
-    const animation = this.state.workingAnimation;
+    const animation = this.state.previewAnimation;
     const rig = this.state.rig ?? this.puppet.rig;
     const time = animation ? this.state.currentTimeMilliseconds : 0;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.

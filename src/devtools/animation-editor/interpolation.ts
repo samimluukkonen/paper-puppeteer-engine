@@ -25,7 +25,7 @@ export type InterpolationUnavailableReason =
   | 'no-outgoing-segment'
   | 'property-curves';
 
-/** Existing controls edit only the clip default. Property curve editing belongs to the future Graph Editor. */
+/** Existing controls edit only the clip default. Property curve edits use the separate, channel-scoped Graph Editor API. */
 export type InterpolationSelectionState =
   | { readonly kind: 'uniform'; readonly scope: 'clip'; readonly mode: Interpolation }
   | { readonly kind: 'unavailable'; readonly reason: InterpolationUnavailableReason };
@@ -101,7 +101,7 @@ export interface UnavailableInterpolationEdit<Animation extends AnimationData> {
   readonly animation: Animation;
 }
 
-/** Atomic capability boundary for future selection UI. Existing controls cannot edit individual keys.
+/** Atomic capability boundary for the legacy selection inspector. Existing controls cannot edit individual keys.
  * Never promote a selection edit into a clip edit, which would affect unrelated segments.
  */
 export function setInterpolationForKeys<Animation extends AnimationData>(

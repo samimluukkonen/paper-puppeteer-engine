@@ -85,8 +85,10 @@ for (const existing of [true, false]) {
     const downloads: string[] = [];
     page.on('download', (download) => downloads.push(download.suggestedFilename()));
     for (const guide of guides) {
-      if (guide.id === 'animation-ik-targets')
+      if (guide.id === 'animation-ik-targets') {
+        if (await page.locator('#graph-editor').isVisible()) await page.locator('#graph-toggle').click();
         await page.getByRole('button', { name: 'Select IK target rightArmIK', exact: true }).click();
+      }
       await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
       const start = page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
       if (!existing && ['animation-keyframe-editing', 'animation-ik-baking'].includes(guide.id)) {

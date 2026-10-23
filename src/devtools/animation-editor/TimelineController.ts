@@ -1,6 +1,9 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
+import type { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
 import { EventInspectorController } from './EventInspectorController.js';
+import { GraphEditorController } from './GraphEditorController.js';
+import { registerGraphGuideTargets } from './graphGuideTargets.js';
 import { InterpolationController } from './InterpolationController.js';
 import { generateRulerTicks, timeToTimelineX } from './timeline.js';
 import { defaultTimelineFilters, normalizedTrackSearch, type TimelineFilters } from './timelineFiltering.js';
@@ -23,6 +26,8 @@ export class TimelineController {
   private readonly session: TimelineSessionController;
   private readonly tracks: TimelineTracksController;
   private readonly interpolation: InterpolationController;
+  private readonly graph: GraphEditorController;
+  private readonly releaseGraphTargets: () => void;
   private readonly eventInspector: EventInspectorController;
   private width = 0;
   private rulerKey = '';
@@ -37,7 +42,10 @@ export class TimelineController {
   private readonly showIK: HTMLInputElement;
   private readonly showEvents: HTMLInputElement;
 
-  constructor(private readonly app: HTMLElement) {
+  constructor(
+    private readonly app: HTMLElement,
+    guideTargets?: GuideTargets,
+  ) {
     this.timeline = this.element('#timeline');
     this.inset = this.element('.timeline-inset');
     this.ruler = this.element('#timeline-ruler');
@@ -143,6 +151,10 @@ export class TimelineController {
       },
       options,
     );
+    this.graph = new GraphEditorController(app, () => this.state);
+    this.releaseGraphTargets = guideTargets
+      ? registerGraphGuideTargets(app, guideTargets, (graph) => this.graph.revealView(graph))
+      : () => {};
     this.bind(this.state);
   }
 
@@ -157,6 +169,7 @@ export class TimelineController {
   }
 
   bind(state: AnimationEditorState, characterId?: string): void {
+    this.graph.cancelGesture();
     this.input.cancelGesture();
     this.state.pause();
     this.unsubscribe?.();
@@ -173,6 +186,7 @@ export class TimelineController {
   }
 
   private render(): void {
+    this.graph.render();
     this.input.synchronize();
     const state = this.state;
     this.navigation.render();
@@ -282,12 +296,15 @@ export class TimelineController {
   }
 
   dispose(): void {
+    this.graph.cancelGesture();
     this.input.cancelGesture();
     this.state.pause();
     this.input.dispose();
     this.session.dispose();
     this.navigation.dispose();
     this.interpolation.dispose();
+    this.releaseGraphTargets();
+    this.graph.dispose();
     this.eventInspector.dispose();
     this.resize.disconnect();
     cancelAnimationFrame(this.resizeFrame);

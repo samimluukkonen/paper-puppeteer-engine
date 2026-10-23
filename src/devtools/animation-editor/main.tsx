@@ -245,7 +245,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     },
   );
   const releaseCharacterSelection = bindCharacterSelection(app);
-  const timeline = new TimelineController(app);
+  const timeline = new TimelineController(app, guideTargets);
   const inspector = new BoneInspectorController(app);
   const releaseNavigationGuard = protectUnsavedChanges(
     () =>

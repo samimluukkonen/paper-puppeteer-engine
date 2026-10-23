@@ -13,7 +13,8 @@ export function interpolationLabel(mode: PropertyCurve['mode']): string {
 }
 
 const unavailableHelp: Record<InterpolationUnavailableReason, string> = {
-  'property-curves': 'The selection contains property curve overrides. Visual curve editing is not available yet.',
+  'property-curves':
+    'The selection contains property curve overrides. Open Graph Editor to edit their outgoing segments.',
   'no-animation': 'Select an animation to inspect interpolation.',
   'empty-selection': 'Select a key to inspect its outgoing interpolation.',
   'missing-key': 'A selected key is no longer available.',
@@ -34,6 +35,6 @@ export function selectedInterpolationControl(selection: InterpolationSelectionSt
     value: selection.mode,
     disabled: true,
     reason: 'clip-only',
-    help: `${interpolationLabel(selection.mode)} is inherited from the clip. Property curve overrides are currently authored through animation data.`,
+    help: `${interpolationLabel(selection.mode)} is inherited from the clip. Open Graph Editor to edit this property’s outgoing segment.`,
   };
 }

@@ -185,7 +185,7 @@ export class BoneInspectorController {
       force ||
       this.bone !== state?.selectedBoneId ||
       this.time !== state?.currentTime ||
-      this.animation !== state?.workingAnimation ||
+      this.animation !== state?.previewAnimation ||
       this.scrubbing !== state?.isScrubbing;
     const previousDraft = this.draft;
     this.draft = state?.boneTransformDraft;
@@ -197,7 +197,7 @@ export class BoneInspectorController {
       if (details) details.open = true;
     }
     this.time = state?.currentTime;
-    this.animation = state?.workingAnimation;
+    this.animation = state?.previewAnimation;
     setText(this.title, this.bone ? `Bone: ${this.bone}` : 'Select a bone');
     if (this.fields.disabled !== !transform) this.fields.disabled = !transform;
     this.fields.hidden = !transform;

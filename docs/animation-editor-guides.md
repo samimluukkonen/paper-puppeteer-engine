@@ -2,7 +2,7 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-The catalog contains sixteen selectable tasks with 77 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+The catalog contains seventeen selectable tasks with 84 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
 
 | Guide                      | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | -------------------------- | ----: | ------------------------------------------------------------------------ |
@@ -14,6 +14,7 @@ The catalog contains sixteen selectable tasks with 77 steps. Open **Feature Guid
 | Timeline Navigation        |     6 | Selected clip                                                            |
 | Keyframe Editing           |     4 | Selected clip with authored bone property keys                           |
 | Interpolation              |     4 | Selected clip                                                            |
+| Graph Editor               |     7 | Selected clip; no bone/IK selection or existing keys required            |
 | Onion Skinning             |     4 | Selected clip                                                            |
 | Pose Library               |     7 | Selected clip; no saved poses or bone selection required                 |
 | Mirrored Animation         |     4 | Selected clip; teaches mapping actual bone IDs                           |
@@ -23,7 +24,7 @@ The catalog contains sixteen selectable tasks with 77 steps. Open **Feature Guid
 | Rig-Tweak Mode             |     4 | None; explains entering the mode without entering it for the artist      |
 | Exporting Animations       |     4 | Selected clip                                                            |
 
-IK tasks use the `ik` registry category; the other fourteen use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
+IK tasks use the `ik` registry category; the other fifteen use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
 
 ## Target contract
 
@@ -34,6 +35,7 @@ IK tasks use the `ik` registry category; the other fourteen use `animation`. Ava
 | Session      | `animation-new`, `animation-selection`, `animation-settings`, `animation-editor-mode`                                                                                                                    |
 | Inspector    | `animation-bones`, `animation-properties`, `animation-x-key`, `animation-interpolation`, `animation-ik-inspector`                                                                                        |
 | Timeline     | `animation-timeline`, `animation-tracks`, `animation-ruler`, `animation-current-time`, `animation-playback`, `animation-zoom`, `animation-track-navigation`, `animation-key-editing`, `animation-events` |
+| Graph        | `animation-graph-toggle`, `animation-graph-property`, `animation-graph-canvas`, `animation-graph-interpolation`, `animation-graph-tangents`, `animation-graph-keys`, `animation-graph-navigation`        |
 | Preview      | `animation-canvas`, `animation-onion`, `animation-onion-settings`, `animation-ik-options`                                                                                                                |
 | Tools        | `animation-mirror`, `animation-mirror-pairs`, `animation-mirror-direction`, `animation-mirror-actions`, `animation-bake`, `animation-bake-actions`                                                       |
 | Pose library | `animation-pose-save`, `animation-pose-browse`, `animation-pose-actions`, `animation-pose-apply`, `animation-pose-history`                                                                               |
@@ -44,16 +46,20 @@ Selection details is a stable disclosure host: instructions explain selecting a 
 
 The existing resolver remeasures real DOM rectangles, clips against scroll containers, opens disclosure ancestors and scrolls targets into view. Action anchors also scroll long mirror/bake panels to the relevant buttons. Unrelated floating animation menus and tool panels close so they cannot obscure the next target; ordinary inspector disclosures remain open. The spotlight follows layout through animation frames, scrolling and resizing. Zoomed/scrolled timeline rulers, expanded tracks, React inspector changes and a moved Phaser preview therefore use current viewport geometry. Missing or inactive targets show a fallback instead of retaining stale coordinates. Explain mode uses native modal protection; optional practice adds scoped input containment with cleanup on each transition.
 
+The Graph Editor tour uses stable anchors for its view switch, property selector, SVG plot, interpolation selector, tangent precision, key precision and navigation controls. `graphGuideTargets.ts` registers view-aware providers with the existing resolver: graph steps reveal the graph; timeline-only steps reveal the timeline. The adapter delegates DOM geometry, clipping, disclosure opening and scrolling to the shared resolver and unregisters providers on editor teardown. Preparation preserves selection, drafts, playhead, authored data and history, including when no bone or IK constraint is selected. Disabled controls stay visible with instructions for selecting a track and adding keys after the tour. No curve or sample keys are created automatically.
+
 ## Current feature limits taught by the catalog
 
-- Clip interpolation supports only Default (Linear) and explicit Linear. Key details is read-only; there are no per-key easing overrides. Smooth/Stepped and FPS control sampling separately.
-- Bone groups support marker dragging, clipboard and duplication. IK keys support single selection, nudging and deletion; group clipboard and marker dragging are unavailable.
+- Clip interpolation supports Default (Linear) and explicit Linear. Graph Editor edits outgoing property overrides with Auto, Linear, Stepped and Bézier, including normalized tangent controls. Key details remains read-only. Smooth/Stepped and FPS control sampling separately.
+- Bone groups support timeline marker dragging, clipboard and duplication. Graph Editor supports individual bone/IK key time/value dragging and precision edits, rejecting neighbor collisions. IK timeline keys support single selection, nudging and deletion; group clipboard and timeline marker dragging remain unavailable.
 - Onion ghosts and mirroring use authored bone poses before IK. Mirror mapping and previews stay separate from explicit commit buttons.
 - Pose Library captures full or selected-bone FK values before IK. Preview is temporary; Apply writes keys as one animation edit. Library edits have separate history, exact compatible-rig checks, and character/project ZIP and autosave persistence. The tour reveals controls without saving, previewing, applying, renaming or deleting a pose.
 - Baking samples the entire clip to bone rotation keys and deactivates baked constraints for that clip. Fixed-target preview must be off; constraints and sampling options can still be rejected by the normal bake panel.
 - JSON export contains committed data. Character ZIP export includes the manifest entry for newly created clips. Downloads do not write project files.
 
 ## Verification
+
+`tests/graphGuideTargets.test.ts` covers graph/timeline view reveal, tangent disclosure, missing/inactive targets, registration cleanup and remount. `tests/browser/animationGraphGuide.spec.ts` covers the seven real-control steps with empty/unselected and keyed/selected clips, draft/selection/time/history preservation, Back/Finish/Escape/focus, switching to a timeline tour and missing-animation reasons.
 
 `tests/animationGuides.test.ts` checks catalog categories, declared targets, step bounds, missing/empty/existing clips, arbitrary rig IDs, optional IK prerequisites, live clip changes and read-only navigation. It checks every exit position plus Back/Finish, immutable documents, history, dirty flags, selections, playhead, playback and temporary drafts. `tests/guideSpotlightLifecycle.test.ts` checks modal closure, focus restoration, target-observer teardown and ResizeObserver disconnection. Shared resolver tests also cover closing unrelated floating menus without closing the target or its ancestors.
 
