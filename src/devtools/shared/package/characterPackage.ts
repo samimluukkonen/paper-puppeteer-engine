@@ -6,6 +6,7 @@ import { CharacterTextureBudget, DEFAULT_CHARACTER_TEXTURE_LIMITS } from '../../
 import type { RigJsonDefinition } from '../../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
+import type { PoseDefinition } from '../../../engine/Pose.js';
 import type { DeepReadonly } from '../../../engine/readonlyData.js';
 import { readResponseBytes, withResourceResponse } from '../../../engine/resourceInput.js';
 import { identifierSchema } from '../../../engine/schemas.js';
@@ -20,6 +21,7 @@ export interface PackageSnapshot {
   readonly rig: RigJsonDefinition;
   readonly skins: readonly SkinDefinition[];
   readonly animations: readonly AnimationClip[];
+  readonly poses?: readonly DeepReadonly<PoseDefinition>[];
   readonly replacements: ReturnType<ArtworkController['exportReplacements']>;
   readonly pendingArtwork?: boolean;
 }
@@ -37,6 +39,7 @@ export function capturePackage(snapshot: PackageSnapshot): PackageSnapshot {
     rig: structuredClone(snapshot.rig),
     skins: structuredClone(snapshot.skins),
     animations: structuredClone(snapshot.animations),
+    poses: structuredClone(snapshot.poses ?? snapshot.definition.poses),
     replacements: snapshot.replacements.map((entry) => ({ ...entry })),
   };
 }
@@ -279,7 +282,21 @@ export async function buildCharacterPackage(
     json(path, { ...clip, version: 1 });
     return path;
   });
-  for (const [index, path] of (manifest.poses ?? []).entries()) json(path, definition.poses[index]);
+  const sourcePosePaths = new Map(
+    definition.poses.map((pose, index) => [
+      pose.library?.id ?? `legacy:${pose.name}`,
+      definition.manifest!.poses?.[index],
+    ]),
+  );
+  const posePaths = (snapshot.poses ?? definition.poses).map((pose) => {
+    const sourceIndex = definition.poses.findIndex((source) => source.name === pose.name);
+    const path =
+      (pose.library ? sourcePosePaths.get(pose.library.id) : definition.manifest!.poses?.[sourceIndex]) ??
+      allocatePath('poses', pose.library?.id ?? pose.name, '.json');
+    json(path, pose);
+    return path;
+  });
+  if (posePaths.length || manifest.poses) manifest.poses = posePaths;
   json('character.json', manifest);
   // Reject authored reference errors before fetching any source artwork. Use the same
   // cross-file validator as CharacterLoader, with the actual generated paths/documents.

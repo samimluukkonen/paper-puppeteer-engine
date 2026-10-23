@@ -19,6 +19,7 @@ export class AnimationEditorPreview {
   private draft: Readonly<Partial<JointTransform>> | undefined;
   private ikDraft: AnimationEditorState['ikTargetDraft'] | undefined;
   private ikId: string | null | undefined;
+  private libraryPose: AnimationEditorState['previewedPose'] | undefined;
   private readonly ikSource: { ikAnimation: IKAnimationPose } = { ikAnimation: new Map() };
   private readonly unsubscribe: () => void;
 
@@ -47,6 +48,7 @@ export class AnimationEditorPreview {
     const draft = this.state.boneTransformDraft;
     const ikDraft = this.state.ikTargetDraft;
     const ikId = this.state.selectedIKConstraintId;
+    const libraryPose = this.state.previewedPose;
     if (
       !force &&
       rig === this.rig &&
@@ -54,6 +56,7 @@ export class AnimationEditorPreview {
       sampledTime === this.sampledTime &&
       draft === this.draft &&
       ikDraft === this.ikDraft &&
+      libraryPose === this.libraryPose &&
       ikId === this.ikId
     )
       return;
@@ -89,6 +92,9 @@ export class AnimationEditorPreview {
     this.player?.sample(time, { mode: 'playback' });
     for (const joint of this.joints?.values() ?? []) Object.assign(this.puppet.getBone(joint.id).pose, joint.pose);
     if (this.state.selectedBoneId) Object.assign(this.puppet.getBone(this.state.selectedBoneId).pose, draft);
+    // Reuse sparse absolute local values before the normal single IK solve.
+    for (const [id, values] of Object.entries(libraryPose?.bones ?? {}))
+      Object.assign(this.puppet.getBone(id).pose, values);
     // Overlay provisional channels without touching compiled clips, runtime targets or ownership.
     const pose = new Map(this.player?.ikAnimation);
     if (ikId && Object.keys(ikDraft).length) {
@@ -106,6 +112,7 @@ export class AnimationEditorPreview {
     this.draft = draft;
     this.ikDraft = ikDraft;
     this.ikId = ikId;
+    this.libraryPose = libraryPose;
   }
 
   dispose(): void {
@@ -121,6 +128,7 @@ export class AnimationEditorPreview {
     this.draft = undefined;
     this.ikDraft = undefined;
     this.ikId = undefined;
+    this.libraryPose = undefined;
     this.ikSource.ikAnimation = new Map();
   }
 }

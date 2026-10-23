@@ -22,6 +22,7 @@ for (const view of [
       await page.setViewportSize({ width: width!, height: height! });
       await page.goto(view.route);
       await expect(page.locator(view.ready)).toContainText(view.text);
+      if (view.prefix === 'rig') await expect(page.getByLabel('Local save status')).toBeVisible();
       const stage = (await page.locator(view.stage).boundingBox())!;
       const canvas = (await page.locator(`${view.stage} canvas`).boundingBox())!;
       expect(stage.height).toBeGreaterThan(view.prefix === 'animation' ? 200 : 400);
@@ -35,7 +36,9 @@ for (const view of [
         const preview = (await page.locator('#editor-app .workspace-preview').boundingBox())!;
         const header = (await page.locator('#editor-app .view-header').boundingBox())!;
         expect(inspector.x).toBeLessThan(preview.x);
-        expect(preview.y).toBe(header.y + header.height + 8);
+        const content = (await page.locator('#editor-app .view-content').boundingBox())!;
+        expect(content.y).toBeGreaterThanOrEqual(header.y + header.height + 8);
+        expect(preview.y).toBe(content.y);
         expect(preview.y + preview.height).toBeCloseTo(height! - 12, 0);
         expect(stage.y + stage.height).toBeCloseTo(preview.y + preview.height - 1, 0);
         expect(stage.width / stage.height).toBeCloseTo(210 / 297, 3);
@@ -116,6 +119,10 @@ test('rig preview divider resizes by keyboard and pointer and resets without edi
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  await expect(page.getByLabel('Local save status')).toBeVisible();
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
   const divider = page.getByRole('separator', { name: 'Rig preview width', exact: true });
   const inspector = page.locator('#rig-inspector');
   const preview = page.locator('#editor-app .workspace-preview');

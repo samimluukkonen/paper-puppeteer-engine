@@ -134,14 +134,16 @@ function characterData(snapshot: PackageSnapshot) {
     directory = `__inspection_${++serial}`;
   const skinPath = (index: number) => `${directory}/skins/inspection-${index}.json`;
   const animationPath = (index: number) => `${directory}/animations/inspection-${index}.json`;
+  const posePath = (index: number) => `${directory}/poses/inspection-${index}.json`;
+  const workingPoses = snapshot.poses ?? snapshot.definition.poses;
   const labels = new Map([
     ...snapshot.skins.map((skin, index) => [skinPath(index), `Skin "${skin.name}"`] as const),
     ...snapshot.animations.map((clip, index) => [animationPath(index), `Animation "${clip.name}"`] as const),
+    ...workingPoses.map((pose, index) => [posePath(index), `Pose "${pose.name}"`] as const),
   ]);
-  const { poses, ...sourceData } = source;
   const manifest: CharacterManifest = {
-    ...structuredClone(sourceData),
-    ...(poses ? { poses: [...poses] } : {}),
+    ...structuredClone(source),
+    poses: workingPoses.map((_, index) => posePath(index)),
     skins: Object.fromEntries(snapshot.skins.map((skin, index) => [skin.name, skinPath(index)])),
     animations: snapshot.animations.map((_, index) => animationPath(index)),
     textures: { ...source.textures },
@@ -158,7 +160,7 @@ function characterData(snapshot: PackageSnapshot) {
       animations: Object.fromEntries(
         snapshot.animations.map((clip, index) => [animationPath(index), { ...clip, version: 1 }]),
       ),
-      poses: Object.fromEntries((source.poses ?? []).map((path, index) => [path, snapshot.definition.poses[index]])),
+      poses: Object.fromEntries(workingPoses.map((pose, index) => [posePath(index), pose])),
     },
   };
 }
@@ -400,7 +402,7 @@ export class ProjectInspector {
         for (const id of new Set([...Object.keys(clip.ikTracks ?? {}), ...(clip.disabledIKConstraints ?? [])]))
           edge(from, ik(id), `Animation "${clip.name}" IK`);
       }
-      for (const pose of definition.poses) {
+      for (const pose of snapshot.poses ?? definition.poses) {
         edge(target, asset('pose', entry.id, pose.name), `Character "${entry.name}"`);
         for (const id of Object.keys(pose.bones))
           edge(asset('pose', entry.id, pose.name), bone(id), `Pose "${pose.name}"`);

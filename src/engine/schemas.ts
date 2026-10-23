@@ -204,6 +204,15 @@ export const poseDefinitionSchema = z.strictObject({
   version: z.literal(POSE_FORMAT_VERSION),
   name: identifierSchema,
   bones: identifierRecord(z.strictObject(transformFields).partial()),
+  /** Optional authoring provenance; existing runtime presets remain valid version-1 poses. */
+  library: z
+    .strictObject({
+      id: identifierSchema,
+      characterId: identifierSchema,
+      rigSignature: z.string().min(1),
+      space: z.literal('fk-local'),
+    })
+    .exactOptional(),
 });
 
 export const characterManifestSchema = z.strictObject({

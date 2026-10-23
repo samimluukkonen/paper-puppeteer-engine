@@ -77,6 +77,8 @@ export class RigWorkspaceLayoutController {
       'click',
       () => {
         layout.style.removeProperty('--rig-preview-width');
+        // Refit from the default layout; the cached fit may reflect wrapped controls after a narrow drag.
+        layout.style.removeProperty('--rig-portrait-width');
       },
       listeners,
     );

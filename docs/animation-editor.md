@@ -469,4 +469,8 @@ The completed [IK animation authoring workflow](ik-animation-authoring.md) expla
 
 ## Shared character workspace
 
-The header editor tabs share one character session. Choose Rig Editor for bind-pose editing or Rig Tweak for corrections at the paused animation pose. Rig, skins and applied images remain available when returning to animation. Changing clips keeps pending edits, individual save checkpoints and Undo/Redo history; the character package includes edits in inactive clips. The package summary displays Rig, Animations, Assets and Skins independently even while its panel is closed. Downloaded files must be saved and placed in your character directory manually. See the [artist workflow](artist-workflow.md) for reload, recovery and export behavior.
+The header editor tabs share one character session. Choose Rig Editor for bind-pose editing or Rig Tweak for corrections at the paused animation pose. Rig, skins and applied images remain available when returning to animation. Changing clips keeps pending edits, individual save checkpoints and Undo/Redo history; the character package includes edits in inactive clips. The package summary displays Rig, Animations, Poses, Assets and Skins independently even while its panel is closed. Downloaded files must be saved and placed in your character directory manually. See the [artist workflow](artist-workflow.md) for reload, recovery and export behavior.
+
+## Advanced Pose Library
+
+Open **Tools → Pose Library…** to save full or selected-bone FK poses, search and organize the character library, preview without changing keys, and apply at the playhead as one animation Undo/Redo edit. Library edits have their own Undo/Redo controls. Character/project packages and local autosave retain poses. See the [Pose Library guide](pose-library.md) for FK/IK behavior, exact rig compatibility and the artist workflow.

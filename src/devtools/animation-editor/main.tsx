@@ -41,6 +41,7 @@ import { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
 import { NewAnimationController } from './NewAnimationController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
+import { PoseLibraryController } from './PoseLibraryController.js';
 import { RigTweakController } from './RigTweakController.js';
 import { TimelineController } from './TimelineController.js';
 import './style.css';
@@ -86,6 +87,7 @@ const rigTweak = new RigTweakController(attachments);
 const newAnimation = new NewAnimationController();
 const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
+const poseLibrary = new PoseLibraryController();
 const ikBake = new IKBakeController(
   (pose) => scene?.setBakePreview(pose),
   () => scene?.getBakeRuntimeConstraints() ?? [],
@@ -170,6 +172,7 @@ function CharacterWorkspace() {
       >
         <AnimationEditorView
           mirrorTools={mirrorTools}
+          poseLibrary={poseLibrary}
           newAnimation={newAnimation}
           ikInspector={ikInspector}
           groundGuide={groundGuide}
@@ -248,6 +251,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     () =>
       (!!initialDraft && (!packages.getSnapshot().ready || packages.hasUnsavedCharacter)) ||
       timeline.hasUnsavedChanges ||
+      packages.getSnapshot().modified.includes('Poses') ||
       !!stateOwner?.hasPendingAnimationEdits ||
       rigTweak.hasUnsavedChanges ||
       artwork.hasPendingChanges,
@@ -307,6 +311,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       rigWorkspace.render(editorScene.rigEditor!);
       editorScene.fitPreview();
       mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
+      poseLibrary.bind(state);
       ikBake.bind(state);
       retiming.bind(state);
       timeline.bind(state, id);
@@ -396,6 +401,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       releaseWorkspaceSelection = undefined;
       recovery.unbind();
       mirrorTools.unbind();
+      poseLibrary.unbind();
       ikBake.unbind();
       retiming.unbind();
       ikInspector.unbind();
@@ -525,6 +531,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     rigTweak.dispose();
     releaseWorkspaceSelection?.();
     mirrorTools.dispose();
+    poseLibrary.dispose();
     ikBake.dispose();
     retiming.dispose();
     newAnimation.dispose();

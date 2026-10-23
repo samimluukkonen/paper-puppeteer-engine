@@ -13,6 +13,7 @@ import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js'
 import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
 import type { IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import type { PoseDefinition } from '../../engine/Pose.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
@@ -40,7 +41,11 @@ import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
 import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
 import type { AnimationExportResult } from './animationSerialization.js';
-import { getEvaluatedBonePropertyValue, getEvaluatedBoneTransform } from './animationValues.js';
+import {
+  getEvaluatedAnimationPose,
+  getEvaluatedBonePropertyValue,
+  getEvaluatedBoneTransform,
+} from './animationValues.js';
 import type { NewAnimationOptions } from './createEmptyAnimation.js';
 import {
   type GhostPoseSample,
@@ -59,10 +64,12 @@ import {
   setInterpolationForKeys,
 } from './interpolation.js';
 import type { KeyframeClipboard } from './keyframeClipboard.js';
+import { setBonePropertyKeyframes } from './keyframeEdits.js';
 import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
+import { PoseLibrary } from './PoseLibrary.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
@@ -87,6 +94,80 @@ export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  readonly poseLibrary: PoseLibrary;
+  private posePreview: { pose: DeepReadonly<PoseDefinition>; animation: ReadonlyAnimation; rig: Rig } | null = null;
+
+  get previewedPose(): DeepReadonly<PoseDefinition> | null {
+    return this.posePreview?.pose ?? null;
+  }
+
+  /** Capture the evaluated authored FK pose, never Puppet's post-IK/rendered transforms. */
+  saveCurrentPose(name: string, boneIds?: readonly string[]): string {
+    if (!this.animationAuthoringEnabled || !this.working || !this.rig)
+      throw new Error('Select an animation before saving a pose.');
+    if (this.hasPendingAnimationEdits) throw new Error('Commit or cancel temporary edits before saving a pose.');
+    const sampled = getEvaluatedAnimationPose(this.working, this.rig, this.currentTimeMilliseconds);
+    const ids = [...new Set(boneIds ?? this.rig.bones.map((bone) => bone.id))];
+    if (!ids.length) throw new Error('Select at least one bone.');
+    const bones = Object.fromEntries(
+      ids.map((id) => {
+        const transform = sampled.get(id);
+        if (!transform) throw new Error(`Unknown bone "${id}".`);
+        return [id, { ...transform }];
+      }),
+    );
+    return this.poseLibrary.add({ version: 1, name, bones }, this.rig);
+  }
+
+  previewLibraryPose(id: string): boolean {
+    if (
+      !this.animationAuthoringEnabled ||
+      !this.working ||
+      !this.rig ||
+      this.hasPendingAnimationEdits ||
+      this.poseLibrary.compatibility(id, this.rig)
+    )
+      return false;
+    return this.batchNotifications(() => {
+      this.pause();
+      this.posePreview = { pose: this.poseLibrary.get(id).pose, animation: this.working!, rig: this.rig! };
+      this.notify();
+      return true;
+    });
+  }
+
+  cancelPosePreview(): void {
+    if (!this.posePreview) return;
+    this.posePreview = null;
+    this.notify();
+  }
+
+  /** One validated keyframe batch and one document history entry, using editor milliseconds. */
+  applyLibraryPose(id: string): boolean {
+    if (
+      !this.animationAuthoringEnabled ||
+      !this.working ||
+      !this.rig ||
+      this.hasPendingAnimationEdits ||
+      this.poseLibrary.compatibility(id, this.rig)
+    )
+      return false;
+    return this.batchNotifications(() => {
+      const pose = this.poseLibrary.get(id).pose;
+      const edits = Object.entries(pose.bones).flatMap(([boneId, values]) =>
+        transformProperties.flatMap((property) =>
+          values[property] === undefined
+            ? []
+            : [{ boneId, property, value: values[property], timeMs: this.currentTimeMilliseconds }],
+        ),
+      );
+      if (!edits.length) return false;
+      const next = setBonePropertyKeyframes(this.working!, this.rig!, edits, { preserveTiming: true });
+      this.pause();
+      this.posePreview = null;
+      return this.installWorkingAnimation(freezeData(next));
+    });
+  }
   /** Loaded character rig, retained independently of restored drafts and preview tweaks. */
   readonly sourceRig: Rig | undefined;
   private readonly document: AnimationEditorDocument;
@@ -118,6 +199,16 @@ export class AnimationEditorState {
 
   constructor(rig?: Rig, animations: readonly AnimationClip[] = [], options: AnimationEditorStateOptions = {}) {
     this.sourceRig = rig;
+    this.poseLibrary = new PoseLibrary(
+      options.characterId ?? 'standalone',
+      rig,
+      options.poses ?? [],
+      () => {
+        this.posePreview = null;
+        this.notify();
+      },
+      () => this.rig,
+    );
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
     this.selection = new AnimationEditorSelection(rig);
@@ -804,6 +895,14 @@ export class AnimationEditorState {
       this.notificationPending = true;
       return;
     }
+    if (
+      this.posePreview &&
+      (this.posePreview.animation !== this.working ||
+        this.posePreview.rig !== this.rig ||
+        !this.animationAuthoringEnabled ||
+        this.hasPendingAnimationEdits)
+    )
+      this.posePreview = null;
     throwNotificationErrors(
       dispatchListeners(this.listeners, (listener) => listener()),
       'Animation editor listeners failed.',
@@ -1115,6 +1214,7 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.posePreview = null;
     this.cancelIKTargetDrag();
     ++this.animationSessions;
     this.keyframes.resetSession();
@@ -1213,7 +1313,8 @@ export class AnimationEditorState {
   private restoreHistory(restore: () => boolean): boolean {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.
     const cancelledDrag = this.cancelTimelineDrag();
-    const cancelled = this.clearTransformDraft() || cancelledDrag;
+    const cancelled = this.clearTransformDraft() || cancelledDrag || !!this.posePreview;
+    this.posePreview = null;
     const changed = restore();
     if (changed) {
       this.updateTime(this.currentTime);

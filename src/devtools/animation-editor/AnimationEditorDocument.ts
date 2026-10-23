@@ -1,5 +1,7 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
 import { ANIMATION_FORMAT_VERSION, AnimationValidationError, type ValidationIssue } from '../../engine/externalData.js';
+import type { PoseDefinition } from '../../engine/Pose.js';
+import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData } from '../shared/editorData.js';
@@ -22,6 +24,8 @@ type AnimationEntry = {
 };
 
 export interface AnimationEditorStateOptions {
+  characterId?: string;
+  poses?: readonly DeepReadonly<PoseDefinition>[];
   /** Original manifest paths by clip name; omitted entries export using the clip name. */
   animationPaths?: Readonly<Record<string, string>>;
 }

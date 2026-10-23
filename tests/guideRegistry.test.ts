@@ -42,6 +42,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
       'animation-keyframe-editing',
       'animation-interpolation',
       'animation-onion-skinning',
+      'animation-pose-library',
       'animation-mirroring',
       'animation-ik-targets',
       'animation-ik-baking',

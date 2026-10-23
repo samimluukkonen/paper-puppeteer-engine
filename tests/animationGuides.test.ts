@@ -25,8 +25,8 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains fifteen bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 15);
+test('Animation Editor catalog contains sixteen bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 16);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
@@ -94,11 +94,16 @@ test('missing character, no clip, empty clip, bone keys and optional IK have liv
   assert.isFalse(launcher.getAvailability('animation-ik-baking').available);
 });
 
-test.each(['no-clip', 'empty', 'existing', 'ik', 'draft'] as const)(
+test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
   'all available guides navigate and exit without authoring: %s',
   (kind) => {
     const { animation, rig, launcher } = workspace(kind === 'existing' || kind === 'ik');
-    if (kind === 'empty' || kind === 'draft') animation.createAnimation({ name: 'empty' });
+    if (kind === 'empty' || kind === 'draft' || kind === 'library') animation.createAnimation({ name: 'empty' });
+    if (kind === 'library') {
+      const id = animation.saveCurrentPose('Saved pose');
+      animation.poseLibrary.rename(id, 'Renamed pose');
+      animation.poseLibrary.undo();
+    }
     if (kind === 'existing' || kind === 'ik') {
       animation.selectAnimation(animation.animationIds[0]!);
       animation.setBonePropertyKeyframe(rig.workingCopy.root, 'x', 23);
@@ -127,6 +132,9 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft'] as const)(
       selection: animation.selectedBoneId,
       ik: animation.selectedIKConstraintId,
       draft: animation.boneTransformDraft,
+      poses: animation.poseLibrary.packagePoses(),
+      libraryUndo: animation.poseLibrary.canUndo,
+      libraryRedo: animation.poseLibrary.canRedo,
     };
     const notify = vi.fn();
     const release = animation.subscribe(notify);
@@ -161,6 +169,9 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft'] as const)(
     assert.equal(animation.selectedBoneId, before.selection);
     assert.equal(animation.selectedIKConstraintId, before.ik);
     assert.deepEqual(animation.boneTransformDraft, before.draft);
+    assert.strictEqual(animation.poseLibrary.packagePoses(), before.poses);
+    assert.equal(animation.poseLibrary.canUndo, before.libraryUndo);
+    assert.equal(animation.poseLibrary.canRedo, before.libraryRedo);
     assert.lengthOf(notify.mock.calls, 0);
     release();
   },

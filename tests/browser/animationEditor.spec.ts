@@ -135,7 +135,9 @@ test('no animations and no selection show safe empty timelines', async ({ page }
     await route.fulfill({ json: { ...manifest, animations: [] } });
   });
   await page.reload();
-  await expect(page.locator('#animation-status')).toHaveText('This character has no animations.');
+  await expect(page.locator('#animation-status')).toHaveText(
+    'This character has no animations. Choose + New Animation to create a clip, or use File tools to import animation JSON.',
+  );
   await expect(page.locator('#animation-stage canvas')).toBeVisible();
   await expect(page.locator('#animation-selection')).toBeDisabled();
   await expect(page.locator('#timeline')).toHaveAttribute('aria-disabled', 'true');

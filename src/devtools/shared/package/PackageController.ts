@@ -13,7 +13,7 @@ import { PACKAGE_MAX_BYTES } from './packageZip.js';
 import { type PackageZipProcessor, packageZipWorker } from './packageZipWorkerClient.js';
 
 export type { PackageDomains } from './PackageFingerprints.js';
-const clean: PackageDomains = { Rig: '', Skins: '', Animations: '', Assets: '' };
+const clean: PackageDomains = { Rig: '', Skins: '', Animations: '', Poses: '', Assets: '' };
 
 /** Independent package checkpoints never mark source files or individual editor documents saved. */
 export class PackageController {
@@ -65,6 +65,7 @@ export class PackageController {
       rig: structuredClone(current.definition.rigFile!),
       skins: current.definition.standaloneSkins,
       animations: current.definition.animations,
+      poses: current.definition.poses,
       replacements: [],
     });
     this.lastFiles = null;

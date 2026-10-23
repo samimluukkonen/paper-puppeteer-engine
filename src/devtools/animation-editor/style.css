@@ -1477,3 +1477,57 @@ a {
   align-items: center;
   gap: 8px;
 }
+
+.animation-pose-library {
+  font-size: 12px;
+}
+
+.animation-pose-content {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+}
+
+.animation-pose-content form,
+.animation-pose-content label {
+  display: grid;
+  gap: 8px;
+}
+
+.animation-pose-content p {
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.animation-pose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.animation-pose-list {
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.animation-pose-list button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.animation-pose-list button[aria-pressed="true"] {
+  border-color: var(--accent-fg);
+}
+
+.animation-pose-list small {
+  color: var(--fg-muted);
+  white-space: nowrap;
+}

@@ -168,6 +168,7 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
     }
   }
   const poseNames = new Set<string>();
+  const poseIds = new Set<string>();
   for (const [index, path] of (manifest.poses ?? []).entries()) {
     const value = data.poses && Object.hasOwn(data.poses, path) ? data.poses[path] : undefined;
     if (value === undefined) {
@@ -181,6 +182,11 @@ function inspectCharacterDefinition(data: CharacterData): CharacterInspection {
       if (poseNames.has(pose.data.name))
         issues.push(issue(`poses[${index}].name`, `Duplicate pose name "${pose.data.name}".`));
       poseNames.add(pose.data.name);
+      if (pose.data.library) {
+        if (poseIds.has(pose.data.library.id))
+          issues.push(issue(`poses[${index}].library.id`, `Duplicate pose library ID "${pose.data.library.id}".`));
+        poseIds.add(pose.data.library.id);
+      }
     }
   }
   return result;

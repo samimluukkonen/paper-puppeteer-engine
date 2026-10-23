@@ -73,6 +73,7 @@ export function ProjectAssetLibrary({
   ];
   const skins = mergeSkins(snapshot.rig.skins ?? [], snapshot.skins);
   const attachments = snapshot.rig.attachments ?? [];
+  const poses = snapshot.poses ?? snapshot.definition.poses;
   return (
     <details className="project-asset-library" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>{name} asset library</summary>
@@ -101,6 +102,16 @@ export function ProjectAssetLibrary({
                   <small>
                     {clip.duration / 1000} s · {clip.loop ? 'Looping' : 'Play once'}
                   </small>
+                </li>
+              ))}
+            </ul>
+          </AssetGroup>
+          <AssetGroup title="Poses" count={poses.length}>
+            <ul className="project-asset-list">
+              {poses.map((pose) => (
+                <li key={pose.library?.id ?? pose.name}>
+                  <span className="project-asset-name">{pose.name}</span>
+                  <small>{Object.keys(pose.bones).length} bones · FK local transforms</small>
                 </li>
               ))}
             </ul>

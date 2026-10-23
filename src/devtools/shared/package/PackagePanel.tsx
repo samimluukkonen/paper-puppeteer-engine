@@ -152,7 +152,7 @@ export function PackagePanel({ controller }: { controller: PackageController }) 
         Character package{' '}
         <small aria-label="Package document status">
           {snapshot.ready
-            ? ['Rig', 'Animations', 'Assets', 'Skins']
+            ? ['Rig', 'Animations', 'Assets', 'Skins', 'Poses']
                 .map((domain) => `${domain}: ${snapshot.modified.includes(domain) ? 'Modified' : 'Clean'}`)
                 .join(' · ')
             : 'Loading character…'}
@@ -174,14 +174,14 @@ export function PackagePanel({ controller }: { controller: PackageController }) 
               </ul>
             )}
             <small>
-              Download validates the rig, skins, animations, paths and image files. Resolve any reported errors and
-              retry.
+              Download validates the rig, skins, animations, poses, paths and image files. Resolve any reported errors
+              and retry.
             </small>
           </div>
         )}
         <p>
           Package checkpoint:{' '}
-          {['Rig', 'Animations', 'Assets', 'Skins']
+          {['Rig', 'Animations', 'Assets', 'Skins', 'Poses']
             .map((domain) => `${domain}: ${snapshot.modified.includes(domain) ? 'Modified' : 'Clean'}`)
             .join(' · ')}
         </p>

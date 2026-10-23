@@ -10,7 +10,7 @@ v0.6.4 verifies the existing editor export and runtime loading pipeline in a sep
 
 ## Build and install
 
-Use Node 24 or newer. From this repository, `npm run build` produces the demo and the library. `npm pack --pack-destination dist` also runs the prepack version check and library build, producing `dist/paper-puppeteer-engine-1.0.5.tgz`. Install that tarball into another project with `npm install /path/to/paper-puppeteer-engine-1.0.5.tgz phaser@4.2.1`.
+Use Node 24 or newer. From this repository, `npm run build` produces the demo and the library. `npm pack --pack-destination dist` also runs the prepack version check and library build, producing `dist/paper-puppeteer-engine-1.1.1.tgz`. Install that tarball into another project with `npm install /path/to/paper-puppeteer-engine-1.1.1.tgz phaser@4.2.1`.
 
 The root and `/runtime` entries expose the same browser runtime. `/core` supports metadata loading, validation, animation evaluation and IK tooling without Phaser/browser globals; `/data` provides authored types; `/serialization` exposes versioned parsers/serializers. All entries include declarations and source maps. Phaser 4.2.1 is an external peer, Zod is a package dependency, and React remains a development dependency. `npm run test:package` verifies the tarball's exports, declarations, documentation links, editor isolation and the standalone consumer's actual test/build commands.
 

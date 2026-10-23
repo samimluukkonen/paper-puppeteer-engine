@@ -39,7 +39,7 @@ test('immutable domain and clip fingerprints reuse hashes across fresh wrappers,
   const fingerprints = new PackageFingerprints(digest);
   const source = fixture();
   const baseline = fingerprints.compute(source);
-  assert.equal(digest.mock.calls.length, 6); // Four domains and two clips.
+  assert.equal(digest.mock.calls.length, 7); // Five domains and two clips.
   digest.mockClear();
   assert.deepEqual(
     fingerprints.compute({ ...source, rig: { ...source.rig }, animations: [...source.animations] }),

@@ -74,6 +74,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       rig: editor.state.recoveryDraft,
       skins: editor.state.standaloneSkins,
       animations: this.state?.packageAnimations() ?? definition.animations,
+      poses: this.state?.poseLibrary.packagePoses() ?? definition.poses,
       replacements: this.artwork?.appliedReplacements() ?? [],
       pendingArtwork: this.hasPendingArtworkProposal,
     };

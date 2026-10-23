@@ -28,7 +28,9 @@ test('rig with no animation files: create, author, play, export, reload and pack
     await route.fulfill({ response, json: { ...manifest, animations: [] } });
   });
   await page.goto('animation-editor/');
-  await expect(page.locator('#animation-status')).toHaveText('This character has no animations.');
+  await expect(page.locator('#animation-status')).toHaveText(
+    'This character has no animations. Choose + New Animation to create a clip, or use File tools to import animation JSON.',
+  );
   await expect(page.locator('#animation-new')).toBeEnabled();
   expect(animationRequests).toBe(0);
   const canvas = page.locator('#animation-stage canvas');

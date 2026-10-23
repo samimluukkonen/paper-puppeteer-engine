@@ -385,6 +385,58 @@ export const animationGuides: readonly GuideDefinition[] = [
     ],
   },
   {
+    id: 'animation-pose-library',
+    title: 'Pose Library',
+    description: 'Save useful FK poses, preview them safely and reuse them as animation keys.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'save',
+        'Save a useful pose',
+        'Tools → Pose Library saves the authored pose at the playhead. After exiting this tour, commit or cancel temporary edits, enter a Pose name and choose Full character or Selected bones in Save scope. Selected timeline keys supply multiple bone IDs; otherwise the selected bone is used. Save Current Pose captures FK local transforms before IK, excluding IK targets and temporary edits.',
+        targets.animationPoseSave,
+      ),
+      step(
+        'browse',
+        'Find and select a pose',
+        'Search poses filters the character library by name. Select a saved row to use it. Full poses store every bone; partial poses affect only stored bones and properties. Existing presets appear here too. Preview and Apply require the same character and compatible rig hierarchy, bind transforms and IK configuration; the panel explains incompatible or missing bones.',
+        targets.animationPoseBrowse,
+      ),
+      step(
+        'preview',
+        'Preview without creating keys',
+        'After exiting the tour, choose Preview to inspect the selected pose at the current animation time. It pauses playback and uses the destination animation’s normal IK once. It creates no keys, dirty state or Undo entry. Cancel preview, Escape or closing Pose Library restores the underlying animation. Reading this guide does not start a preview.',
+        targets.animationPoseActions,
+      ),
+      step(
+        'apply',
+        'Apply at the playhead',
+        'Select the destination animation and place its playhead before choosing Apply Pose. Stored FK values create or update relevant keys as one Animation Undo/Redo edit. Partial poses preserve unrelated bones and tracks. IK target values remain those of the destination animation, so final IK appearance can differ. Continue editing or mirroring the resulting keys normally.',
+        targets.animationPoseApply,
+      ),
+      step(
+        'organize',
+        'Rename or delete deliberately',
+        'Select a saved row, then choose Rename and Save name to change its label while retaining its ID. Delete asks for confirmation and removes the reusable pose without removing previously applied keys. This tour never submits a name, confirms deletion or changes the library.',
+        targets.animationPoseActions,
+      ),
+      step(
+        'history',
+        'Use the right Undo history',
+        'Undo library edit and Redo library edit restore saved-pose creation, renames and deletion. Animation Undo/Redo restores applied keys separately. If a later rig edit removed a referenced bone, undo that rig change before restoring the pose. Preview is view state and belongs to neither history.',
+        targets.animationPoseHistory,
+      ),
+      step(
+        'keep',
+        'Keep the reusable library',
+        'Download character ZIP includes saved poses and their manifest entries. Project ZIPs and local autosave include the library too; Project asset libraries show a counted Poses group. Animation JSON contains the resulting keys, not the reusable library. Reading the guide does not download files or create a save checkpoint.',
+        targets.rigPackage,
+      ),
+    ],
+  },
+  {
     id: 'animation-mirroring',
     title: 'Mirrored Animation',
     description: 'Map bone pairs, preview the opposite side and commit when ready.',

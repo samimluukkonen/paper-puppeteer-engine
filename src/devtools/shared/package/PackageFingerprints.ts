@@ -4,7 +4,7 @@ import { isFullyFrozen } from '../../../engine/readonlyData.js';
 import { draftSource } from '../draftSource.js';
 import type { PackageSnapshot } from './characterPackage.js';
 
-export type PackageDomains = Readonly<Record<'Rig' | 'Skins' | 'Animations' | 'Assets', string>>;
+export type PackageDomains = Readonly<Record<'Rig' | 'Skins' | 'Animations' | 'Poses' | 'Assets', string>>;
 
 /** Only immutable branches can reuse an identity-based fingerprint. Blobs are immutable binaries. */
 function immutableInputs(inputs: readonly unknown[]): boolean {
@@ -53,6 +53,11 @@ export class PackageFingerprints {
       Skins: this.domain('Skins', [embedded, ...snapshot.skins], () => [embedded, snapshot.skins]),
       Animations: this.domain('Animations', snapshot.animations, () =>
         snapshot.animations.map((clip) => this.clip(clip)),
+      ),
+      Poses: this.domain(
+        'Poses',
+        snapshot.poses ?? snapshot.definition.poses,
+        () => snapshot.poses ?? snapshot.definition.poses,
       ),
       Assets: this.domain(
         'Assets',

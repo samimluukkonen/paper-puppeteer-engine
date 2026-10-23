@@ -26,12 +26,15 @@ import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 import type { NewAnimationController } from './NewAnimationController.js';
 import { NewAnimationDialog } from './NewAnimationDialog.js';
+import type { PoseLibraryController } from './PoseLibraryController.js';
+import { PoseLibraryPanel } from './PoseLibraryPanel.js';
 import { type RigTweakController, emptyRigTweakSnapshot, subscribeNoRigTweak } from './RigTweakController.js';
 import { RigTweakPanel } from './RigTweakPanel.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
 export function AnimationEditorView({
   mirrorTools,
+  poseLibrary,
   newAnimation,
   ikInspector,
   ikBake,
@@ -47,6 +50,7 @@ export function AnimationEditorView({
   afterHeader,
 }: {
   mirrorTools: MirrorToolsController;
+  poseLibrary?: PoseLibraryController;
   newAnimation?: NewAnimationController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
@@ -183,6 +187,11 @@ export function AnimationEditorView({
             </details>
             <div className="animation-authoring-tools" inert={tweaking}>
               <EditorMenu id="animation-authoring-tools" label="Tools">
+                {poseLibrary && (
+                  <button id="animation-pose-library-open" type="button" data-open-panel="animation-pose-library-panel">
+                    Pose Library…
+                  </button>
+                )}
                 <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
                   Retime selected keys…
                 </button>
@@ -223,6 +232,7 @@ export function AnimationEditorView({
             </button>
             <div className="animation-authoring-tools" inert={tweaking}>
               <MirrorToolsPanel controller={mirrorTools} />
+              {poseLibrary && <PoseLibraryPanel controller={poseLibrary} />}
               <IKBakePanel controller={ikBake} />
               <KeyframeRetimingPanel controller={retiming} />
             </div>

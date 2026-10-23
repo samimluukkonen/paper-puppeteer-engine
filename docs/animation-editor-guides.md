@@ -2,7 +2,7 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-The catalog contains fifteen selectable tasks with 70 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+The catalog contains sixteen selectable tasks with 77 steps. Open **Feature Guide → Animation Editor**. Steps start as explanations; v0.7.6.6 adds optional **Try It** for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
 
 | Guide                      | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | -------------------------- | ----: | ------------------------------------------------------------------------ |
@@ -15,6 +15,7 @@ The catalog contains fifteen selectable tasks with 70 steps. Open **Feature Guid
 | Keyframe Editing           |     4 | Selected clip with authored bone property keys                           |
 | Interpolation              |     4 | Selected clip                                                            |
 | Onion Skinning             |     4 | Selected clip                                                            |
+| Pose Library               |     7 | Selected clip; no saved poses or bone selection required                 |
 | Mirrored Animation         |     4 | Selected clip; teaches mapping actual bone IDs                           |
 | IK Target Animation        |     5 | Selected clip, rig IK constraint and a selected IK target                |
 | IK Baking                  |     5 | Selected clip, rig IK constraint and authored IK position/influence keys |
@@ -22,21 +23,22 @@ The catalog contains fifteen selectable tasks with 70 steps. Open **Feature Guid
 | Rig-Tweak Mode             |     4 | None; explains entering the mode without entering it for the artist      |
 | Exporting Animations       |     4 | Selected clip                                                            |
 
-IK tasks use the `ik` registry category; the other thirteen use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
+IK tasks use the `ik` registry category; the other fourteen use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
 
 ## Target contract
 
 `animationGuides.ts` supplies the catalog; `anchors.ts` shares IDs with React markup. All steps use UI-only `reveal-target` preparation through the existing `GuideTargets` resolver and spotlight observation lifetime.
 
-| Area      | Stable `data-guide-id` anchors                                                                                                                                                                           |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Session   | `animation-new`, `animation-selection`, `animation-settings`, `animation-editor-mode`                                                                                                                    |
-| Inspector | `animation-bones`, `animation-properties`, `animation-x-key`, `animation-interpolation`, `animation-ik-inspector`                                                                                        |
-| Timeline  | `animation-timeline`, `animation-tracks`, `animation-ruler`, `animation-current-time`, `animation-playback`, `animation-zoom`, `animation-track-navigation`, `animation-key-editing`, `animation-events` |
-| Preview   | `animation-canvas`, `animation-onion`, `animation-onion-settings`, `animation-ik-options`                                                                                                                |
-| Tools     | `animation-mirror`, `animation-mirror-pairs`, `animation-mirror-direction`, `animation-mirror-actions`, `animation-bake`, `animation-bake-actions`                                                       |
-| Ground    | `animation-ground-visible`, `animation-ground-y`, `animation-ground-align`, `animation-ground-reset`                                                                                                     |
-| Saving    | `animation-validation`, `animation-export`, existing `rig-character-package` on the active package panel                                                                                                 |
+| Area         | Stable `data-guide-id` anchors                                                                                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session      | `animation-new`, `animation-selection`, `animation-settings`, `animation-editor-mode`                                                                                                                    |
+| Inspector    | `animation-bones`, `animation-properties`, `animation-x-key`, `animation-interpolation`, `animation-ik-inspector`                                                                                        |
+| Timeline     | `animation-timeline`, `animation-tracks`, `animation-ruler`, `animation-current-time`, `animation-playback`, `animation-zoom`, `animation-track-navigation`, `animation-key-editing`, `animation-events` |
+| Preview      | `animation-canvas`, `animation-onion`, `animation-onion-settings`, `animation-ik-options`                                                                                                                |
+| Tools        | `animation-mirror`, `animation-mirror-pairs`, `animation-mirror-direction`, `animation-mirror-actions`, `animation-bake`, `animation-bake-actions`                                                       |
+| Pose library | `animation-pose-save`, `animation-pose-browse`, `animation-pose-actions`, `animation-pose-apply`, `animation-pose-history`                                                                               |
+| Ground       | `animation-ground-visible`, `animation-ground-y`, `animation-ground-align`, `animation-ground-reset`                                                                                                     |
+| Saving       | `animation-validation`, `animation-export`, existing `rig-character-package` on the active package panel                                                                                                 |
 
 Selection details is a stable disclosure host: instructions explain selecting a bone or event to see its conditional fields. The IK inspector is anchored to the actual selected constraint panel. New-animation dialog instructions spotlight its launch button; the tour does not open or submit a modal form. Rig-Tweak tool instructions point to the mode selector and preview because the tour does not switch into Rig Tweak. Canvas operations spotlight the real preview host with coordinate/interaction guidance, without guessed joint positions.
 
@@ -47,6 +49,7 @@ The existing resolver remeasures real DOM rectangles, clips against scroll conta
 - Clip interpolation supports only Default (Linear) and explicit Linear. Key details is read-only; there are no per-key easing overrides. Smooth/Stepped and FPS control sampling separately.
 - Bone groups support marker dragging, clipboard and duplication. IK keys support single selection, nudging and deletion; group clipboard and marker dragging are unavailable.
 - Onion ghosts and mirroring use authored bone poses before IK. Mirror mapping and previews stay separate from explicit commit buttons.
+- Pose Library captures full or selected-bone FK values before IK. Preview is temporary; Apply writes keys as one animation edit. Library edits have separate history, exact compatible-rig checks, and character/project ZIP and autosave persistence. The tour reveals controls without saving, previewing, applying, renaming or deleting a pose.
 - Baking samples the entire clip to bone rotation keys and deactivates baked constraints for that clip. Fixed-target preview must be off; constraints and sampling options can still be rejected by the normal bake panel.
 - JSON export contains committed data. Character ZIP export includes the manifest entry for newly created clips. Downloads do not write project files.
 
