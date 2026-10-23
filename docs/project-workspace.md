@@ -6,6 +6,8 @@ Open **Project Workspace** from the application header, or visit `/project/`. Ch
 
 ## Authoring workflow
 
+Project ZIP imports and exports use the shared package worker so archive copying and CRC validation run outside the UI thread. Transfers have a 60-second deadline and are canceled when the workspace unmounts. Export records the captured revision only after successful archive construction and download startup; edits made during export remain unexported.
+
 - **New Character** creates the existing root-only rig with an empty default skin. Open **Rig Editor** to build it and import artwork, then **Animation Editor** to create clips.
 - **Add Existing Character** registers either shipped character without changing its source. **Import Character ZIP** accepts the existing editor's stored ZIP character packages.
 - **New Scene** creates an empty scene. In **Scene Editor**, Add Actor lists the registered project characters, including characters whose changes have never been downloaded separately.

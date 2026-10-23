@@ -1,9 +1,10 @@
 import { Download, FolderInput, FolderOpen, FolderPlus, Redo2, ShieldCheck, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { abortable } from '../../engine/abortable.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
 import { readJsonFile } from '../../engine/jsonInput.js';
-import { decodePackageZip, encodePackageZip, PACKAGE_MAX_BYTES } from '../../engine/packageZip.js';
+import { PACKAGE_MAX_BYTES } from '../../engine/packageZip.js';
 import { parseSceneJson } from '../../engine/SceneDefinition.js';
 import type { SceneDefinition } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
@@ -14,6 +15,7 @@ import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
+import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
 import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
 import type { ProjectEditorContext } from './projectBridge.js';
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
@@ -76,6 +78,7 @@ export function ProjectView() {
     revision: number;
   }>();
   const operation = useRef(false);
+  const transferLifetime = useRef(new AbortController());
   const projectRoot = useRef<HTMLDivElement>(null);
   const projectHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -145,7 +148,9 @@ export function ProjectView() {
     window.addEventListener('pageshow', resume);
     document.addEventListener('visibilitychange', hidden);
     const resources = leases.current;
+    const transfers = transferLifetime.current;
     return () => {
+      transfers.abort(new DOMException('Project Workspace closed.', 'AbortError'));
       clearInterval(poll);
       window.removeEventListener('pagehide', leave);
       window.removeEventListener('pageshow', resume);
@@ -407,7 +412,10 @@ export function ProjectView() {
   };
   const readZip = async (file: File) => {
     if (file.size > PACKAGE_MAX_BYTES) throw new Error('Package exceeds 100 MiB.');
-    return decodePackageZip(new Uint8Array(await file.arrayBuffer()));
+    const signal = AbortSignal.any([transferLifetime.current.signal, AbortSignal.timeout(60_000)]);
+    signal.throwIfAborted();
+    const bytes = new Uint8Array(await abortable(file.arrayBuffer(), signal));
+    return packageZipWorker.decode(bytes, signal);
   };
   const importScene = async (file: File): Promise<void> => {
     if (!workspace) return;
@@ -435,10 +443,13 @@ export function ProjectView() {
   };
   const exportProject = async (): Promise<void> => {
     if (!workspace) return;
-    const captured = await buildProjectPackage(workspace);
+    const signal = AbortSignal.any([transferLifetime.current.signal, AbortSignal.timeout(60_000)]);
+    const captured = await buildProjectPackage(workspace, signal);
+    const { bytes } = await packageZipWorker.encode(captured.files, signal);
+    signal.throwIfAborted();
     showValidation(workspace, workspace.inspect('export'));
     downloadBlob(
-      new Blob([encodePackageZip(captured.files)], { type: 'application/zip' }),
+      new Blob([bytes], { type: 'application/zip' }),
       `${workspace.definition.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'project'}.project.zip`,
     );
     workspace.markExported(captured.metadata, captured.characters, captured.scenes);

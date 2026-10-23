@@ -82,6 +82,10 @@ test('project validation reports broken dependencies, blocks export, opens the a
 test('project authoring retains editor owners, switches projects and round trips the exported ZIP', async ({
   page,
 }) => {
+  const zipWorkers: string[] = [];
+  page.on('worker', (worker) => {
+    if (worker.url().includes('packageZip.worker')) zipWorkers.push(worker.url());
+  });
   await page.goto('project/');
   const createProject = async (name: string) => {
     await page.getByRole('button', { name: 'New Project', exact: true }).click();
@@ -157,12 +161,14 @@ test('project authoring retains editor owners, switches projects and round trips
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Project', exact: true }).click();
   const download = await downloadPromise;
+  expect(zipWorkers.length).toBeGreaterThanOrEqual(1);
   const bytes = await readFile(await download.path());
   await page
     .getByLabel('Import Project', { exact: true })
     .setInputFiles({ name: 'film.project.zip', mimeType: 'application/zip', buffer: bytes });
   await expect(page.getByLabel('Select project').locator('option')).toHaveCount(4);
   await expect(page.getByText('Project metadata: Exported', { exact: true })).toBeVisible();
+  expect(zipWorkers.length).toBeGreaterThanOrEqual(2);
   await page.getByRole('button', { name: 'Rig Editor', exact: true }).click();
   const imported = await activeEditor(page);
   await expect(imported.locator('#validation')).toHaveText('Validation: OK');
