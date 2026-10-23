@@ -66,6 +66,7 @@ let workspaceRoutes: ReturnType<typeof bindWorkspaceNavigation> | undefined;
 const guides = new GuideLauncher(
   workspaceGuideHost({
     initialEditor: initialRigView ? 'rig' : 'animation',
+    canCreateCharacter: !projectContext,
     getAnimation: () => stateOwner,
     getRig: () => scene?.rigEditor?.state,
     getOnionEnabled: () => scene?.getOnionSkinSettings().enabled ?? false,
@@ -112,10 +113,10 @@ function CharacterWorkspace() {
     () => JSON.stringify([stateOwner?.selectedAnimationId, stateOwner?.dirty, stateOwner?.hasPendingAnimationEdits]),
   );
   const rigView = snapshot.ready ? snapshot.mode === 'rig' : initialRigView;
+  const draftControls = !projectContext ? <LocalDraftControls {...(autosave ? { autosave } : {})} /> : undefined;
   useLayoutEffect(() => movePreview?.(), [rigView]);
   return (
     <FeatureGuide launcher={guides} targets={guideTargets}>
-      {!projectContext && <LocalDraftControls {...(autosave ? { autosave } : {})} />}
       {snapshot.ready && (
         <EditorContext
           {...(projectName ? { project: projectName } : {})}
@@ -155,7 +156,11 @@ function CharacterWorkspace() {
         </p>
       )}
       <div id="editor-app" className="view-shell workspace-shell rig-workspace" hidden={!rigView} inert={!rigView}>
-        <RigEditorView header={rigView} {...(rigView ? { packages, artwork, attachments, groundGuide } : {})} />
+        <RigEditorView
+          header={rigView}
+          afterHeader={rigView ? draftControls : undefined}
+          {...(rigView ? { packages, artwork, attachments, groundGuide } : {})}
+        />
       </div>
       <div
         id="animation-editor-app"
@@ -176,6 +181,7 @@ function CharacterWorkspace() {
           retiming={retiming}
           rigTweak={rigTweak}
           header={!rigView}
+          afterHeader={!rigView ? draftControls : undefined}
           {...(!rigView ? { packages, artwork, attachments } : {})}
         />
       </div>

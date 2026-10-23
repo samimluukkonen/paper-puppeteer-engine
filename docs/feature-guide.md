@@ -2,6 +2,8 @@
 
 Open **Feature Guide** in an editor’s header. Choose **Rig Editor**, **Animation Editor**, or **Scene Editor**, find the feature you want to learn, and select **Start Guide**. Rig and Animation tours can switch within their shared character workspace. Scene tours run in Scene Editor’s independent workspace; use the Views links to move between workspaces after downloading unsaved work.
 
+**Project Workspace** opens the same catalog. Choose an editor category and a character or scene, then start the guide. The selected editor opens and checks its live requirements. Create assets first with **+ New Character** or **+ New Scene** when the project is empty. The standalone character-creation tour is unavailable within project editors; use Project Workspace to create characters.
+
 Scene Editor offers eight Explain tours: creating a scene, adding/positioning Actors, animation clips, movement, timing, preview and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
 
 The bright outline identifies the real control or panel. The dimmed area is protected from accidental interaction. **Explain** steps describe controls without changing your project. **Back**, **Next**, and **Finish** move through explanations; **Exit** or **Escape** closes the guide. Inspector sections start collapsed and open as their controls are explained.

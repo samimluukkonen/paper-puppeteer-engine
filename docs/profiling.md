@@ -12,6 +12,20 @@ Measurements below record earlier implementation comparisons on individual machi
 
 The [v0.6.5 release report](release-readiness.md#performance-observations) records current candidate observations for small/complex characters, multiple Puppets, dense timelines, onion skinning, IK, scrubbing and replacement decoding. Run CPU and browser diagnostics separately, without other test suites competing for the machine. The repeated package/runtime lifetime diagnostic is also available with `VITE_PROFILE=1 npx vitest run tests/releaseReadiness.test.ts --maxWorkers=1 --reporter=verbose`; ordinary runs still assert object/listener cleanup without timing thresholds.
 
+## Project and scene production baseline
+
+Run these sequentially, separately from tests:
+
+```bash
+PLAYWRIGHT_CHANNEL=chrome npm run profile:project
+PLAYWRIGHT_CHANNEL=chrome npm run profile:scene
+PLAYWRIGHT_CHANNEL=chrome npm run profile:timeline -- --workflow
+```
+
+`profile:project` opens the desktop workspace shell, fetches actual shipped character metadata/artwork, and creates five distinct characters sharing artwork, each with an extra 256-key clip, plus three five-Actor scenes. It reports three samples of complete project ZIP export, ZIP decode/import, package construction plus IndexedDB Blob/hash/transaction autosave, and digest-checked recovery/import. It checks authored character/scene equivalence and discards its own diagnostic draft in `finally`. Fetch/package timings exclude texture decode; the existing artwork workflow reports browser image decoding separately. Timings are observations, with no thresholds or claim about arbitrary project sizes.
+
+`profile:scene` uses real Phaser artwork, two/five Actors, concurrent movement/animation and optional 500 cue markers; it checks Actor/GameObject/shutdown-listener cleanup. Sixty explicit updates measure CPU/UI work, not rendered FPS. The [v1.0.5 report](personal-production-readiness.md) records current measurements and workload limits.
+
 ## Animation, layers, IK, and demo presentation
 
 To isolate animated IK channel evaluation, run

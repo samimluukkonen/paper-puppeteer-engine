@@ -4,7 +4,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -13,14 +12,15 @@ import {
 import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import type { GuideLauncher } from '../devtools/shared/guides/GuideLauncher.js';
 import type { GuideEditor, GuideTargetResolver } from '../devtools/shared/guides/types.js';
+import { FeatureGuideCatalog } from './FeatureGuideCatalog.js';
 import { GuideSpotlight } from './GuideSpotlight.js';
 
 const OpenFeatureGuide = createContext<(() => void) | null>(null);
-const editors = { rig: 'Rig Editor', animation: 'Animation Editor', scene: 'Scene Editor' } as const;
 
 /** Header entry points share one modal across both retained editor views. */
-export function FeatureGuideButton() {
-  const open = useContext(OpenFeatureGuide);
+export function FeatureGuideButton({ onOpen }: { onOpen?: () => void } = {}) {
+  const contextOpen = useContext(OpenFeatureGuide);
+  const open = onOpen ?? contextOpen;
   if (!open) return null;
   return (
     <button type="button" className="feature-guide-open" aria-haspopup="dialog" onClick={open}>
@@ -48,27 +48,42 @@ export function FeatureGuide({
   const opener = useRef<HTMLElement | null>(null);
   const [editor, setEditor] = useState<GuideEditor>(snapshot.context.editor);
   const [error, setError] = useState('');
-  const id = useId();
+  const [requestedGuide, setRequestedGuide] = useState<string>();
   const guides = launcher.registry.getGuidesForEditor(editor);
-  const open = useCallback((): void => {
-    launcher.refresh();
-    setEditor(launcher.controller.getSnapshot().context.editor);
-    setError('');
-    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialog.current?.showModal();
-  }, [launcher]);
+  const open = useCallback(
+    (guideId?: string): void => {
+      setRequestedGuide(guideId);
+      launcher.refresh();
+      setEditor(launcher.controller.getSnapshot().context.editor);
+      setError('');
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      dialog.current?.showModal();
+    },
+    [launcher],
+  );
   useEffect(() => projectEditorContext()?.bindGuide(open), [open]);
+  useEffect(() => {
+    if (!requestedGuide) return;
+    const guide = launcher.registry.getGuideById(requestedGuide);
+    const ready = snapshot.context.capabilities.includes(guide?.editor === 'scene' ? 'tool:scene' : 'character');
+    if (!ready) return;
+    setRequestedGuide(undefined);
+    const result = launcher.launch(requestedGuide);
+    if (result.ok) dialog.current?.close();
+    else setError(result.reason);
+  }, [requestedGuide, snapshot.context, launcher]);
   return (
-    <OpenFeatureGuide.Provider value={open}>
+    <OpenFeatureGuide.Provider value={() => open()}>
       {children}
       <dialog
         ref={dialog}
         className="workspace-dialog feature-guide-dialog"
-        aria-labelledby={`${id}-title`}
-        aria-describedby={`${id}-description`}
+        aria-label="Feature Guide"
         onKeyDown={(event) => {
           if (event.key !== 'Tab') return;
-          const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+          const buttons = event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), select:not(:disabled), input:not(:disabled), [tabindex="0"]',
+          );
           const first = buttons[0];
           const last = buttons[buttons.length - 1];
           if (event.shiftKey && document.activeElement === first) {
@@ -79,6 +94,7 @@ export function FeatureGuide({
             first?.focus();
           }
         }}
+        onCancel={() => setRequestedGuide(undefined)}
         onClose={() => {
           if (launcher.controller.getSnapshot().status === 'active') return;
           // Cross-editor launch hides the opener; restore to the new editor's entry point instead.
@@ -87,95 +103,20 @@ export function FeatureGuide({
           else document.querySelector<HTMLElement>('.workspace-shell:not([hidden]) .feature-guide-open')?.focus();
         }}
       >
-        <div className="workspace-panel-heading">
-          <h2 id={`${id}-title`}>Feature Guide</h2>
-          <button type="button" onClick={() => dialog.current?.close()}>
-            Close
-          </button>
-        </div>
-        <p id={`${id}-description`}>What would you like to learn?</p>
-        <div className="feature-guide-categories" role="group" aria-label="Guide editor">
-          {Object.entries(editors).map(([key, title]) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={editor === key}
-              onClick={() => {
-                setEditor(key as GuideEditor);
-                setError('');
-              }}
-            >
-              {title}
-            </button>
-          ))}
-        </div>
-        <h3>{editors[editor]}</h3>
-        {editor !== 'scene' && !snapshot.context.capabilities.includes('character') && (
-          <p role="status">
-            No character is loaded. Guides that need a character will be available after loading or creating one.
-          </p>
-        )}
-        {snapshot.status === 'active' && (
-          <div className="feature-guide-current">
-            <p>Current guide: {snapshot.currentGuide.title}</p>
-            <button
-              type="button"
-              onClick={() => {
-                launcher.controller.exit();
-                setError('');
-              }}
-            >
-              Exit guide
-            </button>
-          </div>
-        )}
-        {guides.length === 0 && <p>No guides are available for this editor yet.</p>}
-        <ul className="feature-guide-list">
-          {guides.map((guide, index) => {
-            const availability = launcher.getAvailability(guide.id);
-            const prerequisite = launcher.getPrerequisiteGuide(guide.id);
-            const titleId = `${id}-guide-${index}`;
-            const reasonId = `${titleId}-availability`;
-            return (
-              <li key={guide.id} className="feature-guide-entry" aria-labelledby={titleId}>
-                <div>
-                  <h4 id={titleId}>{guide.title}</h4>
-                  <p>{guide.description}</p>
-                  <p id={reasonId} className="feature-guide-availability">
-                    {availability.available ? 'Available' : `Unavailable: ${availability.reason}`}
-                  </p>
-                </div>
-                {!availability.available && prerequisite && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditor(prerequisite.editor);
-                      setError(
-                        `Prerequisite guide: ${prerequisite.title}. Find it in this category and choose Start Guide when available.`,
-                      );
-                    }}
-                  >
-                    Show prerequisite: {prerequisite.title}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  disabled={!availability.available}
-                  aria-label={`Start Guide: ${guide.title}`}
-                  aria-describedby={reasonId}
-                  onClick={() => {
-                    const result = launcher.launch(guide.id);
-                    if (result.ok) dialog.current?.close();
-                    else setError(result.reason);
-                  }}
-                >
-                  Start Guide
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        {error && <p role="alert">{error}</p>}
+        <FeatureGuideCatalog
+          editor={editor}
+          setEditor={setEditor}
+          guides={guides}
+          getAvailability={(guideId) => launcher.getAvailability(guideId)}
+          getPrerequisiteGuide={(guideId) => launcher.getPrerequisiteGuide(guideId)}
+          onStart={(guideId) => launcher.launch(guideId)}
+          onClose={() => dialog.current?.close()}
+          hasCharacter={snapshot.context.capabilities.includes('character')}
+          currentGuide={snapshot.status === 'active' ? snapshot.currentGuide : undefined}
+          onExit={() => launcher.controller.exit()}
+          error={error}
+          setError={setError}
+        />
       </dialog>
       {snapshot.status === 'active' && (
         <GuideSpotlight

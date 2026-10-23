@@ -9,7 +9,11 @@ import {
   requireValidExport,
   type ProjectInspectionInput,
 } from '../src/devtools/project/projectInspection.js';
-import { buildProjectPackage, buildProjectScenePackage } from '../src/devtools/project/projectPackage.js';
+import {
+  buildProjectPackage,
+  buildProjectScenePackage,
+  importProjectPackage,
+} from '../src/devtools/project/projectPackage.js';
 import { ProjectValidationPanel } from '../src/devtools/project/ProjectValidationPanel.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
@@ -495,6 +499,60 @@ test('pending artwork does not hide dependency warnings and referenced skins can
   state.skinReferences = () => ['Scene "Training", Actor "guard"'];
   expect(() => state.renameSkin('alternate', 'changed')).toThrow(/Training.*guard/);
   expect(state.skins.some(({ name }) => name === 'alternate')).toBe(true);
+});
+
+test.each([
+  'missing image',
+  'duplicate bone',
+  'deleted animation',
+  'broken IK',
+  'missing character',
+  'unsupported version',
+  'unsafe path',
+])('both production exporters reject %s without changing saved checkpoints', async (defect) => {
+  const f = fixture();
+  const project = new ProjectWorkspace('Production Film');
+  await project.addCharacter(
+    await buildCharacterPackage(f.snapshot, () => Promise.resolve(new Response(f.files.get('images/paper.png')))),
+  );
+  const scene = {
+    ...f.scene,
+    actors: f.scene.actors.map((actor) => ({ ...actor, character: { manifest: project.characterReference('hero') } })),
+  };
+  project.addScene(scene);
+  const valid = await buildProjectPackage(project);
+  project.markExported(valid.metadata, valid.characters, valid.scenes);
+  const snapshot = project.captureCharacter('hero');
+  let broken = snapshot;
+  // Deliberately corrupt the fixture's backing map beyond its readonly public contract.
+  const files = project.character('hero').files as Map<string, Uint8Array<ArrayBuffer>>;
+  if (defect === 'missing image') files.delete('images/paper.png');
+  if (defect === 'duplicate bone')
+    broken = { ...snapshot, rig: { ...snapshot.rig, bones: [...snapshot.rig.bones, snapshot.rig.bones[0]!] } };
+  if (defect === 'deleted animation') broken = { ...snapshot, animations: [] };
+  if (defect === 'broken IK')
+    broken = { ...snapshot, rig: { ...snapshot.rig, ik: [{ ...snapshot.rig.ik![0]!, middleBone: 'missing' }] } };
+  if (defect === 'unsupported version')
+    broken = { ...snapshot, rig: { ...snapshot.rig, version: 99 } } as unknown as PackageSnapshot;
+  if (defect === 'unsafe path') files.set('../private.png', new Uint8Array([1]));
+  if (defect === 'missing character') {
+    expect(
+      project.scenes.importJson(
+        JSON.stringify({ ...scene, actors: [{ ...scene.actors[0], character: { manifest: 'missing.json' } }] }),
+      ),
+    ).toBe(true);
+  }
+  project.character('hero').capture = () => broken;
+  const authored = project.scenes.workingScene;
+  await expect(buildProjectPackage(project)).rejects.toBeInstanceOf(ProjectValidationError);
+  await expect(buildProjectScenePackage(project, authored!)).rejects.toBeInstanceOf(ProjectValidationError);
+  expect(project.dirty).toBe(false);
+  expect(project.scenes.workingScene).toBe(authored);
+  expect(project.history.canUndo).toBe(true);
+  // The previously downloaded complete package remains independent of damaged working data.
+  const intact = await importProjectPackage(valid.files);
+  expect(intact.captureCharacter('hero').animations[0]!.name).toBe('wave');
+  expect(intact.character('hero').files.get('images/paper.png')).toEqual(f.files.get('images/paper.png'));
 });
 
 test('final project archive budget errors surface as blocking project diagnostics', async () => {

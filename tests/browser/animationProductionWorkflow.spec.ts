@@ -67,7 +67,9 @@ test('revert restores loaded source after export and pauses/resets preview witho
   await page.locator('#play-pause').click();
   const fetchedAssets: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/characters/')) fetchedAssets.push(request.url());
+    // Autosave legitimately reads artwork bytes. Source revert must not reload authored metadata.
+    if (request.url().includes('/characters/') && new URL(request.url()).pathname.endsWith('.json'))
+      fetchedAssets.push(request.url());
   });
   await animationFileAction(page, '#animation-revert', (control) => control.click());
   await expect(page.locator('#play-pause')).toHaveText('Play');
@@ -122,20 +124,18 @@ for (const mode of ['smooth', 'stepped']) {
     await page.locator('#animation-show-bones').uncheck();
     await page.locator('#animation-facing').selectOption('left');
     await (await animationMenuControl(page, '#animation-ik-preview')).check();
+    await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
     const canvas = page.locator('#animation-stage canvas');
-    const ruler = page.locator('#timeline-ruler');
+    const timeInput = page.locator('#timeline-time-input');
     const times = [0, 0.04, 0.08, 0.2, 0.4, 0.8, 1.032, 1.033];
     const capture = async (time: number): Promise<Buffer> => {
-      await ruler.scrollIntoViewIfNeeded();
-      const bounds = await ruler.boundingBox();
-      if (!bounds) throw new Error('Missing timeline ruler.');
-      await ruler.click({
-        position: { x: Math.min(bounds.width - 1, (time / 1.033) * bounds.width), y: bounds.height / 2 },
-      });
-      if (time === 0) await ruler.press('Home');
-      if (time === 1.033) await ruler.press('End');
+      // Compare identical authored times; pixel ruler positions can land on opposite
+      // sides of a key boundary after layout changes during autosave/export.
+      await timeInput.fill(String(time));
+      await timeInput.press('Enter');
       await page.evaluate(() => window.scrollTo(0, 0));
-      return canvas.screenshot();
+      // Compare scene pixels, excluding antialiasing of the panel's rounded corners.
+      return canvas.screenshot({ style: '#animation-stage { border-radius: 0 !important; }' });
     };
     const poses: Buffer[] = [];
     for (const time of times) poses.push(await capture(time));

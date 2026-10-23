@@ -43,6 +43,7 @@ export class LocalAutosave {
     return `Local draft saved · export a ZIP for a disk copy${this.exportedRevision === revision ? ' · Explicitly exported' : ''}`;
   }
   start(): void {
+    if (this.stopped) return;
     this.suspended = false;
     this.observed = undefined;
     this.heartbeat ??= setInterval(() => {
@@ -107,12 +108,17 @@ export class LocalAutosave {
       this.publish(storageError(error));
     } finally {
       this.saving = false;
-      if (this.suspended) void this.storage.release(this.key, this.owner).catch(() => {});
-      // A revision changed during I/O. Schedule its own capture, never label it saved.
-      const latest = this.capture();
-      if (latest && latest.revision !== source.revision) {
-        this.observed = undefined;
-        this.update();
+      // save() hashes artwork before opening its transaction and can reacquire a lock
+      // after suspend/dispose's prompt release. Release again once all its I/O settles.
+      if (this.stopped || this.suspended) {
+        void this.storage.release(this.key, this.owner).catch(() => {});
+      } else {
+        // A revision changed during I/O. Schedule its own capture, never label it saved.
+        const latest = this.capture();
+        if (latest && latest.revision !== source.revision) {
+          this.observed = undefined;
+          this.update();
+        }
       }
     }
   }
@@ -154,7 +160,7 @@ export class LocalAutosave {
     clearTimeout(this.timer);
     clearInterval(this.heartbeat);
     this.listeners.clear();
-    // A pending transaction precedes this release in IndexedDB's transaction queue.
+    // Release promptly; flush's finally also releases if artwork hashing is still pending.
     void this.storage.release(this.key, this.owner).catch(() => {});
   }
 }

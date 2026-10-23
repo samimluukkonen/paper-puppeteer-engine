@@ -209,3 +209,20 @@ test('registry supplies modal rows, optional IK/tool reasons, and creation guide
     'No guides are available for this editor yet.',
   );
 });
+
+test('project editors do not launch the standalone character-creation tour for absent controls', () => {
+  const navigate = vi.fn(() => true);
+  const options = {
+    initialEditor: 'rig' as const,
+    getAnimation: () => undefined,
+    getRig: () => undefined,
+    navigate,
+  };
+  const project = new GuideLauncher(workspaceGuideHost({ ...options, canCreateCharacter: false }));
+  assert.deepEqual(project.launch('rig-new-character'), {
+    ok: false,
+    reason: 'Use + New Character in Project Workspace. This tour covers standalone Rig Editor controls.',
+  });
+  assert.lengthOf(navigate.mock.calls, 0);
+  assert.isTrue(new GuideLauncher(workspaceGuideHost(options)).launch('rig-new-character').ok);
+});

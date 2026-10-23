@@ -57,6 +57,14 @@ export function storageError(error: unknown, operation = 'Autosave'): string {
 /** Complete packages and their Blob bytes share one transaction. Failed writes retain both previous revisions. */
 export class LocalDraftStore implements DraftStorage {
   private database: Promise<IDBDatabase> | undefined;
+  private readonly listeners = new Set<() => void>();
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+  private changed(): void {
+    for (const listener of Array.from(this.listeners)) listener();
+  }
   private readonly locks = new Map<
     string,
     { owner: string; ready: Promise<void>; finished: Promise<void>; release: () => void }
@@ -213,6 +221,7 @@ export class LocalDraftStore implements DraftStorage {
       await request(store.add(record));
       for (const obsolete of existing.slice(DRAFT_RETENTION - 1)) await request(store.delete(obsolete.id));
     });
+    this.changed();
   }
   private info(value: unknown): DraftInfo {
     const parsed = z
@@ -265,5 +274,6 @@ export class LocalDraftStore implements DraftStorage {
     } finally {
       await this.release(key, owner);
     }
+    this.changed();
   }
 }

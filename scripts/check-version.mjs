@@ -25,6 +25,29 @@ assert.equal(
   `file:../../dist/paper-puppeteer-engine-${version}.tgz`,
   'Standalone consumer must install the current release tarball.',
 );
+const standaloneLock = z
+  .object({
+    packages: z.object({
+      '': z.object({ dependencies: z.record(z.string(), z.string()) }),
+      'node_modules/paper-puppeteer-engine': z.object({ version: z.string(), resolved: z.string() }),
+    }),
+  })
+  .parse(JSON.parse(await readFile(new URL('../examples/standalone/package-lock.json', import.meta.url), 'utf8')));
+assert.equal(
+  standaloneLock.packages[''].dependencies['paper-puppeteer-engine'],
+  standalone.dependencies['paper-puppeteer-engine'],
+  'Standalone lockfile must use the current tarball.',
+);
+assert.equal(
+  standaloneLock.packages['node_modules/paper-puppeteer-engine'].version,
+  version,
+  'Standalone lockfile package version must match.',
+);
+assert.equal(
+  standaloneLock.packages['node_modules/paper-puppeteer-engine'].resolved,
+  standalone.dependencies['paper-puppeteer-engine'],
+  'Standalone lockfile resolution must use the current tarball.',
+);
 const changelog = await readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
 assert.ok(changelog.split(/\r?\n/).includes(`## ${version}`), 'Current version must have a changelog entry.');
 console.log(`Package version ${version} is valid SemVer; lockfile, standalone tarball and changelog agree.`);

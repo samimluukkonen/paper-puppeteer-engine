@@ -93,7 +93,9 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 ## Guides
 
 - [Standalone character runtime integration](docs/runtime-integration.md)
+- [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
+- [v1.0.5 internal production readiness and verification](docs/personal-production-readiness.md)
 - [Creating Your First Character](docs/creating-your-first-character.md)
 - [Making Your First Scene](docs/making-your-first-scene.md)
 - [v0.9 Scene Editor readiness and verification](docs/scene-editor-readiness.md)

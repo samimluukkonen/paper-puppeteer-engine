@@ -1,78 +1,83 @@
-import { GraduationCap } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { FeatureGuideButton } from '../../ui/FeatureGuide.js';
+import { FeatureGuideCatalog } from '../../ui/FeatureGuideCatalog.js';
+import { guideRegistry } from '../shared/guides/registry.js';
+import type { GuideEditor } from '../shared/guides/types.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 
-/** Choose a real project asset before opening the existing editor's complete guide catalog. */
+/** Browse the shared catalog, then verify live prerequisites in the selected asset's editor. */
 export function ProjectFeatureGuide({
   project,
   open,
 }: {
   project?: ProjectWorkspace['definition'];
-  open: (kind: 'character' | 'scene', id: string, view: 'rig' | 'animation') => void;
+  open: (kind: 'character' | 'scene', id: string, view: 'rig' | 'animation', guideId: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const [error, setError] = useState('');
+  const [editor, setEditor] = useState<GuideEditor>('rig');
   const [character, setCharacter] = useState('');
   const [scene, setScene] = useState('');
   const characterId = project?.characters.some(({ id }) => id === character) ? character : project?.characters[0]?.id;
   const sceneId = project?.scenes.some(({ id }) => id === scene) ? scene : project?.scenes[0]?.id;
-  const launch = (kind: 'character' | 'scene', id: string | undefined, view: 'rig' | 'animation'): void => {
-    if (!id) return;
-    dialog.current?.close();
-    open(kind, id, view);
-  };
+  const isScene = editor === 'scene';
+  const assetId = isScene ? sceneId : characterId;
   return (
     <>
-      <button className="feature-guide-open" aria-haspopup="dialog" onClick={() => dialog.current?.showModal()}>
-        <GraduationCap size={16} aria-hidden="true" /> Feature Guide
-      </button>
-      <dialog ref={dialog} className="workspace-dialog" aria-label="Project Feature Guide">
-        <div className="workspace-panel-heading">
-          <h2>Feature Guide</h2>
-          <button onClick={() => dialog.current?.close()}>Close</button>
-        </div>
-        <p>
-          Choose a project asset to open its editor and Feature Guide. Tours use your working copy; practice edits are
-          explicit.
-        </p>
-        {characterId ? (
-          <>
-            <label>
-              Guide character{' '}
-              <select value={characterId} onChange={(event) => setCharacter(event.target.value)}>
-                {project?.characters.map(({ id, name }) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="project-actions">
-              <button onClick={() => launch('character', characterId, 'rig')}>Open Rig Editor guides</button>
-              <button onClick={() => launch('character', characterId, 'animation')}>
-                Open Animation Editor guides
-              </button>
-            </div>
-          </>
-        ) : (
-          <p>Create a project and add a character to use rig and animation guides.</p>
-        )}
-        {sceneId ? (
-          <>
-            <label>
-              Guide scene{' '}
-              <select value={sceneId} onChange={(event) => setScene(event.target.value)}>
-                {project?.scenes.map(({ id }) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button onClick={() => launch('scene', sceneId, 'rig')}>Open Scene Editor guides</button>
-          </>
-        ) : (
-          <p>Add a scene to use scene guides.</p>
-        )}
+      <FeatureGuideButton
+        onOpen={() => {
+          setError('');
+          dialog.current?.showModal();
+        }}
+      />
+      <dialog ref={dialog} className="workspace-dialog feature-guide-dialog" aria-label="Feature Guide">
+        <FeatureGuideCatalog
+          error={error}
+          setError={setError}
+          editor={editor}
+          setEditor={setEditor}
+          guides={guideRegistry.getGuidesForEditor(editor)}
+          hasCharacter={!!characterId}
+          availableLabel="Requirements checked in editor"
+          selection={
+            assetId ? (
+              <div className="feature-guide-asset">
+                <label>
+                  {isScene ? 'Guide scene' : 'Guide character'}
+                  <select value={assetId} onChange={(event) => (isScene ? setScene : setCharacter)(event.target.value)}>
+                    {(isScene ? project?.scenes : project?.characters)?.map((asset) => (
+                      <option key={asset.id} value={asset.id}>
+                        {'name' in asset ? asset.name : asset.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p>The guide opens in this asset's editor. Requirements are checked there before the tour starts.</p>
+              </div>
+            ) : (
+              <p role="status">
+                {isScene
+                  ? 'Add a scene to use scene guides.'
+                  : 'Create a project and add a character to use rig and animation guides.'}
+              </p>
+            )
+          }
+          getAvailability={(guideId) => {
+            const standaloneRequirement = guideRegistry
+              .getGuideById(guideId)
+              ?.prerequisites?.find(({ capability }) => capability === 'tool:new-character');
+            if (standaloneRequirement) return { available: false, reason: standaloneRequirement.reason };
+            return assetId
+              ? { available: true }
+              : { available: false, reason: isScene ? 'Add a scene first.' : 'Add a character first.' };
+          }}
+          onStart={(guideId) => {
+            if (!assetId) return { ok: false, reason: 'Choose a project asset first.' };
+            open(isScene ? 'scene' : 'character', assetId, editor === 'animation' ? 'animation' : 'rig', guideId);
+            return { ok: true };
+          }}
+          onClose={() => dialog.current?.close()}
+        />
       </dialog>
     </>
   );

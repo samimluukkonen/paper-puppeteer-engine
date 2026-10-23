@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
@@ -44,6 +44,7 @@ export function AnimationEditorView({
   alignGroundTarget,
   footContacts,
   header = true,
+  afterHeader,
 }: {
   mirrorTools: MirrorToolsController;
   newAnimation?: NewAnimationController;
@@ -58,6 +59,7 @@ export function AnimationEditorView({
   alignGroundTarget?: () => void;
   footContacts?: FootContactGroundController;
   header?: boolean;
+  afterHeader?: ReactNode;
 }) {
   const inspector = useWorkspaceInspector();
   const mode = useSyncExternalStore(
@@ -72,7 +74,11 @@ export function AnimationEditorView({
   ));
   return (
     <>
-      <ViewHeader view="animation" selectionId={header ? 'character-selection' : 'inactive-character-selection'} />
+      <ViewHeader
+        view="animation"
+        selectionId={header ? 'character-selection' : 'inactive-character-selection'}
+        afterHeader={afterHeader}
+      />
       <main className={`animation-layout view-content ${inspector.open ? 'inspector-open' : ''}`}>
         {packages && <PackagePanel controller={packages} />}
         <section

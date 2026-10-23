@@ -21,7 +21,7 @@ npm run check:release
 
 `audit` checks all locked dependencies, including development tooling, and fails on advisories of any severity. CI runs it for pull requests and pushes to `master`. A separate workflow can be triggered manually; it audits the lockfile without installing packages or running dependency lifecycle scripts.
 
-`check:release` runs formatting, lint, typecheck, version validation, all normal unit regressions, both builds and the packed standalone consumer checks in sequence. It does not replace the local browser, performance and human acceptance gates in the [release-readiness report](release-readiness.md). Run optional profiles separately from browser tests to avoid competing workloads. Browser checks stay local-only; dependency audit scheduling is unchanged.
+`check:release` runs formatting, lint, typecheck, version validation, all normal unit regressions, both builds and the packed standalone consumer checks in sequence. It does not replace the local browser, performance and human acceptance gates in the [release-readiness report](release-readiness.md). The [v1.0.5 report](personal-production-readiness.md) covers the complete project workflow, recovery and standalone scene handoff. Run optional profiles separately from browser tests to avoid competing workloads. Browser checks stay local-only; dependency audit scheduling is unchanged.
 
 ### Local browser checks
 

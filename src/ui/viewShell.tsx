@@ -1,7 +1,8 @@
-import { Clapperboard, LayoutTemplate, MonitorPlay, Network } from 'lucide-react';
-import { useSyncExternalStore } from 'react';
+import { Clapperboard, FolderOpen, LayoutTemplate, MonitorPlay, Network } from 'lucide-react';
+import { useSyncExternalStore, type ReactNode, type Ref } from 'react';
 import packageInfo from '../../package.json';
 import { projectEditorContext } from '../devtools/project/projectBridge.js';
+import { AutosaveStatus } from '../devtools/shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
 import { characterChoices, selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
@@ -38,6 +39,12 @@ const views = {
     description: 'Create and manage scene documents.',
     icon: LayoutTemplate,
   },
+  project: {
+    title: 'Project Workspace',
+    path: 'project/',
+    description: 'Characters, animations, artwork and scenes in one project.',
+    icon: FolderOpen,
+  },
 } as const;
 const noSubscribe = () => () => {};
 
@@ -45,9 +52,15 @@ const noSubscribe = () => () => {};
 export function ViewHeader({
   view,
   selectionId = 'character-selection',
+  featureGuide,
+  headingRef,
+  afterHeader,
 }: {
   view: keyof typeof views;
   selectionId?: string;
+  featureGuide?: ReactNode;
+  headingRef?: Ref<HTMLHeadingElement>;
+  afterHeader?: ReactNode;
 }) {
   const current = views[view];
   const project = projectEditorContext();
@@ -59,98 +72,108 @@ export function ViewHeader({
   const root = view === 'demo' ? './' : '../';
   const characterId = selectedCharacterId();
   const choices = view === 'demo' ? characterChoices : workspaceCharacterChoices();
-  const characterQuery = characterId === defaultCharacterId ? '' : `?character=${encodeURIComponent(characterId)}`;
+  const characterQuery =
+    view === 'project' || characterId === defaultCharacterId ? '' : `?character=${encodeURIComponent(characterId)}`;
+  const characterView = view === 'demo' || view === 'rig' || view === 'animation';
   return (
-    <header className="view-header">
-      <div className="view-header-top">
-        <a
-          className="wordmark"
-          href={project ? `${root}project/` : `${root}${characterQuery}`}
-          aria-label="Paper Puppeteer Engine"
-          onClick={
-            project
-              ? (event) => {
-                  event.preventDefault();
-                  project.navigate('project');
-                }
-              : undefined
-          }
-        >
-          <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
-          <span className="wordmark-name">
-            Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
-          </span>
-        </a>
-        <span className="view-version">v{packageInfo.version}</span>
-      </div>
-      <div className="view-header-main">
-        <div className="view-heading">
-          <h1 tabIndex={-1}>
-            {current.title}
-            {view === 'rig' && (
-              <>
-                {' '}
-                <span className="view-title-badge">Bind Pose</span>
-              </>
+    <>
+      <header className="view-header">
+        <div className="view-header-top">
+          <a
+            className="wordmark"
+            href={project ? `${root}project/` : `${root}${characterQuery}`}
+            aria-label="Paper Puppeteer Engine"
+            onClick={
+              project
+                ? (event) => {
+                    event.preventDefault();
+                    project.navigate('project');
+                  }
+                : undefined
+            }
+          >
+            <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
+            <span className="wordmark-name">
+              Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
+            </span>
+          </a>
+          <span className="view-version">v{packageInfo.version}</span>
+        </div>
+        <div className="view-header-main">
+          <div className="view-heading">
+            <h1 ref={headingRef} tabIndex={-1}>
+              {current.title}
+              {view === 'rig' && (
+                <>
+                  {' '}
+                  <span className="view-title-badge">Bind Pose</span>
+                </>
+              )}
+            </h1>
+            <p className="view-description" id={view === 'animation' ? 'character-status' : undefined}>
+              {current.description}
+            </p>
+            {projectIdentity && <p className="project-identity">{projectIdentity}</p>}
+            {characterView && !project && (
+              <label className="character-choice">
+                Character
+                <select
+                  id={selectionId}
+                  data-guide-id={view === 'rig' ? GUIDE_TARGETS.rigCharacter : undefined}
+                  defaultValue={characterId}
+                >
+                  {!choices.some((entry) => entry.id === characterId) && (
+                    <option value={characterId}>{characterId} (unavailable)</option>
+                  )}
+                  {choices.map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
-          </h1>
-          <p className="view-description" id={view === 'animation' ? 'character-status' : undefined}>
-            {current.description}
-          </p>
-          {projectIdentity && <p className="project-identity">{projectIdentity}</p>}
-          {view !== 'scene' && !project && (
-            <label className="character-choice">
-              Character
-              <select
-                id={selectionId}
-                data-guide-id={view === 'rig' ? GUIDE_TARGETS.rigCharacter : undefined}
-                defaultValue={characterId}
-              >
-                {!choices.some((entry) => entry.id === characterId) && (
-                  <option value={characterId}>{characterId} (unavailable)</option>
-                )}
-                {choices.map(({ id, label }) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {view !== 'scene' && !project && (
-            <NewCharacterDialog
-              root={root}
-              guideTargetId={view === 'rig' ? GUIDE_TARGETS.rigNewCharacter : undefined}
-            />
-          )}
-        </div>
-        <div className="view-header-guide">
-          <FeatureGuideButton />
-        </div>
-        <nav className="view-navigation" aria-label="Views">
-          {project ? (
-            <button type="button" onClick={() => project.navigate('project')}>
-              ← Project
-            </button>
-          ) : (
-            <a href={`${root}project/`} aria-label="Project Workspace">
-              Project
-            </a>
-          )}
-          {Object.entries(views)
-            .filter(([id]) => !project || (view !== 'scene' && (id === 'rig' || id === 'animation')))
-            .map(([id, item]) => (
+            {characterView && !project && (
+              <NewCharacterDialog
+                root={root}
+                guideTargetId={view === 'rig' ? GUIDE_TARGETS.rigNewCharacter : undefined}
+              />
+            )}
+          </div>
+          <div className="view-header-guide">{featureGuide ?? <FeatureGuideButton />}</div>
+          <nav className="view-navigation" aria-label="Views">
+            {project ? (
+              <button type="button" onClick={() => project.navigate('project')}>
+                ← Project
+              </button>
+            ) : (
               <a
-                key={id}
-                href={`${root}${item.path}${project ? window.location.search : characterQuery}`}
-                aria-current={id === view ? 'page' : undefined}
+                href={`${root}project/`}
+                aria-label="Project Workspace"
+                aria-current={view === 'project' ? 'page' : undefined}
               >
-                <item.icon size={16} aria-hidden="true" />
-                {item.title}
+                <FolderOpen size={16} aria-hidden="true" />
+                Project
               </a>
-            ))}
-        </nav>
-      </div>
-    </header>
+            )}
+            {Object.entries(views)
+              .filter(([id]) => id !== 'project')
+              .filter(([id]) => !project || (view !== 'scene' && (id === 'rig' || id === 'animation')))
+              .map(([id, item]) => (
+                <a
+                  key={id}
+                  href={`${root}${item.path}${project ? window.location.search : characterQuery}`}
+                  aria-current={id === view ? 'page' : undefined}
+                >
+                  <item.icon size={16} aria-hidden="true" />
+                  {item.title}
+                </a>
+              ))}
+          </nav>
+        </div>
+      </header>
+      {afterHeader}
+      {project?.autosave && <AutosaveStatus autosave={project.autosave} />}
+    </>
   );
 }

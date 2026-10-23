@@ -1,5 +1,6 @@
 # Repository preferences
 
+- Follow the [GitHub / Primer UI style guide](docs/style-guide.md) in every view. Use the shared `ViewHeader`; do not create page-specific header implementations.
 - When following a plan with a version number, write its changelog entry under that version's heading, not under Unreleased. Follow the changelog's existing SemVer convention (for example, plan `v0.9.8.2` uses heading `0.9.8-2`).
 - Use the animator editor's visual style consistently in every view, especially the new scene editor.
 - Inspector sections in both editors must start collapsed by default.

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { openWorkspaceDialog, useWorkspaceInspector, WorkspaceDialog } from '../../ui/Workspace.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
@@ -20,17 +21,23 @@ export function RigEditorView({
   packages,
   groundGuide,
   header = true,
+  afterHeader,
 }: {
   artwork?: ArtworkController;
   attachments?: AttachmentController;
   packages?: PackageController;
   groundGuide?: GroundGuideWorkspace;
   header?: boolean;
+  afterHeader?: ReactNode;
 } = {}) {
   const inspector = useWorkspaceInspector();
   return (
     <>
-      <ViewHeader view="rig" selectionId={header ? 'character-selection' : 'inactive-character-selection'} />
+      <ViewHeader
+        view="rig"
+        selectionId={header ? 'character-selection' : 'inactive-character-selection'}
+        afterHeader={afterHeader}
+      />
       <main className={`workspace-layout view-content ${inspector.open ? 'inspector-open' : ''}`}>
         {packages && <PackagePanel controller={packages} />}
         <section className="workspace-command-bar" aria-label="Rig session">

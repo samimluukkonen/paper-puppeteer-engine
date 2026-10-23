@@ -1,13 +1,15 @@
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import type { SceneEditorDocument, ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
+import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import type { PackageSnapshot, PackageFiles } from '../shared/package/characterPackage.js';
 
 /** Same-origin retained editor hosts reuse the existing applications and their single owners. */
 export interface ProjectEditorContext {
+  readonly autosave?: LocalAutosave;
   readonly projectName: string;
   readonly assetName: string;
   subscribe: (listener: () => void) => () => void;
-  bindGuide(open: () => void): () => void;
+  bindGuide(open: (guideId?: string) => void): () => void;
   readonly characterId?: string;
   readonly definition?: CharacterDefinition;
   readonly sourceDefinition?: CharacterDefinition;

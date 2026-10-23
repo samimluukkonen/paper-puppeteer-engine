@@ -180,7 +180,10 @@ export async function profileEditorWorkflow(baseUrl, sourceRig, channel) {
         return { normal, onion };
       });
       const appearance = await page.evaluate(async () => {
-        const panel = document.querySelector('#attachment-panel');
+        const panel = /** @type {HTMLDetailsElement} */ (
+          document.querySelector('#animation-inspector #attachment-panel')
+        );
+        panel.open = true;
         const skin = /** @type {HTMLSelectElement} */ (panel.querySelector('[aria-label="Active skin"]'));
         const skinSwitchMs = [];
         const original = skin.value;
@@ -193,7 +196,9 @@ export async function profileEditorWorkflow(baseUrl, sourceRig, channel) {
         }
         skin.value = original;
         skin.dispatchEvent(new Event('change', { bubbles: true }));
-        const artwork = /** @type {HTMLDetailsElement} */ (document.querySelector('#artwork-panel'));
+        const artwork = /** @type {HTMLDetailsElement} */ (
+          document.querySelector('#animation-inspector #artwork-panel')
+        );
         artwork.open = true;
         const surface = document.createElement('canvas');
         surface.width = 256;
@@ -204,23 +209,30 @@ export async function profileEditorWorkflow(baseUrl, sourceRig, channel) {
         );
         const files = new DataTransfer();
         files.items.add(new File([blob], 'profile.png', { type: 'image/png' }));
-        const input = /** @type {HTMLInputElement} */ (artwork.querySelector('input[type="file"]'));
+        const input = /** @type {HTMLInputElement} */ (artwork.querySelector('[aria-label="Import sprite"]'));
         const start = performance.now();
         input.files = files.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
         const button = (label) => [...artwork.querySelectorAll('button')].find((entry) => entry.textContent === label);
-        const preview = button('Preview Replacement');
-        while (!artwork.querySelector('[aria-label="Alignment policy"]')) {
-          if (performance.now() - start > 10_000) throw new Error('Artwork import did not complete.');
-          await new Promise((resolve) => requestAnimationFrame(resolve));
-        }
+        /** @param {() => boolean} ready @param {string} operation */
+        const waitFor = async (ready, operation) => {
+          const waiting = performance.now();
+          while (!ready()) {
+            if (performance.now() - waiting > 10_000) throw new Error(`Artwork ${operation} did not complete.`);
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          }
+        };
+        await waitFor(() => artwork.querySelector('[aria-label="Alignment policy"]') !== null, 'import');
         const artworkDecodeMs = performance.now() - start;
         const policy = /** @type {HTMLSelectElement} */ (artwork.querySelector('[aria-label="Alignment policy"]'));
         policy.value = 'normalized';
         policy.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitFor(() => !button('Preview Replacement').disabled, 'alignment selection');
         const applyStart = performance.now();
-        preview.click();
+        button('Preview Replacement').click();
+        await waitFor(() => !button('Apply Replacement').disabled, 'preview');
         button('Apply Replacement').click();
+        await waitFor(() => artwork.textContent.includes('Replacement applied in this session.'), 'apply');
         artwork.getBoundingClientRect();
         return { skinSwitchMs, artworkDecodeMs, artworkPreviewApplyMs: performance.now() - applyStart };
       });

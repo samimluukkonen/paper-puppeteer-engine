@@ -6,6 +6,7 @@ import type { GuideCapability, GuideEditor } from './types.js';
 /** Only this workspace adapter reads documents; the guide controller receives capability facts. */
 export function workspaceGuideHost(options: {
   initialEditor: GuideEditor;
+  canCreateCharacter?: boolean;
   getAnimation(): AnimationEditorState | undefined;
   getRig(): RigEditorState | undefined;
   getOnionEnabled?(): boolean;
@@ -19,7 +20,8 @@ export function workspaceGuideHost(options: {
     getContext: () => {
       const animation = options.getAnimation();
       const rig = options.getRig();
-      const capabilities: GuideCapability[] = ['tool:new-character'];
+      const capabilities: GuideCapability[] = [];
+      if (options.canCreateCharacter !== false) capabilities.push('tool:new-character');
       if (animation && rig) {
         capabilities.push('character');
         if (!rig.validationPending && !rig.validationIssues().some((issue) => issue.severity === 'error'))

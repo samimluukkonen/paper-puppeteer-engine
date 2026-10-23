@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { z } from 'zod';
 import { profileEditorWorkflow } from './profile-editor-workflow.mjs';
+import { profileProjectWorkflow } from './profile-project-workflow.mjs';
 import { profileSceneWorkflow } from './profile-scene-workflow.mjs';
 // Local browser diagnostic only; timings are observations, never CI thresholds.
 const repo = fileURLToPath(new URL('../', import.meta.url));
@@ -49,7 +50,9 @@ try {
     });
     vite.stderr.on('data', (chunk) => process.stderr.write(String(chunk)));
   });
-  if (process.argv.includes('--scene')) {
+  if (process.argv.includes('--project')) {
+    console.log(JSON.stringify(await profileProjectWorkflow(baseUrl, process.env.PLAYWRIGHT_CHANNEL)));
+  } else if (process.argv.includes('--scene')) {
     console.log(JSON.stringify(await profileSceneWorkflow(baseUrl, process.env.PLAYWRIGHT_CHANNEL)));
   } else if (process.argv.includes('--workflow')) {
     console.log(JSON.stringify(await profileEditorWorkflow(baseUrl, rig, process.env.PLAYWRIGHT_CHANNEL)));

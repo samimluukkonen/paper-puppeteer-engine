@@ -15,8 +15,10 @@ test('workspace guides, editor identity, native focus, export access and live ri
   await page.goto('project/');
   await expect(page.getByRole('heading', { name: 'No project open' })).toBeVisible();
   await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
-  const projectGuide = page.getByRole('dialog', { name: 'Project Feature Guide', exact: true });
+  const projectGuide = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
   await expect(projectGuide).toContainText('Create a project and add a character');
+  await expect(projectGuide.locator('.feature-guide-categories button')).toHaveCount(3);
+  await expect(projectGuide.getByRole('button', { name: 'Start Guide: Creating Bones', exact: true })).toBeDisabled();
   await projectGuide.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'New Project', exact: true }).click();
   const project = page.getByRole('dialog', { name: 'New Project', exact: true });
@@ -27,8 +29,12 @@ test('workspace guides, editor identity, native focus, export access and live ri
   await character.getByLabel('Character name').fill('Hero');
   await character.getByRole('button', { name: 'Create Character', exact: true }).click();
   await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
-  await projectGuide.getByRole('button', { name: 'Open Rig Editor guides', exact: true }).click();
+  await page.screenshot({ path: test.info().outputPath('project-feature-guide.png') });
+  await projectGuide.getByRole('button', { name: 'Start Guide: Creating Bones', exact: true }).click();
   const frame = await activeFrame(page);
+  await expect(frame.getByRole('button', { name: 'Exit', exact: true })).toBeVisible();
+  await frame.getByRole('button', { name: 'Exit', exact: true }).click();
+  await frame.getByRole('button', { name: 'Feature Guide', exact: true }).click();
   const catalog = frame.getByRole('dialog', { name: 'Feature Guide', exact: true });
   await expect(catalog).toBeVisible();
   await expect(catalog.getByRole('button', { name: 'Rig Editor', exact: true })).toHaveAttribute(
@@ -39,6 +45,11 @@ test('workspace guides, editor identity, native focus, export access and live ri
   await expect(frame.locator('#validation')).toHaveText('Validation: OK');
   await expect(frame.getByRole('region', { name: 'Editor context' })).toContainText('Project: Forest Story');
   await expect(frame.getByRole('region', { name: 'Editor context' })).toContainText('Character: Hero');
+  // The Creating Bones tour explicitly reveals its hierarchy target. Other panels stay collapsed.
+  const revealed = frame.locator('#rig-inspector details[open]');
+  await expect(revealed).toHaveCount(1);
+  await expect(revealed.locator('#hierarchy')).toBeVisible();
+  await revealed.locator(':scope > summary').click();
   await expect(frame.locator('#rig-inspector details[open]')).toHaveCount(0);
   await expect(frame.getByText('No artwork assigned.', { exact: false })).toBeVisible();
   for (const details of await frame.locator('#hierarchy').locator('xpath=ancestor::details').all())
@@ -92,8 +103,12 @@ test('workspace guides, editor identity, native focus, export access and live ri
   await scene.getByLabel('Scene name').fill('Opening');
   await scene.getByRole('button', { name: 'Create Scene', exact: true }).click();
   await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
-  await projectGuide.getByRole('button', { name: 'Open Scene Editor guides', exact: true }).click();
+  await projectGuide.getByRole('button', { name: 'Scene Editor', exact: true }).click();
+  await projectGuide.getByRole('button', { name: 'Start Guide: Adding an Actor', exact: true }).click();
   const sceneFrame = await activeFrame(page);
+  await expect(sceneFrame.getByRole('button', { name: 'Exit', exact: true })).toBeVisible();
+  await sceneFrame.getByRole('button', { name: 'Exit', exact: true }).click();
+  await sceneFrame.getByRole('button', { name: 'Feature Guide', exact: true }).click();
   const sceneCatalog = sceneFrame.getByRole('dialog', { name: 'Feature Guide', exact: true });
   await expect(sceneCatalog).toBeVisible();
   await expect(sceneCatalog.getByRole('button', { name: 'Scene Editor', exact: true })).toHaveAttribute(

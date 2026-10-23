@@ -103,6 +103,11 @@ test('artist contact workflow from rig authoring through IK keys and portable tw
     await route.fulfill({ response, json: { ...rig, footContactMarkers: loaded.rig.footContactMarkers } });
   });
   await page.goto('scene-editor/');
+  // Keep the saved character draft; this separate scene workflow uses its exported ZIP.
+  await page
+    .getByRole('dialog', { name: 'Recover unsaved work?', exact: true })
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click();
   const source = {
     version: 2,
     id: 'contact-workflow',

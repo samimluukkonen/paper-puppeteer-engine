@@ -21,6 +21,12 @@ const step = (id: string, title: string, description: string, targetId: string):
 export const rigGuides: readonly GuideDefinition[] = [
   {
     id: 'rig-new-character',
+    prerequisites: [
+      {
+        capability: 'tool:new-character',
+        reason: 'Use + New Character in Project Workspace. This tour covers standalone Rig Editor controls.',
+      },
+    ],
     title: 'Creating a New Character',
     description: 'Start a root-only character draft and learn how to keep it.',
     editor: 'rig',

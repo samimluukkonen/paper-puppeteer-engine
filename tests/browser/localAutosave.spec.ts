@@ -117,7 +117,14 @@ test('refresh recovers artwork, committed rig, animation and scene edits then ex
   if ((await restoredRoot.getAttribute('aria-selected')) !== 'true') await restoredRoot.click();
   await expect(await reveal(restored, '#inspector [data-scope=bone][data-field=x]')).toHaveValue('42');
   await restored.getByRole('button', { name: '← Project', exact: true }).click();
-  await expect(page.getByText('Animations: wave', { exact: true })).toBeAttached();
+  const library = page.locator('.project-asset-library').first();
+  await library.locator(':scope > summary').click();
+  await library
+    .locator('.project-asset-group')
+    .filter({ has: page.locator('summary', { hasText: /^Animations/ }) })
+    .locator(':scope > summary')
+    .click();
+  await expect(library.getByText('wave', { exact: true })).toBeVisible();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Project', exact: true }).click();
   const bytes = await readFile(await (await downloading).path());
@@ -153,6 +160,94 @@ test('recovery cancellation preserves data and explicit discard removes it', asy
   await expect(dialog).not.toBeVisible();
   await page.reload();
   await expect(dialog).not.toBeVisible();
+});
+
+test('accepting recovery in a standalone editor restores the project after navigation with one confirmation', async ({
+  page,
+}) => {
+  await page.goto('project/');
+  await createProject(page, 'One Confirmation Film');
+  await saved(page);
+  page.on('dialog', (dialog) => {
+    void dialog.accept();
+  });
+  await page.getByRole('link', { name: 'Rig Editor', exact: true }).click();
+  await expect(page).toHaveURL(/rig-editor\//);
+  const dialog = page.getByRole('dialog', { name: 'Recover unsaved work?', exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Recover Draft', exact: true }).click();
+  await expect(page).toHaveURL(/project\/\?recover=/);
+  await expect(page.getByRole('heading', { name: 'One Confirmation Film', exact: true })).toBeVisible();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByText('Project metadata: Unsaved', { exact: true })).toBeVisible();
+  // The intent is consumed once; a later independent startup offers recovery normally.
+  await saved(page);
+  await page.reload();
+  await expect(dialog).toBeVisible();
+});
+
+test('corrupt newest binary snapshot leaves the previous complete project recoverable through the dialog', async ({
+  page,
+}) => {
+  await page.goto('project/');
+  await createProject(page, 'Last Valid Film');
+  await saved(page);
+  await page.getByText('Project Settings', { exact: true }).click();
+  await page.getByRole('main').getByLabel('Project name', { exact: true }).fill('Newest Film');
+  await page.getByRole('button', { name: 'Apply name', exact: true }).click();
+  await saved(page);
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('paper-puppeteer-recovery', 1);
+      opening.onsuccess = () => resolve(opening.result);
+      opening.onerror = () => reject(opening.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('drafts', 'readwrite');
+        const store = tx.objectStore('drafts');
+        const request = store.getAll();
+        request.onsuccess = () => {
+          // Fixtures were created by the application; deliberately damage one Blob,
+          // retaining its original digest and a fully valid envelope.
+          const records = request.result as {
+            id: string;
+            savedAt: number;
+            files: { path: string; blob: Blob; digest: string }[];
+          }[];
+          if (records.length !== 2) {
+            tx.abort();
+            return;
+          }
+          const latest = records.sort((a, b) => b.savedAt - a.savedAt)[0]!;
+          store.put({
+            ...latest,
+            files: latest.files.map((file, index) => (index === 0 ? { ...file, blob: new Blob(['corrupt']) } : file)),
+          });
+        };
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error ?? new Error('Expected two retained snapshots.'));
+      });
+    } finally {
+      db.close();
+    }
+  });
+  page.on('dialog', (dialog) => {
+    void dialog.accept();
+  });
+  await page.reload();
+  const dialog = page.getByRole('dialog', { name: 'Recover unsaved work?', exact: true });
+  await dialog.getByRole('button', { name: 'Recover Draft', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Corrupt local resource');
+  await expect(dialog.getByLabel('Project / revision').locator('option')).toHaveCount(2);
+  await dialog.getByLabel('Project / revision').selectOption({ index: 1 });
+  await dialog.getByRole('button', { name: 'Recover Draft', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Last Valid Film', exact: true })).toBeVisible();
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export Project', exact: true }).click();
+  const files = decodePackageZip(await readFile(await (await downloading).path()));
+  expect(files.has('project.json')).toBe(true);
 });
 
 test('a second browser tab cannot recover over a live writer and can recover after it leaves', async ({ page }) => {

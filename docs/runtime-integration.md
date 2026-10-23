@@ -10,11 +10,32 @@ v0.6.4 verifies the existing editor export and runtime loading pipeline in a sep
 
 ## Build and install
 
-Use Node 24 or newer. From this repository, `npm run build` produces the demo and the library. `npm pack --pack-destination dist` also runs the prepack version check and library build, producing `dist/paper-puppeteer-engine-0.7.1.tgz`. Install that tarball into another project with `npm install /path/to/paper-puppeteer-engine-0.7.1.tgz phaser@4.2.1`.
+Use Node 24 or newer. From this repository, `npm run build` produces the demo and the library. `npm pack --pack-destination dist` also runs the prepack version check and library build, producing `dist/paper-puppeteer-engine-1.0.5.tgz`. Install that tarball into another project with `npm install /path/to/paper-puppeteer-engine-1.0.5.tgz phaser@4.2.1`.
 
 The root and `/runtime` entries expose the same browser runtime. `/core` supports metadata loading, validation, animation evaluation and IK tooling without Phaser/browser globals; `/data` provides authored types; `/serialization` exposes versioned parsers/serializers. All entries include declarations and source maps. Phaser 4.2.1 is an external peer, Zod is a package dependency, and React remains a development dependency. `npm run test:package` verifies the tarball's exports, declarations, documentation links, editor isolation and the standalone consumer's actual test/build commands.
 
 The [standalone project](https://github.com/samimluukkonen/paper-puppeteer-engine/tree/master/examples/standalone) has its own package manifest, TypeScript configuration, Vite entry and public character folder. Follow its README commands to install, test, build and serve it. Its source imports the installed public runtime by package name, without source aliases. No npm publication or remote release has been performed. Before publication, choose a license and include its license file, supply repository/author/license metadata, confirm registry/name/access and release provenance, and review the tarball with `npm pack --dry-run`. Publishing remains an explicit release action.
+
+## Project and scene handoff
+
+The [Project Workspace](project-workspace.md) owns project metadata and registration; retained character documents own rig/skins/artwork/clips, and `SceneEditorDocument` owns scene data. These authoring modules stay outside runtime entry points. Dependencies use stable character manifest references and animation/skin/Actor IDs; [project validation](project-asset-integrity.md) blocks broken production dependencies before export.
+
+A complete project ZIP is an **editor archive** with `project.json`, character file mappings, shared binary artwork and scene JSON. Reopen it with **Import Project**. To play a project scene elsewhere, open that scene and choose **Download scene package**, then use the public runtime adapter:
+
+```ts
+import { SceneLoader } from 'paper-puppeteer-engine/runtime';
+
+const loaded = await SceneLoader.loadPackage(phaserScene, sceneZipBytes, {
+  onCue: (cue) => console.log(cue.name),
+});
+loaded.runner.play();
+// In the host Phaser update, supply delta once: loaded.runner.update(delta).
+// On leaving the scene: loaded.dispose();
+```
+
+`SceneLoader.load(scene, url)` loads scene JSON with hosted relative character dependencies. `SceneLoader.loadPackage` loads ZIP bytes, a package file map or a ZIP URL, creates Puppets/Actors, isolates texture keys and releases ZIP textures/URLs on disposal. Renderer-independent `CharacterLoader` loads metadata; `loadSceneCharacter` additionally decodes artwork for Phaser. `Puppet` plays clips and applies IK; `Actor` adds movement/facing and `Choreography` coordinates Actor operations. See [Actors](actors.md), [scene loading](scene-editor.md), [choreography](choreography-sequences.md) and the [format matrix](schema-compatibility.md).
+
+Character, rig, skin, animation and project formats remain version **1**; scenes use **2**. ZIP support is the stored UTF-8 subset emitted by these exporters. The [v1.0.5 report](personal-production-readiness.md) records exact workflow/runtime verification and limits.
 
 ## Exported package layout and validation
 
@@ -27,7 +48,7 @@ poses/*.json                   optional static authored poses
 images/*.{png,webp}             exact sprite binaries, including replacement artwork
 ```
 
-This layout illustrates the shipped example; existing manifest directories, filenames and identifiers are retained. `character.json` is the root and every resource path is relative to it, even when a rig or skin is nested elsewhere. The manifest maps texture keys to image files, and rig sprites/attachments refer to those keys. Attachments are definitions within the rig, rather than separate documents. Baked IK uses ordinary bone keys and the existing clip-local suppression field. Authored format versions remain `1`; library version `0.7.1` is independent of file format versions.
+This layout illustrates the shipped example; existing manifest directories, filenames and identifiers are retained. `character.json` is the root and every resource path is relative to it, even when a rig or skin is nested elsewhere. The manifest maps texture keys to image files, and rig sprites/attachments refer to those keys. Attachments are definitions within the rig, rather than separate documents. Baked IK uses ordinary bone keys and the existing clip-local suppression field. Authored format versions remain `1`; the package version in `package.json` is independent of file format versions.
 
 Before download/import, the existing exporter checks complete file presence, metadata references, supported versions, rig/animation/skin compatibility and image headers/budgets. Browser export also decodes every distinct image, verifies decoded dimensions and releases its temporary decode URLs. Node validation checks headers/metadata without claiming full image decoding. Missing or incompatible data fails the export before success/checkpoints. Static PNG/WebP packages support only the whole-image frame (`undefined` or `__BASE`); resolve atlas/spritesheet frames to separate static images before exporting.
 

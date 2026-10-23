@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import packageInfo from '../../../package.json';
+import { Download, FolderInput, FolderOpen, FolderPlus, Redo2, ShieldCheck, Undo2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
 import { readJsonFile } from '../../engine/jsonInput.js';
@@ -9,11 +9,12 @@ import type { SceneDefinition } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { downloadBlob } from '../../shared/downloadJson.js';
 import { bindExportShortcut, blocksEditorShortcut, historyShortcut } from '../../shared/keyboardShortcuts.js';
-import puppetLogo from '../../ui/images/puppet-running-header.png';
+import { ViewHeader } from '../../ui/viewShell.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
+import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
 import type { ProjectEditorContext } from './projectBridge.js';
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
 import {
@@ -50,7 +51,8 @@ interface EditorHost {
   context: ProjectEditorContext;
   pending?: () => boolean;
   openView?: (view: 'rig' | 'animation') => void;
-  openGuide?: () => void;
+  openGuide?: (guideId?: string) => void;
+  guideId?: string | undefined;
   guidePending?: boolean;
 }
 interface RuntimeLease {
@@ -179,7 +181,7 @@ export function ProjectView() {
       setStatus(error instanceof Error ? error.message : String(error));
     }
   };
-  const addProject = (workspace: ProjectWorkspace): void => {
+  const addProject = useCallback((workspace: ProjectWorkspace): void => {
     const autosave = new LocalAutosave(
       workspace.recoveryKey ?? `project:${workspace.definition.id}`,
       localDrafts,
@@ -207,7 +209,7 @@ export function ProjectView() {
     setActive(undefined);
     setSettingsName(workspace.definition.name);
     setStatus('Project open in this tab. Export a project ZIP to keep your work.');
-  };
+  }, []);
   const runtime = async (workspace: ProjectWorkspace, id: string, namespace?: string): Promise<RuntimeLease> => {
     const snapshot = workspace.captureCharacter(id);
     const files = await buildCharacterPackage(snapshot, characterFileFetcher(workspace.character(id).files));
@@ -220,6 +222,7 @@ export function ProjectView() {
     id: string,
     view: 'rig' | 'animation' = 'rig',
     guide = false,
+    guideId?: string,
   ): Promise<void> => {
     if (!selected) return;
     const workspace = selected.workspace;
@@ -230,8 +233,11 @@ export function ProjectView() {
       existing.openView?.(view);
       setActive(existing.token);
       if (guide) {
-        if (existing.openGuide) existing.openGuide();
-        else existing.guidePending = true;
+        if (existing.openGuide) existing.openGuide(guideId);
+        else {
+          existing.guidePending = true;
+          existing.guideId = guideId;
+        }
       }
       return;
     }
@@ -252,6 +258,7 @@ export function ProjectView() {
     const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
     let lastAuthoredRevision = workspace.autosaveRevision;
     const context: ProjectEditorContext = {
+      autosave: selected.autosave,
       get projectName() {
         return workspace.definition.name;
       },
@@ -266,7 +273,8 @@ export function ProjectView() {
         host.openGuide = open;
         if (host.guidePending) {
           host.guidePending = false;
-          open();
+          open(host.guideId);
+          delete host.guideId;
         }
         return () => {
           delete host.openGuide;
@@ -383,7 +391,16 @@ export function ProjectView() {
       url.searchParams.set('character', id);
       workspace.character(id).loading = true;
     }
-    const host: EditorHost = { token, session: selected, asset: id, kind, src: url.href, context, guidePending: guide };
+    const host: EditorHost = {
+      token,
+      session: selected,
+      asset: id,
+      kind,
+      src: url.href,
+      context,
+      guidePending: guide,
+      guideId,
+    };
     owners.current.set(token, host);
     setHosts((held) => [...held, host]);
     setActive(token);
@@ -452,39 +469,18 @@ export function ProjectView() {
   });
   return (
     <div ref={projectRoot} className="view-shell workspace-shell project-workspace">
-      <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
-      <div hidden={!!active}>
-        <header className="view-header">
-          <div className="view-header-top">
-            <a className="wordmark" href="../">
-              <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
-              <span className="wordmark-name">
-                Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
-              </span>
-            </a>
-            <span className="view-version">v{packageInfo.version}</span>
-          </div>
-          <div className="view-header-main">
-            <div className="view-heading">
-              <h1 ref={projectHeading} tabIndex={-1}>
-                Project Workspace
-              </h1>
-              <p className="view-description">Characters, animations, artwork and scenes in one project.</p>
-            </div>
-            <div className="view-header-guide">
-              <ProjectFeatureGuide
-                {...(workspace ? { project: workspace.definition } : {})}
-                open={(kind, id, view) => run(() => openAsset(kind, id, view, true))}
-              />
-            </div>
-            <nav className="view-navigation" aria-label="Views">
-              <a href="../">Engine Demo</a>
-              <a href="../rig-editor/">Rig Editor</a>
-              <a href="../animation-editor/">Animation Editor</a>
-              <a href="../scene-editor/">Scene Editor</a>
-            </nav>
-          </div>
-        </header>
+      <div className="project-overview" hidden={!!active}>
+        <ViewHeader
+          view="project"
+          headingRef={projectHeading}
+          featureGuide={
+            <ProjectFeatureGuide
+              {...(workspace ? { project: workspace.definition } : {})}
+              open={(kind, id, view, guideId) => run(() => openAsset(kind, id, view, true, guideId))}
+            />
+          }
+        />
+        <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
         <div className="workspace-command-bar">
           <button
             className="workspace-primary"
@@ -494,15 +490,18 @@ export function ProjectView() {
               projectDialog.current?.showModal();
             }}
           >
+            <FolderPlus size={16} aria-hidden="true" />
             New Project
           </button>
           <FileAction
             label="Import Project"
+            icon={<FolderInput size={16} aria-hidden="true" />}
             accept=".zip"
             disabled={busy}
             onFile={(file) => run(async () => addProject(await importProjectPackage(await readZip(file))))}
           />
           <label>
+            <FolderOpen size={16} aria-hidden="true" />
             Project{' '}
             <select
               aria-label="Select project"
@@ -527,15 +526,19 @@ export function ProjectView() {
           {workspace && (
             <>
               <button disabled={busy || !workspace.history.canUndo} onClick={() => attempt(() => workspace.undo())}>
+                <Undo2 size={16} aria-hidden="true" />
                 Undo Project
               </button>
               <button disabled={busy || !workspace.history.canRedo} onClick={() => attempt(() => workspace.redo())}>
+                <Redo2 size={16} aria-hidden="true" />
                 Redo Project
               </button>
               <button disabled={busy} title="Export project ZIP (Ctrl/Cmd+S)" onClick={() => run(exportProject)}>
+                <Download size={16} aria-hidden="true" />
                 Export Project
               </button>
               <button disabled={busy} onClick={() => validate()}>
+                <ShieldCheck size={16} aria-hidden="true" />
                 Validate Project
               </button>
             </>
@@ -549,8 +552,8 @@ export function ProjectView() {
           <main className="project-content project-panel">
             <h2>No project open</h2>
             <p>
-              Choose New Project to start empty, Import Project to open a project ZIP, or Recovery drafts to restore
-              local work.
+              Choose New Project to start empty, or Import Project to open a project ZIP. Available local recovery
+              drafts appear below the header.
             </p>
           </main>
         )}
@@ -585,7 +588,11 @@ export function ProjectView() {
               <section className="project-panel">
                 <h2>Characters</h2>
                 <div className="project-actions">
-                  <button disabled={busy} onClick={() => characterDialog.current?.showModal()}>
+                  <button
+                    className="workspace-primary"
+                    disabled={busy}
+                    onClick={() => characterDialog.current?.showModal()}
+                  >
                     + New Character
                   </button>
                   <FileAction
@@ -612,6 +619,7 @@ export function ProjectView() {
                     </select>
                   </label>
                   <button
+                    className="workspace-primary"
                     disabled={busy}
                     onClick={() =>
                       run(async () => {
@@ -645,7 +653,11 @@ export function ProjectView() {
                         >
                           Animation Editor
                         </button>
-                        <button disabled={busy} onClick={() => attempt(() => workspace.remove('characters', entry.id))}>
+                        <button
+                          className="workspace-danger"
+                          disabled={busy}
+                          onClick={() => attempt(() => workspace.remove('characters', entry.id))}
+                        >
                           Remove
                         </button>
                       </div>
@@ -659,7 +671,11 @@ export function ProjectView() {
               <section className="project-panel">
                 <h2>Scenes</h2>
                 <div className="project-actions">
-                  <button disabled={busy} onClick={() => sceneDialog.current?.showModal()}>
+                  <button
+                    className="workspace-primary"
+                    disabled={busy}
+                    onClick={() => sceneDialog.current?.showModal()}
+                  >
                     + New Scene
                   </button>
                   <FileAction
@@ -680,7 +696,11 @@ export function ProjectView() {
                         <button disabled={busy} onClick={() => run(() => openAsset('scene', entry.id))}>
                           Scene Editor
                         </button>
-                        <button disabled={busy} onClick={() => attempt(() => workspace.remove('scenes', entry.id))}>
+                        <button
+                          className="workspace-danger"
+                          disabled={busy}
+                          onClick={() => attempt(() => workspace.remove('scenes', entry.id))}
+                        >
                           Remove
                         </button>
                       </div>
@@ -705,32 +725,10 @@ export function ProjectView() {
                   animations: entry.definition.animations,
                   replacements: [],
                 };
-                return (
-                  <details key={id}>
-                    <summary>{name} asset library</summary>
-                    <p>Rig: {snapshot.definition.rigPath}</p>
-                    <p>
-                      Images:{' '}
-                      {[
-                        ...new Set([
-                          ...Object.keys(snapshot.definition.textures),
-                          ...snapshot.replacements.map((entry) => entry.assetKey),
-                        ]),
-                      ].join(', ') || 'None'}
-                    </p>
-                    <p>Animations: {snapshot.animations.map((clip) => clip.name).join(', ') || 'None'}</p>
-                    <p>
-                      Skins:{' '}
-                      {[...new Set([...snapshot.skins, ...(snapshot.rig.skins ?? [])].map((skin) => skin.name))].join(
-                        ', ',
-                      ) || 'None'}
-                    </p>
-                    <p>Attachments: {snapshot.rig.attachments?.map((entry) => entry.id).join(', ') || 'None'}</p>
-                  </details>
-                );
+                return <ProjectAssetLibrary key={id} name={name} snapshot={snapshot} files={entry.files} />;
               })}
             </section>
-            <details className="project-panel">
+            <details className="project-panel project-settings">
               <summary>Project Settings</summary>
               <form
                 onSubmit={(event) => {
@@ -821,7 +819,9 @@ export function ProjectView() {
             <button type="button" onClick={() => characterDialog.current?.close()}>
               Cancel
             </button>
-            <button disabled={busy}>Create Character</button>
+            <button className="workspace-primary" disabled={busy}>
+              Create Character
+            </button>
           </div>
         </form>
       </dialog>
@@ -845,7 +845,9 @@ export function ProjectView() {
             <button type="button" onClick={() => sceneDialog.current?.close()}>
               Cancel
             </button>
-            <button disabled={busy}>Create Scene</button>
+            <button className="workspace-primary" disabled={busy}>
+              Create Scene
+            </button>
           </div>
         </form>
       </dialog>
@@ -902,19 +904,27 @@ const noSubscribe = (): (() => void) => () => {};
 
 function FileAction({
   label,
+  icon,
   accept,
   disabled,
   onFile,
 }: {
   label: string;
+  icon?: ReactNode;
   accept: string;
   disabled: boolean;
   onFile: (file: File) => void;
 }) {
+  const input = useRef<HTMLInputElement>(null);
   return (
-    <label className="project-file-action">
-      {label}
+    <span className="project-file-action">
+      <button type="button" disabled={disabled} onClick={() => input.current?.click()}>
+        {icon}
+        {label}
+      </button>
       <input
+        ref={input}
+        hidden
         type="file"
         accept={accept}
         disabled={disabled}
@@ -925,6 +935,6 @@ function FileAction({
           if (file) onFile(file);
         }}
       />
-    </label>
+    </span>
   );
 }

@@ -1,6 +1,44 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { buildScenePackage, encodePackageZip, parseSceneJson } from 'paper-puppeteer-engine/core';
+import { buildScenePackage, decodePackageZip, encodePackageZip, parseSceneJson } from 'paper-puppeteer-engine/core';
+
+test('exact personal-production scene survives repeated standalone loading, seeking, playback and cleanup', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const artifact = process.env.PPE_PRODUCTION_SCENE_ZIP;
+  test.skip(!artifact, 'Opt in with the personalProductionWorkflow scene ZIP.');
+  const bytes = await readFile(artifact!);
+  const authored = parseSceneJson(new TextDecoder().decode(decodePackageZip(new Uint8Array(bytes)).get('scene.json')));
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('scene.html');
+  await expect(page.getByRole('status')).toContainText('Ready: standalone-encounter');
+  for (let cycle = 0; cycle < 3; cycle++) {
+    await page.getByLabel('Open scene ZIP').setInputFiles({
+      name: 'production.scene.zip',
+      mimeType: 'application/zip',
+      buffer: bytes,
+    });
+    await expect(page.getByRole('status')).toContainText(`Ready: ${authored.id} / ${authored.actors.length} Actors`);
+    await page.getByLabel('Time (ms)').fill('500');
+    await expect(page.getByRole('status')).toContainText('paused / 500 ms');
+    await expect(page.getByLabel('Scene cues')).toHaveText('');
+    const paused = await page.locator('canvas').screenshot();
+    await page.getByLabel('Time (ms)').fill('1000');
+    expect((await page.locator('canvas').screenshot()).equals(paused)).toBe(false);
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect(page.getByLabel('Scene cues')).toHaveText('production-arrived\n');
+    await expect(page.getByRole('status')).toContainText(`completed / ${authored.duration} ms`, {
+      timeout: authored.duration + 10_000,
+    });
+    await expect(page.locator('canvas')).toHaveCount(1);
+  }
+  await page.getByRole('button', { name: 'Clean up', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Disposed');
+  await expect(page.locator('canvas')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
 
 test('exact editor first-scene ZIP runs in the independent consumer', async ({ page }) => {
   const artifact = process.env.PPE_WORKFLOW_SCENE_ZIP;

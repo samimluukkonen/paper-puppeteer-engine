@@ -17,6 +17,10 @@ Open **Project Workspace** from the application header, or visit `/project/`. Ch
 
 Inspector and asset-library disclosures start collapsed. The workspace follows the Animation Editor's desktop theme and controls.
 
+**Feature Guide** uses the same catalog as the editors. Choose Rig, Animation or Scene, select a project asset and choose a guide. Its editor opens and checks the current requirements before starting. Unavailable guides explain what is missing; standalone character-creation instructions are disabled inside a project, where **+ New Character** owns creation.
+
+In **Assets**, expand a character's library to see rig counts and separate **Images**, **Animations**, **Skins** and **Attachments** categories. Each starts collapsed and shows its item count. Image rows include previews; animation rows show duration and looping, and skin rows identify the default skin. This inventory is read-only; use the character's editor to make changes.
+
 ## Architecture and ownership
 
 `ProjectDefinition` is a version-1 manifest containing project ID/name and character/scene references. Character entries have the original character ID, a display name and a stable project manifest path. Scene entries have the original scene ID and a separate document path. Registrations reject duplicate IDs case-insensitively. Display names and source filenames are never lookup keys. Generated numbered directories avoid filename collisions without rewriting authored IDs.

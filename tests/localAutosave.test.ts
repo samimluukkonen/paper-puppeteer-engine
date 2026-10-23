@@ -188,6 +188,60 @@ test('pagehide stops writes, releases the tab lease and pageshow resumes debounc
   assert.lengthOf(f.storage.saved, 1);
 });
 
+test.each(['suspend', 'dispose'] as const)(
+  '%s releases ownership even when artwork hashing finishes after the first release',
+  async (exit) => {
+    const f = fixture();
+    let finishHashing = (): void => {};
+    const hashing = new Promise<void>((resolve) => {
+      finishHashing = resolve;
+    });
+    let held = false;
+    const save = vi.spyOn(f.storage, 'save').mockImplementation(async () => {
+      await hashing;
+      // LocalDraftStore acquires its Web Lock only after hashing all Blob bytes.
+      held = true;
+    });
+    f.storage.release.mockImplementation(() => {
+      held = false;
+      return Promise.resolve();
+    });
+    const saving = f.autosave.flush();
+    await vi.advanceTimersByTimeAsync(0);
+    f.autosave[exit]();
+    finishHashing();
+    await saving;
+    assert.isFalse(held, 'another editor must be able to acquire this draft');
+    const calls = f.storage.release.mock.calls.length;
+    if (exit === 'dispose') f.autosave.start();
+    await vi.advanceTimersByTimeAsync(6000);
+    assert.equal(f.storage.release.mock.calls.length, calls);
+    assert.equal(save.mock.calls.length, 1);
+  },
+);
+
+test('teardown during package reads neither saves nor publishes late notifications', async () => {
+  const f = fixture();
+  let finish = (_files: Map<string, Uint8Array<ArrayBuffer>>): void => {};
+  f.build.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const listener = vi.fn();
+  f.autosave.subscribe(listener);
+  const saving = f.autosave.flush();
+  f.autosave.dispose();
+  const notifications = listener.mock.calls.length;
+  finish(new Map());
+  await saving;
+  assert.lengthOf(f.storage.saved, 0);
+  assert.equal(listener.mock.calls.length, notifications);
+  f.autosave.start();
+  assert.equal(vi.getTimerCount(), 0);
+});
+
 test('storage unavailable is actionable rather than a successful autosave', async () => {
   const storage = new LocalDraftStore(undefined);
   await expect(storage.claim('film', 'tab')).rejects.toThrow(/storage is unavailable/);
