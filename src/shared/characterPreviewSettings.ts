@@ -14,7 +14,7 @@ const previewSettings: Readonly<Record<string, CharacterPreviewSettings>> = Obje
   [sketchCharacter.id]: paperDollPreview,
 });
 
-/** Editor-only characters can load any rig; preview chains are optional and independent of demo presentation. */
+/** Editor-only characters can load any rig; preview chains are optional. */
 export function getCharacterPreviewSettings(id: string): CharacterPreviewSettings {
   return Object.hasOwn(previewSettings, id) ? previewSettings[id]! : emptyPreview;
 }

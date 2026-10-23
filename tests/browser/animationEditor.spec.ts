@@ -9,7 +9,7 @@ async function openEditor(page: Page): Promise<void> {
   await expect(page.locator('#animation-stage canvas')).toBeVisible();
 }
 
-test('editor routes and the demo remain linked under the deployment base', async ({ page, baseURL }) => {
+test('home and editor routes remain linked under the deployment base', async ({ page, baseURL }) => {
   await page.goto('./');
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await expect(page).toHaveURL(new URL('animation-editor/', baseURL).href);
@@ -25,8 +25,8 @@ test('editor routes and the demo remain linked under the deployment base', async
   await expect(x).toHaveValue('0');
   await page.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await expect(page.locator('#animation-selection')).toHaveValue('idle');
-  await page.getByRole('link', { name: 'Engine demo' }).click();
-  await expect(page.locator('#status-text')).toContainText('Current: idle');
+  await page.getByRole('link', { name: 'Project Workspace', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Project Workspace', exact: true })).toBeVisible();
 });
 
 test('unsaved animation settings protect navigation, refresh, and character selection until undone', async ({
@@ -42,8 +42,8 @@ test('unsaved animation settings protect navigation, refresh, and character sele
     expect(dialog.type()).toBe('beforeunload');
     await dialog.dismiss();
   };
-  // Editor tabs retain the shared workspace; leaving it for the demo must protect unsaved clips.
-  await Promise.all([dismissNavigation(), page.getByRole('link', { name: 'Engine Demo', exact: true }).click()]);
+  // Editor tabs retain the shared workspace; leaving it for Project Workspace must protect unsaved clips.
+  await Promise.all([dismissNavigation(), page.getByRole('link', { name: 'Project Workspace', exact: true }).click()]);
   await Promise.all([
     dismissNavigation(),
     page.evaluate(() => {

@@ -1,7 +1,4 @@
 import { assert, test, vi } from 'vitest';
-import { DemoFootPlanting } from '../src/demo/DemoFootPlanting.js';
-import { DemoKatanaController } from '../src/demo/DemoKatanaController.js';
-import { Katana } from '../src/demo/Katana.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { localToWorld } from '../src/engine/affineMath.js';
@@ -12,8 +9,6 @@ import type { IKKeyframe } from '../src/engine/ik/animationKeyframes.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
-import { paperDollIK } from '../src/shared/paperDollIK.js';
-import { demoRig, sword, walk } from './helpers/demoCharacter.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -594,58 +589,6 @@ test('late-bound weapon providers observe rendered animated primary and nested c
   puppet.syncIK();
   assert.equal(grip.status, 'inactive', 'generic zero mix is restored after specialized ownership ends');
   puppet.destroy();
-});
-
-test('actual foot planting and secondary katana grips retain targets and influence against conflicting generic tracks', () => {
-  const scene = puppetScene();
-  const definition = new Rig({ root: demoRig.root, bones: demoRig.bones, ik: paperDollIK });
-  const ikTracks = Object.fromEntries(
-    paperDollIK.map((chain) => [chain.name, [{ time: 0, x: -900, y: -900, mix: 0 }]]),
-  );
-  const puppet = new Puppet(scene, {
-    rig: definition,
-    x: 380,
-    y: 362,
-    animations: [
-      { ...walk, ikTracks },
-      { ...sword, ikTracks },
-    ],
-    autoUpdate: false,
-  });
-  const feet = new DemoFootPlanting(scene, puppet);
-  for (const facing of ['right', 'left'] as const) {
-    puppet.setFacing(facing).play('walk');
-    puppet.update(250);
-    const frame = feet.update(true);
-    puppet.syncPose();
-    for (const side of ['left', 'right'] as const) {
-      const leg = puppet.getIK(`${side}LegIK`);
-      assert.equal(leg.mix, frame.walkFeet![side].mix);
-      if (leg.mix > 0) {
-        assert.deepEqual(leg.resolvedTarget, frame.targets[side]);
-        assert.notEqual(leg.status, 'inactive');
-      }
-    }
-  }
-  const katana = new Katana(scene);
-  const controller = new DemoKatanaController(puppet, katana);
-  for (const facing of ['right', 'left'] as const) {
-    puppet.setFacing(facing).play('sword');
-    controller.syncMode(false);
-    controller.configureArms({ x: 420, y: 300 }, true, false);
-    controller.reattach();
-    puppet.syncPose();
-    const secondary = puppet.getIK(facing === 'right' ? 'leftArmIK' : 'rightArmIK');
-    assert.deepEqual(secondary.resolvedTarget, controller.getSecondaryTarget());
-    assert.notEqual(secondary.status, 'inactive');
-    assert.deepEqual(puppet.getIK(facing === 'right' ? 'rightArmIK' : 'leftArmIK').target, { x: 420, y: 300 });
-    feet.update(false);
-    puppet.syncIK();
-    assert.isFalse(puppet.getIK('leftLegIK').enabled);
-    assert.isFalse(puppet.getIK('rightLegIK').enabled);
-  }
-  puppet.destroy();
-  katana.container.destroy();
 });
 
 test.each(['left', 'right'] as const)(

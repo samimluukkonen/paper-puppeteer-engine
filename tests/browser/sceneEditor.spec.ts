@@ -66,7 +66,7 @@ test('empty creation, multiple documents, properties, history, downloads and uns
   await page.getByLabel('Select scene').selectOption('second');
   await downloadScene(page);
   expect(characterRequests).toEqual([]);
-  await page.getByRole('link', { name: 'Engine Demo', exact: true }).click();
+  await page.getByRole('link', { name: 'Project Workspace', exact: true }).click();
   await expect(page).not.toHaveURL(/scene-editor\//);
   await page.getByRole('link', { name: 'Scene Editor', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'No scene open', exact: true })).toBeVisible();

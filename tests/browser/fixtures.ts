@@ -204,7 +204,7 @@ export const test = base.extend<{ browserErrors: string[] }>({
       });
       page.on('requestfailed', (request) => {
         const reason = request.failure()?.errorText;
-        // Navigating between the demo and editor can cancel an in-flight resource request.
+        // Navigating between views can cancel an in-flight resource request.
         if (request.url().startsWith(`${origin}/`) && reason !== 'net::ERR_ABORTED')
           errors.push(`${reason} ${request.url()}`);
       });

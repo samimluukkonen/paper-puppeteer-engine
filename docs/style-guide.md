@@ -1,6 +1,6 @@
 # UI style guide — GitHub / Primer
 
-The application follows **GitHub's Primer product UI**: compact controls, clear hierarchy, quiet bordered surfaces and consistent interactions. This document is the repository's implementation guide. The Animation Editor is the existing visual reference; Project Workspace, Rig Editor, Scene Editor and the demo use the same foundation.
+The application follows **GitHub's Primer product UI**: compact controls, clear hierarchy, quiet bordered surfaces and consistent interactions. This document is the repository's implementation guide. The Animation Editor is the existing visual reference; Project Workspace, Rig Editor, and Scene Editor use the same foundation.
 
 Official references: [Primer Product UI](https://primer.style/product/), [foundations](https://primer.style/product/getting-started/foundations/), [layout](https://primer.style/product/getting-started/foundations/layout/), [primitives](https://primer.style/product/primitives/). The rules below adapt those conventions to this desktop authoring tool; they do not claim pixel-identical GitHub components. We reuse the existing React/CSS implementation and Lucide icons; adding Primer packages or replacing the icon library is unnecessary.
 
@@ -59,4 +59,4 @@ Use the shared system sans-serif stack; reserve `--font-mono` for JSON, IDs or n
 
 ## Reviewing UI changes
 
-Compare Project, Rig, Animation, Scene and demo headers on desktop: the shared logo/version/navigation and active state must match. Check empty/loading/populated/error states, keyboard focus, collapsed inspectors and genuine action availability. Use local browser tests and screenshots for relevant behavior; keep browser tests/installations out of CI. New page CSS should describe content geometry, not duplicate shared controls or header styling.
+Compare Project, Rig, Animation and Scene headers on desktop: the shared logo/version/navigation and active state must match. Check empty/loading/populated/error states, keyboard focus, collapsed inspectors and genuine action availability. Use local browser tests and screenshots for relevant behavior; keep browser tests/installations out of CI. New page CSS should describe content geometry, not duplicate shared controls or header styling.

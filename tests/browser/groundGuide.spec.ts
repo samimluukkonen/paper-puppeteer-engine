@@ -254,6 +254,6 @@ test('scene guide dragging and two-character feet alignment preserve choreograph
   await expect(panel.getByRole('checkbox', { name: 'Snap to Ground', exact: true })).toBeChecked();
   expect(await exportedScene(page)).toEqual(aligned);
   await page.screenshot({ path: test.info().outputPath('scene-ground-alignment.png') });
-  await page.getByRole('link', { name: 'Engine Demo', exact: true }).click();
+  await page.getByRole('link', { name: 'Project Workspace', exact: true }).click();
   expect(errors).toEqual([]);
 });

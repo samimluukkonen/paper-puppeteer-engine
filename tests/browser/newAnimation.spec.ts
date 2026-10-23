@@ -115,7 +115,7 @@ test('existing clips: cancellation, duplicate validation, multiple unsaved docum
   await create(page, 'new-walk');
   await page.locator('#animation-selection').selectOption('idle');
   const rejected = page.waitForEvent('dialog').then((prompt) => prompt.dismiss());
-  await page.getByRole('link', { name: 'Engine demo' }).click();
+  await page.getByRole('link', { name: 'Project Workspace', exact: true }).click();
   await rejected;
   await expect(page.locator('#animation-new')).toBeVisible();
   await page.locator('#animation-selection').selectOption('new-idle');

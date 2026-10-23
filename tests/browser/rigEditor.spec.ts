@@ -20,7 +20,7 @@ test('unsaved edits block navigation and refresh until exported', async ({ page 
     expect(dialog.type()).toBe('beforeunload');
     await dialog.dismiss();
   };
-  await Promise.all([rejectNavigation(), page.getByRole('link', { name: 'Engine demo' }).click()]);
+  await Promise.all([rejectNavigation(), page.getByRole('link', { name: 'Project Workspace', exact: true }).click()]);
   expect(page.url()).toBe(originalUrl);
   await expect(field(page, 'x')).toHaveValue('12');
   await Promise.all([
@@ -31,8 +31,8 @@ test('unsaved edits block navigation and refresh until exported', async ({ page 
   ]);
   await expect(field(page, 'x')).toHaveValue('12');
   await rigFileAction(page, '#log-json', (control) => control.click());
-  await page.getByRole('link', { name: 'Engine demo' }).click();
-  await expect(page.locator('#status-text')).toContainText('Current: idle');
+  await page.getByRole('link', { name: 'Project Workspace', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Project Workspace', exact: true })).toBeVisible();
 });
 
 test.beforeEach(async ({ page }) => {

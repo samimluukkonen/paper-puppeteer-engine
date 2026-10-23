@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import packageInfo from '../../package.json' with { type: 'json' };
 import { test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
@@ -12,15 +13,15 @@ test('all desktop pages use the common header, version and navigation, with reco
     ['animation-editor/', 'Animation Editor'],
     ['rig-editor/', 'Rig Editor'],
     ['scene-editor/', 'Scene Editor'],
-    ['', 'Engine Demo'],
   ] as const) {
     await page.goto(path || './');
     const header = page.getByRole('banner');
     await expect(header).toHaveCount(1);
     await expect(header.getByRole('heading', { name: title, exact: title !== 'Rig Editor' })).toBeVisible();
-    await expect(header.locator('.view-version')).toHaveText('v1.0.5');
+    await expect(header.locator('.view-version')).toHaveText(`v${packageInfo.version}`);
     await expect(header.getByRole('link', { name: 'Project Workspace', exact: true })).toBeVisible();
     await expect(header.locator('[aria-current=page]')).toHaveCount(1);
+    await expect(header.getByRole('link', { name: /Engine Demo/i })).toHaveCount(0);
     const bar = page.locator('.local-draft-bar:visible');
     if (await bar.count()) {
       expect((await bar.boundingBox())!.y).toBeGreaterThanOrEqual(

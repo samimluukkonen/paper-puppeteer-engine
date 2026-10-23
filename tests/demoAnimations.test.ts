@@ -1,5 +1,4 @@
 import { assert, test } from 'vitest';
-import { demoHipPositions } from '../src/demo/demoPresentation.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
@@ -37,54 +36,41 @@ function fixture() {
   return { rig, joints, player };
 }
 
-for (const facing of ['left', 'right'] as const) {
-  test(`walk facing ${facing} keeps the idle thigh anchors throughout playback and restart`, () => {
-    const { rig, joints, player } = fixture();
-    const applyHips = () => {
-      for (const [id, x] of Object.entries(demoHipPositions(rig, facing))) joints.get(id)!.pose.x = x;
-    };
-    player.play('idle');
-    applyHips();
-    const anchors = ['leftThigh', 'rightThigh'].map((id) => {
-      const { x, y } = joints.get(id)!.pose;
-      return { id, x, y };
-    });
-    player.play('walk');
-    applyHips();
-    for (let restart = 0; restart < 2; restart += 1) {
-      if (restart) {
-        player.restart();
-        applyHips();
-      }
-      for (let time = 0; time <= walk.duration; time += 10) {
-        player.sample(time);
-        for (const anchor of anchors) {
-          assert.strictEqual(joints.get(anchor.id)!.pose.x, anchor.x);
-          assert.strictEqual(joints.get(anchor.id)!.pose.y, anchor.y);
-        }
-      }
-    }
+test('sample walk keeps the idle thigh anchors throughout playback and restart', () => {
+  const { joints, player } = fixture();
+  player.play('idle');
+  const anchors = ['leftThigh', 'rightThigh'].map((id) => {
+    const { x, y } = joints.get(id)!.pose;
+    return { id, x, y };
   });
-}
-
-for (const facing of ['left', 'right'] as const) {
-  test(`sword stance uses the idle lower-body pose facing ${facing}, even after walking`, () => {
-    const { rig, joints, player } = fixture();
-    const lowerBody = ['pelvis', 'leftThigh', 'leftLowerLeg', 'leftFoot', 'rightThigh', 'rightLowerLeg', 'rightFoot'];
-    const poseAt = (clip: 'idle' | 'sword', time: number) => {
-      player.play(clip);
+  player.play('walk');
+  for (let restart = 0; restart < 2; restart += 1) {
+    if (restart) player.restart();
+    for (let time = 0; time <= walk.duration; time += 10) {
       player.sample(time);
-      for (const [id, x] of Object.entries(demoHipPositions(rig, facing))) joints.get(id)!.pose.x = x;
-      return lowerBody.map((id) => ({ id, pose: { ...joints.get(id)!.pose } }));
-    };
-    for (const time of [0, 250, 900, 1400, 1800]) {
-      const idlePose = poseAt('idle', time);
-      player.play('walk');
-      player.sample(750);
-      assert.deepEqual(poseAt('sword', time), idlePose);
+      for (const anchor of anchors) {
+        assert.strictEqual(joints.get(anchor.id)!.pose.x, anchor.x);
+        assert.strictEqual(joints.get(anchor.id)!.pose.y, anchor.y);
+      }
     }
-  });
-}
+  }
+});
+
+test('sample sword stance uses the idle lower-body pose, even after walking', () => {
+  const { joints, player } = fixture();
+  const lowerBody = ['pelvis', 'leftThigh', 'leftLowerLeg', 'leftFoot', 'rightThigh', 'rightLowerLeg', 'rightFoot'];
+  const poseAt = (clip: 'idle' | 'sword', time: number) => {
+    player.play(clip);
+    player.sample(time);
+    return lowerBody.map((id) => ({ id, pose: { ...joints.get(id)!.pose } }));
+  };
+  for (const time of [0, 250, 900, 1400, 1800]) {
+    const idlePose = poseAt('idle', time);
+    player.play('walk');
+    player.sample(750);
+    assert.deepEqual(poseAt('sword', time), idlePose);
+  }
+});
 
 for (const clip of demoAnimations) {
   for (const facing of ['left', 'right'] as const) {

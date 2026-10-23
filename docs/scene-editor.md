@@ -130,7 +130,7 @@ Without an asset catalog, validation checks reference syntax, actor ID uniquenes
 
 ## Verification
 
-Unit regressions cover empty creation, valid/invalid documents, non-JSON rejection, versions, stable actor IDs, optional asset catalogs, deterministic round trips, immutable source/working isolation, history, saved checkpoints, switching, guarded replacement and character-data preservation. Local desktop Playwright coverage exercises creation, property edits, switching, Undo/Redo, downloads, inactive-document unload protection, imports, canceled replacements, revert, and navigation from the demo. Browser tests remain local-only.
+Unit regressions cover empty creation, valid/invalid documents, non-JSON rejection, versions, stable actor IDs, optional asset catalogs, deterministic round trips, immutable source/working isolation, history, saved checkpoints, switching, guarded replacement and character-data preservation. Local desktop Playwright coverage exercises creation, property edits, switching, Undo/Redo, downloads, inactive-document unload protection, imports, canceled replacements, revert, and navigation from Project Workspace. Browser tests remain local-only.
 
 Required commands:
 

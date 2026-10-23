@@ -269,4 +269,4 @@ IK normally measures the current joint-to-child offsets, including effective cha
 
 Debug crosses and outlined circles mark joint pivots; orange dots mark sprite origins (which may differ if the image has an offset). Lines connect parents and children. Names remain upright when mirrored.
 
-Use `puppet.setDebugLabelSide('boneId', 'left')` or `'right'` to choose the screen side of a pivot label. Omit the side to restore automatic placement. In the demo's idle pose, the near knee label faces outward: right lower leg to the left when facing right, and left lower leg to the right when facing left. The left foot label stays to the right in right-facing idle, and the right foot label stays to the left in left-facing idle.
+Use `puppet.setDebugLabelSide('boneId', 'left')` or `'right'` to choose the screen side of a pivot label. Omit the side to restore automatic placement.

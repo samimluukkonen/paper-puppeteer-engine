@@ -1,11 +1,11 @@
-import { Clapperboard, FolderOpen, LayoutTemplate, MonitorPlay, Network } from 'lucide-react';
+import { Clapperboard, FolderOpen, LayoutTemplate, Network } from 'lucide-react';
 import { useSyncExternalStore, type ReactNode, type Ref } from 'react';
 import packageInfo from '../../package.json';
 import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import { AutosaveStatus } from '../devtools/shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
-import { characterChoices, selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
+import { selectedCharacterId, workspaceCharacterChoices } from './characterSelection.js';
 import { FeatureGuideButton } from './FeatureGuide.js';
 import puppetLogo from './images/puppet-running-header.png';
 import { NewCharacterDialog } from './NewCharacterDialog.js';
@@ -15,12 +15,6 @@ import './workspace.css';
 import './dropdowns.css';
 
 const views = {
-  demo: {
-    title: 'Engine Demo',
-    path: '',
-    description: 'Explore animation, playback, and inverse kinematics.',
-    icon: MonitorPlay,
-  },
   rig: {
     title: 'Rig Editor',
     path: 'rig-editor/',
@@ -48,7 +42,7 @@ const views = {
 } as const;
 const noSubscribe = () => () => {};
 
-/** Shared navigation and page identity for the demo and authoring tools. */
+/** Shared navigation and page identity for the authoring tools. */
 export function ViewHeader({
   view,
   selectionId = 'character-selection',
@@ -69,19 +63,19 @@ export function ViewHeader({
       ? `Project: ${project.projectName} · ${view === 'scene' ? 'Scene' : 'Character'}: ${project.assetName}`
       : '',
   );
-  const root = view === 'demo' ? './' : '../';
+  const root = '../';
   const characterId = selectedCharacterId();
-  const choices = view === 'demo' ? characterChoices : workspaceCharacterChoices();
+  const choices = workspaceCharacterChoices();
   const characterQuery =
     view === 'project' || characterId === defaultCharacterId ? '' : `?character=${encodeURIComponent(characterId)}`;
-  const characterView = view === 'demo' || view === 'rig' || view === 'animation';
+  const characterView = view === 'rig' || view === 'animation';
   return (
     <>
       <header className="view-header">
         <div className="view-header-top">
           <a
             className="wordmark"
-            href={project ? `${root}project/` : `${root}${characterQuery}`}
+            href={`${root}project/`}
             aria-label="Paper Puppeteer Engine"
             onClick={
               project

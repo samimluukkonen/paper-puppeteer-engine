@@ -141,7 +141,7 @@ test("navigating away from a clean tab preserves another tab's unsaved animation
     await (await animationControl(page, '#animation-mode')).selectOption('stepped');
     await expect.poll(() => draftKeys(page)).toHaveLength(1);
     const stored = await page.evaluate(() => JSON.stringify(localStorage));
-    await clean.goto(new URL('../', page.url()).href);
+    await clean.goto(new URL('../scene-editor/', page.url()).href);
     expect(await page.evaluate(() => JSON.stringify(localStorage))).toEqual(stored);
     await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
   } finally {

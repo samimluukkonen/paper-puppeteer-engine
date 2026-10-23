@@ -17,7 +17,7 @@ npm run test:package
 npm run check:release
 ```
 
-`check` runs Oxfmt formatting validation, Oxlint linting (including type-aware TypeScript rules), and TypeScript 7's authoritative `tsc --noEmit` check. `npm run check:fix` applies Oxlint's safe fixes, formats with Oxfmt, and checks types. `build` verifies TypeScript and produces **both** the demo in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production demo. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
+`check` runs Oxfmt formatting validation, Oxlint linting (including type-aware TypeScript rules), and TypeScript 7's authoritative `tsc --noEmit` check. `npm run check:fix` applies Oxlint's safe fixes, formats with Oxfmt, and checks types. `build` verifies TypeScript and produces **both** the authoring application in `dist/demo` and the reusable ES module plus declarations in `dist/library`. `preview` serves the production authoring application. The existing `build:demo` command and `dist/demo` directory name are retained for build/deployment compatibility. Vitest tests cover rig validation, animation, pure IK math, coordinate adapters, lengths, mix, and pose restoration without requiring a browser; `npm run test:watch` runs them interactively.
 
 `audit` checks all locked dependencies, including development tooling, and fails on advisories of any severity. CI runs it for pull requests and pushes to `master`. A separate workflow can be triggered manually; it audits the lockfile without installing packages or running dependency lifecycle scripts.
 
@@ -32,7 +32,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-The command builds the demo, then runs every scenario against both the Vite development server and the production preview under `/paper-puppeteer-engine/`. Tests cover animation playback, global Home navigation, shortcut typing/modifier/IME guards, repeated animation switching, scrub interruption, demo playback, facing, skins, IK controls, navigation between demo and editor, dragging outside the canvas, inspector focus and per-field undo, exported/original/imported rig reloads plus a page reload, animation replacement confirmations and source revert, and smooth/stepped canvas round trips with facing and fixed-target IK. Character package scenarios also export replacement binaries and rig edits, reload/import ZIPs through CharacterLoader and Puppet, switch runtime skins/facing and repeatedly dispose previews. They verify artwork changes through canvas screenshots and catch browser exceptions and failed local asset requests. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
+The command builds the authoring application, then runs every scenario against both the Vite development server and the production preview under `/paper-puppeteer-engine/`. Tests cover animation playback, global Home navigation, shortcut typing/modifier/IME guards, repeated animation switching, scrub interruption, facing, skins, IK controls, navigation between authoring views, dragging outside the canvas, inspector focus and per-field undo, exported/original/imported rig reloads plus a page reload, animation replacement confirmations and source revert, and smooth/stepped canvas round trips with facing and fixed-target IK. Character package scenarios also export replacement binaries and rig edits, reload/import ZIPs through CharacterLoader and Puppet, switch runtime skins/facing and repeatedly dispose previews. They verify artwork changes through canvas screenshots and catch browser exceptions and failed local asset requests. To use an installed Chrome (including on macOS versions unsupported by bundled Chromium), run `PLAYWRIGHT_CHANNEL=chrome npm run test:browser`. Failure traces are saved under `test-results/`.
 
 See the [profiling guide](profiling.md) for optional CPU and browser profiles, workload descriptions, and historical measurements. Profiles are local diagnostics and have no timing thresholds.
 
@@ -48,7 +48,7 @@ Unsafe-value and unbound-method rules are errors throughout application code, te
 
 Install the recommended `oxc.oxc-vscode` extension for format-on-save and explicit safe fixes on save. Existing character JSON schema associations are retained, and the editor inherits type-aware linting from the root config.
 
-Direct dependency versions are pinned in [package.json](../package.json), and `package-lock.json` locks the resolved dependency graph. React is a development dependency used by the bundled demo/editor applications; it does not become a dependency of the engine package.
+Direct dependency versions are pinned in [package.json](../package.json), and `package-lock.json` locks the resolved dependency graph. React is a development dependency used by the bundled editor applications; it does not become a dependency of the engine package.
 
 ## Architecture
 
@@ -60,7 +60,7 @@ The [v0.6.2 schema and compatibility guide](schema-compatibility.md) inventories
 
 See the [v0.6.1 runtime API and architecture audit](runtime-api.md) for dependency directions, public/internal/editor contracts, entry points, lifecycle ownership and the minimal consumer example. The package root and `/runtime` share the browser API; `/core`, `/data` and `/serialization` remain renderer independent. The scene character loader lives in the engine, with its old application path retained as a re-export.
 
-The demo and both editor entry routes use React 19.3.1 with TypeScript JSX and Vite's JSX transform. `ui/viewShell.tsx` shares navigation and character identity, and `ui/workspace.css` shares the compact header, command bar, canvas/inspector layout, and narrow-screen drawer styling. `ui/mountView.tsx` initializes Phaser and the editing controllers in a layout effect after React commits their hosts; unmounting releases controllers, observers, and the game before React removes the DOM.
+The authoring views use React 19.3.1 with TypeScript JSX and Vite's JSX transform. `ui/viewShell.tsx` shares navigation and character identity, and `ui/workspace.css` shares the compact header, command bar, canvas/inspector layout, and narrow-screen drawer styling. `ui/mountView.tsx` initializes Phaser and the editing controllers in a layout effect after React commits their hosts; unmounting releases controllers, observers, and the game before React removes the DOM.
 
 The [Scene Editor](scene-editor.md), [first-scene walkthrough](making-your-first-scene.md), and [v0.9 readiness report](scene-editor-readiness.md) cover an independent React route at `/scene-editor/`. `SceneEditorDocument` owns per-scene immutable snapshots, saved checkpoints, actor commands and bounded gesture history. Its Phaser stage reuses `CharacterLoader`, `loadSceneCharacter`, `Actor` and `Puppet` for independent character instances, visual placement and initial appearance. Definitions/artwork are cached for the page lifetime; runtime instances are released on removal and scene switches. The engine's version-2 scene schemas, validation and serialization remain renderer independent. The action timeline reuses Animation Editor ruler/coordinate/snapping utilities, adds collapsed action properties and validated grouped history, and preserves separate scene and animation data models. Scene transfers preflight character dependencies before installing working copies or downloading canonical JSON/ZIPs. Pure scene package APIs rebase shared assets into the existing character package layout; an optional runtime `SceneLoader` loads JSON or ZIPs without editor dependencies. A separate `SceneRunner` adapts declarations to Actor/Puppet operations with one Phaser delta clock. `SceneEditorPlayback` owns view-only controls and playhead state; seeks reconstruct isolated runtime contexts from initial data, suppress gameplay events/cues, and never write document history. The stage retains authored-placement previews separately, and a collapsed runtime inspector exposes selected-time transforms.
 
@@ -70,9 +70,9 @@ The [v0.6.3 shared character workspace](react-editor-workflow-verification.md) m
 
 `RigStructureCommands` builds hierarchy edits and checks bone/slot dependencies. `RigArtworkCommands` validates attachment and skin edits and skin exports. Both install proposals through `RigEditorState`, which retains the shared snapshot/history boundary, validation, recovery, saved baselines and preview selection.
 
-The demo build emits separate Phaser and React vendor chunks. Changes to application modules retain the vendor chunk hashes, so browsers can reuse cached runtimes across application releases. The library build continues to leave Phaser external for the consuming application to supply.
+The authoring application build emits separate Phaser and React vendor chunks. Changes to application modules retain the vendor chunk hashes, so browsers can reuse cached runtimes across application releases. The library build continues to leave Phaser external for the consuming application to supply.
 
-The engine stays independent of React. The demo uses `DemoUIStore` and `useSyncExternalStore` to render commands and status from scene notifications. Each command subscribes to its own pressed value, so crossfade status updates do not render unchanged controls. Engine, animation editor, and demo subscriber notifications use stable listener snapshots and report failures after remaining listeners run; runtime disposal still stops delivery. Rig and animation state, history, import/export, and the existing controller-managed inspector/timeline regions remain in their current modules. Those regions are stable hosts in React components; keep their child content under one owner when migrating additional controls. Layout preferences never enter authored JSON.
+The engine stays independent of React. Engine and animation editor subscriber notifications use stable listener snapshots and report failures after remaining listeners run; runtime disposal still stops delivery. Rig and animation state, history, import/export, and the existing controller-managed inspector/timeline regions remain in their current modules. Those regions are stable hosts in React components; keep their child content under one owner when migrating additional controls. Layout preferences never enter authored JSON.
 
 The [Feature Guide](feature-guide-architecture.md) adds a frontend-only typed registry, session controller, stable editor anchors, and one DOM/panel/canvas rectangle contract. Both editors share a React selection modal with registry categories, live prerequisite reasons and guarded first-step launch. The [Rig Editor catalog](rig-editor-guides.md) covers ten implemented tasks with 49 steps. The [Animation Editor catalog](animation-editor-guides.md) covers sixteen implemented authoring workflows. Guides are short, feature-specific units; a shared modal spotlight and positioned step cards provide Explain tours and optional real-control practice with safe reveal, restart/catalog navigation, prerequisite links, focus restoration, and missing-target fallback. The short [artist guide](feature-guide.md) describes the workflow. Guide state and UI-only reveal preparation stay separate from authored documents, history, and playback.
 
@@ -120,18 +120,6 @@ src/engine/
   data.ts              Type-only shared authored data contracts
   serialization.ts     Versioned validation, parsing and pose serialization
   loadSceneCharacter.ts  Cancellation-aware scene metadata/artwork loading
-src/demo/
-  DemoScene.ts         Character loading, playback controls and UI state
-  DemoInput.ts         Pointer/keyboard bindings and shutdown cleanup
-  demoCommands.ts      Shared button commands and pose-aware keyboard shortcuts
-  DemoPoseAuthoring.ts  Static pose editing, inspector and export
-  DemoPresenter.ts     Sampled pose layout, IK coordination and target markers
-  DemoFootPlanting.ts  Ground targets, body sway and walk contact constraints
-  DemoKatanaController.ts  Weapon modes, arm targets, mounting and draw layers
-  DemoKatanaGripSolver.ts  Rear-palm clearance, path continuity and reach recovery
-  demoPresentation.ts  Walking arm order and walking/idle shoulder placement by facing
-  demoCharacterProfiles.ts  Per-character placement, facing, grips, foot contacts and IK configuration
-  Katana.ts            Placeholder weapon transform and two data-defined grips
 src/devtools/rig-editor/
   main.tsx             React page bootstrap and lifetime
   editorMarkup.tsx     React workspace shell
@@ -196,21 +184,19 @@ src/devtools/shared/
   poseMirroring.ts     Pure bind-relative authored-pose reflection and structured compatibility errors
 src/shared/
   characterCatalog.ts  Character identities and picker labels
-  characterPreviewSettings.ts  Optional immutable IK settings shared by demo and editors
+  characterPreviewSettings.ts  Optional immutable IK settings shared by editors
   paperDollIK.ts        Default arm/leg chains with explicit execution priorities
-  domUpdates.ts        Conditional DOM writes for demo and editor playback notifications
+  domUpdates.ts        Conditional DOM writes for editor playback notifications
   downloadJson.ts       Browser JSON download and temporary URL cleanup
   loadSceneCharacter.ts  Cancelable metadata and artwork loading for a scene session
 public/characters/demo-puppet/  Shipped rig, skins, animations, poses, and artwork
 docs/                  Focused user and developer guides
-src/main.tsx           React demo bootstrap and Phaser lifetime
+src/main.ts            Home redirect to Project Workspace
 ```
 
-The engine does not import demo code or assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with two factors representing their composed ancestor transform. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. Debug overlays allocate their Phaser objects only when first enabled and reuse them across toggles; label-side settings made before enabling debug are retained. The puppet's outer container provides placement, scale, and facing independently of animation tracks. The demo uses one texture per WebGL batch for reliable rendering on software WebGL; hosts control their own Phaser renderer settings.
+The engine does not import editor code or sample assets. `Rig`, `Joint`, `AnimationPlayer`, the IK solver, and `TwoBoneIKConstraint` do not depend on Phaser. Bone containers provide the joint hierarchy; each image and its attachments have an independent draw slot with two factors representing their composed ancestor transform. This permits global drawing order while preserving rotation, scaling, and shear. `syncPose()` applies the evaluated pose, executes IK, then synchronizes rendering and debug overlays. Debug overlays allocate their Phaser objects only when first enabled and reuse them across toggles; label-side settings made before enabling debug are retained. The puppet's outer container provides placement, scale, and facing independently of animation tracks. Hosts control their own Phaser renderer settings.
 
-Character identities and picker labels live in `src/shared/characterCatalog.ts`; optional preview IK chains live in `src/shared/characterPreviewSettings.ts`, with the bundled arm/leg definitions in `src/shared/paperDollIK.ts`. The demo and both editors share immutable preview settings. Characters without registered preview settings receive an empty chain list, allowing editor-only characters with arbitrary rigs to load without a demo presentation profile. Register preview settings separately when a character needs IK preview.
-
-Demo presentation is configured in `src/demo/demoCharacterProfiles.ts`. Each profile supplies clip names for the idle, walk, and sword actions, the upper-body clip and bone mask, combat pose name, appearance overrides, stage placement, IK names, layout/facing behavior, katana grip and clearance settings, and foot contact settings, and includes its shared preview chains. The default skin comes from the character definition. The demo scene, presenter, and pose authoring consume those profiles. Register another catalog entry and presentation profile alongside its character definition to add a demo character; sample layout and sketch limb swapping still expect their existing humanoid bone and limb attachment conventions.
+Character identities and picker labels live in `src/shared/characterCatalog.ts`; optional preview IK chains live in `src/shared/characterPreviewSettings.ts`, with the bundled arm/leg definitions in `src/shared/paperDollIK.ts`. Both character editors share immutable preview settings. Characters without registered preview settings receive an empty chain list, allowing characters with arbitrary rigs to load. Register preview settings separately when a character needs IK preview.
 
 Character definitions lazily cache compiler-owned immutable clips in `compiledAnimations`. Puppets created from the same definition share those clips while retaining independent clocks, event listeners, pose buffers, and disposal. Supplying `animations` explicitly (including an empty array) overrides the character clips and keeps ordinary runtime validation and snapshot ownership.
 

@@ -59,7 +59,7 @@ for (const editor of ['rig', 'animation'] as const) {
         expect(dialog.type()).toBe('beforeunload');
         await dialog.dismiss();
       }),
-      page.getByRole('link', { name: 'Engine demo' }).click(),
+      page.getByRole('link', { name: 'Project Workspace', exact: true }).click(),
     ]);
     expect(page.url()).toBe(url);
     await input.setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('corrupt image') });

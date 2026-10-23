@@ -5,7 +5,7 @@ before reading. Imports also check the formatted export size, so compact payload
 unexportable session. Export checks formatting overhead before allocating its JSON string. Failed imports
 preserve the active session and its undo history.
 
-Open `/animation-editor/` from **Open Animation Editor** in the demo or **Animation Editor** in the Rig Editor. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
+Open `/animation-editor/` directly or choose **Animation Editor** in the shared header. The sample character loads with its default skin and its first animation (`idle`). The independent Rig Editor remains at `/rig-editor/`.
 
 Expand **Character package** above the command bar to download the complete validated character ZIP, including applied sprite replacements, and reload/import it into an isolated production runtime preview. Individual JSON downloads retain their existing checkpoints and file placement workflow. See the [complete artist and package workflow](artist-workflow.md).
 
@@ -41,7 +41,7 @@ All inspector sections start closed. **Selection details** contains the bone fie
 
 Select `idle`, `walk`, or another character animation in the Animation menu. Click the timeline or drag the ruler to preview its authored pose. Drag empty lanes to select keys. Pointer capture keeps scrubbing active outside the timeline; time clamps at both ends. Release, pointer cancellation, focus loss, or hiding the page ends scrubbing. Touch and pen use the same pointer path. Focus the ruler to scrub with Left/Down and Right/Up by 0.01 seconds; Shift increases the step to 0.1 seconds. Ruler navigation preserves selected keys. In the tracks, Left/Right nudge selected keys together while preserving spacing, or scrub when no keys are selected. Home / End navigate to the endpoints.
 
-The sample `sword` and `guardUpperBody` clips contain baked arm rotations for a two-handed katana grip, so both show a complete sword-ready pose without IK. `sword` adds the idle body bob; `guardUpperBody` is the torso/arm overlay used while walking in the demo. The editor shows the default skin without the demo's katana prop; interactive weapon aiming and grip IK remain demo behavior.
+The sample `sword` and `guardUpperBody` clips contain baked arm rotations for a two-handed katana grip, so both show a complete sword-ready pose without IK. `sword` adds the idle body bob; `guardUpperBody` contains the torso/arm overlay. The editor shows the default skin.
 
 **Play** starts or resumes at the current time. **Pause** holds time, playhead, and pose. **Restart** immediately returns to zero and preserves whether playback is active. **Home** does the same from anywhere outside typing controls; **End** seeks to the endpoint with editor or body focus outside typing controls. **Space** toggles Play/Pause outside input, select, textarea, and content-editable regions; holding Space toggles only once. Focused buttons retain native Space activation (Restart rewinds, Loop preview toggles looping). Modified shortcuts and IME composition leave editor time alone. **Loop preview** toggles a transient editor preference (off by default). With it off, playback stops exactly at duration and holds the final pose. With it on, the editor wraps time and preserves overshoot, including deltas spanning several animation lengths. Scrubbing the ruler while playing temporarily suspends advancement; release, cancellation, lost pointer capture, focus loss, or page hiding ends the drag and resumes from the scrubbed time. Dragging while paused stays paused. Releasing at the final endpoint stops non-looping playback; looping playback wraps on the next update. An explicit Pause during a drag cancels resume. Pressing Play at the endpoint starts again at zero. Selecting another animation resets time and pauses. Controls are disabled without a valid animation. There is no separate Stop control in this milestone.
 
@@ -299,7 +299,7 @@ The controller/state and preview tests cover selection without mutation, propert
 
 ## Verification checklist
 
-- [ ] Open the demo, Rig Editor, and Animation Editor independently; navigate between them under the local and deployed base paths.
+- [ ] Open Project Workspace, Rig Editor, and Animation Editor independently; navigate between them under the local and deployed base paths.
 - [ ] In the Rig Editor select `head`, edit its X value, and undo; confirm validation still succeeds.
 - [ ] Confirm the sample puppet artwork and default skin appear in the Animation Editor.
 - [ ] Select `idle` and `walk`; confirm time resets to zero and duration/metadata/ruler update.

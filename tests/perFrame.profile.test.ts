@@ -1,13 +1,8 @@
-import { assert, test, vi } from 'vitest';
-import { demoRenderOrder } from '../src/demo/demoPresentation.js';
-import { DemoPresenter } from '../src/demo/DemoPresenter.js';
+import { test, vi } from 'vitest';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
-import { paperDollIK } from '../src/shared/paperDollIK.js';
-import { demoRig, idle, sword, walk } from './helpers/demoCharacter.js';
-import { demoPuppetScene } from './helpers/demoPuppetScene.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -164,87 +159,3 @@ for (let index = 0; index < 12; index += 1)
   puppet.addIK({ name: `inactive${index}`, rootBone: 'upper', middleBone: 'lower', endBone: 'hand', enabled: false });
 puppet.addIK({ name: 'active', rootBone: 'upper', middleBone: 'lower', endBone: 'hand', mix: 0.5 }).setTarget(60, 70);
 profile('36 bones, one active and 12 inactive IK constraints', () => puppet.update(16));
-
-for (const facing of ['left', 'right'] as const) {
-  for (const workload of ['walk', 'sword-reachable', 'sword-clamped', 'sword-head-sweep', 'upper-body'] as const) {
-    const scene = demoPuppetScene();
-    const demo = new Puppet(scene, {
-      rig: demoRig,
-      skin: 'default',
-      animations: [idle, walk, sword],
-      ik: paperDollIK,
-      x: 380,
-      y: 362,
-      scale: 1.08,
-      autoUpdate: false,
-    });
-    assert.isDefined(demo.getSlotImage('headVisual'), 'profiles include the body silhouette used by grip correction');
-    demo.setFacing(facing).play(workload.startsWith('sword') ? 'sword' : 'walk');
-    const presenter = new DemoPresenter(scene, demo);
-    const syncPose = demo.syncPose.bind(demo);
-    let syncs = 0;
-    demo.syncPose = (options) => {
-      syncs += 1;
-      syncPose(options);
-    };
-    const syncIK = demo.syncIK.bind(demo);
-    let ikSyncs = 0;
-    demo.syncIK = (options) => {
-      ikSyncs += 1;
-      // Compare the same correction workload with the previous full-sync path.
-      if (import.meta.env.VITE_PROFILE_FULL_IK_SYNC === '1') demo.syncPose(options);
-      else syncIK(options);
-    };
-    const refreshDebugViews = demo.refreshDebugViews.bind(demo);
-    let debugRefreshes = 0;
-    demo.refreshDebugViews = () => {
-      debugRefreshes += 1;
-      refreshDebugViews();
-    };
-    let frames = 0,
-      totalSyncs = 0,
-      maxSyncs = 0,
-      totalIKSyncs = 0,
-      maxIKSyncs = 0,
-      correctionFrames = 0;
-    profile(
-      `demo ${facing}, ${workload}`,
-      () => {
-        const phase = ((frames % 240) / 240) * Math.PI * 2;
-        const direction = facing === 'right' ? 1 : -1;
-        presenter.handTarget =
-          workload === 'sword-clamped'
-            ? { x: 380 + direction * Math.sin(phase) * 250, y: 280 + Math.cos(phase) * 180 }
-            : workload === 'sword-head-sweep'
-              ? { x: 380 + direction * Math.sin(phase) * 100, y: 220 + Math.cos(phase) * 50 }
-              : { x: 380 + direction * 55, y: 320 };
-        syncs = 0;
-        ikSyncs = 0;
-        demo.preparePose();
-        const evaluated = demo.animationPlayer.update(16);
-        // Optional comparison recreates the old unconditional order application.
-        if (import.meta.env.VITE_PROFILE_UNCACHED === '1')
-          demo.setRenderOrder(demoRenderOrder(demo.rig, demo.currentAnimation, facing));
-        presenter.feet.advance(16);
-        presenter.update(
-          { handIK: workload !== 'walk', footIK: true, upperBody: workload === 'upper-body' },
-          evaluated,
-        );
-        totalSyncs += syncs;
-        maxSyncs = Math.max(maxSyncs, syncs);
-        totalIKSyncs += ikSyncs;
-        maxIKSyncs = Math.max(maxIKSyncs, ikSyncs);
-        if (ikSyncs > 0) correctionFrames += 1;
-        frames += 1;
-      },
-      () => {
-        assert.equal(debugRefreshes, frames, 'overlays refresh once per final presentation frame');
-        if (import.meta.env.VITE_PROFILE_FULL_IK_SYNC !== '1')
-          assert.equal(totalSyncs, frames, 'correction passes avoid full synchronization');
-        if (workload === 'sword-head-sweep' || workload === 'sword-clamped')
-          assert.isAbove(correctionFrames, 0, 'profile exercises the katana correction loops');
-        return `syncPose/frame: mean ${(totalSyncs / frames).toFixed(2)}, max ${maxSyncs}; syncIK/frame: mean ${(totalIKSyncs / frames).toFixed(2)}, max ${maxIKSyncs}; debug refreshes/frame: ${(debugRefreshes / frames).toFixed(2)}; corrections on ${((correctionFrames / frames) * 100).toFixed(1)}% of frames (includes warmup)`;
-      },
-    );
-  }
-}

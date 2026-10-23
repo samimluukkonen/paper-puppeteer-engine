@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Remove Engine Demo and its controls, runtime presentation and dedicated tests. Open Project Workspace at the app home address and keep the sample characters available in the editors.
+
 - Remove the standalone examples project and its version/build/browser checks. Generate character packages directly in runtime integration tests.
 
 - Extract retained project editor contexts, runtime leases and preview teardown into a dedicated controller. Cancel opening work on workspace disposal, release late leases, and finish remaining cleanup after individual preview failures.

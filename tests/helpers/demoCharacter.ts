@@ -6,7 +6,7 @@ const read = (path: string): unknown =>
   JSON.parse(readFileSync(new URL(`../../public/characters/demo-puppet/${path}`, import.meta.url), 'utf8'));
 const manifest = characterManifestSchema.parse(read('character.json'));
 
-/** Tests and profiles exercise the same character files loaded by the browser demo. */
+/** Tests and profiles exercise the same sample character files loaded by the editors. */
 export const demoCharacter = CharacterDefinition.fromData({
   manifest,
   rig: read(manifest.rig),

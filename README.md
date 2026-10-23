@@ -1,10 +1,10 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, a developer pose inspector, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The demo and editor display the version from `package.json`.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`.
 
-**Live demo:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
+**Authoring tools:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
-Pushes to `master` build and deploy the demo through [the Pages workflow](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.github/workflows/deploy-pages.yml). In the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. The workflow publishes `dist/demo` and can also be run from the Actions tab.
+Pushes to `master` build and deploy the authoring tools through [the Pages workflow](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.github/workflows/deploy-pages.yml). In the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. The workflow publishes `dist/demo` and can also be run from the Actions tab.
 
 ## Install and run
 
@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. The demo starts in idle. The control panel also supports clicking/tapping.
+Open the local URL printed by Vite to start in Project Workspace. Use the shared header to open the Rig, Animation or Scene Editor.
 
 The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` supports playback preview, property keyframing, multi-key selection, dragging, clipboard commands, undo/redo, and [configurable multi-pose onion skinning](docs/onion-skin-controls.md). See [onion-skin production verification](docs/animation-editor-onion-skinning-verification.md) for v0.5.3 completion checks. Use the [Rig Editor](docs/rig-editor.md) at `/rig-editor/` to edit bind poses. Both editors offer recovery of unsaved edits from browser drafts; download JSON to save your work in the project.
 
@@ -105,7 +105,6 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 
 | Guide                                                                | Contents                                                                                                   |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| [Demo controls](docs/demo.md)                                        | Keyboard controls, playback examples, facing, skins, and pose authoring                                    |
 | [Foot contact markers](docs/foot-contact-markers.md)                 | Visual rig marker editing, bone-local data, validation and post-IK world position evaluation               |
 | [Rig editor](docs/rig-editor.md)                                     | Editing, snapping, undo/redo, validation, imports, exports, and embedding                                  |
 | [Animation editor](docs/animation-editor.md)                         | Working copies, property keyframing, keyframe dragging and snapping, playback, and runtime pose preview    |
@@ -159,9 +158,8 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 
 - Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
 - One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine.
-- Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot planting is manual; the walk remains in place.
+- Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot contacts require explicit IK targets; the sample walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.
-- Two-handed gripping adjusts the primary arm target when the second grip leaves the opposite arm's reach. The katana is a demo prop, not a combat system.
 - Debug name labels can overlap on dense rigs. Independent draw slots use two transform containers per drawable; profile very large rigs for your rendering workload.
 - The rig editor loads the sample character and edits an in-memory working copy. It exports JSON for manual placement in the character folder; it does not write to the project automatically or edit animation timelines. Character JSON loading uses `fetch`; apps with another asset pipeline can use `CharacterDefinition.fromData`.
 

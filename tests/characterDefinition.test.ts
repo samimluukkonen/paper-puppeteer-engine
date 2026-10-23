@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type Phaser from 'phaser';
 import { assert, test, vi } from 'vitest';
-import { demoHipPositions, demoRenderOrder } from '../src/demo/demoPresentation.js';
 import { compileClip } from '../src/engine/AnimationClip.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { evaluateClip } from '../src/engine/AnimationPose.js';
@@ -153,11 +152,6 @@ test('complete sample character validates and already-parsed data becomes runtim
   const player = new AnimationPlayer(definition.rig, joints);
   for (const clip of definition.animations) player.addAnimation(clip);
   for (const chain of paperDollIK) assert.ok(new TwoBoneIKConstraint(chain, definition.rig, joints));
-  assert.notDeepEqual(demoHipPositions(definition.rig, 'left'), demoHipPositions(definition.rig, 'right'));
-  assert.notDeepEqual(
-    demoRenderOrder(definition.rig, 'walk', 'left'),
-    demoRenderOrder(definition.rig, 'walk', 'right'),
-  );
   player.play('walk');
   player.update(250);
   assert.notEqual(joints.get('leftThigh')?.pose.rotation, joints.get('rightThigh')?.pose.rotation);

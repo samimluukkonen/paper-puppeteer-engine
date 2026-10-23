@@ -2,7 +2,6 @@ import { expect } from '@playwright/test';
 import { animationHierarchy, animationMenuControl, test, selectRigEntry } from './fixtures.js';
 
 for (const view of [
-  { route: './', prefix: 'demo', stage: '#stage', ready: '#status-text', text: 'Current: idle' },
   { route: 'rig-editor/', prefix: 'rig', stage: '#editor-stage', ready: '#validation', text: 'Validation: OK' },
   {
     route: 'animation-editor/',
@@ -75,9 +74,6 @@ for (const view of [
       await page.locator('#animation-bone-fields [data-property="x"]').fill('12');
       await page.getByRole('button', { name: 'Set X key', exact: true }).click();
       await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');
-    } else {
-      await page.locator('[data-action="walk"]').click();
-      await expect(page.locator('#status-text')).toContainText('Current: walk');
     }
     await page.locator(`#${view.prefix}-inspector-close`).click();
     await expect(toggle).toBeFocused();
@@ -93,9 +89,6 @@ for (const view of [
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('Control+z');
       await expect(page.locator('#inspector input[data-field="x"]')).toHaveValue('12');
-    } else if (view.prefix === 'demo') {
-      await page.keyboard.press('1');
-      await expect(page.locator('#status-text')).toContainText('Current: walk');
     }
     await page.keyboard.press('Escape');
     await expect(help).toBeFocused();
@@ -110,7 +103,6 @@ for (const view of [
     if (view.prefix === 'rig') await expect(page.locator('#inspector input[data-field="x"]')).toHaveValue('12');
     else if (view.prefix === 'animation')
       await expect(page.locator('#animation-bone-fields [data-property="x"]')).toHaveValue('12');
-    else await expect(page.locator('[data-action="walk"]')).toHaveAttribute('aria-pressed', 'true');
     expect(await canvas.evaluate((element, original) => element === original, originalCanvas)).toBe(true);
   });
 }

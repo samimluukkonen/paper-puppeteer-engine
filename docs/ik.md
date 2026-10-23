@@ -68,7 +68,7 @@ Constraint `status` reports `inactive`, `solved`, `clamped`, `singular-transform
 
 ### Foot planting
 
-`F` enables foot planting only while walking, when the puppet's body sways horizontally and vertically. Idle and sword stance keep their authored leg poses, leave leg IK disabled, and recenter the puppet. During walking, each ankle target follows the authored horizontal stride. IK limits how low the ankle can sink during contact, then fades out before toe-off so the authored heel rise and return swing remain visible. The legs alternate by half a cycle and mirror with facing. This is an in-place stepping demonstration without terrain detection or ground raycasts. Foot orientation remains authored; this version constrains endpoint position only.
+Hosts can implement foot contacts using world-space leg targets and influence. Blend constraint influence with the authored walk to preserve toe-off and the return swing. The solver constrains endpoint position; foot orientation remains authored.
 
 ```ts
 puppet.setIKTarget('leftLegIK', { x: 360, y: 510 });
@@ -76,17 +76,9 @@ puppet.getIK('leftLegIK').enabled = true;
 // Moving the puppet container now makes the leg solve toward the fixed point.
 ```
 
-### Two-handed katana
+### Two-handed props
 
-`src/demo/Katana.ts` defines a weapon container with primary and secondary grip points in its own coordinates. Hand joints are at the wrists; the demo places each grip 15 local pixels down the corresponding hand, at the palm center. Facing changes remount the weapon on the front hand: the right hand holds the primary grip when facing right, and the left hand holds the secondary grip when facing left. The mount compensates for blade rotation so its grip stays on that palm. One-handed mouse targeting (`H`) moves the front arm and its attached katana.
-
-In stance `3`, the front arm runs at priority 0 and follows the mouse target. Its solved hand transform carries the katana. The rear arm runs at priority 1 with an `endOffset` at the **palm**. A target provider reads its grip in world space after the demo aims the blade with `Q` / `E`. Rotating the katana therefore moves the rear grip, and that arm solves toward it in the same frame. Priorities switch when facing changes, so the left arm can fully extend when pointing left.
-
-The demo uses bend direction `-1` for both elbows in the two-handed stance. Both hands follow their grip points without moving the shoulders.
-
-In the two-handed stance, the blade can turn through a horizontal overhead pose. In either facing direction, the rear palm stays outside the head, torso, pelvis, and both legs, including the feet. It travels around the head's corners in bounded steps and can return below the head to torso height. Crossing to the body's other side still requires passing above the head. The demo checks the cutout edges at the palm's height and adjusts the front arm's hand target when either input would carry the rear palm behind the body. Both arms' reach limits are respected, and clearance is checked again after smoothing and reach recovery. Both shoulders stay fixed and both palms stay on the hilt.
-
-The sketch swaps its actual limb chains when facing left while keeping the right hand on the primary grip in both directions. The left hand holds the secondary grip and obeys the same torso and leg restrictions in its two-handed sword stance and upper-body sword layer while walking. Its body clearance margin is −4 pixels, allowing a small overlap at the body edge while retaining the eight-pixel head clearance. When facing left, the hilt follows the right palm in the `katanaHilt` slot behind the right leg; the blade keeps its foreground layer. This applies to both the grip-aware prop and the one-handed slot sprite.
+Attach a prop at its primary grip, then give the secondary arm a target provider that reads the secondary grip through the prop’s world transform. Use a palm `endOffset` when the hand joint is at the wrist. The host owns the prop, grip coordinates and any reach or clearance adjustments.
 
 ```ts
 // Assume katana is attached at its primary grip and both arm chains are registered.

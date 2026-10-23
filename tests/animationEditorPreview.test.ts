@@ -1,5 +1,4 @@
 import { assert, test, vi } from 'vitest';
-import { katanaGrips } from '../src/demo/Katana.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import * as animationClip from '../src/engine/AnimationClip.js';
@@ -501,7 +500,7 @@ test.each(['sword', 'guardUpperBody'])('%s previews a complete two-handed grip w
   state.setCurrentTime(0.75);
   state.selectAnimation(name);
   const swordAngle = -0.65;
-  const gripSpacing = katanaGrips.primary.x - katanaGrips.secondary.x;
+  const gripSpacing = 26; // Palm spacing authored into the sample clips.
   const assertGrip = () => {
     const palm = (side: 'left' | 'right') =>
       puppet.getBone(`${side}Hand`).container.getWorldTransformMatrix().transformPoint(0, 15);

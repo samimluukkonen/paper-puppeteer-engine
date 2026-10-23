@@ -16,7 +16,7 @@ In Rig Editor or Animation Editor, drag the amber **↕ Ground** label verticall
 
 **Align IK target Y to guide** is a separate explicit authoring action. Select an authored IK target and show the guide, then use this button to set X/Y keys at the held playhead in one animation Undo action. It preserves requested world X, sets requested world Y to the guide, and applies the inverse full puppet transform; a rotated enclosing transform may require both local coordinates to change. Bones, events, duration and IK influence remain unchanged. Provider/runtime-owned, disabled, baked-out and singular/unsupported chains retain the existing manipulation guards. The guide's snapping checkbox does not gate this explicit alignment command.
 
-Animation IK alignment addresses the **requested IK target**. `endOffset` identifies a solver endpoint, without establishing that it is a sole. Optional attachment `groundContacts` support Scene Editor placement (below); they do not change the animation target command. Demo sole offsets belong to `DemoFootPlanting` and its presentation profiles. IK target alignment/snapping therefore do not promise exact foot contact. Solver reach and influence can prevent the solved endpoint reaching the request. Foot planting is unchanged.
+Animation IK alignment addresses the **requested IK target**. `endOffset` identifies a solver endpoint, without establishing that it is a sole. Optional attachment `groundContacts` support Scene Editor placement (below); they do not change the animation target command. IK target alignment/snapping therefore do not promise exact foot contact. Solver reach and influence can prevent the solved endpoint reaching the request.
 
 ## Marker-based ground alignment (v0.9.8.3)
 
@@ -123,7 +123,7 @@ Paths below are relative to the repository root. These are internal editor APIs;
 - `tests/animationGroundGuide.test.ts`, `animationEditorScene.test.ts`, `animationEditorIKHandles.test.ts`, `groundGuide.test.ts`: guide workflow and authoring regressions.
 - `tests/browser/animationGroundGuide.spec.ts`: local desktop canvas drag, Escape, playback, switching, alignment, exported-data equivalence and reload workflow.
 
-The focused local browser command is `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationGroundGuide.spec.ts tests/browser/groundGuide.spec.ts` after building the demo.
+The focused local browser command is `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationGroundGuide.spec.ts tests/browser/groundGuide.spec.ts` after building the authoring application.
 
 ## v0.9.7.2 verification results
 

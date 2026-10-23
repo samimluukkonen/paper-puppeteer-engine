@@ -23,7 +23,7 @@ export default defineConfig({
         },
       },
     },
-    // The demo includes Phaser; the library build leaves it external.
+    // The editor application includes Phaser; the library build leaves it external.
     chunkSizeWarningLimit: 1600,
   },
 });
