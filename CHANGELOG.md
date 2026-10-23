@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Cancel autosave package preparation on discard, suspension and disposal; time out stalled draft builds and artwork requests while preserving the previous draft and allowing retry.
+
 - Bound scene actors, actions, per-instance bone/slot allocation and aggregate artwork bytes/pixels before constructing runtime previews. Share texture guards across scene character loads and validate scene ZIP texture totals.
 
 - Add one-click retained-draft cleanup in Animation Editor, Rig Editor and Rig Tweak, including declined recovery candidates, to prevent repeated restore prompts on later visits. Use red danger styling for cleanup and green for retained-draft downloads.

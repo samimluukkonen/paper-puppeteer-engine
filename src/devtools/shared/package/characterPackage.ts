@@ -133,24 +133,51 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
 }
 
 async function readImage(url: string, fetcher: typeof fetch, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
-  const response = await fetcher(url, { signal, cache: 'no-store' });
-  if (!response.ok) throw new Error(`Could not include image "${url}" (${response.status}).`);
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error(`Empty image "${url}".`);
+  signal.throwIfAborted();
+  const controller = new AbortController();
+  const abort = (): void => controller.abort(signal.reason);
+  signal.addEventListener('abort', abort, { once: true });
+  const timeout = setTimeout(
+    () => controller.abort(new DOMException(`Image request timed out: ${url}`, 'TimeoutError')),
+    30_000,
+  );
+  let reader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>> | undefined;
+  const cancel = (): void => {
+    void reader?.cancel(controller.signal.reason).catch(() => {});
+  };
+  controller.signal.addEventListener('abort', cancel, { once: true });
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
+    const pending = fetcher(url, { signal: controller.signal, cache: 'no-store' }).then((response) => {
+      if (controller.signal.aborted) {
+        void response.body?.cancel(controller.signal.reason).catch(() => {});
+        controller.signal.throwIfAborted();
+      }
+      return response;
+    });
+    const response = await abortable(pending, controller.signal);
+    reader = response.body?.getReader();
+    controller.signal.throwIfAborted();
+    if (!response.ok) throw new Error(`Could not include image "${url}" (${response.status}).`);
+    if (Number(response.headers.get('content-length')) > PACKAGE_MAX_FILE_BYTES)
+      throw new Error(`Image "${url}" exceeds 10 MiB.`);
+    if (!reader) throw new Error(`Empty image "${url}".`);
     while (true) {
-      signal.throwIfAborted();
-      const { done, value } = await reader.read();
+      controller.signal.throwIfAborted();
+      const { done, value } = await abortable(reader.read(), controller.signal);
+      controller.signal.throwIfAborted();
       if (done) break;
       size += value.length;
       if (size > PACKAGE_MAX_FILE_BYTES) throw new Error(`Image "${url}" exceeds 10 MiB.`);
       chunks.push(value);
     }
   } finally {
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
+    clearTimeout(timeout);
+    signal.removeEventListener('abort', abort);
+    controller.signal.removeEventListener('abort', cancel);
+    void reader?.cancel().catch(() => {});
+    reader?.releaseLock();
   }
   const bytes = new Uint8Array(size);
   let offset = 0;
@@ -187,6 +214,7 @@ export async function buildCharacterPackage(
   fetcher: typeof fetch = fetch,
   signal: AbortSignal = new AbortController().signal,
 ): Promise<PackageFiles> {
+  signal.throwIfAborted();
   const snapshot = capturePackage(input);
   const { definition, rig } = snapshot;
   if (!definition.manifest) throw new Error('Character has no source manifest.');
@@ -378,3 +406,4 @@ export function packageJson(files: PackageFiles, path: string): unknown {
   if (!bytes) throw new Error(`Missing package file "${path}".`);
   return JSON.parse(decoder.decode(bytes)) as unknown;
 }
+import { abortable } from '../../../engine/abortable.js';

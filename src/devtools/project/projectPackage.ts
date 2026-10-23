@@ -26,6 +26,7 @@ const encoder = new TextEncoder();
 export async function packageHostedCharacter(
   definition: CharacterDefinition,
   fetcher: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<PackageFiles> {
   const files = await buildScenePackage(
     {
@@ -40,6 +41,7 @@ export async function packageHostedCharacter(
       baseUrl: definition.baseUrl ?? 'https://project.invalid/scene.json',
       fetcher,
       loadCharacter: () => Promise.resolve(definition),
+      ...(signal ? { signal } : {}),
     },
   );
   const prefix = 'characters/character-1/';
@@ -60,7 +62,8 @@ export function characterFileFetcher(files: PackageFiles): typeof fetch {
 }
 
 /** Capture all authored domains synchronously before the first image read. */
-export async function buildProjectPackage(workspace: ProjectWorkspace) {
+export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const report = workspace.inspect('export', true);
   requireValidExport(report);
   const metadata = parseProjectDefinition(workspace.definition);
@@ -76,8 +79,9 @@ export async function buildProjectPackage(workspace: ProjectWorkspace) {
     files.set(path, encoder.encode(canonicalJson(data)));
   };
   for (const entry of metadata.characters) {
+    signal?.throwIfAborted();
     const captured = characters.get(entry.id)!;
-    const packaged = await buildCharacterPackage(captured, sources.get(entry.id)).catch((error: unknown) => {
+    const packaged = await buildCharacterPackage(captured, sources.get(entry.id), signal).catch((error: unknown) => {
       throw packageExportFailure(report, { kind: 'character', owner: entry.id, id: entry.id }, error);
     });
     const textures = new Set(Object.values(captured.definition.manifest!.textures));

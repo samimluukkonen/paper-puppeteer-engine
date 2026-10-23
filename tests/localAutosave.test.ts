@@ -38,7 +38,9 @@ function fixture() {
   let revision = '1';
   let pending = false;
   let dirty = true;
-  const build = vi.fn(() => Promise.resolve(new Map([['project.json', new TextEncoder().encode(revision)]])));
+  const build = vi.fn((_signal?: AbortSignal) =>
+    Promise.resolve(new Map([['project.json', new TextEncoder().encode(revision)]])),
+  );
   const autosave = new LocalAutosave('project:film', storage, () =>
     pending
       ? undefined
@@ -110,6 +112,53 @@ test('quota failures preserve the last successful draft and allow explicit retry
   f.autosave.retry();
   await vi.advanceTimersByTimeAsync(0);
   assert.equal(f.storage.saved.at(-1)!.revision, '2');
+});
+
+test('a stalled build times out, retains the previous draft and permits retry', async () => {
+  const f = fixture();
+  await vi.advanceTimersByTimeAsync(1000);
+  f.build.mockImplementationOnce(() => new Promise(() => {}));
+  f.edit('2');
+  await vi.advanceTimersByTimeAsync(61_000);
+  assert.equal(f.storage.saved.at(-1)!.revision, '1');
+  assert.match(f.autosave.getSnapshot(), /Autosave failed:.*timed out/);
+  assert.isTrue(f.build.mock.calls.at(-1)![0]!.aborted);
+  f.autosave.retry();
+  await vi.advanceTimersByTimeAsync(0);
+  assert.equal(f.storage.saved.at(-1)!.revision, '2');
+});
+
+test('discard cancels a stalled build promptly and ignores its late result', async () => {
+  const f = fixture();
+  let finish = (_files: Map<string, Uint8Array<ArrayBuffer>>): void => {};
+  f.build.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const saving = f.autosave.flush();
+  const discarding = f.autosave.discard();
+  assert.isTrue(f.build.mock.calls[0]![0]!.aborted);
+  await vi.advanceTimersByTimeAsync(10);
+  await Promise.all([saving, discarding]);
+  finish(new Map());
+  await vi.advanceTimersByTimeAsync(0);
+  assert.lengthOf(f.storage.saved, 0);
+  assert.match(f.autosave.getSnapshot(), /discarded/);
+  f.autosave.retry();
+  await vi.advanceTimersByTimeAsync(0);
+  assert.lengthOf(f.storage.saved, 1);
+});
+
+test.each(['suspend', 'dispose'] as const)('%s aborts pending draft preparation', async (exit) => {
+  const f = fixture();
+  f.build.mockImplementationOnce(() => new Promise(() => {}));
+  const saving = f.autosave.flush();
+  f.autosave[exit]();
+  await saving;
+  assert.isTrue(f.build.mock.calls[0]![0]!.aborted);
+  assert.lengthOf(f.storage.saved, 0);
 });
 
 test('export status retains recovery and discard pauses writes until resumed', async () => {

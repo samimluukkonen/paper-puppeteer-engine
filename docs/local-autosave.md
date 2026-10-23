@@ -6,6 +6,8 @@ Committed authored changes are checked every 500 ms and saved after a 1-second d
 
 ## Ownership and consistent capture
 
+Draft preparation times out after 60 seconds; each artwork request, including its response body, has a 30-second deadline. Failed or timed-out preparation keeps the previous saved revisions and offers Retry. Discard, page suspension and disposal cancel preparation promptly, including host operations that ignore cancellation; late results cannot write a draft. An already-dispatched storage transaction still settles before Discard removes its revisions.
+
 `ProjectWorkspace` remains the project metadata owner. The retained character editor owns its rig, skins, animations and artwork; `SceneEditorDocument` owns scene working copies. Autosave reads those owners without ending gestures, marking exports, changing Undo/Redo or installing snapshots. Switching project/editor views retains these owners and each project's autosave controller.
 
 `buildProjectPackage` captures project metadata, all character snapshots, source file fetchers and all scenes synchronously before asynchronous binary reads. Existing character/scene/package validators preflight the full detached payload. Replacement/imported artwork contributes its immutable Blob bytes. No draft references temporary Blob URLs. Standalone character drafts wrap their complete character package in a project; standalone scene drafts wrap all retained scenes and their character dependencies, rebasing references through the project packager.

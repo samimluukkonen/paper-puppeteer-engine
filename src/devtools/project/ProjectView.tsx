@@ -193,7 +193,7 @@ export function ProjectView() {
               revision,
               name: workspace.definition.name,
               dirty: workspace.hasUnsavedChanges,
-              build: async () => (await buildProjectPackage(workspace)).files,
+              build: async (signal) => (await buildProjectPackage(workspace, signal)).files,
             };
       },
     );

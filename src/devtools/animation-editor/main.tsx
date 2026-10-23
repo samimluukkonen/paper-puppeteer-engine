@@ -365,7 +365,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
             name: snapshot.rig.name ?? id,
             revision: canonicalJson(fingerprints.compute(snapshot)),
             dirty: packages.hasUnsavedChanges,
-            build: () => buildCharacterDraft(editorScene.packageSnapshot(), projectId),
+            build: (signal) => buildCharacterDraft(editorScene.packageSnapshot(), projectId, signal),
           };
         });
         autosave.start();

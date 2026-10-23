@@ -713,6 +713,41 @@ test('invalid image, failed fetch and cancellation leave the source intact', asy
   assert.equal(JSON.stringify(source), before);
 });
 
+test('package image deadlines cover both stalled requests and stalled response bodies', async () => {
+  vi.useFakeTimers();
+  try {
+    for (const phase of ['request', 'body']) {
+      const cancel = vi.fn();
+      const fetcher: typeof fetch = () =>
+        phase === 'request'
+          ? new Promise(() => {})
+          : Promise.resolve(new Response(new ReadableStream<Uint8Array>({ cancel })));
+      const pending = rejected(buildCharacterPackage(fixture(), fetcher), /timed out/);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await pending;
+      if (phase === 'body') assert.equal(cancel.mock.calls.length, 1);
+    }
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('an image response arriving after cancellation releases its body', async () => {
+  const controller = new AbortController();
+  let respond = (_response: Response): void => {};
+  const fetcher: typeof fetch = () =>
+    new Promise((resolve) => {
+      respond = resolve;
+    });
+  const building = rejected(buildCharacterPackage(fixture(), fetcher, controller.signal), /cancelled/);
+  controller.abort(new Error('cancelled'));
+  await building;
+  const cancel = vi.fn();
+  respond(new Response(new ReadableStream<Uint8Array>({ cancel })));
+  await Promise.resolve();
+  assert.equal(cancel.mock.calls.length, 1);
+});
+
 test('ZIP checksum, truncation, unsupported compression and traversal are rejected', async () => {
   const zip = encodePackageZip(await buildCharacterPackage(fixture(), fetchImage));
   const damaged = new Uint8Array(zip);

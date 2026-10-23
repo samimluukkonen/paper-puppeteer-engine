@@ -6,7 +6,7 @@ export interface AutosaveSource {
   name: string;
   dirty: boolean;
   /** Must capture every authored domain synchronously before its first await. */
-  build(): Promise<PackageFiles>;
+  build(signal: AbortSignal): Promise<PackageFiles>;
 }
 
 /** One owner per document; UI/playback notifications are filtered by authored fingerprints. */
@@ -18,6 +18,7 @@ export class LocalAutosave {
   private exportedRevision: string | undefined;
   private observed: string | undefined;
   private saving = false;
+  private buildRequest: AbortController | undefined;
   private stopped = false;
   private disabled = false;
   private suspended = false;
@@ -96,17 +97,29 @@ export class LocalAutosave {
     const source = this.capture();
     if (!source || source.revision === this.saved || (!source.dirty && this.saved === undefined)) return;
     this.saving = true;
+    const request = new AbortController();
+    this.buildRequest = request;
+    const timeout = setTimeout(
+      () => request.abort(new DOMException('Local draft preparation timed out.', 'TimeoutError')),
+      60_000,
+    );
     this.publish('Saving locally…');
     try {
       // Start building now, before awaiting the lease; build() captures a consistent revision.
-      const files = await source.build();
+      const files = await abortable(source.build(request.signal), request.signal);
+      request.signal.throwIfAborted();
+      // Once dispatched, the atomic storage transaction must settle before discard.
+      this.buildRequest = undefined;
+      clearTimeout(timeout);
       if (this.stopped || this.disabled || this.suspended) return;
       await this.storage.save(this.key, this.owner, source.name, source.revision, files);
       this.saved = source.revision;
       this.publish(this.savedMessage(source.revision));
     } catch (error) {
-      this.publish(storageError(error));
+      if (!this.stopped && !this.disabled && !this.suspended) this.publish(storageError(error));
     } finally {
+      clearTimeout(timeout);
+      if (this.buildRequest === request) this.buildRequest = undefined;
       this.saving = false;
       // save() hashes artwork before opening its transaction and can reacquire a lock
       // after suspend/dispose's prompt release. Release again once all its I/O settles.
@@ -136,6 +149,7 @@ export class LocalAutosave {
   /** pagehide releases promptly; a crash without this event expires the lease after 15 seconds. */
   suspend(): void {
     this.suspended = true;
+    this.buildRequest?.abort(new DOMException('Local saving suspended.', 'AbortError'));
     clearInterval(this.heartbeat);
     this.heartbeat = undefined;
     clearTimeout(this.timer);
@@ -144,6 +158,7 @@ export class LocalAutosave {
   /** Explicit removal disables future writes until the user asks to resume. */
   async discard(): Promise<void> {
     this.disabled = true;
+    this.buildRequest?.abort(new DOMException('Local draft discarded.', 'AbortError'));
     clearTimeout(this.timer);
     // Do not race an already dispatched transaction.
     while (this.saving) await new Promise((resolve) => setTimeout(resolve, 10));
@@ -157,6 +172,7 @@ export class LocalAutosave {
   }
   dispose(): void {
     this.stopped = true;
+    this.buildRequest?.abort(new DOMException('Local saving disposed.', 'AbortError'));
     clearTimeout(this.timer);
     clearInterval(this.heartbeat);
     this.listeners.clear();
@@ -164,3 +180,4 @@ export class LocalAutosave {
     void this.storage.release(this.key, this.owner).catch(() => {});
   }
 }
+import { abortable } from '../../../engine/abortable.js';

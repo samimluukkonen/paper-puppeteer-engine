@@ -7,11 +7,11 @@ import type { SceneEditorDocument } from '../../scene-editor/SceneEditorDocument
 import { buildCharacterPackage, capturePackage, type PackageSnapshot } from '../package/characterPackage.js';
 
 /** Standalone drafts use the same complete portable project payload as project recovery. */
-export async function buildCharacterDraft(input: PackageSnapshot, id: string) {
+export async function buildCharacterDraft(input: PackageSnapshot, id: string, signal?: AbortSignal) {
   const snapshot = capturePackage(input);
   const workspace = new ProjectWorkspace(snapshot.rig.name ?? snapshot.definition.id, id);
-  await workspace.addCharacter(await buildCharacterPackage(snapshot));
-  return (await buildProjectPackage(workspace)).files;
+  await workspace.addCharacter(await buildCharacterPackage(snapshot, undefined, signal));
+  return (await buildProjectPackage(workspace, signal)).files;
 }
 
 export function sceneDraftSource(document: SceneEditorDocument, registry: SceneCharacterRegistry, id: string) {
@@ -21,7 +21,7 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
     name: scenes[0]!.name,
     revision: canonicalJson(scenes),
     dirty: document.hasUnsavedChanges,
-    build: async () => {
+    build: async (signal?: AbortSignal) => {
       // All retained scene snapshots are immutable and captured before dependency reads.
       const workspace = new ProjectWorkspace(scenes[0]!.name, id);
       const references = new Map<string, string>();
@@ -30,7 +30,8 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
           const reference = actor.character.manifest;
           if (references.has(reference)) continue;
           const definition = await registry.load(reference);
-          const characterId = await workspace.addCharacter(await packageHostedCharacter(definition));
+          signal?.throwIfAborted();
+          const characterId = await workspace.addCharacter(await packageHostedCharacter(definition, undefined, signal));
           references.set(reference, workspace.characterReference(characterId));
         }
       for (const scene of scenes)
@@ -41,7 +42,7 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
             character: { manifest: references.get(actor.character.manifest)! },
           })),
         });
-      return (await buildProjectPackage(workspace)).files;
+      return (await buildProjectPackage(workspace, signal)).files;
     },
   };
 }
