@@ -5,6 +5,7 @@ import { validatePackageFiles } from '../../engine/packageZip.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import { createEmptyScene, parseSceneDefinition, type SceneDefinition } from '../../engine/SceneDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
+import { draftSource } from '../shared/draftSource.js';
 import {
   capturePackage,
   type PackageFiles,
@@ -12,6 +13,7 @@ import {
   validatePackage,
 } from '../shared/package/characterPackage.js';
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
+import { sceneFingerprint } from '../shared/sceneFingerprint.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { parseProjectDefinition, type ProjectDefinition } from './ProjectDefinition.js';
 import {
@@ -81,10 +83,10 @@ export class ProjectWorkspace {
       if (entry.loading || entry.pending?.()) return undefined;
       characters.push(this.characterDigest(id, entry));
     }
-    return canonicalJson({
+    return draftSource({
       metadata: this.metadata,
       characters,
-      scenes: this.metadata.scenes.map(({ id }) => this.scenes.scene(id)),
+      scenes: this.metadata.scenes.map(({ id }) => sceneFingerprint(this.scenes.scene(id)!)),
     });
   }
   private createHistory(): SnapshotHistory<DeepReadonly<ProjectDefinition>> {
@@ -234,7 +236,7 @@ export class ProjectWorkspace {
     return this.characterDigest(id, entry) !== this.checkpoints.get(id);
   }
   sceneDirty(id: string): boolean {
-    return canonicalJson(this.scenes.scene(id)) !== this.sceneCheckpoints.get(id);
+    return sceneFingerprint(this.scenes.scene(id)!) !== this.sceneCheckpoints.get(id);
   }
   addScene(input: unknown): string {
     const scene = parseSceneDefinition(input);
@@ -326,7 +328,7 @@ export class ProjectWorkspace {
     this.saved = freezeData(parseProjectDefinition(metadata));
     for (const [id, snapshot] of characters)
       this.checkpoints.set(id, canonicalJson(this.fingerprints.get(id)!.compute(snapshot)));
-    this.sceneCheckpoints = new Map(scenes.map((scene) => [scene.id, canonicalJson(scene)]));
+    this.sceneCheckpoints = new Map(scenes.map((scene) => [scene.id, sceneFingerprint(scene)]));
     this.refresh();
   }
   /** Archive import keeps stable paths; initialized documents remain separate owners. */

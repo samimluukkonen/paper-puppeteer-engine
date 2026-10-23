@@ -328,6 +328,53 @@ test('scene gestures expose no autosavable revision until commit; cancellation r
   assert.equal(workspace.autosaveRevision, revision);
 });
 
+test('project and standalone recovery fingerprint scenes whose combined JSON exceeds 10 MiB', async () => {
+  vi.useRealTimers();
+  const draft = createNewCharacter({ id: 'hero', name: 'Hero' });
+  const workspace = new ProjectWorkspace('Large scenes');
+  await workspace.addCharacter(
+    await buildCharacterPackage({
+      definition: draft.definition,
+      rig: draft.definition.rigFile!,
+      skins: draft.definition.standaloneSkins,
+      animations: [],
+      replacements: [],
+    }),
+  );
+  const manifest = workspace.characterReference('hero');
+  const payload = 'x'.repeat(5.1 * 1024 * 1024);
+  for (const id of ['one', 'two'])
+    workspace.addScene({
+      ...createEmptyScene({ id }),
+      actors: [{ id: 'actor', character: { manifest }, position: { x: 0, y: 0 } }],
+      actions: [{ id: 'cue', type: 'cue', actorId: 'actor', time: 0, name: 'data', payload }],
+    });
+  const before = workspace.autosaveRevision;
+  assert.match(before!, /^sha256-v1:[0-9a-f]{64}$/);
+  const exported = await buildProjectPackage(workspace);
+  workspace.markExported(exported.metadata, exported.characters, exported.scenes);
+  assert.isFalse(workspace.hasUnsavedChanges);
+  assert.equal(workspace.autosaveRevision, before);
+  const registry = new SceneCharacterRegistry(() => Promise.resolve(draft.definition));
+  try {
+    const source = sceneDraftSource(workspace.scenes, registry, 'large-scenes')!;
+    assert.match(source.revision, /^sha256-v1:[0-9a-f]{64}$/);
+    const restored = await importProjectPackage(await source.build());
+    assert.equal(restored.scenes.scene('one')!.actions[0]!.type, 'cue');
+    assert.deepEqual(restored.scenes.scene('two')!.actions, workspace.scenes.scene('two')!.actions);
+    workspace.scenes.updateProperties({ name: 'Changed' });
+    assert.notEqual(workspace.autosaveRevision, before);
+    assert.notEqual(sceneDraftSource(workspace.scenes, registry, 'large-scenes')!.revision, source.revision);
+    workspace.scenes.undo();
+    assert.equal(workspace.autosaveRevision, before);
+    assert.equal(sceneDraftSource(workspace.scenes, registry, 'large-scenes')!.revision, source.revision);
+    workspace.scenes.redo();
+    assert.notEqual(workspace.autosaveRevision, before);
+  } finally {
+    registry.dispose();
+  }
+});
+
 test('rig, animation and binary sprites survive a complete detached crash recovery', async () => {
   vi.useRealTimers();
   const draft = createNewCharacter({ id: 'hero', name: 'Hero' });

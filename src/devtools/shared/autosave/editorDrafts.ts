@@ -5,6 +5,7 @@ import { buildProjectPackage, packageHostedCharacter } from '../../project/proje
 import { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
 import type { SceneCharacterRegistry } from '../../scene-editor/SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from '../../scene-editor/SceneEditorDocument.js';
+import { draftSource } from '../draftSource.js';
 import {
   buildCharacterPackage,
   capturePackage,
@@ -12,6 +13,7 @@ import {
   type PackageFiles,
   type PackageSnapshot,
 } from '../package/characterPackage.js';
+import { sceneFingerprint } from '../sceneFingerprint.js';
 
 function samePackage(first: PackageFiles, second: PackageFiles): boolean {
   return (
@@ -36,7 +38,7 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
   const scenes = document.sceneIds.map((id) => document.scene(id)!);
   return {
     name: scenes[0]!.name,
-    revision: canonicalJson(scenes),
+    revision: draftSource(scenes.map(sceneFingerprint)),
     dirty: document.hasUnsavedChanges,
     build: async (signal?: AbortSignal) => {
       // All retained scene snapshots are immutable and captured before dependency reads.
