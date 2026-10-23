@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Share bounded response streaming, request deadlines and cancellation across character metadata, scene resources and package artwork. Release readers promptly even when custom fetch or stream cancellation stalls, and cancel late response bodies.
+
 - Preserve custom character manifest paths through project export/import, rebase standalone scene ZIPs independently, and reject physical metadata collisions before a download can overwrite a resource.
 
 - Cache compact per-scene fingerprints for project checkpoints and both project/standalone autosave revisions, allowing multiple individually valid scenes to exceed 10 MiB in aggregate without disabling recovery.

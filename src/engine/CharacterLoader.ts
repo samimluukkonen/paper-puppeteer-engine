@@ -1,6 +1,7 @@
 import { type CharacterData, CharacterDefinition, characterManifestSchema } from './CharacterDefinition.js';
 import { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError, readJsonResponse, validateInputLimit } from './jsonInput.js';
 import { JsonWorkloadBudget, type JsonWorkloadLimitOptions } from './jsonWorkloadLimits.js';
+import { withResourceResponse } from './resourceInput.js';
 
 export const DEFAULT_CHARACTER_LOAD_LIMITS = Object.freeze({
   maxJsonBytes: DEFAULT_MAX_JSON_BYTES,
@@ -101,35 +102,32 @@ export const CharacterLoader = {
         inspect?: (data: unknown) => void,
       ): Promise<{ data: unknown; url: string }> => {
         controller.signal.throwIfAborted();
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        let response: Response | undefined;
         try {
           checkUrl(resourceUrl);
-          timer = setTimeout(
-            () =>
-              controller.abort(new DOMException(`Character JSON request timed out: "${resourceUrl}".`, 'TimeoutError')),
-            limits.timeoutMs,
+          return await withResourceResponse(
+            resourceUrl,
+            fetcher,
+            {
+              controller,
+              timeoutMs: limits.timeoutMs,
+              timeoutMessage: `Character JSON request timed out: "${resourceUrl}".`,
+              ...(options.urlPolicy ? { init: { redirect: 'error' } } : {}),
+            },
+            async (response, requestSignal) => {
+              if (options.urlPolicy && response.redirected)
+                throw new Error('Character metadata redirects are disabled by URL policy.');
+              if (response.url) checkUrl(response.url);
+              if (!response.ok) throw new Error(`Could not load character JSON "${resourceUrl}" (${response.status}).`);
+              const data = await readJsonResponse(response, limits.maxJsonBytes, requestSignal, countBytes);
+              inspect?.(data);
+              return { data, url: response.url || resourceUrl };
+            },
           );
-          response = await fetcher(resourceUrl, {
-            signal: controller.signal,
-            ...(options.urlPolicy ? { redirect: 'error' } : {}),
-          });
-          controller.signal.throwIfAborted();
-          if (options.urlPolicy && response.redirected)
-            throw new Error('Character metadata redirects are disabled by URL policy.');
-          if (response.url) checkUrl(response.url);
-          if (!response.ok) throw new Error(`Could not load character JSON "${resourceUrl}" (${response.status}).`);
-          const data = await readJsonResponse(response, limits.maxJsonBytes, controller.signal, countBytes);
-          inspect?.(data);
-          return { data, url: response.url || resourceUrl };
         } catch (error) {
           // Stop workers before they acquire another resource after a sibling fails.
           const failure: unknown = controller.signal.aborted ? controller.signal.reason : error;
           controller.abort(failure);
-          if (response && !response.bodyUsed) await response.body?.cancel(failure).catch(() => {});
           throw failure;
-        } finally {
-          if (timer !== undefined) clearTimeout(timer);
         }
       };
       const { data: manifestData, url: manifestUrl } = await read(requestedUrl);

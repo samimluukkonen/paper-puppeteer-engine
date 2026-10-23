@@ -7,6 +7,7 @@ import type { RigJsonDefinition } from '../../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
 import type { DeepReadonly } from '../../../engine/readonlyData.js';
+import { readResponseBytes, withResourceResponse } from '../../../engine/resourceInput.js';
 import { identifierSchema } from '../../../engine/schemas.js';
 import type { SkinDefinition, SpriteDefinition, SpriteAttachmentDefinition } from '../../../engine/types.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
@@ -133,59 +134,26 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
 }
 
 async function readImage(url: string, fetcher: typeof fetch, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
-  signal.throwIfAborted();
-  const controller = new AbortController();
-  const abort = (): void => controller.abort(signal.reason);
-  signal.addEventListener('abort', abort, { once: true });
-  const timeout = setTimeout(
-    () => controller.abort(new DOMException(`Image request timed out: ${url}`, 'TimeoutError')),
-    30_000,
+  return withResourceResponse(
+    url,
+    fetcher,
+    {
+      signal,
+      timeoutMs: 30_000,
+      timeoutMessage: `Image request timed out: ${url}`,
+      init: { cache: 'no-store' },
+    },
+    (response, requestSignal) =>
+      readResponseBytes(response, {
+        maxBytes: PACKAGE_MAX_FILE_BYTES,
+        signal: requestSignal,
+        limitError: () => new Error(`Image "${url}" exceeds 10 MiB.`),
+        emptyError: () => new Error(`Empty image "${url}".`),
+        validateResponse: (value) => {
+          if (!value.ok) throw new Error(`Could not include image "${url}" (${value.status}).`);
+        },
+      }),
   );
-  let reader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>> | undefined;
-  const cancel = (): void => {
-    void reader?.cancel(controller.signal.reason).catch(() => {});
-  };
-  controller.signal.addEventListener('abort', cancel, { once: true });
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    const pending = fetcher(url, { signal: controller.signal, cache: 'no-store' }).then((response) => {
-      if (controller.signal.aborted) {
-        void response.body?.cancel(controller.signal.reason).catch(() => {});
-        controller.signal.throwIfAborted();
-      }
-      return response;
-    });
-    const response = await abortable(pending, controller.signal);
-    reader = response.body?.getReader();
-    controller.signal.throwIfAborted();
-    if (!response.ok) throw new Error(`Could not include image "${url}" (${response.status}).`);
-    if (Number(response.headers.get('content-length')) > PACKAGE_MAX_FILE_BYTES)
-      throw new Error(`Image "${url}" exceeds 10 MiB.`);
-    if (!reader) throw new Error(`Empty image "${url}".`);
-    while (true) {
-      controller.signal.throwIfAborted();
-      const { done, value } = await abortable(reader.read(), controller.signal);
-      controller.signal.throwIfAborted();
-      if (done) break;
-      size += value.length;
-      if (size > PACKAGE_MAX_FILE_BYTES) throw new Error(`Image "${url}" exceeds 10 MiB.`);
-      chunks.push(value);
-    }
-  } finally {
-    clearTimeout(timeout);
-    signal.removeEventListener('abort', abort);
-    controller.signal.removeEventListener('abort', cancel);
-    void reader?.cancel().catch(() => {});
-    reader?.releaseLock();
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return bytes;
 }
 
 /** Convert session origin multipliers to the existing normalized-origin/offset format, even outside 0..1. */
@@ -406,4 +374,3 @@ export function packageJson(files: PackageFiles, path: string): unknown {
   if (!bytes) throw new Error(`Missing package file "${path}".`);
   return JSON.parse(decoder.decode(bytes)) as unknown;
 }
-import { abortable } from '../../../engine/abortable.js';

@@ -1,3 +1,5 @@
+import { readResponseBody } from './resourceInput.js';
+
 /** Default size limit for externally loaded JSON and editor file/paste imports. */
 export const DEFAULT_MAX_JSON_BYTES = 10 * 1024 * 1024;
 
@@ -41,38 +43,20 @@ export async function readJsonResponse(
   countBytes: (bytes: number) => void,
 ): Promise<unknown> {
   validateInputLimit(maxBytes, 'JSON byte limit');
-  const reader = response.body?.getReader();
-  const onAbort = (): void => {
-    void reader?.cancel(signal.reason).catch(() => {});
-  };
-  signal.addEventListener('abort', onAbort, { once: true });
-  try {
-    signal.throwIfAborted();
-    const length = Number(response.headers.get('content-length'));
-    if (length > maxBytes) throw new JsonInputLimitError(`JSON exceeds the ${maxBytes}-byte size limit.`);
-    const decoder = new TextDecoder();
-    const parts: string[] = [];
-    let bytes = 0;
-    if (reader) {
-      while (true) {
-        const chunk = await reader.read();
-        signal.throwIfAborted();
-        if (chunk.done) break;
-        bytes += chunk.value.byteLength;
-        if (bytes > maxBytes) throw new JsonInputLimitError(`JSON exceeds the ${maxBytes}-byte size limit.`);
-        countBytes(chunk.value.byteLength);
-        parts.push(decoder.decode(chunk.value, { stream: true }));
-      }
-    }
-    parts.push(decoder.decode());
-    const data: unknown = JSON.parse(parts.join(''));
-    signal.throwIfAborted();
-    return data;
-  } catch (error) {
-    await reader?.cancel(error).catch(() => {});
-    throw error;
-  } finally {
-    signal.removeEventListener('abort', onAbort);
-    reader?.releaseLock();
-  }
+  const decoder = new TextDecoder();
+  const parts: string[] = [];
+  await readResponseBody(
+    response,
+    {
+      maxBytes,
+      signal,
+      countBytes,
+      limitError: () => new JsonInputLimitError(`JSON exceeds the ${maxBytes}-byte size limit.`),
+    },
+    (bytes) => parts.push(decoder.decode(bytes, { stream: true })),
+  );
+  parts.push(decoder.decode());
+  const data: unknown = JSON.parse(parts.join(''));
+  signal.throwIfAborted();
+  return data;
 }
