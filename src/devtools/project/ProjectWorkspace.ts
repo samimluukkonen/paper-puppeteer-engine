@@ -1,6 +1,7 @@
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { equalJsonData } from '../../engine/equalJsonData.js';
+import { validatePackageFiles } from '../../engine/packageZip.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import { createEmptyScene, parseSceneDefinition, type SceneDefinition } from '../../engine/SceneDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
@@ -162,6 +163,9 @@ export class ProjectWorkspace {
     return path;
   }
   async addCharacter(files: PackageFiles, name?: string): Promise<string> {
+    // Project archives can alias one physical binary to many logical files.
+    // Bound that expanded layout before allocating any detached byte copies.
+    validatePackageFiles(files);
     // Detach incoming bytes; callers cannot mutate artwork after registration.
     const owned = new Map([...files].map(([path, bytes]) => [path, new Uint8Array(bytes)]));
     const definition = await validatePackage(owned);

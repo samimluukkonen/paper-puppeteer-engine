@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { assert, expect, test } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
 import {
   buildProjectPackage,
@@ -33,6 +33,38 @@ async function emptyCharacter(id = 'hero'): Promise<PackageFiles> {
     replacements: [],
   });
 }
+
+test.each([257, 101])('project import bounds %s logical aliases before copying shared binaries', async (count) => {
+  const project = new ProjectWorkspace('Film');
+  await project.addCharacter(await emptyCharacter());
+  const files = new Map((await buildProjectPackage(project)).files);
+  const archive = JSON.parse(new TextDecoder().decode(files.get('project.json'))) as {
+    characters: { files: Record<string, string> }[];
+  };
+  const shared = new Uint8Array(count === 257 ? 1024 : 1024 * 1024);
+  files.set('shared.bin', shared);
+  for (let index = 0; index < count; ++index) archive.characters[0]!.files[`aliases/copy-${index}.bin`] = 'shared.bin';
+  files.set('project.json', new TextEncoder().encode(JSON.stringify(archive)));
+  const Native = Uint8Array;
+  let copies = 0;
+  vi.stubGlobal(
+    'Uint8Array',
+    new Proxy(Native, {
+      construct(target, args): Uint8Array<ArrayBuffer> {
+        const input: unknown = args[0];
+        if (input === shared) copies++;
+        return Reflect.construct(target, args) as Uint8Array<ArrayBuffer>;
+      },
+    }),
+  );
+  try {
+    await expect(importProjectPackage(files)).rejects.toThrow(count === 257 ? /1–256 files/ : /100 MiB/);
+    assert.equal(copies, 0);
+    assert.equal(project.definition.characters.length, 1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 
 test('plain JSON crosses retained editor realms while classes and accessors remain invalid', () => {
   const foreign: unknown = runInNewContext('({ version: 2, nested: { x: 12 }, array: [{ y: 10 }] })');

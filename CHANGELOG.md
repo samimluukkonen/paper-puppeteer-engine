@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Validate expanded project character file counts and byte totals before copying imported binaries, preventing physical-file aliases from multiplying allocations past package limits.
+
 - Process Project Workspace ZIP imports and exports in the shared package worker, with transfer deadlines and cancellation on workspace teardown. Record export checkpoints only after the worker finishes and the download starts.
 
 - Deduplicate equivalent scene recovery character packages across manifest aliases and retained scenes. Give distinct same-ID packages collision-free IDs in the detached recovery copy, preserving every Actor dependency and original source document.
