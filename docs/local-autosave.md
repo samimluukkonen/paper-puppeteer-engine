@@ -14,6 +14,8 @@ Draft preparation times out after 60 seconds; each artwork request, including it
 
 ## Persistence format and retention
 
+Standalone scene recovery merges equivalent character packages even when their manifest references differ. Distinct packages sharing a character ID receive unique `-recovery-N` IDs in the detached recovery project, with Actor references remapped to their own package. Original scene snapshots and character definitions retain their authored identities.
+
 Database: `paper-puppeteer-recovery`, database version **1**.
 
 - `drafts`: records keyed by a revision UUID, with a document `key` index. Each envelope has `version: 1`, `id`, `key`, `name`, an actual `savedAt` timestamp in epoch milliseconds, the authored `revision` fingerprint, and `files: [{ path, blob, digest }]`. JSON documents are canonical UTF-8 package files; image files contain actual binary data. Each digest is SHA-256.

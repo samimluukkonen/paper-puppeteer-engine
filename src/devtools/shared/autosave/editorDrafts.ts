@@ -1,10 +1,27 @@
 import { canonicalJson } from '../../../engine/authoredSerialization.js';
+import { characterManifestSchema } from '../../../engine/CharacterDefinition.js';
 import { parseSceneDefinition } from '../../../engine/SceneDefinition.js';
 import { buildProjectPackage, packageHostedCharacter } from '../../project/projectPackage.js';
 import { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
 import type { SceneCharacterRegistry } from '../../scene-editor/SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from '../../scene-editor/SceneEditorDocument.js';
-import { buildCharacterPackage, capturePackage, type PackageSnapshot } from '../package/characterPackage.js';
+import {
+  buildCharacterPackage,
+  capturePackage,
+  packageJson,
+  type PackageFiles,
+  type PackageSnapshot,
+} from '../package/characterPackage.js';
+
+function samePackage(first: PackageFiles, second: PackageFiles): boolean {
+  return (
+    first.size === second.size &&
+    [...first].every(([path, bytes]) => {
+      const other = second.get(path);
+      return other?.length === bytes.length && bytes.every((byte, index) => byte === other[index]);
+    })
+  );
+}
 
 /** Standalone drafts use the same complete portable project payload as project recovery. */
 export async function buildCharacterDraft(input: PackageSnapshot, id: string, signal?: AbortSignal) {
@@ -25,15 +42,45 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
       // All retained scene snapshots are immutable and captured before dependency reads.
       const workspace = new ProjectWorkspace(scenes[0]!.name, id);
       const references = new Map<string, string>();
-      for (const scene of scenes)
-        for (const actor of scene.actors) {
-          const reference = actor.character.manifest;
-          if (references.has(reference)) continue;
-          const definition = await registry.load(reference);
-          signal?.throwIfAborted();
-          const characterId = await workspace.addCharacter(await packageHostedCharacter(definition, undefined, signal));
-          references.set(reference, workspace.characterReference(characterId));
+      const manifests = [...new Set(scenes.flatMap((scene) => scene.actors.map((actor) => actor.character.manifest)))];
+      const definitions = new Map<string, Awaited<ReturnType<typeof registry.load>>>();
+      for (const reference of manifests) {
+        signal?.throwIfAborted();
+        definitions.set(reference, await registry.load(reference));
+      }
+      // Reserve all source IDs before allocating recovery-only aliases, including later packages.
+      const reserved = new Set([...definitions.values()].map((definition) => definition.id.toLowerCase()));
+      const packages = new Map<string, { files: PackageFiles; reference: string }[]>();
+      for (const [reference, definition] of definitions) {
+        signal?.throwIfAborted();
+        const files = await packageHostedCharacter(definition, undefined, signal);
+        const identity = definition.id.toLowerCase();
+        const previous = packages.get(identity) ?? [];
+        const equivalent = previous.find((entry) => samePackage(entry.files, files));
+        if (equivalent) {
+          references.set(reference, equivalent.reference);
+          continue;
         }
+        let owned = files;
+        if (previous.length) {
+          let index = 2;
+          let alias: string;
+          do {
+            alias = `${definition.id.slice(0, 170)}-recovery-${index++}`;
+          } while (reserved.has(alias.toLowerCase()));
+          reserved.add(alias.toLowerCase());
+          const manifest = characterManifestSchema.parse(packageJson(files, 'character.json'));
+          owned = new Map(files).set(
+            'character.json',
+            new TextEncoder().encode(canonicalJson({ ...manifest, id: alias })),
+          );
+        }
+        const characterId = await workspace.addCharacter(owned);
+        const target = workspace.characterReference(characterId);
+        previous.push({ files, reference: target });
+        packages.set(identity, previous);
+        references.set(reference, target);
+      }
       for (const scene of scenes)
         workspace.addScene({
           ...parseSceneDefinition(scene),

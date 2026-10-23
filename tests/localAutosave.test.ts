@@ -401,6 +401,69 @@ test('standalone scenes preserve all retained documents in the portable recovery
   registry.dispose();
 });
 
+test('scene recovery deduplicates equivalent packages across different references and retained scenes', async () => {
+  vi.useRealTimers();
+  const document = new SceneEditorDocument();
+  const definitions = ['one', 'two'].map(() => createNewCharacter({ id: 'shared-hero', name: 'Hero' }).definition);
+  const registry = new SceneCharacterRegistry((reference) =>
+    Promise.resolve(definitions[reference.startsWith('../') ? 1 : 0]!),
+  );
+  document.createScene({ id: 'one' });
+  document.addActor('characters/hero/character.json');
+  document.createScene({ id: 'two' });
+  document.addActor('../characters/hero/character.json');
+  const before = document.sceneIds.map((id) => document.scene(id));
+  try {
+    const recovered = await importProjectPackage(await sceneDraftSource(document, registry, 'film')!.build());
+    assert.equal(recovered.definition.characters.length, 1);
+    assert.equal(
+      recovered.scenes.scene('one')!.actors[0]!.character.manifest,
+      recovered.scenes.scene('two')!.actors[0]!.character.manifest,
+    );
+    assert.deepEqual(
+      document.sceneIds.map((id) => document.scene(id)),
+      before,
+    );
+    assert.equal(definitions[0]!.id, 'shared-hero');
+  } finally {
+    registry.dispose();
+  }
+});
+
+test('scene recovery preserves distinct same-ID packages without colliding with other source IDs', async () => {
+  vi.useRealTimers();
+  const document = new SceneEditorDocument();
+  const definitions = [
+    createNewCharacter({ id: 'shared-hero', name: 'First' }).definition,
+    createNewCharacter({ id: 'shared-hero', name: 'Second' }).definition,
+    createNewCharacter({ id: 'shared-hero-recovery-2', name: 'Third' }).definition,
+  ];
+  const registry = new SceneCharacterRegistry((reference) => Promise.resolve(definitions[Number(reference[0])]!));
+  document.createScene({ id: 'one' });
+  for (let index = 0; index < definitions.length; index++) document.addActor(`${index}/character.json`);
+  try {
+    const recovered = await importProjectPackage(await sceneDraftSource(document, registry, 'film')!.build());
+    assert.equal(recovered.definition.characters.length, 3);
+    const actors = recovered.scenes.scene('one')!.actors;
+    assert.equal(new Set(actors.map((actor) => actor.character.manifest)).size, 3);
+    assert.deepEqual(
+      actors.map(
+        (actor) => recovered.character(recovered.resolveCharacter(actor.character.manifest)).definition.rigFile!.name,
+      ),
+      ['First', 'Second', 'Third'],
+    );
+    assert.equal(recovered.definition.characters[1]!.id, 'shared-hero-recovery-3');
+    assert.deepEqual(
+      definitions.map((definition) => definition.id),
+      ['shared-hero', 'shared-hero', 'shared-hero-recovery-2'],
+    );
+    const again = await importProjectPackage((await buildProjectPackage(recovered)).files);
+    assert.deepEqual(again.definition, recovered.definition);
+  } finally {
+    registry.dispose();
+  }
+});
+
 test('open Actor and action gestures block project snapshots and cancellation restores the authored revision', async () => {
   vi.useRealTimers();
   const workspace = new ProjectWorkspace('Film');

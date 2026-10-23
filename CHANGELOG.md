@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Deduplicate equivalent scene recovery character packages across manifest aliases and retained scenes. Give distinct same-ID packages collision-free IDs in the detached recovery copy, preserving every Actor dependency and original source document.
+
 - Cancel autosave package preparation on discard, suspension and disposal; time out stalled draft builds and artwork requests while preserving the previous draft and allowing retry.
 
 - Bound scene actors, actions, per-instance bone/slot allocation and aggregate artwork bytes/pixels before constructing runtime previews. Share texture guards across scene character loads and validate scene ZIP texture totals.
