@@ -109,6 +109,58 @@ export const animationGuides: readonly GuideDefinition[] = [
     ],
   },
   {
+    id: 'animation-variation',
+    title: 'Create an Animation Variation',
+    description: 'Copy an existing animation, preview optional timing changes and edit the new clip independently.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'source',
+        'Choose the source animation',
+        'After exiting this tour, select the animation you want to build on. Create Variation copies its current authored working copy, including committed unsaved edits. Finish or cancel temporary bone/IK edits and key drags first. The source animation stays unchanged; this tour only highlights controls.',
+        targets.animationSelection,
+      ),
+      step(
+        'name',
+        'Open Create Variation and choose an ID',
+        'Choose Create Variation to open its dialog. Check Source, then enter a unique New name / ID. The suggested ID is unused; duplicate IDs are rejected. Use letters, numbers, - or _, starting with a letter or number. The name is the stable animation ID, with no separate display name. To give a later version another ID, create another variation.',
+        targets.animationVariation,
+      ),
+      step(
+        'timing',
+        'Keep timing or scale the whole clip',
+        'In the dialog, Time scale 1 keeps timing, 2 doubles duration and 0.5 plays twice as fast. Duration, bone keys, IK keys and events scale together. Curves, event payloads, loop/playback settings and baked IK suppression are preserved. Authored stepped FPS stays the same. Invalid scales or collapsed key times are rejected.',
+        targets.animationVariation,
+      ),
+      step(
+        'preview',
+        'Preview before creating',
+        'Change Time scale or scrub Preview position in the dialog to sample the proposal on this canvas. Preview pauses playback without changing the source, its playhead, exports or history, and fires no animation events. Cancel or Escape discards the proposal and restores the held source pose. This tour does not open the dialog or start a preview.',
+        targets.animationCanvas,
+      ),
+      step(
+        'create',
+        'Create a separate New / Unsaved animation',
+        'When ready, choose Create Variation in the dialog. The new clip is registered and selected as New / Unsaved, paused at zero, with its own empty edit history. The source keeps its committed edits and history. Tracks, curves and nested event payloads are independent copies; later changes to either animation never propagate to the other.',
+        targets.animationSelection,
+      ),
+      step(
+        'edit',
+        'Edit and compare independently',
+        'Select a bone or IK track and edit keys normally. Graph Editor refines outgoing curves; Pose Library, Mirror tools and IK baking work on the variation as usual. Undo/Redo affects edits to the selected clip; creation itself is navigation. Switch between source and variation to compare them. Revert restores the variation’s initial copied baseline.',
+        targets.animationGraphToggle,
+      ),
+      step(
+        'save',
+        'Keep the variation and use its new ID',
+        'Download JSON exports the selected variation. Character and project ZIPs include registered variations, including inactive ones. Reload/import uses the ordinary animation format. Scene Editor animation clips and runtime queues/states refer to the new ID; existing source references stay unchanged. Downloading does not write files into the source directory.',
+        targets.animationExport,
+      ),
+    ],
+  },
+  {
     id: 'animation-first-keyframe',
     title: 'Create Your First Keyframe',
     description: 'Select a bone, place the playhead and commit a local transform key.',

@@ -9,6 +9,7 @@ import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { importAnimationJson } from './animationImport.js';
 import { serializeAnimation, type AnimationExportResult } from './animationSerialization.js';
+import { createAnimationVariation, type AnimationVariationOptions } from './animationVariation.js';
 import { createEmptyAnimation, type NewAnimationOptions } from './createEmptyAnimation.js';
 import { inspectEditorAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 
@@ -201,6 +202,22 @@ export class AnimationEditorDocument {
       this.reportError(error);
       return false;
     }
+    return this.registerNewAnimation(animation);
+  }
+
+  /** Copy the current committed working snapshot, including unsaved authored edits. */
+  createVariation(options: AnimationVariationOptions): boolean {
+    try {
+      if (!this.working || !this.rig) throw new Error('Select a valid source animation first.');
+      if (this.animations.has(options.name)) throw new Error(`Animation "${options.name}" is already registered.`);
+      return this.registerNewAnimation(createAnimationVariation(this.working, this.rig, options));
+    } catch (error) {
+      this.reportError(error);
+      return false;
+    }
+  }
+
+  private registerNewAnimation(animation: ReadonlyAnimation): boolean {
     const previous = this.selectedId === null ? undefined : this.animations.get(this.selectedId);
     if (previous) {
       previous.working = this.working;

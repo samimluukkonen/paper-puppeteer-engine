@@ -36,6 +36,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
     [
       'animation-ground-reference',
       'animation-new',
+      'animation-variation',
       'animation-first-keyframe',
       'animation-animate-bone',
       'animation-timeline-navigation',

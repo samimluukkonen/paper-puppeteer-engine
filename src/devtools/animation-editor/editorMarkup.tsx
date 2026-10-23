@@ -12,6 +12,8 @@ import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { AnimationGroundPanel } from './AnimationGroundPanel.js';
+import type { AnimationVariationController } from './AnimationVariationController.js';
+import { AnimationVariationDialog } from './AnimationVariationDialog.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
 import type { FootContactGroundController } from './FootContactGroundController.js';
@@ -37,6 +39,7 @@ export function AnimationEditorView({
   mirrorTools,
   poseLibrary,
   newAnimation,
+  variations,
   ikInspector,
   ikBake,
   retiming,
@@ -53,6 +56,7 @@ export function AnimationEditorView({
   mirrorTools: MirrorToolsController;
   poseLibrary?: PoseLibraryController;
   newAnimation?: NewAnimationController;
+  variations?: AnimationVariationController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
   retiming: KeyframeRetimingController;
@@ -112,6 +116,7 @@ export function AnimationEditorView({
               </label>
             )}
             {newAnimation && <NewAnimationDialog controller={newAnimation} />}
+            {variations && <AnimationVariationDialog controller={variations} />}
             <label inert={tweaking}>
               Animation <select id="animation-selection" data-guide-id={GUIDE_TARGETS.animationSelection}></select>
             </label>

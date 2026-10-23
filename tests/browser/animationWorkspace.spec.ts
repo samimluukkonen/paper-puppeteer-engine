@@ -44,7 +44,9 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
     expect(inspector.x).toBeLessThan(preview.x);
     expect(inspector.width).toBe(timelinePanel.width);
     const header = (await page.locator('#animation-editor-app .view-header').boundingBox())!;
-    expect(preview.y).toBe(header.y + header.height + 8);
+    const localSave = page.locator('#animation-editor-app .local-draft-bar:visible');
+    const chromeBottom = (await localSave.count()) ? (await localSave.boundingBox())! : header;
+    expect(preview.y).toBe(chromeBottom.y + chromeBottom.height + 8);
     expect(preview.y).toBeLessThan((await commandBar.boundingBox())!.y);
     expect(preview.y + preview.height).toBeCloseTo(timelinePanel.y + timelinePanel.height, 0);
     expect(stage.y + stage.height).toBeCloseTo(preview.y + preview.height - 1, 0);
@@ -56,7 +58,10 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
     const tracks = (await page.locator('.timeline-inset').boundingBox())!;
     const rulerHeight = (await page.locator('#timeline-ruler').boundingBox())!.height;
     expect(tracks.height - rulerHeight).toBeGreaterThanOrEqual(width! < 1280 ? 90 : 150);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
+    // Short desktop windows retain the editors' minimum panel heights and scroll to their bottom.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(
+      Math.max(height!, Math.ceil(preview.y + preview.height)),
+    );
     const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
     await page.locator('#timeline-add-event').click();
     await expect(page.locator('#animation-event-inspector')).toBeVisible();

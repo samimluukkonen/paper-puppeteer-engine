@@ -25,8 +25,8 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains seventeen bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 17);
+test('Animation Editor catalog contains eighteen bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 18);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
@@ -122,6 +122,9 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     const before = {
       rig: rig.workingCopy,
       clip: animation.workingAnimation,
+      ids: animation.animationIds,
+      session: animation.sessionRevision,
+      preview: animation.previewAnimation,
       json: JSON.stringify(animation.workingAnimation),
       history: animation.historyLength,
       rigHistory: rig.historyLength,
@@ -159,6 +162,9 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     }
     assert.strictEqual(rig.workingCopy, before.rig);
     assert.strictEqual(animation.workingAnimation, before.clip);
+    assert.strictEqual(animation.animationIds, before.ids);
+    assert.equal(animation.sessionRevision, before.session);
+    assert.strictEqual(animation.previewAnimation, before.preview);
     assert.equal(JSON.stringify(animation.workingAnimation), before.json);
     assert.equal(animation.historyLength, before.history);
     assert.equal(rig.historyLength, before.rigHistory);

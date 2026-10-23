@@ -46,6 +46,7 @@ import {
   getEvaluatedBonePropertyValue,
   getEvaluatedBoneTransform,
 } from './animationValues.js';
+import { createAnimationVariation, type AnimationVariationOptions } from './animationVariation.js';
 import type { NewAnimationOptions } from './createEmptyAnimation.js';
 import {
   type GhostPoseSample,
@@ -96,6 +97,39 @@ export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  private variationPreview: {
+    base: ReadonlyAnimation;
+    rig: Rig;
+    animation: ReadonlyAnimation;
+    timeMs: number;
+  } | null = null;
+
+  get previewTimeMilliseconds(): Milliseconds {
+    return this.variationPreview?.timeMs ?? this.currentTimeMilliseconds;
+  }
+
+  /** Pose-only scrub in the existing preview; authored clocks, events and history stay untouched. */
+  previewVariation(options: AnimationVariationOptions, progress: number): void {
+    if (!this.animationAuthoringEnabled || !this.working || !this.rig || this.hasPendingAnimationEdits)
+      throw new Error('Commit or cancel temporary edits before previewing a variation.');
+    if (!Number.isFinite(progress) || progress < 0 || progress > 1)
+      throw new Error('Preview progress must be from 0 to 1.');
+    const animation = createAnimationVariation(this.working, this.rig, options);
+    this.batchNotifications(() => {
+      this.pause();
+      this.posePreview = null;
+      this.variationPreview = { base: this.working!, rig: this.rig!, animation, timeMs: animation.duration * progress };
+      this.notify();
+    });
+  }
+
+  cancelVariationPreview(): boolean {
+    if (!this.variationPreview) return false;
+    this.variationPreview = null;
+    this.notify();
+    return true;
+  }
+
   private graphGesture: {
     readonly base: ReadonlyAnimation;
     readonly ref: GraphKeyRef;
@@ -105,7 +139,7 @@ export class AnimationEditorState {
 
   /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
   get previewAnimation(): ReadonlyAnimation | null {
-    return this.graphGesture?.preview ?? this.working;
+    return this.variationPreview?.animation ?? this.graphGesture?.preview ?? this.working;
   }
   get graphEditActive(): boolean {
     return this.graphGesture !== null;
@@ -456,8 +490,8 @@ export class AnimationEditorState {
   }
   get selectedIKTargetValues() {
     const id = this.selectedIKConstraintId;
-    if (this.graphGesture && id && this.rig)
-      return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.currentTimeMilliseconds);
+    if ((this.graphGesture || this.variationPreview) && id && this.rig)
+      return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.previewTimeMilliseconds);
     return this.ik.selectedIKTargetValues;
   }
   selectIKConstraint(id: string, property: IKAnimationProperty | null = null): boolean {
@@ -660,10 +694,11 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
+    const variation = this.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event || ik || graph;
+    return this.cancelKeyframeDrag() || event || ik || graph || variation;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -992,6 +1027,15 @@ export class AnimationEditorState {
       return;
     }
     if (
+      this.variationPreview &&
+      (this.variationPreview.base !== this.working ||
+        this.variationPreview.rig !== this.rig ||
+        !this.animationAuthoringEnabled ||
+        this.hasPendingAnimationEdits ||
+        this.isPlaying)
+    )
+      this.variationPreview = null;
+    if (
       this.posePreview &&
       (this.posePreview.animation !== this.working ||
         this.posePreview.rig !== this.rig ||
@@ -1179,7 +1223,9 @@ export class AnimationEditorState {
           this.rig,
           boneId,
           property,
-          this.playback.resolveTimeMilliseconds(timeSeconds),
+          timeSeconds === this.currentTime
+            ? this.previewTimeMilliseconds
+            : this.playback.resolveTimeMilliseconds(timeSeconds),
         )
       : undefined;
   }
@@ -1190,7 +1236,9 @@ export class AnimationEditorState {
           this.previewAnimation,
           this.rig,
           boneId,
-          this.playback.resolveTimeMilliseconds(timeSeconds),
+          timeSeconds === this.currentTime
+            ? this.previewTimeMilliseconds
+            : this.playback.resolveTimeMilliseconds(timeSeconds),
         )
       : undefined;
   }
@@ -1315,6 +1363,7 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.variationPreview = null;
     this.cancelGraphEdit();
     this.posePreview = null;
     this.cancelIKTargetDrag();
@@ -1339,11 +1388,24 @@ export class AnimationEditorState {
 
   /** A new document is a navigation boundary, never an edit to the previously selected clip. */
   createAnimation(options: NewAnimationOptions): boolean {
+    return this.createAnimationSession(() => this.document.createAnimation(options));
+  }
+
+  createVariation(options: AnimationVariationOptions): boolean {
+    if (this.hasPendingAnimationEdits) {
+      this.document.reportError(new Error('Commit or cancel temporary edits before creating a variation.'));
+      this.notify();
+      return false;
+    }
+    return this.createAnimationSession(() => this.document.createVariation(options));
+  }
+
+  private createAnimationSession(create: () => boolean): boolean {
     if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => {
       const previousId = this.selectedAnimationId;
       const previousContext = { time: this.currentTime, keys: this.selectedKeys };
-      const created = this.document.createAnimation(options);
+      const created = create();
       if (created) {
         if (previousId) this.clipContexts.set(previousId, previousContext);
         this.resetAnimationSession(true);

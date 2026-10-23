@@ -31,6 +31,7 @@ import { bindWorkspaceNavigation, workspaceView } from '../shared/WorkspaceNavig
 import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { AnimationVariationController } from './AnimationVariationController.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
@@ -85,6 +86,7 @@ const artwork = new ArtworkController(
 const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
 const newAnimation = new NewAnimationController();
+const variations = new AnimationVariationController();
 const retiming = new KeyframeRetimingController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const poseLibrary = new PoseLibraryController();
@@ -174,6 +176,7 @@ function CharacterWorkspace() {
           mirrorTools={mirrorTools}
           poseLibrary={poseLibrary}
           newAnimation={newAnimation}
+          variations={variations}
           ikInspector={ikInspector}
           groundGuide={groundGuide}
           footContacts={footContacts}
@@ -307,6 +310,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       );
       guides.refresh();
       newAnimation.bind(state);
+      variations.bind(state);
       rigTweak.bind(state, editorScene.rigEditor!);
       rigWorkspace.render(editorScene.rigEditor!);
       editorScene.fitPreview();
@@ -392,6 +396,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       stateOwner = undefined;
       guides.refresh();
       newAnimation.unbind();
+      variations.unbind();
       rigWorkspace.showError(message);
       packages.unbind();
       releaseAnimationPackage?.();
@@ -535,6 +540,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     ikBake.dispose();
     retiming.dispose();
     newAnimation.dispose();
+    variations.dispose();
     workspace.dispose();
     recoveryControls.dispose();
     releaseNavigationGuard();

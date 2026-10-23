@@ -493,6 +493,14 @@ a {
 .animation-dialog::backdrop {
   background: var(--backdrop);
 }
+.animation-variation-dialog {
+  width: 440px;
+  padding: 16px;
+}
+.animation-variation-dialog label {
+  display: grid;
+  gap: 8px;
+}
 .animation-dialog-heading {
   display: flex;
   justify-content: space-between;

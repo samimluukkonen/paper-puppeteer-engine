@@ -39,7 +39,7 @@ export class AnimationEditorPreview {
     }
     const animation = this.state.previewAnimation;
     const rig = this.state.rig ?? this.puppet.rig;
-    const time = animation ? this.state.currentTimeMilliseconds : 0;
+    const time = animation ? this.state.previewTimeMilliseconds : 0;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.
     const sampledTime =
       animation && time !== animation.duration

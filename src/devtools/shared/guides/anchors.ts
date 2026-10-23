@@ -53,6 +53,7 @@ export const GUIDE_TARGETS = {
   rigGroundY: 'rig-ground-y',
   rigGroundReset: 'rig-ground-reset',
   animationNew: 'animation-new',
+  animationVariation: 'animation-variation',
   animationSelection: 'animation-selection',
   animationSettings: 'animation-settings',
   animationMode: 'animation-editor-mode',
