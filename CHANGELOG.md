@@ -37,6 +37,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.1.4
+
+Add [Motion Cleanup & Diagnostics](docs/motion-diagnostics.md) to Animation Editor’s Tools menu, with manual configurable possible-issue detection through the runtime property sampler, actual key spacing and shortest-path rotation. Inspect findings through shared timeline selection. Conservatively propose linear interior property removals, protect events, nonlinear/stepped motion, IK chains/ancestors and baked metadata, and verify combined deviation against the original. Add selectable candidates, numerical error reports, a pose-only before/after canvas scrub preview, cancellation and explicit Apply as one revalidated Undo/Redo transaction. Cache reports outside playback and bound dense-channel cleanup work. Defer contact-drift inference without authored contact intervals. Add unit and local desktop browser regressions; authored formats and public runtime APIs stay unchanged.
+
 ## 1.1.3
 
 Add a seven-step **Create an Animation Variation** tour to the shared Feature Guide catalog, covering source selection, unique IDs, time scaling, preview/cancel, New / Unsaved documents, independent editing/history and export/Scene Editor references. Highlight the real toolbar action and existing workspace controls without opening dialogs or changing authored data. Extend guide immutability and local desktop browser coverage.

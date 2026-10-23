@@ -27,6 +27,8 @@ import type { KeyframeRetimingController } from './KeyframeRetimingController.js
 import { KeyframeRetimingPanel } from './KeyframeRetimingPanel.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
+import type { MotionDiagnosticsController } from './MotionDiagnosticsController.js';
+import { MotionDiagnosticsPanel } from './MotionDiagnosticsPanel.js';
 import type { NewAnimationController } from './NewAnimationController.js';
 import { NewAnimationDialog } from './NewAnimationDialog.js';
 import type { PoseLibraryController } from './PoseLibraryController.js';
@@ -43,6 +45,7 @@ export function AnimationEditorView({
   ikInspector,
   ikBake,
   retiming,
+  motionDiagnostics,
   artwork,
   rigTweak,
   attachments,
@@ -60,6 +63,7 @@ export function AnimationEditorView({
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
   retiming: KeyframeRetimingController;
+  motionDiagnostics?: MotionDiagnosticsController;
   artwork?: ArtworkController;
   rigTweak?: RigTweakController;
   attachments?: AttachmentController;
@@ -198,6 +202,11 @@ export function AnimationEditorView({
                     Pose Library…
                   </button>
                 )}
+                {motionDiagnostics && (
+                  <button type="button" data-open-panel="animation-motion-panel">
+                    Motion Diagnostics…
+                  </button>
+                )}
                 <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
                   Retime selected keys…
                 </button>
@@ -241,6 +250,7 @@ export function AnimationEditorView({
               {poseLibrary && <PoseLibraryPanel controller={poseLibrary} />}
               <IKBakePanel controller={ikBake} />
               <KeyframeRetimingPanel controller={retiming} />
+              {motionDiagnostics && <MotionDiagnosticsPanel controller={motionDiagnostics} />}
             </div>
             <div className="animation-save" inert={tweaking}>
               <button

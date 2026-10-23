@@ -1647,3 +1647,32 @@ a {
 #graph-toggle[aria-pressed="true"] {
   border-color: var(--accent-fg);
 }
+
+.animation-motion-panel {
+  width: min(520px, calc(100vw - 40px));
+}
+.animation-motion-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-block: 16px;
+}
+.animation-motion-list {
+  max-height: 200px;
+  overflow: auto;
+  padding: 0;
+  list-style: none;
+}
+.animation-motion-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--border-default);
+}
+.animation-motion-panel label.animation-motion-candidate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

@@ -40,6 +40,7 @@ import { IKBakeController } from './IKBakeController.js';
 import { IKInspectorController } from './IKInspectorController.js';
 import { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
+import { MotionDiagnosticsController } from './MotionDiagnosticsController.js';
 import { NewAnimationController } from './NewAnimationController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { PoseLibraryController } from './PoseLibraryController.js';
@@ -88,6 +89,7 @@ const rigTweak = new RigTweakController(attachments);
 const newAnimation = new NewAnimationController();
 const variations = new AnimationVariationController();
 const retiming = new KeyframeRetimingController();
+const motionDiagnostics = new MotionDiagnosticsController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
 const poseLibrary = new PoseLibraryController();
 const ikBake = new IKBakeController(
@@ -185,6 +187,7 @@ function CharacterWorkspace() {
           }}
           ikBake={ikBake}
           retiming={retiming}
+          motionDiagnostics={motionDiagnostics}
           rigTweak={rigTweak}
           header={!rigView}
           afterHeader={!rigView ? draftControls : undefined}
@@ -318,6 +321,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       poseLibrary.bind(state);
       ikBake.bind(state);
       retiming.bind(state);
+      motionDiagnostics.bind(state);
       timeline.bind(state, id);
       inspector.bind(state);
       ikInspector.bind(state);
@@ -409,6 +413,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       poseLibrary.unbind();
       ikBake.unbind();
       retiming.unbind();
+      motionDiagnostics.unbind();
       ikInspector.unbind();
       inspector.unbind();
       timeline.showError(message);
@@ -539,6 +544,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     poseLibrary.dispose();
     ikBake.dispose();
     retiming.dispose();
+    motionDiagnostics.dispose();
     newAnimation.dispose();
     variations.dispose();
     workspace.dispose();

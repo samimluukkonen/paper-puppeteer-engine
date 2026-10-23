@@ -68,10 +68,12 @@ import {
 } from './interpolation.js';
 import type { KeyframeClipboard } from './keyframeClipboard.js';
 import { setBonePropertyKeyframes } from './keyframeEdits.js';
+import type { PropertyKeyframeTarget } from './keyframeEdits.js';
 import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
+import { previewMotionCleanup, type MotionDiagnosticOptions } from './motionDiagnostics.js';
 import { PoseLibrary } from './PoseLibrary.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
@@ -79,6 +81,7 @@ import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js
 import { AnimationEditorTimelineSnapping, type TimelineSnapSettings } from './timelineSnapping.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
+import { getValidatedEditorAnimation } from './validatedAnimation.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
@@ -97,6 +100,52 @@ export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  private cleanupPreview: { base: ReadonlyAnimation; rig: Rig; animation: ReadonlyAnimation; timeMs: number } | null =
+    null;
+
+  get cleanupPreviewActive(): boolean {
+    return !!this.cleanupPreview && this.cleanupPreview.base === this.working && this.cleanupPreview.rig === this.rig;
+  }
+
+  /** Pose-only comparison through the existing runtime canvas; events and authored data stay untouched. */
+  previewCleanup(animation: ReadonlyAnimation, timeMs: number): void {
+    if (!this.working || !this.rig || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits)
+      throw new Error('Commit or cancel temporary edits before cleanup preview.');
+    if (!Number.isFinite(timeMs) || timeMs < 0 || timeMs > animation.duration) throw new Error('Invalid preview time.');
+    getValidatedEditorAnimation(animation, this.rig);
+    this.batchNotifications(() => {
+      this.pause();
+      this.variationPreview = null;
+      this.posePreview = null;
+      this.cleanupPreview = { base: this.working!, rig: this.rig!, animation, timeMs };
+      this.notify();
+    });
+  }
+  cancelCleanupPreview(): boolean {
+    if (!this.cleanupPreview) return false;
+    this.cleanupPreview = null;
+    this.notify();
+    return true;
+  }
+  applyMotionCleanup(
+    targets: readonly PropertyKeyframeTarget[],
+    options: Partial<MotionDiagnosticOptions> = {},
+  ): boolean {
+    if (
+      !this.working ||
+      !this.rig ||
+      !this.animationAuthoringEnabled ||
+      this.hasPendingAnimationEdits ||
+      !targets.length
+    )
+      return false;
+    return this.batchNotifications(() => {
+      const result = previewMotionCleanup(this.working!, this.rig!, targets, options);
+      const next = this.document.inspect(result.animation);
+      return !!next && this.installWorkingAnimation(next);
+    });
+  }
+
   private variationPreview: {
     base: ReadonlyAnimation;
     rig: Rig;
@@ -105,7 +154,11 @@ export class AnimationEditorState {
   } | null = null;
 
   get previewTimeMilliseconds(): Milliseconds {
-    return this.variationPreview?.timeMs ?? this.currentTimeMilliseconds;
+    return (
+      (this.cleanupPreviewActive ? this.cleanupPreview!.timeMs : undefined) ??
+      this.variationPreview?.timeMs ??
+      this.currentTimeMilliseconds
+    );
   }
 
   /** Pose-only scrub in the existing preview; authored clocks, events and history stay untouched. */
@@ -118,6 +171,7 @@ export class AnimationEditorState {
     this.batchNotifications(() => {
       this.pause();
       this.posePreview = null;
+      this.cancelCleanupPreview();
       this.variationPreview = { base: this.working!, rig: this.rig!, animation, timeMs: animation.duration * progress };
       this.notify();
     });
@@ -139,7 +193,12 @@ export class AnimationEditorState {
 
   /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
   get previewAnimation(): ReadonlyAnimation | null {
-    return this.variationPreview?.animation ?? this.graphGesture?.preview ?? this.working;
+    return (
+      (this.cleanupPreviewActive ? this.cleanupPreview!.animation : undefined) ??
+      this.variationPreview?.animation ??
+      this.graphGesture?.preview ??
+      this.working
+    );
   }
   get graphEditActive(): boolean {
     return this.graphGesture !== null;
@@ -254,6 +313,7 @@ export class AnimationEditorState {
       return false;
     return this.batchNotifications(() => {
       this.pause();
+      this.cancelCleanupPreview();
       this.posePreview = { pose: this.poseLibrary.get(id).pose, animation: this.working!, rig: this.rig! };
       this.notify();
       return true;
@@ -694,11 +754,12 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
+    const cleanup = this.cancelCleanupPreview();
     const variation = this.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event || ik || graph || variation;
+    return this.cancelKeyframeDrag() || event || ik || graph || variation || cleanup;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -1027,6 +1088,11 @@ export class AnimationEditorState {
       return;
     }
     if (
+      this.cleanupPreview &&
+      (!this.cleanupPreviewActive || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits || this.isPlaying)
+    )
+      this.cleanupPreview = null;
+    if (
       this.variationPreview &&
       (this.variationPreview.base !== this.working ||
         this.variationPreview.rig !== this.rig ||
@@ -1268,6 +1334,7 @@ export class AnimationEditorState {
 
   play(): void {
     if (!this.animationAuthoringEnabled) return;
+    this.cancelCleanupPreview();
     this.playbackController.play();
   }
 
@@ -1277,6 +1344,7 @@ export class AnimationEditorState {
 
   togglePlayback(): void {
     if (!this.animationAuthoringEnabled) return;
+    this.cancelCleanupPreview();
     this.playbackController.togglePlayback();
   }
 
@@ -1363,6 +1431,7 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.cleanupPreview = null;
     this.variationPreview = null;
     this.cancelGraphEdit();
     this.posePreview = null;
