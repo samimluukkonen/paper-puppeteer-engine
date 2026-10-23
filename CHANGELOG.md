@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Extract retained project editor contexts, runtime leases and preview teardown into a dedicated controller. Cancel opening work on workspace disposal, release late leases, and finish remaining cleanup after individual preview failures.
+
 - Share bounded response streaming, request deadlines and cancellation across character metadata, scene resources and package artwork. Release readers promptly even when custom fetch or stream cancellation stalls, and cancel late response bodies.
 
 - Preserve custom character manifest paths through project export/import, rebase standalone scene ZIPs independently, and reject physical metadata collisions before a download can overwrite a resource.

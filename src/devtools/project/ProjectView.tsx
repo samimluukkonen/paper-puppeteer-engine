@@ -1,7 +1,6 @@
 import { Download, FolderInput, FolderOpen, FolderPlus, Redo2, ShieldCheck, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { abortable } from '../../engine/abortable.js';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
 import { readJsonFile } from '../../engine/jsonInput.js';
 import { PACKAGE_MAX_BYTES } from '../../engine/packageZip.js';
@@ -14,62 +13,25 @@ import { ViewHeader } from '../../ui/viewShell.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
-import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
+import { buildCharacterPackage } from '../shared/package/characterPackage.js';
 import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
 import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
-import type { ProjectEditorContext } from './projectBridge.js';
+import { ProjectEditorHosts, type ProjectEditorHost, type ProjectSession } from './ProjectEditorHosts.js';
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
-import {
-  ProjectValidationError,
-  requireValidExport,
-  type ProjectInspection,
-  type ValidationContext,
-} from './projectInspection.js';
-import {
-  buildProjectPackage,
-  buildProjectScenePackage,
-  characterFileFetcher,
-  importProjectPackage,
-  packageHostedCharacter,
-} from './projectPackage.js';
+import { ProjectValidationError, type ProjectInspection, type ValidationContext } from './projectInspection.js';
+import { buildProjectPackage, importProjectPackage, packageHostedCharacter } from './projectPackage.js';
 import { ProjectValidationPanel } from './ProjectValidationPanel.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
 import '../../ui/theme.css';
 import '../../ui/viewShell.css';
 import '../../ui/workspace.css';
 
-interface ProjectSession {
-  key: string;
-  workspace: ProjectWorkspace;
-  autosave: LocalAutosave;
-  releaseAutosave: () => void;
-}
-interface EditorHost {
-  token: string;
-  session: ProjectSession;
-  asset: string;
-  kind: 'character' | 'scene';
-  src: string;
-  context: ProjectEditorContext;
-  pending?: () => boolean;
-  openView?: (view: 'rig' | 'animation') => void;
-  openGuide?: (guideId?: string) => void;
-  guideId?: string | undefined;
-  guidePending?: boolean;
-}
-interface RuntimeLease {
-  definition: CharacterDefinition;
-  dispose(): void;
-}
-
 /** Each retained host runs the existing editor app; hiding it never destroys authored state/history. */
 export function ProjectView() {
   const [sessions, setSessions] = useState<ProjectSession[]>([]);
   const [selected, setSelected] = useState<ProjectSession>();
   const [active, setActive] = useState<string>();
-  const [hosts, setHosts] = useState<EditorHost[]>([]);
-  const owners = useRef(new Map<string, EditorHost>());
-  const leases = useRef(new Set<RuntimeLease>());
+  const [hosts, setHosts] = useState<readonly ProjectEditorHost[]>([]);
   const [status, setStatus] = useState('Create a project or import a project ZIP.');
   const [busy, setBusy] = useState(false);
   const [validation, setValidation] = useState<{
@@ -104,6 +66,15 @@ export function ProjectView() {
   const showValidation = (owner: ProjectWorkspace, report: ProjectInspection): void => {
     setValidation({ workspace: owner, report, revision: owner.getSnapshot() });
   };
+  const [editors] = useState(
+    () =>
+      new ProjectEditorHosts({
+        baseUrl: window.location.href,
+        changed: setHosts,
+        activate: setActive,
+        validate: showValidation,
+      }),
+  );
   useEffect(() => {
     if (!workspace || !validationContext || validationRevision === revision) return;
     const timer = setTimeout(
@@ -117,7 +88,7 @@ export function ProjectView() {
     if (workspace) showValidation(workspace, workspace.inspect(context, true));
   };
   useEffect(() => {
-    const resolve = (token: string) => owners.current.get(token)?.context;
+    const resolve = editors.resolve;
     window.paperProjectEditor = resolve;
     const guard = (event: BeforeUnloadEvent): void => {
       if (
@@ -147,7 +118,6 @@ export function ProjectView() {
     window.addEventListener('pagehide', leave);
     window.addEventListener('pageshow', resume);
     document.addEventListener('visibilitychange', hidden);
-    const resources = leases.current;
     const transfers = transferLifetime.current;
     return () => {
       transfers.abort(new DOMException('Project Workspace closed.', 'AbortError'));
@@ -161,10 +131,9 @@ export function ProjectView() {
       }
       window.removeEventListener('beforeunload', guard);
       if (window.paperProjectEditor === resolve) delete window.paperProjectEditor;
-      for (const lease of resources) lease.dispose();
-      resources.clear();
+      editors.dispose();
     };
-  }, []);
+  }, [editors]);
   const run = (task: () => Promise<void>): void => {
     if (operation.current) return;
     operation.current = true;
@@ -215,210 +184,13 @@ export function ProjectView() {
     setSettingsName(workspace.definition.name);
     setStatus('Project open in this tab. Export a project ZIP to keep your work.');
   }, []);
-  const runtime = async (workspace: ProjectWorkspace, id: string, namespace?: string): Promise<RuntimeLease> => {
-    const snapshot = workspace.captureCharacter(id);
-    const files = await buildCharacterPackage(snapshot, characterFileFetcher(workspace.character(id).files));
-    const lease = await openPackageRuntime(files, new AbortController().signal, namespace);
-    leases.current.add(lease);
-    return lease;
-  };
-  const openAsset = async (
+  const openAsset = (
     kind: 'character' | 'scene',
     id: string,
     view: 'rig' | 'animation' = 'rig',
     guide = false,
     guideId?: string,
-  ): Promise<void> => {
-    if (!selected) return;
-    const workspace = selected.workspace;
-    const existing = [...owners.current.values()].find(
-      (host) => host.session === selected && host.kind === kind && host.asset === id,
-    );
-    if (existing) {
-      existing.openView?.(view);
-      setActive(existing.token);
-      if (guide) {
-        if (existing.openGuide) existing.openGuide(guideId);
-        else {
-          existing.guidePending = true;
-          existing.guideId = guideId;
-        }
-      }
-      return;
-    }
-    const token = crypto.randomUUID();
-    const ownedLeases = new Set<RuntimeLease>();
-    let closed = false;
-    let failed = false;
-    let disposeScene: (() => void) | undefined;
-    const initialLease = kind === 'character' ? await runtime(workspace, id) : undefined;
-    if (initialLease) ownedLeases.add(initialLease);
-    const definition = initialLease?.definition;
-    if (kind === 'scene') workspace.scenes.selectScene(id);
-    const choices = workspace.definition.characters.map((entry) => ({
-      id: entry.id,
-      label: entry.name,
-      manifest: entry.manifest,
-    }));
-    // Scene runtime definitions are fresh on every opening. The document remains the same owner.
-    const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
-    let lastAuthoredRevision = workspace.autosaveRevision;
-    const context: ProjectEditorContext = {
-      autosave: selected.autosave,
-      get projectName() {
-        return workspace.definition.name;
-      },
-      get assetName() {
-        return kind === 'character'
-          ? (workspace.definition.characters.find((entry) => entry.id === id)?.name ?? id)
-          : (workspace.scenes.scene(id)?.name ?? id);
-      },
-      subscribe: workspace.subscribe,
-      bindGuide: (open) => {
-        const host = owners.current.get(token)!;
-        host.openGuide = open;
-        if (host.guidePending) {
-          host.guidePending = false;
-          open(host.guideId);
-          delete host.guideId;
-        }
-        return () => {
-          delete host.openGuide;
-        };
-      },
-      ...(definition
-        ? {
-            definition,
-            characterId: id,
-            sourceDefinition: workspace.character(id).definition,
-            fetcher: characterFileFetcher(workspace.character(id).files),
-          }
-        : { scenes: workspace.scenes }),
-      choices,
-      changed: () => {
-        const revision = workspace.autosaveRevision;
-        if (revision === lastAuthoredRevision) return;
-        lastAuthoredRevision = revision;
-        workspace.refresh();
-      },
-      characterLoadFailed: () => {
-        if (kind !== 'character' || closed) return;
-        const entry = workspace.character(id);
-        if (!entry.loading) return;
-        failed = true;
-        entry.loading = false;
-        workspace.refresh();
-      },
-      bindScene: (dispose) => {
-        disposeScene = dispose;
-      },
-      validateScene: (scene) => {
-        const report = workspace.inspect('export', true, parseSceneJson(JSON.stringify(scene)));
-        showValidation(workspace, report);
-        requireValidExport(report);
-        workspace.validateScene(scene);
-      },
-      confirmReplacement: (assetKind, assetId) => {
-        const dependents = workspace
-          .dependents({ kind: assetKind, owner: id, id: assetId })
-          .filter(({ from }) => from.kind !== 'character');
-        return (
-          !dependents.length ||
-          window.confirm(
-            `Replace ${assetKind} "${assetId}"? This affects:\n${dependents.map(({ label }) => label).join('\n')}\n\nReferences will be kept. Continue?`,
-          )
-        );
-      },
-      assetReferences: (kind, assetId) =>
-        workspace
-          .dependents({ kind, owner: id, id: assetId })
-          .filter(({ from }) => from.kind === 'actor')
-          .map(({ label }) => label),
-      buildScenePackage: (scene) =>
-        buildProjectScenePackage(workspace, scene).catch((error: unknown) => {
-          if (error instanceof ProjectValidationError) showValidation(workspace, error.report);
-          throw error;
-        }),
-      loadCharacter: (reference) => {
-        const characterId = workspace.resolveCharacter(reference);
-        let request = runtimeCharacters.get(reference);
-        if (!request) {
-          request = runtime(
-            workspace,
-            characterId,
-            `project_${token.replaceAll('-', '_')}_${runtimeCharacters.size}`,
-          ).then((lease) => {
-            if (closed) {
-              lease.dispose();
-              leases.current.delete(lease);
-              throw new Error('Scene preview closed.');
-            }
-            ownedLeases.add(lease);
-            return lease.definition;
-          });
-          runtimeCharacters.set(reference, request);
-        }
-        return request;
-      },
-      bindCharacter: (capture, pending, navigate) => {
-        const entry = workspace.character(id);
-        entry.capture = capture;
-        entry.pending = pending;
-        entry.loading = false;
-        const host = owners.current.get(token)!;
-        host.pending = pending;
-        host.openView = navigate;
-        workspace.refresh();
-        return () => {
-          delete entry.capture;
-          delete entry.pending;
-          entry.loading = false;
-          delete host.pending;
-          delete host.openView;
-        };
-      },
-      navigate: () => {
-        setActive(undefined);
-        workspace.refresh();
-        // Scene stages cache textures by reference. Dispose this preview on return so later
-        // character edits are reflected on its next opening; authored scene history is retained.
-        if (kind === 'scene' || failed) {
-          closed = true;
-          disposeScene?.();
-          disposeScene = undefined;
-          owners.current.delete(token);
-          setHosts((held) => held.filter((host) => host.token !== token));
-          // React removes the iframe and its Phaser consumers before releasing their URLs.
-          setTimeout(() => {
-            for (const lease of ownedLeases) {
-              lease.dispose();
-              leases.current.delete(lease);
-            }
-            ownedLeases.clear();
-          }, 0);
-        }
-      },
-    };
-    const url = new URL(`../${kind === 'scene' ? 'scene' : view}-editor/`, window.location.href);
-    url.searchParams.set('projectSession', token);
-    if (kind === 'character') {
-      url.searchParams.set('character', id);
-      workspace.character(id).loading = true;
-    }
-    const host: EditorHost = {
-      token,
-      session: selected,
-      asset: id,
-      kind,
-      src: url.href,
-      context,
-      guidePending: guide,
-      guideId,
-    };
-    owners.current.set(token, host);
-    setHosts((held) => [...held, host]);
-    setActive(token);
-  };
+  ): Promise<void> => (selected ? editors.open(selected, kind, id, view, guide, guideId) : Promise.resolve());
   const readZip = async (file: File) => {
     if (file.size > PACKAGE_MAX_BYTES) throw new Error('Package exceeds 100 MiB.');
     const signal = AbortSignal.any([transferLifetime.current.signal, AbortSignal.timeout(60_000)]);
