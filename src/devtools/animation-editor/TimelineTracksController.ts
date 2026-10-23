@@ -253,11 +253,14 @@ export class TimelineTracksController {
         for (const key of track.keyframes) {
           const marker = row.markers.get(key.time)!;
           const segment = isIKKey(key) ? undefined : state.getSegmentInterpolation(key);
-          setAttribute(marker, 'data-interpolation', segment?.mode ?? 'unavailable');
+          const ikCurve = isIKKey(key)
+            ? state.findIKPropertyKeyframe(key.constraintId, key.property, key.time)?.curve
+            : undefined;
+          setAttribute(marker, 'data-interpolation', ikCurve?.mode ?? segment?.mode ?? 'unavailable');
           const interpolation = isIKKey(key)
-            ? `${interpolationLabel(state.authoredInterpolation ?? 'linear')} (inherited from clip)`
+            ? `${interpolationLabel(ikCurve?.mode ?? state.authoredInterpolation ?? 'linear')} (${ikCurve ? 'property override' : 'inherited from clip'})`
             : segment
-              ? `${interpolationLabel(segment.mode)} (inherited from clip)`
+              ? `${interpolationLabel(segment.mode)} (${segment.scope === 'property' ? 'property override' : 'inherited from clip'})`
               : 'Unavailable (no outgoing segment)';
           setAttribute(
             marker,

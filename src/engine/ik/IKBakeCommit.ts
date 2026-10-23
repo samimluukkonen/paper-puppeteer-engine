@@ -1,4 +1,5 @@
 import type { AnimationClip, Keyframe } from '../AnimationClip.js';
+import { withoutKeyframeProperty } from '../animationCurves.js';
 import { getBoneTrack } from '../animationTracks.js';
 import { equalJsonData } from '../equalJsonData.js';
 import { ANIMATION_FORMAT_VERSION, parseAnimationClip, type ValidationIssue } from '../externalData.js';
@@ -53,8 +54,8 @@ export function commitIKBake(
       const properties = new Set(affected.properties.map((entry) => entry.property));
       const rows = new Map<number, Keyframe>();
       for (const key of getBoneTrack(source, affected.boneId)) {
-        const row = { ...key };
-        for (const property of properties) delete row[property];
+        let row = key;
+        for (const property of properties) row = withoutKeyframeProperty(row, property);
         if (transformProperties.some((property) => row[property] !== undefined)) rows.set(row.time, row);
       }
       for (const key of expected.generatedAnimation.tracks[affected.boneId]!) {

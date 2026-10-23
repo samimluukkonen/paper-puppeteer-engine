@@ -45,7 +45,7 @@ The v0.5.7.1 [timeline track search and filtering](docs/timeline-track-filtering
 
 The v0.5.5.4 [visual IK target controls](docs/visual-ik-targets.md) let artists drag hand and foot targets in the preview, cancel with Escape, and commit both coordinates with Set Target Key. Temporary previews stay outside exported JSON and document history.
 
-The animation format supports clip-level linear interpolation. Smooth and stepped modes control playback sampling; per-key interpolation editing is unavailable. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
+The animation format defaults to linear interpolation and supports optional outgoing property curves with linear, stepped or cubic Bézier timing. Smooth and stepped playback modes control sampling independently. Visual curve editing is planned for the Graph Editor. See the [animation guide](docs/animation.md) for runtime behavior and the [changelog](CHANGELOG.md) for milestone history and verification notes.
 
 The v0.5.4 [mirrored animation tools](docs/mirroring-hardening-verification.md) combine [bone pairing](docs/bone-symmetry-mapping.md), [bind-relative pose reflection](docs/pose-mirroring.md), [sparse keyframe authoring](docs/mirrored-keyframe-authoring.md), and [React controls](docs/react-mirroring-tools.md). Browser-local pair preferences and a read-only overlay support artist review before atomic, undoable commits. The completed hardening phase covers asymmetric rigs, lifecycle cleanup, runtime/serialization regressions and an [artist walkthrough](docs/animation-editor.md#mirror-a-left-arm-movement).
 

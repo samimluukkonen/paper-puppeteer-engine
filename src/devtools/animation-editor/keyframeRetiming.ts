@@ -1,3 +1,4 @@
+import { withoutKeyframeProperty } from '../../engine/animationCurves.js';
 import { findIKPropertyKeyframe, ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
 import {
   normalizeKeyframeTime,
@@ -58,13 +59,14 @@ function retimeTrack<Property extends string>(
     const selected = removals.get(time) ?? new Set<Property>();
     selected.add(property);
     removals.set(time, selected);
-    return { property, timeMs: afterTimeMs, value: indexedRows.get(time)![property]! };
+    const row = indexedRows.get(time)!;
+    return { property, timeMs: afterTimeMs, value: row[property]!, curve: row.curves?.[property] ?? null };
   });
   const remaining = rows.flatMap((row) => {
     const selected = removals.get(row.time);
     if (!selected) return [row];
-    const next = { ...row };
-    for (const property of selected) delete next[property];
+    let next = row;
+    for (const property of selected) next = withoutKeyframeProperty(next, property);
     return properties.some((property) => next[property] !== undefined) ? [next] : [];
   });
   const next = setTrackPropertyKeyframes(remaining, edits, properties, true);

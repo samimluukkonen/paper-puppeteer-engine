@@ -127,13 +127,37 @@ export const rigDefinitionSchema = z.object({
   ik: z.array(twoBoneIKDefinitionSchema).exactOptional(),
 });
 
-export const keyframeSchema = z.object({ time: finiteNumber, ...transformFields });
+const curveHandleSchema = z.strictObject({ x: finiteNumber.min(0).max(1), y: finiteNumber.min(0).max(1) });
+export const propertyCurveSchema = z.discriminatedUnion('mode', [
+  z.strictObject({ mode: z.literal('linear') }),
+  z.strictObject({ mode: z.literal('stepped') }),
+  z.strictObject({ mode: z.literal('bezier'), control1: curveHandleSchema, control2: curveHandleSchema }),
+]);
+const boneCurvesSchema = z.strictObject({
+  x: propertyCurveSchema.exactOptional(),
+  y: propertyCurveSchema.exactOptional(),
+  rotation: propertyCurveSchema.exactOptional(),
+  scaleX: propertyCurveSchema.exactOptional(),
+  scaleY: propertyCurveSchema.exactOptional(),
+});
+const ikCurvesSchema = z.strictObject({
+  x: propertyCurveSchema.exactOptional(),
+  y: propertyCurveSchema.exactOptional(),
+  mix: propertyCurveSchema.exactOptional(),
+});
+
+export const keyframeSchema = z.object({
+  time: finiteNumber,
+  ...transformFields,
+  curves: boneCurvesSchema.exactOptional(),
+});
 /** Sparse target position and solver influence, using ordinary authored row times. */
 export const ikKeyframeSchema = z.object({
   time: finiteNumber,
   x: finiteNumber.exactOptional(),
   y: finiteNumber.exactOptional(),
   mix: ikMixSchema.exactOptional(),
+  curves: ikCurvesSchema.exactOptional(),
 });
 export const animationEventSchema = z.object({
   time: finiteNumber,

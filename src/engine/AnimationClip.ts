@@ -1,3 +1,10 @@
+import {
+  copyPropertyCurve,
+  evaluateCurveProgress,
+  propertyKeyframe,
+  type PropertyCurve,
+  type PropertyCurves,
+} from './animationCurves.js';
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
 import { ikAnimationProperties, type IKAnimationProperty, type IKKeyframe } from './ik/animationKeyframes.js';
 import { copyJsonData } from './jsonData.js';
@@ -8,19 +15,20 @@ import type { JointTransform, TransformProperty } from './types.js';
 import { assertFinite, transformProperties } from './types.js';
 import { checkAnimationReferences, throwValidationIssue } from './validation.js';
 
-/** Version 1 supports linear segments only. Smooth/stepped describe playback sample timing. */
+/** Clip-wide default. Optional per-property curves override individual outgoing segments. */
 export type Interpolation = 'linear';
 
 export interface Keyframe extends Partial<JointTransform> {
   /** Milliseconds from the start of the clip. Values are absolute local poses. */
   time: number;
+  curves?: PropertyCurves<TransformProperty>;
 }
 
 export interface AnimationClip {
   name: string;
   duration: number;
   loop: boolean;
-  /** Optional clip-level declaration; omitting it also uses linear interpolation. No per-key/track overrides. */
+  /** Optional clip-level default; omitting it also uses linear interpolation. */
   interpolation?: Interpolation;
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
   /** Constraint-name keyed sparse rows. Positions are puppet-local, before placement/facing/scale. */
@@ -43,12 +51,13 @@ export function copyAnimationEvent<Event extends AnimationEvent>(event: Event): 
   return Object.hasOwn(event, 'data') ? { ...event, data: copyJsonData(event.data) } : { ...event };
 }
 
-/** Smooth samples continuous time; stepped quantizes time before evaluating the same linear segments. */
+/** Smooth samples continuous time; stepped quantizes time before evaluating property segments. */
 export type AnimationPlaybackMode = { mode: 'smooth' } | { mode: 'stepped'; fps: number };
 
 export interface PropertyKeyframe {
   readonly time: number;
   readonly value: number;
+  readonly curve?: PropertyCurve;
 }
 
 export interface CompiledTrack {
@@ -84,8 +93,7 @@ function ownCompiledTrack(track: CompiledTrack): CompiledTrack {
     bone: track.bone,
     properties: readonlyMap(
       [...track.properties].map(
-        ([property, keys]) =>
-          [property, Object.freeze(keys.map((key) => Object.freeze({ time: key.time, value: key.value })))] as const,
+        ([property, keys]) => [property, Object.freeze(keys.map(copyCompiledKeyframe))] as const,
       ),
     ),
   });
@@ -99,13 +107,20 @@ function ownCompiledIKTrack(track: CompiledIKTrack): CompiledIKTrack {
     constraint: track.constraint,
     properties: readonlyMap(
       [...track.properties].map(
-        ([property, keys]) =>
-          [property, Object.freeze(keys.map((key) => Object.freeze({ time: key.time, value: key.value })))] as const,
+        ([property, keys]) => [property, Object.freeze(keys.map(copyCompiledKeyframe))] as const,
       ),
     ),
   });
   ownedIKTracks.add(owned);
   return owned;
+}
+
+function copyCompiledKeyframe(key: PropertyKeyframe): PropertyKeyframe {
+  return freezeData({
+    time: key.time,
+    value: key.value,
+    ...(key.curve ? { curve: copyPropertyCurve(key.curve) } : {}),
+  });
 }
 
 /** @internal Share compiler-owned immutable clips; snapshot externally assembled compiled data. */
@@ -123,7 +138,11 @@ export function ownCompiledClip(clip: CompiledClip): CompiledClip {
       if (!keys.length) throw new Error(`Compiled property "${track.bone}.${property}" needs at least one key.`);
       const authoredKeys = keys.map((key) => {
         assertFinite(key.value, `Compiled property ${track.bone}.${property}`);
-        return keyframeSchema.parse({ time: key.time, [property]: key.value });
+        return keyframeSchema.parse({
+          time: key.time,
+          [property]: key.value,
+          ...(key.curve !== undefined ? { curves: { [property]: key.curve } } : {}),
+        });
       });
       // Reuse authored timeline rules for each independently compiled property.
       checkAnimationReferences(
@@ -142,7 +161,13 @@ export function ownCompiledClip(clip: CompiledClip): CompiledClip {
       if (!ikAnimationProperties.includes(property)) throw new Error(`Unknown compiled IK property "${property}".`);
       if (!keys.length)
         throw new Error(`Compiled IK property "${track.constraint}.${property}" needs at least one key.`);
-      const authoredKeys = keys.map((key) => ikKeyframeSchema.parse({ time: key.time, [property]: key.value }));
+      const authoredKeys = keys.map((key) =>
+        ikKeyframeSchema.parse({
+          time: key.time,
+          [property]: key.value,
+          ...(key.curve !== undefined ? { curves: { [property]: key.curve } } : {}),
+        }),
+      );
       checkAnimationReferences(
         { ...metadata, ikTracks: { [track.constraint]: authoredKeys }, events: [] },
         undefined,
@@ -201,7 +226,7 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
       const samples: PropertyKeyframe[] = [];
       for (const key of keys) {
         const value = key[property];
-        if (value !== undefined) samples.push({ time: key.time, value });
+        if (value !== undefined) samples.push(propertyKeyframe(key, property));
       }
       if (samples.length > 0) properties.set(property, samples);
     }
@@ -215,9 +240,7 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
     const properties = new Map<IKAnimationProperty, readonly PropertyKeyframe[]>();
     if (!cached) {
       for (const property of ikAnimationProperties) {
-        const samples = keys.flatMap((key) =>
-          key[property] === undefined ? [] : [{ time: key.time, value: key[property] }],
-        );
+        const samples = keys.flatMap((key) => (key[property] === undefined ? [] : [propertyKeyframe(key, property)]));
         if (samples.length) properties.set(property, samples);
       }
     }
@@ -238,6 +261,7 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
 }
 
 export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, property?: TransformProperty): number {
+  assertFinite(time, 'Property sample time');
   const first = keys[0];
   if (!first) throw new Error('Cannot sample an empty property track.');
   if (time <= first.time) return first.value;
@@ -253,7 +277,10 @@ export function sampleProperty(keys: readonly PropertyKeyframe[], time: number, 
   const next = keys[low];
   if (!next) return keys[keys.length - 1]!.value;
   const previous = keys[low - 1]!;
-  const progress = (time - previous.time) / (next.time - previous.time);
+  const duration = next.time - previous.time;
+  // Compilation rejects duplicates; retain a safe fallback for direct low-level callers.
+  if (duration <= 0) return next.value;
+  const progress = evaluateCurveProgress(previous.curve, (time - previous.time) / duration);
   if (property === 'rotation') {
     return previous.value + shortestRotationDelta(previous.value, next.value) * progress;
   }

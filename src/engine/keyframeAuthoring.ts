@@ -1,6 +1,15 @@
+import {
+  copyPropertyCurve,
+  withoutKeyframeProperty,
+  type PropertyCurve,
+  type PropertyCurves,
+} from './animationCurves.js';
 import { assertFinite } from './types.js';
 
-export type SparseKeyframe<Property extends string> = { readonly time: number } & Partial<Record<Property, number>>;
+export type SparseKeyframe<Property extends string> = {
+  readonly time: number;
+  readonly curves?: PropertyCurves<Property>;
+} & Partial<Record<Property, number>>;
 
 /** One nanosecond expressed in the external format's milliseconds; never an FPS snap. */
 export const KEYFRAME_TIME_TOLERANCE_MS = 1e-6;
@@ -44,6 +53,7 @@ export function replacePropertyAtTime<Property extends string>(
   value: number,
   source = -1,
   properties: readonly Property[],
+  curve: PropertyCurve | undefined = source >= 0 ? keys[source]?.curves?.[property] : undefined,
 ): SparseKeyframe<Property>[] {
   const nextKeys: SparseKeyframe<Property>[] = [];
   for (const [index, key] of keys.entries()) {
@@ -51,14 +61,15 @@ export function replacePropertyAtTime<Property extends string>(
       nextKeys.push(key);
       continue;
     }
-    const row = { ...key };
-    delete row[property];
+    const row = withoutKeyframeProperty(key, property);
     if (properties.some((entry) => row[entry] !== undefined)) nextKeys.push(row);
   }
   // Nearby sibling properties must not shift the inserted property's time.
   const row = nextKeys.findIndex((key) => key.time === time);
-  if (row >= 0) nextKeys[row] = { ...nextKeys[row]!, [property]: value };
-  else nextKeys.push({ time, [property]: value } as SparseKeyframe<Property>);
+  const inserted = { ...(row >= 0 ? nextKeys[row] : {}), time, [property]: value } as SparseKeyframe<Property>;
+  if (curve) Object.assign(inserted, { curves: { ...inserted.curves, [property]: copyPropertyCurve(curve) } });
+  if (row >= 0) nextKeys[row] = inserted;
+  else nextKeys.push(inserted);
   nextKeys.sort((a, b) => a.time - b.time);
   return nextKeys;
 }
@@ -68,6 +79,8 @@ export interface PropertyKeyframeWrite<Property extends string> {
   readonly property: Property;
   readonly timeMs: number;
   readonly value: number;
+  /** Omission preserves controls on a value update; null explicitly resets a copied/replaced segment. */
+  readonly curve?: PropertyCurve | null;
 }
 
 /** Index nearby rows while editing one track; publish and sort its array only once. */
@@ -110,8 +123,13 @@ export function setTrackPropertyKeyframes<Property extends string>(
     }
     return found;
   };
-  const insertions: Pick<PropertyKeyframeWrite<Property>, 'property' | 'timeMs' | 'value'>[] = [];
-  for (const { property, timeMs, value } of edits) {
+  const insertions: PropertyKeyframeWrite<Property>[] = [];
+  const insert = (property: Property, time: number, value: number, curve: PropertyCurve | null | undefined): void => {
+    const row = { ...rows.get(time), time, [property]: value } as SparseKeyframe<Property>;
+    if (curve) Object.assign(row, { curves: { ...row.curves, [property]: copyPropertyCurve(curve) } });
+    add(row);
+  };
+  for (const { property, timeMs, value, curve: authoredCurve } of edits) {
     let time = timeMs;
     let distance = Infinity;
     for (const row of preserveTiming ? [] : matches(timeMs, property)) {
@@ -123,18 +141,19 @@ export function setTrackPropertyKeyframes<Property extends string>(
     }
     // Collision removal is centered on the canonical destination, including matches
     // outside the original query's tolerance. Other properties retain their times.
-    for (const key of matches(time, property)) {
-      const row = { ...key };
-      delete row[property];
+    const collisions = matches(time, property);
+    const curve =
+      authoredCurve === undefined ? collisions.find((key) => key.time === time)?.curves?.[property] : authoredCurve;
+    for (const key of collisions) {
+      const row = withoutKeyframeProperty(key, property);
       if (properties.some((entry) => row[entry] !== undefined)) rows.set(row.time, row);
       else remove(row.time);
     }
-    if (preserveTiming) insertions.push({ property, timeMs: time, value });
-    else add({ ...rows.get(time), time, [property]: value } as SparseKeyframe<Property>);
+    if (preserveTiming) insertions.push({ property, timeMs: time, value, ...(curve ? { curve } : {}) });
+    else insert(property, time, value, curve);
   }
   // Group members never collide with each other. Replace external matches first,
   // then insert every translated time exactly, including distinct nearby keys.
-  for (const { property, timeMs: time, value } of insertions)
-    add({ ...rows.get(time), time, [property]: value } as SparseKeyframe<Property>);
+  for (const { property, timeMs: time, value, curve } of insertions) insert(property, time, value, curve);
   return [...rows.values()].sort((a, b) => a.time - b.time);
 }

@@ -62,11 +62,33 @@ Looping wraps the clock at the duration; use matching start/end poses for a seam
 
 ### Interpolation and sample timing
 
-Version 1 supports only linear interpolation. The optional clip-level `interpolation: 'linear'` declaration states that behavior; omitting it produces the same result. Tracks and keyframes have no interpolation metadata or outgoing-segment mode. A property's last key has no outgoing segment, and a single-key property remains constant.
+Version 1 defaults to linear interpolation. The optional clip-level `interpolation: 'linear'` declaration states that default; omitting it produces the same result. Since v1.1.2.1, a sparse keyframe can optionally carry `curves`, keyed by the property whose outgoing segment it controls. Bone properties are `x`, `y`, `rotation`, `scaleX` and `scaleY`; IK properties are `x`, `y` and `mix`. The same row must contain that property's numeric value. Controls apply until the next key on that property, skipping rows that key only siblings. A property's last key has no outgoing segment, and a single-key property remains constant; terminal controls can be retained for later key insertion or movement.
 
-`playback.mode` controls when the linear evaluator samples the clip. `smooth` uses continuous time; `stepped` rounds sample time down to an FPS boundary and holds that evaluated pose until the next boundary. For keys at 0 ms (`x: 0`) and 1000 ms (`x: 100`), sampling at 550 ms produces `x: 55` in smooth mode and `x: 50` at 10 FPS in stepped mode. Both use the same linear segment. Rotation segments use the existing shortest angular path.
+Supported outgoing curves are `{ mode: 'linear' }`, `{ mode: 'stepped' }` (hold until the next key), and cubic Bézier controls:
 
-Clip `playback` settings are authored data. A player's default playback mode is runtime configuration, and editor preview speed/loop settings are transient preferences. Per-key or per-track interpolation would require an explicit extension to the schema, compiler, and runtime evaluator before authoring APIs could expose it.
+```json
+{
+  "time": 0,
+  "rotation": -0.4,
+  "curves": {
+    "rotation": {
+      "mode": "bezier",
+      "control1": { "x": 0.25, "y": 0 },
+      "control2": { "x": 0.75, "y": 1 }
+    }
+  }
+}
+```
+
+Each handle uses segment-relative coordinates: `(0, 0)` is the start and `(1, 1)` is the end. Handle X maps elapsed time; Y maps progress between the endpoint values. All coordinates must be finite and in `[0, 1]`, with `control1.x <= control2.x`. This makes time monotonic and keeps values bounded, including IK influence. Flat endpoint tangents and coincident handles are valid. The runtime inverts Bézier time with deterministic bisection before evaluating value progress. Overshooting controls, explicit multi-turn rotation and graph viewport/selection state are outside this extension. The file version stays **1**; omitted controls retain exactly the previous defaults. Older readers that reject unknown fields require an update to load clips containing `curves`.
+
+Rotation uses that progress along the existing shortest angular path in radians, including the negative half-turn tie. Values such as 170° → −170° travel 20°, even with Bézier timing. Authored values are retained without unwrapping or conversion into full-turn spins. At an exact interior/final key, the sampler may return an angularly equivalent unwrapped endpoint (190° in that example); after the last key it holds the stored value (−170°), preserving the previous runtime convention.
+
+`playback.mode` controls when the shared evaluator samples the clip. `smooth` uses continuous time; `stepped` rounds sample time down to an FPS boundary and holds that evaluated pose until the next boundary. For linear keys at 0 ms (`x: 0`) and 1000 ms (`x: 100`), sampling at 550 ms produces `x: 55` in smooth mode and `x: 50` at 10 FPS in stepped mode. A property-level stepped curve instead holds until the next property key, independently of FPS. Clip playback settings are authored data. A player's default playback mode is runtime configuration, and editor preview speed/loop settings are transient preferences.
+
+For property previews, import `compileClip`, `sampleProperty` and the `PropertyKeyframe`/`PropertyCurve` types from `/core` (also available through the root entry). Compilation validates and produces immutable bone and IK property maps. Pass one map entry to `sampleProperty(keys, timeMilliseconds, property)`; pass `'rotation'` for angular channels and omit it for IK. This is the same sampler used by `evaluateClip`, `evaluateIKClip`, buffered playback, layers and editor previews. Direct sampling expects validated, strictly ordered, nonempty keys and a finite time. It holds nearest endpoints outside the property range and does not advance clocks or emit events.
+
+The Animation Editor preserves curves through import/export, history, movement, retiming, copying and selected-key mirroring. Normalized controls travel with their property; deletion removes only that property's controls. Value-only edits preserve existing controls; copied linear/default keys replace destination controls. IK baking samples curves through the runtime and replaces generated bone rotations with linear segments while preserving unrelated controls. Curves currently enter through authored data; the visual Graph Editor and tangent dragging are deferred to v1.1.2.2.
 
 `stop()` freezes every layer and discards pending queue requests. `restart()` also discards pending requests. `restart()` resets every selected layer to time zero and clears its fade, retaining clip speeds, masks, weights, the global speed, playback mode, and pause state. Time-zero events fire after all restarted layers have been synchronized. To restart only one layer, call `play(name, { layer, speed })` with its desired settings.
 

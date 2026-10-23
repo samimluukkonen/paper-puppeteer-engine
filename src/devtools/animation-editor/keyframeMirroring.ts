@@ -143,6 +143,7 @@ export function sampleSelectedKeyframeMirror(
       property: source.property,
       timeMs: source.timeMs,
       value: poses.get(source.timeMs)!.get(boneId)![source.property]!,
+      curve: findBonePropertyKeyframe(animation, source.boneId, source.property, source.timeMs)!.curve ?? null,
     };
   });
   return edits;

@@ -324,13 +324,13 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'linear',
         'Understand Clip interpolation',
-        'Clip interpolation offers Default (Linear) and Linear. They evaluate identically. This format currently supports no easing curves or per-key interpolation overrides; Stepped is a playback sampling mode.',
+        'Clip interpolation offers Default (Linear) and Linear. They evaluate identically. Animation data can also carry outgoing property curves; visual curve editing is deferred. Stepped playback controls sampling independently.',
         targets.animationSettings,
       ),
       step(
         'inspect',
         'Inspect an outgoing segment',
-        'Select a bone property key, then open Key details. Selected key interpolation is read-only and inherited from the clip. A final key has no outgoing segment; choose a key with another key after it on that property to inspect the segment.',
+        'Select a bone property key, then open Key details. Selected key interpolation is read-only. It shows the inherited default or explains that property curves require future visual editing controls. A final key has no outgoing segment; choose a key with another key after it on that property to inspect the segment.',
         targets.animationInterpolation,
       ),
       step(

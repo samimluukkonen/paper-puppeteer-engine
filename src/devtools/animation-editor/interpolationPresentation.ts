@@ -1,4 +1,5 @@
 import type { Interpolation } from '../../engine/AnimationClip.js';
+import type { PropertyCurve } from '../../engine/animationCurves.js';
 import { animationClipSchema } from '../../engine/schemas.js';
 import type { InterpolationSelectionState, InterpolationUnavailableReason } from './interpolation.js';
 
@@ -7,11 +8,12 @@ export const AUTHORED_INTERPOLATION_MODES: readonly Interpolation[] = Object.fre
   animationClipSchema.shape.interpolation.unwrap().value,
 ]);
 
-export function interpolationLabel(mode: Interpolation): string {
+export function interpolationLabel(mode: PropertyCurve['mode']): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
 
 const unavailableHelp: Record<InterpolationUnavailableReason, string> = {
+  'property-curves': 'The selection contains property curve overrides. Visual curve editing is not available yet.',
   'no-animation': 'Select an animation to inspect interpolation.',
   'empty-selection': 'Select a key to inspect its outgoing interpolation.',
   'missing-key': 'A selected key is no longer available.',
@@ -32,6 +34,6 @@ export function selectedInterpolationControl(selection: InterpolationSelectionSt
     value: selection.mode,
     disabled: true,
     reason: 'clip-only',
-    help: `${interpolationLabel(selection.mode)} is inherited from the clip. This format has no per-key interpolation overrides.`,
+    help: `${interpolationLabel(selection.mode)} is inherited from the clip. Property curve overrides are currently authored through animation data.`,
   };
 }

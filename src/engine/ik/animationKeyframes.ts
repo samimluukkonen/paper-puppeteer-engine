@@ -1,4 +1,5 @@
 import type { AnimationClip, PropertyKeyframe } from '../AnimationClip.js';
+import { propertyKeyframe, withoutKeyframeProperty, type PropertyCurves } from '../animationCurves.js';
 import { AnimationValidationError, shapeIssues } from '../externalData.js';
 import { keyframeTimesMatch, matchingRow, normalizeKeyframeTime, replacePropertyAtTime } from '../keyframeAuthoring.js';
 import { type DeepReadonly, isFullyFrozen } from '../readonlyData.js';
@@ -17,6 +18,7 @@ export interface IKKeyframe {
   x?: number;
   y?: number;
   mix?: number;
+  curves?: PropertyCurves<IKAnimationProperty>;
 }
 
 export type IKAnimationTrack = readonly IKKeyframe[];
@@ -62,7 +64,7 @@ function indexedProperties(animation: AnimationData, constraintId: string) {
     properties = new Map(
       ikAnimationProperties.map((property) => [
         property,
-        keys.flatMap((key) => (key[property] === undefined ? [] : [{ time: key.time, value: key[property] }])),
+        keys.flatMap((key) => (key[property] === undefined ? [] : [propertyKeyframe(key, property)])),
       ]),
     );
     propertyIndexes.set(keys, properties);
@@ -101,11 +103,11 @@ function queryKeyframe(
   const properties = indexedProperties(animation, constraintId);
   if (properties) {
     const key = indexedKeyframe(properties.get(property)!, timeMs);
-    return key ? { ...key } : undefined;
+    return key ? { ...key, ...(key.curve ? { curve: structuredClone(key.curve) } : {}) } : undefined;
   }
   const keys = rows(animation, constraintId);
   const key = keys[matchingRow(keys, timeMs, property)];
-  return key ? { time: key.time, value: key[property]! } : undefined;
+  return key ? propertyKeyframe(key, property) : undefined;
 }
 
 function install<Animation extends AnimationData>(
@@ -172,8 +174,7 @@ export function removeIKPropertyKeyframe<Animation extends AnimationData>(
   const keys = rows(animation, constraintId);
   const index = matchingRow(keys, timeMs, property);
   if (index < 0) return animation;
-  const row = { ...keys[index]! };
-  delete row[property];
+  const row = withoutKeyframeProperty(keys[index]!, property);
   const nextKeys = keys.flatMap((key, current) =>
     current !== index ? [key] : ikAnimationProperties.some((entry) => row[entry] !== undefined) ? [row] : [],
   );
@@ -224,9 +225,12 @@ export function getIKPropertyKeyframes(
   assertConstraint(rig, constraintId);
   assertProperty(property);
   const properties = indexedProperties(animation, constraintId);
-  if (properties) return properties.get(property)!.map((key) => ({ ...key }));
+  if (properties)
+    return properties
+      .get(property)!
+      .map((key) => ({ ...key, ...(key.curve ? { curve: structuredClone(key.curve) } : {}) }));
   return rows(animation, constraintId).flatMap((key) =>
-    key[property] === undefined ? [] : [{ time: key.time, value: key[property] }],
+    key[property] === undefined ? [] : [propertyKeyframe(key, property)],
   );
 }
 

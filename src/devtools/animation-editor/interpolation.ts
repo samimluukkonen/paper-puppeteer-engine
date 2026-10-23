@@ -1,4 +1,5 @@
 import type { Interpolation } from '../../engine/AnimationClip.js';
+import type { PropertyCurve } from '../../engine/animationCurves.js';
 import type { Rig } from '../../engine/Rig.js';
 import { animationClipSchema } from '../../engine/schemas.js';
 import { findBonePropertyKeyframe, findNextBonePropertyKeyframe } from './keyframeQueries.js';
@@ -9,16 +10,22 @@ import { getValidatedEditorAnimation, validateEditedAnimation } from './validate
 
 /** Authored segment metadata only. Playback sample timing is deliberately independent. */
 export interface SegmentInterpolation {
-  readonly scope: 'clip';
-  readonly mode: Interpolation;
+  readonly scope: 'clip' | 'property';
+  readonly mode: PropertyCurve['mode'];
+  readonly curve?: PropertyCurve;
   /** Canonical property references in editor seconds; start identifies the outgoing segment. */
   readonly start: KeyframeSelection;
   readonly end: KeyframeSelection;
 }
 
-export type InterpolationUnavailableReason = 'no-animation' | 'empty-selection' | 'missing-key' | 'no-outgoing-segment';
+export type InterpolationUnavailableReason =
+  | 'no-animation'
+  | 'empty-selection'
+  | 'missing-key'
+  | 'no-outgoing-segment'
+  | 'property-curves';
 
-/** Version 1 has a single clip-wide mode, so mixed interpolation cannot be authored. */
+/** Existing controls edit only the clip default. Property curve editing belongs to the future Graph Editor. */
 export type InterpolationSelectionState =
   | { readonly kind: 'uniform'; readonly scope: 'clip'; readonly mode: Interpolation }
   | { readonly kind: 'unavailable'; readonly reason: InterpolationUnavailableReason };
@@ -27,7 +34,7 @@ export function getAnimationInterpolation(animation: AnimationData | null): Inte
   return animation ? (animation.interpolation ?? 'linear') : undefined;
 }
 
-/** Neither endpoint owns interpolation: all segments inherit the clip's declaration/default.
+/** An optional start-key curve overrides the clip's declaration/default on this property.
  * Last keys and one-key property timelines have no outgoing segment, including in looping clips.
  */
 export function getSegmentInterpolation(
@@ -41,8 +48,9 @@ export function getSegmentInterpolation(
   const end = findNextBonePropertyKeyframe(animation, ref.boneId, ref.property, start.time);
   if (!end) return undefined;
   return {
-    scope: 'clip',
-    mode: getAnimationInterpolation(animation)!,
+    scope: start.curve ? 'property' : 'clip',
+    mode: start.curve?.mode ?? getAnimationInterpolation(animation)!,
+    ...(start.curve ? { curve: start.curve } : {}),
     start: { boneId: ref.boneId, property: ref.property, time: toSeconds(start.time) },
     end: { boneId: ref.boneId, property: ref.property, time: toSeconds(end.time) },
   };
@@ -56,13 +64,17 @@ export function getInterpolationForKeys(
   if (!animation) return { kind: 'unavailable', reason: 'no-animation' };
   if (!keys.length) return { kind: 'unavailable', reason: 'empty-selection' };
   let terminal = false;
+  let propertyCurves = false;
   for (const ref of keys) {
     if (!findBonePropertyKeyframe(animation, ref.boneId, ref.property, toMilliseconds(ref.time)))
       return { kind: 'unavailable', reason: 'missing-key' };
-    if (!getSegmentInterpolation(animation, ref)) terminal = true;
+    const segment = getSegmentInterpolation(animation, ref);
+    if (!segment) terminal = true;
+    if (segment?.scope === 'property') propertyCurves = true;
   }
   // Missing identities take precedence over terminal segments, regardless of selection order.
   if (terminal) return { kind: 'unavailable', reason: 'no-outgoing-segment' };
+  if (propertyCurves) return { kind: 'unavailable', reason: 'property-curves' };
   return { kind: 'uniform', scope: 'clip', mode: getAnimationInterpolation(animation)! };
 }
 
@@ -89,7 +101,7 @@ export interface UnavailableInterpolationEdit<Animation extends AnimationData> {
   readonly animation: Animation;
 }
 
-/** Atomic capability boundary for future selection UI. Version 1 cannot edit individual keys.
+/** Atomic capability boundary for future selection UI. Existing controls cannot edit individual keys.
  * Never promote a selection edit into a clip edit, which would affect unrelated segments.
  */
 export function setInterpolationForKeys<Animation extends AnimationData>(

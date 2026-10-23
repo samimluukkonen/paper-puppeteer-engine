@@ -11,7 +11,8 @@ export type {
   Keyframe,
   PropertyKeyframe,
 } from './AnimationClip.js';
-export { compileClip } from './AnimationClip.js';
+export { compileClip, sampleProperty } from './AnimationClip.js';
+export type { CurveHandle, PropertyCurve, PropertyCurves } from './animationCurves.js';
 export type {
   AnimationCompletion,
   FiredAnimationEvent,

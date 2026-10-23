@@ -1,4 +1,5 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
+import { copyPropertyCurve, type PropertyCurve } from '../../engine/animationCurves.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assertFinite, type TransformProperty } from '../../engine/types.js';
@@ -14,6 +15,7 @@ export interface KeyframeClipboardEntry {
   /** Authored milliseconds relative to the earliest copied key. */
   readonly relativeTimeMs: Milliseconds;
   readonly value: number;
+  readonly curve?: PropertyCurve;
 }
 
 export interface KeyframeClipboard {
@@ -21,7 +23,7 @@ export interface KeyframeClipboard {
   readonly anchorTimeMs: Milliseconds;
 }
 
-/** Snapshot only authored property samples. Interpolation is clip-level; no per-key metadata exists. */
+/** Snapshot authored values and their outgoing controls without sampling runtime poses. */
 export function copyKeyframeSelection(
   animation: DeepReadonly<AnimationClip>,
   keys: readonly KeyframeSelection[],
@@ -40,11 +42,12 @@ export function copyKeyframeSelection(
   const anchorTimeMs = samples[0]!.time;
   return freezeData({
     anchorTimeMs,
-    entries: samples.map(({ boneId, property, time, value }) => ({
+    entries: samples.map(({ boneId, property, time, value, curve }) => ({
       boneId,
       property,
       relativeTimeMs: time - anchorTimeMs,
       value,
+      ...(curve ? { curve: copyPropertyCurve(curve) } : {}),
     })),
   });
 }
@@ -60,10 +63,10 @@ export function pasteKeyframeClipboard<Animation extends DeepReadonly<AnimationC
 ): { animation: Animation; keys: readonly KeyframeSelection[] } {
   assertFinite(anchorTimeMs, 'Clipboard paste anchor');
   if (anchorTimeMs < 0) throw new Error('Clipboard paste anchor must be nonnegative.');
-  const edits = clipboard.entries.map(({ boneId, property, relativeTimeMs, value }) => {
+  const edits = clipboard.entries.map(({ boneId, property, relativeTimeMs, value, curve }) => {
     assertFinite(relativeTimeMs, 'Clipboard relative time');
     if (relativeTimeMs < 0) throw new Error('Clipboard relative time must be nonnegative.');
-    return { boneId, property, timeMs: anchorTimeMs + relativeTimeMs, value };
+    return { boneId, property, timeMs: anchorTimeMs + relativeTimeMs, value, curve: curve ?? null };
   });
   const next = setBonePropertyKeyframes(animation, rig, edits, {
     extendDuration: true,

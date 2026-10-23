@@ -1,3 +1,4 @@
+import { withoutKeyframeProperty, type PropertyCurve } from '../../engine/animationCurves.js';
 import { replacePropertyAtTime, setTrackPropertyKeyframes } from '../../engine/keyframeAuthoring.js';
 import type { Rig } from '../../engine/Rig.js';
 import { assertFinite, type TransformProperty, transformProperties } from '../../engine/types.js';
@@ -22,7 +23,7 @@ export function setBonePropertyKeyframe<Animation extends AnimationData>(
   getValidatedEditorAnimation(animation, rig);
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const propertyIndex = matchingRow(keys, timeMs, property);
-  const index = propertyIndex >= 0 ? propertyIndex : matchingRow(keys, timeMs);
+  const index = propertyIndex >= 0 ? propertyIndex : matchingRow<TransformProperty>(keys, timeMs);
   if (index >= 0 && keys[index]![property] === value) return animation;
   const nextKeys = [...keys];
   if (index >= 0) nextKeys[index] = { ...keys[index]!, [property]: value };
@@ -52,6 +53,7 @@ export interface PropertyKeyframeTarget {
 
 export interface PropertyKeyframeEdit extends PropertyKeyframeTarget {
   readonly value: number;
+  readonly curve?: PropertyCurve | null;
 }
 
 /** Atomically validate a group and optionally extend authored duration. By default each edit canonicalizes
@@ -132,8 +134,8 @@ export function removeBonePropertyKeyframes<Animation extends AnimationData>(
     const nextKeys = animation.tracks[boneId]!.flatMap((key) => {
       const properties = removalsByTime.get(key.time);
       if (!properties) return [key];
-      const row = { ...key };
-      for (const property of properties) delete row[property];
+      let row = key;
+      for (const property of properties) row = withoutKeyframeProperty(row, property);
       return transformProperties.some((property) => row[property] !== undefined) ? [row] : [];
     });
     if (nextKeys.length) tracks[boneId] = nextKeys;
@@ -144,7 +146,7 @@ export function removeBonePropertyKeyframes<Animation extends AnimationData>(
 }
 
 /** Move time only (milliseconds), replacing all destination matches on this property.
- * Sparse-row siblings retain their original times. Interpolation is clip-level and stays unchanged.
+ * Sparse-row siblings retain their original times. Outgoing controls travel with the property.
  */
 export function moveBonePropertyKeyframe<Animation extends AnimationData>(
   animation: Animation,
@@ -211,7 +213,7 @@ export function moveBonePropertyKeyframes<Animation extends AnimationData>(
     assertTarget(animation, rig, target.boneId, target.property, target.timeMs);
     const key = findBonePropertyKeyframe(animation, target.boneId, target.property, target.timeMs);
     if (!key) throw new Error('Cannot move a missing keyframe.');
-    const source = { ...target, timeMs: key.time, value: key.value };
+    const source = { ...target, timeMs: key.time, value: key.value, curve: key.curve ?? null };
     sources.set(JSON.stringify([source.boneId, source.property, source.timeMs]), source);
   }
   const keys = [...sources.values()];

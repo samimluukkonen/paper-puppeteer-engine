@@ -1,4 +1,5 @@
 import type { AnimationClip } from './AnimationClip.js';
+import type { PropertyCurves } from './animationCurves.js';
 import type { RigDefinition, SkinDefinition } from './types.js';
 
 export interface ValidationIssue {
@@ -193,6 +194,7 @@ export function checkAnimationReferences(
       report,
       `Keys for "${bone}" must have strictly increasing times within the clip.`,
     );
+    checkPropertyCurves(keys, `tracks.${bone}`, report);
   }
   const constraints = rig ? new Set((rig.ik ?? []).map((constraint) => constraint.name)) : undefined;
   const disabled = new Set<string>();
@@ -213,6 +215,7 @@ export function checkAnimationReferences(
         report({ severity: 'error', path: `${path}[${index}]`, message: 'IK keyframe needs x, y or mix.' });
     }
     checkKeyframeTimeline(keys, clip.duration, path, report);
+    checkPropertyCurves(keys, path, report);
   }
   for (const [index, event] of (clip.events ?? []).entries()) {
     if (event.time < 0 || event.time > clip.duration)
@@ -224,6 +227,31 @@ export function checkAnimationReferences(
         },
         `Invalid event in animation "${clip.name}".`,
       );
+  }
+}
+
+/** Controls belong only to keyed channels; terminal controls are retained for later insert/move edits. */
+function checkPropertyCurves(
+  keys: readonly { curves?: PropertyCurves<string> }[],
+  path: string,
+  report: ReportValidationIssue,
+): void {
+  for (const [index, key] of keys.entries()) {
+    for (const [property, curve] of Object.entries(key.curves ?? {})) {
+      const curvePath = `${path}[${index}].curves.${property}`;
+      if (!Object.hasOwn(key, property))
+        report({
+          severity: 'error',
+          path: curvePath,
+          message: 'Curve controls require a value on the same keyframe property.',
+        });
+      if (curve?.mode === 'bezier' && curve.control1.x > curve.control2.x)
+        report({
+          severity: 'error',
+          path: curvePath,
+          message: 'Bézier time controls must be ordered: control1.x <= control2.x.',
+        });
+    }
   }
 }
 

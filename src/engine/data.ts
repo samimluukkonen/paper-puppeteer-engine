@@ -13,6 +13,7 @@ export type {
   TransformProperty,
 } from './types.js';
 export type { AnimationClip, AnimationEvent, AnimationPlaybackMode, Interpolation, Keyframe } from './AnimationClip.js';
+export type { CurveHandle, PropertyCurve, PropertyCurves } from './animationCurves.js';
 export type { CharacterData, CharacterManifest } from './CharacterDefinition.js';
 export type {
   AnimationJsonDefinition,

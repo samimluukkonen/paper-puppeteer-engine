@@ -37,6 +37,10 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.1.2-1
+
+Add the animation curve foundation: optional per-property outgoing linear, stepped and bounded cubic Bézier controls in version-1 bone/IK keys. Validate finite normalized handles, monotonic time, keyed-property ownership and strictly ordered timelines. Reuse the runtime property sampler for playback, previews, layers, crossfades and IK baking, preserving linear defaults, smooth/stepped sampling and shortest-path radian rotation. Export `sampleProperty` and curve types for future Graph Editor previews. Preserve controls through deterministic serialization, key edits, clipboard, movement, retiming, selected-key mirroring and history; remove replaced rotation controls during IK bake commits. Regenerate the animation JSON Schema, document coordinates and compatibility, and add curve and integration regressions. Visual Graph Editor work remains deferred.
+
 ## 1.1.1
 
 Add a seven-step Pose Library tour to the shared Animation Editor Feature Guide catalog, with real-control highlights for full/partial capture, browsing, preview/cancel, Apply, library editing/history and persistence. Keep guide navigation read-only for both poses and animation keys.

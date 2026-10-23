@@ -1,3 +1,4 @@
+import { copyPropertyCurve, type PropertyCurve, type PropertyCurves } from '../../engine/animationCurves.js';
 import {
   ANIMATION_FORMAT_VERSION,
   inspectAnimationDefinition,
@@ -21,6 +22,19 @@ function normalizeNumber(value: number): number {
   if (Number.isInteger(value)) return value;
   const rounded = roundEditorNumber(value);
   return rounded !== 0 && Math.abs(rounded - value) <= Number.EPSILON * Math.abs(value) * 4 ? rounded : value;
+}
+
+/** Canonical property/control order with exact authored control values. */
+function orderCurves<Property extends string>(
+  curves: PropertyCurves<Property>,
+  properties: readonly Property[],
+): PropertyCurves<Property> {
+  const result: Partial<Record<Property, PropertyCurve>> = {};
+  for (const property of properties) {
+    const curve = curves[property];
+    if (curve) result[property] = copyPropertyCurve(curve);
+  }
+  return result;
 }
 
 /** Payload numbers are application data; only object field order is canonicalized. */
@@ -88,6 +102,7 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
           bone,
           animation.tracks[bone]!.map((key) => ({
             time: timeValue(key.time),
+            ...(key.curves === undefined ? {} : { curves: orderCurves(key.curves, transformProperties) }),
             ...Object.fromEntries(
               transformProperties
                 .filter((property) => key[property] !== undefined)
@@ -106,6 +121,7 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
                 name,
                 animation.ikTracks![name]!.map((key) => ({
                   time: timeValue(key.time),
+                  ...(key.curves === undefined ? {} : { curves: orderCurves(key.curves, ikAnimationProperties) }),
                   ...Object.fromEntries(
                     ikAnimationProperties
                       .filter((property) => key[property] !== undefined)

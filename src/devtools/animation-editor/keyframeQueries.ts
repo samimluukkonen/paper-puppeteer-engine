@@ -1,4 +1,5 @@
 import type { Keyframe, PropertyKeyframe } from '../../engine/AnimationClip.js';
+import { copyPropertyCurve, propertyKeyframe } from '../../engine/animationCurves.js';
 import { type TransformProperty, transformProperties } from '../../engine/types.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, keyframeTimesMatch, matchingRow } from './keyframeTargets.js';
@@ -46,7 +47,7 @@ function propertyIndexes(animation: AnimationData, boneId: string): Map<Transfor
           keys = [];
           properties.set(entry, keys);
         }
-        keys.push({ time: row.time, value, order });
+        keys.push({ ...propertyKeyframe(row, entry), order });
       }
     }
     for (const keys of properties.values()) keys.sort((a, b) => a.time - b.time || a.order - b.order);
@@ -89,11 +90,11 @@ export function findBonePropertyKeyframe(
 ): PropertyKeyframe | undefined {
   if (!transformProperties.includes(property) || !Number.isFinite(timeMs)) return undefined;
   const indexed = indexedKeyframe(animation, boneId, property, timeMs);
-  if (indexed !== false) return indexed ? { time: indexed.time, value: indexed.value } : undefined;
+  if (indexed !== false) return indexed ? copySample(indexed) : undefined;
   const keys = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const key = keys[matchingRow(keys, timeMs, property)];
   const value = key?.[property];
-  return key && value !== undefined ? { time: key.time, value } : undefined;
+  return key && value !== undefined ? propertyKeyframe(key, property) : undefined;
 }
 
 export function hasKeyframeAtTime(
@@ -124,11 +125,11 @@ export function findNextBonePropertyKeyframe(
       else high = middle;
     }
     const key = keys[low];
-    return key ? { time: key.time, value: key.value } : undefined;
+    return key ? copySample(key) : undefined;
   }
   const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
   const row = rows.find((key) => key.time > timeMs && key[property] !== undefined);
-  return row ? { time: row.time, value: row[property]! } : undefined;
+  return row ? propertyKeyframe(row, property) : undefined;
 }
 
 /** Find a strictly previous/next property key, skipping every time within the shared tolerance. */
@@ -156,7 +157,7 @@ export function findAdjacentBonePropertyKeyframe(
       else high = middle;
     }
     const key = keys[direction === 1 ? low : low - 1];
-    return key ? { time: key.time, value: key.value } : undefined;
+    return key ? copySample(key) : undefined;
   }
   // Mutable authored tracks stay fresh and retain their stored order without copying arrays.
   const rows = Object.hasOwn(animation.tracks, boneId) ? animation.tracks[boneId]! : [];
@@ -164,9 +165,13 @@ export function findAdjacentBonePropertyKeyframe(
     const row = rows[index]!;
     const value = row[property];
     if (value !== undefined && direction * (row.time - timeMs) > 0 && !keyframeTimesMatch(row.time, timeMs))
-      return { time: row.time, value };
+      return propertyKeyframe(row, property);
   }
   return undefined;
+}
+
+function copySample(key: PropertyKeyframe): PropertyKeyframe {
+  return { time: key.time, value: key.value, ...(key.curve ? { curve: copyPropertyCurve(key.curve) } : {}) };
 }
 
 export function getKeyedPropertiesAtTime(
