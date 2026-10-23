@@ -17,6 +17,7 @@ export interface ProjectEditorContext {
   readonly scenes?: SceneEditorDocument;
   readonly choices: readonly { id: string; label: string; manifest: string }[];
   changed(): void;
+  characterLoadFailed(): void;
   loadCharacter(reference: string): Promise<CharacterDefinition>;
   bindScene(dispose: () => void): void;
   validateScene(scene: ReadonlyScene): void;

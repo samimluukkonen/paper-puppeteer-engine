@@ -383,6 +383,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       movePreview?.();
     },
     (message) => {
+      projectContext?.characterLoadFailed();
       stateOwner = undefined;
       guides.refresh();
       newAnimation.unbind();

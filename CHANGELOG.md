@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Load guarded static WebP artwork in character and scene editors. Release failed character opening state so project export/autosave can continue, and recreate failed hosts on the next opening.
+
 - Validate expanded project character file counts and byte totals before copying imported binaries, preventing physical-file aliases from multiplying allocations past package limits.
 
 - Process Project Workspace ZIP imports and exports in the shared package worker, with transfer deadlines and cancellation on workspace teardown. Record export checkpoints only after the worker finishes and the download starts.

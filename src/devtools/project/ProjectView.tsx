@@ -249,6 +249,7 @@ export function ProjectView() {
     const token = crypto.randomUUID();
     const ownedLeases = new Set<RuntimeLease>();
     let closed = false;
+    let failed = false;
     let disposeScene: (() => void) | undefined;
     const initialLease = kind === 'character' ? await runtime(workspace, id) : undefined;
     if (initialLease) ownedLeases.add(initialLease);
@@ -298,6 +299,14 @@ export function ProjectView() {
         const revision = workspace.autosaveRevision;
         if (revision === lastAuthoredRevision) return;
         lastAuthoredRevision = revision;
+        workspace.refresh();
+      },
+      characterLoadFailed: () => {
+        if (kind !== 'character' || closed) return;
+        const entry = workspace.character(id);
+        if (!entry.loading) return;
+        failed = true;
+        entry.loading = false;
         workspace.refresh();
       },
       bindScene: (dispose) => {
@@ -373,7 +382,7 @@ export function ProjectView() {
         workspace.refresh();
         // Scene stages cache textures by reference. Dispose this preview on return so later
         // character edits are reflected on its next opening; authored scene history is retained.
-        if (kind === 'scene') {
+        if (kind === 'scene' || failed) {
           closed = true;
           disposeScene?.();
           disposeScene = undefined;

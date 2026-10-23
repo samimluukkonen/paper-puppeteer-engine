@@ -306,7 +306,11 @@ class SceneStage extends Phaser.Scene {
         if (!this.alive) return;
         const definition = await this.characters.load(manifest);
         if (!this.alive) return;
-        const ready = await loadSceneCharacter(this, manifest, { definition, sharedBudget: this.textureBudget });
+        const ready = await loadSceneCharacter(this, manifest, {
+          definition,
+          allowWebp: true,
+          sharedBudget: this.textureBudget,
+        });
         if (!ready || !this.alive) return;
         this.definitions.set(manifest, ready);
         sync();

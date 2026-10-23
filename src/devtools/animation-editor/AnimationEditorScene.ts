@@ -506,8 +506,8 @@ export class AnimationEditorScene extends Phaser.Scene {
         window.location.href,
       );
       const definition = await (this.options.definition
-        ? loadSceneCharacter(this, url.href, { definition: this.options.definition })
-        : loadSceneCharacter(this, url.href));
+        ? loadSceneCharacter(this, url.href, { definition: this.options.definition, allowWebp: true })
+        : loadSceneCharacter(this, url.href, { allowWebp: true }));
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
       const documents = createCharacterDocuments(definition, {
         artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),

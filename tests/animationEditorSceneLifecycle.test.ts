@@ -34,7 +34,7 @@ test.each([
 ])('loads a configured character URL %s', (path, expected) => {
   const { scene } = fixture(path);
   scene.create();
-  assert.deepEqual(vi.mocked(loadSceneCharacter).mock.calls, [[scene, expected]]);
+  assert.deepEqual(vi.mocked(loadSceneCharacter).mock.calls, [[scene, expected, { allowWebp: true }]]);
 });
 
 test('shutdown releases editor state, filename, and character even while metadata loads', () => {
