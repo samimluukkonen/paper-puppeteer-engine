@@ -5,6 +5,7 @@ import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneActorDefinition } from '../../engine/SceneDefinition.js';
+import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
 import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { actorGroundOffset } from './actorGrounding.js';
 import type { ActorGroundContact, ReadonlyScene } from './SceneEditorDocument.js';
@@ -22,6 +23,7 @@ export class SceneActorPreview {
   constructor(private readonly scene: Phaser.Scene) {}
 
   sync(document: ReadonlyScene, definitions: ReadonlyMap<string, CharacterDefinition>): void {
+    assertSceneInstanceBudget(document, definitions);
     if (this.sceneId !== document.id) this.dispose();
     this.sceneId = document.id;
     for (const [id, entry] of this.instances) {

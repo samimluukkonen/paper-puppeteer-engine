@@ -5,6 +5,8 @@ import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
+import { createSceneTextureBudget } from '../../engine/sceneTextureBudget.js';
+import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
@@ -33,6 +35,7 @@ class SceneStage extends Phaser.Scene {
   private readonly definitions = new Map<string, CharacterDefinition>();
   private readonly requests = new Set<string>();
   private queue: Promise<void> = Promise.resolve();
+  private readonly textureBudget = createSceneTextureBudget();
   private alive = true;
   private refresh: () => void = () => {};
   private readonly failures = new Map<string, string>();
@@ -76,6 +79,7 @@ class SceneStage extends Phaser.Scene {
         .filter(Boolean)
         .join('\n');
       try {
+        assertSceneInstanceBudget(document, this.definitions);
         this.playback.sync(
           document,
           document.actors.every((actor) => this.definitions.has(actor.character.manifest)),
@@ -302,7 +306,7 @@ class SceneStage extends Phaser.Scene {
         if (!this.alive) return;
         const definition = await this.characters.load(manifest);
         if (!this.alive) return;
-        const ready = await loadSceneCharacter(this, manifest, { definition });
+        const ready = await loadSceneCharacter(this, manifest, { definition, sharedBudget: this.textureBudget });
         if (!ready || !this.alive) return;
         this.definitions.set(manifest, ready);
         sync();

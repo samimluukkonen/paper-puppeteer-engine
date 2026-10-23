@@ -64,12 +64,13 @@ export class CharacterTextureBudget {
       throw new CharacterTextureLimitError(`Image "${key}" exceeds the ${this.limits.maxImageBytes}-byte limit.`);
     const before = this.bytes.get(key) ?? 0;
     if (bytes <= before) return;
-    this.bytes.set(key, bytes);
-    this.totalBytes += bytes - before;
-    if (this.totalBytes > this.limits.maxTotalImageBytes)
+    const total = this.totalBytes + bytes - before;
+    if (total > this.limits.maxTotalImageBytes)
       throw new CharacterTextureLimitError(
         `Character artwork exceeds the ${this.limits.maxTotalImageBytes}-byte total limit.`,
       );
+    this.bytes.set(key, bytes);
+    this.totalBytes = total;
   }
 
   private countPixels(key: string, width: number, height: number): void {
@@ -84,12 +85,13 @@ export class CharacterTextureBudget {
       throw new CharacterTextureLimitError(`Image "${key}" exceeds the ${this.limits.maxImagePixels}-pixel limit.`);
     const before = this.pixels.get(key) ?? 0;
     if (pixels <= before) return;
-    this.pixels.set(key, pixels);
-    this.totalPixels += pixels - before;
-    if (this.totalPixels > this.limits.maxTotalImagePixels)
+    const total = this.totalPixels + pixels - before;
+    if (total > this.limits.maxTotalImagePixels)
       throw new CharacterTextureLimitError(
         `Character artwork exceeds the ${this.limits.maxTotalImagePixels}-pixel total limit.`,
       );
+    this.pixels.set(key, pixels);
+    this.totalPixels = total;
   }
 
   /** Validate complete package binaries against the same per-texture runtime allocation budget. */
@@ -149,7 +151,9 @@ export class CharacterTextureBudget {
   }
 
   /** Guard only this helper's files; unrelated assets keep the host loader's own behavior. */
-  guard(file: Phaser.Loader.File, active: () => boolean): void {
+  guard(file: Phaser.Loader.File, active: () => boolean, sharedBudget?: CharacterTextureBudget): void {
+    // One callback owner preserves the original failure when either budget rejects.
+    const budgets = sharedBudget ? [this, sharedBudget] : [this];
     const progress = file.onProgress.bind(file);
     const loaded = file.onLoad.bind(file);
     const errored = file.onError.bind(file);
@@ -194,11 +198,13 @@ export class CharacterTextureBudget {
     file.onProgress = (event): void => {
       if (!active() || failed || finished) return;
       try {
-        if (event.lengthComputable && event.total > this.limits.maxImageBytes)
-          throw new CharacterTextureLimitError(
-            `Image "${file.key}" exceeds the ${this.limits.maxImageBytes}-byte limit.`,
-          );
-        this.countBytes(file.key, event.loaded);
+        for (const budget of budgets) {
+          if (event.lengthComputable && event.total > budget.limits.maxImageBytes)
+            throw new CharacterTextureLimitError(
+              `Image "${file.key}" exceeds the ${budget.limits.maxImageBytes}-byte limit.`,
+            );
+          budget.countBytes(file.key, event.loaded);
+        }
       } catch (error) {
         rejectDownload(error);
         return;
@@ -209,7 +215,7 @@ export class CharacterTextureBudget {
       if (!active() || failed || finished) return;
       const response: unknown = xhr.response;
       try {
-        if (response instanceof Blob) this.countBytes(file.key, response.size);
+        if (response instanceof Blob) for (const budget of budgets) budget.countBytes(file.key, response.size);
       } catch (error) {
         rejectDownload(error);
         return;
@@ -245,7 +251,7 @@ export class CharacterTextureBudget {
           (buffer) => {
             if (!active() || failed || finished || file.state !== state) return;
             try {
-              this.checkImageHeader(file.key, new Uint8Array(buffer));
+              for (const budget of budgets) budget.checkImageHeader(file.key, new Uint8Array(buffer));
             } catch (error) {
               rejectProcessing(error);
               return;
@@ -273,7 +279,7 @@ export class CharacterTextureBudget {
           typeof image.naturalHeight !== 'number'
         )
           throw new CharacterTextureLimitError(`Could not inspect image "${file.key}" dimensions.`);
-        this.countPixels(file.key, image.naturalWidth, image.naturalHeight);
+        for (const budget of budgets) budget.countPixels(file.key, image.naturalWidth, image.naturalHeight);
       } catch (error) {
         rejectProcessing(error);
         return;

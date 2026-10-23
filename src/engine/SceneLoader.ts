@@ -12,6 +12,7 @@ import { parseSceneJson } from './SceneDefinition.js';
 import { validateScenePackage, type ScenePackageFiles } from './ScenePackage.js';
 import { readSceneResource } from './sceneResource.js';
 import { SceneRunner, type SceneRunnerOptions } from './SceneRunner.js';
+import { createSceneTextureBudget } from './sceneTextureBudget.js';
 
 export interface SceneLoadOptions {
   readonly fetcher?: typeof fetch;
@@ -154,11 +155,13 @@ async function loadSession(
     release = prepared.dispose;
     controller.signal.throwIfAborted();
     // Serialize artwork sessions because Phaser texture keys are shared by all Actors.
+    const sharedBudget = createSceneTextureBudget();
     for (const [reference, definition] of prepared.resolved.characters) {
       const ready = await loadSceneCharacter(scene, reference, {
         definition,
         signal: controller.signal,
         allowWebp: true,
+        sharedBudget,
       });
       controller.signal.throwIfAborted();
       if (!ready) throw new Error('Scene shut down while loading character artwork.');

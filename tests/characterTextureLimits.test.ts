@@ -50,7 +50,7 @@ function webp(width = 2, height = 3, chunk: 'VP8X' | 'VP8L' | 'VP8 ' = 'VP8X'): 
   return bytes;
 }
 
-function fixture(options: CharacterTextureLimitOptions = {}) {
+function fixture(options: CharacterTextureLimitOptions = {}, sharedBudget?: CharacterTextureBudget) {
   const budget = new CharacterTextureBudget(options);
   let active = true;
   const loader = Object.assign(new EventEmitter(), {
@@ -92,7 +92,7 @@ function fixture(options: CharacterTextureLimitOptions = {}) {
     file.onProcess = decode;
     file.onProcessComplete = complete;
     file.onProcessError = processError;
-    budget.guard(file, () => active);
+    budget.guard(file, () => active, sharedBudget);
     const load = () => file.onLoad(file.xhrLoader!, { target: xhr } as unknown as ProgressEvent);
     const progress = (loaded: number, total = 0, lengthComputable = false) =>
       file.onProgress({ loaded, total, lengthComputable } as ProgressEvent);
@@ -142,6 +142,24 @@ test('unknown-length image transfers are aborted at the byte limit without decod
   image.file.onError(image.file.xhrLoader!, {} as ProgressEvent);
   assert.equal(image.decode.mock.calls.length, 0);
   assert.equal(image.xhr.abort.mock.calls.length, 1);
+});
+
+test('shared scene guards preserve per-character guards and reject before decoding', async () => {
+  const shared = new CharacterTextureBudget({ maxTotalImagePixels: 6 });
+  const first = fixture({}, shared).image('first');
+  first.load();
+  await vi.waitFor(() => assert.equal(first.complete.mock.calls.length, 1));
+  const second = fixture({}, shared).image('second');
+  second.load();
+  await vi.waitFor(() => assert.equal(second.processError.mock.calls.length, 1));
+  assert.equal(second.decode.mock.calls.length, 0);
+  assert.match(getCharacterTextureLimitError(second.file)!.message, /6-pixel total limit/);
+
+  const strict = fixture({ maxImagePixels: 5 }, new CharacterTextureBudget({})).image('strict');
+  strict.load();
+  await vi.waitFor(() => assert.equal(strict.processError.mock.calls.length, 1));
+  assert.equal(strict.decode.mock.calls.length, 0);
+  assert.match(getCharacterTextureLimitError(strict.file)!.message, /5-pixel limit/);
 });
 
 test('declared image sizes reject before receiving the entire response', () => {

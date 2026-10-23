@@ -3,6 +3,7 @@ import { canonicalJson } from './authoredSerialization.js';
 import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
+import { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 import { identifierSchema } from './schemas.js';
 import type { ValidationIssue } from './validation.js';
 
@@ -100,8 +101,8 @@ export const sceneDefinitionSchema = z.strictObject({
   name: sceneIdentifier,
   /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
   duration: z.number().positive(),
-  actors: z.array(sceneActorDefinitionSchema),
-  actions: z.array(sceneActionDefinitionSchema),
+  actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),
+  actions: z.array(sceneActionDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions),
 });
 
 export type SceneDefinition = z.infer<typeof sceneDefinitionSchema>;
@@ -127,6 +128,18 @@ export class SceneValidationError extends Error {
 
 function inspectSceneDefinition(input: unknown, options: SceneValidationOptions): ValidationResult<SceneDefinition> {
   const issues: ValidationIssue[] = [];
+  // Bound raw collections before walking/cloning entries or allocating schema issues.
+  if (input !== null && typeof input === 'object') {
+    for (const [field, limit] of [
+      ['actors', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors],
+      ['actions', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions],
+    ] as const) {
+      const entries: unknown = Object.getOwnPropertyDescriptor(input, field)?.value;
+      if (Array.isArray(entries) && entries.length > limit)
+        issues.push({ severity: 'error', path: field, message: `Scene exceeds the ${limit}-${field} limit.` });
+    }
+    if (issues.length) return { issues };
+  }
   checkJson(input, '', issues);
   if (issues.length) return { issues };
   const { issues: versionIssues, versionError } = inspectVersion(input, SCENE_FORMAT_VERSION, 'scene');

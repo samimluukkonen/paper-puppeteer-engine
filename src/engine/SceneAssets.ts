@@ -3,6 +3,7 @@ import { CharacterLoader } from './CharacterLoader.js';
 import { packagePath } from './packageZip.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { parseSceneDefinition, type SceneDefinition, type SceneCharacterAssets } from './SceneDefinition.js';
+import { assertSceneInstanceBudget } from './sceneWorkloadLimits.js';
 
 export interface SceneAssetOptions {
   /** URL of scene.json; relative character references resolve against this URL. */
@@ -75,6 +76,7 @@ export async function resolveSceneDefinition(input: unknown, options: SceneAsset
       options.signal?.throwIfAborted();
       validateSceneCharacterPaths(character);
       characters.set(reference, character);
+      assertSceneInstanceBudget(definition, characters);
     } catch (error) {
       throw new Error(
         `Character "${reference}" could not load: ${error instanceof Error ? error.message : String(error)}`,

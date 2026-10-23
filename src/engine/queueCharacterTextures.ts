@@ -8,6 +8,8 @@ export const DEFAULT_CHARACTER_TEXTURE_TIMEOUT_MS = 30_000;
 export { CharacterTextureLimitError, DEFAULT_CHARACTER_TEXTURE_LIMITS } from './characterTextureLimits.js';
 
 export interface CharacterTextureLoadOptions extends CharacterTextureLimitOptions {
+  /** @internal Additional aggregate budget shared by a scene's character loads. */
+  sharedBudget?: CharacterTextureBudget;
   /** Timeout for each image XHR request. Defaults to 30 seconds. */
   timeoutMs?: number;
 }
@@ -56,13 +58,16 @@ export function queueCharacterTextures(
           `Texture key "${key}" is already pending in this scene's loader. Finish or cancel that load before queueing the character.`,
         );
       budget.checkInlineImage(key, url);
+      options.sharedBudget?.checkInlineImage(key, url);
     }
   }
   const pending = new Map<string, TextureReservation>();
   let settled = false;
   let queueingKey: string | undefined;
   const onAdd = (key: string, type: string, _loader: Phaser.Loader.LoaderPlugin, file: Phaser.Loader.File): void => {
-    if (type === 'image' && key === queueingKey) budget.guard(file, () => !settled);
+    if (type === 'image' && key === queueingKey) {
+      budget.guard(file, () => !settled, options.sharedBudget);
+    }
   };
   const release = (): void => {
     if (settled) return;

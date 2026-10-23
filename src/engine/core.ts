@@ -1,4 +1,5 @@
 /** Public renderer-independent APIs. Existing pure authoring and bake exports remain supported. */
+export { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 export type {
   AnimationClip,
   AnimationEvent,

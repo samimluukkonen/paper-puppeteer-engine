@@ -7,6 +7,7 @@ import { packagePath, PACKAGE_MAX_FILE_BYTES, validatePackageFiles } from './pac
 import { resolveSceneDefinition, type ResolvedScene, type SceneAssetOptions } from './SceneAssets.js';
 import { parseSceneDefinition, parseSceneJson, serializeSceneDefinition } from './SceneDefinition.js';
 import { readSceneResource } from './sceneResource.js';
+import { createSceneTextureBudget } from './sceneTextureBudget.js';
 
 export type ScenePackageFiles = ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 const packageBase = 'https://scene-package.invalid/scene.json';
@@ -53,6 +54,7 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
           !resource.hash,
       }),
   });
+  const sceneBudget = createSceneTextureBudget();
   for (const [reference, definition] of resolved.characters) {
     const folder = reference.slice(0, reference.lastIndexOf('/') + 1);
     const budget = new CharacterTextureBudget({ allowWebp: true });
@@ -60,6 +62,7 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
       const image = files.get(`${folder}${path}`);
       if (!image) throw new Error(`Missing scene package image "${folder}${path}".`);
       budget.checkImage(key, image);
+      sceneBudget.checkImage(`${reference}:${key}`, image);
     }
     for (const sprite of [
       ...definition.rig.bones.flatMap((bone) => (bone.sprite ? [bone.sprite] : [])),
