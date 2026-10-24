@@ -37,6 +37,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.2.1
+
+Add independent Scene Artwork with local PNG/static WebP import and existing project image selection. Place images behind Actors with world-space dragging, a corner scale handle, numeric transforms, visibility, replacement, reset and removal. Keep inspector sections collapsed and group canvas gestures into one Undo/Redo operation with Escape cancellation. Artwork edits preserve Actor data, runtime instances and playback time.
+
+Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
+
 ## 1.1.5
 
 Integrate and harden advanced animation authoring across Pose Library, Graph Editor, variations, diagnostics, cleanup, recovery and Scene Editor. Release variation preview clocks when previewing a library pose, restore authored motion on playback, and synchronize cleanup IK inspector sampling with the canvas. Remove measured per-clock pose compatibility scans and redundant linear diagnostic samples while retaining runtime evaluation and cleanup tolerance checks. Add read-only Bézier handle, diagnostics and cleanup Feature Guides with stable controls, cross-tool/runtime/package/lifecycle regressions, a complete local desktop project workflow and optional performance diagnostics. Update the [artist workflow](docs/advanced-animation-workflow.md) and [internal v1.1 readiness assessment](docs/advanced-animation-readiness.md). Authored formats and public runtime APIs remain compatible; no publishing or CI browser changes.

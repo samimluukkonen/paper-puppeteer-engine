@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import { characterManifestSchema, type CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { decodeImage } from '../../engine/decodeImage.js';
 import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import { packagePath, validatePackageFiles } from '../../engine/packageZip.js';
 import { parseSceneJson, serializeSceneDefinition } from '../../engine/SceneDefinition.js';
@@ -19,6 +20,7 @@ import { ProjectWorkspace } from './ProjectWorkspace.js';
 const archiveSchema = z.strictObject({
   project: projectDefinitionSchema,
   characters: z.array(z.strictObject({ id: z.string(), files: z.record(z.string(), z.string()) })),
+  images: z.record(z.string(), z.string()).exactOptional(),
 });
 const encoder = new TextEncoder();
 
@@ -68,6 +70,9 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
   requireValidExport(report);
   const metadata = parseProjectDefinition(workspace.definition);
   const characters = new Map(metadata.characters.map(({ id }) => [id, workspace.captureCharacter(id)]));
+  const imageAssets = new Map(
+    workspace.scenes.images.entries.map((image) => [image.reference, workspace.scenes.images.read(image.reference)]),
+  );
   const sources = new Map(
     metadata.characters.map(({ id }) => [id, characterFileFetcher(workspace.character(id).files)]),
   );
@@ -112,10 +117,30 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
     }
     records.push({ id: entry.id, files: mapping });
   }
+  const imageMapping: Record<string, string> = {};
+  for (const image of metadata.images ?? []) {
+    const bytes = imageAssets.get(`../${image.path}`);
+    if (!bytes) throw new Error(`Missing project image "${image.path}".`);
+    if (typeof Image !== 'undefined') {
+      const decoded = await decodeImage(bytes, signal ?? new AbortController().signal);
+      decoded.dispose();
+    }
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    const physical = sharedImages.get(digest) ?? image.path;
+    add(physical, bytes, sharedImages.has(digest));
+    sharedImages.set(digest, physical);
+    imageMapping[image.path] = physical;
+  }
   metadata.scenes.forEach((entry, index) => {
     add(entry.path, encoder.encode(serializeSceneDefinition(scenes[index]!)));
   });
-  json('project.json', { project: metadata, characters: records });
+  json('project.json', {
+    project: metadata,
+    characters: records,
+    ...(Object.keys(imageMapping).length ? { images: imageMapping } : {}),
+  });
   try {
     validatePackageFiles(files);
   } catch (error) {
@@ -158,6 +183,16 @@ export async function importProjectPackage(files: PackageFiles): Promise<Project
     if (record.files['character.json'] !== entry.manifest) throw new Error('Character manifest path mismatch.');
     const id = await workspace.addCharacter(characterFiles, entry.name);
     if (id !== entry.id) throw new Error(`Character ID mismatch for "${entry.id}".`);
+  }
+  for (const image of metadata.images ?? []) {
+    const physical = packagePath(archive.images?.[image.path] ?? image.path);
+    const bytes = files.get(physical);
+    if (!bytes) throw new Error(`Missing project image "${image.path}".`);
+    workspace.scenes.images.register(`../${image.path}`, bytes, image.name);
+    if (typeof Image !== 'undefined') {
+      const decoded = await decodeImage(bytes, new AbortController().signal);
+      decoded.dispose();
+    }
   }
   // Install the original reference paths before resolving scene dependencies.
   workspace.installImportedMetadata({ ...metadata, scenes: [] });
@@ -202,6 +237,16 @@ export async function buildProjectScenePackage(
     const prefix = `characters/character-${references.size + 1}/`;
     references.set(reference, `${prefix}character.json`);
     for (const [path, bytes] of packaged) files.set(`${prefix}${path}`, bytes);
+  }
+  const images = new Map<string, string>();
+  for (const image of scene.images ?? []) {
+    let path = images.get(image.image);
+    if (!path) {
+      path = `images/image-${images.size + 1}.${image.image.toLowerCase().endsWith('.webp') ? 'webp' : 'png'}`;
+      images.set(image.image, path);
+      files.set(path, workspace.scenes.images.read(image.image));
+    }
+    image.image = path;
   }
   for (const actor of scene.actors) actor.character.manifest = references.get(actor.character.manifest)!;
   files.set('scene.json', encoder.encode(serializeSceneDefinition(scene)));

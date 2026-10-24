@@ -1,4 +1,5 @@
 import { DEFAULT_CHARACTER_TEXTURE_LIMITS as limits } from '../../../engine/characterTextureLimits.js';
+import { decodeImage } from '../../../engine/decodeImage.js';
 import { IMAGE_HEADER_BYTES, inspectImageHeader } from '../../../engine/imageHeader.js';
 
 export interface SpriteMetadata {
@@ -45,45 +46,6 @@ export async function importSprite(file: File, signal: AbortSignal): Promise<Imp
     !file.name.toLowerCase().endsWith(header.format === 'image/png' ? '.png' : '.webp')
   )
     throw new Error('The filename or image type does not match its contents. Export the sprite again.');
-  const blob = file.slice(0, file.size, header.format);
-  const url = URL.createObjectURL(blob);
-  const image = new Image();
-  let disposed = false;
-  const dispose = (): void => {
-    if (disposed) return;
-    disposed = true;
-    image.src = '';
-    URL.revokeObjectURL(url);
-  };
-  try {
-    await new Promise<void>((resolve, reject) => {
-      let finished = false;
-      const finish = (error?: unknown): void => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timeout);
-        signal.removeEventListener('abort', abort);
-        if (error) reject(error);
-        else resolve();
-      };
-      const abort = (): void => finish(signal.reason ?? new Error('Sprite import cancelled.'));
-      const timeout = setTimeout(() => finish(new Error('Image decoding timed out. Export the sprite again.')), 15000);
-      signal.addEventListener('abort', abort, { once: true });
-      image.src = url;
-      void Promise.resolve()
-        .then(() => image.decode())
-        .then(
-          () => finish(),
-          () => finish(new Error('The image is corrupt or cannot be decoded by this browser. Export it as a new PNG.')),
-        );
-    });
-    signal.throwIfAborted();
-    checkDimensions(image.naturalWidth, image.naturalHeight);
-    if (image.naturalWidth !== header.width || image.naturalHeight !== header.height)
-      throw new Error('Decoded dimensions do not match the image header. Export the sprite again.');
-    return { ...header, filename: file.name, bytes: file.size, blob, url, image, dispose };
-  } catch (error) {
-    dispose();
-    throw error;
-  }
+  const decoded = await decodeImage(new Uint8Array(await file.arrayBuffer()), signal);
+  return { ...decoded, filename: file.name, bytes: file.size };
 }

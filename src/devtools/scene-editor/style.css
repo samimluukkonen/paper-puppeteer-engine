@@ -319,3 +319,42 @@
 #scene-timeline-divider:focus-visible {
   background: var(--accent-muted);
 }
+
+.scene-artwork-commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.scene-artwork-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.scene-artwork-list li + li {
+  margin-top: 4px;
+}
+
+.scene-artwork-list button {
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.scene-artwork-list button[aria-pressed="true"] {
+  border-color: var(--accent-fg);
+}
+
+.scene-inspector .scene-artwork-visibility {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.scene-artwork-visibility input {
+  width: auto;
+  min-height: 0;
+}

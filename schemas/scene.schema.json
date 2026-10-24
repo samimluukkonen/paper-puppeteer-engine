@@ -34,6 +34,74 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
+    "images": {
+      "maxItems": 256,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "image": {
+            "type": "string",
+            "pattern": "\\.(?:png|webp)$"
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "scale": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "y": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": ["id", "image", "position", "scale", "visible", "order"],
+        "additionalProperties": false
+      }
+    },
     "actors": {
       "maxItems": 256,
       "type": "array",

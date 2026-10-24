@@ -1,14 +1,18 @@
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { CharacterLoader } from './CharacterLoader.js';
-import { packagePath } from './packageZip.js';
+import { CharacterTextureBudget } from './characterTextureLimits.js';
+import { inspectImageHeader } from './imageHeader.js';
+import { packagePath, PACKAGE_MAX_FILE_BYTES } from './packageZip.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { parseSceneDefinition, type SceneDefinition, type SceneCharacterAssets } from './SceneDefinition.js';
+import { readSceneResource } from './sceneResource.js';
 import { assertSceneInstanceBudget } from './sceneWorkloadLimits.js';
 
 export interface SceneAssetOptions {
   /** URL of scene.json; relative character references resolve against this URL. */
   readonly baseUrl: string;
   readonly fetcher?: typeof fetch;
+  readonly loadImage?: (reference: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly signal?: AbortSignal;
   /** Optional host cache. Must return a complete immutable CharacterDefinition. */
   readonly loadCharacter?: (manifestUrl: string, reference: string) => Promise<CharacterDefinition>;
@@ -18,6 +22,7 @@ export interface ResolvedScene {
   readonly definition: DeepReadonly<SceneDefinition>;
   /** Keys are the exact stable references in the scene, rather than character/Actor IDs. */
   readonly characters: ReadonlyMap<string, CharacterDefinition>;
+  readonly images?: ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 }
 
 export function sceneAssetCatalog(
@@ -84,7 +89,23 @@ export async function resolveSceneDefinition(input: unknown, options: SceneAsset
       );
     }
   }
+  const images = new Map<string, Uint8Array<ArrayBuffer>>();
+  const budget = new CharacterTextureBudget({ allowWebp: true });
+  for (const reference of new Set(definition.images?.map((image) => image.image))) {
+    options.signal?.throwIfAborted();
+    const url = new URL(reference, options.baseUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Scene images must use HTTP(S).');
+    const bytes = await (options.loadImage?.(reference) ??
+      readSceneResource(url.href, options.fetcher ?? fetch, PACKAGE_MAX_FILE_BYTES, options.signal));
+    budget.checkImage(reference, bytes);
+    const header = inspectImageHeader(bytes)!;
+    if (!reference.toLowerCase().endsWith(header.format === 'image/png' ? '.png' : '.webp'))
+      throw new Error(`Image format does not match path "${reference}".`);
+    images.set(reference, bytes);
+  }
+  options.signal?.throwIfAborted();
   return {
+    images,
     definition: freezeData(parseSceneDefinition(definition, { characters: sceneAssetCatalog(characters) })),
     characters,
   };

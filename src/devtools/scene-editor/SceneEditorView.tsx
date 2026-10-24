@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { readJsonFile } from '../../engine/jsonInput.js';
-import { encodePackageZip } from '../../engine/packageZip.js';
+import { encodePackageZip, PACKAGE_MAX_FILE_BYTES } from '../../engine/packageZip.js';
 import { serializeSceneDefinition } from '../../engine/SceneDefinition.js';
 import { buildScenePackage } from '../../engine/ScenePackage.js';
+import { readSceneResource } from '../../engine/sceneResource.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { bindExportShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorContext } from '../../ui/EditorContext.js';
@@ -15,6 +16,7 @@ import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
 import { SceneActorsPanel } from './SceneActorsPanel.js';
+import { SceneArtworkPanel } from './SceneArtworkPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
@@ -165,6 +167,10 @@ export function SceneEditorView({
   const assetOptions = (signal: AbortSignal) => ({
     baseUrl: window.location.href,
     signal,
+    loadImage: (reference: string) =>
+      document.images.has(reference)
+        ? Promise.resolve(document.images.read(reference))
+        : readSceneResource(new URL(reference, window.location.href).href, fetch, PACKAGE_MAX_FILE_BYTES, signal),
     loadCharacter: (_url: string, reference: string) => registry.load(reference),
   });
   const importJson = async (json: string, signal: AbortSignal): Promise<void> => {
@@ -368,6 +374,7 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />
               <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />
               <ScenePlaybackInspector
                 key={`preview-${scene.id}`}

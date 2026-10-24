@@ -43,6 +43,13 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
     build: async (signal?: AbortSignal) => {
       // All retained scene snapshots are immutable and captured before dependency reads.
       const workspace = new ProjectWorkspace(scenes[0]!.name, id);
+      const referencesToImages = new Set(scenes.flatMap((scene) => scene.images?.map((image) => image.image) ?? []));
+      for (const reference of referencesToImages)
+        workspace.scenes.images.register(
+          reference,
+          document.images.read(reference),
+          document.images.entries.find((asset) => asset.reference === reference)?.name,
+        );
       const references = new Map<string, string>();
       const manifests = [...new Set(scenes.flatMap((scene) => scene.actors.map((actor) => actor.character.manifest)))];
       const definitions = new Map<string, Awaited<ReturnType<typeof registry.load>>>();

@@ -2,6 +2,7 @@ import { canonicalJson } from './authoredSerialization.js';
 import { characterManifestSchema } from './CharacterDefinition.js';
 import { CharacterLoader } from './CharacterLoader.js';
 import { CharacterTextureBudget } from './characterTextureLimits.js';
+import { decodeImage } from './decodeImage.js';
 import { DEFAULT_MAX_JSON_BYTES } from './jsonInput.js';
 import { packagePath, PACKAGE_MAX_FILE_BYTES, validatePackageFiles } from './packageZip.js';
 import { resolveSceneDefinition, type ResolvedScene, type SceneAssetOptions } from './SceneAssets.js';
@@ -29,6 +30,7 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
         `Scene package character must use characters/<folder>/character.json: ${actor.character.manifest}`,
       );
   }
+  for (const image of scene.images ?? []) packagePath(image.image);
   const fetcher: typeof fetch = (input) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
     const bytes =
@@ -55,6 +57,13 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
       }),
   });
   const sceneBudget = createSceneTextureBudget();
+  for (const [reference, bytes] of resolved.images ?? []) {
+    sceneBudget.checkImage(`image:${reference}`, bytes);
+    if (typeof Image !== 'undefined') {
+      const decoded = await decodeImage(bytes, signal ?? new AbortController().signal);
+      decoded.dispose();
+    }
+  }
   for (const [reference, definition] of resolved.characters) {
     const folder = reference.slice(0, reference.lastIndexOf('/') + 1);
     const budget = new CharacterTextureBudget({ allowWebp: true });
@@ -142,6 +151,13 @@ export async function buildScenePackage(input: unknown, options: SceneAssetOptio
     }
   }
   for (const actor of scene.actors) actor.character.manifest = references.get(actor.character.manifest)!;
+  const imagePaths = new Map<string, string>();
+  for (const [reference, bytes] of resolved.images ?? []) {
+    const path = `images/image-${imagePaths.size + 1}.${reference.toLowerCase().endsWith('.webp') ? 'webp' : 'png'}`;
+    imagePaths.set(reference, path);
+    add(path, bytes);
+  }
+  for (const image of scene.images ?? []) image.image = imagePaths.get(image.image)!;
   add('scene.json', encoder.encode(serializeSceneDefinition(scene)));
   await validateScenePackage(files, options.signal);
   return files;

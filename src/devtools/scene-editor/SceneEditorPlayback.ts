@@ -1,3 +1,4 @@
+import { equalJsonData } from '../../engine/equalJsonData.js';
 import type { SceneRunnerOptions } from '../../engine/SceneRunner.js';
 import { SceneRunner } from '../../engine/SceneRunner.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
@@ -46,10 +47,18 @@ export class SceneEditorPlayback {
   }
 
   /** Selection notifications reuse the same immutable snapshot and keep playback running.
-   * Authored edits/switches reset playback to initial placement; incomplete assets disable it.
+   * Artwork-only edits retain the current Actors and clock. Other authored edits/switches reset playback to initial placement; incomplete assets disable it.
    */
   sync(source: ReadonlyScene | null, ready: boolean, createActor: SceneRunnerOptions['createActor']): void {
     if (this.source === source && this.runner && ready) return;
+    if (this.source && source && this.runner && ready) {
+      const { images: _previousImages, ...previous } = this.source;
+      const { images: _nextImages, ...next } = source;
+      if (equalJsonData(previous, next)) {
+        this.source = source;
+        return;
+      }
+    }
     if (this.source === source && !this.runner && !ready) return;
     this.runner?.dispose();
     this.runner = undefined;

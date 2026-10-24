@@ -1,6 +1,6 @@
 # Scene Editor: visual authoring, packages and playback (v0.9.7.3)
 
-[All guides](../README.md#guides) · [Making Your First Scene](making-your-first-scene.md) · [v0.9 readiness report](scene-editor-readiness.md)
+[Scene backgrounds and image assets](scene-artwork.md) · [All guides](../README.md#guides) · [Making Your First Scene](making-your-first-scene.md) · [v0.9 readiness report](scene-editor-readiness.md)
 
 Open **Scene Editor** in the application navigation, or visit `/scene-editor/`. Use **New Scene** to choose a stable scene ID, name and duration. No character or scene JSON is required. Expand **Scene properties**, edit the name or duration in seconds, and click **Apply properties**. Inspector sections start collapsed. Scene IDs remain fixed after creation/import.
 

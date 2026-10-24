@@ -32,6 +32,7 @@ export type { CreateIKConstraintOptions, IKConstraintPatch, IKConstraintDependen
 export type {
   SceneDefinition,
   SceneActorDefinition,
+  SceneImageDefinition,
   SceneActionDefinition,
   SceneCharacterReference,
   SceneCharacterAssets,

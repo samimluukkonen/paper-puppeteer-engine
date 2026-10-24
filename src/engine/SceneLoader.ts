@@ -9,6 +9,7 @@ import { decodePackageZip, PACKAGE_MAX_BYTES } from './packageZip.js';
 import { Puppet } from './Puppet.js';
 import { resolveSceneDefinition, type ResolvedScene, type SceneAssetOptions } from './SceneAssets.js';
 import { parseSceneJson } from './SceneDefinition.js';
+import { SceneImageLayer } from './SceneImageLayer.js';
 import { validateScenePackage, type ScenePackageFiles } from './ScenePackage.js';
 import { readSceneResource } from './sceneResource.js';
 import { SceneRunner, type SceneRunnerOptions } from './SceneRunner.js';
@@ -117,7 +118,14 @@ export const SceneLoader = {
           );
         }
         signal.throwIfAborted();
-        return { resolved: { definition: resolved.definition, characters }, dispose };
+        return {
+          resolved: {
+            definition: resolved.definition,
+            characters,
+            ...(resolved.images ? { images: resolved.images } : {}),
+          },
+          dispose,
+        };
       } catch (error) {
         dispose();
         throw error;
@@ -133,6 +141,7 @@ async function loadSession(
 ): Promise<LoadedScene> {
   const controller = new AbortController();
   let runner: SceneRunner | undefined;
+  let artwork: SceneImageLayer | undefined;
   let release: (() => void) | undefined;
   let disposed = false;
   const dispose = (): void => {
@@ -142,7 +151,11 @@ async function loadSession(
     scene.events.off('shutdown', dispose);
     options.signal?.removeEventListener('abort', dispose);
     try {
-      runner?.dispose();
+      try {
+        runner?.dispose();
+      } finally {
+        artwork?.dispose();
+      }
     } finally {
       release?.();
     }
@@ -166,6 +179,16 @@ async function loadSession(
       controller.signal.throwIfAborted();
       if (!ready) throw new Error('Scene shut down while loading character artwork.');
     }
+    const images = prepared.resolved.images ?? new Map<string, Uint8Array<ArrayBuffer>>();
+    for (const [reference, bytes] of images) sharedBudget.checkImage(`image:${reference}`, bytes);
+    artwork = new SceneImageLayer(scene, (reference) => {
+      const bytes = images.get(reference);
+      if (!bytes) return Promise.reject(new Error(`Missing scene image "${reference}".`));
+      return Promise.resolve(bytes);
+    });
+    artwork.sync(prepared.resolved.definition.images);
+    await artwork.ready();
+    controller.signal.throwIfAborted();
     runner = new SceneRunner(prepared.resolved.definition, {
       ...(options.onCue ? { onCue: options.onCue } : {}),
       createActor: (data, depth) => {

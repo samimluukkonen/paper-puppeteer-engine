@@ -1,8 +1,10 @@
+import { characterManifestSchema } from '../../engine/CharacterDefinition.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { inspectImageHeader } from '../../engine/imageHeader.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { parseSceneJson } from '../../engine/SceneDefinition.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
-import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
+import { buildCharacterPackage, openPackageRuntime, packageJson } from '../shared/package/characterPackage.js';
 import type { ProjectEditorContext } from './projectBridge.js';
 import { ProjectValidationError, requireValidExport, type ProjectInspection } from './projectInspection.js';
 import { buildProjectScenePackage, characterFileFetcher } from './projectPackage.js';
@@ -219,6 +221,29 @@ export class ProjectEditorHosts {
           if (error instanceof ProjectValidationError) this.options.validate(workspace, error.report);
           throw error;
         }),
+      loadProjectImages: async () => {
+        const images: { id: string; name: string; bytes: Uint8Array<ArrayBuffer>; width: number; height: number }[] =
+          [];
+        for (const { id: characterId } of workspace.definition.characters) {
+          const packaged = await buildCharacterPackage(
+            workspace.captureCharacter(characterId),
+            characterFileFetcher(workspace.character(characterId).files),
+          );
+          const manifest = characterManifestSchema.parse(packageJson(packaged, 'character.json'));
+          for (const path of new Set(Object.values(manifest.textures))) {
+            const bytes = packaged.get(path)!;
+            const header = inspectImageHeader(bytes)!;
+            images.push({
+              id: `${characterId}:${path}`,
+              name: `${characterId}: ${path}`,
+              bytes,
+              width: header.width,
+              height: header.height,
+            });
+          }
+        }
+        return images;
+      },
       loadCharacter: (reference) => {
         const characterId = workspace.resolveCharacter(reference);
         let request = runtimeCharacters.get(reference);

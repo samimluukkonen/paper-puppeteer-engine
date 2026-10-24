@@ -7,6 +7,7 @@ import {
   SceneValidationError,
   serializeSceneDefinition,
   type SceneActorDefinition,
+  type SceneImageDefinition,
   type SceneActionDefinition,
   type SceneDefinition,
   type SceneValidationOptions,
@@ -15,6 +16,7 @@ import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { SceneImageRegistry } from './SceneImageRegistry.js';
 
 export type ReadonlyScene = DeepReadonly<SceneDefinition>;
 export interface ActorGroundContact {
@@ -27,6 +29,7 @@ interface SceneEntry {
   saved: ReadonlyScene;
   working: ReadonlyScene;
   unsavedNew: boolean;
+  selectedImage: string | null;
   selectedActor: string | null;
   selectedAction: string | null;
   readonly history: SnapshotHistory<ReadonlyScene>;
@@ -40,6 +43,8 @@ export class SceneEditorDocument {
   private revision = 0;
   private dragAction: string | null = null;
   private dragActor: string | null = null;
+  private dragImage: string | null = null;
+  readonly images = new SceneImageRegistry();
   private groundOffsets: ReadonlyMap<string, number> = new Map();
   private groundContacts: ReadonlyMap<string, readonly ActorGroundContact[]> = new Map();
   private readonly selectedContacts = new Map<string, string>();
@@ -111,6 +116,10 @@ export class SceneEditorDocument {
   get dirty(): boolean {
     return !!this.entry && this.isDirty(this.entry);
   }
+  needsImportConfirmation(id: string): boolean {
+    const entry = this.entries.get(id);
+    return !!entry && this.isDirty(entry);
+  }
   get hasUnsavedChanges(): boolean {
     return [...this.entries.values()].some((entry) => this.isDirty(entry));
   }
@@ -161,6 +170,7 @@ export class SceneEditorDocument {
       saved: source,
       working: source,
       unsavedNew,
+      selectedImage: null,
       selectedActor: null,
       selectedAction: null,
       history: new SnapshotHistory(
@@ -172,6 +182,7 @@ export class SceneEditorDocument {
       ),
     };
     this.cancelActionDrag();
+    this.cancelImageDrag();
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
     this.groundOffsets = new Map();
@@ -197,6 +208,7 @@ export class SceneEditorDocument {
   selectScene(id: string): boolean {
     if (!this.entries.has(id)) return this.reportError(new Error(`Unknown scene "${id}".`));
     this.cancelActionDrag();
+    this.cancelImageDrag();
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
     this.selected = id;
@@ -239,18 +251,114 @@ export class SceneEditorDocument {
     }
   }
 
+  get selectedImageId(): string | null {
+    const id = this.entry?.selectedImage;
+    return this.workingScene?.images?.some((image) => image.id === id) ? id! : null;
+  }
+  selectImage(id: string | null): void {
+    if (!this.entry || (id !== null && !this.workingScene?.images?.some((image) => image.id === id))) return;
+    this.cancelActorDrag();
+    this.cancelActionDrag();
+    if (id !== this.selectedImageId) this.cancelImageDrag();
+    this.entry.selectedImage = id;
+    this.entry.selectedActor = null;
+    this.entry.selectedAction = null;
+    this.notify();
+  }
+  addImage(reference: string): boolean {
+    this.endImageDrag();
+    this.endActorDrag();
+    this.endActionDrag();
+    const scene = this.workingScene;
+    if (!scene) return false;
+    if (!this.images.has(reference)) return this.reportError(new Error(`Missing image "${reference}".`));
+    let index = 1;
+    while (scene.images?.some((image) => image.id === `image-${index}`)) index++;
+    const id = `image-${index}`;
+    if (
+      !this.replaceScene({
+        ...scene,
+        images: [
+          ...(scene.images ?? []),
+          {
+            id,
+            image: reference,
+            position: { x: 0, y: 0 },
+            scale: { x: 1, y: 1 },
+            visible: true,
+            order: Math.min(255, scene.images?.length ?? 0),
+          },
+        ],
+      })
+    )
+      return false;
+    this.selectImage(id);
+    return true;
+  }
+  updateImage(id: string, patch: Partial<Omit<SceneImageDefinition, 'id'>>): boolean {
+    if (!this.dragImage) {
+      this.endActorDrag();
+      this.endActionDrag();
+    }
+    const scene = this.workingScene;
+    if (!scene?.images?.some((image) => image.id === id)) return false;
+    return this.replaceScene({
+      ...scene,
+      images: scene.images.map((image) => (image.id === id ? { ...image, ...patch } : image)),
+    });
+  }
+  removeImage(id: string): boolean {
+    this.endImageDrag();
+    const scene = this.workingScene;
+    if (!scene?.images?.some((image) => image.id === id)) return false;
+    return this.replaceScene({ ...scene, images: scene.images.filter((image) => image.id !== id) });
+  }
+  beginImageDrag(id: string): boolean {
+    this.cancelImageDrag();
+    this.selectImage(id);
+    if (!this.entry || this.selectedImageId !== id) return false;
+    this.entry.history.beginOperation();
+    this.dragImage = id;
+    return true;
+  }
+  moveImageDrag(patch: Pick<SceneImageDefinition, 'position' | 'scale'>): boolean {
+    return this.dragImage ? this.updateImage(this.dragImage, patch) : false;
+  }
+  endImageDrag(): void {
+    if (!this.dragImage) return;
+    this.dragImage = null;
+    this.entry?.history.endOperation();
+    this.notify();
+  }
+  cancelImageDrag(): void {
+    if (!this.dragImage) return;
+    this.dragImage = null;
+    this.entry?.history.cancelOperation();
+    this.notify();
+  }
+  /** Sources, checkpoints, undo, redo and active gestures all keep their binary dependencies. */
+  cleanupImages(): number {
+    const retained = new Set<string>();
+    for (const entry of this.entries.values())
+      for (const scene of [entry.source, entry.saved, entry.working, ...entry.history.retainedSnapshots])
+        for (const image of scene.images ?? []) retained.add(image.image);
+    return this.images.removeUnused(retained);
+  }
+
   get selectedActorId(): string | null {
     const id = this.entry?.selectedActor;
     return this.workingScene?.actors.some((actor) => actor.id === id) ? id! : null;
   }
   get hasActiveGesture(): boolean {
-    return this.dragActor !== null || this.dragAction !== null;
+    return this.dragImage !== null || this.dragActor !== null || this.dragAction !== null;
   }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;
+    this.cancelImageDrag();
     if (id !== this.selectedActorId) this.cancelActorDrag();
     this.cancelActionDrag();
     this.entry.selectedAction = null;
+    this.entry.selectedImage = null;
     this.entry.selectedActor = id;
     this.notify();
   }
@@ -262,6 +370,7 @@ export class SceneEditorDocument {
   }
   addActor(manifest: string, position = { x: 0, y: 0 }): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene) return this.reportError(new Error('No scene is selected.'));
@@ -273,6 +382,7 @@ export class SceneEditorDocument {
   }
   updateActor(id: string, patch: Partial<SceneActorDefinition>): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
@@ -293,6 +403,7 @@ export class SceneEditorDocument {
   }
   setActorAppearance(id: string, property: 'animation' | 'skin', value: string | null): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
@@ -309,6 +420,7 @@ export class SceneEditorDocument {
   }
   duplicateActor(id: string): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     const actor = scene?.actors.find((entry) => entry.id === id);
@@ -342,6 +454,7 @@ export class SceneEditorDocument {
   }
   removeActor(id: string, options: { removeActions?: boolean } = {}): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return false;
@@ -361,6 +474,7 @@ export class SceneEditorDocument {
   }
   reorderActor(id: string, offset: -1 | 1): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene) return false;
@@ -373,6 +487,7 @@ export class SceneEditorDocument {
   }
   beginActorDrag(id: string): boolean {
     this.cancelActionDrag();
+    this.cancelImageDrag();
     this.cancelActorDrag();
     if (!this.workingScene?.actors.some((actor) => actor.id === id)) return false;
     this.selectActor(id);
@@ -475,8 +590,10 @@ export class SceneEditorDocument {
   selectAction(id: string | null): void {
     const action = this.workingScene?.actions.find((action) => action.id === id);
     if (!this.entry || (id !== null && !action)) return;
+    this.cancelImageDrag();
     this.cancelActorDrag();
     if (id !== this.selectedActionId) this.cancelActionDrag();
+    this.entry.selectedImage = null;
     this.entry.selectedAction = id;
     if (action) this.entry.selectedActor = action.actorId;
     this.notify();
@@ -487,6 +604,7 @@ export class SceneEditorDocument {
     return `action-${index}`;
   }
   addAction(input: SceneActionInput): boolean {
+    this.endImageDrag();
     this.endActorDrag();
     this.endActionDrag();
     const scene = this.workingScene;
@@ -497,6 +615,7 @@ export class SceneEditorDocument {
     return true;
   }
   updateAction(id: string, input: SceneActionDefinition): boolean {
+    this.endImageDrag();
     this.endActorDrag();
     this.endActionDrag();
     return this.replaceAction(id, input);
@@ -509,6 +628,7 @@ export class SceneEditorDocument {
     return this.replaceScene({ ...scene, actions: scene.actions.map((action) => (action.id === id ? input : action)) });
   }
   removeAction(id: string): boolean {
+    this.endImageDrag();
     this.endActorDrag();
     this.endActionDrag();
     const scene = this.workingScene;
@@ -521,6 +641,7 @@ export class SceneEditorDocument {
     return action ? this.addAction({ ...action, time }) : false;
   }
   beginActionDrag(id: string): boolean {
+    this.cancelImageDrag();
     this.cancelActorDrag();
     this.cancelActionDrag();
     if (!this.workingScene?.actions.some((action) => action.id === id)) return false;
@@ -547,17 +668,20 @@ export class SceneEditorDocument {
 
   updateProperties(properties: { name?: string; duration?: number }): boolean {
     this.endActionDrag();
+    this.endImageDrag();
     this.endActorDrag();
     return this.replaceScene({ ...this.workingScene, ...properties });
   }
   undo(): boolean {
     this.cancelActionDrag();
+    this.cancelImageDrag();
     this.cancelActorDrag();
     if (!this.entry?.history.undo()) return false;
     return this.success();
   }
   redo(): boolean {
     this.cancelActionDrag();
+    this.cancelImageDrag();
     this.cancelActorDrag();
     if (!this.entry?.history.redo()) return false;
     return this.success();
@@ -566,6 +690,7 @@ export class SceneEditorDocument {
     const entry = this.entry;
     if (!entry || (this.dirty && !options.discardChanges)) return false;
     this.cancelActionDrag();
+    this.cancelImageDrag();
     this.cancelActorDrag();
     entry.history.change(() => {
       entry.working = entry.source;
@@ -574,7 +699,10 @@ export class SceneEditorDocument {
   }
   exportJson(): string {
     if (!this.workingScene) throw new Error('No scene is selected.');
-    return serializeSceneDefinition(this.parse(this.workingScene), this.validation);
+    return serializeSceneDefinition(this.parse(this.workingScene), {
+      ...this.validation,
+      images: new Set(this.images.entries.map((image) => image.reference)),
+    });
   }
   validateScene(): boolean {
     try {

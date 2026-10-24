@@ -58,6 +58,7 @@ export type { JsonWorkloadLimitOptions } from './jsonWorkloadLimits.js';
 export type {
   SceneDefinition,
   SceneActorDefinition,
+  SceneImageDefinition,
   SceneActionDefinition,
   SceneCharacterReference,
   SceneCharacterAssets,

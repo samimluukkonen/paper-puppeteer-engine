@@ -419,11 +419,12 @@ export class ProjectInspector {
         ? [...new Set(parsed.data.actors.map((actor) => actor.character.manifest))]
         : [];
       const catalogKey = canonicalJson(references.map((reference) => [reference, catalog.get(reference) ?? null]));
-      const key = canonicalJson([source ?? null, catalogKey]);
+      const imageReferences = new Set(project.images?.map((image) => `../${image.path}`));
+      const key = canonicalJson([source ?? null, catalogKey, [...imageReferences]]);
       let cached = this.scenes.get(entry.id);
       if (cached?.key !== key) {
         checked.scenes++;
-        cached = { key, issues: validateSceneDefinition(source, { characters: catalog }) };
+        cached = { key, issues: validateSceneDefinition(source, { characters: catalog, images: imageReferences }) };
         this.scenes.set(entry.id, cached);
       }
       for (const issue of cached.issues) {

@@ -18,6 +18,9 @@ export interface ProjectEditorContext {
   readonly choices: readonly { id: string; label: string; manifest: string }[];
   changed(): void;
   characterLoadFailed(): void;
+  loadProjectImages?(): Promise<
+    readonly { id: string; name: string; bytes: Uint8Array<ArrayBuffer>; width: number; height: number }[]
+  >;
   loadCharacter(reference: string): Promise<CharacterDefinition>;
   bindScene(dispose: () => void): void;
   validateScene(scene: ReadonlyScene): void;

@@ -9,9 +9,11 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
     if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       if (document.hasActiveGesture) {
+        document.cancelImageDrag();
         document.cancelActorDrag();
         document.cancelActionDrag();
-      } else if (document.selectedActionId) document.selectAction(null);
+      } else if (document.selectedImageId) document.selectImage(null);
+      else if (document.selectedActionId) document.selectAction(null);
       else document.selectActor(null);
       return;
     }
@@ -29,7 +31,8 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       if (event.repeat) return;
-      if (document.selectedActionId) document.removeAction(document.selectedActionId);
+      if (document.selectedImageId) document.removeImage(document.selectedImageId);
+      else if (document.selectedActionId) document.removeAction(document.selectedActionId);
       else if (document.selectedActorId) {
         const id = document.selectedActorId;
         const references = document.actorReferences(id);

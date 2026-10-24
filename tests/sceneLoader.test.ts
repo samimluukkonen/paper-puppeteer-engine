@@ -1,5 +1,6 @@
 import { rejects } from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
@@ -230,4 +231,108 @@ test('failed scene HTTP responses cancel their bodies and release the loading se
   await rejects(SceneLoader.load(scene, 'https://assets.test/scene.json', { fetcher }), /404/);
   assert.equal(cancel.mock.calls.length, 1);
   assert.equal(events.listenerCount('shutdown'), 0);
+});
+
+test('artwork-only edits preserve runtime Actor identity, transforms and playback clock', async () => {
+  const source = sceneFixture();
+  const assets = assetFixture();
+  const resolved = await resolveSceneDefinition(source, assets);
+  const character = [...resolved.characters.values()][0]!;
+  const playback = new SceneEditorPlayback();
+  const scene = stage().scene;
+  const factory = (data: (typeof source.actors)[number], depth: number) =>
+    new Actor({
+      id: data.id,
+      puppet: new Puppet(scene, { definition: character, autoUpdate: false, depth }),
+      puppetOwnership: 'owned',
+    });
+  playback.sync(source, true, factory);
+  playback.seek(500);
+  playback.play();
+  const actors = playback.actors;
+  const hero = actors!.get('hero')!;
+  const position = { ...hero.position };
+  playback.sync(
+    {
+      ...source,
+      images: [
+        {
+          id: 'background',
+          image: '../images/forest.png',
+          position: { x: 100, y: 0 },
+          scale: { x: 2, y: 3 },
+          visible: true,
+          order: 0,
+        },
+      ],
+    },
+    true,
+    factory,
+  );
+  assert.strictEqual(playback.actors, actors);
+  assert.strictEqual(playback.actors!.get('hero'), hero);
+  assert.deepEqual(hero.position, position);
+  assert.equal(playback.time, 500);
+  assert.equal(playback.status, 'playing');
+  playback.dispose();
+});
+
+test('SceneLoader restores packaged backgrounds behind Actors and disposes their private textures', async () => {
+  class ImageStub {
+    src = '';
+    naturalWidth = 1;
+    naturalHeight = 1;
+    decode() {
+      return Promise.resolve();
+    }
+  }
+  const source = sceneFixture();
+  source.images = [
+    {
+      id: 'background',
+      image: '../images/forest.png',
+      position: { x: -100, y: 50 },
+      scale: { x: 4, y: 3 },
+      visible: true,
+      order: 0,
+    },
+  ];
+  const assets = assetFixture();
+  const bytes = new Uint8Array(artworkFixture().documents['images/paper.png'] as Uint8Array<ArrayBuffer>);
+  const files = await buildScenePackage(source, { ...assets, loadImage: () => Promise.resolve(bytes) });
+  const { scene } = stage();
+  const textures = new Set<string>();
+  const drawn: Phaser.GameObjects.Image[] = [];
+  const createImage = scene.add.image.bind(scene.add);
+  vi.spyOn(scene.add, 'image').mockImplementation((x, y, key, frame) => {
+    const image = createImage(x, y, key, frame);
+    drawn.push(image);
+    return image;
+  });
+  Object.assign(scene.textures, {
+    exists: (key: string) => textures.has(key),
+    addImage: (key: string) => {
+      textures.add(key);
+      return {};
+    },
+    remove: (key: string) => {
+      textures.delete(key);
+    },
+  });
+  vi.stubGlobal('Image', ImageStub);
+  try {
+    const loaded = await SceneLoader.loadPackage(scene, files);
+    sessions.push(loaded);
+    assert.equal(drawn.length, 1);
+    assert.equal(drawn[0]!.x, -100);
+    assert.equal(drawn[0]!.scaleX, 4);
+    assert.isBelow(drawn[0]!.depth, loaded.runner.actors.get('hero')!.puppet.container.depth);
+    loaded.runner.seek(500);
+    assert.equal(drawn[0]!.x, -100);
+    loaded.dispose();
+    assert.equal(textures.size, 0);
+    assert.isTrue((drawn[0] as unknown as { isDestroyed: boolean }).isDestroyed);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

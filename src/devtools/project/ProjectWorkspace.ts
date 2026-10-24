@@ -56,6 +56,7 @@ export class ProjectWorkspace {
     );
     this.history = this.createHistory();
     this.scenes.subscribe(this.refresh);
+    this.scenes.images.subscribe(this.refresh);
   }
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -67,7 +68,13 @@ export class ProjectWorkspace {
     for (const listener of Array.from(this.listeners)) listener();
   };
   get definition(): DeepReadonly<ProjectDefinition> {
-    return this.metadata;
+    const images = this.scenes.images.entries.map((asset) => ({
+      id: asset.reference.replace(/^(?:\.\.\/)+/, ''),
+      name: asset.name,
+      path: asset.reference.replace(/^(?:\.\.\/)+/, ''),
+    }));
+    const { images: _images, ...metadata } = this.metadata;
+    return images.length ? { ...metadata, images } : metadata;
   }
   /** Recovery never claims that a browser snapshot was written to disk. */
   markRecovered(key: string): void {
@@ -84,7 +91,7 @@ export class ProjectWorkspace {
       characters.push(this.characterDigest(id, entry));
     }
     return draftSource({
-      metadata: this.metadata,
+      metadata: this.definition,
       characters,
       scenes: this.metadata.scenes.map(({ id }) => sceneFingerprint(this.scenes.scene(id)!)),
     });
@@ -106,7 +113,7 @@ export class ProjectWorkspace {
     );
   }
   get dirty(): boolean {
-    return !this.saved || !equalJsonData(this.metadata, this.saved);
+    return !this.saved || !equalJsonData(this.definition, this.saved);
   }
   get hasUnsavedChanges(): boolean {
     return (
@@ -270,18 +277,21 @@ export class ProjectWorkspace {
         ];
       }),
     );
-    return parseSceneDefinition(scene, { characters });
+    return parseSceneDefinition(scene, {
+      characters,
+      images: new Set(this.scenes.images.entries.map((image) => image.reference)),
+    });
   }
   /** Only committed authored revisions call this; playback and selection need no validation. */
   inspect(context: ValidationContext = 'draft', fresh = false, scene?: SceneDefinition): ProjectInspection {
     const references = scene && new Set(scene.actors.map((actor) => actor.character.manifest));
     const metadata = references
       ? {
-          ...this.metadata,
+          ...this.definition,
           characters: this.metadata.characters.filter((entry) => references.has(entry.manifest)),
           scenes: [{ id: scene.id, path: 'scene.json' }],
         }
-      : this.metadata;
+      : this.definition;
     const characters = new Map<string, InspectionCharacter>();
     for (const { id } of metadata.characters) {
       const entry = this.character(id);

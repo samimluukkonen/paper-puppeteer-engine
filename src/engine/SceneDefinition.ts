@@ -44,6 +44,22 @@ export const sceneCharacterReferenceSchema = z.strictObject({
     .refine(safeSceneManifest, 'Use a safe manifest path without encoded aliases or internal traversal.'),
 });
 
+/** Image paths resolve relative to the scene JSON, with the same confined leading-parent policy. */
+export const sceneImageReferenceSchema = z
+  .string()
+  .regex(/\.(?:png|webp)$/i)
+  .refine(safeSceneManifest, 'Use a stable PNG/WebP path without aliases, queries or traversal.');
+export const sceneImageDefinitionSchema = z.strictObject({
+  id: sceneIdentifier,
+  image: sceneImageReferenceSchema,
+  position: z.strictObject({ x: z.number(), y: z.number() }),
+  scale: z.strictObject({ x: z.number().positive(), y: z.number().positive() }),
+  visible: z.boolean(),
+  order: z.number().int().min(0).max(255),
+  opacity: z.number().min(0).max(1).exactOptional(),
+});
+export type SceneImageDefinition = z.infer<typeof sceneImageDefinitionSchema>;
+
 export const sceneActorDefinitionSchema = z.strictObject({
   id: sceneIdentifier,
   character: sceneCharacterReferenceSchema,
@@ -101,6 +117,7 @@ export const sceneDefinitionSchema = z.strictObject({
   name: sceneIdentifier,
   /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
   duration: z.number().positive(),
+  images: z.array(sceneImageDefinitionSchema).max(256).exactOptional(),
   actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),
   actions: z.array(sceneActionDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions),
 });
@@ -117,6 +134,7 @@ export interface SceneCharacterAssets {
 }
 export interface SceneValidationOptions {
   readonly characters?: ReadonlyMap<string, SceneCharacterAssets>;
+  readonly images?: ReadonlySet<string>;
 }
 
 export class SceneValidationError extends Error {
@@ -131,6 +149,7 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   // Bound raw collections before walking/cloning entries or allocating schema issues.
   if (input !== null && typeof input === 'object') {
     for (const [field, limit] of [
+      ['images', 256],
       ['actors', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors],
       ['actions', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions],
     ] as const) {
@@ -154,6 +173,13 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   const report = (path: string, message: string): void => {
     issues.push({ severity: 'error', path, message });
   };
+  const imageIds = new Set<string>();
+  for (const [index, image] of (scene.images ?? []).entries()) {
+    if (imageIds.has(image.id)) report(`images[${index}].id`, `Duplicate image element ID "${image.id}".`);
+    imageIds.add(image.id);
+    if (options.images && !options.images.has(image.image))
+      report(`images[${index}].image`, `Missing image "${image.image}". Import or replace it before export.`);
+  }
   const actors = new Map<string, SceneActorDefinition>();
   for (const [index, actor] of scene.actors.entries()) {
     const path = `actors[${index}]`;
