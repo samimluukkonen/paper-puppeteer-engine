@@ -58,6 +58,7 @@ export class SceneEditorPlayback {
         layers: _previousLayers,
         camera: _previousCamera,
         cameraTracks: _previousTracks,
+        transitions: _previousTransitions,
         ...previous
       } = this.source;
       const {
@@ -65,6 +66,7 @@ export class SceneEditorPlayback {
         layers: _nextLayers,
         camera: _nextCamera,
         cameraTracks: _nextTracks,
+        transitions: _nextTransitions,
         ...next
       } = source;
       if (equalJsonData(previous, next)) {

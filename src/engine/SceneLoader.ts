@@ -15,6 +15,7 @@ import { validateScenePackage, type ScenePackageFiles } from './ScenePackage.js'
 import { readSceneResource } from './sceneResource.js';
 import { SceneRunner, type SceneRunnerOptions } from './SceneRunner.js';
 import { createSceneTextureBudget } from './sceneTextureBudget.js';
+import { SceneTransitionOverlay } from './SceneTransitionOverlay.js';
 
 export interface SceneLoadOptions {
   readonly fetcher?: typeof fetch;
@@ -147,6 +148,7 @@ async function loadSession(
   const controller = new AbortController();
   let runner: SceneRunner | undefined;
   let artwork: SceneImageLayer | undefined;
+  let transitions: SceneTransitionOverlay | undefined;
   let release: (() => void) | undefined;
   let disposed = false;
   let audience: { camera: CinematicCameraTarget; viewport: CameraViewport } | undefined;
@@ -160,7 +162,11 @@ async function loadSession(
       try {
         runner?.dispose();
       } finally {
-        artwork?.dispose();
+        try {
+          artwork?.dispose();
+        } finally {
+          transitions?.dispose();
+        }
       }
     } finally {
       release?.();
@@ -195,8 +201,11 @@ async function loadSession(
     artwork.sync(prepared.resolved.definition.images, prepared.resolved.definition.layers);
     await artwork.ready();
     controller.signal.throwIfAborted();
+    if (prepared.resolved.definition.transitions?.length) transitions = new SceneTransitionOverlay(scene);
     runner = new SceneRunner(prepared.resolved.definition, {
+      ...(transitions ? { transitionOverlay: transitions } : {}),
       onCamera: (state) => {
+        transitions?.setCamera(state);
         if (!audience || disposed) return;
         applyCinematicCamera(audience.camera, state, audience.viewport);
         const definition = prepared.resolved.definition;

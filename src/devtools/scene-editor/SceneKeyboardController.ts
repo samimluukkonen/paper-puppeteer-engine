@@ -14,6 +14,7 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
         document.cancelActorDrag();
         document.cancelActionDrag();
       } else if (document.cameraSelected) document.selectCamera(false);
+      else if (document.selectedTransition) document.selectTransition(null);
       else if (document.selectedImageId) document.selectImage(null);
       else if (document.selectedActionId) document.selectAction(null);
       else document.selectActor(null);
@@ -33,6 +34,10 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       if (event.repeat) return;
+      if (document.selectedTransition) {
+        document.removeTransition(document.selectedTransition.id);
+        return;
+      }
       const cameraKey = document.selectedCameraKey;
       if (cameraKey) {
         document.removeCameraKey(cameraKey.property, cameraKey.key.id);

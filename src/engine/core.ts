@@ -228,3 +228,5 @@ export {
   cameraKeyframeSchema,
   cameraTracksSchema,
 } from './cameraAnimation.js';
+export { evaluateTransitionAtTime, sceneTransitionSchema, CLEAR_SCENE_TRANSITION } from './sceneTransitions.js';
+export type { SceneTransition, SceneTransitionState, SceneTransitionTarget } from './sceneTransitions.js';

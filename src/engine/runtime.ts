@@ -42,3 +42,4 @@ export type {
 export { loadSceneCharacter, type SceneCharacterLoadOptions } from './loadSceneCharacter.js';
 
 export { SceneLoader, type SceneLoadOptions, type LoadedScene } from './SceneLoader.js';
+export { SceneTransitionOverlay } from './SceneTransitionOverlay.js';

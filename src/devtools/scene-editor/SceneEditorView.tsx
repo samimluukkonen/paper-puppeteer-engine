@@ -29,6 +29,7 @@ import { ScenePlaybackInspector } from './ScenePlaybackInspector.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
 import { exportSceneJson, importSceneJson, sceneExportFilename } from './SceneTransfer.js';
+import { SceneTransitionPanel } from './SceneTransitionPanel.js';
 import { SceneWorkspaceLayoutController } from './SceneWorkspaceLayoutController.js';
 import './style.css';
 
@@ -399,6 +400,7 @@ export function SceneEditorView({
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
               <SceneCameraPanel key={`camera-${scene.id}`} document={document} playback={playback} />
+              <SceneTransitionPanel key={`transitions-${scene.id}`} document={document} />
               <SceneLayersPanel key={`layers-${scene.id}`} document={document} />
               <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />
               <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />

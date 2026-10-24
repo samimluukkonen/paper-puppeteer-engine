@@ -347,3 +347,100 @@ for (const populated of [false, true]) {
     expect(errors).toEqual([]);
   });
 }
+
+for (const populated of [false, true]) {
+  test(`cuts and fades guide preserves ${populated ? 'selected effects, cuts, clock and preview' : 'an empty scene without creating effects'}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('scene-editor/');
+    const source = {
+      version: 2,
+      id: 'cuts-fades-guide',
+      name: 'Cuts and fades guide',
+      duration: 4000,
+      actors: [],
+      actions: [],
+      ...(populated
+        ? {
+            cameraTracks: {
+              x: [
+                { id: 'wide', time: 0, value: 0, curve: { mode: 'stepped' } },
+                { id: 'close', time: 2000, value: 120 },
+              ],
+              zoom: [
+                { id: 'wide', time: 0, value: 1, curve: { mode: 'stepped' } },
+                { id: 'close', time: 2000, value: 2 },
+              ],
+            },
+            transitions: [
+              { id: 'opening', time: 0, duration: 1000, type: 'fade-in', color: '#123456' },
+              { id: 'closing', time: 3000, duration: 1000, type: 'fade-out', color: '#123456' },
+            ],
+          }
+        : {}),
+    };
+    await page.getByLabel('Open scene JSON').setInputFiles({
+      name: 'transitions.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(source)),
+    });
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+    await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+    const toolbar = page.locator('.scene-stage-toolbar');
+    const selected = page.getByRole('button', { name: 'Fade out at 3 s', exact: true });
+    if (populated) {
+      await page.locator('.scene-camera > summary').click();
+      await page.getByLabel('Camera Key Edit mode', { exact: true }).check();
+      await page.getByLabel('Playhead (s)', { exact: true }).fill('1.5');
+      await toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true }).click();
+      await page.getByLabel('Editor overlays', { exact: true }).check();
+      await selected.click();
+      await page.getByText('Transition properties · Fade out', { exact: true }).click();
+      await page.getByLabel('Fade duration (seconds)', { exact: true }).fill('0.5');
+      await page.getByRole('button', { name: 'Apply transition properties', exact: true }).click();
+      await page.getByRole('button', { name: 'Undo', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+    }
+    await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+    const guide = guideRegistry.getGuideById('scene-cuts-fades')!;
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+    const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+    for (const [index, step] of guide.steps.entries()) {
+      await expect(tour.getByRole('heading', { name: step.title, exact: true })).toBeVisible();
+      const target = page.locator(`[data-guide-id="${step.targetId}"]`);
+      await expect(target).toHaveCount(1);
+      await expect(target).toBeVisible();
+      await expect(page.locator('.guide-spotlight-hole')).toBeVisible();
+      await expect(tour).not.toContainText('Target unavailable');
+      if (step.id === 'timing' && !populated) await expect(target).toContainText('No fades yet?');
+      if (step.id === 'appearance')
+        await page.screenshot({ path: test.info().outputPath(`transition-guide-${populated}.png`) });
+      if (index + 1 < guide.steps.length) await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await tour.getByRole('button', { name: 'Exit', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'Edit', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    await expect(page.getByLabel('Playhead (s)', { exact: true })).toHaveValue(populated ? '1.5' : '0');
+    await expect(page.getByLabel('Scene playback status')).toContainText(populated ? 'paused' : 'stopped');
+    if (populated) {
+      await expect(selected).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByLabel('Camera Key Edit mode', { exact: true })).toBeChecked();
+      await expect(page.getByLabel('Fade duration (seconds)', { exact: true })).toHaveValue('1');
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+      await expect(toolbar.getByRole('button', { name: 'Exit Camera Preview', exact: true })).toBeVisible();
+      await expect(page.getByLabel('Editor overlays', { exact: true })).toBeChecked();
+    } else {
+      await expect(page.getByLabel('Camera Key Edit mode', { exact: true })).not.toBeChecked();
+      await expect(page.getByLabel('Scene transitions', { exact: true }).getByRole('button')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
+      await expect(toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true })).toBeVisible();
+    }
+    const waiting = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download scene JSON', exact: true }).click();
+    expect(JSON.parse(await readFile(await (await waiting).path(), 'utf8'))).toEqual(source);
+    expect(errors).toEqual([]);
+  });
+}

@@ -26,6 +26,7 @@ import {
   type SceneValidationOptions,
 } from '../../engine/SceneDefinition.js';
 import { sceneLayers } from '../../engine/sceneLayers.js';
+import type { SceneTransition } from '../../engine/sceneTransitions.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
@@ -51,6 +52,7 @@ interface SceneEntry {
   selectedImage: string | null;
   selectedActor: string | null;
   selectedAction: string | null;
+  selectedTransition: string | null;
   readonly history: SnapshotHistory<ReadonlyScene>;
 }
 
@@ -203,6 +205,7 @@ export class SceneEditorDocument {
       selectedImage: null,
       selectedActor: null,
       selectedAction: null,
+      selectedTransition: null,
       history: new SnapshotHistory(
         () => entry.working,
         (snapshot) => {
@@ -330,6 +333,36 @@ export class SceneEditorDocument {
     }
     return this.replaceScene({ ...scene, cameraTracks: tracks });
   }
+  /** A cut uses the existing camera owner: each preceding channel key holds until
+   * this shot's key. A time-zero baseline prevents first-key pre-roll changing the old shot.
+   * All three channels and predecessor curves enter history in one validated snapshot.
+   */
+  setCameraCut(time = this.cameraTime?.() ?? 0, values: CinematicCameraState = this.cinematicCamera): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene) return false;
+    const tracks = { ...scene.cameraTracks };
+    for (const property of CAMERA_PROPERTIES) {
+      let keys = [...(tracks[property] ?? [])];
+      const nextId = (): string => {
+        let index = 1;
+        while (keys.some((key) => key.id === `camera-key-${index}`)) index++;
+        return `camera-key-${index}`;
+      };
+      if (time > 0 && !keys.some((key) => key.time < time))
+        keys.push({ id: nextId(), time: 0, value: evaluateCameraAtTime(scene, 0)[property] });
+      const existing = keys.find((key) => key.time === time);
+      const shot = { ...existing, id: existing?.id ?? nextId(), time, value: values[property] };
+      keys = [...keys.filter((key) => key.time !== time), shot].sort((a, b) => a.time - b.time);
+      let before = -1;
+      for (let index = 0; index < keys.length; index++) if (keys[index]!.time < time) before = index;
+      if (before >= 0) keys[before] = { ...keys[before]!, curve: { mode: 'stepped' } };
+      tracks[property] = keys;
+    }
+    if (!this.replaceScene({ ...scene, cameraTracks: tracks })) return false;
+    this.setCameraKeyEditing(true);
+    return true;
+  }
   updateCameraKey(property: CameraProperty, id: string, patch: Partial<Omit<CameraKeyframe, 'id'>>): boolean {
     if (!this.dragCameraKey) this.finishLayerGestures();
     const scene = this.workingScene;
@@ -394,6 +427,7 @@ export class SceneEditorDocument {
     this.cancelActorDrag();
     this.cancelActionDrag();
     if (!this.entry) return;
+    this.entry.selectedTransition = null;
     this.entry.cameraSelected = selected;
     this.entry.selectedCameraKey = null;
     if (selected) {
@@ -582,6 +616,7 @@ export class SceneEditorDocument {
     this.cancelActionDrag();
     if (id !== this.selectedImageId) this.cancelImageDrag();
     this.entry.cameraSelected = false;
+    this.entry.selectedTransition = null;
     this.entry.selectedImage = id;
     this.entry.selectedActor = null;
     this.entry.selectedAction = null;
@@ -696,6 +731,7 @@ export class SceneEditorDocument {
     this.entry.selectedAction = null;
     this.entry.selectedImage = null;
     this.entry.cameraSelected = false;
+    this.entry.selectedTransition = null;
     this.entry.selectedActor = id;
     this.notify();
   }
@@ -931,6 +967,41 @@ export class SceneEditorDocument {
     const id = this.entry?.selectedAction;
     return this.workingScene?.actions.some((action) => action.id === id) ? id! : null;
   }
+  get selectedTransition(): Readonly<SceneTransition> | null {
+    return this.workingScene?.transitions?.find((effect) => effect.id === this.entry?.selectedTransition) ?? null;
+  }
+  selectTransition(id: string | null): void {
+    if (!this.entry || (id !== null && !this.workingScene?.transitions?.some((effect) => effect.id === id))) return;
+    this.selectActor(null);
+    this.entry.selectedTransition = id;
+    this.notify();
+  }
+  addTransition(input: Omit<SceneTransition, 'id'>): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene) return false;
+    let index = 1;
+    while (scene.transitions?.some((effect) => effect.id === `transition-${index}`)) index++;
+    const id = `transition-${index}`;
+    if (!this.replaceScene({ ...scene, transitions: [...(scene.transitions ?? []), { ...input, id }] })) return false;
+    this.selectTransition(id);
+    return true;
+  }
+  updateTransition(id: string, patch: Partial<Omit<SceneTransition, 'id'>>): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene?.transitions?.some((effect) => effect.id === id)) return false;
+    return this.replaceScene({
+      ...scene,
+      transitions: scene.transitions.map((effect) => (effect.id === id ? { ...effect, ...patch, id } : effect)),
+    });
+  }
+  removeTransition(id: string): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene?.transitions?.some((effect) => effect.id === id)) return false;
+    return this.replaceScene({ ...scene, transitions: scene.transitions.filter((effect) => effect.id !== id) });
+  }
   selectAction(id: string | null): void {
     const action = this.workingScene?.actions.find((action) => action.id === id);
     if (!this.entry || (id !== null && !action)) return;
@@ -940,6 +1011,7 @@ export class SceneEditorDocument {
     if (id !== this.selectedActionId) this.cancelActionDrag();
     this.entry.selectedImage = null;
     this.entry.cameraSelected = false;
+    this.entry.selectedTransition = null;
     this.entry.selectedAction = id;
     if (action) this.entry.selectedActor = action.actorId;
     this.notify();

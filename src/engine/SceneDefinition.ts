@@ -5,6 +5,7 @@ import { cinematicCameraSchema, CINEMATIC_CAMERA_MIN_ZOOM, CINEMATIC_CAMERA_MAX_
 import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
+import { sceneTransitionSchema } from './sceneTransitions.js';
 import { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 import { identifierSchema } from './schemas.js';
 import type { ValidationIssue } from './validation.js';
@@ -131,6 +132,7 @@ export const sceneDefinitionSchema = z.strictObject({
   duration: z.number().positive(),
   camera: cinematicCameraSchema.exactOptional(),
   cameraTracks: cameraTracksSchema.exactOptional(),
+  transitions: z.array(sceneTransitionSchema).max(1000).exactOptional(),
   layers: z.array(sceneLayerDefinitionSchema).min(2).max(64).exactOptional(),
   images: z.array(sceneImageDefinitionSchema).max(256).exactOptional(),
   actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),
@@ -166,6 +168,7 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
     for (const [field, limit] of [
       ['layers', 64],
       ['images', 256],
+      ['transitions', 1000],
       ['actors', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors],
       ['actions', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions],
     ] as const) {
@@ -204,6 +207,22 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
       if (key.curve?.mode === 'bezier' && key.curve.control1.x > key.curve.control2.x)
         report(`${path}.curve`, 'Bézier time handles must be monotonic.');
     }
+  }
+  const transitionIds = new Set<string>();
+  const transitions = (scene.transitions ?? []).map((transition, index) => ({ transition, index }));
+  transitions.sort((a, b) => a.transition.time - b.transition.time);
+  let previousEnd = -1;
+  for (const { transition, index } of transitions) {
+    const path = `transitions[${index}]`;
+    if (transitionIds.has(transition.id)) report(`${path}.id`, 'Transition IDs must be unique.');
+    transitionIds.add(transition.id);
+    const end = transition.time + transition.duration;
+    if (end <= transition.time) report(`${path}.duration`, 'Transition duration must advance scene time.');
+    if (!Number.isFinite(end) || end > scene.duration)
+      report(`${path}.duration`, 'Transition end must stay within scene duration.');
+    if (transition.time < previousEnd)
+      report(`${path}.time`, 'Fade intervals must not overlap. Move or shorten this fade.');
+    previousEnd = Math.max(previousEnd, end);
   }
   const layerIds = new Set<string>();
   for (const [index, layer] of (scene.layers ?? []).entries()) {

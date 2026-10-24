@@ -45,3 +45,4 @@ export type { CreateFootContactMarkerOptions } from './footContactMarkers.js';
 export type { CinematicCameraState, CameraViewport, CinematicCameraTarget } from './cinematicCamera.js';
 
 export type { CameraProperty, CameraKeyframe, CameraTracks } from './cameraAnimation.js';
+export type { SceneTransition, SceneTransitionState, SceneTransitionTarget } from './sceneTransitions.js';

@@ -47,6 +47,16 @@ export function SceneTimeline({
   const [snap, setSnap] = useState(true);
   const setPlayhead = (time: number): void => playback.seek(time);
   const [kind, setKind] = useState<SceneActionDefinition['type']>('animation');
+  const [fadeType, setFadeType] = useState<'fade-in' | 'fade-out'>('fade-in');
+  const cuts = [
+    ...new Set(
+      CAMERA_PROPERTIES.flatMap((property) =>
+        (scene.cameraTracks?.[property] ?? []).flatMap((key, index, keys) =>
+          index > 0 && keys[index - 1]?.curve?.mode === 'stepped' ? [key.time] : [],
+        ),
+      ),
+    ),
+  ].sort((a, b) => a - b);
   const width = Math.max(300, viewportWidth - 146) * zoom;
   const seconds = scene.duration / 1000;
   const actor = scene.actors.find((actor) => actor.id === document.selectedActorId);
@@ -127,6 +137,44 @@ export function SceneTimeline({
         >
           Set Camera Key
         </button>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.sceneCameraCut}
+          disabled={document.hasActiveGesture}
+          onClick={() => {
+            playback.pause();
+            document.setCameraCut(playback.time);
+          }}
+        >
+          Set Camera Cut
+        </button>
+        <label>
+          Effect type
+          <select
+            value={fadeType}
+            onChange={(event) => setFadeType(event.target.value === 'fade-in' ? 'fade-in' : 'fade-out')}
+          >
+            <option value="fade-in">Fade in</option>
+            <option value="fade-out">Fade out</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          className="workspace-primary"
+          data-guide-id={GUIDE_TARGETS.sceneAddTransition}
+          disabled={document.hasActiveGesture || playback.time >= scene.duration}
+          onClick={() => {
+            playback.pause();
+            document.addTransition({
+              type: fadeType,
+              time: playback.time,
+              duration: Math.min(1000, scene.duration - playback.time),
+              color: '#000000',
+            });
+          }}
+        >
+          Add effect
+        </button>
         <label>
           Action type
           <select
@@ -171,7 +219,8 @@ export function SceneTimeline({
       <p className="workspace-caption">
         Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses snapping. Scroll
         to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing. Camera diamonds select
-        keys; drag to move their time. Inspect values and outgoing curves in Cinematic Camera.
+        keys; drag to move their time. Set Camera Cut holds the preceding shot until this key; edit the new shot in
+        Cinematic Camera. Select fades to edit start, duration and color in Transition properties.
       </p>
       <ScenePlaybackError playback={playback} />
       {scene.actors.length > 0 && !scene.actions.length && (
@@ -432,6 +481,51 @@ export function SceneTimeline({
                 </div>
               </div>
             ))}
+          </div>
+          <div className="scene-track-row" data-guide-id={GUIDE_TARGETS.sceneTransitions} style={{ height: 62 }}>
+            <span className="scene-track-label">Transitions</span>
+            <div className="scene-track-lane" style={{ width }} aria-label="Scene transitions">
+              {(scene.transitions ?? []).map((effect) => (
+                <button
+                  type="button"
+                  key={effect.id}
+                  className="scene-action clip scene-transition"
+                  aria-label={`${effect.type === 'fade-in' ? 'Fade in' : 'Fade out'} at ${effect.time / 1000} s`}
+                  aria-pressed={document.selectedTransition?.id === effect.id}
+                  title={`${effect.type} · ${effect.time / 1000} s · ${effect.duration / 1000} s · ${effect.color}`}
+                  style={{ left: x(effect.time), width: Math.max(6, x(effect.duration)), top: 4 }}
+                  onClick={() => {
+                    playback.pause();
+                    document.selectTransition(effect.id);
+                  }}
+                >
+                  {effect.type === 'fade-in' ? 'Fade in' : 'Fade out'}
+                </button>
+              ))}
+              {cuts.map((time) => (
+                <button
+                  type="button"
+                  key={`cut-${time}`}
+                  className="scene-action marker scene-camera-key"
+                  aria-label={`Camera cut at ${time / 1000} s`}
+                  title={`Cut · ${time / 1000} s`}
+                  style={{ left: x(time), width: 16, top: 32 }}
+                  onClick={() => {
+                    playback.seek(time);
+                    for (const property of CAMERA_PROPERTIES) {
+                      const keys = scene.cameraTracks?.[property] ?? [];
+                      const index = keys.findIndex((key) => key.time === time);
+                      if (index > 0 && keys[index - 1]?.curve?.mode === 'stepped') {
+                        document.selectCameraKey(property, keys[index]!.id);
+                        break;
+                      }
+                    }
+                  }}
+                >
+                  ◆
+                </button>
+              ))}
+            </div>
           </div>
           <ScenePlayhead playback={playback} duration={scene.duration} width={width} />
         </div>

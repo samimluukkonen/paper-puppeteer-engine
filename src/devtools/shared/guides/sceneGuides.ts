@@ -30,6 +30,68 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 export const sceneGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-cuts-fades',
+    'Cinematic Cuts, Fades & Transitions',
+    'Cut between camera shots and author color fades with deterministic seeking on the scene timeline.',
+    scene,
+    [
+      step(
+        'cut',
+        'Create an instant shot cut',
+        T.sceneCameraCut,
+        'After exiting this tour, set Playhead (s) to the desired cut time and choose Set Camera Cut. The command captures X, Y and Zoom keys and makes the preceding keys Stepped, holding the old shot until the exact cut boundary. If needed, it adds a time-zero baseline to preserve the opening frame. All channels enter one scene Undo step. Actors are optional; the tour never creates or selects a cut.',
+      ),
+      step(
+        'shot',
+        'Frame the new shot',
+        T.sceneCameraKeyValues,
+        'Set Camera Cut enables Camera Key Edit mode. At the cut time, change Center X/Y and Camera zoom, then Apply camera key to create the close-up. The previous shot holds until this time; seeking to the exact boundary shows the new frame. Camera channels keep their existing owner and independent controls. The tour leaves key editing mode, values and selection unchanged.',
+      ),
+      step(
+        'add',
+        'Add a fade at the playhead',
+        T.sceneAddTransition,
+        'Choose Effect type → Fade in or Fade out, then Add effect. Fade in reveals the scene from black or a color; Fade out covers it. New effects start at the playhead, use black and last up to one second of remaining scene time. For an opening fade, use time 0. No Actor is required. If the playhead is at the scene end, move it earlier before adding a fade.',
+      ),
+      step(
+        'timing',
+        'Set fade start and duration',
+        T.sceneTransitionTiming,
+        'Select a fade on the Transitions track, then open Transition properties. Edit Fade start (seconds) and Fade duration (seconds), and choose Apply transition properties. Duration must be positive and the effect must end within scene duration. Authored times use milliseconds on the same clock as Actors and camera keys. With no fade selected, this section explains how to begin; the tour does not select one for you.',
+      ),
+      step(
+        'appearance',
+        'Choose fade direction and color',
+        T.sceneTransitionAppearance,
+        'Fade type chooses Fade in from color or Fade out to color. Fade color uses a six-digit #rrggbb value; black is the default. Apply transition properties commits direction, color and timing together. Fade in changes opacity from 1 to 0; Fade out changes it from 0 to 1. This is a full output-frame overlay above backgrounds, Actors and foreground artwork, below editor guides. React controls stay available.',
+      ),
+      step(
+        'track',
+        'Select fades and cut markers',
+        T.sceneTransitions,
+        'The upper Transitions row shows fade intervals; click a clip to select it and pause playback. Cut diamonds appear below: click one to seek to its time and select a camera channel key. Edit camera timing in Selected camera key or drag its channel diamond. Fade edges participate in ruler snapping. Empty rows are ready for your first cut or fade after the tour.',
+      ),
+      step(
+        'holds',
+        'Hold a color and resolve conflicts',
+        T.sceneTransitionProperties,
+        'A completed fade holds its final opacity until the next fade. For a fade-out, color hold and fade-in, leave a gap between two effects using the same color. Fade intervals cannot overlap; move or shorten an effect if validation reports a conflict. Adjacent fades are allowed and the later fade owns their shared boundary. Delete transition or Delete/Backspace removes the selected effect; scene Undo/Redo restores edits. These transitions stay within one scene.',
+      ),
+      step(
+        'preview',
+        'Preview and seek through transitions',
+        T.sceneCameraPreview,
+        'After exiting this tour, choose Preview Through Camera and Play. Pause inside a fade, scrub forward and backward, and return to the same time: color, opacity and framing must match. Scrub just before and exactly at a cut to see the immediate shot change. Actors and animations continue beneath fades. Seeking samples authored data without replaying a fade or dispatching external cues. The tour never changes playback, preview mode or overlays.',
+      ),
+      step(
+        'save',
+        'Save shots and fades together',
+        T.scenePackage,
+        'Download scene JSON preserves stepped camera keys and fade IDs, times, durations, types and colors; keep its referenced assets with it. Download scene package includes the character and artwork files for portable handoff. Project export and local recovery retain transitions too. Standalone SceneLoader playback evaluates fades on the runner clock and cleans up its overlay on disposal. Editor selection, playhead and preview settings are not exported.',
+      ),
+    ],
+  ),
+  guide(
     'scene-camera-keyframes',
     'Camera Timeline & Keyframes',
     'Animate camera pans and zooms with timeline keys, outgoing curves and deterministic scene playback.',

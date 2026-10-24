@@ -3,9 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { assert, test } from 'vitest';
 import { SceneArtworkPanel } from '../src/devtools/scene-editor/SceneArtworkPanel.js';
 import { SceneCameraPanel } from '../src/devtools/scene-editor/SceneCameraPanel.js';
+import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharacterRegistry.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
 import { SceneLayersPanel } from '../src/devtools/scene-editor/SceneLayersPanel.js';
+import { SceneTimeline } from '../src/devtools/scene-editor/SceneTimeline.js';
+import { SceneTransitionPanel } from '../src/devtools/scene-editor/SceneTransitionPanel.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { guideRegistry } from '../src/devtools/shared/guides/registry.js';
@@ -15,12 +18,14 @@ import { artworkFixture } from './helpers/scenePackageFixtures.js';
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {
   const document = new SceneEditorDocument();
   const launcher = new GuideLauncher(sceneGuideHost(document));
-  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 13);
+  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 14);
   assert.deepEqual(launcher.getAvailability('scene-creating'), { available: true });
   assert.isFalse(launcher.getAvailability('scene-adding-actor').available);
   assert.isFalse(launcher.getAvailability('scene-backgrounds-layers').available);
   assert.isFalse(launcher.getAvailability('scene-cinematic-camera').available);
   assert.isFalse(launcher.getAvailability('scene-camera-keyframes').available);
+  assert.isFalse(launcher.getAvailability('scene-cuts-fades').available);
+  assert.equal(launcher.getPrerequisiteGuide('scene-cuts-fades')?.id, 'scene-creating');
   assert.equal(launcher.getPrerequisiteGuide('scene-camera-keyframes')?.id, 'scene-creating');
   assert.equal(launcher.getPrerequisiteGuide('scene-cinematic-camera')?.id, 'scene-creating');
   assert.equal(launcher.getPrerequisiteGuide('scene-adding-actor')?.id, 'scene-creating');
@@ -30,6 +35,7 @@ test('scene tours gate missing documents and selections, and explain tours prese
   assert.isTrue(launcher.getAvailability('scene-backgrounds-layers').available);
   assert.isTrue(launcher.getAvailability('scene-cinematic-camera').available);
   assert.isTrue(launcher.getAvailability('scene-camera-keyframes').available);
+  assert.isTrue(launcher.getAvailability('scene-cuts-fades').available);
   assert.isTrue(launcher.getAvailability('scene-ground-reference').available);
   assert.isFalse(launcher.getAvailability('scene-positioning').available);
   document.addActor('../characters/demo/character.json');
@@ -252,4 +258,78 @@ test('camera keyframe guide exposes unique anchors with or without keys and pres
   document.undo();
   launcher.refresh();
   inspect(true);
+});
+
+test('cuts and fades guide exposes real targets in empty and selected-effect states without authoring', () => {
+  const document = new SceneEditorDocument();
+  document.createScene({ id: 'transitions-tour', duration: 4000 });
+  const launcher = new GuideLauncher(sceneGuideHost(document));
+  const guide = guideRegistry.getGuideById('scene-cuts-fades')!;
+  assert.equal(guide.title, 'Cinematic Cuts, Fades & Transitions');
+  assert.lengthOf(guide.steps, 9);
+  const registry = new SceneCharacterRegistry();
+  const playback = new SceneEditorPlayback();
+  const inspect = (populated: boolean) => {
+    const html =
+      renderToStaticMarkup(createElement(SceneTransitionPanel, { document })) +
+      renderToStaticMarkup(
+        createElement(SceneTimeline, { scene: document.workingScene!, document, registry, playback }),
+      );
+    for (const id of [
+      GUIDE_TARGETS.sceneCameraCut,
+      GUIDE_TARGETS.sceneAddTransition,
+      GUIDE_TARGETS.sceneTransitions,
+      GUIDE_TARGETS.sceneTransitionProperties,
+      GUIDE_TARGETS.sceneTransitionTiming,
+      GUIDE_TARGETS.sceneTransitionAppearance,
+    ])
+      assert.lengthOf([...html.matchAll(new RegExp(`data-guide-id="${id}"`, 'g'))], 1);
+    assert.notInclude(html, '<details open');
+    assert.include(html, populated ? 'Fade duration (seconds)' : 'No fades yet?');
+    const before = document.workingScene;
+    const json = document.exportJson();
+    const state = () => [
+      document.selectedTransition,
+      document.selectedCameraKey,
+      document.cameraSelected,
+      document.cameraKeyEditing,
+      document.cameraPreviewing,
+      document.cameraOverlays,
+      document.selectedActorId,
+      document.selectedActionId,
+      document.selectedImageId,
+      document.canUndo,
+      document.canRedo,
+      document.cinematicCamera,
+    ];
+    const view = state();
+    assert.isTrue(launcher.launch(guide.id).ok);
+    for (const [index, step] of guide.steps.entries()) {
+      assert.equal(step.preparation, 'reveal-target');
+      assert.notEqual(step.mode, 'try-it');
+      if (index) assert.isTrue(launcher.controller.next().ok);
+    }
+    launcher.controller.exit();
+    assert.strictEqual(document.workingScene, before);
+    assert.equal(document.exportJson(), json);
+    assert.deepEqual(state(), view);
+  };
+  try {
+    inspect(false);
+    assert.isUndefined(document.workingScene!.transitions);
+    assert.isUndefined(document.workingScene!.cameraTracks);
+    document.setCameraCut(2000, { x: 120, y: 0, zoom: 2 });
+    document.addTransition({ time: 3000, duration: 1000, type: 'fade-out', color: '#123456' });
+    const id = document.selectedTransition!.id;
+    document.setCameraTimeProvider(() => 1500);
+    document.setCameraPreview(true);
+    document.setCameraOverlays(true);
+    document.selectTransition(id);
+    document.updateTransition(id, { duration: 500 });
+    document.undo();
+    inspect(true);
+  } finally {
+    registry.dispose();
+    playback.dispose();
+  }
 });

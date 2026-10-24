@@ -43,6 +43,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.2.5
+
+Add a nine-step **Cinematic Cuts, Fades & Transitions** Feature Guide to the shared Scene catalog. Reveal cut capture, shot framing, fade creation, timing, direction/color, transition tracks, holds/conflicts, deterministic preview and saving, including guidance for empty scenes. Preserve authored data, selection, playback, preview and Undo/Redo; add unit and local desktop browser coverage.
+
+Add **Set Camera Cut** using existing stepped camera channels, with time-zero baselines, exact-boundary seeking and one scene history entry. Show cut markers alongside a compact Transitions track. Add selectable fade-in/out effects with stable IDs and collapsed start/duration/type/color controls, deletion and Undo/Redo. Retain Actor instances and playback time during fade edits.
+
+Evaluate fades from the millisecond scene clock, holding their final opacity until the next fade; reject overlapping intervals, invalid colors/timing and scene-boundary violations. Render the output-frame overlay above backgrounds, Actors and foreground artwork, below editor guides, with cleanup on cancellation/disposal. Preserve optional transitions in scene-format-2 JSON, portable ZIPs, project documents and recovery. Integrate standalone SceneLoader playback and export the pure evaluator, types and host-owned overlay. Update schema and camera documentation; cover cuts, fades, seeking, history, persistence, runtime and desktop browser authoring locally.
+
 ## 1.2.4
 
 Add a nine-step **Camera Timeline & Keyframes** guide to the shared Scene catalog. Highlight real capture, mode, time, value, track, property and curve controls with empty-key guidance, plus camera preview and portable saving. Preserve authored keys/curves, selection, edit mode, playhead, preview and history; add unit and local desktop browser coverage.

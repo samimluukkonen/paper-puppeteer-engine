@@ -16,6 +16,12 @@ import {
   type SceneDefinition,
 } from './SceneDefinition.js';
 import { sceneActorDepth, sceneLayer } from './sceneLayers.js';
+import {
+  CLEAR_SCENE_TRANSITION,
+  evaluateTransitionAtTime,
+  type SceneTransitionState,
+  type SceneTransitionTarget,
+} from './sceneTransitions.js';
 import { assertFinite } from './types.js';
 
 export type SceneRunnerStatus =
@@ -46,6 +52,9 @@ export interface SceneRunnerOptions {
   readonly camera?: { readonly target: CinematicCameraTarget; readonly viewport?: () => CameraViewport };
   /** Render-only sample notification after clock commands, including seeks and stop. */
   readonly onCamera?: (state: Readonly<CinematicCameraState>) => void;
+  /** Host-owned overlay; cleared on disposal/failure/cancel. Never dispatches scene cues. */
+  readonly transitionOverlay?: SceneTransitionTarget;
+  readonly onTransition?: (state: SceneTransitionState) => void;
 }
 
 /** Declarative scene adapter over the v0.8 Actor runtime. Owns one millisecond clock;
@@ -111,6 +120,9 @@ export class SceneRunner {
   get cinematicCamera() {
     return evaluateCameraAtTime(this.definition, this.cursor);
   }
+  get transition() {
+    return evaluateTransitionAtTime(this.definition, this.cursor);
+  }
   /** Hosts without an attached camera can apply the same clock sample explicitly. */
   applyCamera(camera: CinematicCameraTarget, viewport?: CameraViewport): CameraViewport {
     return applyCinematicCamera(camera, this.cinematicCamera, viewport);
@@ -119,6 +131,11 @@ export class SceneRunner {
     const camera = this.options.camera;
     if (camera) this.applyCamera(camera.target, camera.viewport?.());
     this.options.onCamera?.(this.cinematicCamera);
+    const transition = ['disposed', 'failed', 'cancelled', 'interrupted'].includes(this.state)
+      ? CLEAR_SCENE_TRANSITION
+      : this.transition;
+    this.options.transitionOverlay?.setTransition(transition);
+    this.options.onTransition?.(transition);
   }
   get status(): SceneRunnerStatus {
     return this.state;
@@ -211,7 +228,12 @@ export class SceneRunner {
   dispose(): void {
     if (this.state === 'disposed' && !this.instances.size) return;
     this.state = 'disposed';
-    this.release();
+    try {
+      this.release();
+    } finally {
+      this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
+      this.options.onTransition?.(CLEAR_SCENE_TRANSITION);
+    }
   }
 
   private execute(operation: () => void): void {
@@ -322,6 +344,14 @@ export class SceneRunner {
       }
     } finally {
       this.ownCommand = false;
+    }
+    if (status !== 'completed') {
+      try {
+        this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
+        this.options.onTransition?.(CLEAR_SCENE_TRANSITION);
+      } catch (error) {
+        errors.push(error);
+      }
     }
     throwNotificationErrors(errors, 'Scene cancellation failed.');
   }

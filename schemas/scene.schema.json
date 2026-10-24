@@ -340,6 +340,45 @@
       },
       "additionalProperties": false
     },
+    "transitions": {
+      "maxItems": 1000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "type": {
+            "type": "string",
+            "enum": ["fade-in", "fade-out"]
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": ["id", "time", "duration", "type", "color"],
+        "additionalProperties": false
+      }
+    },
     "layers": {
       "minItems": 2,
       "maxItems": 64,

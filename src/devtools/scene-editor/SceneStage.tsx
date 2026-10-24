@@ -9,6 +9,8 @@ import { Puppet } from '../../engine/Puppet.js';
 import { SceneImageLayer } from '../../engine/SceneImageLayer.js';
 import { sceneLayer } from '../../engine/sceneLayers.js';
 import { createSceneTextureBudget } from '../../engine/sceneTextureBudget.js';
+import { SceneTransitionOverlay } from '../../engine/SceneTransitionOverlay.js';
+import { CLEAR_SCENE_TRANSITION, evaluateTransitionAtTime } from '../../engine/sceneTransitions.js';
 import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
@@ -49,6 +51,7 @@ class SceneStage extends Phaser.Scene {
   private preview!: SceneActorPreview;
   private overlay!: Phaser.GameObjects.Graphics;
   private grid!: Phaser.GameObjects.Graphics;
+  private transitions!: SceneTransitionOverlay;
   private groundOverlay!: GroundGuideOverlay;
   private groundHandle!: SceneGroundHandle;
   private gesture: Gesture | undefined;
@@ -114,6 +117,7 @@ class SceneStage extends Phaser.Scene {
       return bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : undefined;
     });
     this.grid = this.add.graphics().setDepth(-1000);
+    this.transitions = new SceneTransitionOverlay(this);
     this.overlay = this.add.graphics().setDepth(1_000_000);
     this.groundOverlay = new GroundGuideOverlay(this, { draggable: true });
     this.groundHandle = new SceneGroundHandle(this.document.groundGuide);
@@ -431,6 +435,7 @@ class SceneStage extends Phaser.Scene {
         () => this.playback.dispose(),
         () => this.preview.dispose(),
         () => this.artwork.dispose(),
+        () => this.transitions.dispose(),
       ]) {
         try {
           dispose();
@@ -557,6 +562,13 @@ class SceneStage extends Phaser.Scene {
     this.playback.update(delta);
     this.syncCamera();
     this.syncArtwork();
+    const source = this.document.workingScene;
+    this.transitions.setCamera(this.document.cinematicCamera);
+    this.transitions.setTransition(
+      source && (this.playback.previewing || this.document.cameraPreviewing)
+        ? evaluateTransitionAtTime(source, this.playback.time)
+        : CLEAR_SCENE_TRANSITION,
+    );
     const cleanPreview = this.document.cameraPreviewing && !this.document.cameraOverlays;
     const guide = this.document.groundGuide.getSnapshot().guide;
     this.groundOverlay.render(cleanPreview ? { ...guide, enabled: false } : guide);

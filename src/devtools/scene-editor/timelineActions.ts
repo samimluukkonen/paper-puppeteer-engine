@@ -33,6 +33,10 @@ export function snapSceneTime(
         minTime: min / 1000,
         maxTime: max / 1000,
         targets: [
+          ...(scene.transitions ?? []).flatMap((effect) => [
+            { type: 'keyframe' as const, time: effect.time / 1000 },
+            { type: 'keyframe' as const, time: (effect.time + effect.duration) / 1000 },
+          ]),
           ...scene.actions
             .filter((action) => action.id !== actionId)
             .flatMap((action) => [
