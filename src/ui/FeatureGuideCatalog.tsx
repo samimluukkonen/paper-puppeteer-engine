@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import type {
   GuideAvailability,
   GuideCommandResult,
@@ -41,6 +41,15 @@ export function FeatureGuideCatalog({
   availableLabel?: string;
 }) {
   const id = useId();
+  const [search, setSearch] = useState('');
+  const searchInput = useRef<HTMLInputElement>(null);
+  const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const visibleGuides = guides
+    .filter((guide) => {
+      const text = `${guide.title} ${guide.description}`.toLowerCase();
+      return terms.every((term) => text.includes(term));
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
   return (
     <>
       <div className="workspace-panel-heading">
@@ -66,6 +75,30 @@ export function FeatureGuideCatalog({
         ))}
       </div>
       <h3>{editors[editor]}</h3>
+      <div className="feature-guide-search">
+        <label htmlFor={`${id}-search`}>Search guides</label>
+        <input
+          ref={searchInput}
+          id={`${id}-search`}
+          type="search"
+          value={search}
+          placeholder="Search titles and descriptions"
+          aria-describedby={`${id}-search-help`}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              searchInput.current?.focus();
+            }}
+          >
+            Clear search
+          </button>
+        )}
+      </div>
+      <p id={`${id}-search-help`}>Search within the selected editor category.</p>
       {selection}
       {editor !== 'scene' && !hasCharacter && !selection && (
         <p role="status">
@@ -86,9 +119,15 @@ export function FeatureGuideCatalog({
           </button>
         </div>
       )}
-      {guides.length === 0 && <p>No guides are available for this editor yet.</p>}
+      <p role="status">
+        {guides.length === 0
+          ? 'No guides are available for this editor yet.'
+          : visibleGuides.length === 0
+            ? `No guides match your search in ${editors[editor]}. Try another search or editor category.`
+            : `${visibleGuides.length} of ${guides.length} guides`}
+      </p>
       <ul className="feature-guide-list">
-        {guides.map((guide, index) => {
+        {visibleGuides.map((guide, index) => {
           const availability = getAvailability(guide.id);
           const prerequisite = getPrerequisiteGuide?.(guide.id);
           const titleId = `${id}-guide-${index}`;
@@ -106,6 +145,7 @@ export function FeatureGuideCatalog({
                 <button
                   type="button"
                   onClick={() => {
+                    setSearch('');
                     setEditor(prerequisite.editor);
                     setError(
                       `Prerequisite guide: ${prerequisite.title}. Find it in this category and choose Start Guide when available.`,

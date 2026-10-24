@@ -4,6 +4,71 @@ import { animationHierarchy, selectRigEntry, test } from './fixtures.js';
 
 test.describe.configure({ timeout: 60_000 });
 
+for (const route of ['project/', 'rig-editor/']) {
+  test(`feature catalog sorts and searches titles and descriptions in ${route}`, async ({ page }) => {
+    await page.goto(route);
+    if (route === 'rig-editor/') await expect(page.locator('#validation')).toHaveText('Validation: OK');
+    else await expect(page.getByRole('heading', { name: 'No project open' })).toBeVisible();
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
+    const titles = dialog.locator('.feature-guide-entry h4');
+    const search = dialog.getByRole('searchbox', { name: 'Search guides', exact: true });
+    for (const [editor, category] of [
+      ['rig', 'Rig Editor'],
+      ['animation', 'Animation Editor'],
+      ['scene', 'Scene Editor'],
+    ] as const) {
+      await dialog.getByRole('button', { name: category, exact: true }).click();
+      const expected = guideRegistry
+        .getGuidesForEditor(editor)
+        .map(({ title }) => title)
+        .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+      await expect(titles).toHaveText(expected);
+    }
+    await dialog.getByRole('button', { name: 'Rig Editor', exact: true }).click();
+    // Match separate words from the description and title, with whitespace and mixed case.
+    await search.fill('  COORDINATES   joint  ');
+    await expect(titles).toHaveText(['Editing Joint Positions']);
+    await expect(dialog).toContainText(`1 of ${guideRegistry.getGuidesForEditor('rig').length} guides`);
+    const start = dialog.getByRole('button', { name: 'Start Guide: Editing Joint Positions', exact: true });
+    if (route === 'project/') await expect(start).toBeDisabled();
+    else await expect(start).toBeEnabled();
+    await dialog.getByRole('button', { name: 'Scene Editor', exact: true }).click();
+    await expect(search).toHaveValue('  COORDINATES   joint  ');
+    await expect(titles).toHaveCount(0);
+    await expect(dialog).toContainText('No guides match your search in Scene Editor.');
+    await dialog.getByRole('button', { name: 'Clear search', exact: true }).click();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('');
+    await expect(titles).toHaveCount(guideRegistry.getGuidesForEditor('scene').length);
+    await search.fill('zzzz-no-matching-guide');
+    await expect(titles).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Clear search', exact: true }).click();
+    await search.fill('   ');
+    await expect(titles).toHaveCount(guideRegistry.getGuidesForEditor('scene').length);
+    await dialog.getByRole('button', { name: 'Clear search', exact: true }).click();
+    if (route === 'rig-editor/') {
+      await dialog.getByRole('button', { name: 'Rig Editor', exact: true }).click();
+      await search.fill('joint positions');
+      await start.click();
+      await expect(dialog).not.toBeVisible();
+      await expect(page.getByRole('dialog', { name: 'Editing Joint Positions', exact: true })).toBeVisible();
+    }
+  });
+}
+
+test('showing a prerequisite clears search so its guide is visible', async ({ page }) => {
+  await page.goto('rig-editor/?character=unavailable');
+  await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
+  const search = dialog.getByRole('searchbox', { name: 'Search guides', exact: true });
+  await search.fill('joint positions');
+  await expect(dialog.locator('.feature-guide-entry')).toHaveCount(1);
+  await dialog.getByRole('button', { name: 'Show prerequisite: Creating a New Character', exact: true }).click();
+  await expect(search).toHaveValue('');
+  await expect(dialog.getByRole('heading', { name: 'Creating a New Character', exact: true })).toBeVisible();
+});
+
 test('feature selection uses the registry, keyboard categories, modal focus containment and restoration', async ({
   page,
 }) => {

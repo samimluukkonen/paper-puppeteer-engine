@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Sort Feature Guide entries alphabetically in every editor category and add shared title/description search, result counts and clear/no-results feedback in Project Workspace and the editors.
+
 - Show a shared dark loading screen before view scripts load, including the home redirect and embedded project editors. Match the editor theme, respect reduced motion and dismiss it when the workspace shell is ready.
 
 - Share compact icon-labelled Project/Edit, Character package and Local draft tabs across Project Workspace and the Rig, Animation and Scene editors, with keyboard navigation, collapsible controls and automatic Feature Guide tab reveal. Preserve mounted controls and draft state while reclaiming vertical workspace. Render recovery dialogs outside hidden tab panels so reload always offers a visible, dismissible recovery dialog.
