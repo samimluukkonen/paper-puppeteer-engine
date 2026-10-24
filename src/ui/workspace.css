@@ -121,6 +121,105 @@
   flex: 0 0 auto;
   font-size: 13px;
 }
+.editor-tabs {
+  container-type: inline-size;
+  min-width: 0;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  font-size: 13px;
+}
+.editor-tabs-heading,
+.editor-tabs [role="tablist"] {
+  display: flex;
+  align-items: stretch;
+}
+.editor-tabs-heading {
+  justify-content: space-between;
+  padding: 0 4px 0 0;
+  border-bottom: 1px solid var(--border-default);
+  border-radius: 6px 6px 0 0;
+  background: var(--bg-default);
+}
+.editor-tabs [role="tablist"] {
+  margin-bottom: -1px;
+  min-width: 0;
+}
+.editor-tabs:not(:has(> [role="tabpanel"]:not([hidden]))) .editor-tabs-heading {
+  border-bottom: 0;
+  border-radius: 6px;
+}
+.editor-tabs [role="tab"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-right: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  border-radius: 0;
+  background: var(--bg-default);
+  color: var(--fg-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.editor-tabs [role="tab"]:first-child {
+  border-top-left-radius: 5px;
+}
+.editor-tabs [role="tab"]:hover:not([aria-selected="true"]) {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+}
+.editor-tabs [role="tab"][aria-selected="true"] {
+  color: var(--fg-default);
+  border-bottom-color: var(--bg-subtle);
+  background: var(--bg-subtle);
+  font-weight: 600;
+}
+.editor-tabs [role="tab"]:focus-visible {
+  outline-offset: -4px;
+}
+.editor-tabs [role="tab"][aria-selected="true"] > svg {
+  color: var(--accent-fg);
+}
+@container (width < 380px) {
+  .editor-tabs [role="tab"] > svg {
+    display: none;
+  }
+}
+.editor-tabs .editor-tabs-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  align-self: center;
+  margin-left: 4px;
+}
+.editor-tabs .editor-tabs-collapse:hover {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+}
+.editor-tabs > [role="tabpanel"] {
+  border-radius: 0 0 6px 6px;
+  background: var(--bg-subtle);
+}
+.editor-tabs > [role="tabpanel"] > :is(.workspace-command-bar, .animation-command-bar, .package-tools) {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.editor-tabs :is(.rig-recovery, .animation-recovery) {
+  padding: 8px 12px;
+  border-top: 0;
+}
+.editor-tabs :is(.local-draft-bar, .local-save-status) {
+  border-bottom: 0;
+}
 .workspace-command-bar > label,
 .workspace-preview-options label {
   display: flex;

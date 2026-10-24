@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
-import { ViewHeader } from '../../ui/viewShell.js';
+import { EditorTabs } from '../../ui/EditorTabs.js';
+import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
 import { useWorkspaceInspector } from '../../ui/Workspace.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { AttachmentPanel } from '../rig-editor/AttachmentPanel.js';
@@ -87,217 +88,259 @@ export function AnimationEditorView({
   ));
   return (
     <>
-      <ViewHeader
-        view="animation"
-        selectionId={header ? 'character-selection' : 'inactive-character-selection'}
-        afterHeader={afterHeader}
-      />
+      <ViewHeader view="animation" selectionId={header ? 'character-selection' : 'inactive-character-selection'} />
       <main className={`animation-layout view-content ${inspector.open ? 'inspector-open' : ''}`}>
-        {packages && <PackagePanel controller={packages} />}
-        <section
-          className={`animation-command-bar ${tweaking ? 'rig-tweak-active' : ''}`}
-          aria-label="Animation session"
-        >
-          <div className="animation-session-selection" role="group" aria-label="Animation selection and history">
-            {rigTweak && (
-              <label className="editor-mode-control">
-                <span className="editor-sr-only">Editor Mode</span>
-                <select
-                  id="editor-mode"
-                  data-guide-id={GUIDE_TARGETS.animationMode}
-                  value={mode.mode}
-                  disabled={!mode.ready}
-                  title={tweaking ? 'Editing rig data · Playback paused' : 'Editor Mode'}
-                  onChange={(event) => {
-                    const next = event.target.value === 'rig-tweak' ? 'rig-tweak' : 'animation';
-                    rigTweak.setMode(next);
-                    if (next === 'rig-tweak' && inspector.narrow && !inspector.open) inspector.toggleOpen();
-                  }}
+        <EditorTabs
+          label="Animation editor controls"
+          tabs={[
+            {
+              id: 'animation-edit',
+              label: 'Edit',
+              icon: 'edit',
+              content: (
+                <section
+                  className={`animation-command-bar ${tweaking ? 'rig-tweak-active' : ''}`}
+                  aria-label="Animation session"
                 >
-                  <option value="animation">Animation</option>
-                  <option value="rig-tweak">Rig Tweak</option>
-                </select>
-              </label>
-            )}
-            {newAnimation && <NewAnimationDialog controller={newAnimation} />}
-            {variations && <AnimationVariationDialog controller={variations} />}
-            <label inert={tweaking}>
-              Animation <select id="animation-selection" data-guide-id={GUIDE_TARGETS.animationSelection}></select>
-            </label>
-            <div className="animation-history" inert={tweaking}>
-              <button
-                id="animation-undo"
-                className="editor-icon-button"
-                aria-label="Undo"
-                type="button"
-                aria-keyshortcuts="Control+Z Meta+Z"
-                title="Undo (Ctrl/Cmd+Z)"
-              >
-                <EditorIcon name="undo" />
-                <span className="editor-sr-only">Undo</span>
-              </button>
-              <button
-                id="animation-redo"
-                className="editor-icon-button"
-                aria-label="Redo"
-                type="button"
-                aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
-                title="Redo (Ctrl/Cmd+Shift+Z)"
-              >
-                <EditorIcon name="redo" />
-                <span className="editor-sr-only">Redo</span>
-              </button>
-            </div>
-          </div>
-          <div className="animation-session-actions" role="group" aria-label="Animation commands">
-            <details id="animation-clip-settings" className="animation-menu" data-workspace-menu inert={tweaking}>
-              <summary>Clip settings</summary>
-              <div
-                className="animation-menu-content animation-clip-panel"
-                data-guide-id={GUIDE_TARGETS.animationSettings}
-              >
-                <div className="animation-settings" aria-label="Authored animation settings">
-                  <label>
-                    Mode{' '}
-                    <select id="animation-mode">
-                      <option value="smooth">Smooth</option>
-                      <option value="stepped">Stepped</option>
-                    </select>
-                  </label>
-                  <label>
-                    FPS{' '}
-                    <input
-                      id="animation-fps"
-                      type="number"
-                      min={AUTHORED_FPS_MIN}
-                      max={AUTHORED_FPS_MAX}
-                      step="any"
-                      aria-describedby="animation-settings-help"
-                    />
-                  </label>
-                </div>
-                <p id="animation-settings-help">
-                  Mode and FPS edit the working animation. FPS applies to stepped poses; key times stay unchanged.
-                </p>
-                <label>
-                  Clip interpolation{' '}
-                  <select id="animation-interpolation" aria-describedby="animation-interpolation-help" disabled>
-                    <option value="">Default (Linear)</option>
-                    {interpolationOptions}
-                  </select>
-                </label>
-                <p id="animation-interpolation-help">
-                  Applies to the whole clip. Default and explicit Linear evaluate identically. Smooth/stepped sampling
-                  uses Mode and FPS above.
-                </p>
+                  <div
+                    className="animation-session-selection"
+                    role="group"
+                    aria-label="Animation selection and history"
+                  >
+                    {rigTweak && (
+                      <label className="editor-mode-control">
+                        <span className="editor-sr-only">Editor Mode</span>
+                        <select
+                          id="editor-mode"
+                          data-guide-id={GUIDE_TARGETS.animationMode}
+                          value={mode.mode}
+                          disabled={!mode.ready}
+                          title={tweaking ? 'Editing rig data · Playback paused' : 'Editor Mode'}
+                          onChange={(event) => {
+                            const next = event.target.value === 'rig-tweak' ? 'rig-tweak' : 'animation';
+                            rigTweak.setMode(next);
+                            if (next === 'rig-tweak' && inspector.narrow && !inspector.open) inspector.toggleOpen();
+                          }}
+                        >
+                          <option value="animation">Animation</option>
+                          <option value="rig-tweak">Rig Tweak</option>
+                        </select>
+                      </label>
+                    )}
+                    {newAnimation && <NewAnimationDialog controller={newAnimation} />}
+                    {variations && <AnimationVariationDialog controller={variations} />}
+                    <label inert={tweaking}>
+                      Animation{' '}
+                      <select id="animation-selection" data-guide-id={GUIDE_TARGETS.animationSelection}></select>
+                    </label>
+                    <div className="animation-history" inert={tweaking}>
+                      <button
+                        id="animation-undo"
+                        className="editor-icon-button"
+                        aria-label="Undo"
+                        type="button"
+                        aria-keyshortcuts="Control+Z Meta+Z"
+                        title="Undo (Ctrl/Cmd+Z)"
+                      >
+                        <EditorIcon name="undo" />
+                        <span className="editor-sr-only">Undo</span>
+                      </button>
+                      <button
+                        id="animation-redo"
+                        className="editor-icon-button"
+                        aria-label="Redo"
+                        type="button"
+                        aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
+                        title="Redo (Ctrl/Cmd+Shift+Z)"
+                      >
+                        <EditorIcon name="redo" />
+                        <span className="editor-sr-only">Redo</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="animation-session-actions" role="group" aria-label="Animation commands">
+                    <details
+                      id="animation-clip-settings"
+                      className="animation-menu"
+                      data-workspace-menu
+                      inert={tweaking}
+                    >
+                      <summary>Clip settings</summary>
+                      <div
+                        className="animation-menu-content animation-clip-panel"
+                        data-guide-id={GUIDE_TARGETS.animationSettings}
+                      >
+                        <div className="animation-settings" aria-label="Authored animation settings">
+                          <label>
+                            Mode{' '}
+                            <select id="animation-mode">
+                              <option value="smooth">Smooth</option>
+                              <option value="stepped">Stepped</option>
+                            </select>
+                          </label>
+                          <label>
+                            FPS{' '}
+                            <input
+                              id="animation-fps"
+                              type="number"
+                              min={AUTHORED_FPS_MIN}
+                              max={AUTHORED_FPS_MAX}
+                              step="any"
+                              aria-describedby="animation-settings-help"
+                            />
+                          </label>
+                        </div>
+                        <p id="animation-settings-help">
+                          Mode and FPS edit the working animation. FPS applies to stepped poses; key times stay
+                          unchanged.
+                        </p>
+                        <label>
+                          Clip interpolation{' '}
+                          <select id="animation-interpolation" aria-describedby="animation-interpolation-help" disabled>
+                            <option value="">Default (Linear)</option>
+                            {interpolationOptions}
+                          </select>
+                        </label>
+                        <p id="animation-interpolation-help">
+                          Applies to the whole clip. Default and explicit Linear evaluate identically. Smooth/stepped
+                          sampling uses Mode and FPS above.
+                        </p>
 
-                <p id="animation-metadata"></p>
-                <p id="animation-session-status"></p>
-              </div>
-            </details>
-            <div className="animation-authoring-tools" inert={tweaking}>
-              <EditorMenu id="animation-authoring-tools" label="Tools">
-                {poseLibrary && (
-                  <button id="animation-pose-library-open" type="button" data-open-panel="animation-pose-library-panel">
-                    Pose Library…
-                  </button>
-                )}
-                {motionDiagnostics && (
-                  <button type="button" data-open-panel="animation-motion-panel">
-                    Motion Diagnostics…
-                  </button>
-                )}
-                <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
-                  Retime selected keys…
-                </button>
-                <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
-                  Mirror tools…
-                </button>
-                <button id="animation-bake-open" type="button" data-open-panel="animation-bake-panel">
-                  Bake IK…
-                </button>
-              </EditorMenu>
-            </div>
-            <EditorMenu id="animation-view-menu" label="View">
-              <button id="animation-reset-layout" type="button">
-                Reset layout
-              </button>
-              <button id="animation-help-open" type="button" aria-haspopup="dialog">
-                Editor help…
-              </button>
-            </EditorMenu>
-            <button
-              id="animation-tools-open"
-              type="button"
-              aria-haspopup="dialog"
-              title="Open file tools for import and export (Ctrl/Cmd+S)"
-              inert={tweaking}
-            >
-              File tools
-            </button>
-            <button
-              ref={inspector.toggle}
-              id="animation-inspector-toggle"
-              type="button"
-              aria-expanded={inspector.open}
-              aria-controls="animation-inspector"
-              onClick={inspector.toggleOpen}
-            >
-              Inspector
-            </button>
-            <div className="animation-authoring-tools" inert={tweaking}>
-              <MirrorToolsPanel controller={mirrorTools} />
-              {poseLibrary && <PoseLibraryPanel controller={poseLibrary} />}
-              <IKBakePanel controller={ikBake} />
-              <KeyframeRetimingPanel controller={retiming} />
-              {motionDiagnostics && <MotionDiagnosticsPanel controller={motionDiagnostics} />}
-            </div>
-            <div className="animation-save" inert={tweaking}>
-              <button
-                id="animation-download"
-                data-guide-id={GUIDE_TARGETS.animationExport}
-                type="button"
-                title="Download committed edits as JSON; move the file into your character folder"
-              >
-                Download JSON
-              </button>
-            </div>
-          </div>
-          <div className="animation-feedback">
-            <span id="animation-dirty" role="status"></span>
-            {rigTweak && (
-              <span id="rig-session-dirty" role="status">
-                Rig: {mode.rigDirty ? 'Modified' : 'Clean'}
-              </span>
-            )}
-            {tweaking && (
-              <span id="editor-mode-status" role="status">
-                Editing rig data · Playback paused
-              </span>
-            )}
+                        <p id="animation-metadata"></p>
+                        <p id="animation-session-status"></p>
+                      </div>
+                    </details>
+                    <div className="animation-authoring-tools" inert={tweaking}>
+                      <EditorMenu id="animation-authoring-tools" label="Tools">
+                        {poseLibrary && (
+                          <button
+                            id="animation-pose-library-open"
+                            type="button"
+                            data-open-panel="animation-pose-library-panel"
+                          >
+                            Pose Library…
+                          </button>
+                        )}
+                        {motionDiagnostics && (
+                          <button type="button" data-open-panel="animation-motion-panel">
+                            Motion Diagnostics…
+                          </button>
+                        )}
+                        <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
+                          Retime selected keys…
+                        </button>
+                        <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
+                          Mirror tools…
+                        </button>
+                        <button id="animation-bake-open" type="button" data-open-panel="animation-bake-panel">
+                          Bake IK…
+                        </button>
+                      </EditorMenu>
+                    </div>
+                    <EditorMenu id="animation-view-menu" label="View">
+                      <button id="animation-reset-layout" type="button">
+                        Reset layout
+                      </button>
+                      <button id="animation-help-open" type="button" aria-haspopup="dialog">
+                        Editor help…
+                      </button>
+                    </EditorMenu>
+                    <button
+                      id="animation-tools-open"
+                      type="button"
+                      aria-haspopup="dialog"
+                      title="Open file tools for import and export (Ctrl/Cmd+S)"
+                      inert={tweaking}
+                    >
+                      File tools
+                    </button>
+                    <button
+                      ref={inspector.toggle}
+                      id="animation-inspector-toggle"
+                      type="button"
+                      aria-expanded={inspector.open}
+                      aria-controls="animation-inspector"
+                      onClick={inspector.toggleOpen}
+                    >
+                      Inspector
+                    </button>
+                    <div className="animation-authoring-tools" inert={tweaking}>
+                      <MirrorToolsPanel controller={mirrorTools} />
+                      {poseLibrary && <PoseLibraryPanel controller={poseLibrary} />}
+                      <IKBakePanel controller={ikBake} />
+                      <KeyframeRetimingPanel controller={retiming} />
+                      {motionDiagnostics && <MotionDiagnosticsPanel controller={motionDiagnostics} />}
+                    </div>
+                    <div className="animation-save" inert={tweaking}>
+                      <button
+                        id="animation-download"
+                        data-guide-id={GUIDE_TARGETS.animationExport}
+                        type="button"
+                        title="Download committed edits as JSON; move the file into your character folder"
+                      >
+                        Download JSON
+                      </button>
+                    </div>
+                  </div>
+                  <div className="animation-feedback">
+                    <span id="animation-dirty" role="status"></span>
+                    {rigTweak && (
+                      <span id="rig-session-dirty" role="status">
+                        Rig: {mode.rigDirty ? 'Modified' : 'Clean'}
+                      </span>
+                    )}
+                    {tweaking && (
+                      <span id="editor-mode-status" role="status">
+                        Editing rig data · Playback paused
+                      </span>
+                    )}
 
-            <p id="animation-status" data-guide-id={GUIDE_TARGETS.animationValidation} role="status">
-              Loading character…
-            </p>
-            <p id="animation-export-feedback" role="status"></p>
-            <p id="animation-import-feedback" role="status"></p>
-          </div>
-          <div className="animation-recovery" role="group" aria-label="Draft recovery">
-            <p id="animation-draft-status" role="status"></p>
-            <button id="animation-download-retained-drafts" className="workspace-primary" type="button" hidden>
-              Download retained drafts
-            </button>
-            <button
-              id="animation-clear-retained-drafts"
-              className="workspace-danger"
-              type="button"
-              title="Permanently delete retained browser drafts for this animation"
-              hidden
-            >
-              Clear retained drafts
-            </button>
-          </div>
-        </section>
+                    <p id="animation-status" data-guide-id={GUIDE_TARGETS.animationValidation} role="status">
+                      Loading character…
+                    </p>
+                    <p id="animation-export-feedback" role="status"></p>
+                    <p id="animation-import-feedback" role="status"></p>
+                  </div>
+                </section>
+              ),
+            },
+            ...(packages
+              ? [
+                  {
+                    id: 'animation-package',
+                    label: 'Character package',
+                    icon: 'package' as const,
+                    content: <PackagePanel controller={packages} />,
+                  },
+                ]
+              : []),
+            {
+              id: 'animation-draft',
+              label: 'Local draft',
+              icon: 'draft',
+              content: (
+                <>
+                  <EditorDraftControls>{afterHeader}</EditorDraftControls>
+                  <div className="animation-recovery" role="group" aria-label="Draft recovery">
+                    <p id="animation-draft-status" role="status"></p>
+                    <button id="animation-download-retained-drafts" className="workspace-primary" type="button" hidden>
+                      Download retained drafts
+                    </button>
+                    <button
+                      id="animation-clear-retained-drafts"
+                      className="workspace-danger"
+                      type="button"
+                      title="Permanently delete retained browser drafts for this animation"
+                      hidden
+                    >
+                      Clear retained drafts
+                    </button>
+                  </div>
+                </>
+              ),
+            },
+          ]}
+        />
         <aside
           ref={inspector.panel}
           id="animation-inspector"

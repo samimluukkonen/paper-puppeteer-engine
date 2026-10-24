@@ -8,6 +8,7 @@ import { test, selectRigEntry } from './fixtures.js';
 test('package preview exposes controls only after its artwork and puppet are ready', async ({ page }) => {
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator(':scope > summary').click();
   const download = page.waitForEvent('download');
@@ -76,6 +77,7 @@ test('static WebP replacement exports and reloads with guarded runtime image loa
   await artwork.getByLabel('Alignment policy').selectOption('pixels');
   await artwork.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
   await artwork.getByRole('button', { name: 'Apply Replacement', exact: true }).click();
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator(':scope > summary').click();
   const waiting = page.waitForEvent('download');
@@ -121,10 +123,12 @@ for (const editor of ['rig', 'animation'] as const) {
     });
     await page.goto(`${editor}-editor/`);
     await expect(page.locator(editor === 'rig' ? '#validation' : '#animation-status')).toHaveText('Validation: OK');
+    await page.getByRole('tab', { name: 'Character package', exact: true }).click();
     const packages = page.locator('.package-tools');
     await packages.locator(':scope > summary').click();
     await expect(packages).toContainText('Rig: Clean');
     await expect(packages).toContainText('Animations: Clean');
+    await page.getByRole('tab', { name: 'Edit', exact: true }).click();
     if (editor === 'animation') {
       await page.locator('#animation-selection').selectOption('walk');
       await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('rig-tweak');
@@ -159,6 +163,7 @@ for (const editor of ['rig', 'animation'] as const) {
     await expect(packages).toContainText('Assets: Modified');
     if (editor === 'animation')
       await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('animation');
+    await page.getByRole('tab', { name: 'Character package', exact: true }).click();
     const waiting = page.waitForEvent('download');
     await packages.getByRole('button', { name: 'Download character ZIP', exact: true }).click();
     const download = await waiting,

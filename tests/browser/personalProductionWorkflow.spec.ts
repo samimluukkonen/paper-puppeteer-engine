@@ -149,6 +149,7 @@ test('personal production: new project and artwork → rig/IK/keys → scene →
   await recover(page); // Refresh after bone and IK key authoring.
   frame = await editor(page, 'Animation Editor');
   await expect(frame.locator('#animation-selection')).toHaveValue('reach');
+  await frame.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = frame.locator('.package-tools:visible');
   await packages.locator(':scope > summary').click();
   const characterDownload = page.waitForEvent('download');

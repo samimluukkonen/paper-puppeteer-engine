@@ -82,6 +82,7 @@ test('rig with no animation files: create, author, play, export, reload and pack
   expect(animationFileSchema.parse(JSON.parse(await readFile(await (await secondDownload).path(), 'utf8')))).toEqual(
     authored,
   );
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator(':scope > summary').click();
   const zipWaiting = page.waitForEvent('download');

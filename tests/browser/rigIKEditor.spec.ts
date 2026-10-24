@@ -220,6 +220,7 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   expect(
     await page.locator('#animation-stage canvas').evaluate((element, original) => element === original, canvas),
   ).toBe(true);
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator('summary').click();
   const downloadingPackage = page.waitForEvent('download');

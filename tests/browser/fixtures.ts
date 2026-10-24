@@ -156,6 +156,7 @@ export async function rigFileAction<T>(
   action: (control: Locator) => Promise<T>,
 ): Promise<T> {
   const dialog = page.locator('#rig-tools-dialog');
+  if (!(await dialog.isVisible())) await page.getByRole('tab', { name: 'Edit', exact: true }).click();
   if (!(await dialog.isVisible())) await page.locator('#rig-tools-open').click();
   const result = await action(page.locator(selector));
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
@@ -164,6 +165,8 @@ export async function rigFileAction<T>(
 
 /** Follow the workspace's settings disclosure before interacting with authored controls. */
 export async function animationControl(page: Page, selector: string): Promise<Locator> {
+  if (!(await page.locator('#animation-edit-panel').isVisible()))
+    await page.getByRole('tab', { name: 'Edit', exact: true }).click();
   if (selector === '#animation-download') {
     const dialog = page.locator('#animation-tools-dialog');
     if (await dialog.isVisible()) await dialog.getByRole('button', { name: 'Close', exact: true }).click();
@@ -182,6 +185,7 @@ export async function animationFileAction<T>(
   action: (control: Locator) => Promise<T>,
 ): Promise<T> {
   const dialog = page.locator('#animation-tools-dialog');
+  if (!(await dialog.isVisible())) await page.getByRole('tab', { name: 'Edit', exact: true }).click();
   if (!(await dialog.isVisible())) await page.locator('#animation-tools-open').click();
   const result = await action(page.locator(selector));
   if (

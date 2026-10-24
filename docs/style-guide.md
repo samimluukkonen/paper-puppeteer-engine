@@ -26,6 +26,7 @@ Use `FeatureGuideButton` and `FeatureGuideCatalog` for every Feature Guide entry
 - Use the compact Animation Editor proportions: 16 px page gutters, 8 px gaps between chrome regions, 12–16 px panel padding, 6 px control radii and subtle 1 px borders. Use 4, 8, 12, 16 and 24 px spacing increments for new content; reuse existing component rules first.
 - Expanded settings use 16 px between the disclosure summary and form, 8 px between labels and inputs, and 8 px between adjacent controls. Align action buttons with the input edge.
 - Asset libraries use collapsed, counted categories and separate readable rows. Constrain image previews to fixed boxes with `object-fit: contain`; release preview object URLs when the category closes. Do not render inventories as comma-separated paragraphs.
+- Project Workspace and editors use shared `EditorTabs` for Edit, Character package (character editors) and Local draft controls. Start on Project or Edit, keep inactive panels mounted, and allow the controls to collapse for more canvas space. Use arrow keys/Home/End within the tab list; Feature Guides reveal their target tab.
 - Keep related actions together in a command bar and use bordered lists/panels for assets. Avoid extra nested boxes, large empty banners, oversized titles and decorative cards.
 - Keep inspector disclosures and project details collapsed initially. Opening a section is view state, independent of authored Undo/Redo and export data.
 - Target desktop windows only. Do not add mobile layouts or mobile verification without an explicit change to repository policy.
@@ -52,7 +53,7 @@ Use the shared system sans-serif stack; reserve `--font-mono` for JSON, IDs or n
 
 - Use neutral buttons for ordinary commands, green `.workspace-primary` for create/add actions (including New Character, New Scene and Add Existing Character) and the main export action, and `.workspace-danger` for destructive cleanup/removal. Keep the same hover, disabled and focus behavior everywhere.
 - Navigation is a link; an operation is a button. Every enabled button must perform an available operation or show actionable feedback.
-- Hide **Recovery drafts** when there are no retained drafts. Hide its empty bar when no document or feedback is present. Refresh availability after successful saves/discards and when returning to the window. Keep save status visible for an open document.
+- Hide **Recovery drafts** when there are no retained drafts. Hide its empty bar when no document or feedback is present. Refresh availability after successful saves/discards and when returning to the window. Keep save status available for an open document in the shared Local draft tab. Project Workspace uses the same Local draft tab.
 - Keep local save status in one quiet, vertically centered row. Put Recovery drafts and Draft actions at the right; keep retry/resume and discard inside the actions menu. Show detailed failures with an actionable next step without repeating the full recovery error across the page.
 - Recovery discovery must not interrupt editing when a new autosave appears. Offer existing recovery on startup; reopening the catalog is explicit.
 - Keep file import compact: a named button opens an accessibly labelled file input; do not show a redundant native “Choose file / No file chosen” row next to the same action.

@@ -180,14 +180,9 @@ a {
     minmax(var(--timeline-min-height), 1fr);
   padding: 0;
 }
-.animation-layout > .package-tools {
+.animation-layout > .editor-tabs {
   grid-column: 1;
-  grid-row: 1;
-  margin-bottom: 8px;
-}
-.animation-layout > .animation-command-bar {
-  grid-column: 1;
-  grid-row: 2;
+  grid-row: 1 / 3;
   margin-bottom: 8px;
 }
 .animation-preview,

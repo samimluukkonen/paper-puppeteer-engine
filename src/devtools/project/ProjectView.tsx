@@ -9,6 +9,7 @@ import type { SceneDefinition } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { downloadBlob } from '../../shared/downloadJson.js';
 import { bindExportShortcut, blocksEditorShortcut, historyShortcut } from '../../shared/keyboardShortcuts.js';
+import { EditorTabs } from '../../ui/EditorTabs.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
@@ -272,70 +273,99 @@ export function ProjectView() {
             />
           }
         />
-        <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
-        <div className="workspace-command-bar">
-          <button
-            className="workspace-primary"
-            disabled={busy}
-            onClick={() => {
-              setName('');
-              projectDialog.current?.showModal();
-            }}
-          >
-            <FolderPlus size={16} aria-hidden="true" />
-            New Project
-          </button>
-          <FileAction
-            label="Import Project"
-            icon={<FolderInput size={16} aria-hidden="true" />}
-            accept=".zip"
-            disabled={busy}
-            onFile={(file) => run(async () => addProject(await importProjectPackage(await readZip(file))))}
-          />
-          <label>
-            <FolderOpen size={16} aria-hidden="true" />
-            Project{' '}
-            <select
-              aria-label="Select project"
-              value={selected?.key ?? ''}
-              disabled={busy}
-              onChange={(event) => {
-                const session = sessions.find((entry) => entry.key === event.target.value);
-                setSelected(session);
-                setSettingsName(session?.workspace.definition.name ?? '');
-              }}
-            >
-              <option value="" disabled>
-                No project selected
-              </option>
-              {sessions.map((session) => (
-                <option key={session.key} value={session.key}>
-                  {session.workspace.definition.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {workspace && (
-            <>
-              <button disabled={busy || !workspace.history.canUndo} onClick={() => attempt(() => workspace.undo())}>
-                <Undo2 size={16} aria-hidden="true" />
-                Undo Project
-              </button>
-              <button disabled={busy || !workspace.history.canRedo} onClick={() => attempt(() => workspace.redo())}>
-                <Redo2 size={16} aria-hidden="true" />
-                Redo Project
-              </button>
-              <button disabled={busy} title="Export project ZIP (Ctrl/Cmd+S)" onClick={() => run(exportProject)}>
-                <Download size={16} aria-hidden="true" />
-                Export Project
-              </button>
-              <button disabled={busy} onClick={() => validate()}>
-                <ShieldCheck size={16} aria-hidden="true" />
-                Validate Project
-              </button>
-            </>
-          )}
-        </div>
+        <EditorTabs
+          label="Project workspace controls"
+          tabs={[
+            {
+              id: 'project-edit',
+              label: 'Project',
+              icon: 'project',
+              content: (
+                <div className="workspace-command-bar">
+                  <button
+                    className="workspace-primary"
+                    disabled={busy}
+                    onClick={() => {
+                      setName('');
+                      projectDialog.current?.showModal();
+                    }}
+                  >
+                    <FolderPlus size={16} aria-hidden="true" />
+                    New Project
+                  </button>
+                  <FileAction
+                    label="Import Project"
+                    icon={<FolderInput size={16} aria-hidden="true" />}
+                    accept=".zip"
+                    disabled={busy}
+                    onFile={(file) => run(async () => addProject(await importProjectPackage(await readZip(file))))}
+                  />
+                  <label>
+                    <FolderOpen size={16} aria-hidden="true" />
+                    Project{' '}
+                    <select
+                      aria-label="Select project"
+                      value={selected?.key ?? ''}
+                      disabled={busy}
+                      onChange={(event) => {
+                        const session = sessions.find((entry) => entry.key === event.target.value);
+                        setSelected(session);
+                        setSettingsName(session?.workspace.definition.name ?? '');
+                      }}
+                    >
+                      <option value="" disabled>
+                        No project selected
+                      </option>
+                      {sessions.map((session) => (
+                        <option key={session.key} value={session.key}>
+                          {session.workspace.definition.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {workspace && (
+                    <>
+                      <button
+                        disabled={busy || !workspace.history.canUndo}
+                        onClick={() => attempt(() => workspace.undo())}
+                      >
+                        <Undo2 size={16} aria-hidden="true" />
+                        Undo Project
+                      </button>
+                      <button
+                        disabled={busy || !workspace.history.canRedo}
+                        onClick={() => attempt(() => workspace.redo())}
+                      >
+                        <Redo2 size={16} aria-hidden="true" />
+                        Redo Project
+                      </button>
+                      <button
+                        disabled={busy}
+                        title="Export project ZIP (Ctrl/Cmd+S)"
+                        onClick={() => run(exportProject)}
+                      >
+                        <Download size={16} aria-hidden="true" />
+                        Export Project
+                      </button>
+                      <button disabled={busy} onClick={() => validate()}>
+                        <ShieldCheck size={16} aria-hidden="true" />
+                        Validate Project
+                      </button>
+                    </>
+                  )}
+                </div>
+              ),
+            },
+            {
+              id: 'project-draft',
+              label: 'Local draft',
+              icon: 'draft',
+              content: (
+                <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
+              ),
+            },
+          ]}
+        />
         <p className="workspace-caption project-status" role="status">
           {busy ? 'Working… ' : ''}
           {status}
@@ -344,8 +374,8 @@ export function ProjectView() {
           <main className="project-content project-panel">
             <h2>No project open</h2>
             <p>
-              Choose New Project to start empty, or Import Project to open a project ZIP. Available local recovery
-              drafts appear below the header.
+              Choose New Project to start empty, or Import Project to open a project ZIP. Saved recovery drafts are
+              available in the Local draft tab.
             </p>
           </main>
         )}

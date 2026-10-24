@@ -77,7 +77,21 @@ export class GuideTargets implements GuideTargetResolver {
       const provider = this.geometry.get(id)?.provider;
       if (provider) return provider.reveal?.() ?? false;
       const element = this.findElement(id);
-      if (!element || element.closest('[hidden]')) return false;
+      if (!element) return false;
+      let revealedPanel: Element | null = null;
+      // Tab changes only reveal existing UI; controllers and document state remain mounted.
+      for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+        const tab = ancestor.getAttribute('data-editor-tab-panel');
+        if (tab !== null) {
+          // Do not activate a retained editor that is itself hidden.
+          if (ancestor.parentElement?.closest('[hidden], [inert]')) return false;
+          ancestor.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: tab }));
+          revealedPanel = ancestor;
+        }
+      }
+      const hidden = element.closest('[hidden]');
+      // React commits tab visibility after this request; the guide measures again on the next frame.
+      if (hidden && hidden !== revealedPanel) return false;
       // Floating animation menus can otherwise obscure the next spotlight, even when its geometry is valid.
       // Only close unrelated overlays; keep the target's ancestors and ordinary inspector disclosures open.
       const workspace = element.closest('.animation-workspace');
@@ -90,7 +104,7 @@ export class GuideTargets implements GuideTargetResolver {
       for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
         if (ancestor.tagName === 'DETAILS') ancestor.setAttribute('open', '');
       }
-      element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      if (!hidden) element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
       return true;
     } catch {
       return false;

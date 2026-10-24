@@ -150,7 +150,7 @@ test('expanding onion settings keeps the menu and its controls inside the viewpo
   }
 });
 
-test('narrow session controls wrap and draft recovery stays on its own row', async ({ page }) => {
+test('narrow session controls wrap and retained drafts use the Local draft tab', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openEditor(page);
   await page.getByRole('separator', { name: 'Preview width', exact: true }).press('End');
@@ -165,17 +165,22 @@ test('narrow session controls wrap and draft recovery stays on its own row', asy
       for (const element of elements) (element as HTMLButtonElement).hidden = false;
     });
   const bar = (await page.locator('.animation-command-bar').boundingBox())!;
-  for (const selector of ['.animation-session-selection', '.animation-session-actions', '.animation-recovery']) {
+  for (const selector of ['.animation-session-selection', '.animation-session-actions']) {
     const box = (await page.locator(selector).boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(bar.x);
     expect(box.x + box.width).toBeLessThanOrEqual(bar.x + bar.width);
   }
-  const recovery = (await page.locator('.animation-recovery').boundingBox())!;
-  const status = (await page.locator('.animation-feedback').boundingBox())!;
-  expect(recovery.y).toBeGreaterThanOrEqual(status.y + status.height);
   const download = (await page.locator('#animation-download').boundingBox())!;
   const fileTools = (await page.locator('#animation-tools-open').boundingBox())!;
   expect(download.y).toBe(fileTools.y);
+  await expect(page.locator('.animation-recovery')).toBeHidden();
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+  await expect(page.locator('.animation-recovery')).toBeVisible();
+  await expect(page.locator('.animation-command-bar')).toBeHidden();
+  const recovery = (await page.locator('.animation-recovery').boundingBox())!;
+  const tabs = (await page.locator('.editor-tabs:visible').boundingBox())!;
+  expect(recovery.x + recovery.width).toBeLessThanOrEqual(tabs.x + tabs.width);
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
 });
 

@@ -107,6 +107,31 @@ test('animation reveal closes unrelated floating menus while retaining the targe
   assert.deepEqual(querySelectorAll.mock.calls, [['[data-workspace-menu][open], [data-tool-panel][open]']]);
 });
 
+test('tab targets request a UI reveal while hidden retained editors stay inactive', () => {
+  const item = anchor('package');
+  const panel = anchor('tab-panel');
+  const chrome = anchor('tabs');
+  panel.attributes.set('data-editor-tab-panel', 'rig-package');
+  item.node.parentElement = panel.element;
+  panel.node.parentElement = chrome.element;
+  let hidden = true;
+  item.node.closest.mockImplementation((selector) => (selector === '[hidden]' && hidden ? panel.element : null));
+  const dispatchEvent = vi.fn((event: Event) => {
+    assert.equal(event.type, 'workspace:reveal-tab');
+    assert.equal((event as CustomEvent<string>).detail, 'rig-package');
+    hidden = false;
+    return true;
+  });
+  Object.assign(panel.node, { dispatchEvent });
+  const targets = new GuideTargets(root([item.element]).parent);
+  assert.isTrue(targets.reveal('package'));
+  assert.lengthOf(dispatchEvent.mock.calls, 1);
+  hidden = true;
+  chrome.node.closest.mockReturnValue(chrome.element);
+  assert.isFalse(targets.reveal('package'));
+  assert.lengthOf(dispatchEvent.mock.calls, 1, 'do not reveal an inactive retained editor');
+});
+
 test('geometry providers support canvas regions, live measurement, explicit reveal, and safe cleanup', () => {
   const host = root([]);
   const targets = new GuideTargets(host.parent);

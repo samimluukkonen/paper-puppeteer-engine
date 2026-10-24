@@ -136,6 +136,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   await expect(time).toHaveValue('0.5');
   await page.locator('#animation-stage canvas').screenshot({ path: test.info().outputPath('authored.png') });
 
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator(':scope > summary').click();
   const downloading = page.waitForEvent('download');

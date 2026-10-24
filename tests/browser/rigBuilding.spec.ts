@@ -152,6 +152,7 @@ test('build a new character, import and align artwork, animate, export and reloa
     '◇ branch-visual',
     'bud',
   ]);
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('#editor-app .package-tools');
   await packages.locator(':scope > summary').click();
   await expect(packages.getByLabel('Character readiness')).toContainText('Ready for export validation.');

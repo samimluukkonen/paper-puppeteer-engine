@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Share compact icon-labelled Project/Edit, Character package and Local draft tabs across Project Workspace and the Rig, Animation and Scene editors, with keyboard navigation, collapsible controls and automatic Feature Guide tab reveal. Preserve mounted controls and draft state while reclaiming vertical workspace. Render recovery dialogs outside hidden tab panels so reload always offers a visible, dismissible recovery dialog.
+
 - Remove Engine Demo and its controls, runtime presentation and dedicated tests. Open Project Workspace at the app home address and keep the sample characters available in the editors.
 
 - Remove the standalone examples project and its version/build/browser checks. Generate character packages directly in runtime integration tests.

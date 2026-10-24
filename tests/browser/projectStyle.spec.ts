@@ -44,6 +44,7 @@ test('recovery has no empty button/bar, updates after save/discard and uses the 
   await create.getByLabel('Project name', { exact: true }).fill('Artist Film');
   await create.getByRole('button', { name: 'Create Project', exact: true }).click();
   await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
   const draftButton = await page.getByRole('button', { name: 'Recovery drafts', exact: true }).boundingBox();
   const retryButton = await page.locator('.local-draft-menu > summary').boundingBox();
   expect(

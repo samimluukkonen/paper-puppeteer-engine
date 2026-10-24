@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { ViewHeader } from '../../ui/viewShell.js';
+import { EditorTabs } from '../../ui/EditorTabs.js';
+import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
 import { openWorkspaceDialog, useWorkspaceInspector, WorkspaceDialog } from '../../ui/Workspace.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { ArtworkPanel } from '../shared/artwork/ArtworkPanel.js';
@@ -33,117 +34,144 @@ export function RigEditorView({
   const inspector = useWorkspaceInspector();
   return (
     <>
-      <ViewHeader
-        view="rig"
-        selectionId={header ? 'character-selection' : 'inactive-character-selection'}
-        afterHeader={afterHeader}
-      />
+      <ViewHeader view="rig" selectionId={header ? 'character-selection' : 'inactive-character-selection'} />
       <main className={`workspace-layout view-content ${inspector.open ? 'inspector-open' : ''}`}>
-        {packages && <PackagePanel controller={packages} />}
-        <section className="workspace-command-bar" aria-label="Rig session">
-          <div className="rig-session-editing" role="group" aria-label="Rig editing controls">
-            <label>
-              Edit{' '}
-              <select id="edit-mode" data-guide-id={GUIDE_TARGETS.rigEditMode}>
-                <option value="joint">Joint Editing</option>
-                <option value="sprite">Artwork Offset Editing</option>
-                <option value="origin">Sprite Origin Editing</option>
-                <option value="slot">Slot Transform Editing</option>
-              </select>
-            </label>
-            <label>
-              Grid{' '}
-              <select id="grid-snap">
-                <option value="0">Off</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="5">5</option>
-                <option value="10">10</option>
-              </select>
-            </label>
-            <label>
-              Rotation snap{' '}
-              <select id="rotation-snap">
-                <option value="0">Off</option>
-                <option value="1">1°</option>
-                <option value="5">5°</option>
-                <option value="15">15°</option>
-              </select>
-            </label>
-            <span className="rig-history" data-guide-id={GUIDE_TARGETS.rigHistory}>
-              <button id="undo" type="button" aria-keyshortcuts="Control+Z Meta+Z">
-                Undo
-              </button>
-              <button id="redo" type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
-                Redo
-              </button>
-            </span>
-          </div>
-          <div className="rig-session-actions" role="group" aria-label="Rig commands">
-            <button
-              id="rig-tools-open"
-              title="Open file tools for import and export (Ctrl/Cmd+S)"
-              data-guide-id={GUIDE_TARGETS.rigFileTools}
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => openWorkspaceDialog('rig-tools-dialog')}
-            >
-              File tools
-            </button>
-            <button
-              id="rig-help-open"
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => openWorkspaceDialog('rig-help-dialog')}
-            >
-              Help
-            </button>
-            <button id="rig-reset-layout" type="button" onClick={inspector.reset}>
-              Reset layout
-            </button>
-            <button
-              ref={inspector.toggle}
-              id="rig-inspector-toggle"
-              className="workspace-inspector-toggle"
-              type="button"
-              aria-expanded={inspector.open}
-              aria-controls="rig-inspector"
-              onClick={inspector.toggleOpen}
-            >
-              Inspector
-            </button>
-            <div className="workspace-save">
-              <button
-                id="download-json"
-                data-guide-id={GUIDE_TARGETS.rigDownload}
-                className="workspace-primary"
-                type="button"
-              >
-                Download rig.json
-              </button>
-            </div>
-          </div>
-          <div className="workspace-feedback">
-            <span id="dirty-status" role="status" />
-            <div id="validation" role="status" data-guide-id={GUIDE_TARGETS.rigValidation} />
-            <div id="action-feedback" role="status" />
-          </div>
-          <div className="rig-recovery" role="group" aria-label="Rig draft recovery">
-            <p id="rig-draft-status" role="status" />
-            <button id="rig-download-retained-drafts" className="workspace-primary" type="button" hidden>
-              Download retained drafts
-            </button>
-            <button
-              id="rig-clear-retained-drafts"
-              className="workspace-danger"
-              type="button"
-              title="Permanently delete retained browser drafts for this rig"
-              hidden
-            >
-              Clear retained drafts
-            </button>
-          </div>
-        </section>
+        <EditorTabs
+          label="Rig editor controls"
+          tabs={[
+            {
+              id: 'rig-edit',
+              label: 'Edit',
+              icon: 'edit',
+              content: (
+                <section className="workspace-command-bar" aria-label="Rig session">
+                  <div className="rig-session-editing" role="group" aria-label="Rig editing controls">
+                    <label>
+                      Edit{' '}
+                      <select id="edit-mode" data-guide-id={GUIDE_TARGETS.rigEditMode}>
+                        <option value="joint">Joint Editing</option>
+                        <option value="sprite">Artwork Offset Editing</option>
+                        <option value="origin">Sprite Origin Editing</option>
+                        <option value="slot">Slot Transform Editing</option>
+                      </select>
+                    </label>
+                    <label>
+                      Grid{' '}
+                      <select id="grid-snap">
+                        <option value="0">Off</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                      </select>
+                    </label>
+                    <label>
+                      Rotation snap{' '}
+                      <select id="rotation-snap">
+                        <option value="0">Off</option>
+                        <option value="1">1°</option>
+                        <option value="5">5°</option>
+                        <option value="15">15°</option>
+                      </select>
+                    </label>
+                    <span className="rig-history" data-guide-id={GUIDE_TARGETS.rigHistory}>
+                      <button id="undo" type="button" aria-keyshortcuts="Control+Z Meta+Z">
+                        Undo
+                      </button>
+                      <button id="redo" type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
+                        Redo
+                      </button>
+                    </span>
+                  </div>
+                  <div className="rig-session-actions" role="group" aria-label="Rig commands">
+                    <button
+                      id="rig-tools-open"
+                      title="Open file tools for import and export (Ctrl/Cmd+S)"
+                      data-guide-id={GUIDE_TARGETS.rigFileTools}
+                      type="button"
+                      aria-haspopup="dialog"
+                      onClick={() => openWorkspaceDialog('rig-tools-dialog')}
+                    >
+                      File tools
+                    </button>
+                    <button
+                      id="rig-help-open"
+                      type="button"
+                      aria-haspopup="dialog"
+                      onClick={() => openWorkspaceDialog('rig-help-dialog')}
+                    >
+                      Help
+                    </button>
+                    <button id="rig-reset-layout" type="button" onClick={inspector.reset}>
+                      Reset layout
+                    </button>
+                    <button
+                      ref={inspector.toggle}
+                      id="rig-inspector-toggle"
+                      className="workspace-inspector-toggle"
+                      type="button"
+                      aria-expanded={inspector.open}
+                      aria-controls="rig-inspector"
+                      onClick={inspector.toggleOpen}
+                    >
+                      Inspector
+                    </button>
+                    <div className="workspace-save">
+                      <button
+                        id="download-json"
+                        data-guide-id={GUIDE_TARGETS.rigDownload}
+                        className="workspace-primary"
+                        type="button"
+                      >
+                        Download rig.json
+                      </button>
+                    </div>
+                  </div>
+                  <div className="workspace-feedback">
+                    <span id="dirty-status" role="status" />
+                    <div id="validation" role="status" data-guide-id={GUIDE_TARGETS.rigValidation} />
+                    <div id="action-feedback" role="status" />
+                  </div>
+                </section>
+              ),
+            },
+            ...(packages
+              ? [
+                  {
+                    id: 'rig-package',
+                    label: 'Character package',
+                    icon: 'package' as const,
+                    content: <PackagePanel controller={packages} />,
+                  },
+                ]
+              : []),
+            {
+              id: 'rig-draft',
+              label: 'Local draft',
+              icon: 'draft',
+              content: (
+                <>
+                  <EditorDraftControls>{afterHeader}</EditorDraftControls>
+                  <div className="rig-recovery" role="group" aria-label="Rig draft recovery">
+                    <p id="rig-draft-status" role="status" />
+                    <button id="rig-download-retained-drafts" className="workspace-primary" type="button" hidden>
+                      Download retained drafts
+                    </button>
+                    <button
+                      id="rig-clear-retained-drafts"
+                      className="workspace-danger"
+                      type="button"
+                      title="Permanently delete retained browser drafts for this rig"
+                      hidden
+                    >
+                      Clear retained drafts
+                    </button>
+                  </div>
+                </>
+              ),
+            },
+          ]}
+        />
         <aside
           ref={inspector.panel}
           id="rig-inspector"

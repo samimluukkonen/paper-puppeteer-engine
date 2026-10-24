@@ -154,6 +154,7 @@ test('recovery cancellation preserves data and explicit discard removes it', asy
   await page.reload();
   const dialog = page.getByRole('dialog', { name: 'Recover unsaved work?', exact: true });
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
   await page.getByRole('button', { name: 'Recovery drafts', exact: true }).click();
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Discard Draft', exact: true }).click();

@@ -91,6 +91,7 @@ test('artist workflow retains one canvas, documents, artwork and history between
   await page.goForward();
   await expect(page.locator('#animation-editor-app')).toBeVisible();
   expect(dialogs).toEqual([]);
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator('summary').click();
   const downloading = page.waitForEvent('download');

@@ -110,6 +110,7 @@ test('first artwork imports into an empty draft and exports as a real image with
     .setInputFiles({ name: 'guardian.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await expect(artwork.getByLabel('Artwork asset', { exact: true })).toHaveValue('guardian');
   await expect(artwork).toContainText('Artwork added to the library.');
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('#editor-app .package-tools');
   await packages.locator(':scope > summary').click();
   const downloading = page.waitForEvent('download');

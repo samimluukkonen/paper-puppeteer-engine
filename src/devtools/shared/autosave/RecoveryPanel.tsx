@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { z } from 'zod';
 import { importProjectPackage } from '../../project/projectPackage.js';
 import type { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
@@ -264,97 +265,102 @@ export function RecoveryPanel({
           {status}
         </p>
       )}
-      <dialog
-        ref={dialog}
-        className="workspace-dialog recovery-dialog"
-        aria-label="Recover unsaved work?"
-        aria-describedby={descriptionId}
-      >
-        <div className="workspace-dialog-header">
-          <h2>Recover unsaved work?</h2>
-          <button
-            type="button"
-            className="workspace-icon-button"
-            aria-label="Close recovery"
-            disabled={busy}
-            onClick={() => dialog.current?.close()}
+      {createPortal(
+        <div className="local-recovery">
+          <dialog
+            ref={dialog}
+            className="workspace-dialog recovery-dialog"
+            aria-label="Recover unsaved work?"
+            aria-describedby={descriptionId}
           >
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="workspace-dialog-body">
-          <p id={descriptionId} className="recovery-description">
-            A saved local draft is available. Choose a revision to restore.
-          </p>
-          <label className="recovery-revision">
-            Project / revision
-            <select value={selected} disabled={busy} onChange={(event) => setSelected(event.target.value)}>
-              {drafts.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name} · {new Date(entry.savedAt).toLocaleString()}
-                </option>
-              ))}
-            </select>
-          </label>
-          {draft && (
-            <div className="recovery-summary">
-              <History size={20} aria-hidden="true" />
-              <div>
-                <strong>{draft.name}</strong>
-                <span>
-                  Last saved{' '}
-                  <time dateTime={new Date(draft.savedAt).toISOString()}>
-                    {new Date(draft.savedAt).toLocaleString()}
-                  </time>
-                </span>
+            <div className="workspace-dialog-header">
+              <h2>Recover unsaved work?</h2>
+              <button
+                type="button"
+                className="workspace-icon-button"
+                aria-label="Close recovery"
+                disabled={busy}
+                onClick={() => dialog.current?.close()}
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="workspace-dialog-body">
+              <p id={descriptionId} className="recovery-description">
+                A saved local draft is available. Choose a revision to restore.
+              </p>
+              <label className="recovery-revision">
+                Project / revision
+                <select value={selected} disabled={busy} onChange={(event) => setSelected(event.target.value)}>
+                  {drafts.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.name} · {new Date(entry.savedAt).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {draft && (
+                <div className="recovery-summary">
+                  <History size={20} aria-hidden="true" />
+                  <div>
+                    <strong>{draft.name}</strong>
+                    <span>
+                      Last saved{' '}
+                      <time dateTime={new Date(draft.savedAt).toISOString()}>
+                        {new Date(draft.savedAt).toLocaleString()}
+                      </time>
+                    </span>
+                  </div>
+                </div>
+              )}
+              <p className="recovery-help">
+                Recovery opens a separate project. Export a ZIP afterwards to keep a disk copy.
+              </p>
+              {status && (
+                <p className="recovery-feedback" role="alert">
+                  {status}
+                </p>
+              )}
+            </div>
+            <div className="workspace-dialog-footer">
+              <button
+                className="workspace-danger"
+                disabled={busy || !draft}
+                onClick={() => {
+                  if (!draft) return;
+                  setBusy(true);
+                  void localDrafts
+                    .discard(draft.key, owner.current)
+                    .then(async () => {
+                      dialog.current?.close();
+                      setStatus('Local recovery data discarded.');
+                      await refresh();
+                    })
+                    .catch((error: unknown) => setStatus(storageError(error, 'Recovery')))
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Discard Draft
+              </button>
+              <div className="workspace-dialog-actions">
+                <button disabled={busy} onClick={() => dialog.current?.close()}>
+                  Cancel
+                </button>
+                <button
+                  className="workspace-primary"
+                  disabled={busy || !draft}
+                  onClick={() => {
+                    if (draft) void recover(draft);
+                  }}
+                >
+                  Recover Draft
+                </button>
               </div>
             </div>
-          )}
-          <p className="recovery-help">
-            Recovery opens a separate project. Export a ZIP afterwards to keep a disk copy.
-          </p>
-          {status && (
-            <p className="recovery-feedback" role="alert">
-              {status}
-            </p>
-          )}
-        </div>
-        <div className="workspace-dialog-footer">
-          <button
-            className="workspace-danger"
-            disabled={busy || !draft}
-            onClick={() => {
-              if (!draft) return;
-              setBusy(true);
-              void localDrafts
-                .discard(draft.key, owner.current)
-                .then(async () => {
-                  dialog.current?.close();
-                  setStatus('Local recovery data discarded.');
-                  await refresh();
-                })
-                .catch((error: unknown) => setStatus(storageError(error, 'Recovery')))
-                .finally(() => setBusy(false));
-            }}
-          >
-            Discard Draft
-          </button>
-          <div className="workspace-dialog-actions">
-            <button disabled={busy} onClick={() => dialog.current?.close()}>
-              Cancel
-            </button>
-            <button
-              className="workspace-primary"
-              disabled={busy || !draft}
-              onClick={() => {
-                if (draft) void recover(draft);
-              }}
-            >
-              Recover Draft
-            </button>
-          </div>
-        </div>
-      </dialog>
+          </dialog>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

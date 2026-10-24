@@ -72,6 +72,7 @@ test('artist contact workflow from rig authoring through IK keys and portable tw
   expect(await exportClip()).toBe(original);
   await page.locator('#animation-redo').click();
   expect(await exportClip()).toBe(committed);
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator(':scope > summary').click();
   const waiting = page.waitForEvent('download');

@@ -7,7 +7,8 @@ import { readSceneResource } from '../../engine/sceneResource.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { bindExportShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorContext } from '../../ui/EditorContext.js';
-import { ViewHeader } from '../../ui/viewShell.js';
+import { EditorTabs } from '../../ui/EditorTabs.js';
+import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { sceneDraftSource } from '../shared/autosave/editorDrafts.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
@@ -233,105 +234,126 @@ export function SceneEditorView({
   return (
     <>
       <ViewHeader view="scene" />
-      {!project && <LocalDraftControls {...(autosave ? { autosave } : {})} />}
-      <div className="workspace-command-bar" aria-label="Scene document commands">
-        <div hidden={!!project} className="scene-transfer-commands">
-          <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>
-            New Scene
-          </button>
-          <label className="scene-open">
-            Open scene JSON
-            <input
-              type="file"
-              accept=".json,application/json"
-              disabled={loading}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = '';
-                if (!file) return;
-                runTransfer(async (signal) => {
-                  const json = await readJsonFile(file);
-                  signal.throwIfAborted();
-                  await importJson(json, signal);
-                });
-              }}
-            />
-          </label>
-          <button type="button" disabled={loading} onClick={() => pasteDialog.current?.showModal()}>
-            Paste scene JSON
-          </button>
-        </div>
-        <label hidden={!!project}>
-          Scene{' '}
-          <select
-            aria-label="Select scene"
-            value={document.selectedSceneId ?? ''}
-            disabled={!scene}
-            onChange={(event) => {
-              document.selectScene(event.target.value);
-            }}
-          >
-            {!scene && <option value="">No scene selected</option>}
-            {document.sceneIds.map((id) => (
-              <option key={id} value={id}>
-                {id}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          data-guide-id={GUIDE_TARGETS.sceneHistory}
-          disabled={!document.canUndo}
-          onClick={() => {
-            document.undo();
-          }}
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          disabled={!document.canRedo}
-          onClick={() => {
-            document.redo();
-          }}
-        >
-          Redo
-        </button>
-        <button
-          type="button"
-          disabled={!scene}
-          onClick={() => {
-            if (!document.dirty || window.confirm('Revert this scene to its original source?'))
-              document.revertScene({ discardChanges: true });
-          }}
-        >
-          Revert
-        </button>
-        <button type="button" disabled={!scene || loading} onClick={() => exportScene('validate')}>
-          Validate Scene
-        </button>
-        <button type="button" disabled={!scene || loading} onClick={() => exportScene('copy')}>
-          Copy Scene JSON
-        </button>
-        <button
-          type="button"
-          data-guide-id={GUIDE_TARGETS.sceneExport}
-          disabled={!scene || loading}
-          title="Download scene JSON (Ctrl/Cmd+S)"
-          onClick={() => exportScene('json')}
-        >
-          Download scene JSON
-        </button>
-        <button
-          type="button"
-          data-guide-id={GUIDE_TARGETS.scenePackage}
-          disabled={!scene || loading}
-          onClick={() => exportScene('zip')}
-        >
-          Download scene package
-        </button>
-      </div>
+      <EditorTabs
+        label="Scene editor controls"
+        tabs={[
+          {
+            id: 'scene-edit',
+            label: 'Edit',
+            icon: 'edit',
+            content: (
+              <div className="workspace-command-bar" aria-label="Scene document commands">
+                <div hidden={!!project} className="scene-transfer-commands">
+                  <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>
+                    New Scene
+                  </button>
+                  <label className="scene-open">
+                    Open scene JSON
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      disabled={loading}
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = '';
+                        if (!file) return;
+                        runTransfer(async (signal) => {
+                          const json = await readJsonFile(file);
+                          signal.throwIfAborted();
+                          await importJson(json, signal);
+                        });
+                      }}
+                    />
+                  </label>
+                  <button type="button" disabled={loading} onClick={() => pasteDialog.current?.showModal()}>
+                    Paste scene JSON
+                  </button>
+                </div>
+                <label hidden={!!project}>
+                  Scene{' '}
+                  <select
+                    aria-label="Select scene"
+                    value={document.selectedSceneId ?? ''}
+                    disabled={!scene}
+                    onChange={(event) => {
+                      document.selectScene(event.target.value);
+                    }}
+                  >
+                    {!scene && <option value="">No scene selected</option>}
+                    {document.sceneIds.map((id) => (
+                      <option key={id} value={id}>
+                        {id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  data-guide-id={GUIDE_TARGETS.sceneHistory}
+                  disabled={!document.canUndo}
+                  onClick={() => {
+                    document.undo();
+                  }}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  disabled={!document.canRedo}
+                  onClick={() => {
+                    document.redo();
+                  }}
+                >
+                  Redo
+                </button>
+                <button
+                  type="button"
+                  disabled={!scene}
+                  onClick={() => {
+                    if (!document.dirty || window.confirm('Revert this scene to its original source?'))
+                      document.revertScene({ discardChanges: true });
+                  }}
+                >
+                  Revert
+                </button>
+                <button type="button" disabled={!scene || loading} onClick={() => exportScene('validate')}>
+                  Validate Scene
+                </button>
+                <button type="button" disabled={!scene || loading} onClick={() => exportScene('copy')}>
+                  Copy Scene JSON
+                </button>
+                <button
+                  type="button"
+                  data-guide-id={GUIDE_TARGETS.sceneExport}
+                  disabled={!scene || loading}
+                  title="Download scene JSON (Ctrl/Cmd+S)"
+                  onClick={() => exportScene('json')}
+                >
+                  Download scene JSON
+                </button>
+                <button
+                  type="button"
+                  data-guide-id={GUIDE_TARGETS.scenePackage}
+                  disabled={!scene || loading}
+                  onClick={() => exportScene('zip')}
+                >
+                  Download scene package
+                </button>
+              </div>
+            ),
+          },
+          {
+            id: 'scene-draft',
+            label: 'Local draft',
+            icon: 'draft',
+            content: (
+              <EditorDraftControls>
+                {!project && <LocalDraftControls {...(autosave ? { autosave } : {})} />}
+              </EditorDraftControls>
+            ),
+          },
+        ]}
+      />
       <EditorContext
         {...(project ? { project: project.projectName } : {})}
         editor="Scene"

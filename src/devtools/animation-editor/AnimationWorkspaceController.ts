@@ -27,7 +27,7 @@ export class AnimationWorkspaceController {
     const inspector = app.querySelector<HTMLElement>('#animation-inspector')!;
     const preview = app.querySelector<HTMLElement>('.animation-preview')!;
     const previewOptions = app.querySelector<HTMLElement>('.animation-preview-options')!;
-    const commands = app.querySelector<HTMLElement>('.animation-command-bar')!;
+    const commands = app.querySelector<HTMLElement>('.editor-tabs')!;
     const controlsHeight = (): number =>
       commands.getBoundingClientRect().bottom + 8 - layout.getBoundingClientRect().top;
     const authoringHeight = (): number => layout.clientHeight - controlsHeight();

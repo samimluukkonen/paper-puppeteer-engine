@@ -107,6 +107,7 @@ test('artist saves full and partial poses, searches, previews/cancels, applies a
   expect(clip.tracks.head).toHaveLength(1);
   expect(clip.tracks.head![0]!.time).toBe(375);
   expect(clip.tracks.head![0]!.rotation).toBeCloseTo((35 * Math.PI) / 180);
+  await page.getByRole('tab', { name: 'Character package', exact: true }).click();
   const packages = page.locator('.package-tools');
   await packages.locator(':scope > summary').click();
   const download = page.waitForEvent('download');
@@ -167,6 +168,7 @@ for (const emptyLibrary of [true, false]) {
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
     await expect(page.locator('#animation-pose-library-panel')).not.toHaveAttribute('open');
     const snapshot = async () => {
+      await page.getByRole('tab', { name: 'Character package', exact: true }).click();
       const packages = page.locator('.package-tools');
       if (!(await packages.evaluate((element) => (element as HTMLDetailsElement).open)))
         await packages.locator(':scope > summary').click();
@@ -174,6 +176,7 @@ for (const emptyLibrary of [true, false]) {
       await packages.getByRole('button', { name: 'Download character ZIP', exact: true }).click();
       const files = decodePackageZip(await readFile(await (await waiting).path()));
       await packages.locator(':scope > summary').click();
+      await page.getByRole('tab', { name: 'Edit', exact: true }).click();
       return [...files].map(([path, bytes]) => [path, Buffer.from(bytes).toString('base64')]);
     };
     const before = await snapshot();

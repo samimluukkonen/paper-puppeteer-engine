@@ -21,7 +21,7 @@ for (const view of [
       await page.setViewportSize({ width: width!, height: height! });
       await page.goto(view.route);
       await expect(page.locator(view.ready)).toContainText(view.text);
-      if (view.prefix === 'rig') await expect(page.getByLabel('Local save status')).toBeVisible();
+      if (view.prefix === 'rig') await expect(page.getByLabel('Local save status')).toBeHidden();
       const stage = (await page.locator(view.stage).boundingBox())!;
       const canvas = (await page.locator(`${view.stage} canvas`).boundingBox())!;
       expect(stage.height).toBeGreaterThan(view.prefix === 'animation' ? 200 : 400);
@@ -111,7 +111,7 @@ test('rig preview divider resizes by keyboard and pointer and resets without edi
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await expect(page.getByLabel('Local save status')).toBeVisible();
+  await expect(page.getByLabel('Local save status')).toBeHidden();
   await page.evaluate(
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );

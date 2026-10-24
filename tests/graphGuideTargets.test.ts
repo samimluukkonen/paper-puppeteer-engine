@@ -11,6 +11,7 @@ function fixture() {
   const details = {
     tagName: 'DETAILS',
     parentElement: null,
+    getAttribute: () => null,
     setAttribute: () => {
       precision = true;
     },

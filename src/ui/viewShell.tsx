@@ -167,6 +167,17 @@ export function ViewHeader({
         </nav>
       </header>
       {afterHeader}
+      {view === 'project' && project?.autosave && <AutosaveStatus autosave={project.autosave} />}
+    </>
+  );
+}
+
+/** Local/project save controls share the editor's Local draft tab. */
+export function EditorDraftControls({ children }: { children?: ReactNode }) {
+  const project = projectEditorContext();
+  return (
+    <>
+      {children}
       {project?.autosave && <AutosaveStatus autosave={project.autosave} />}
     </>
   );

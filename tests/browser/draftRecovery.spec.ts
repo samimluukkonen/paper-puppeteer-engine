@@ -263,6 +263,7 @@ test('animation recovery ignores reordered tracks and retains changed-source dra
   await expect(await animationControl(page, '#animation-mode')).toHaveValue('smooth');
   await expect.poll(() => draftKeys(page)).toHaveLength(1);
   const stored = await page.evaluate(() => JSON.stringify(localStorage));
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.locator('#animation-download-retained-drafts').click(),
@@ -303,6 +304,7 @@ test('declined animation drafts can be cleared together to stop later recovery p
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect.poll(() => draftKeys(page)).toHaveLength(4);
   expect(dialogs).toHaveLength(4);
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
   await page.locator('#animation-clear-retained-drafts').click();
   await expect.poll(() => draftKeys(page)).toHaveLength(0);
   await expect(page.locator('#animation-clear-retained-drafts')).toBeHidden();
@@ -336,6 +338,7 @@ for (const cleanupView of ['Rig Editor', 'Rig Tweak'] as const) {
     await selectRigEntry(page, 'head');
     await expect(x).toHaveValue('0');
     const stored = await page.evaluate(() => JSON.stringify(localStorage));
+    await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       page.locator('#rig-download-retained-drafts').click(),
