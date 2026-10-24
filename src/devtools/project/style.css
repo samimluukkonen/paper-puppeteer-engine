@@ -59,6 +59,8 @@
   width: 100%;
   height: 100vh;
   border: 0;
+  background: var(--bg-default);
+  color-scheme: dark;
 }
 .project-editor-host[hidden] {
   display: none;

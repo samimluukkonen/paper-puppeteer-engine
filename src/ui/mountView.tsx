@@ -1,6 +1,7 @@
 import { useLayoutEffect, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
+import { finishViewLoading } from './viewLoading.js';
 
 type InitializeView = (app: HTMLElement) => () => void;
 
@@ -28,5 +29,6 @@ export function mountView(app: HTMLElement, content: ReactNode, initialize: Init
       </ViewLifetime>,
     );
   });
+  finishViewLoading();
   return () => root.unmount();
 }
