@@ -1,4 +1,11 @@
 import type { Actor } from './Actor.js';
+import { evaluateCameraAtTime } from './cameraAnimation.js';
+import {
+  applyCinematicCamera,
+  type CameraViewport,
+  type CinematicCameraTarget,
+  type CinematicCameraState,
+} from './cinematicCamera.js';
 import { throwNotificationErrors } from './notifications.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import {
@@ -35,6 +42,10 @@ export interface SceneRunnerOptions {
   readonly createActor: (definition: DeepReadonly<SceneActorDefinition>, depth: number) => Actor;
   /** Only delivered by actual playback, never by snapshot reconstruction. */
   readonly onCue?: (cue: SceneCue) => void;
+  /** Optional host camera, evaluated on the Actor clock. Viewport is read again after resize. */
+  readonly camera?: { readonly target: CinematicCameraTarget; readonly viewport?: () => CameraViewport };
+  /** Render-only sample notification after clock commands, including seeks and stop. */
+  readonly onCamera?: (state: Readonly<CinematicCameraState>) => void;
 }
 
 /** Declarative scene adapter over the v0.8 Actor runtime. Owns one millisecond clock;
@@ -89,12 +100,25 @@ export class SceneRunner {
     }
     this.rebuild(false);
     for (const actor of this.instances.values()) actor.pauseAnimation();
+    this.syncCamera();
   }
   get actors(): ReadonlyMap<string, Actor> {
     return this.instances;
   }
   get time(): number {
     return this.cursor;
+  }
+  get cinematicCamera() {
+    return evaluateCameraAtTime(this.definition, this.cursor);
+  }
+  /** Hosts without an attached camera can apply the same clock sample explicitly. */
+  applyCamera(camera: CinematicCameraTarget, viewport?: CameraViewport): CameraViewport {
+    return applyCinematicCamera(camera, this.cinematicCamera, viewport);
+  }
+  private syncCamera(): void {
+    const camera = this.options.camera;
+    if (camera) this.applyCamera(camera.target, camera.viewport?.());
+    this.options.onCamera?.(this.cinematicCamera);
   }
   get status(): SceneRunnerStatus {
     return this.state;
@@ -193,6 +217,7 @@ export class SceneRunner {
   private execute(operation: () => void): void {
     try {
       operation();
+      this.syncCamera();
     } catch (error) {
       this.failure = error;
       try {

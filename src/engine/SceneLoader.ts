@@ -1,12 +1,7 @@
 import type Phaser from 'phaser';
 import { Actor } from './Actor.js';
 import { CharacterDefinition, characterManifestSchema } from './CharacterDefinition.js';
-import {
-  applyCinematicCamera,
-  DEFAULT_CINEMATIC_CAMERA,
-  type CinematicCameraTarget,
-  type CameraViewport,
-} from './cinematicCamera.js';
+import { applyCinematicCamera, type CinematicCameraTarget, type CameraViewport } from './cinematicCamera.js';
 import type { RigJsonDefinition } from './externalData.js';
 import { inspectImageHeader } from './imageHeader.js';
 import { DEFAULT_MAX_JSON_BYTES } from './jsonInput.js';
@@ -154,6 +149,7 @@ async function loadSession(
   let artwork: SceneImageLayer | undefined;
   let release: (() => void) | undefined;
   let disposed = false;
+  let audience: { camera: CinematicCameraTarget; viewport: CameraViewport } | undefined;
   const dispose = (): void => {
     if (disposed) return;
     disposed = true;
@@ -200,6 +196,12 @@ async function loadSession(
     await artwork.ready();
     controller.signal.throwIfAborted();
     runner = new SceneRunner(prepared.resolved.definition, {
+      onCamera: (state) => {
+        if (!audience || disposed) return;
+        applyCinematicCamera(audience.camera, state, audience.viewport);
+        const definition = prepared.resolved.definition;
+        artwork!.sync(definition.images, definition.layers, state);
+      },
       ...(options.onCue ? { onCue: options.onCue } : {}),
       createActor: (data, depth) => {
         const definition = prepared.resolved.characters.get(data.character.manifest)!;
@@ -219,8 +221,9 @@ async function loadSession(
       applyCamera(camera, viewport) {
         if (disposed) throw new Error('Scene load disposed.');
         const definition = prepared.resolved.definition;
-        const state = definition.camera ?? DEFAULT_CINEMATIC_CAMERA;
-        const result = applyCinematicCamera(camera, state, viewport);
+        const state = runner!.cinematicCamera;
+        audience = { camera, viewport: viewport ?? { x: 0, y: 0, width: camera.width, height: camera.height } };
+        const result = applyCinematicCamera(camera, state, audience.viewport);
         // Center-relative compensation matches the editor at every viewport size and zoom.
         artwork!.sync(definition.images, definition.layers, state);
         return result;

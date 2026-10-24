@@ -32,7 +32,13 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
-      if (event.repeat || document.cameraSelected) return;
+      if (event.repeat) return;
+      const cameraKey = document.selectedCameraKey;
+      if (cameraKey) {
+        document.removeCameraKey(cameraKey.property, cameraKey.key.id);
+        return;
+      }
+      if (document.cameraSelected) return;
       if (document.selectedImageId) document.removeImage(document.selectedImageId);
       else if (document.selectedActionId) document.removeAction(document.selectedActionId);
       else if (document.selectedActorId) {

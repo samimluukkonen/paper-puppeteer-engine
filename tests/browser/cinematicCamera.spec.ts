@@ -64,7 +64,7 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
   await page.getByRole('button', { name: 'Apply image transform', exact: true }).click();
   await page.locator('.scene-layers summary').click();
   await page.getByLabel('Layer for image-2', { exact: true }).selectOption('foreground');
-  await page.locator('.scene-camera summary').click();
+  await page.locator('.scene-camera > summary').click();
   await page.getByLabel('Center X', { exact: true }).fill('100');
   await page.getByLabel('Camera zoom', { exact: true }).fill('1.5');
   await page.getByRole('button', { name: 'Apply camera', exact: true }).click();
@@ -166,7 +166,7 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
   await page
     .getByLabel('Open scene JSON')
     .setInputFiles({ name: 'camera.json', mimeType: 'application/json', buffer: data });
-  await page.locator('.scene-camera summary').click();
+  await page.locator('.scene-camera > summary').click();
   await expect(page.getByLabel('Center X', { exact: true })).toHaveValue('100');
   await expect(page.getByLabel('Camera zoom', { exact: true })).toHaveValue('1.5');
 });

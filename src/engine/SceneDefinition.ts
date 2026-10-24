@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { canonicalJson } from './authoredSerialization.js';
-import { cinematicCameraSchema } from './cinematicCamera.js';
+import { CAMERA_PROPERTIES, cameraTracksSchema } from './cameraAnimation.js';
+import { cinematicCameraSchema, CINEMATIC_CAMERA_MIN_ZOOM, CINEMATIC_CAMERA_MAX_ZOOM } from './cinematicCamera.js';
 import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
@@ -129,6 +130,7 @@ export const sceneDefinitionSchema = z.strictObject({
   /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
   duration: z.number().positive(),
   camera: cinematicCameraSchema.exactOptional(),
+  cameraTracks: cameraTracksSchema.exactOptional(),
   layers: z.array(sceneLayerDefinitionSchema).min(2).max(64).exactOptional(),
   images: z.array(sceneImageDefinitionSchema).max(256).exactOptional(),
   actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),
@@ -187,6 +189,22 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   const report = (path: string, message: string): void => {
     issues.push({ severity: 'error', path, message });
   };
+  for (const property of CAMERA_PROPERTIES) {
+    const keys = scene.cameraTracks?.[property] ?? [];
+    const ids = new Set<string>();
+    for (const [index, key] of keys.entries()) {
+      const path = `cameraTracks.${property}[${index}]`;
+      if (ids.has(key.id)) report(`${path}.id`, 'Camera key IDs must be unique within a channel.');
+      ids.add(key.id);
+      if (key.time > scene.duration) report(`${path}.time`, 'Camera keys must stay within scene duration.');
+      if (index > 0 && key.time <= keys[index - 1]!.time)
+        report(`${path}.time`, 'Camera keys must have strictly increasing times.');
+      if (property === 'zoom' && (key.value < CINEMATIC_CAMERA_MIN_ZOOM || key.value > CINEMATIC_CAMERA_MAX_ZOOM))
+        report(`${path}.value`, 'Camera zoom keys must stay between 0.1 and 8.');
+      if (key.curve?.mode === 'bezier' && key.curve.control1.x > key.curve.control2.x)
+        report(`${path}.curve`, 'Bézier time handles must be monotonic.');
+    }
+  }
   const layerIds = new Set<string>();
   for (const [index, layer] of (scene.layers ?? []).entries()) {
     if (layerIds.has(layer.id)) report(`layers[${index}].id`, `Duplicate layer ID "${layer.id}".`);

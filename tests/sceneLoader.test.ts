@@ -310,6 +310,20 @@ test('SceneLoader restores packaged backgrounds behind Actors and disposes their
   }
   const source = sceneFixture();
   source.camera = { x: 120, y: -50, zoom: 2 };
+  source.cameraTracks = {
+    x: [
+      { id: 'start', time: 0, value: 120 },
+      { id: 'end', time: 2000, value: 520 },
+    ],
+    y: [
+      { id: 'start', time: 0, value: -50 },
+      { id: 'end', time: 2000, value: 50 },
+    ],
+    zoom: [
+      { id: 'start', time: 0, value: 2 },
+      { id: 'end', time: 2000, value: 4 },
+    ],
+  };
   source.layers = [
     { id: 'background', name: 'Background', visible: true, parallax: 0.2 },
     { id: 'actors', name: 'Actors', visible: true, parallax: 1 },
@@ -356,6 +370,7 @@ test('SceneLoader restores packaged backgrounds behind Actors and disposes their
     assert.isBelow(drawn[0]!.depth, loaded.runner.actors.get('hero')!.puppet.container.depth);
     loaded.runner.seek(500);
     assert.equal(drawn[0]!.x, -100);
+    loaded.runner.seek(0);
     const camera = { width: 1000, height: 700, setViewport: vi.fn(), setZoom: vi.fn(), centerOn: vi.fn() };
     loaded.applyCamera(camera);
     assert.closeTo(drawn[0]!.x, -4, 1e-9);
@@ -364,10 +379,58 @@ test('SceneLoader restores packaged backgrounds behind Actors and disposes their
     loaded.applyCamera(camera, { x: 0, y: 0, width: 500, height: 500 });
     assert.closeTo(drawn[0]!.x, -4, 1e-9);
     assert.deepEqual(source.images[0]!.position, { x: -100, y: 50 });
+    for (const time of [1000, 1500, 500, 1000]) {
+      loaded.runner.seek(time);
+      const state = loaded.runner.cinematicCamera;
+      assert.closeTo(drawn[0]!.x, -100 + 0.8 * state.x, 1e-9);
+      assert.closeTo(drawn[0]!.y, 50 + 0.8 * state.y, 1e-9);
+      assert.deepEqual(camera.centerOn.mock.calls.at(-1), [state.x, state.y]);
+      assert.deepEqual(camera.setZoom.mock.calls.at(-1), [state.zoom * 0.5]);
+    }
+    loaded.runner.play();
+    loaded.runner.update(100);
+    assert.closeTo(drawn[0]!.x, -100 + 0.8 * loaded.runner.cinematicCamera.x, 1e-9);
     loaded.dispose();
     assert.equal(textures.size, 0);
     assert.isTrue((drawn[0] as unknown as { isDestroyed: boolean }).isDestroyed);
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+test('loaded camera animation follows Actor clock on playback, pause, seek, restart and stop', async () => {
+  const source = {
+    ...sceneFixture(),
+    cameraTracks: {
+      x: [
+        { id: 'start', time: 0, value: 0 },
+        { id: 'end', time: 2000, value: 200 },
+      ],
+      zoom: [
+        { id: 'start', time: 0, value: 1 },
+        { id: 'end', time: 2000, value: 3 },
+      ],
+    },
+  };
+  const loaded = await SceneLoader.fromDefinition(stage().scene, source, assetFixture());
+  sessions.push(loaded);
+  const camera = { width: 1000, height: 700, setViewport: vi.fn(), setZoom: vi.fn(), centerOn: vi.fn() };
+  loaded.applyCamera(camera);
+  loaded.runner.play();
+  loaded.runner.update(1000);
+  assert.deepEqual(camera.centerOn.mock.calls.at(-1), [100, 0]);
+  assert.deepEqual(camera.setZoom.mock.calls.at(-1), [2]);
+  loaded.runner.pause();
+  loaded.runner.update(500);
+  assert.deepEqual(camera.centerOn.mock.calls.at(-1), [100, 0]);
+  for (const time of [1700, 500, 1000]) {
+    loaded.runner.seek(time);
+    assert.deepEqual(camera.centerOn.mock.calls.at(-1), [time / 10, 0]);
+    assert.closeTo(camera.setZoom.mock.calls.at(-1)![0] as number, 1 + time / 1000, 1e-9);
+  }
+  loaded.runner.restart();
+  assert.deepEqual(camera.centerOn.mock.calls.at(-1), [0, 0]);
+  loaded.runner.update(500);
+  loaded.runner.stop();
+  assert.deepEqual(camera.centerOn.mock.calls.at(-1), [0, 0]);
 });

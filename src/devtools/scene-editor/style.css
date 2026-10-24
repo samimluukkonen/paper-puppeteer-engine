@@ -420,3 +420,15 @@
 .scene-camera > summary {
   margin-bottom: 16px;
 }
+.scene-camera-group {
+  height: 32px;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-subtle);
+}
+.scene-camera-group .scene-track-label {
+  height: 100%;
+}
+.scene-camera-key-inspector > summary {
+  margin-bottom: 16px;
+}

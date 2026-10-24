@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
@@ -31,6 +32,15 @@ export function SceneTimeline({
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
   const gesture = useRef<Drag | null>(null);
+  const cameraGesture = useRef<{
+    pointer: number;
+    x: number;
+    time: number;
+    property: CameraProperty;
+    id: string;
+    width: number;
+    valid: boolean;
+  } | null>(null);
   const scrub = useRef<number | null>(null);
   const [viewportWidth, setViewportWidth] = useState(600);
   const [zoom, setZoom] = useState(1);
@@ -50,12 +60,18 @@ export function SceneTimeline({
   useEffect(() => {
     const cancel = (): void => {
       gesture.current = null;
+      cameraGesture.current = null;
       scrub.current = null;
       document.cancelActionDrag();
+      document.cancelCameraDrag();
     };
     window.addEventListener('blur', cancel);
     const escape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !blocksEditorShortcut(event) && (gesture.current || scrub.current !== null)) {
+      if (
+        event.key === 'Escape' &&
+        !blocksEditorShortcut(event) &&
+        (gesture.current || cameraGesture.current || scrub.current !== null)
+      ) {
         event.preventDefault();
         cancel();
       }
@@ -99,6 +115,18 @@ export function SceneTimeline({
       <div className="scene-timeline-toolbar">
         <h2>Scene timeline</h2>
         <ScenePlaybackControls playback={playback} />
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.sceneCameraSetKey}
+          disabled={document.hasActiveGesture}
+          onClick={() => {
+            playback.pause();
+            document.setCameraKey(playback.time);
+            document.setCameraKeyEditing(true);
+          }}
+        >
+          Set Camera Key
+        </button>
         <label>
           Action type
           <select
@@ -142,7 +170,8 @@ export function SceneTimeline({
       </div>
       <p className="workspace-caption">
         Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses snapping. Scroll
-        to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing.
+        to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing. Camera diamonds select
+        keys; drag to move their time. Inspect values and outgoing curves in Cinematic Camera.
       </p>
       <ScenePlaybackError playback={playback} />
       {scene.actors.length > 0 && !scene.actions.length && (
@@ -176,6 +205,22 @@ export function SceneTimeline({
             return;
           }
           const drag = gesture.current;
+          const cameraDrag = cameraGesture.current;
+          if (cameraDrag?.pointer === event.pointerId) {
+            const time = snapSceneTime(
+              scene,
+              null,
+              cameraDrag.time + ((event.clientX - cameraDrag.x) / cameraDrag.width) * scene.duration,
+              cameraDrag.width,
+              playback.time,
+              snap && !event.altKey,
+              0,
+              scene.duration,
+              cameraDrag,
+            );
+            cameraDrag.valid = document.changeCameraKeyDrag(time);
+            return;
+          }
           if (!drag || drag.pointer !== event.pointerId) return;
           const delta = ((event.clientX - drag.x) / drag.width) * scene.duration;
           const action = drag.action;
@@ -208,6 +253,14 @@ export function SceneTimeline({
         }}
         onPointerUp={(event) => {
           scrub.current = null;
+          const cameraDrag = cameraGesture.current;
+          if (cameraDrag?.pointer === event.pointerId) {
+            cameraGesture.current = null;
+            if (cameraDrag.valid) document.endCameraDrag();
+            else document.cancelCameraDrag();
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            return;
+          }
           const drag = gesture.current;
           if (!drag || drag.pointer !== event.pointerId) return;
           gesture.current = null;
@@ -219,11 +272,15 @@ export function SceneTimeline({
           scrub.current = null;
           gesture.current = null;
           document.cancelActionDrag();
+          cameraGesture.current = null;
+          document.cancelCameraDrag();
         }}
         onLostPointerCapture={() => {
           scrub.current = null;
           gesture.current = null;
           document.cancelActionDrag();
+          cameraGesture.current = null;
+          document.cancelCameraDrag();
         }}
       >
         <div className="scene-timeline-content" style={{ width: width + 146 }}>
@@ -322,6 +379,60 @@ export function SceneTimeline({
             );
           })}
           {!scene.actors.length && <p>Add Actors to create timeline tracks.</p>}
+          <div data-guide-id={GUIDE_TARGETS.sceneCameraTracks}>
+            <div className="scene-track-row scene-camera-group">
+              <button type="button" className="scene-track-label" onClick={() => document.selectCamera()}>
+                Camera
+              </button>
+              <span className="workspace-caption">Center and zoom · scene clock</span>
+            </div>
+            {CAMERA_PROPERTIES.map((property) => (
+              <div className="scene-track-row" key={property} style={{ height: 32 }}>
+                <button type="button" className="scene-track-label" onClick={() => document.selectCamera()}>
+                  {property === 'zoom' ? 'Zoom' : property.toUpperCase()}
+                </button>
+                <div className="scene-track-lane" style={{ width }} aria-label={`Camera ${property} keys`}>
+                  {(scene.cameraTracks?.[property] ?? []).map((key) => (
+                    <button
+                      key={key.id}
+                      type="button"
+                      className="scene-action marker scene-camera-key"
+                      aria-label={`Camera ${property} key at ${key.time / 1000} s`}
+                      aria-pressed={
+                        document.selectedCameraKey?.property === property &&
+                        document.selectedCameraKey.key.id === key.id
+                      }
+                      title={`${key.value} · ${key.time / 1000} s · ${key.curve?.mode ?? 'linear'}`}
+                      style={{ left: x(key.time), width: 16, top: 4 }}
+                      onClick={() => {
+                        playback.pause();
+                        document.selectCameraKey(property, key.id);
+                      }}
+                      onPointerDown={(event) => {
+                        if (event.button !== 0) return;
+                        event.preventDefault();
+                        viewport.current?.focus();
+                        playback.pause();
+                        if (!document.beginCameraKeyDrag(property, key.id)) return;
+                        viewport.current?.setPointerCapture(event.pointerId);
+                        cameraGesture.current = {
+                          pointer: event.pointerId,
+                          x: event.clientX,
+                          time: key.time,
+                          property,
+                          id: key.id,
+                          width,
+                          valid: true,
+                        };
+                      }}
+                    >
+                      ◆
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
           <ScenePlayhead playback={playback} duration={scene.duration} width={width} />
         </div>
       </div>

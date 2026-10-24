@@ -100,6 +100,7 @@ class SceneStage extends Phaser.Scene {
   }
 
   create(): void {
+    this.document.setCameraTimeProvider(() => this.playback.time);
     this.artwork = new SceneImageLayer(
       this,
       (reference) => Promise.resolve(this.document.images.read(reference)),
@@ -185,6 +186,8 @@ class SceneStage extends Phaser.Scene {
       this.document.cancelActorDrag();
     };
     const unsubscribePlayback = this.playback.subscribe(() => {
+      this.syncCamera();
+      this.syncArtwork();
       this.document.setGroundPreviewing(this.playback.previewing);
       if (this.playback.previewing && (this.gesture || this.imageGesture)) {
         this.gesture = undefined;
@@ -211,6 +214,7 @@ class SceneStage extends Phaser.Scene {
         }
         const point = this.point(event);
         if (!this.document.cameraPreviewing && this.hitCamera(point) && this.document.beginCameraDrag()) {
+          this.playback.pause();
           this.cameraGesture = {
             pointer: event.pointerId,
             scene: this.document.selectedSceneId!,
@@ -410,6 +414,7 @@ class SceneStage extends Phaser.Scene {
       unsubscribe();
       unsubscribeImages();
       this.document.setActorBoundsProvider(undefined);
+      this.document.setCameraTimeProvider(undefined);
       this.document.setActorGroundOffsets(new Map());
       this.document.setActorGroundContacts(new Map());
       unsubscribePlayback();
@@ -549,11 +554,12 @@ class SceneStage extends Phaser.Scene {
       });
   }
   update(_time: number, delta: number): void {
+    this.playback.update(delta);
     this.syncCamera();
+    this.syncArtwork();
     const cleanPreview = this.document.cameraPreviewing && !this.document.cameraOverlays;
     const guide = this.document.groundGuide.getSnapshot().guide;
     this.groundOverlay.render(cleanPreview ? { ...guide, enabled: false } : guide);
-    this.playback.update(delta);
     for (const { actor } of this.preview.instances.values())
       actor.puppet.container.setVisible(
         !this.playback.previewing &&

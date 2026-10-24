@@ -30,6 +30,68 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 export const sceneGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-camera-keyframes',
+    'Camera Timeline & Keyframes',
+    'Animate camera pans and zooms with timeline keys, outgoing curves and deterministic scene playback.',
+    scene,
+    [
+      step(
+        'capture',
+        'Capture the first shot',
+        T.sceneCameraSetKey,
+        'After exiting this tour, set the playhead to 0 seconds and choose Set Camera Key. It captures the evaluated camera center and zoom on all three Camera rows and enables Camera Key Edit mode. You can begin in an empty scene; Actors are optional. This tour only reveals controls and never creates or selects keys.',
+      ),
+      step(
+        'mode',
+        'Choose explicit camera key editing',
+        T.sceneCameraKeyMode,
+        'Camera Key Edit mode makes Apply camera key, Reset Camera, Frame Selected Actor and frame dragging author keys at the playhead. With the mode off, numeric controls edit initial settings. Wheel zoom and middle/right/Alt-drag always navigate the editor without creating keys; animated frames require Key Edit mode to drag. The tour leaves your mode unchanged.',
+      ),
+      step(
+        'time',
+        'Choose a later shot time',
+        T.sceneTime,
+        'Set Playhead (s) to 3, or scrub the ruler, to place the next shot. Seeking pauses playback. The UI displays seconds; camera keys, Actors and parallax share the same millisecond scene clock. Keyed channels hold their first and last values outside their key range; channels without keys use the initial camera settings.',
+      ),
+      step(
+        'values',
+        'Pan and zoom into the next shot',
+        T.sceneCameraKeyValues,
+        'With Camera Key Edit mode enabled, change Center X/Y and Camera zoom, then choose Apply camera key. Centers use scene pixels; zoom ranges from 0.1 to 8. For example, pan toward an Actor at 3 seconds and add a closer zoom at 5 seconds. Frame Selected Actor can capture one explicit shot when an Actor is selected; it never enables continuous tracking.',
+      ),
+      step(
+        'tracks',
+        'Select and move camera diamonds',
+        T.sceneCameraTracks,
+        'Camera has independent X, Y and Zoom rows below the Actor tracks. Click a diamond to select it and pause playback; drag it to move its time. Snap uses the frame grid, other camera keys, Actor clip edges and playhead; Alt bypasses snapping. Escape, blur or capture loss cancels a drag. Each completed drag is one scene Undo step. If the rows are empty, capture the first shot after exiting the tour.',
+      ),
+      step(
+        'properties',
+        'Inspect, duplicate and delete a key',
+        T.sceneCameraKeyProperties,
+        'Open Cinematic Camera → Selected camera key to edit a selected diamond’s exact time and value, then Apply selected camera key. Duplicate camera key copies its outgoing curve to an explicit time; Delete camera key or Delete/Backspace removes the selected diamond. Same-channel time collisions are rejected. Scene Undo/Redo restores these edits while retaining the Actor clock. Without a selected key this section explains how to begin; the tour never selects one for you.',
+      ),
+      step(
+        'curves',
+        'Shape the outgoing camera motion',
+        T.sceneCameraKeyCurves,
+        'Choose Linear, Stepped, Smooth / eased preset or Bézier for the selected key’s outgoing segment. Stepped holds until the next key. Smooth uses a Bézier ease preset; Bézier exposes four normalized handle coordinates above this menu. Keep each coordinate in [0, 1] and the first X no greater than the second X. Apply selected camera key commits handle edits. Bounded curves keep zoom between its endpoint values; evaluated zoom is also clamped to [0.1, 8]. Select a diamond after the tour if no curve controls are shown.',
+      ),
+      step(
+        'preview',
+        'Preview and repeat a seek',
+        T.sceneCameraPreview,
+        'After exiting this tour, choose Preview Through Camera, then Play. Camera motion, Actors and background parallax advance together. Pause, Restart or scrub repeatedly between 2 and 5 seconds: returning to an identical time produces identical framing. Stop returns the scene clock to zero. Exit Camera Preview restores editor navigation. The tour never changes the clock, preview mode or overlays.',
+      ),
+      step(
+        'save',
+        'Save camera keys and curves',
+        T.scenePackage,
+        'Download scene JSON preserves Camera X/Y/Zoom keys and their outgoing curves; keep its referenced assets with it. Download scene package includes the referenced character and artwork files for portable handoff. Export Project and local recovery retain the camera tracks too. At runtime, LoadedScene.applyCamera opts the host camera into the runner clock and parallax. Static and legacy scenes remain supported; editor navigation and Key Edit mode are not exported.',
+      ),
+    ],
+  ),
+  guide(
     'scene-cinematic-camera',
     'Cinematic Camera',
     'Author audience framing, frame an Actor and preview through the camera independently of editor navigation.',
@@ -81,7 +143,7 @@ export const sceneGuides: readonly GuideDefinition[] = [
         'save',
         'Save the camera with the scene',
         T.scenePackage,
-        'Download scene JSON stores the initial camera center and zoom with image and character references. Download scene package includes those settings and the referenced artwork and character files; Export Project and local recovery retain camera settings too. Editor navigation, selection, preview mode and overlays are excluded. At runtime, the host explicitly applies framing with LoadedScene.applyCamera and reapplies it after resizing. Camera timeline keys are not supported yet.',
+        'Download scene JSON stores initial camera settings and Camera X/Y/Zoom timeline keys, including outgoing curves. Scene packages, Export Project and local recovery retain them too. Set Camera Key captures the playhead camera; Camera Key Edit mode makes Apply camera key, framing and frame dragging author explicit keys. Navigation, selection, preview mode and overlays are excluded. At runtime, LoadedScene.applyCamera opts into the runner clock and parallax; reapply it after resizing.',
       ),
     ],
   ),

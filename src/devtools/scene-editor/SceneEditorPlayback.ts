@@ -53,8 +53,20 @@ export class SceneEditorPlayback {
   sync(source: ReadonlyScene | null, ready: boolean, createActor: SceneRunnerOptions['createActor']): void {
     if (this.source === source && this.runner && ready) return;
     if (this.source && source && this.runner && ready) {
-      const { images: _previousImages, layers: _previousLayers, camera: _previousCamera, ...previous } = this.source;
-      const { images: _nextImages, layers: _nextLayers, camera: _nextCamera, ...next } = source;
+      const {
+        images: _previousImages,
+        layers: _previousLayers,
+        camera: _previousCamera,
+        cameraTracks: _previousTracks,
+        ...previous
+      } = this.source;
+      const {
+        images: _nextImages,
+        layers: _nextLayers,
+        camera: _nextCamera,
+        cameraTracks: _nextTracks,
+        ...next
+      } = source;
       if (equalJsonData(previous, next)) {
         this.source = source;
         this.syncLayers();

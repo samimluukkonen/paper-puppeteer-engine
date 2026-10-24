@@ -85,3 +85,5 @@ export type { SceneAssetOptions, ResolvedScene } from './SceneAssets.js';
 export { buildScenePackage, validateScenePackage } from './ScenePackage.js';
 export type { ScenePackageFiles } from './ScenePackage.js';
 export { encodePackageZip, decodePackageZip } from './packageZip.js';
+
+export type { CameraProperty, CameraKeyframe, CameraTracks } from './cameraAnimation.js';

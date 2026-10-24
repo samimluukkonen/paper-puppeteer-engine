@@ -43,6 +43,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.2.4
+
+Add a nine-step **Camera Timeline & Keyframes** guide to the shared Scene catalog. Highlight real capture, mode, time, value, track, property and curve controls with empty-key guidance, plus camera preview and portable saving. Preserve authored keys/curves, selection, edit mode, playhead, preview and history; add unit and local desktop browser coverage.
+
+Add optional sparse Cinematic Camera X/Y/zoom keyframe tracks to Scene Editor's existing timeline, sharing its ruler, snapping, playhead and grouped scene Undo/Redo. Add explicit Set Camera Key and Camera Key Edit mode, diamond selection/dragging, numeric time/value edits, duplication, deletion and outgoing Linear, Stepped, eased preset and bounded Bézier controls. Keep navigation independent and inspectors collapsed initially.
+
+Evaluate camera tracks deterministically on the existing millisecond scene clock through the character property sampler. Preserve Actor instances/time during camera edits and synchronize audience framing and layer parallax during playback, direct seeking, pause/restart and export/reload. Keep static/legacy scene defaults virtual, validate bounded zoom and monotonic curves, preserve tracks in JSON/project/recovery/portable packages, export the evaluator and types, and update the scene schema and [camera guide](docs/cinematic-camera.md). Add unit and local desktop browser regressions; browser tests remain local-only.
+
 ## 1.2.3
 
 Add an eight-step **Cinematic Camera** Feature Guide to the shared Scene catalog, covering frame selection and dragging, center coordinates, zoom/reset, Actor framing, audience preview, independent navigation and saving/runtime handoff. Reveal real controls with empty-scene guidance while preserving authored data, selection, history, playhead and preview mode. Add unit and local desktop browser coverage.

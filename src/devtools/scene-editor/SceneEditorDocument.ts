@@ -1,4 +1,10 @@
 import {
+  CAMERA_PROPERTIES,
+  evaluateCameraAtTime,
+  type CameraProperty,
+  type CameraKeyframe,
+} from '../../engine/cameraAnimation.js';
+import {
   cameraForBounds,
   DEFAULT_CINEMATIC_CAMERA,
   type CameraViewport,
@@ -38,6 +44,8 @@ interface SceneEntry {
   working: ReadonlyScene;
   unsavedNew: boolean;
   cameraSelected: boolean;
+  cameraKeyEdit: boolean;
+  selectedCameraKey: { property: CameraProperty; id: string } | null;
   cameraPreview: boolean;
   cameraOverlays: boolean;
   selectedImage: string | null;
@@ -55,6 +63,9 @@ export class SceneEditorDocument {
   private dragAction: string | null = null;
   private dragActor: string | null = null;
   private dragCamera = false;
+  private dragCameraKey = false;
+  private cameraDragTime = 0;
+  private cameraTime: (() => number) | undefined;
   private actorBounds: ((id: string) => CameraViewport | undefined) | undefined;
   private dragImage: string | null = null;
   private readonly lockedLayers = new Map<string, Set<string>>();
@@ -185,6 +196,8 @@ export class SceneEditorDocument {
       working: source,
       unsavedNew,
       cameraSelected: false,
+      cameraKeyEdit: false,
+      selectedCameraKey: null,
       cameraPreview: false,
       cameraOverlays: false,
       selectedImage: null,
@@ -272,7 +285,99 @@ export class SceneEditorDocument {
   }
 
   get cinematicCamera(): Readonly<CinematicCameraState> {
-    return this.workingScene?.camera ?? DEFAULT_CINEMATIC_CAMERA;
+    return this.workingScene
+      ? evaluateCameraAtTime(this.workingScene, this.cameraTime?.() ?? 0)
+      : DEFAULT_CINEMATIC_CAMERA;
+  }
+  /** Clock ownership remains in playback. This provider never writes authored data. */
+  setCameraTimeProvider(provider: (() => number) | undefined): void {
+    this.cameraTime = provider;
+  }
+  get cameraKeyEditing(): boolean {
+    return this.entry?.cameraKeyEdit ?? false;
+  }
+  setCameraKeyEditing(enabled: boolean): void {
+    this.selectCamera();
+    if (this.entry) this.entry.cameraKeyEdit = enabled;
+    this.notify();
+  }
+  get selectedCameraKey(): { property: CameraProperty; key: Readonly<CameraKeyframe> } | null {
+    const selected = this.cameraSelected && this.entry?.selectedCameraKey;
+    const key = selected && this.workingScene?.cameraTracks?.[selected.property]?.find((key) => key.id === selected.id);
+    return selected && key ? { property: selected.property, key } : null;
+  }
+  selectCameraKey(property: CameraProperty, id: string): void {
+    this.selectCamera();
+    if (!this.entry || !this.workingScene?.cameraTracks?.[property]?.some((key) => key.id === id)) return;
+    this.entry.selectedCameraKey = { property, id };
+    this.entry.cameraKeyEdit = true;
+    this.notify();
+  }
+  /** Explicit capture; channels at the same time are replaced without duplicating keys. */
+  setCameraKey(time = this.cameraTime?.() ?? 0, values: Partial<CinematicCameraState> = this.cinematicCamera): boolean {
+    if (!this.dragCamera) this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene) return false;
+    const tracks = { ...scene.cameraTracks };
+    for (const property of CAMERA_PROPERTIES) {
+      if (values[property] === undefined) continue;
+      const keys = tracks[property] ?? [];
+      const existing = keys.find((key) => Math.abs(key.time - time) < 1e-6);
+      let index = 1;
+      while (keys.some((key) => key.id === `camera-key-${index}`)) index++;
+      const next = { ...existing, id: existing?.id ?? `camera-key-${index}`, time, value: values[property] };
+      tracks[property] = [...keys.filter((key) => key !== existing), next].sort((a, b) => a.time - b.time);
+    }
+    return this.replaceScene({ ...scene, cameraTracks: tracks });
+  }
+  updateCameraKey(property: CameraProperty, id: string, patch: Partial<Omit<CameraKeyframe, 'id'>>): boolean {
+    if (!this.dragCameraKey) this.finishLayerGestures();
+    const scene = this.workingScene;
+    const keys = scene?.cameraTracks?.[property];
+    if (!scene || !keys?.some((key) => key.id === id)) return false;
+    return this.replaceScene({
+      ...scene,
+      cameraTracks: {
+        ...scene.cameraTracks,
+        [property]: keys.map((key) => (key.id === id ? { ...key, ...patch } : key)).sort((a, b) => a.time - b.time),
+      },
+    });
+  }
+  removeCameraKey(property: CameraProperty, id: string): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene?.cameraTracks?.[property]?.some((key) => key.id === id)) return false;
+    return this.replaceScene({
+      ...scene,
+      cameraTracks: { ...scene.cameraTracks, [property]: scene.cameraTracks[property].filter((key) => key.id !== id) },
+    });
+  }
+  duplicateCameraKey(property: CameraProperty, id: string, time: number): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    const keys = scene?.cameraTracks?.[property];
+    const key = keys?.find((key) => key.id === id);
+    if (!scene || !key || !keys) return false;
+    let index = 1;
+    while (keys.some((key) => key.id === `camera-key-${index}`)) index++;
+    const next = { ...key, id: `camera-key-${index}`, time };
+    const result = this.replaceScene({
+      ...scene,
+      cameraTracks: { ...scene.cameraTracks, [property]: [...keys, next].sort((a, b) => a.time - b.time) },
+    });
+    if (result) this.selectCameraKey(property, next.id);
+    return result;
+  }
+  beginCameraKeyDrag(property: CameraProperty, id: string): boolean {
+    this.selectCameraKey(property, id);
+    if (!this.selectedCameraKey) return false;
+    this.entry!.history.beginOperation();
+    this.dragCameraKey = true;
+    return true;
+  }
+  changeCameraKeyDrag(time: number): boolean {
+    const selected = this.selectedCameraKey;
+    return this.dragCameraKey && selected ? this.updateCameraKey(selected.property, selected.key.id, { time }) : false;
   }
   get cameraSelected(): boolean {
     return this.entry?.cameraSelected ?? false;
@@ -290,6 +395,7 @@ export class SceneEditorDocument {
     this.cancelActionDrag();
     if (!this.entry) return;
     this.entry.cameraSelected = selected;
+    this.entry.selectedCameraKey = null;
     if (selected) {
       this.entry.selectedImage = null;
       this.entry.selectedAction = null;
@@ -315,7 +421,12 @@ export class SceneEditorDocument {
   updateCamera(patch: Partial<CinematicCameraState>): boolean {
     if (!this.dragCamera) this.finishLayerGestures();
     if (!this.workingScene) return false;
-    return this.replaceScene({ ...this.workingScene, camera: { ...this.cinematicCamera, ...patch } });
+    if (this.cameraKeyEditing)
+      return this.setCameraKey(this.dragCamera ? this.cameraDragTime : (this.cameraTime?.() ?? 0), patch);
+    return this.replaceScene({
+      ...this.workingScene,
+      camera: { ...(this.workingScene.camera ?? DEFAULT_CINEMATIC_CAMERA), ...patch },
+    });
   }
   resetCamera(): boolean {
     return this.updateCamera(DEFAULT_CINEMATIC_CAMERA);
@@ -340,22 +451,30 @@ export class SceneEditorDocument {
   beginCameraDrag(): boolean {
     this.selectCamera();
     if (!this.entry || this.cameraPreviewing) return false;
+    if (
+      !this.cameraKeyEditing &&
+      CAMERA_PROPERTIES.some((property) => this.workingScene?.cameraTracks?.[property]?.length)
+    )
+      return false;
     this.entry.history.beginOperation();
     this.dragCamera = true;
+    this.cameraDragTime = this.cameraTime?.() ?? 0;
     return true;
   }
   moveCameraDrag(position: { x: number; y: number }): boolean {
     return this.dragCamera ? this.updateCamera(position) : false;
   }
   endCameraDrag(): void {
-    if (!this.dragCamera) return;
+    if (!this.dragCamera && !this.dragCameraKey) return;
     this.dragCamera = false;
+    this.dragCameraKey = false;
     this.entry?.history.endOperation();
     this.notify();
   }
   cancelCameraDrag(): void {
-    if (!this.dragCamera) return;
+    if (!this.dragCamera && !this.dragCameraKey) return;
     this.dragCamera = false;
+    this.dragCameraKey = false;
     this.entry?.history.cancelOperation();
     this.notify();
   }
@@ -560,7 +679,13 @@ export class SceneEditorDocument {
     return this.workingScene?.actors.some((actor) => actor.id === id) ? id! : null;
   }
   get hasActiveGesture(): boolean {
-    return this.dragCamera || this.dragImage !== null || this.dragActor !== null || this.dragAction !== null;
+    return (
+      this.dragCamera ||
+      this.dragCameraKey ||
+      this.dragImage !== null ||
+      this.dragActor !== null ||
+      this.dragAction !== null
+    );
   }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;

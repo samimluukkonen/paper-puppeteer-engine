@@ -1,3 +1,4 @@
+import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
 import { sceneActionDuration } from '../../engine/SceneDefinition.js';
 import { resolveTimelineSnap } from '../animation-editor/timelineSnapping.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
@@ -20,6 +21,7 @@ export function snapSceneTime(
   enabled: boolean,
   min = 0,
   max = scene.duration,
+  excludeCameraKey?: { property: CameraProperty; id: string },
 ): number {
   return (
     resolveTimelineSnap(
@@ -30,12 +32,19 @@ export function snapSceneTime(
         playheadTime: playhead / 1000,
         minTime: min / 1000,
         maxTime: max / 1000,
-        targets: scene.actions
-          .filter((action) => action.id !== actionId)
-          .flatMap((action) => [
-            { type: 'keyframe' as const, time: action.time / 1000 },
-            { type: 'keyframe' as const, time: (action.time + sceneActionDuration(action)) / 1000 },
-          ]),
+        targets: [
+          ...scene.actions
+            .filter((action) => action.id !== actionId)
+            .flatMap((action) => [
+              { type: 'keyframe' as const, time: action.time / 1000 },
+              { type: 'keyframe' as const, time: (action.time + sceneActionDuration(action)) / 1000 },
+            ]),
+          ...CAMERA_PROPERTIES.flatMap((property) =>
+            (scene.cameraTracks?.[property] ?? [])
+              .filter((key) => property !== excludeCameraKey?.property || key.id !== excludeCameraKey.id)
+              .map((key) => ({ type: 'keyframe' as const, time: key.time / 1000 })),
+          ),
+        ],
       },
       { enabled, frames: true, keyframes: true, events: true, playhead: true },
     ).time * 1000

@@ -398,7 +398,7 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
-              <SceneCameraPanel key={`camera-${scene.id}`} document={document} />
+              <SceneCameraPanel key={`camera-${scene.id}`} document={document} playback={playback} />
               <SceneLayersPanel key={`layers-${scene.id}`} document={document} />
               <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />
               <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />

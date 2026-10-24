@@ -185,7 +185,7 @@ for (const populated of [false, true]) {
       await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
       await page.locator('.scene-layers summary').click();
       await page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true }).click();
-      await page.locator('.scene-camera summary').click();
+      await page.locator('.scene-camera > summary').click();
       await page.getByRole('button', { name: 'Select Cinematic Camera', exact: true }).click();
       await toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true }).click();
       await page.getByLabel('Editor overlays', { exact: true }).check();
@@ -238,6 +238,107 @@ for (const populated of [false, true]) {
         'false',
       );
       await expect(toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
+    }
+    const waiting = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download scene JSON', exact: true }).click();
+    expect(JSON.parse(await readFile(await (await waiting).path(), 'utf8'))).toEqual(source);
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const populated of [false, true]) {
+  test(`camera keyframe guide preserves ${populated ? 'selected keys, clock, curves and preview' : 'an empty scene without creating keys'}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('scene-editor/');
+    const source = {
+      version: 2,
+      id: 'keyframe-guide',
+      name: 'Keyframe guide',
+      duration: 4000,
+      actors: [],
+      actions: [],
+      ...(populated
+        ? {
+            cameraTracks: {
+              x: [
+                {
+                  id: 'start',
+                  time: 0,
+                  value: 0,
+                  curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } },
+                },
+                { id: 'end', time: 3000, value: 120 },
+              ],
+              zoom: [
+                { id: 'start', time: 0, value: 1 },
+                { id: 'end', time: 3000, value: 2 },
+              ],
+            },
+          }
+        : {}),
+    };
+    await page.getByLabel('Open scene JSON').setInputFiles({
+      name: 'camera.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(source)),
+    });
+    await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+    await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+    if (populated) {
+      await page.getByRole('button', { name: 'Camera x key at 0 s', exact: true }).click();
+      await page.locator('.scene-camera > summary').click();
+      await page.locator('.scene-camera-key-inspector > summary').click();
+      await page.getByLabel('Camera key interpolation', { exact: true }).selectOption('stepped');
+      await page.getByRole('button', { name: 'Undo', exact: true }).click();
+      await page.getByLabel('Playhead (s)', { exact: true }).fill('1');
+      await page
+        .locator('.scene-stage-toolbar')
+        .getByRole('button', { name: 'Preview Through Camera', exact: true })
+        .click();
+      await page.getByLabel('Editor overlays', { exact: true }).check();
+      await page.getByRole('button', { name: 'Camera x key at 0 s', exact: true }).click();
+    }
+    await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+    const guide = guideRegistry.getGuideById('scene-camera-keyframes')!;
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+    const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+    for (const [index, step] of guide.steps.entries()) {
+      await expect(tour.getByRole('heading', { name: step.title, exact: true })).toBeVisible();
+      const target = page.locator(`[data-guide-id="${step.targetId}"]`);
+      await expect(target).toHaveCount(1);
+      await expect(target).toBeVisible();
+      await expect(page.locator('.guide-spotlight-hole')).toBeVisible();
+      await expect(tour).not.toContainText('Target unavailable');
+      if (step.id === 'curves') {
+        if (populated) await expect(page.getByLabel('Camera key interpolation', { exact: true })).toHaveValue('bezier');
+        else await expect(target).toContainText('No keys yet?');
+        await page.screenshot({ path: test.info().outputPath(`camera-keyframe-curves-${populated}.png`) });
+      }
+      if (index + 1 < guide.steps.length) await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await tour.getByRole('button', { name: 'Exit', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'Edit', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    await expect(page.getByLabel('Playhead (s)', { exact: true })).toHaveValue(populated ? '1' : '0');
+    if (populated) {
+      await expect(page.getByRole('button', { name: 'Camera x key at 0 s', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await expect(page.getByLabel('Camera Key Edit mode', { exact: true })).toBeChecked();
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+      await expect(
+        page.locator('.scene-stage-toolbar').getByRole('button', { name: 'Exit Camera Preview', exact: true }),
+      ).toBeVisible();
+      await expect(page.getByLabel('Editor overlays', { exact: true })).toBeChecked();
+    } else {
+      await expect(page.getByLabel('Camera Key Edit mode', { exact: true })).not.toBeChecked();
+      await expect(page.locator('.scene-camera-key')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
     }
     const waiting = page.waitForEvent('download');

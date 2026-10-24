@@ -220,3 +220,11 @@ export {
   cameraForBounds,
   applyCinematicCamera,
 } from './cinematicCamera.js';
+
+export type { CameraProperty, CameraKeyframe, CameraTracks } from './cameraAnimation.js';
+export {
+  CAMERA_PROPERTIES,
+  evaluateCameraAtTime,
+  cameraKeyframeSchema,
+  cameraTracksSchema,
+} from './cameraAnimation.js';
