@@ -29,6 +29,59 @@ const step = (id: string, title: string, description: string, targetId: string):
 /** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
+    id: 'animation-preview-displacement',
+    title: 'Preview Displacement',
+    description:
+      'Add a temporary world trajectory for steps, dodges, jumps or any animation while preserving authored motion.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'enable',
+        'Keep authored motion and opt into displacement',
+        'As Authored is the default: no additional movement is applied, and root/pelvis/bone motion stays authored. After exiting this tour, deliberately enable additional preview displacement to add world movement. Root translation is not extracted or replaced, so account for motion already in the clip. Enable Environment Preview above the canvas for a static background; an image is optional. This tour only reveals controls and changes no settings or animation data.',
+        targets.animationDisplacementEnable,
+      ),
+      step(
+        'add',
+        'Add a point at animation time',
+        'After exiting, pause and set Time (s) or scrub the existing ruler, then choose Add position point. It starts at that playhead time with the trajectory’s current offset. If that time is occupied, Add suggests the midpoint of the largest interval. Start with a zero offset at time 0. These preview points are separate from real animation keyframes; no walking-specific simulator is used.',
+        targets.animationDisplacementAdd,
+      ),
+      step(
+        'points',
+        'Edit timed world positions',
+        'Enter Time (s), Offset X and Offset Y, then Apply point. X increases right and Y down in world pixels, independently of facing and scale; choose the X sign for your intended direction. A short step can use 0s → (0, 0), 0.3s → (0, 0), 0.55s → (45, 0), 1s → (45, 0). A jump can use 0s → (0, 0), 0.5s → (40, -100), 1s → (80, 0). Points sort by time. Use finite numbers and unique nonnegative times. Remove deletes only that preview point. With no points, add one after exiting this tour.',
+        targets.animationDisplacementPoints,
+      ),
+      step(
+        'interpolation',
+        'Choose how segments move',
+        'Linear interpolates each segment, allowing different speeds, stationary intervals, backward or sideways moves and returns to earlier positions. Equal adjacent offsets hold still. Stepped holds an offset until the next point’s exact time. The first and last offsets hold outside the point range. Points beyond the current clip duration are retained for a longer clip but are not reached during current playback.',
+        targets.animationDisplacementInterpolation,
+      ),
+      step(
+        'time',
+        'Review synchronized motion',
+        'After exiting, play, pause or seek with Time (s) and the ruler to compare the same pose with and without displacement. Both use the existing animation clock; stepped playback holds the same sampled pose and offset, including the exact clip endpoint. Loop preview returns to the initial displacement each cycle. Seeking to a time gives the same offset from either direction. IK continues through the normal Puppet solve; this tool does not lock feet or author IK keys.',
+        targets.animationTime,
+      ),
+      step(
+        'trajectory',
+        'Show the spatial trajectory',
+        'Show preview trajectory draws an independent line and circles in the viewport while displacement is enabled. It marks the preview origin’s world path, not bone motion or background artwork; stationary and repeated positions overlap. Wheel zooms and middle drag pans. Facing mirrors the character while world offsets and the environment keep their direction. An empty trajectory can be configured after exiting this guide.',
+        targets.animationDisplacementTrajectory,
+      ),
+      step(
+        'reset',
+        'Disable, reset and keep the right data',
+        'Uncheck Enable additional preview displacement to restore the preview origin while retaining the trajectory and all authored skeletal motion. Reset trajectory clears points, restores defaults and disables displacement. Each clip retains its own settings while switching animations in this editor session; reload releases them. Animation Undo/Redo, JSON, recovery, character ZIPs and project ZIPs exclude these preview settings. Imported project background images can still be saved in the project ZIP. This guide never enables, resets or saves anything for you.',
+        targets.animationDisplacementReset,
+      ),
+    ],
+  },
+  {
     id: 'animation-environment-preview',
     title: 'Environment Preview',
     description: 'Preview any animation against a static image, align its floor and keep authored motion unchanged.',

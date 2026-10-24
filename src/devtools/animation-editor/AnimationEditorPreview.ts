@@ -1,11 +1,13 @@
-import { quantizePlaybackTime } from '../../engine/animationMath.js';
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { IKAnimationPose } from '../../engine/ik/AnimationIKPose.js';
 import { Joint } from '../../engine/Joint.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform } from '../../engine/types.js';
+import { CHARACTER_PREVIEW_ORIGIN } from '../shared/previewPlacement.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { evaluatePreviewDisplacement, motionPreviewSampleTime } from './motionPreview.js';
+import type { MotionPreviewController } from './MotionPreviewController.js';
 import { getCompiledPreviewClip } from './previewClip.js';
 
 /** Editor-owned runtime player samples the working copy; the puppet still owns rendering and IK. */
@@ -22,29 +24,46 @@ export class AnimationEditorPreview {
   private libraryPose: AnimationEditorState['previewedPose'] | undefined;
   private readonly ikSource: { ikAnimation: IKAnimationPose } = { ikAnimation: new Map() };
   private readonly unsubscribe: () => void;
+  private readonly releaseMotion: (() => void) | undefined;
 
   constructor(
     private readonly state: AnimationEditorState,
-    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'setIKAnimationSource'>,
+    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'setIKAnimationSource'> &
+      Partial<Pick<Puppet, 'container'>>,
+    private readonly motion?: MotionPreviewController,
   ) {
     this.refresh();
     this.unsubscribe = state.subscribe(() => this.refresh());
+    this.releaseMotion = motion?.subscribe(() => this.refresh());
   }
 
   refresh(force = false): void {
     if (this.disposed) return;
+    const animation = this.state.previewAnimation;
+    const time = animation ? this.state.previewTimeMilliseconds : 0;
+    const sampledTime = motionPreviewSampleTime(animation, time);
+    // The editor owns this top-level preview instance. Bone-local root keys remain untouched;
+    // world offsets are never multiplied by puppet scale or facing and never accumulate.
+    const container = this.puppet.container;
+    if (this.motion && container) {
+      const offset =
+        this.state.animationAuthoringEnabled && animation
+          ? evaluatePreviewDisplacement(this.motion.getSnapshot().settings, sampledTime)
+          : { x: 0, y: 0 };
+      const x = CHARACTER_PREVIEW_ORIGIN.x + offset.x;
+      const y = CHARACTER_PREVIEW_ORIGIN.y + offset.y;
+      if (container.x !== x || container.y !== y) {
+        container.setPosition(x, y);
+        force = true; // World-target IK and detached debug overlays must follow placement too.
+      }
+    }
     if (this.state.editorMode === 'rig') {
       this.puppet.setIKAnimationSource(undefined);
+      if (force) this.puppet.syncPose();
       return;
     }
-    const animation = this.state.previewAnimation;
     const rig = this.state.rig ?? this.puppet.rig;
-    const time = animation ? this.state.previewTimeMilliseconds : 0;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.
-    const sampledTime =
-      animation && time !== animation.duration
-        ? quantizePlaybackTime(time, animation.playback ?? { mode: 'smooth' })
-        : time;
     const draft = this.state.boneTransformDraft;
     const ikDraft = this.state.ikTargetDraft;
     const ikId = this.state.selectedIKConstraintId;
@@ -119,6 +138,8 @@ export class AnimationEditorPreview {
     if (this.disposed) return;
     this.disposed = true;
     this.unsubscribe();
+    this.releaseMotion?.();
+    if (this.motion) this.puppet.container?.setPosition(CHARACTER_PREVIEW_ORIGIN.x, CHARACTER_PREVIEW_ORIGIN.y);
     this.puppet.setIKAnimationSource(undefined);
     this.player?.dispose();
     this.player = undefined;

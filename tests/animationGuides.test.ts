@@ -1,4 +1,5 @@
 import { assert, test, vi } from 'vitest';
+import { MotionPreviewController } from '../src/devtools/animation-editor/MotionPreviewController.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { getGuidesForEditor } from '../src/devtools/shared/guides/registry.js';
@@ -25,8 +26,8 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains twenty-two bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 22);
+test('Animation Editor catalog contains twenty-three bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 23);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
@@ -203,3 +204,46 @@ test('Environment Preview guide supports empty clips without images or IK and on
   for (const phrase of ['PNG', 'WebP', 'image center', 'middle drag', 'project ZIP', 'session', 'IK targets'])
     assert.include(instructions, phrase);
 });
+
+test.each([false, true])(
+  'Preview Displacement guide needs only a selected clip and preserves session preferences; configured=%s',
+  (configured) => {
+    const { animation, launcher } = workspace();
+    const guide = guides.find((entry) => entry.id === 'animation-preview-displacement')!;
+    assert.deepEqual(launcher.getAvailability(guide.id), {
+      available: false,
+      reason: 'Create or select an animation first.',
+    });
+    animation.createAnimation({ name: 'empty' });
+    const motion = new MotionPreviewController();
+    motion.bind(animation);
+    if (configured)
+      motion.update({
+        enabled: true,
+        positionKeys: [
+          { time: 0, offsetX: 0, offsetY: 0 },
+          { time: 500, offsetX: 40, offsetY: -80 },
+        ],
+        interpolation: 'stepped',
+        showTrajectory: false,
+      });
+    animation.setCurrentTime(0.3);
+    launcher.refresh();
+    const before = motion.getSnapshot();
+    assert.isTrue(launcher.getAvailability(guide.id).available);
+    assert.lengthOf(guide.steps, 7);
+    assert.isTrue(launcher.launch(guide.id).ok);
+    const targets = { resolve: () => ({ x: 0, y: 0, width: 200, height: 40 }), reveal: () => true };
+    for (const [index, step] of guide.steps.entries()) {
+      assert.equal(step.mode, 'explain');
+      assert.equal(step.preparation, 'reveal-target');
+      assert.equal(launcher.controller.getSnapshot().currentStep?.id, step.id);
+      assert.isTrue(launcher.controller.prepareCurrentStep(targets).ok);
+      if (index < guide.steps.length - 1) assert.isTrue(launcher.controller.next().ok);
+    }
+    assert.isTrue(launcher.controller.finish().ok);
+    assert.strictEqual(motion.getSnapshot(), before);
+    assert.equal(animation.currentTime, 0.3);
+    motion.dispose();
+  },
+);

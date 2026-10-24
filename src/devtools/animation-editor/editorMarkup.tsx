@@ -32,6 +32,8 @@ import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 import type { MotionDiagnosticsController } from './MotionDiagnosticsController.js';
 import { MotionDiagnosticsPanel } from './MotionDiagnosticsPanel.js';
+import type { MotionPreviewController } from './MotionPreviewController.js';
+import { MotionPreviewPanel } from './MotionPreviewPanel.js';
 import type { NewAnimationController } from './NewAnimationController.js';
 import { NewAnimationDialog } from './NewAnimationDialog.js';
 import type { PoseLibraryController } from './PoseLibraryController.js';
@@ -57,6 +59,7 @@ export function AnimationEditorView({
   alignGroundTarget,
   footContacts,
   environment,
+  motionPreview,
   projectEnvironment = false,
   loadProjectImages,
   header = true,
@@ -78,6 +81,7 @@ export function AnimationEditorView({
   alignGroundTarget?: () => void;
   footContacts?: FootContactGroundController;
   environment?: EnvironmentPreviewController;
+  motionPreview?: MotionPreviewController;
   projectEnvironment?: boolean;
   loadProjectImages?: (() => Promise<readonly EnvironmentProjectImage[]>) | undefined;
   header?: boolean;
@@ -367,6 +371,7 @@ export function AnimationEditorView({
           {attachments && tweaking && <RigIKPanel controller={attachments} />}
           {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
+            {motionPreview && <MotionPreviewPanel controller={motionPreview} />}
             {environment && groundGuide && (
               <EnvironmentPreviewPanel
                 controller={environment}

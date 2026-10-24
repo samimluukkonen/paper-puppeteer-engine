@@ -30,6 +30,8 @@ import type { EnvironmentPreviewController } from './EnvironmentPreviewControlle
 import { EnvironmentPreviewLayer } from './EnvironmentPreviewLayer.js';
 import { FootContactGroundController } from './FootContactGroundController.js';
 import { alignIKTargetToGuide } from './ikTargetCoordinates.js';
+import { MotionPreviewController } from './MotionPreviewController.js';
+import { MotionPreviewLayer } from './MotionPreviewLayer.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
 import { getCompiledPreviewClip } from './previewClip.js';
 import { toSeconds } from './timeUnits.js';
@@ -42,11 +44,14 @@ export interface AnimationEditorSceneOptions {
   readonly groundGuide?: GroundGuideWorkspace;
   readonly footContacts?: FootContactGroundController;
   readonly environment?: EnvironmentPreviewController;
+  readonly motionPreview?: MotionPreviewController;
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
   readonly groundGuide: GroundGuideWorkspace;
   readonly footContacts: FootContactGroundController;
+  readonly motionPreview: MotionPreviewController;
+  private motionLayer: MotionPreviewLayer | undefined;
   private environmentLayer: EnvironmentPreviewLayer | undefined;
   private contactOverlay: AnimationPoseOverlay | undefined;
   private groundOverlay: GroundGuideOverlay | undefined;
@@ -147,6 +152,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     super('AnimationEditorScene');
     this.groundGuide = options.groundGuide ?? new GroundGuideWorkspace('animation-preview-world');
     this.footContacts = options.footContacts ?? new FootContactGroundController();
+    this.motionPreview = options.motionPreview ?? new MotionPreviewController();
     this.options = { ...options, ...(options.ikChains ? { ikChains: structuredClone(options.ikChains) } : {}) };
   }
 
@@ -156,6 +162,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       ++this.loadSession;
       this.environmentLayer?.dispose();
       this.environmentLayer = undefined;
+      this.motionLayer?.dispose();
+      this.motionLayer = undefined;
       this.releaseMode?.();
       this.releaseMode = undefined;
       this.rigEditor?.disable();
@@ -192,6 +200,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.ghosts = undefined;
       this.preview?.dispose();
       this.preview = undefined;
+      this.motionPreview.unbind();
       this.artwork?.unbind();
       this.puppet?.destroy();
       this.puppet = undefined;
@@ -204,6 +213,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
+    this.motionLayer?.render();
     this.syncMirrorPreview();
     this.syncBakePreview();
     this.ikHandles?.render();
@@ -545,7 +555,9 @@ export class AnimationEditorScene extends Phaser.Scene {
             .map((chain) => ({ ...chain, enabled: false })),
         ],
       });
-      preview = new AnimationEditorPreview(state, puppet);
+      this.motionPreview.bind(state);
+      preview = new AnimationEditorPreview(state, puppet, this.motionPreview);
+      this.motionLayer = new MotionPreviewLayer(this, state, this.motionPreview);
       ghosts = new AnimationEditorGhostLayer(this, state, puppet);
       ghosts.setSettings(this.onionSkinSettings);
       this.ghosts = ghosts;
@@ -602,7 +614,7 @@ export class AnimationEditorScene extends Phaser.Scene {
             this.puppet = next;
             state.updatePreviewRig(new Rig(rigState.workingCopy, rigState.skins));
             this.appliedWorkingRig = rigState.workingCopy;
-            preview = new AnimationEditorPreview(state, next);
+            preview = new AnimationEditorPreview(state, next, this.motionPreview);
             ghosts = new AnimationEditorGhostLayer(this, state, next);
             ghosts.setSettings(this.onionSkinSettings);
             this.preview = preview;
@@ -673,6 +685,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.onReady(state, definition.id);
     } catch (error) {
       this.environmentLayer?.setActive(false);
+      this.motionLayer?.dispose();
+      this.motionLayer = undefined;
       this.footContacts.unbind();
       this.contactOverlay?.destroy();
       this.contactOverlay = undefined;
@@ -699,6 +713,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       ghosts?.dispose();
       this.ghosts = undefined;
       preview?.dispose();
+      this.motionPreview.unbind();
       this.artwork?.unbind();
       puppet?.destroy();
       this.preview = undefined;

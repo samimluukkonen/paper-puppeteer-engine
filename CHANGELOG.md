@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.6-2
+
+Add a seven-step **Preview Displacement** Feature Guide to the shared Animation catalog, covering additive opt-in, point timing and world coordinates, segment interpolation, synchronized playback, the trajectory overlay, reset and session-only saving. Reveal existing controls for empty and configured trajectories without changing settings, authored data, playhead or history; add prerequisite and local desktop guide coverage.
+
+Add optional motion-agnostic Animation Editor preview displacement with clip-specific, session-only time/X/Y points, linear or stepped interpolation, reset and an optional world trajectory overlay. Default to As Authored; deliberate additive opt-in preserves skeletal root motion, facing, scale and IK. Evaluate offsets deterministically from the existing pose sample time, including stepped playback and exact endpoints, and apply them only to the preview Puppet's outer world container. Keep animation data, scene Actors, history, recovery and exports unchanged. Cover trajectories, seeking, playback, transforms, validation and lifecycle with unit and local desktop browser regressions; document the [motion preview workflow and architecture](docs/motion-preview.md).
+
 ## 1.1.6-1
 
 Add a seven-step Environment Preview Feature Guide to the shared Animation catalog, covering image import/selection, world transforms, shared ground alignment, viewport navigation, reset and session/project saving. Reveal existing controls without changing preview settings, authored data or history; cover guide prerequisites, targets and local desktop navigation.

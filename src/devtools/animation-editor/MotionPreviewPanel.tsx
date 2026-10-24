@@ -1,0 +1,116 @@
+import { useSyncExternalStore } from 'react';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import type { MotionPreviewController } from './MotionPreviewController.js';
+import { toMilliseconds, toSeconds } from './timeUnits.js';
+
+export function MotionPreviewPanel({ controller }: { controller: MotionPreviewController }) {
+  const { settings, ready, clipId, message } = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
+  return (
+    <details className="motion-preview-panel">
+      <summary>Preview displacement</summary>
+      <fieldset disabled={!ready}>
+        <label data-guide-id={GUIDE_TARGETS.animationDisplacementEnable}>
+          <input
+            type="checkbox"
+            checked={settings.enabled}
+            onChange={(event) => controller.update({ enabled: event.target.checked })}
+          />{' '}
+          Enable additional preview displacement
+        </label>
+        <p className="workspace-caption">
+          {settings.enabled ? 'Additive world displacement' : 'As Authored — no additional movement'}. Skeletal root
+          motion stays authored. Enable deliberately when motion already includes translation.
+        </p>
+        <p className="workspace-caption">
+          X moves right, Y down in world pixels, independent of facing and scale. Times are animation seconds; stepped
+          playback holds the same pose and displacement sample. These points last for this clip in this editor session
+          only.
+        </p>
+        <label data-guide-id={GUIDE_TARGETS.animationDisplacementInterpolation}>
+          Trajectory interpolation
+          <select
+            aria-label="Trajectory interpolation"
+            value={settings.interpolation}
+            onChange={(event) => controller.update({ interpolation: event.target.value as 'linear' | 'stepped' })}
+          >
+            <option value="linear">Linear</option>
+            <option value="stepped">Stepped</option>
+          </select>
+        </label>
+        <label data-guide-id={GUIDE_TARGETS.animationDisplacementTrajectory}>
+          <input
+            type="checkbox"
+            checked={settings.showTrajectory}
+            onChange={(event) => controller.update({ showTrajectory: event.target.checked })}
+          />{' '}
+          Show preview trajectory
+        </label>
+        <div
+          className="motion-preview-points"
+          aria-label="Preview position points"
+          data-guide-id={GUIDE_TARGETS.animationDisplacementPoints}
+        >
+          {!settings.positionKeys.length && (
+            <p className="workspace-caption">No preview points. Add a position point to define a trajectory.</p>
+          )}
+          {settings.positionKeys.map((point, index) => (
+            <form
+              key={`${clipId}:${index}:${point.time}:${point.offsetX}:${point.offsetY}`}
+              aria-label={`Preview point ${index + 1}`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const values = new FormData(event.currentTarget);
+                controller.editPoint(index, {
+                  time: toMilliseconds(Number(values.get('time'))),
+                  offsetX: Number(values.get('x')),
+                  offsetY: Number(values.get('y')),
+                });
+              }}
+            >
+              <label>
+                Time (s)
+                <input name="time" type="number" min="0" step="any" required defaultValue={toSeconds(point.time)} />
+              </label>
+              <label>
+                Offset X<input name="x" type="number" step="any" required defaultValue={point.offsetX} />
+              </label>
+              <label>
+                Offset Y<input name="y" type="number" step="any" required defaultValue={point.offsetY} />
+              </label>
+              <div className="animation-history">
+                <button type="submit">Apply point {index + 1}</button>
+                <button
+                  type="button"
+                  className="workspace-danger"
+                  aria-label={`Remove preview point ${index + 1}`}
+                  onClick={() => controller.removePoint(index)}
+                >
+                  Remove
+                </button>
+              </div>
+            </form>
+          ))}
+        </div>
+        <div className="animation-history">
+          <button
+            type="button"
+            className="workspace-primary"
+            data-guide-id={GUIDE_TARGETS.animationDisplacementAdd}
+            onClick={() => controller.addPoint()}
+          >
+            Add position point
+          </button>
+          <button
+            type="button"
+            data-guide-id={GUIDE_TARGETS.animationDisplacementReset}
+            onClick={() => controller.reset()}
+          >
+            Reset trajectory
+          </button>
+        </div>
+      </fieldset>
+      {!clipId && <p className="workspace-caption">Select an animation to edit its preview trajectory.</p>}
+      {message && <p role="alert">{message}</p>}
+    </details>
+  );
+}

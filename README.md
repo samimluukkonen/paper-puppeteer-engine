@@ -19,7 +19,7 @@ Open the local URL printed by Vite to start in Project Workspace. Use the shared
 
 The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` supports playback preview, property keyframing, multi-key selection, dragging, clipboard commands, undo/redo, and [configurable multi-pose onion skinning](docs/onion-skin-controls.md). See [onion-skin production verification](docs/animation-editor-onion-skinning-verification.md) for v0.5.3 completion checks. Use the [Rig Editor](docs/rig-editor.md) at `/rig-editor/` to edit bind poses. Both editors offer recovery of unsaved edits from browser drafts; download JSON to save your work in the project.
 
-Use [Animation Environment Preview](docs/animation-environment-preview.md) to evaluate any animation against a static project image, with world-space transforms and the shared ground reference.
+Use [Animation Environment Preview](docs/animation-environment-preview.md) to evaluate any animation against a static project image, with world-space transforms and the shared ground reference. Add an optional [preview displacement trajectory](docs/motion-preview.md) for steps, dodges, jumps or any other movement without changing animation keys.
 
 The [Scene Editor](docs/scene-editor.md) at `/scene-editor/` provides independent scene documents, Actor placement, action timelines, Play/Pause/Restart/Stop, speed and deterministic scrubbing. Inspect runtime transforms without changing authored positions, saved state or Undo history. Download scenes before leaving the page.
 

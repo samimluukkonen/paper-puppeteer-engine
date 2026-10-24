@@ -42,6 +42,7 @@ import { IKInspectorController } from './IKInspectorController.js';
 import { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { MirrorToolsController } from './MirrorToolsController.js';
 import { MotionDiagnosticsController } from './MotionDiagnosticsController.js';
+import { MotionPreviewController } from './MotionPreviewController.js';
 import { NewAnimationController } from './NewAnimationController.js';
 import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { PoseLibraryController } from './PoseLibraryController.js';
@@ -81,6 +82,7 @@ const ikInspector = new IKInspectorController();
 const groundGuide = new GroundGuideWorkspace('animation-preview-world');
 const footContacts = new FootContactGroundController();
 const environment = new EnvironmentPreviewController(projectContext?.imageAssets);
+const motionPreview = new MotionPreviewController();
 const packages = new PackageController(undefined, projectContext?.fetcher);
 const artwork = new ArtworkController(
   undefined,
@@ -185,6 +187,7 @@ function CharacterWorkspace() {
           groundGuide={groundGuide}
           footContacts={footContacts}
           environment={environment}
+          motionPreview={motionPreview}
           projectEnvironment={!!projectContext}
           loadProjectImages={projectContext?.loadProjectImages}
           alignGroundTarget={() => {
@@ -433,6 +436,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
       groundGuide,
       environment,
+      motionPreview,
       footContacts,
     },
     artwork,
@@ -564,6 +568,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     releaseCharacterSelection();
     game.destroy(true);
     environment.dispose();
+    motionPreview.dispose();
     attachments.dispose();
     artwork.dispose();
     scene = undefined;
