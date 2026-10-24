@@ -26,6 +26,7 @@ import { AnimationEditorGroundHandle } from './AnimationEditorGroundHandle.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { EnvironmentPreviewCamera } from './EnvironmentPreviewCamera.js';
 import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 import { EnvironmentPreviewLayer } from './EnvironmentPreviewLayer.js';
 import { FootContactGroundController } from './FootContactGroundController.js';
@@ -53,6 +54,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   readonly motionPreview: MotionPreviewController;
   private motionLayer: MotionPreviewLayer | undefined;
   private environmentLayer: EnvironmentPreviewLayer | undefined;
+  private environmentCamera: EnvironmentPreviewCamera | undefined;
   private contactOverlay: AnimationPoseOverlay | undefined;
   private groundOverlay: GroundGuideOverlay | undefined;
   private groundHandle: AnimationEditorGroundHandle | undefined;
@@ -160,6 +162,8 @@ export class AnimationEditorScene extends Phaser.Scene {
     const session = ++this.loadSession;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       ++this.loadSession;
+      this.environmentCamera?.dispose();
+      this.environmentCamera = undefined;
       this.environmentLayer?.dispose();
       this.environmentLayer = undefined;
       this.motionLayer?.dispose();
@@ -210,6 +214,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.environmentCamera?.render();
     const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
@@ -683,7 +688,17 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.input.on('pointerdown', this.selectPreviewBone, this);
       this.environmentLayer?.setActive(true);
       this.onReady(state, definition.id);
+      // onReady fits the ordinary viewport before the optional environment borrows its camera.
+      if (session === this.loadSession && this.sys.isActive() && this.options.environment)
+        this.environmentCamera = new EnvironmentPreviewCamera(
+          this.cameras.main,
+          state,
+          this.options.environment,
+          this.motionPreview,
+        );
     } catch (error) {
+      this.environmentCamera?.dispose();
+      this.environmentCamera = undefined;
       this.environmentLayer?.setActive(false);
       this.motionLayer?.dispose();
       this.motionLayer = undefined;

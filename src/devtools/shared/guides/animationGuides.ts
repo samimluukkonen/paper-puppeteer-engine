@@ -84,7 +84,8 @@ export const animationGuides: readonly GuideDefinition[] = [
   {
     id: 'animation-environment-preview',
     title: 'Environment Preview',
-    description: 'Preview any animation against a static image, align its floor and keep authored motion unchanged.',
+    description:
+      'Preview animations against world artwork with fixed/follow cameras, synchronized playback and scrubbing.',
     editor: 'animation',
     category: 'animation',
     prerequisites: animation,
@@ -120,15 +121,33 @@ export const animationGuides: readonly GuideDefinition[] = [
         targets.animationEnvironmentGround,
       ),
       step(
+        'camera-mode',
+        'Choose Fixed or Follow Character',
+        'After exiting, open Preview Camera inside Environment Preview. Fixed keeps the selected world center steady so steps, jumps and walk cycles travel across the background. Follow Character adds the optional preview displacement to that center: the character stays framed while world artwork scrolls in the viewport. It follows the outer preview placement; authored root and bone motion remain inside the skeleton. Configure additional movement with the separate Preview Displacement guide. No image or trajectory is required to read this tour.',
+        targets.animationEnvironmentCameraMode,
+      ),
+      step(
+        'camera-framing',
+        'Set framing, zoom or reset the camera',
+        'Camera X/Y set the world center, starting at (380, 435); Follow adds displacement to that center. Enter values and choose Apply preview camera. Zoom accepts 0.1 to 4; zoom out to inspect travel beyond the image. Wheel zooms and middle drag pans the same session camera, including a framing offset in Follow mode. Movement is never clamped to the background. Reset Camera restores Fixed, center (380, 435) and zoom 1 without changing animation time, trajectory or background placement. This tour only reveals these controls.',
+        targets.animationEnvironmentCameraTransform,
+      ),
+      step(
+        'playback',
+        'Use the shared playback controls',
+        'After exiting, use the existing Play/Pause, Restart, Speed and Loop preview controls. Pose, preview displacement, ground contacts and camera share the same animation clock. Pause holds the preview. Restart returns to the configured beginning and keeps the current play/pause state. Each loop resets displacement to its configured first position, including a nonzero start; continuous travel over repeated loops is unavailable. Stepped playback holds pose, displacement and camera together. The guide never starts, pauses or restarts playback for you.',
+        targets.animationPlayback,
+      ),
+      step(
         'review',
-        'Review motion and navigate',
-        'After exiting, play or scrub any clip and compare animations with the same background. Wheel zooms and middle drag pans; resizing panels also preserves background world coordinates. Facing changes the character without flipping the environment. The image stays fixed in the world while the animation plays. Return to Animation mode after Rig Editor or Rig Tweak to see the environment.',
-        targets.animationCanvas,
+        'Scrub forward and backward consistently',
+        'After exiting, set Time (s) or scrub the ruler forward and backward, then revisit the same time. Pose, preview displacement and camera return to the same evaluated state, including exact clip endpoints. Seeking does not trigger animation events, gameplay callbacks or audio. Background placement and Ground Y stay fixed in world space even in Follow mode. Facing mirrors only the character. Existing foot markers follow the final pose and displacement; passive preview never snaps feet, changes IK or corrects contact drift.',
+        targets.animationTime,
       ),
       step(
         'reset-save',
         'Reset and keep the right assets',
-        'Clear background removes the selection without deleting the shared image. Reset Environment clears the selection, restores transforms and disables the mode while preserving the ground guide and library. Environment settings last for this editor session and reset on reload. Download a project ZIP to keep imported project images; animation JSON and character ZIPs carry no environment settings or background binaries.',
+        'Disabling Environment Preview or entering Rig Editor/Rig Tweak restores the ordinary editor viewport. Return to Animation mode and enable Environment Preview to reuse its camera settings. Camera and environment settings are session-only; reload resets them, and animation Undo/Redo, JSON, recovery and character ZIPs exclude them. Clear background removes the selection without deleting the shared image. Reset Environment also resets the camera and disables the mode while preserving the ground guide and library. Download a project ZIP to keep imported project images; it does not save preview camera settings. This guide never resets or saves anything for you.',
         targets.animationEnvironmentReset,
       ),
     ],

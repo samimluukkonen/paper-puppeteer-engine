@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.6-3
+
+Extend the existing **Environment Preview** Feature Guide to ten steps with fixed/follow camera selection, world center/zoom/reset, shared playback and loop reset, deterministic silent scrubbing and session-only viewport restoration. Reveal the real collapsed camera controls without changing settings, playback, history or authored data; cover empty and configured previews with unit and local desktop browser regressions.
+
+Synchronize Environment Preview's fixed/follow camera with the Animation Editor's existing pose/displacement clock, including stepped sampling, exact endpoints, play/pause, speed, restart and silent forward/backward seeks. Add collapsed, session-only camera center/zoom/reset controls, retain native pan/wheel navigation and restore the ordinary viewport on disable, Rig/Rig Tweak and shutdown. Keep backgrounds and ground in world space, preserve facing/IK/contact visualization, allow travel beyond image bounds and explicitly reset displacement on each loop; continuous travel remains unavailable. Cover deterministic camera/pose/contact sampling, looping, cleanup and unchanged animation data with unit and local desktop sword-cut, jump and walk browser regressions. Preserve the higher package/lockfile version `1.2.6`.
+
 ## 1.1.6-2
 
 Add a seven-step **Preview Displacement** Feature Guide to the shared Animation catalog, covering additive opt-in, point timing and world coordinates, segment interpolation, synchronized playback, the trajectory overlay, reset and session-only saving. Reveal existing controls for empty and configured trajectories without changing settings, authored data, playhead or history; add prerequisite and local desktop guide coverage.

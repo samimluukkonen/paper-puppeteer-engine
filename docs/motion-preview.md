@@ -21,6 +21,8 @@ Offsets are world pixels from the fixed preview origin: positive X right, positi
 
 Linear interpolation provides variable segment speeds and stationary intervals. Stepped interpolation holds each point until the next point's exact time. Both hold first/last offsets outside the point range. **Show preview trajectory** draws an independent spatial guide; repeated positions overlap. Looping returns to the clip's initial displacement each cycle.
 
+The [Environment Preview camera](animation-environment-preview.md) offers Fixed and Follow Character modes on the same sampled time. Fixed shows travel across the background; Follow adds displacement to the configured world center. Neither mode changes world artwork, pose, facing, IK or trajectory data. Looping always resets to the configured beginning; continuous multi-cycle travel is unavailable.
+
 ## Transform and time ownership
 
 Animation tracks target bone-local `Joint.pose` values, including root translation. `AnimationEditorPreview` samples them through the existing `AnimationPlayer`, then installs them on the Puppet before the normal preset/IK/render synchronization. Root bone keys keep their original semantics.

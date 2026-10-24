@@ -105,7 +105,7 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     await page.locator('#animation-selection').selectOption(clip);
     const original = await exported(page);
     const environment = page.locator('.environment-preview-panel');
-    await environment.locator('summary').click();
+    await environment.locator(':scope > summary').click();
     const background = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 700;
@@ -129,11 +129,11 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     await environment.getByLabel('Background X', { exact: true }).fill('380');
     await environment.getByLabel('Background Y', { exact: true }).fill('300');
     await environment.getByRole('button', { name: 'Apply background transform', exact: true }).click();
-    await environment.locator('summary').click();
+    await environment.locator(':scope > summary').click();
 
     const panel = page.locator('.motion-preview-panel');
     await expect(panel).not.toHaveAttribute('open');
-    await panel.locator('summary').click();
+    await panel.locator(':scope > summary').click();
     const enable = panel.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true });
     await expect(enable).not.toBeChecked();
     await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).uncheck();
@@ -172,6 +172,57 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
       expect(await pixelDifference(page, await canvas.screenshot(), authored)).toBe(0);
     }
     await enable.check();
+    await panel.locator(':scope > summary').click();
+    await environment.locator(':scope > summary').click();
+    const camera = environment.locator('.environment-camera-panel');
+    await expect(camera).not.toHaveAttribute('open');
+    await camera.locator('summary').click();
+    await camera.getByLabel('Zoom', { exact: true }).fill('0.8');
+    await camera.getByRole('button', { name: 'Apply preview camera', exact: true }).click();
+    await camera.screenshot({ path: test.info().outputPath('preview-camera-controls.png') });
+    await environment.getByRole('checkbox', { name: 'Show Ground Reference', exact: true }).check();
+    let fixed: Buffer | undefined;
+    for (const mode of ['fixed', 'follow']) {
+      await camera.getByLabel('Preview camera mode').selectOption(mode);
+      await environment.locator(':scope > summary').click();
+      await seek(page, 0.425);
+      const target = await canvas.screenshot();
+      await test.info().attach(`${mode}-camera`, { body: target, contentType: 'image/png' });
+      if (mode === 'fixed') fixed = target;
+      else expect(await pixelDifference(page, target, fixed!)).toBeGreaterThan(0);
+      await seek(page, 0.9);
+      await seek(page, 0.1);
+      await seek(page, 0.425);
+      expect(await pixelDifference(page, await canvas.screenshot(), target)).toBe(0);
+      await page.locator('#reset-time').click();
+      await waitForPreviewPaint(page);
+      const beginning = await canvas.screenshot();
+      await page.locator('#playback-speed').selectOption('2');
+      await page.locator('#play-pause').click();
+      await expect
+        .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
+        .toBeGreaterThan(0.1);
+      await page.locator('#play-pause').click();
+      await expect(page.locator('#play-pause')).toHaveAttribute('aria-label', 'Play');
+      await waitForPreviewPaint(page);
+      const paused = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
+      await waitForPreviewPaint(page);
+      expect(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')).toBe(paused);
+      await page.locator('#reset-time').click();
+      await waitForPreviewPaint(page);
+      expect(await pixelDifference(page, await canvas.screenshot(), beginning)).toBe(0);
+      await environment.locator(':scope > summary').click();
+      await expect(environment.getByLabel('Background X', { exact: true })).toHaveValue('380');
+      await expect(environment.getByLabel('Background Y', { exact: true })).toHaveValue('300');
+      await expect(camera.getByLabel('Camera X', { exact: true })).toHaveValue('380');
+      await expect(camera.getByLabel('Camera Y', { exact: true })).toHaveValue('435');
+    }
+    await camera.getByRole('button', { name: 'Reset Camera', exact: true }).click();
+    await expect(camera.getByLabel('Zoom', { exact: true })).toHaveValue('1');
+    await expect(camera.getByLabel('Preview camera mode')).toHaveValue('fixed');
+    await environment.locator(':scope > summary').click();
+    await panel.locator(':scope > summary').click();
+    await page.locator('#playback-speed').selectOption('1');
     await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).check();
     await page.locator('#play-pause').click();
     await expect

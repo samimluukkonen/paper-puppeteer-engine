@@ -913,7 +913,27 @@ test('environment preview preserves the authoritative Puppet, poses, IK, skins, 
     ikChains: [{ name: 'arm', rootBone: 'rightUpperArm', middleBone: 'rightForearm', endBone: 'rightHand' }],
   });
   const fixture = puppetScene();
-  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  Object.assign(scene, {
+    add: fixture.add,
+    textures: fixture.textures,
+    input: new EventEmitter(),
+    cameras: {
+      main: {
+        width: 800,
+        height: 600,
+        scrollX: 0,
+        scrollY: 0,
+        zoom: 1,
+        setZoom(zoom: number) {
+          this.zoom = zoom;
+        },
+        centerOn(x: number, y: number) {
+          this.scrollX = x - this.width / 2;
+          this.scrollY = y - this.height / 2;
+        },
+      },
+    },
+  });
   scene.create();
   await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
   try {
@@ -955,6 +975,28 @@ test('environment preview preserves the authoritative Puppet, poses, IK, skins, 
   } finally {
     scene.events.emit('shutdown');
     assert.isUndefined(Reflect.get(scene, 'environmentLayer'));
+    assert.isUndefined(Reflect.get(scene, 'environmentCamera'));
     environment.dispose();
   }
+});
+
+test('shutdown during ready does not install an environment camera or retain preview subscriptions', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const environment = new EnvironmentPreviewController();
+  const error = vi.fn();
+  const ready = vi.fn(() => {
+    scene.events.emit('shutdown');
+  });
+  const scene = new AnimationEditorScene(ready, error, { environment });
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  assert.isUndefined(Reflect.get(scene, 'environmentCamera'));
+  assert.isUndefined(Reflect.get(scene, 'puppet'));
+  assert.isUndefined(Reflect.get(scene, 'state'));
+  environment.update({ enabled: true });
+  assert.deepEqual(error.mock.calls, []);
+  environment.dispose();
 });

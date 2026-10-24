@@ -58,7 +58,7 @@ test('environment imports PNG/WebP, aligns a static world background, preserves 
   await expect(panel).not.toHaveAttribute('open');
   await page.locator('#animation-selection').selectOption('walk');
   const original = await exported(page);
-  await panel.locator('summary').click();
+  await panel.locator(':scope > summary').click();
   await panel
     .getByLabel('Import environment image')
     .setInputFiles({ name: 'forest.png', mimeType: 'image/png', buffer: await backgroundBytes(page) });
@@ -180,7 +180,7 @@ test('animation environment imports share project assets and survive project pac
   await expect(frame.locator('#validation')).toHaveText('Validation: OK');
   await frame.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   const panel = frame.locator('.environment-preview-panel');
-  await panel.locator('summary').click();
+  await panel.locator(':scope > summary').click();
   await panel.getByRole('button', { name: 'Load project character images', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Project images are available');
   await panel.getByLabel('Background', { exact: true }).selectOption('project:hero:paper.png');

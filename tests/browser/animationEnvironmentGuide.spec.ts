@@ -8,13 +8,21 @@ const guide = guideRegistry.getGuideById('animation-environment-preview')!;
 
 async function snapshot(page: Page) {
   return {
-    controls: await page.locator('.environment-preview-panel input').evaluateAll((inputs) =>
+    controls: await page
+      .locator('.environment-preview-panel input, .environment-preview-panel select')
+      .evaluateAll((inputs) =>
+        inputs.map((element) => {
+          const input = element as HTMLInputElement;
+          return { name: input.name, type: input.type, value: input.value, checked: input.checked };
+        }),
+      ),
+    motion: await page.locator('.motion-preview-panel input, .motion-preview-panel select').evaluateAll((inputs) =>
       inputs.map((element) => {
         const input = element as HTMLInputElement;
-        return { name: input.name, type: input.type, value: input.value, checked: input.checked };
+        return { name: input.name, value: input.value, checked: input.checked };
       }),
     ),
-    image: await page.locator('.environment-preview-panel select').inputValue(),
+    image: await page.locator('.environment-preview-panel').getByLabel('Background', { exact: true }).inputValue(),
     ground: await page.evaluate(() =>
       Object.entries(localStorage).filter(([key]) => key.startsWith('paper-puppeteer:ground-guide:')),
     ),
@@ -23,6 +31,10 @@ async function snapshot(page: Page) {
     dirty: await page.locator('#animation-dirty').textContent(),
     undo: await page.locator('#animation-undo').isEnabled(),
     redo: await page.locator('#animation-redo').isEnabled(),
+    playing: await page.locator('#play-pause').getAttribute('aria-label'),
+    speed: await page.locator('#playback-speed').inputValue(),
+    loop: await page.locator('#preview-loop').getAttribute('aria-pressed'),
+    facing: await page.locator('#animation-facing').inputValue(),
   };
 }
 
@@ -34,9 +46,11 @@ for (const configured of [false, true]) {
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
     await page.locator('#animation-selection').selectOption('walk');
     const panel = page.locator('.environment-preview-panel');
+    const camera = panel.locator('.environment-camera-panel');
     await expect(panel).not.toHaveAttribute('open');
+    await expect(camera).not.toHaveAttribute('open');
     if (configured) {
-      await panel.locator('summary').click();
+      await panel.locator(':scope > summary').click();
       await panel.getByLabel('Import environment image').setInputFiles({
         name: 'paper-torso.png',
         mimeType: 'image/png',
@@ -49,7 +63,30 @@ for (const configured of [false, true]) {
       await panel.getByLabel('Background Y', { exact: true }).fill('435');
       await panel.getByLabel('Scale', { exact: true }).fill('0.5');
       await panel.getByRole('button', { name: 'Apply background transform', exact: true }).click();
-      await panel.locator('summary').click();
+      await camera.locator('summary').click();
+      await camera.getByLabel('Preview camera mode').selectOption('follow');
+      await camera.getByLabel('Camera X', { exact: true }).fill('410');
+      await camera.getByLabel('Camera Y', { exact: true }).fill('450');
+      await camera.getByLabel('Zoom', { exact: true }).fill('0.75');
+      await camera.getByRole('button', { name: 'Apply preview camera', exact: true }).click();
+      await camera.getByLabel('Camera X', { exact: true }).fill('417');
+      await camera.locator('summary').click();
+      await panel.locator(':scope > summary').click();
+      const motion = page.locator('.motion-preview-panel');
+      await motion.locator('summary').click();
+      await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
+      await page.locator('#timeline-time-input').fill('0.6');
+      await page.locator('#timeline-time-input').press('Enter');
+      await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
+      const point = motion.getByRole('form', { name: 'Preview point 2', exact: true });
+      await point.getByLabel('Offset X', { exact: true }).fill('60');
+      await point.getByLabel('Offset Y', { exact: true }).fill('-30');
+      await point.getByRole('button', { name: 'Apply point 2', exact: true }).click();
+      await motion.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+      await motion.locator('summary').click();
+      await page.locator('#playback-speed').selectOption('0.5');
+      await page.locator('#preview-loop').click();
+      await page.locator('#animation-facing').selectOption('left');
     }
     const json = async () => {
       const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
@@ -92,12 +129,13 @@ for (const configured of [false, true]) {
         .toBe(true);
       await expect(tour.getByRole('status')).toHaveCount(0);
       await expect(tour.getByRole('button', { name: 'Try It', exact: true })).toHaveCount(0);
-      if (index === 3) {
+      if (step.id === 'camera-framing') {
+        await expect(camera).toHaveAttribute('open');
         await tour.getByRole('button', { name: 'Back', exact: true }).click();
         await tour.getByRole('button', { name: 'Next', exact: true }).click();
       }
-      if (index === 4 && configured)
-        await page.screenshot({ path: test.info().outputPath('environment-preview-guide.png') });
+      if (step.id === 'camera-framing' && configured)
+        await page.screenshot({ path: test.info().outputPath('environment-preview-camera-guide.png') });
       await tour
         .getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true })
         .click();
@@ -110,7 +148,10 @@ for (const configured of [false, true]) {
     const restarted = await launch();
     await restarted.getByRole('button', { name: 'Next', exact: true }).click();
     await restarted.getByRole('button', { name: 'Restart guide', exact: true }).click();
-    await expect(restarted).toContainText('Step 1 of 7');
+    await expect(restarted).toContainText(`Step 1 of ${guide.steps.length}`);
+    for (let i = 0; i < guide.steps.findIndex((step) => step.id === 'camera-mode'); i++)
+      await restarted.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(camera.getByLabel('Preview camera mode')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(restarted).toHaveCount(0);
     expect(await snapshot(page)).toEqual(before);

@@ -1673,6 +1673,7 @@ a {
 }
 
 .environment-preview-panel > label,
+.environment-camera-panel > label,
 .environment-preview-panel form > label {
   display: flex;
   align-items: center;
@@ -1687,9 +1688,15 @@ a {
 }
 
 .environment-preview-panel > .animation-history,
+.environment-camera-panel > form,
+.environment-preview-panel > .environment-camera-panel,
 .environment-preview-panel > form,
 .environment-preview-panel > button {
   margin-bottom: 8px;
+}
+
+.workspace-inspector-sections .environment-camera-panel[open] > summary {
+  margin-bottom: 16px;
 }
 
 .motion-preview-panel fieldset {

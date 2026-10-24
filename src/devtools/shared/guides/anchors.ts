@@ -131,6 +131,8 @@ export const GUIDE_TARGETS = {
   animationEnvironmentBackground: 'animation-environment-background',
   animationEnvironmentTransform: 'animation-environment-transform',
   animationEnvironmentGround: 'animation-environment-ground',
+  animationEnvironmentCameraMode: 'animation-environment-camera-mode',
+  animationEnvironmentCameraTransform: 'animation-environment-camera-transform',
   animationEnvironmentReset: 'animation-environment-reset',
   animationDisplacementEnable: 'animation-displacement-enable',
   animationDisplacementAdd: 'animation-displacement-add',

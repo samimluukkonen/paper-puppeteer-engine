@@ -4,6 +4,7 @@ import {
   updateEnvironmentPreview,
   type EnvironmentPreviewSettings,
 } from '../shared/environmentPreview.js';
+import { DEFAULT_PREVIEW_CAMERA, type PreviewCameraSettings, updatePreviewCamera } from './previewCamera.js';
 
 export interface EnvironmentProjectImage {
   readonly id: string;
@@ -17,6 +18,7 @@ export interface EnvironmentProjectImage {
 export class EnvironmentPreviewController {
   private snapshot = {
     settings: DEFAULT_ENVIRONMENT_PREVIEW,
+    camera: DEFAULT_PREVIEW_CAMERA,
     busy: false,
     message: '',
     error: '',
@@ -47,6 +49,12 @@ export class EnvironmentPreviewController {
     if (!this.alive) return;
     this.publish({ settings: updateEnvironmentPreview(this.snapshot.settings, patch) });
   }
+  updateCamera(patch: Partial<PreviewCameraSettings>): void {
+    this.publish({ camera: updatePreviewCamera(this.snapshot.camera, patch) });
+  }
+  resetCamera(): void {
+    this.publish({ camera: DEFAULT_PREVIEW_CAMERA });
+  }
   clear(): void {
     this.request?.abort();
     this.request = undefined;
@@ -62,7 +70,7 @@ export class EnvironmentPreviewController {
   }
   reset(): void {
     this.clear();
-    this.publish({ settings: DEFAULT_ENVIRONMENT_PREVIEW });
+    this.publish({ settings: DEFAULT_ENVIRONMENT_PREVIEW, camera: DEFAULT_PREVIEW_CAMERA });
   }
   /** Align the image's bottom edge; interior floor levels can be placed with Background Y. */
   alignBottom(groundY: number): void {

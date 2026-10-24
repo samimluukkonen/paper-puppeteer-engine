@@ -34,7 +34,7 @@ export function EnvironmentPreviewPanel({
   loadProjectImages?: (() => Promise<readonly EnvironmentProjectImage[]>) | undefined;
   project: boolean;
 }) {
-  const { settings, busy, message, error, projectImages } = useSyncExternalStore(
+  const { settings, camera, busy, message, error, projectImages } = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
   );
@@ -169,6 +169,69 @@ export function EnvironmentPreviewPanel({
       <p className="workspace-caption">
         Position is the image center in preview-world pixels; X increases right, Y down. Align an interior floor with
         Background Y. Edit the shared guide in Ground Reference.
+      </p>
+      <details className="environment-camera-panel">
+        <summary>Preview Camera</summary>
+        <label>
+          Mode
+          <select
+            data-guide-id={GUIDE_TARGETS.animationEnvironmentCameraMode}
+            aria-label="Preview camera mode"
+            value={camera.mode}
+            onChange={(event) =>
+              controller.updateCamera({ mode: event.target.value === 'follow' ? 'follow' : 'fixed' })
+            }
+          >
+            <option value="fixed">Fixed</option>
+            <option value="follow">Follow Character</option>
+          </select>
+        </label>
+        <form
+          data-guide-id={GUIDE_TARGETS.animationEnvironmentCameraTransform}
+          onSubmit={(event) => {
+            event.preventDefault();
+            const values = new FormData(event.currentTarget);
+            controller.updateCamera({
+              x: Number(values.get('cameraX')),
+              y: Number(values.get('cameraY')),
+              zoom: Number(values.get('zoom')),
+            });
+          }}
+        >
+          {(
+            [
+              ['Camera X', 'x', 'cameraX'],
+              ['Camera Y', 'y', 'cameraY'],
+              ['Zoom', 'zoom', 'zoom'],
+            ] as const
+          ).map(([label, key, name]) => (
+            <label key={`${key}:${camera[key]}`}>
+              {label}
+              <input
+                type="number"
+                name={name}
+                step="any"
+                required
+                defaultValue={camera[key]}
+                {...(key === 'zoom' ? { min: 0.1, max: 4 } : {})}
+              />
+            </label>
+          ))}
+          <div className="animation-history">
+            <button type="submit">Apply preview camera</button>
+            <button type="button" onClick={() => controller.resetCamera()}>
+              Reset Camera
+            </button>
+          </div>
+        </form>
+        <p className="workspace-caption">
+          Camera X/Y set the world center. Follow adds preview displacement to that center. Pan and wheel zoom adjust
+          this session's camera. Zoom out to 0.1 to inspect travel beyond the background; movement is never clamped.
+        </p>
+      </details>
+      <p className="workspace-caption">
+        Use the timeline's Play/Pause, Restart, speed, loop and scrub controls. Each loop resets displacement to its
+        configured beginning; continuous travel is unavailable.
       </p>
       <button type="button" data-guide-id={GUIDE_TARGETS.animationEnvironmentReset} onClick={() => controller.reset()}>
         Reset Environment
