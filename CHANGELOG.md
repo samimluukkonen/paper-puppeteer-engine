@@ -43,6 +43,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.2.6
+
+Harden the integrated cinematic workflow with a complete layered-artwork/two-Actor regression through camera keys, cuts, fades, Undo/Redo, browser autosave recovery, project export/reimport and standalone Phaser scene-package playback. Verify repeated arbitrary seeks, camera/parallax/fade sampling, silent passive seeking and runtime texture/object cleanup. Update the legacy action-timeline browser test to check Actor lanes independently of camera and transition rows. Keep legacy scene defaults and the existing scene-format-2 APIs.
+
+Keep Camera Key Edit mode and inspector checkboxes compact. Release private artwork byte/pixel reservations on removal, decode failure and disposal, preventing false memory-limit errors after repeated scene changes. Charge independent renderers separately and roll back rejected complete-image reservations. Avoid redundant artwork texture assignments and display-list depth sorts during camera sampling. Extend the local scene profiler with three large parallax images, camera pans/zooms, frequent camera-key edits and scene ZIP export; retain Actor, texture and listener leak checks.
+
+Add focused Scene Feature Guides for background artwork, layers, parallax, framing, camera editing, camera keys, cuts and fades by reusing existing stable anchors and reveal-only steps. Publish [Creating Your First Cinematic Scene](docs/creating-your-first-cinematic-scene.md), including editor/audience camera separation, portable saving, optional Phaser pixel-art settings and deferred features. Record verification and performance in the [v1.2 integration report](docs/cinematic-scene-readiness.md).
+
 ## 1.2.5
 
 Add a nine-step **Cinematic Cuts, Fades & Transitions** Feature Guide to the shared Scene catalog. Reveal cut capture, shot framing, fade creation, timing, direction/color, transition tracks, holds/conflicts, deterministic preview and saving, including guidance for empty scenes. Preserve authored data, selection, playback, preview and Undo/Redo; add unit and local desktop browser coverage.

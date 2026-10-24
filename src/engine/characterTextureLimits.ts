@@ -96,8 +96,32 @@ export class CharacterTextureBudget {
 
   /** Validate complete package binaries against the same per-texture runtime allocation budget. */
   checkImage(key: string, bytes: Uint8Array): void {
-    this.countBytes(key, bytes.byteLength);
-    this.checkImageHeader(key, bytes);
+    const previousBytes = this.bytes.get(key);
+    const previousPixels = this.pixels.get(key);
+    try {
+      this.countBytes(key, bytes.byteLength);
+      this.checkImageHeader(key, bytes);
+    } catch (error) {
+      // A rejected header/pixel allocation must not retain a partial byte reservation.
+      this.release(key);
+      if (previousBytes !== undefined) {
+        this.bytes.set(key, previousBytes);
+        this.totalBytes += previousBytes;
+      }
+      if (previousPixels !== undefined) {
+        this.pixels.set(key, previousPixels);
+        this.totalPixels += previousPixels;
+      }
+      throw error;
+    }
+  }
+
+  /** Release an exclusively owned allocation after its texture/consumers are destroyed. */
+  release(key: string): void {
+    this.totalBytes -= this.bytes.get(key) ?? 0;
+    this.totalPixels -= this.pixels.get(key) ?? 0;
+    this.bytes.delete(key);
+    this.pixels.delete(key);
   }
 
   /** Inline image URLs use Phaser's image-element path; bound their encoded payload before queueing. */

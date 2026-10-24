@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { afterEach, assert, expect, test, vi } from 'vitest';
+import { CharacterTextureBudget } from '../src/engine/characterTextureLimits.js';
 import type { SceneImageDefinition } from '../src/engine/SceneDefinition.js';
 import { SceneImageLayer } from '../src/engine/SceneImageLayer.js';
 import { DEFAULT_SCENE_LAYERS, sceneActorDepth } from '../src/engine/sceneLayers.js';
@@ -176,7 +177,7 @@ test('failed decoding is actionable, retryable and releases each failed lease', 
     override decode = () => Promise.reject(new Error('broken'));
   }
   vi.stubGlobal('Image', BrokenImage);
-  const layer = new SceneImageLayer(scene, bytes);
+  const layer = new SceneImageLayer(scene, bytes, () => {}, new CharacterTextureBudget({ maxTotalImagePixels: 1 }));
   layer.sync([image]);
   await expect(layer.ready()).rejects.toThrow(/corrupt/);
   assert.equal(revoke.mock.calls.length, 1);
@@ -217,4 +218,61 @@ test('shared renderer applies layer depth, visibility and native parallax withou
   assert.equal(JSON.stringify(elements), authored);
   assert.lengthOf(objects, 2);
   layer.dispose();
+});
+
+test('camera pans and zoom samples retain texture consumers without queuing unchanged depth sorts', async () => {
+  const { scene, objects } = stage();
+  const layer = new SceneImageLayer(scene, bytes);
+  layer.sync([image]);
+  await layer.ready();
+  const object = objects[0]!;
+  const depth = vi.spyOn(object, 'setDepth');
+  const texture = vi.spyOn(object, 'setTexture');
+  for (let x = 0; x < 60; x++) layer.sync([image], undefined, { x, y: x / 2 });
+  assert.equal(depth.mock.calls.length, 0);
+  assert.equal(texture.mock.calls.length, 0);
+  assert.equal(objects.length, 1);
+  layer.sync([{ ...image, order: 2 }]);
+  assert.equal(depth.mock.calls.length, 1);
+  layer.dispose();
+});
+
+test('switching artwork releases its shared pixel budget before the next scene allocates textures', async () => {
+  const { scene, textures } = stage();
+  const budget = new CharacterTextureBudget({ maxTotalImagePixels: 1 });
+  const layer = new SceneImageLayer(scene, bytes, () => {}, budget);
+  try {
+    for (let index = 0; index < 4; index++) {
+      layer.sync([{ ...image, image: `images/scene-${index}.png` }]);
+      await layer.ready();
+      assert.equal(layer.objects.size, 1);
+      assert.equal(textures.size, 2); // One private image and the shared character texture.
+    }
+  } finally {
+    layer.dispose();
+  }
+  assert.deepEqual([...textures], ['shared-character']);
+});
+
+test('independent renderers charge separate textures and a rejected allocation can retry after disposal', async () => {
+  const { scene, textures } = stage();
+  const budget = new CharacterTextureBudget({ maxTotalImagePixels: 1 });
+  const first = new SceneImageLayer(scene, bytes, () => {}, budget);
+  const second = new SceneImageLayer(scene, bytes, () => {}, budget);
+  try {
+    first.sync([image]);
+    await first.ready();
+    second.sync([image]);
+    await expect(second.ready()).rejects.toThrow(/1-pixel total limit/);
+    assert.equal(first.objects.size, 1);
+    assert.equal(second.objects.size, 0);
+    first.dispose();
+    second.retry();
+    await second.ready();
+    assert.equal(second.objects.size, 1);
+  } finally {
+    first.dispose();
+    second.dispose();
+  }
+  assert.deepEqual([...textures], ['shared-character']);
 });

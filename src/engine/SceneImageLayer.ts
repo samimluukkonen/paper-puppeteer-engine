@@ -73,13 +73,16 @@ export class SceneImageLayer {
           ? parallaxPosition(element.position, layer.parallax, cinematicScroll)
           : element.position;
         object.scrollFactorX = object.scrollFactorY = cinematicScroll ? 1 : layer.parallax;
+        if (object.texture.key !== lease.key) object.setTexture(lease.key);
         object
-          .setTexture(lease.key)
           .setPosition(position.x, position.y)
           .setScale(element.scale.x, element.scale.y)
           .setVisible(element.visible && layer.visible)
-          .setAlpha(element.opacity ?? 1)
-          .setDepth(sceneImageDepth({ layers }, element, index));
+          .setAlpha(element.opacity ?? 1);
+        // Camera sampling changes presentation every frame. Phaser queues a full
+        // display-list sort even when setDepth receives the existing depth.
+        const depth = sceneImageDepth({ layers }, element, index);
+        if (object.depth !== depth) object.setDepth(depth);
       } else if (!this.pending.has(element.image) && !this.failures.has(element.image)) {
         // Store the request before it can complete and trigger a reconciliation.
         const request = Promise.resolve()
@@ -108,12 +111,13 @@ export class SceneImageLayer {
     if (!this.alive || !this.elements.some((image) => image.image === reference)) return;
     const budget = createSceneTextureBudget();
     budget.checkImage(reference, bytes);
-    this.sharedBudget?.checkImage(`image:${reference}`, bytes);
     const key = `${this.prefix}${++this.serial}`;
     const controller = new AbortController();
     const lease: TextureLease = { key, controller };
     this.textures.set(reference, lease);
     try {
+      // Charge actual allocations, including independent layers using the same reference.
+      this.sharedBudget?.checkImage(key, bytes);
       const decoded = await decodeImage(bytes, controller.signal);
       lease.dispose = decoded.dispose;
       if (!this.alive || this.textures.get(reference) !== lease) {
@@ -140,6 +144,7 @@ export class SceneImageLayer {
     try {
       if (this.scene.textures.exists(lease.key)) this.scene.textures.remove(lease.key);
     } finally {
+      this.sharedBudget?.release(lease.key);
       lease.dispose?.();
     }
   }

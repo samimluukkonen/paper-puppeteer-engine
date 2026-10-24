@@ -125,6 +125,29 @@ test('package binaries and runtime transfers share per-texture byte and pixel bu
   );
 });
 
+test('rejected allocations roll back partial charges while release permits new live textures', async () => {
+  const bytes = new Uint8Array(await png(1, 1).arrayBuffer());
+  const budget = new CharacterTextureBudget({ maxTotalImagePixels: 1, maxTotalImageBytes: bytes.length * 2 });
+  budget.checkImage('first', bytes);
+  assert.throws(() => budget.checkImage('rejected', bytes), /1-pixel total limit/);
+  budget.release('first');
+  budget.release('first');
+  const larger = new Uint8Array(bytes.length * 2);
+  larger.set(bytes);
+  budget.checkImage('next', larger);
+  assert.throws(() => budget.checkImage('over-limit', bytes), /byte total limit/);
+});
+
+test('a rejected replacement retains the previous live texture reservation', async () => {
+  const budget = new CharacterTextureBudget({ maxTotalImagePixels: 6 });
+  budget.checkImage('kept', new Uint8Array(await png(2, 3).arrayBuffer()));
+  assert.throws(() => budget.checkImage('kept', new Uint8Array([1, 2, 3])), /PNG/);
+  const next = new Uint8Array(await png(1, 1).arrayBuffer());
+  assert.throws(() => budget.checkImage('other', next), /6-pixel total limit/);
+  budget.release('kept');
+  budget.checkImage('other', next);
+});
+
 test('unknown-length image transfers are aborted at the byte limit without decoding', () => {
   const f = fixture({ maxImageBytes: 8 });
   const image = f.image();

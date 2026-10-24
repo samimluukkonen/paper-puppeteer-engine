@@ -397,8 +397,9 @@
 .scene-layer-element select {
   max-width: 120px;
 }
-.scene-inspector .scene-layers input[type="checkbox"] {
+.scene-inspector input[type="checkbox"] {
   width: auto;
+  min-height: 0;
 }
 .scene-inspector .scene-layers .scene-artwork-commands label {
   display: flex;

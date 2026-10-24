@@ -25,7 +25,7 @@ export function SceneCameraPanel({
     <details className="scene-camera">
       <summary>Cinematic Camera</summary>
       <div className="scene-artwork-commands">
-        <label data-guide-id={GUIDE_TARGETS.sceneCameraKeyMode}>
+        <label className="scene-artwork-visibility" data-guide-id={GUIDE_TARGETS.sceneCameraKeyMode}>
           <input
             type="checkbox"
             checked={document.cameraKeyEditing}

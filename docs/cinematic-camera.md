@@ -1,5 +1,7 @@
 # Cinematic Camera
 
+Start with [Creating Your First Cinematic Scene](creating-your-first-cinematic-scene.md) for the complete artist workflow, runtime handoff and optional pixel-art rendering settings.
+
 Open **Feature Guide → Scene → Cinematic Cuts, Fades & Transitions** for a nine-step tour of instant shot changes, fade authoring, timing and color, holds/conflicts, deterministic preview and saving. An open scene is enough; Actors, cuts and fades are optional. The guide reveals controls without changing authored data, selection, playback, preview settings or Undo/Redo.
 
 Open **Feature Guide → Scene → Cinematic Camera** for an eight-step tour of framing, numeric controls, Actor framing, audience preview, independent navigation and saving. It requires an open scene, works before adding Actors, and only reveals controls without editing the camera or switching preview modes.

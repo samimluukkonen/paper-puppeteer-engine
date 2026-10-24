@@ -28,7 +28,7 @@ const guide = (
 ): GuideDefinition => ({ id, title, description, editor: 'scene', category: 'scene', prerequisites, steps });
 
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
-export const sceneGuides: readonly GuideDefinition[] = [
+const workflowGuides: readonly GuideDefinition[] = [
   guide(
     'scene-cuts-fades',
     'Cinematic Cuts, Fades & Transitions',
@@ -506,5 +506,77 @@ export const sceneGuides: readonly GuideDefinition[] = [
         'Download scene package includes scene.json, referenced character files and scene artwork, retaining layer order and parallax. SceneLoader.loadPackage loads the exported ZIP at runtime. The editor imports scene JSON with its image references; Export Project includes artwork in the workspace ZIP.',
       ),
     ],
+  ),
+];
+
+/** Focused entries reuse verified workflow steps and their stable React/Phaser anchors. */
+function focusedGuide(id: string, title: string, description: string, sourceId: string, stepIds: readonly string[]) {
+  const source = workflowGuides.find((entry) => entry.id === sourceId)!;
+  return guide(
+    id,
+    title,
+    description,
+    scene,
+    stepIds.map((id) => source.steps.find((step) => step.id === id)!),
+  );
+}
+
+export const sceneGuides: readonly GuideDefinition[] = [
+  ...workflowGuides,
+  focusedGuide(
+    'scene-background-artwork',
+    'Adding Background Artwork',
+    'Import PNG/WebP artwork, reuse project images and keep the binaries with your scene.',
+    'scene-backgrounds-layers',
+    ['import', 'reuse', 'placement', 'save'],
+  ),
+  focusedGuide(
+    'scene-managing-layers',
+    'Managing Layers',
+    'Arrange artwork behind and in front of Actors with ordering, visibility and locks.',
+    'scene-backgrounds-layers',
+    ['layers', 'order', 'save'],
+  ),
+  focusedGuide(
+    'scene-understanding-parallax',
+    'Understanding Parallax',
+    'Choose scrolling factors and inspect depth without changing authored placement.',
+    'scene-backgrounds-layers',
+    ['parallax', 'preview', 'save'],
+  ),
+  focusedGuide(
+    'scene-framing',
+    'Framing a Scene',
+    'Select the audience frame, fit an Actor and inspect camera preview.',
+    'scene-cinematic-camera',
+    ['select', 'frame', 'actor', 'preview'],
+  ),
+  focusedGuide(
+    'scene-editing-camera',
+    'Editing Cinematic Camera',
+    'Set camera center and zoom while keeping editor navigation independent.',
+    'scene-cinematic-camera',
+    ['center', 'zoom', 'navigation', 'save'],
+  ),
+  focusedGuide(
+    'scene-camera-keys',
+    'Camera Keyframes',
+    'Capture a pan and zoom, preview it and save the camera timeline.',
+    'scene-camera-keyframes',
+    ['capture', 'mode', 'time', 'values', 'preview', 'save'],
+  ),
+  focusedGuide(
+    'scene-camera-cuts',
+    'Creating Camera Cuts',
+    'Hold a shot until an exact cut boundary and frame the next shot.',
+    'scene-cuts-fades',
+    ['cut', 'shot', 'track', 'preview', 'save'],
+  ),
+  focusedGuide(
+    'scene-fade-transitions',
+    'Adding Fade Transitions',
+    'Create timed color fades, inspect holds and resolve overlapping intervals.',
+    'scene-cuts-fades',
+    ['add', 'timing', 'appearance', 'holds', 'preview', 'save'],
   ),
 ];

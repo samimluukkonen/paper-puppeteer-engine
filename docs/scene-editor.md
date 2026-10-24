@@ -1,6 +1,6 @@
 # Scene Editor: visual authoring, packages and playback (v0.9.7.3)
 
-[Scene backgrounds and image assets](scene-artwork.md) · [All guides](../README.md#guides) · [Making Your First Scene](making-your-first-scene.md) · [v0.9 readiness report](scene-editor-readiness.md)
+[Creating Your First Cinematic Scene](creating-your-first-cinematic-scene.md) · [Scene backgrounds and image assets](scene-artwork.md) · [All guides](../README.md#guides) · [Making Your First Scene](making-your-first-scene.md) · [v0.9 readiness report](scene-editor-readiness.md)
 
 Open **Scene Editor** in the application navigation, or visit `/scene-editor/`. Use **New Scene** to choose a stable scene ID, name and duration. No character or scene JSON is required. Expand **Scene properties**, edit the name or duration in seconds, and click **Apply properties**. Inspector sections start collapsed. Scene IDs remain fixed after creation/import.
 
@@ -250,7 +250,7 @@ See the [runtime integration guide](runtime-integration.md#project-and-scene-han
 
 ## v0.9 production hardening
 
-Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers ten Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
+Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers twenty-two Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
 
 Playback subscriptions are confined to clock controls, the playhead and an expanded runtime inspector. Authored clip rows no longer rebuild on every Phaser frame. Initial-placement animation sampling suppresses gameplay events and uses explicit hard cuts. Teardown clears ownership and attempts all Actor cleanup even when a callback fails. Runtime scene windows remain hard cuts, and scene/character format versions remain 2/1.
 

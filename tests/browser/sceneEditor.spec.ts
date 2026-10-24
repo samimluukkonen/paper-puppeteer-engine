@@ -247,7 +247,7 @@ test('visual scene timeline edits clips, markers, properties, grouped history an
       }),
     ),
   });
-  await expect(page.locator('.scene-track-row')).toHaveCount(3);
+  for (const actor of ['a', 'b']) await expect(page.getByLabel(`${actor} actions`, { exact: true })).toBeVisible();
   const tracks = page.getByLabel('Action tracks', { exact: true });
   await tracks.getByRole('button', { name: 'a', exact: true }).click();
   await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('move');
