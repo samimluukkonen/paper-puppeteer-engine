@@ -17,6 +17,8 @@ import type { AnimationVariationController } from './AnimationVariationControlle
 import { AnimationVariationDialog } from './AnimationVariationDialog.js';
 import { EditorIcon } from './EditorIcon.js';
 import { EditorMenu } from './EditorMenu.js';
+import type { EnvironmentPreviewController, EnvironmentProjectImage } from './EnvironmentPreviewController.js';
+import { EnvironmentPreviewPanel, EnvironmentPreviewToggle } from './EnvironmentPreviewPanel.js';
 import type { FootContactGroundController } from './FootContactGroundController.js';
 import { GraphEditorPanel } from './GraphEditorPanel.js';
 import type { IKBakeController } from './IKBakeController.js';
@@ -54,6 +56,9 @@ export function AnimationEditorView({
   groundGuide,
   alignGroundTarget,
   footContacts,
+  environment,
+  projectEnvironment = false,
+  loadProjectImages,
   header = true,
   afterHeader,
 }: {
@@ -72,6 +77,9 @@ export function AnimationEditorView({
   groundGuide?: GroundGuideWorkspace;
   alignGroundTarget?: () => void;
   footContacts?: FootContactGroundController;
+  environment?: EnvironmentPreviewController;
+  projectEnvironment?: boolean;
+  loadProjectImages?: (() => Promise<readonly EnvironmentProjectImage[]>) | undefined;
   header?: boolean;
   afterHeader?: ReactNode;
 }) {
@@ -359,6 +367,14 @@ export function AnimationEditorView({
           {attachments && tweaking && <RigIKPanel controller={attachments} />}
           {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
           <div hidden={tweaking} inert={tweaking}>
+            {environment && groundGuide && (
+              <EnvironmentPreviewPanel
+                controller={environment}
+                ground={groundGuide}
+                project={projectEnvironment}
+                loadProjectImages={loadProjectImages}
+              />
+            )}
             {groundGuide && alignGroundTarget && (
               <AnimationGroundPanel
                 workspace={groundGuide}
@@ -758,6 +774,12 @@ export function AnimationEditorView({
         </section>
         <section className="animation-preview" aria-label="Animation preview">
           <div className="animation-preview-options">
+            {environment && (
+              <EnvironmentPreviewToggle
+                controller={environment}
+                guideTargetId={GUIDE_TARGETS.animationEnvironmentEnable}
+              />
+            )}
             <label>
               Facing{' '}
               <select id="animation-facing">

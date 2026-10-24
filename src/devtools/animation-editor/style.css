@@ -1671,3 +1671,23 @@ a {
   align-items: center;
   gap: 8px;
 }
+
+.environment-preview-panel > label,
+.environment-preview-panel form > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.environment-preview-panel select,
+.environment-preview-panel input[type="number"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.environment-preview-panel > .animation-history,
+.environment-preview-panel > form,
+.environment-preview-panel > button {
+  margin-bottom: 8px;
+}

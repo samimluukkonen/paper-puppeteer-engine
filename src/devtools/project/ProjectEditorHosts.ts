@@ -176,6 +176,7 @@ export class ProjectEditorHosts {
             fetcher: characterFileFetcher(workspace.character(id).files),
           }
         : { scenes: workspace.scenes }),
+      imageAssets: workspace.scenes.images,
       choices,
       changed: () => {
         const revision = workspace.autosaveRevision;

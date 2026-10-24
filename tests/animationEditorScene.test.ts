@@ -3,6 +3,7 @@ import { afterEach, assert, test, vi } from 'vitest';
 import type { AnimationEditorGhostLayer } from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { EnvironmentPreviewController } from '../src/devtools/animation-editor/EnvironmentPreviewController.js';
 import { createBoneSymmetryMapping, inferBoneSymmetryPairs } from '../src/devtools/shared/boneSymmetry.js';
 import { localToWorld } from '../src/engine/affineMath.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
@@ -898,5 +899,62 @@ test('ground is available before any animation exists and persists through creat
     assert.deepEqual(error.mock.calls, []);
   } finally {
     scene.events.emit('shutdown');
+  }
+});
+
+test('environment preview preserves the authoritative Puppet, poses, IK, skins, facing, playback and every clip document', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const environment = new EnvironmentPreviewController();
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error, {
+    environment,
+    ikChains: [{ name: 'arm', rootBone: 'rightUpperArm', middleBone: 'rightForearm', endBone: 'rightHand' }],
+  });
+  const fixture = puppetScene();
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input: new EventEmitter() });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    const original = JSON.stringify(scene.packageSnapshot());
+    puppet.setSkin('alternate');
+    scene.setFacing('left');
+    scene.setIKPreview(true);
+    for (const clip of state.animationIds) {
+      state.selectAnimation(clip);
+      state.setCurrentTime(0.3);
+      state.play();
+      const snapshot = () =>
+        JSON.stringify(
+          puppet.rig.bones.map((bone) => ({
+            pose: puppet.getBone(bone.id).pose,
+            world: puppet.getBone(bone.id).getWorldPosition(),
+            texture: puppet.getBone(bone.id).sprite?.texture.key,
+          })),
+        );
+      const pose = snapshot();
+      const time = state.currentTime;
+      for (const enabled of [true, false, true]) {
+        environment.update({ enabled, x: -30, y: 500, scale: 2 });
+        assert.strictEqual(Reflect.get(scene, 'puppet'), puppet);
+        assert.equal(snapshot(), pose);
+        assert.equal(puppet.facingDirection, 'left');
+        assert.isTrue(puppet.getIK('arm').enabled);
+        assert.isTrue(state.isPlaying);
+        assert.equal(state.currentTime, time);
+        assert.isFalse(state.dirty);
+        assert.equal(state.historyLength, 0);
+        assert.equal(JSON.stringify(scene.packageSnapshot()), original);
+      }
+      state.pause();
+    }
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+    assert.isUndefined(Reflect.get(scene, 'environmentLayer'));
+    environment.dispose();
   }
 });

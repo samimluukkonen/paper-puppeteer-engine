@@ -1,5 +1,6 @@
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import type { SceneEditorDocument, ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
+import type { SceneImageRegistry } from '../scene-editor/SceneImageRegistry.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import type { PackageSnapshot, PackageFiles } from '../shared/package/characterPackage.js';
 
@@ -15,12 +16,13 @@ export interface ProjectEditorContext {
   readonly sourceDefinition?: CharacterDefinition;
   readonly fetcher?: typeof fetch;
   readonly scenes?: SceneEditorDocument;
+  readonly imageAssets?: SceneImageRegistry;
   readonly choices: readonly { id: string; label: string; manifest: string }[];
   changed(): void;
   characterLoadFailed(): void;
-  loadProjectImages?(): Promise<
-    readonly { id: string; name: string; bytes: Uint8Array<ArrayBuffer>; width: number; height: number }[]
-  >;
+  loadProjectImages?(
+    this: void,
+  ): Promise<readonly { id: string; name: string; bytes: Uint8Array<ArrayBuffer>; width: number; height: number }[]>;
   loadCharacter(reference: string): Promise<CharacterDefinition>;
   bindScene(dispose: () => void): void;
   validateScene(scene: ReadonlyScene): void;

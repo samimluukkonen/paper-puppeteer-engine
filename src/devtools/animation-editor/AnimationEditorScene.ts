@@ -26,6 +26,8 @@ import { AnimationEditorGroundHandle } from './AnimationEditorGroundHandle.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
+import { EnvironmentPreviewLayer } from './EnvironmentPreviewLayer.js';
 import { FootContactGroundController } from './FootContactGroundController.js';
 import { alignIKTargetToGuide } from './ikTargetCoordinates.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';
@@ -39,11 +41,13 @@ export interface AnimationEditorSceneOptions {
   readonly ikChains?: readonly TwoBoneIKDefinition[];
   readonly groundGuide?: GroundGuideWorkspace;
   readonly footContacts?: FootContactGroundController;
+  readonly environment?: EnvironmentPreviewController;
 }
 
 export class AnimationEditorScene extends Phaser.Scene {
   readonly groundGuide: GroundGuideWorkspace;
   readonly footContacts: FootContactGroundController;
+  private environmentLayer: EnvironmentPreviewLayer | undefined;
   private contactOverlay: AnimationPoseOverlay | undefined;
   private groundOverlay: GroundGuideOverlay | undefined;
   private groundHandle: AnimationEditorGroundHandle | undefined;
@@ -150,6 +154,8 @@ export class AnimationEditorScene extends Phaser.Scene {
     const session = ++this.loadSession;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       ++this.loadSession;
+      this.environmentLayer?.dispose();
+      this.environmentLayer = undefined;
       this.releaseMode?.();
       this.releaseMode = undefined;
       this.rigEditor?.disable();
@@ -190,6 +196,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.puppet?.destroy();
       this.puppet = undefined;
     });
+    if (this.options.environment) this.environmentLayer = new EnvironmentPreviewLayer(this, this.options.environment);
     void this.loadCharacter(session);
   }
 
@@ -624,6 +631,7 @@ export class AnimationEditorScene extends Phaser.Scene {
         const tweaking = !state.animationAuthoringEnabled;
 
         this.rigMode = tweaking;
+        this.environmentLayer?.setActive(!tweaking);
         this.clearMirrorPreview();
         this.clearBakePreview();
         this.ikHandles?.setVisible(this.ikHandlesVisible && !tweaking);
@@ -661,8 +669,10 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.groundHandle = new AnimationEditorGroundHandle(this, this.groundGuide, state);
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input.on('pointerdown', this.selectPreviewBone, this);
+      this.environmentLayer?.setActive(true);
       this.onReady(state, definition.id);
     } catch (error) {
+      this.environmentLayer?.setActive(false);
       this.footContacts.unbind();
       this.contactOverlay?.destroy();
       this.contactOverlay = undefined;

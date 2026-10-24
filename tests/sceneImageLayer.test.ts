@@ -1,5 +1,7 @@
 import type Phaser from 'phaser';
 import { afterEach, assert, expect, test, vi } from 'vitest';
+import { EnvironmentPreviewController } from '../src/devtools/animation-editor/EnvironmentPreviewController.js';
+import { EnvironmentPreviewLayer } from '../src/devtools/animation-editor/EnvironmentPreviewLayer.js';
 import { CharacterTextureBudget } from '../src/engine/characterTextureLimits.js';
 import type { SceneImageDefinition } from '../src/engine/SceneDefinition.js';
 import { SceneImageLayer } from '../src/engine/SceneImageLayer.js';
@@ -275,4 +277,67 @@ test('independent renderers charge separate textures and a rejected allocation c
     second.dispose();
   }
   assert.deepEqual([...textures], ['shared-character']);
+});
+
+test('animation environment owns one world image, preserves navigation transforms and cleans resources on toggles/disposal', async () => {
+  const { scene, objects, textures, revoke } = stage();
+  const controller = new EnvironmentPreviewController();
+  controller.images.register(image.image, await bytes());
+  controller.update({ enabled: true, image: image.image, x: 380, y: 435, scale: 2 });
+  const layer = new EnvironmentPreviewLayer(scene, controller);
+  layer.setActive(true);
+  await vi.waitFor(() => assert.equal(objects.length, 1));
+  const first = objects[0]!;
+  assert.equal(first.x, 380);
+  assert.equal(first.y, 435);
+  assert.equal(first.scrollFactorX, 1);
+  assert.isBelow(first.depth, 0);
+  Object.assign(scene, { cameras: { main: { zoom: 2, scrollX: -130, scrollY: 240, width: 900, height: 600 } } });
+  controller.update({ x: 410 });
+  assert.equal(first.x, 410);
+  assert.equal(first.y, 435);
+  assert.equal(first.scaleX, 2);
+  assert.equal(objects.length, 1);
+  controller.update({ visible: false });
+  assert.isTrue(first.destroyed);
+  assert.deepEqual([...textures], ['shared-character']);
+  controller.update({ visible: true });
+  await vi.waitFor(() => assert.equal(objects.length, 2));
+  controller.update({ enabled: false });
+  assert.deepEqual([...textures], ['shared-character']);
+  controller.update({ enabled: true });
+  await vi.waitFor(() => assert.equal(objects.length, 3));
+  layer.setActive(false); // Rig view uses the same canvas, without environment artwork.
+  assert.deepEqual([...textures], ['shared-character']);
+  layer.setActive(true);
+  await vi.waitFor(() => assert.equal(objects.length, 4));
+  layer.dispose();
+  layer.dispose();
+  controller.update({ x: 500 });
+  assert.deepEqual([...textures], ['shared-character']);
+  assert.equal(revoke.mock.calls.length, 4);
+  controller.dispose();
+});
+
+test('missing animation environment artwork reports failure and recovers when the shared registry receives the image', async () => {
+  const { scene, objects, textures } = stage();
+  const controller = new EnvironmentPreviewController();
+  const layer = new EnvironmentPreviewLayer(scene, controller);
+  controller.update({ enabled: true, image: image.image });
+  layer.setActive(true);
+  await vi.waitFor(() => assert.match(controller.getSnapshot().error, /Missing image/));
+  assert.equal(objects.length, 0);
+  controller.images.register(image.image, await bytes());
+  await vi.waitFor(() => assert.equal(objects.length, 1));
+  assert.equal(controller.getSnapshot().error, '');
+  controller.images.removeUnused(new Set());
+  assert.isTrue(objects[0]!.destroyed);
+  assert.deepEqual([...textures], ['shared-character']);
+  controller.update({ image: '../images/absent.png' });
+  await vi.waitFor(() => assert.match(controller.getSnapshot().error, /Missing image/));
+  controller.clear();
+  assert.equal(controller.getSnapshot().error, '');
+  assert.deepEqual([...textures], ['shared-character']);
+  layer.dispose();
+  controller.dispose();
 });

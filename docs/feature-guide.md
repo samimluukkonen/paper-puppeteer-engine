@@ -8,6 +8,8 @@ Guides appear in alphabetical order within each editor category. Use **Search gu
 
 Scene Editor offers eight Explain tours: creating a scene, adding/positioning Actors, animation clips, movement, timing, preview and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
 
+Animation Editor offers **Environment Preview**, a seven-step Explain tour of static image import/selection, world transforms, shared ground alignment, viewport navigation and session/project saving. It works with an empty selected animation and no background image. The tour reveals controls without changing preview settings or authored motion. See [Animation Environment Preview](animation-environment-preview.md).
+
 The bright outline identifies the real control or panel. The dimmed area is protected from accidental interaction. **Explain** steps describe controls without changing your project. **Back**, **Next**, and **Finish** move through explanations; **Exit** or **Escape** closes the guide. Inspector sections start collapsed and open as their controls are explained.
 
 Some steps offer **Try It**. Choose it to enable only the highlighted real control. You can use the mouse or Tab/Shift+Tab and Enter/Space. The guide’s navigation remains available. Choose **Explain** to stop practicing. Practice is optional: **Next** continues without requiring completion, and detected success never advances automatically.

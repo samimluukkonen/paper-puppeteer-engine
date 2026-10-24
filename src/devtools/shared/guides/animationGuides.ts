@@ -29,6 +29,58 @@ const step = (id: string, title: string, description: string, targetId: string):
 /** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
+    id: 'animation-environment-preview',
+    title: 'Environment Preview',
+    description: 'Preview any animation against a static image, align its floor and keep authored motion unchanged.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'enable',
+        'Enable Environment Preview',
+        'After exiting this tour, enable Environment Preview above the canvas or in its inspector section. Use it for any animation, including attacks, jumps, rolls and in-place motion. The same character, IK, skins, facing and playback are used. This tour only reveals controls; it does not enable the preview or change your animation.',
+        targets.animationEnvironmentEnable,
+      ),
+      step(
+        'import',
+        'Import or browse project artwork',
+        'Import Image accepts PNG or static WebP. In a project, Load project character images also offers existing character artwork in Background. Imported project images enter the shared image library and can be reused by other animations. Standalone imports last for this editor session. No image is required to read this guide.',
+        targets.animationEnvironmentImport,
+      ),
+      step(
+        'background',
+        'Choose and show a background',
+        'Background selects an image from the shared library. No background is a valid starting state: import an image first if the list is empty. Show background hides the image while retaining its selection and transform. A missing image can be replaced by selecting or importing another image. These controls leave keys and animation history unchanged.',
+        targets.animationEnvironmentBackground,
+      ),
+      step(
+        'transform',
+        'Position the image in preview world',
+        'Background X/Y identify the image center in world pixels: X increases right, Y down. The character preview origin is (380, 435). Scale is uniform; 1 uses native image size. Enter values and choose Apply background transform. Reset background transform restores (0, 0) and scale 1. The image is independent of the character and its bones.',
+        targets.animationEnvironmentTransform,
+      ),
+      step(
+        'ground',
+        'Align the visible floor',
+        'Enable Show Ground Reference to use the existing guide. Set Ground Y in Ground reference, then use Align image bottom to ground to move only the background. It preserves X and scale. For a floor inside the image, adjust Background Y until it meets the line. This never moves bones, IK targets or keyframes; alignment is available after selecting an image and showing the guide.',
+        targets.animationEnvironmentGround,
+      ),
+      step(
+        'review',
+        'Review motion and navigate',
+        'After exiting, play or scrub any clip and compare animations with the same background. Wheel zooms and middle drag pans; resizing panels also preserves background world coordinates. Facing changes the character without flipping the environment. The image stays fixed in the world while the animation plays. Return to Animation mode after Rig Editor or Rig Tweak to see the environment.',
+        targets.animationCanvas,
+      ),
+      step(
+        'reset-save',
+        'Reset and keep the right assets',
+        'Clear background removes the selection without deleting the shared image. Reset Environment clears the selection, restores transforms and disables the mode while preserving the ground guide and library. Environment settings last for this editor session and reset on reload. Download a project ZIP to keep imported project images; animation JSON and character ZIPs carry no environment settings or background binaries.',
+        targets.animationEnvironmentReset,
+      ),
+    ],
+  },
+  {
     id: 'animation-ground-reference',
     title: 'Using Ground Reference',
     description: 'Inspect contact against a fixed preview reference and explicitly align an authored IK target.',

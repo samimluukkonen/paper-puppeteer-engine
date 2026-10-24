@@ -25,8 +25,8 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains twenty-one bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 21);
+test('Animation Editor catalog contains twenty-two bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 22);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
@@ -182,3 +182,24 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     release();
   },
 );
+
+test('Environment Preview guide supports empty clips without images or IK and only reveals controls', () => {
+  const { animation, launcher } = workspace();
+  const guide = guides.find((entry) => entry.id === 'animation-environment-preview')!;
+  assert.deepEqual(launcher.getAvailability(guide.id), {
+    available: false,
+    reason: 'Create or select an animation first.',
+  });
+  animation.createAnimation({ name: 'empty' });
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability(guide.id).available);
+  assert.lengthOf(guide.steps, 7);
+  for (const step of guide.steps) {
+    assert.equal(step.mode, 'explain');
+    assert.equal(step.preparation, 'reveal-target');
+    assert.isUndefined(step.prerequisites);
+  }
+  const instructions = guide.steps.map((step) => step.description).join(' ');
+  for (const phrase of ['PNG', 'WebP', 'image center', 'middle drag', 'project ZIP', 'session', 'IK targets'])
+    assert.include(instructions, phrase);
+});

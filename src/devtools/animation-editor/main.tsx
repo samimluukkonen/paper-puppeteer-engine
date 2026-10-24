@@ -35,6 +35,7 @@ import { AnimationVariationController } from './AnimationVariationController.js'
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 import { FootContactGroundController } from './FootContactGroundController.js';
 import { IKBakeController } from './IKBakeController.js';
 import { IKInspectorController } from './IKInspectorController.js';
@@ -79,6 +80,7 @@ const guides = new GuideLauncher(
 const ikInspector = new IKInspectorController();
 const groundGuide = new GroundGuideWorkspace('animation-preview-world');
 const footContacts = new FootContactGroundController();
+const environment = new EnvironmentPreviewController(projectContext?.imageAssets);
 const packages = new PackageController(undefined, projectContext?.fetcher);
 const artwork = new ArtworkController(
   undefined,
@@ -182,6 +184,9 @@ function CharacterWorkspace() {
           ikInspector={ikInspector}
           groundGuide={groundGuide}
           footContacts={footContacts}
+          environment={environment}
+          projectEnvironment={!!projectContext}
+          loadProjectImages={projectContext?.loadProjectImages}
           alignGroundTarget={() => {
             scene?.alignSelectedIKTargetToGround();
           }}
@@ -427,6 +432,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
           : {}),
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
       groundGuide,
+      environment,
       footContacts,
     },
     artwork,
@@ -557,6 +563,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     previewControls.abort();
     releaseCharacterSelection();
     game.destroy(true);
+    environment.dispose();
     attachments.dispose();
     artwork.dispose();
     scene = undefined;
