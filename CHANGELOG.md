@@ -39,6 +39,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.2.3
+
+Add an eight-step **Cinematic Camera** Feature Guide to the shared Scene catalog, covering frame selection and dragging, center coordinates, zoom/reset, Actor framing, audience preview, independent navigation and saving/runtime handoff. Reveal real controls with empty-scene guidance while preserving authored data, selection, history, playhead and preview mode. Add unit and local desktop browser coverage.
+
+Add an authored Cinematic Camera with scene-pixel center coordinates, bounded zoom and a fixed 1000 × 700 (10:7) output frame. Keep editor navigation independent; add frame selection/dragging, collapsed camera controls, Reset Camera and rendered-bounds Actor framing with an origin fallback. Preview through the camera with clean artwork by default, optional editor overlays, preserved playback and exact navigation restoration. Persist initial camera state through scene history, JSON, project/recovery and portable packages without rewriting legacy scenes. Reuse Phaser cameras and parallax compensation; expose explicit runtime camera application with aspect-preserving viewport fitting. Update the scene schema and [camera guide](docs/cinematic-camera.md); add unit and local desktop browser regressions.
+
 ## 1.2.2
 
 Hide the focus outline on programmatically focused Feature Guide titles while retaining title announcements, modal focus handling and visible keyboard focus on guide controls.

@@ -11,6 +11,7 @@ test('scene catalog gates empty selections and all tours resolve real controls w
   await open.click();
   await expect(catalog.getByRole('button', { name: 'Start Guide: Creating a Scene', exact: true })).toBeEnabled();
   await expect(catalog.getByRole('button', { name: 'Start Guide: Adding an Actor', exact: true })).toBeDisabled();
+  await expect(catalog.getByRole('button', { name: 'Start Guide: Cinematic Camera', exact: true })).toBeDisabled();
   await expect(
     catalog.getByRole('button', { name: 'Start Guide: Backgrounds, Layers and Parallax', exact: true }),
   ).toBeDisabled();
@@ -145,3 +146,103 @@ test('background guide reveals selected locked artwork without changing the scen
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
   expect(await downloadScene()).toEqual(beforeTour);
 });
+
+for (const populated of [false, true]) {
+  test(`camera guide reveals every target without changing ${populated ? 'authored preview' : 'empty scene'} state`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('scene-editor/');
+    const source = {
+      version: 2,
+      id: 'camera-guide',
+      name: 'Camera guide',
+      duration: 2000,
+      ...(populated ? { camera: { x: 120, y: -40, zoom: 1.5 } } : {}),
+      actors: populated
+        ? [
+            {
+              id: 'hero',
+              character: { manifest: '../characters/demo-puppet/character.json' },
+              position: { x: 0, y: 100 },
+            },
+          ]
+        : [],
+      actions: [],
+    };
+    await page.getByLabel('Open scene JSON').setInputFiles({
+      name: 'camera.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(source)),
+    });
+    await expect(page.getByRole('region', { name: 'Editor context', exact: true }).getByRole('status')).toContainText(
+      'Scene imported.',
+    );
+    await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+    const toolbar = page.locator('.scene-stage-toolbar');
+    if (populated) {
+      await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+      await page.locator('.scene-layers summary').click();
+      await page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true }).click();
+      await page.locator('.scene-camera summary').click();
+      await page.getByRole('button', { name: 'Select Cinematic Camera', exact: true }).click();
+      await toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true }).click();
+      await page.getByLabel('Editor overlays', { exact: true }).check();
+      await page.getByLabel('Playhead (s)', { exact: true }).fill('0.5');
+      await page.getByLabel('Playhead (s)', { exact: true }).press('Enter');
+      await page.getByLabel('Center X', { exact: true }).fill('150');
+      await page.getByRole('button', { name: 'Apply camera', exact: true }).click();
+      await page.getByRole('button', { name: 'Undo', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+    }
+    // Start from the other tab to verify that the saving step reveals the real Edit controls.
+    await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+    const guide = guideRegistry.getGuideById('scene-cinematic-camera')!;
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+    const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+    for (const [index, step] of guide.steps.entries()) {
+      await expect(tour.getByRole('heading', { name: step.title, exact: true })).toBeVisible();
+      const target = page.locator(`[data-guide-id="${step.targetId}"]`);
+      await expect(target).toHaveCount(1);
+      await expect(target).toBeVisible();
+      await expect(page.locator('.guide-spotlight-hole')).toBeVisible();
+      await expect(tour).not.toContainText('Target unavailable');
+      if (step.id === 'actor' && !populated) {
+        await expect(target).toBeDisabled();
+        await expect(tour).toContainText('With no Actor selected');
+      }
+      if (index + 1 < guide.steps.length) await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await tour.getByRole('button', { name: 'Exit', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'Edit', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    if (populated) {
+      await expect(page.getByRole('button', { name: 'Select Cinematic Camera', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await expect(toolbar.getByRole('button', { name: 'Exit Camera Preview', exact: true })).toBeVisible();
+      await expect(page.getByLabel('Editor overlays', { exact: true })).toBeChecked();
+      await expect(page.getByLabel('Playhead (s)', { exact: true })).toHaveValue('0.5');
+      await expect(page.getByLabel('Scene playback status')).toContainText('paused');
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+      await expect(page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    } else {
+      await expect(page.getByRole('button', { name: 'Select Cinematic Camera', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      await expect(toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
+    }
+    const waiting = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download scene JSON', exact: true }).click();
+    expect(JSON.parse(await readFile(await (await waiting).path(), 'utf8'))).toEqual(source);
+    expect(errors).toEqual([]);
+  });
+}

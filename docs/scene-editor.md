@@ -22,7 +22,7 @@ Expand **Scene actors** to select, duplicate, remove, or change preview depth wi
 
 Click an actor's artwork or origin handle to select and drag it. The colored X/Y handles constrain a move to one axis. **Actor properties** provides ID/name, read-only character manifest reference, numeric initial X/Y, facing and supported animation/skin choices. Inspector sections start collapsed. Animation selection samples its first pose without advancing a scene clock; choosing **Bind pose** restores the rig's bind pose. Facing and skin use existing runtime APIs. Character defaults remain implicit until you choose an override.
 
-Coordinates are stage/world units: (0,0) starts at the viewport center, X increases rightward and Y downward. Canvas FIT scaling, camera zoom and camera scroll are converted before calculating drag offsets. Mouse wheel zooms around the pointer. Middle/right/Alt-drag pans; **Reset view** returns to the initial camera. The optional 32-unit grid, camera and selection are editor-only. One complete drag is one history entry. Escape, pointer cancellation or window blur restores the pre-drag snapshot without consuming history or losing Redo. Switching scenes also cancels unfinished moves.
+Coordinates are stage/world units: (0,0) starts at the viewport center, X increases rightward and Y downward. Canvas FIT scaling, camera zoom and camera scroll are converted before calculating drag offsets. Mouse wheel zooms around the pointer. Middle/right/Alt-drag pans; **Reset view** returns to the initial camera. The optional 32-unit grid, navigation camera and selection are editor-only. The separate [Cinematic Camera](cinematic-camera.md) defines the saved audience frame. One complete drag is one history entry. Escape, pointer cancellation or window blur restores the pre-drag snapshot without consuming history or losing Redo. Switching scenes also cancels unfinished moves.
 
 ## Action timeline
 
@@ -54,7 +54,7 @@ Two overlapping movement clips, or two overlapping base-animation clips, for one
 
 The ruler and numeric **Playhead (s)** field seek and pause, including while playing. Focusing the numeric field pauses before editing so clock updates cannot overwrite typed input. Seeking creates fresh Actor/Puppet instances from immutable initial data, then runs the same validated declarations up to the requested time. Updates split at every action start/end, including when a frame crosses several commands. End ownership releases before adjacent clips start; equal-time starts follow authored array order. There are no browser execution timers or asynchronous Promise barriers in the scheduler. Wait actions annotate an absolute interval; they do not delay unrelated declarations.
 
-Expand **Runtime preview** and select an Actor track to inspect its current position, facing, animation and clip time. Initial X/Y and appearance fields continue to describe authored data. Placement dragging is available after Stop; camera pan/zoom remain available during playback. Selection preserves playback; authored edits, Undo/Redo and scene switches cancel the old context and restore initial placement.
+Expand **Runtime preview** and select an Actor track to inspect its current position, facing, animation and clip time. Initial X/Y and appearance fields continue to describe authored data. Placement dragging is available after Stop; camera pan/zoom remain available during playback. Selection preserves playback. Actor/action edits, their Undo/Redo and scene switches cancel the old context and restore initial placement; camera, artwork and layer edits preserve the current Actors and playhead.
 
 Animation actions restart the existing base clip with their authored loop and speed overrides, with no implicit crossfade. A finite clip that completes before its window ends holds its terminal pose; a looping or longer clip stops at its window end and holds that pose until another animation action replaces it. Movement uses `Actor.moveTo` independently of animation; author a simultaneous walk clip when desired. Facing uses `Actor.setFacing` / `lookAt` at the scheduled time after all Actors reach that time. Initial animations use their ordinary clip settings. Scene completion stops remaining playback and settles runtime waits. Actor destruction/disposal, movement replacement/cancellation, and owned animation interruption halt future scheduling. Cleanup cancels only matching owned movement/playback IDs and preserves newer external commands. Old movement Promise continuations cannot affect a rebuilt context.
 
@@ -148,7 +148,7 @@ npm run check:version
 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneEditor.spec.ts
 ```
 
-Deferred: camera direction, dialogue, branching, physics, pathfinding and automatic scene draft recovery.
+Deferred at v0.9.2: camera direction, dialogue, branching, physics, pathfinding and automatic scene draft recovery. Initial cinematic framing and recovery have since been added; see the linked current guides.
 
 ### v0.9.2 verification
 
@@ -255,3 +255,7 @@ Start with [Making Your First Scene](making-your-first-scene.md) for the complet
 Playback subscriptions are confined to clock controls, the playhead and an expanded runtime inspector. Authored clip rows no longer rebuild on every Phaser frame. Initial-placement animation sampling suppresses gameplay events and uses explicit hard cuts. Teardown clears ownership and attempts all Actor cleanup even when a callback fails. Runtime scene windows remain hard cuts, and scene/character format versions remain 2/1.
 
 See [visual layers, depth and parallax](scene-layers.md) for foreground/background ordering, the Actors band, layer locks and view-only camera preview.
+
+## Cinematic framing
+
+Use the collapsed **Cinematic Camera** inspector to author a center and zoom independently of editor pan/zoom, frame an Actor, or preview the 1000 × 700 audience view. See the [Cinematic Camera guide](cinematic-camera.md) for coordinate conventions, parallax, persistence and runtime camera application.

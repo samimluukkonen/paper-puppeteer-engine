@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { canonicalJson } from './authoredSerialization.js';
+import { cinematicCameraSchema } from './cinematicCamera.js';
 import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
@@ -127,6 +128,7 @@ export const sceneDefinitionSchema = z.strictObject({
   name: sceneIdentifier,
   /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
   duration: z.number().positive(),
+  camera: cinematicCameraSchema.exactOptional(),
   layers: z.array(sceneLayerDefinitionSchema).min(2).max(64).exactOptional(),
   images: z.array(sceneImageDefinitionSchema).max(256).exactOptional(),
   actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),

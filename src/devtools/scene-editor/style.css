@@ -416,3 +416,7 @@
 .scene-stage-toolbar input[type="number"] {
   width: 72px;
 }
+
+.scene-camera > summary {
+  margin-bottom: 16px;
+}

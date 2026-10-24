@@ -414,7 +414,9 @@ test('layers compose foreground over Actors with parallax picking, locks, histor
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(cameraOnly)),
   });
-  await expect(page.getByRole('status')).toContainText('Scene imported.');
+  await expect(page.getByRole('region', { name: 'Editor context', exact: true }).getByRole('status')).toContainText(
+    'Scene imported.',
+  );
   await expect(page.locator('.scene-preview-error')).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('scene-layers.png') });
 });

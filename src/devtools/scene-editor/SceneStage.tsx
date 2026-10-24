@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import { Actor } from '../../engine/Actor.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { cinematicFrame, SCENE_OUTPUT_VIEWPORT } from '../../engine/cinematicCamera.js';
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
@@ -18,6 +19,7 @@ import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
+import { SceneCameraPreview } from './SceneCameraPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
@@ -29,6 +31,8 @@ type Gesture = { pointer: number; scene: string; start: Point; origin: Point; ax
 
 /** Phaser owns rendering; React/document changes reconcile existing instances without remounting the game. */
 class SceneStage extends Phaser.Scene {
+  private cameraPreview!: SceneCameraPreview;
+  private cameraGesture: Gesture | undefined;
   private artwork!: SceneImageLayer;
   private imageGesture:
     | {
@@ -64,9 +68,17 @@ class SceneStage extends Phaser.Scene {
   }
   showGrid = true;
   private cinematicScroll: Point = { x: 0, y: 0 };
-  /** View-only simulation of a future cinematic camera, independent of editor navigation. */
+  /** Legacy parallax inspection offset; view-only and ignored by audience preview. */
   setPreviewScroll(scroll: Point): void {
-    if (!this.sys.isActive() || !Number.isFinite(scroll.x) || !Number.isFinite(scroll.y)) return;
+    if (
+      this.document.cameraPreviewing ||
+      !this.sys.isActive() ||
+      !Number.isFinite(scroll.x) ||
+      !Number.isFinite(scroll.y)
+    )
+      return;
+    this.document.cancelCameraDrag();
+    this.cameraGesture = undefined;
     this.document.cancelImageDrag();
     this.document.cancelActorDrag();
     this.gesture = undefined;
@@ -75,7 +87,7 @@ class SceneStage extends Phaser.Scene {
     this.cameras.main.scrollX += scroll.x - this.cinematicScroll.x;
     this.cameras.main.scrollY += scroll.y - this.cinematicScroll.y;
     this.cinematicScroll = scroll;
-    this.artwork.sync(this.document.workingScene?.images, this.document.workingScene?.layers, scroll);
+    this.syncArtwork();
   }
 
   constructor(
@@ -95,11 +107,17 @@ class SceneStage extends Phaser.Scene {
       this.textureBudget,
     );
     this.preview = new SceneActorPreview(this);
+    this.document.setActorBoundsProvider((id) => {
+      const actor = this.playback.actors?.get(id) ?? this.preview.instances.get(id)?.actor;
+      const bounds = actor?.puppet.container.getBounds();
+      return bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : undefined;
+    });
     this.grid = this.add.graphics().setDepth(-1000);
     this.overlay = this.add.graphics().setDepth(1_000_000);
     this.groundOverlay = new GroundGuideOverlay(this, { draggable: true });
     this.groundHandle = new SceneGroundHandle(this.document.groundGuide);
     this.cameras.main.centerOn(0, 0);
+    this.cameraPreview = new SceneCameraPreview(this.cameras.main);
     const canvas = this.game.canvas;
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', 'Actor placement canvas');
@@ -112,7 +130,9 @@ class SceneStage extends Phaser.Scene {
       )
         this.imageGesture = undefined;
       const document = this.document.workingScene;
-      this.artwork.sync(document?.images, document?.layers, this.cinematicScroll);
+      if (!this.document.hasActiveGesture) this.cameraGesture = undefined;
+      this.syncCamera();
+      this.syncArtwork();
       if (!document) {
         this.preview.dispose();
         this.document.setActorGroundOffsets(new Map());
@@ -159,6 +179,8 @@ class SceneStage extends Phaser.Scene {
       this.imageGesture = undefined;
       this.pan = undefined;
       this.groundHandle.cancel();
+      this.document.cancelCameraDrag();
+      this.cameraGesture = undefined;
       this.document.cancelImageDrag();
       this.document.cancelActorDrag();
     };
@@ -167,6 +189,8 @@ class SceneStage extends Phaser.Scene {
       if (this.playback.previewing && (this.gesture || this.imageGesture)) {
         this.gesture = undefined;
         this.imageGesture = undefined;
+        this.document.cancelCameraDrag();
+        this.cameraGesture = undefined;
         this.document.cancelImageDrag();
         this.document.cancelActorDrag();
       }
@@ -175,15 +199,27 @@ class SceneStage extends Phaser.Scene {
       'pointerdown',
       (event) => {
         if (!this.document.workingScene || (event.button !== 0 && event.button !== 1 && event.button !== 2)) return;
-        if (this.imageGesture || this.gesture || this.pan || this.groundHandle.dragging) return;
+        if (this.cameraGesture || this.imageGesture || this.gesture || this.pan || this.groundHandle.dragging) return;
         event.preventDefault();
         canvas.focus();
         canvas.setPointerCapture(event.pointerId);
+        if (this.document.cameraPreviewing && !this.document.cameraOverlays) return;
         if (event.button !== 0 || event.altKey) {
+          if (this.document.cameraPreviewing) return;
           this.pan = { pointer: event.pointerId, x: event.clientX, y: event.clientY };
           return;
         }
         const point = this.point(event);
+        if (!this.document.cameraPreviewing && this.hitCamera(point) && this.document.beginCameraDrag()) {
+          this.cameraGesture = {
+            pointer: event.pointerId,
+            scene: this.document.selectedSceneId!,
+            start: point,
+            origin: this.document.cinematicCamera,
+            axis: 'both',
+          };
+          return;
+        }
         if (this.groundHandle.down(event.pointerId, point, this.cameras.main)) return;
         // Runtime transforms are view-only. The independent guide remains draggable during preview.
         if (this.playback.previewing) return;
@@ -191,7 +227,7 @@ class SceneStage extends Phaser.Scene {
         let id: string | null = null;
         let axis: Gesture['axis'] = 'both';
         const zoom = this.cameras.main.zoom;
-        if (selected && sceneLayer(this.document.workingScene, 'actors').visible) {
+        if (!this.document.cameraSelected && selected && sceneLayer(this.document.workingScene, 'actors').visible) {
           const dx = (point.x - selected.position.x) * zoom;
           const dy = (point.y - selected.position.y) * zoom;
           if (Math.hypot(dx, dy) < 12) {
@@ -277,6 +313,9 @@ class SceneStage extends Phaser.Scene {
           );
           this.pan.x = event.clientX;
           this.pan.y = event.clientY;
+        } else if (this.cameraGesture?.pointer === event.pointerId) {
+          const gesture = this.cameraGesture;
+          this.document.moveCameraDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), 'both'));
         } else if (this.groundHandle.dragging) {
           this.groundHandle.move(event.pointerId, this.point(event));
         } else if (this.imageGesture?.pointer === event.pointerId) {
@@ -293,6 +332,12 @@ class SceneStage extends Phaser.Scene {
     canvas.addEventListener(
       'pointerup',
       (event) => {
+        if (this.cameraGesture?.pointer === event.pointerId) {
+          const gesture = this.cameraGesture;
+          this.document.moveCameraDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), 'both'));
+          this.cameraGesture = undefined;
+          this.document.endCameraDrag();
+        }
         this.groundHandle.up(event.pointerId, this.point(event));
         if (this.imageGesture?.pointer === event.pointerId) {
           this.moveImageGesture(this.point(event));
@@ -319,7 +364,14 @@ class SceneStage extends Phaser.Scene {
       'wheel',
       (event) => {
         event.preventDefault();
-        if (this.imageGesture || this.gesture || this.groundHandle.dragging) return;
+        if (
+          this.document.cameraPreviewing ||
+          this.cameraGesture ||
+          this.imageGesture ||
+          this.gesture ||
+          this.groundHandle.dragging
+        )
+          return;
         const bounds = canvas.getBoundingClientRect();
         zoomCameraAt(
           this.cameras.main,
@@ -336,7 +388,7 @@ class SceneStage extends Phaser.Scene {
         if (
           event.key === 'Escape' &&
           !blocksEditorShortcut(event) &&
-          (this.imageGesture || this.gesture || this.pan || this.groundHandle.dragging)
+          (this.cameraGesture || this.imageGesture || this.gesture || this.pan || this.groundHandle.dragging)
         ) {
           event.preventDefault();
           cancel();
@@ -357,6 +409,7 @@ class SceneStage extends Phaser.Scene {
       this.alive = false;
       unsubscribe();
       unsubscribeImages();
+      this.document.setActorBoundsProvider(undefined);
       this.document.setActorGroundOffsets(new Map());
       this.document.setActorGroundContacts(new Map());
       unsubscribePlayback();
@@ -383,6 +436,39 @@ class SceneStage extends Phaser.Scene {
       throwNotificationErrors(errors, 'Scene stage disposal failed.');
     });
     sync();
+  }
+  private syncCamera(): void {
+    this.cameraPreview.sync(this.document.cameraPreviewing, this.document.cinematicCamera, {
+      x: 0,
+      y: 0,
+      width: this.scale.gameSize.width,
+      height: this.scale.gameSize.height,
+    });
+  }
+  private syncArtwork(): void {
+    const scene = this.document.workingScene;
+    const state = this.document.cinematicCamera;
+    const offset = this.document.cameraPreviewing ? { x: 0, y: 0 } : this.cinematicScroll;
+    this.artwork.sync(scene?.images, scene?.layers, { x: state.x + offset.x, y: state.y + offset.y });
+  }
+  private hitCamera(point: Point): boolean {
+    const state = this.document.cinematicCamera;
+    const frame = cinematicFrame(state);
+    const tolerance = 10 / this.cameras.main.zoom;
+    // Unselected edges select the camera. The center handle requires explicit selection.
+    return (
+      (this.document.cameraSelected && Math.hypot(point.x - state.x, point.y - state.y) < tolerance * 1.5) ||
+      (point.x >= frame.x - tolerance &&
+        point.x <= frame.x + frame.width + tolerance &&
+        point.y >= frame.y - tolerance &&
+        point.y <= frame.y + frame.height + tolerance &&
+        Math.min(
+          Math.abs(point.x - frame.x),
+          Math.abs(point.x - frame.x - frame.width),
+          Math.abs(point.y - frame.y),
+          Math.abs(point.y - frame.y - frame.height),
+        ) < tolerance)
+    );
   }
   private startImageGesture(pointer: number, point: Point, id: string, resize: boolean): void {
     const image = this.document.workingScene?.images?.find((image) => image.id === id);
@@ -414,10 +500,27 @@ class SceneStage extends Phaser.Scene {
     });
   }
   private point(event: PointerEvent): Point {
+    const canvasBounds = this.game.canvas.getBoundingClientRect();
+    const camera = this.cameras.main;
+    const scaleX = canvasBounds.width / this.scale.gameSize.width;
+    const scaleY = canvasBounds.height / this.scale.gameSize.height;
     return stagePoint(
       { x: event.clientX, y: event.clientY },
-      this.game.canvas.getBoundingClientRect(),
-      this.cameras.main,
+      {
+        left: canvasBounds.left + camera.x * scaleX,
+        top: canvasBounds.top + camera.y * scaleY,
+        width: camera.width * scaleX,
+        height: camera.height * scaleY,
+      },
+      {
+        scrollX: camera.scrollX,
+        scrollY: camera.scrollY,
+        zoom: camera.zoom,
+        width: camera.width,
+        height: camera.height,
+        originX: camera.originX,
+        originY: camera.originY,
+      },
     );
   }
   private ensureCharacter(manifest: string, sync: () => void): void {
@@ -446,7 +549,10 @@ class SceneStage extends Phaser.Scene {
       });
   }
   update(_time: number, delta: number): void {
-    this.groundOverlay.render(this.document.groundGuide.getSnapshot().guide);
+    this.syncCamera();
+    const cleanPreview = this.document.cameraPreviewing && !this.document.cameraOverlays;
+    const guide = this.document.groundGuide.getSnapshot().guide;
+    this.groundOverlay.render(cleanPreview ? { ...guide, enabled: false } : guide);
     this.playback.update(delta);
     for (const { actor } of this.preview.instances.values())
       actor.puppet.container.setVisible(
@@ -456,7 +562,7 @@ class SceneStage extends Phaser.Scene {
       );
     const camera = this.cameras.main;
     this.grid.clear();
-    if (this.showGrid) {
+    if (this.showGrid && !cleanPreview) {
       const top = camera.getWorldPoint(0, 0);
       const bottom = camera.getWorldPoint(camera.width, camera.height);
       this.grid.lineStyle(1 / camera.zoom, 0x454550, 0.4);
@@ -464,6 +570,19 @@ class SceneStage extends Phaser.Scene {
       for (let y = Math.floor(top.y / 32) * 32; y <= bottom.y; y += 32) this.grid.lineBetween(top.x, y, bottom.x, y);
     }
     this.overlay.clear();
+    if (cleanPreview) return;
+    if (!this.document.cameraPreviewing) {
+      const state = this.document.cinematicCamera;
+      const frame = cinematicFrame(state);
+      const z = camera.zoom;
+      this.overlay
+        .lineStyle((this.document.cameraSelected ? 2 : 1) / z, 0x58a6ff, 0.9)
+        .strokeRect(frame.x, frame.y, frame.width, frame.height);
+      this.overlay
+        .lineBetween(state.x - 9 / z, state.y, state.x + 9 / z, state.y)
+        .lineBetween(state.x, state.y - 9 / z, state.x, state.y + 9 / z);
+      if (this.document.cameraSelected) this.overlay.strokeCircle(state.x, state.y, 12 / z);
+    }
     const action = this.document.workingScene?.actions.find((entry) => entry.id === this.document.selectedActionId);
     if (action?.type === 'move') {
       const { x, y } = action.destination;
@@ -481,7 +600,13 @@ class SceneStage extends Phaser.Scene {
     }
     const id = this.document.selectedActorId;
     const actor = id && (this.playback.actors?.get(id) ?? this.preview.instances.get(id)?.actor);
-    if (!actor || !this.document.workingScene || !sceneLayer(this.document.workingScene, 'actors').visible) return;
+    if (
+      this.document.cameraSelected ||
+      !actor ||
+      !this.document.workingScene ||
+      !sceneLayer(this.document.workingScene, 'actors').visible
+    )
+      return;
     const { x, y } = actor.position;
     if (this.document.showFootContacts) {
       for (const contact of evaluatedFootContacts(actor.puppet)) {
@@ -515,6 +640,7 @@ export function SceneStageView({
   registry: SceneCharacterRegistry;
   playback: SceneEditorPlayback;
 }) {
+  useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const [error, setError] = useState('');
   const [stage, setStage] = useState<SceneStage>();
   const [grid, setGrid] = useState(true);
@@ -522,7 +648,7 @@ export function SceneStageView({
   useLayoutEffect(() => {
     const scene = new SceneStage(document, registry, playback, setError);
     setStage(scene);
-    const game = createEditorGame('scene-stage-canvas', scene, { width: 1000, height: 700 });
+    const game = createEditorGame('scene-stage-canvas', scene, SCENE_OUTPUT_VIEWPORT);
     const release = observePreview(window.document.querySelector<HTMLElement>('#scene-stage-canvas')!, game);
     return () => {
       release();
@@ -555,7 +681,7 @@ export function SceneStageView({
               type="number"
               step="any"
               value={previewScroll[axis]}
-              disabled={document.hasActiveGesture}
+              disabled={document.hasActiveGesture || document.cameraPreviewing}
               onChange={(event) => {
                 const value = event.target.valueAsNumber;
                 if (!Number.isFinite(value)) return;
@@ -568,6 +694,8 @@ export function SceneStageView({
         ))}
         <button
           type="button"
+          data-guide-id={GUIDE_TARGETS.sceneCameraNavigation}
+          disabled={document.cameraPreviewing}
           onClick={() => {
             if (stage?.sys.isActive()) {
               stage.setPreviewScroll({ x: 0, y: 0 });
@@ -578,7 +706,28 @@ export function SceneStageView({
         >
           Reset view
         </button>
-        <span>Wheel: zoom · Middle/right/Alt-drag: pan · Shift: bypass ground snap · Escape: cancel drag</span>
+        <button
+          type="button"
+          data-guide-id={GUIDE_TARGETS.sceneCameraPreview}
+          disabled={!stage}
+          aria-pressed={document.cameraPreviewing}
+          onClick={() => document.setCameraPreview(!document.cameraPreviewing)}
+        >
+          {document.cameraPreviewing ? 'Exit Camera Preview' : 'Preview Through Camera'}
+        </button>
+        {document.cameraPreviewing && (
+          <label>
+            <input
+              type="checkbox"
+              checked={document.cameraOverlays}
+              onChange={(event) => document.setCameraOverlays(event.target.checked)}
+            />{' '}
+            Editor overlays
+          </label>
+        )}
+        <span>
+          1000 × 700 · 10:7 · Wheel: zoom · Middle/right/Alt-drag: pan · Shift: bypass ground snap · Escape: cancel drag
+        </span>
       </div>
       <div id="scene-stage-canvas" />
       {error && (

@@ -1,6 +1,12 @@
 import type Phaser from 'phaser';
 import { Actor } from './Actor.js';
 import { CharacterDefinition, characterManifestSchema } from './CharacterDefinition.js';
+import {
+  applyCinematicCamera,
+  DEFAULT_CINEMATIC_CAMERA,
+  type CinematicCameraTarget,
+  type CameraViewport,
+} from './cinematicCamera.js';
 import type { RigJsonDefinition } from './externalData.js';
 import { inspectImageHeader } from './imageHeader.js';
 import { DEFAULT_MAX_JSON_BYTES } from './jsonInput.js';
@@ -23,6 +29,10 @@ export interface SceneLoadOptions {
 export interface LoadedScene {
   /** The host supplies runner.update(delta) once per Phaser update. */
   readonly runner: SceneRunner;
+  /** Opt into authored audience framing on a host-owned centered, unrotated Phaser camera.
+   * Reapply with the full viewport after resizing. No camera is changed during load.
+   */
+  applyCamera(camera: CinematicCameraTarget, viewport?: CameraViewport): CameraViewport;
   /** Releases Actors/listeners and ZIP-owned artwork. Hosted character textures remain shared. */
   dispose(): void;
 }
@@ -203,7 +213,19 @@ async function loadSession(
         }
       },
     });
-    return { runner, dispose };
+    return {
+      runner,
+      dispose,
+      applyCamera(camera, viewport) {
+        if (disposed) throw new Error('Scene load disposed.');
+        const definition = prepared.resolved.definition;
+        const state = definition.camera ?? DEFAULT_CINEMATIC_CAMERA;
+        const result = applyCinematicCamera(camera, state, viewport);
+        // Center-relative compensation matches the editor at every viewport size and zoom.
+        artwork!.sync(definition.images, definition.layers, state);
+        return result;
+      },
+    };
   } catch (error) {
     // Preparation may complete after a shutdown already ran dispose(). Release its URLs too.
     if (disposed) release?.();

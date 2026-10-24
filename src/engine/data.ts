@@ -41,3 +41,5 @@ export type {
 } from './SceneDefinition.js';
 
 export type { CreateFootContactMarkerOptions } from './footContactMarkers.js';
+
+export type { CinematicCameraState, CameraViewport, CinematicCameraTarget } from './cinematicCamera.js';

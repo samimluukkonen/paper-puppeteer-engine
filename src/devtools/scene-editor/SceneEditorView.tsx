@@ -18,6 +18,7 @@ import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
 import { SceneActorsPanel } from './SceneActorsPanel.js';
 import { SceneArtworkPanel } from './SceneArtworkPanel.js';
+import { SceneCameraPanel } from './SceneCameraPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
@@ -397,6 +398,7 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <SceneCameraPanel key={`camera-${scene.id}`} document={document} />
               <SceneLayersPanel key={`layers-${scene.id}`} document={document} />
               <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />
               <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />

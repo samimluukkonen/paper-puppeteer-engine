@@ -34,6 +34,24 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
+    "camera": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "zoom": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 8
+        }
+      },
+      "required": ["x", "y", "zoom"],
+      "additionalProperties": false
+    },
     "layers": {
       "minItems": 2,
       "maxItems": 64,

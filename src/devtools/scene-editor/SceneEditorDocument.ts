@@ -1,3 +1,9 @@
+import {
+  cameraForBounds,
+  DEFAULT_CINEMATIC_CAMERA,
+  type CameraViewport,
+  type CinematicCameraState,
+} from '../../engine/cinematicCamera.js';
 import { equalJsonData } from '../../engine/equalJsonData.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import {
@@ -31,6 +37,9 @@ interface SceneEntry {
   saved: ReadonlyScene;
   working: ReadonlyScene;
   unsavedNew: boolean;
+  cameraSelected: boolean;
+  cameraPreview: boolean;
+  cameraOverlays: boolean;
   selectedImage: string | null;
   selectedActor: string | null;
   selectedAction: string | null;
@@ -45,6 +54,8 @@ export class SceneEditorDocument {
   private revision = 0;
   private dragAction: string | null = null;
   private dragActor: string | null = null;
+  private dragCamera = false;
+  private actorBounds: ((id: string) => CameraViewport | undefined) | undefined;
   private dragImage: string | null = null;
   private readonly lockedLayers = new Map<string, Set<string>>();
   readonly images = new SceneImageRegistry();
@@ -173,6 +184,9 @@ export class SceneEditorDocument {
       saved: source,
       working: source,
       unsavedNew,
+      cameraSelected: false,
+      cameraPreview: false,
+      cameraOverlays: false,
       selectedImage: null,
       selectedActor: null,
       selectedAction: null,
@@ -186,6 +200,7 @@ export class SceneEditorDocument {
     };
     this.cancelActionDrag();
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
     this.groundOffsets = new Map();
@@ -213,6 +228,7 @@ export class SceneEditorDocument {
     if (!this.entries.has(id)) return this.reportError(new Error(`Unknown scene "${id}".`));
     this.cancelActionDrag();
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
     this.selected = id;
@@ -255,6 +271,95 @@ export class SceneEditorDocument {
     }
   }
 
+  get cinematicCamera(): Readonly<CinematicCameraState> {
+    return this.workingScene?.camera ?? DEFAULT_CINEMATIC_CAMERA;
+  }
+  get cameraSelected(): boolean {
+    return this.entry?.cameraSelected ?? false;
+  }
+  get cameraPreviewing(): boolean {
+    return this.entry?.cameraPreview ?? false;
+  }
+  get cameraOverlays(): boolean {
+    return this.entry?.cameraOverlays ?? false;
+  }
+  selectCamera(selected = true): void {
+    this.cancelCameraDrag();
+    this.cancelImageDrag();
+    this.cancelActorDrag();
+    this.cancelActionDrag();
+    if (!this.entry) return;
+    this.entry.cameraSelected = selected;
+    if (selected) {
+      this.entry.selectedImage = null;
+      this.entry.selectedAction = null;
+    }
+    this.notify();
+  }
+  setCameraPreview(enabled: boolean): void {
+    this.selectCamera(this.cameraSelected);
+    this.groundGuide.cancelDrag();
+    if (!this.entry) return;
+    this.entry.cameraPreview = enabled;
+    this.notify();
+  }
+  setCameraOverlays(enabled: boolean): void {
+    this.cancelCameraDrag();
+    this.cancelImageDrag();
+    this.cancelActorDrag();
+    this.groundGuide.cancelDrag();
+    if (!this.entry) return;
+    this.entry.cameraOverlays = enabled;
+    this.notify();
+  }
+  updateCamera(patch: Partial<CinematicCameraState>): boolean {
+    if (!this.dragCamera) this.finishLayerGestures();
+    if (!this.workingScene) return false;
+    return this.replaceScene({ ...this.workingScene, camera: { ...this.cinematicCamera, ...patch } });
+  }
+  resetCamera(): boolean {
+    return this.updateCamera(DEFAULT_CINEMATIC_CAMERA);
+  }
+  /** Measurements stay in the view; frame only the explicitly selected Actor. */
+  setActorBoundsProvider(provider: ((id: string) => CameraViewport | undefined) | undefined): void {
+    this.actorBounds = provider;
+  }
+  frameSelectedActor(): boolean {
+    const actor = this.workingScene?.actors.find((actor) => actor.id === this.selectedActorId);
+    if (!actor) return false;
+    const bounds = this.actorBounds?.(actor.id);
+    const camera =
+      bounds &&
+      bounds.width > 0 &&
+      bounds.height > 0 &&
+      [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite)
+        ? cameraForBounds(bounds)
+        : { ...this.cinematicCamera, ...actor.position };
+    return this.updateCamera(camera);
+  }
+  beginCameraDrag(): boolean {
+    this.selectCamera();
+    if (!this.entry || this.cameraPreviewing) return false;
+    this.entry.history.beginOperation();
+    this.dragCamera = true;
+    return true;
+  }
+  moveCameraDrag(position: { x: number; y: number }): boolean {
+    return this.dragCamera ? this.updateCamera(position) : false;
+  }
+  endCameraDrag(): void {
+    if (!this.dragCamera) return;
+    this.dragCamera = false;
+    this.entry?.history.endOperation();
+    this.notify();
+  }
+  cancelCameraDrag(): void {
+    if (!this.dragCamera) return;
+    this.dragCamera = false;
+    this.entry?.history.cancelOperation();
+    this.notify();
+  }
+
   get selectedImageId(): string | null {
     const id = this.entry?.selectedImage;
     return this.workingScene?.images?.some((image) => image.id === id) ? id! : null;
@@ -277,6 +382,7 @@ export class SceneEditorDocument {
   }
   private finishLayerGestures(): void {
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     this.endActionDrag();
   }
@@ -352,9 +458,11 @@ export class SceneEditorDocument {
   }
   selectImage(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.images?.some((image) => image.id === id))) return;
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     this.cancelActionDrag();
     if (id !== this.selectedImageId) this.cancelImageDrag();
+    this.entry.cameraSelected = false;
     this.entry.selectedImage = id;
     this.entry.selectedActor = null;
     this.entry.selectedAction = null;
@@ -362,6 +470,7 @@ export class SceneEditorDocument {
   }
   addImage(reference: string): boolean {
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     this.endActionDrag();
     const scene = this.workingScene;
@@ -395,6 +504,7 @@ export class SceneEditorDocument {
   updateImage(id: string, patch: Partial<Omit<SceneImageDefinition, 'id'>>): boolean {
     if (this.isImageLocked(id) || (patch.layerId && this.isLayerLocked(patch.layerId))) return false;
     if (!this.dragImage) {
+      this.endCameraDrag();
       this.endActorDrag();
       this.endActionDrag();
     }
@@ -407,7 +517,7 @@ export class SceneEditorDocument {
   }
   removeImage(id: string): boolean {
     if (this.isImageLocked(id)) return false;
-    this.endImageDrag();
+    this.finishLayerGestures();
     const scene = this.workingScene;
     if (!scene?.images?.some((image) => image.id === id)) return false;
     return this.replaceScene({ ...scene, images: scene.images.filter((image) => image.id !== id) });
@@ -450,15 +560,17 @@ export class SceneEditorDocument {
     return this.workingScene?.actors.some((actor) => actor.id === id) ? id! : null;
   }
   get hasActiveGesture(): boolean {
-    return this.dragImage !== null || this.dragActor !== null || this.dragAction !== null;
+    return this.dragCamera || this.dragImage !== null || this.dragActor !== null || this.dragAction !== null;
   }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;
+    this.cancelCameraDrag();
     this.cancelImageDrag();
     if (id !== this.selectedActorId) this.cancelActorDrag();
     this.cancelActionDrag();
     this.entry.selectedAction = null;
     this.entry.selectedImage = null;
+    this.entry.cameraSelected = false;
     this.entry.selectedActor = id;
     this.notify();
   }
@@ -471,6 +583,7 @@ export class SceneEditorDocument {
   addActor(manifest: string, position = { x: 0, y: 0 }): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene) return this.reportError(new Error('No scene is selected.'));
@@ -483,6 +596,7 @@ export class SceneEditorDocument {
   updateActor(id: string, patch: Partial<SceneActorDefinition>): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
@@ -504,6 +618,7 @@ export class SceneEditorDocument {
   setActorAppearance(id: string, property: 'animation' | 'skin', value: string | null): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
@@ -521,6 +636,7 @@ export class SceneEditorDocument {
   duplicateActor(id: string): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     const actor = scene?.actors.find((entry) => entry.id === id);
@@ -555,6 +671,7 @@ export class SceneEditorDocument {
   removeActor(id: string, options: { removeActions?: boolean } = {}): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return false;
@@ -575,6 +692,7 @@ export class SceneEditorDocument {
   reorderActor(id: string, offset: -1 | 1): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene) return false;
@@ -588,6 +706,7 @@ export class SceneEditorDocument {
   beginActorDrag(id: string): boolean {
     this.cancelActionDrag();
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     if (!this.workingScene?.actors.some((actor) => actor.id === id)) return false;
     this.selectActor(id);
@@ -691,9 +810,11 @@ export class SceneEditorDocument {
     const action = this.workingScene?.actions.find((action) => action.id === id);
     if (!this.entry || (id !== null && !action)) return;
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     if (id !== this.selectedActionId) this.cancelActionDrag();
     this.entry.selectedImage = null;
+    this.entry.cameraSelected = false;
     this.entry.selectedAction = id;
     if (action) this.entry.selectedActor = action.actorId;
     this.notify();
@@ -705,6 +826,7 @@ export class SceneEditorDocument {
   }
   addAction(input: SceneActionInput): boolean {
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     this.endActionDrag();
     const scene = this.workingScene;
@@ -716,6 +838,7 @@ export class SceneEditorDocument {
   }
   updateAction(id: string, input: SceneActionDefinition): boolean {
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     this.endActionDrag();
     return this.replaceAction(id, input);
@@ -729,6 +852,7 @@ export class SceneEditorDocument {
   }
   removeAction(id: string): boolean {
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     this.endActionDrag();
     const scene = this.workingScene;
@@ -742,6 +866,7 @@ export class SceneEditorDocument {
   }
   beginActionDrag(id: string): boolean {
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     this.cancelActionDrag();
     if (!this.workingScene?.actions.some((action) => action.id === id)) return false;
@@ -769,12 +894,14 @@ export class SceneEditorDocument {
   updateProperties(properties: { name?: string; duration?: number }): boolean {
     this.endActionDrag();
     this.endImageDrag();
+    this.endCameraDrag();
     this.endActorDrag();
     return this.replaceScene({ ...this.workingScene, ...properties });
   }
   undo(): boolean {
     this.cancelActionDrag();
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     if (!this.entry?.history.undo()) return false;
     return this.success();
@@ -782,6 +909,7 @@ export class SceneEditorDocument {
   redo(): boolean {
     this.cancelActionDrag();
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     if (!this.entry?.history.redo()) return false;
     return this.success();
@@ -791,6 +919,7 @@ export class SceneEditorDocument {
     if (!entry || (this.dirty && !options.discardChanges)) return false;
     this.cancelActionDrag();
     this.cancelImageDrag();
+    this.cancelCameraDrag();
     this.cancelActorDrag();
     entry.history.change(() => {
       entry.working = entry.source;

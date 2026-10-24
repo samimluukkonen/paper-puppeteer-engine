@@ -200,6 +200,28 @@ test('external cancellation cleans up an already loaded session', async () => {
   assert.equal(events.listenerCount('shutdown'), 0);
 });
 
+test('runtime camera application is explicit, preserves choreography and fits the authored frame after resize', async () => {
+  const source = { ...sceneFixture(), camera: { x: 120, y: -50, zoom: 2 } };
+  const loaded = await SceneLoader.fromDefinition(stage().scene, source, assetFixture());
+  sessions.push(loaded);
+  const camera = { width: 1000, height: 700, setViewport: vi.fn(), setZoom: vi.fn(), centerOn: vi.fn() };
+  loaded.runner.seek(500);
+  const before = snapshot(loaded.runner);
+  const actors = [...loaded.runner.actors.values()];
+  loaded.applyCamera(camera);
+  assert.deepEqual(camera.setViewport.mock.calls, [[0, 0, 1000, 700]]);
+  assert.deepEqual(camera.setZoom.mock.calls, [[2]]);
+  assert.deepEqual(camera.centerOn.mock.calls, [[120, -50]]);
+  loaded.applyCamera(camera, { x: 0, y: 0, width: 500, height: 500 });
+  assert.deepEqual(camera.setViewport.mock.calls[1], [0, 75, 500, 350]);
+  assert.deepEqual(camera.setZoom.mock.calls[1], [1]);
+  assert.deepEqual(snapshot(loaded.runner), before);
+  assert.deepEqual([...loaded.runner.actors.values()], actors);
+  assert.equal(loaded.runner.time, 500);
+  loaded.dispose();
+  assert.throws(() => loaded.applyCamera(camera), /disposed/);
+});
+
 test('ZIP runtime artwork uses isolated keys, shares image aliases, and releases URLs/textures on dispose', async () => {
   const files = await buildScenePackage(sceneFixture(), artworkFixture());
   const zip = encodePackageZip(files);
@@ -287,6 +309,11 @@ test('SceneLoader restores packaged backgrounds behind Actors and disposes their
     }
   }
   const source = sceneFixture();
+  source.camera = { x: 120, y: -50, zoom: 2 };
+  source.layers = [
+    { id: 'background', name: 'Background', visible: true, parallax: 0.2 },
+    { id: 'actors', name: 'Actors', visible: true, parallax: 1 },
+  ];
   source.images = [
     {
       id: 'background',
@@ -329,6 +356,14 @@ test('SceneLoader restores packaged backgrounds behind Actors and disposes their
     assert.isBelow(drawn[0]!.depth, loaded.runner.actors.get('hero')!.puppet.container.depth);
     loaded.runner.seek(500);
     assert.equal(drawn[0]!.x, -100);
+    const camera = { width: 1000, height: 700, setViewport: vi.fn(), setZoom: vi.fn(), centerOn: vi.fn() };
+    loaded.applyCamera(camera);
+    assert.closeTo(drawn[0]!.x, -4, 1e-9);
+    assert.closeTo(drawn[0]!.y, 10, 1e-9);
+    assert.equal(drawn[0]!.scrollFactorX, 1);
+    loaded.applyCamera(camera, { x: 0, y: 0, width: 500, height: 500 });
+    assert.closeTo(drawn[0]!.x, -4, 1e-9);
+    assert.deepEqual(source.images[0]!.position, { x: -100, y: 50 });
     loaded.dispose();
     assert.equal(textures.size, 0);
     assert.isTrue((drawn[0] as unknown as { isDestroyed: boolean }).isDestroyed);

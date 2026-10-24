@@ -30,6 +30,62 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 export const sceneGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-cinematic-camera',
+    'Cinematic Camera',
+    'Author audience framing, frame an Actor and preview through the camera independently of editor navigation.',
+    scene,
+    [
+      step(
+        'select',
+        'Select the cinematic camera',
+        T.sceneCameraSelect,
+        'After exiting this tour, choose Select Cinematic Camera in the Cinematic Camera inspector. The camera defines the audience frame independently of Actors. Its selection keeps the last selected Actor available for framing. This tour only reveals controls; it does not select, move or reset anything.',
+      ),
+      step(
+        'frame',
+        'Position the audience frame',
+        T.sceneStage,
+        'The blue rectangle is the 1000 × 700 output frame, with a 10:7 aspect ratio and a center cross. Outside camera preview, drag a frame edge to select and move the camera, or drag its center after selecting it. A completed drag is one scene Undo step; Escape cancels it without moving Actors.',
+      ),
+      step(
+        'center',
+        'Set the camera center',
+        T.sceneCameraCenter,
+        'Center X and Center Y use scene pixels: X increases rightward and Y downward. They describe the middle of the audience frame, not a scroll offset. Enter both values and use Apply camera to commit. Scenes without saved camera settings start at center (0, 0) and zoom 1.',
+      ),
+      step(
+        'zoom',
+        'Adjust zoom and reset framing',
+        T.sceneCameraZoom,
+        'Camera zoom ranges from 0.1 to 8. At zoom 1, the frame covers 1000 × 700 scene pixels; at zoom 2, it covers 500 × 350. Apply camera commits the values. Reset Camera restores center (0, 0) and zoom 1 as an undoable camera edit. Actor transforms and animation keys stay unchanged.',
+      ),
+      step(
+        'actor',
+        'Frame a selected Actor',
+        T.sceneCameraFrameActor,
+        'Select an Actor in Scene Layers, the Actor list or its timeline track, then choose Frame Selected Actor. The camera fits the current rendered bounds with 20% breathing room and bounded zoom. If reliable bounds are unavailable, it centers on the initial Actor origin and keeps zoom. With no Actor selected the button is disabled; you can still author the camera in an empty scene. The tour preserves your selection.',
+      ),
+      step(
+        'preview',
+        'Preview through the camera',
+        T.sceneCameraPreview,
+        'After exiting this tour, choose Preview Through Camera to see audience framing with backgrounds, parallax, Actors and foreground layers. Playback and scrubbing remain available. Editor overlays start hidden; enable Editor overlays during preview to show ground and selection controls. Exit Camera Preview restores the saved editor view. This tour never switches preview modes or starts playback.',
+      ),
+      step(
+        'navigation',
+        'Keep editor navigation independent',
+        T.sceneCameraNavigation,
+        'Outside camera preview, wheel zoom and middle/right/Alt-drag pan navigate the editor without changing the authored camera. Reset view restores navigation and clears the temporary Preview camera X/Y parallax inspection offset; it does not reset cinematic framing. These navigation controls are disabled during audience preview. Preview camera X/Y is view-only and excluded from audience framing and saved camera settings.',
+      ),
+      step(
+        'save',
+        'Save the camera with the scene',
+        T.scenePackage,
+        'Download scene JSON stores the initial camera center and zoom with image and character references. Download scene package includes those settings and the referenced artwork and character files; Export Project and local recovery retain camera settings too. Editor navigation, selection, preview mode and overlays are excluded. At runtime, the host explicitly applies framing with LoadedScene.applyCamera and reapplies it after resizing. Camera timeline keys are not supported yet.',
+      ),
+    ],
+  ),
+  guide(
     'scene-backgrounds-layers',
     'Backgrounds, Layers and Parallax',
     'Import scene artwork, arrange it around Actors and preview layer parallax.',

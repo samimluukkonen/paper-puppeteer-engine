@@ -208,3 +208,15 @@ export { encodePackageZip, decodePackageZip } from './packageZip.js';
 
 export { createFootContactMarker, getFootContactWorldPosition } from './footContactMarkers.js';
 export type { CreateFootContactMarkerOptions } from './footContactMarkers.js';
+
+export type { CinematicCameraState, CameraViewport, CinematicCameraTarget } from './cinematicCamera.js';
+export {
+  DEFAULT_CINEMATIC_CAMERA,
+  SCENE_OUTPUT_VIEWPORT,
+  CINEMATIC_CAMERA_MIN_ZOOM,
+  CINEMATIC_CAMERA_MAX_ZOOM,
+  cinematicCameraSchema,
+  cinematicFrame,
+  cameraForBounds,
+  applyCinematicCamera,
+} from './cinematicCamera.js';
