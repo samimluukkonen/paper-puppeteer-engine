@@ -8,10 +8,12 @@ import {
   serializeSceneDefinition,
   type SceneActorDefinition,
   type SceneImageDefinition,
+  type SceneLayerDefinition,
   type SceneActionDefinition,
   type SceneDefinition,
   type SceneValidationOptions,
 } from '../../engine/SceneDefinition.js';
+import { sceneLayers } from '../../engine/sceneLayers.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
@@ -44,6 +46,7 @@ export class SceneEditorDocument {
   private dragAction: string | null = null;
   private dragActor: string | null = null;
   private dragImage: string | null = null;
+  private readonly lockedLayers = new Map<string, Set<string>>();
   readonly images = new SceneImageRegistry();
   private groundOffsets: ReadonlyMap<string, number> = new Map();
   private groundContacts: ReadonlyMap<string, readonly ActorGroundContact[]> = new Map();
@@ -188,6 +191,7 @@ export class SceneEditorDocument {
     this.groundOffsets = new Map();
     this.groundContacts = new Map();
     this.selectedContacts.clear();
+    this.lockedLayers.delete(scene.id);
     this.entries.set(scene.id, entry);
     this.selected = scene.id;
     this.groundGuide.bind(scene.id);
@@ -255,6 +259,97 @@ export class SceneEditorDocument {
     const id = this.entry?.selectedImage;
     return this.workingScene?.images?.some((image) => image.id === id) ? id! : null;
   }
+  isLayerLocked(id: string): boolean {
+    return this.lockedLayers.get(this.selectedSceneId ?? '')?.has(id) ?? false;
+  }
+  setLayerLocked(id: string, locked: boolean): void {
+    if (!this.selectedSceneId || id === 'actors') return;
+    this.cancelImageDrag();
+    let locks = this.lockedLayers.get(this.selectedSceneId);
+    if (!locks) this.lockedLayers.set(this.selectedSceneId, (locks = new Set()));
+    if (locked) locks.add(id);
+    else locks.delete(id);
+    this.notify();
+  }
+  isImageLocked(id: string): boolean {
+    const image = this.workingScene?.images?.find((image) => image.id === id);
+    return !!image && this.isLayerLocked(image.layerId ?? 'background');
+  }
+  private finishLayerGestures(): void {
+    this.endImageDrag();
+    this.endActorDrag();
+    this.endActionDrag();
+  }
+  addLayer(): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene) return false;
+    const layers = sceneLayers(scene);
+    let index = 1;
+    while (layers.some((layer) => layer.id === `layer-${index}`)) index++;
+    return this.replaceScene({
+      ...scene,
+      layers: [...layers, { id: `layer-${index}`, name: `Layer ${index}`, visible: true, parallax: 1 }],
+    });
+  }
+  updateLayer(id: string, patch: Partial<Omit<SceneLayerDefinition, 'id'>>): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene || !sceneLayers(scene).some((layer) => layer.id === id)) return false;
+    return this.replaceScene({
+      ...scene,
+      layers: sceneLayers(scene).map((layer) => (layer.id === id ? { ...layer, ...patch } : layer)),
+    });
+  }
+  reorderLayer(id: string, offset: -1 | 1): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene) return false;
+    const layers = [...sceneLayers(scene)];
+    const index = layers.findIndex((layer) => layer.id === id);
+    const target = index + offset;
+    if (index < 0 || target < 0 || target >= layers.length) return false;
+    [layers[index], layers[target]] = [layers[target]!, layers[index]!];
+    return this.replaceScene({ ...scene, layers });
+  }
+  /** Safe deletion: retain all elements and assets, moving artwork into Background in one history entry. */
+  removeLayer(id: string): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    if (!scene || id === 'background' || id === 'actors' || this.isLayerLocked(id) || this.isLayerLocked('background'))
+      return false;
+    if (!sceneLayers(scene).some((layer) => layer.id === id)) return false;
+    return this.replaceScene({
+      ...scene,
+      layers: sceneLayers(scene).filter((layer) => layer.id !== id),
+      ...(scene.images
+        ? { images: scene.images.map((image) => (image.layerId === id ? { ...image, layerId: 'background' } : image)) }
+        : {}),
+    });
+  }
+  assignImageLayer(id: string, layerId: string): boolean {
+    this.finishLayerGestures();
+    if (this.isLayerLocked(layerId)) return false;
+    return this.updateImage(id, { layerId });
+  }
+  reorderImage(id: string, offset: -1 | 1): boolean {
+    this.finishLayerGestures();
+    const scene = this.workingScene;
+    const image = scene?.images?.find((image) => image.id === id);
+    if (!scene || !image || this.isImageLocked(id)) return false;
+    const siblings = (scene.images ?? [])
+      .filter((entry) => (entry.layerId ?? 'background') === (image.layerId ?? 'background'))
+      .sort((a, b) => a.order - b.order);
+    const index = siblings.findIndex((entry) => entry.id === id);
+    const target = index + offset;
+    if (target < 0 || target >= siblings.length) return false;
+    [siblings[index], siblings[target]] = [siblings[target]!, siblings[index]!];
+    const orders = new Map(siblings.map((entry, order) => [entry.id, order]));
+    return this.replaceScene({
+      ...scene,
+      images: scene.images!.map((entry) => (orders.has(entry.id) ? { ...entry, order: orders.get(entry.id)! } : entry)),
+    });
+  }
   selectImage(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.images?.some((image) => image.id === id))) return;
     this.cancelActorDrag();
@@ -271,6 +366,8 @@ export class SceneEditorDocument {
     this.endActionDrag();
     const scene = this.workingScene;
     if (!scene) return false;
+    if (this.isLayerLocked('background'))
+      return this.reportError(new Error('Unlock Background before adding artwork.'));
     if (!this.images.has(reference)) return this.reportError(new Error(`Missing image "${reference}".`));
     let index = 1;
     while (scene.images?.some((image) => image.id === `image-${index}`)) index++;
@@ -296,6 +393,7 @@ export class SceneEditorDocument {
     return true;
   }
   updateImage(id: string, patch: Partial<Omit<SceneImageDefinition, 'id'>>): boolean {
+    if (this.isImageLocked(id) || (patch.layerId && this.isLayerLocked(patch.layerId))) return false;
     if (!this.dragImage) {
       this.endActorDrag();
       this.endActionDrag();
@@ -308,12 +406,14 @@ export class SceneEditorDocument {
     });
   }
   removeImage(id: string): boolean {
+    if (this.isImageLocked(id)) return false;
     this.endImageDrag();
     const scene = this.workingScene;
     if (!scene?.images?.some((image) => image.id === id)) return false;
     return this.replaceScene({ ...scene, images: scene.images.filter((image) => image.id !== id) });
   }
   beginImageDrag(id: string): boolean {
+    if (this.isImageLocked(id)) return false;
     this.cancelImageDrag();
     this.selectImage(id);
     if (!this.entry || this.selectedImageId !== id) return false;

@@ -49,9 +49,19 @@ export const sceneImageReferenceSchema = z
   .string()
   .regex(/\.(?:png|webp)$/i)
   .refine(safeSceneManifest, 'Use a stable PNG/WebP path without aliases, queries or traversal.');
+/** Back-to-front array order. Reserved background/actors bands keep legacy scenes predictable. */
+export const sceneLayerDefinitionSchema = z.strictObject({
+  id: sceneIdentifier,
+  name: sceneIdentifier,
+  visible: z.boolean(),
+  parallax: z.number().nonnegative(),
+});
+export type SceneLayerDefinition = z.infer<typeof sceneLayerDefinitionSchema>;
+
 export const sceneImageDefinitionSchema = z.strictObject({
   id: sceneIdentifier,
   image: sceneImageReferenceSchema,
+  layerId: sceneIdentifier.exactOptional(),
   position: z.strictObject({ x: z.number(), y: z.number() }),
   scale: z.strictObject({ x: z.number().positive(), y: z.number().positive() }),
   visible: z.boolean(),
@@ -117,6 +127,7 @@ export const sceneDefinitionSchema = z.strictObject({
   name: sceneIdentifier,
   /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
   duration: z.number().positive(),
+  layers: z.array(sceneLayerDefinitionSchema).min(2).max(64).exactOptional(),
   images: z.array(sceneImageDefinitionSchema).max(256).exactOptional(),
   actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),
   actions: z.array(sceneActionDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions),
@@ -149,6 +160,7 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   // Bound raw collections before walking/cloning entries or allocating schema issues.
   if (input !== null && typeof input === 'object') {
     for (const [field, limit] of [
+      ['layers', 64],
       ['images', 256],
       ['actors', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors],
       ['actions', DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions],
@@ -173,10 +185,26 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   const report = (path: string, message: string): void => {
     issues.push({ severity: 'error', path, message });
   };
+  const layerIds = new Set<string>();
+  for (const [index, layer] of (scene.layers ?? []).entries()) {
+    if (layerIds.has(layer.id)) report(`layers[${index}].id`, `Duplicate layer ID "${layer.id}".`);
+    layerIds.add(layer.id);
+    if (layer.id === 'actors' && layer.parallax !== 1)
+      report(`layers[${index}].parallax`, 'The Actors band uses normal world scrolling (1).');
+  }
+  if (scene.layers) {
+    for (const id of ['background', 'actors'])
+      if (!layerIds.has(id)) report('layers', `Missing reserved "${id}" layer.`);
+  } else {
+    layerIds.add('background');
+    layerIds.add('actors');
+  }
   const imageIds = new Set<string>();
   for (const [index, image] of (scene.images ?? []).entries()) {
     if (imageIds.has(image.id)) report(`images[${index}].id`, `Duplicate image element ID "${image.id}".`);
     imageIds.add(image.id);
+    if (!layerIds.has(image.layerId ?? 'background') || image.layerId === 'actors')
+      report(`images[${index}].layerId`, 'Choose an existing artwork layer; the Actors band contains only Puppets.');
     if (options.images && !options.images.has(image.image))
       report(`images[${index}].image`, `Missing image "${image.image}". Import or replace it before export.`);
   }

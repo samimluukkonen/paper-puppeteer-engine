@@ -6,6 +6,7 @@ import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { SceneImageLayer } from '../../engine/SceneImageLayer.js';
+import { sceneLayer } from '../../engine/sceneLayers.js';
 import { createSceneTextureBudget } from '../../engine/sceneTextureBudget.js';
 import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
@@ -15,6 +16,7 @@ import { roundEditorNumber } from '../shared/editorData.js';
 import { createEditorGame } from '../shared/editorGame.js';
 import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
@@ -61,6 +63,20 @@ class SceneStage extends Phaser.Scene {
     this.refresh();
   }
   showGrid = true;
+  private cinematicScroll: Point = { x: 0, y: 0 };
+  /** View-only simulation of a future cinematic camera, independent of editor navigation. */
+  setPreviewScroll(scroll: Point): void {
+    if (!this.sys.isActive() || !Number.isFinite(scroll.x) || !Number.isFinite(scroll.y)) return;
+    this.document.cancelImageDrag();
+    this.document.cancelActorDrag();
+    this.gesture = undefined;
+    this.imageGesture = undefined;
+    this.groundHandle.cancel();
+    this.cameras.main.scrollX += scroll.x - this.cinematicScroll.x;
+    this.cameras.main.scrollY += scroll.y - this.cinematicScroll.y;
+    this.cinematicScroll = scroll;
+    this.artwork.sync(this.document.workingScene?.images, this.document.workingScene?.layers, scroll);
+  }
 
   constructor(
     private readonly document: SceneEditorDocument,
@@ -96,7 +112,7 @@ class SceneStage extends Phaser.Scene {
       )
         this.imageGesture = undefined;
       const document = this.document.workingScene;
-      this.artwork.sync(document?.images);
+      this.artwork.sync(document?.images, document?.layers, this.cinematicScroll);
       if (!document) {
         this.preview.dispose();
         this.document.setActorGroundOffsets(new Map());
@@ -175,7 +191,7 @@ class SceneStage extends Phaser.Scene {
         let id: string | null = null;
         let axis: Gesture['axis'] = 'both';
         const zoom = this.cameras.main.zoom;
-        if (selected) {
+        if (selected && sceneLayer(this.document.workingScene, 'actors').visible) {
           const dx = (point.x - selected.position.x) * zoom;
           const dy = (point.y - selected.position.y) * zoom;
           if (Math.hypot(dx, dy) < 12) {
@@ -195,14 +211,17 @@ class SceneStage extends Phaser.Scene {
         const selectedObject = selectedImage && this.artwork.objects.get(selectedImage.id);
         const selectedBounds = selectedObject?.getBounds();
         const resize =
-          !!selectedImage?.visible &&
+          !!selectedObject?.visible &&
+          !this.document.isImageLocked(selectedImage?.id ?? '') &&
           !!selectedBounds &&
           Math.hypot(point.x - selectedBounds.right, point.y - selectedBounds.bottom) * zoom < 12;
         if (resize && selectedImage && selectedObject) {
           this.startImageGesture(event.pointerId, point, selectedImage.id, true);
           return;
         }
-        if (!id) {
+        // Selected handles take precedence; otherwise the unified display depth chooses the hit.
+        const hits: { id: string; kind: 'actor' | 'image'; depth: number }[] = [];
+        if (!id && sceneLayer(this.document.workingScene, 'actors').visible) {
           for (const actor of [...this.document.workingScene.actors].reverse()) {
             const entry = this.preview.instances.get(actor.id);
             if (!entry) continue;
@@ -211,19 +230,26 @@ class SceneStage extends Phaser.Scene {
               bounds.contains(point.x, point.y) ||
               Math.hypot(point.x - actor.position.x, point.y - actor.position.y) < 14 / zoom
             ) {
-              id = actor.id;
-              break;
+              hits.push({ id: actor.id, kind: 'actor', depth: entry.actor.puppet.container.depth });
             }
           }
         }
         if (!id) {
-          const images = [...(this.document.workingScene.images ?? [])].reverse().sort((a, b) => b.order - a.order);
-          for (const image of images) {
-            if (image.visible && this.artwork.objects.get(image.id)?.getBounds().contains(point.x, point.y)) {
-              this.startImageGesture(event.pointerId, point, image.id, false);
-              return;
-            }
+          for (const image of this.document.workingScene.images ?? []) {
+            const object = this.artwork.objects.get(image.id);
+            if (
+              object?.visible &&
+              !this.document.isImageLocked(image.id) &&
+              object.getBounds().contains(point.x, point.y)
+            )
+              hits.push({ id: image.id, kind: 'image', depth: object.depth });
           }
+          const hit = hits.sort((a, b) => b.depth - a.depth)[0];
+          if (hit?.kind === 'image') {
+            this.startImageGesture(event.pointerId, point, hit.id, false);
+            return;
+          }
+          id = hit?.id ?? null;
         }
         this.document.selectActor(id);
         const actor = this.document.workingScene.actors.find((actor) => actor.id === id);
@@ -423,7 +449,11 @@ class SceneStage extends Phaser.Scene {
     this.groundOverlay.render(this.document.groundGuide.getSnapshot().guide);
     this.playback.update(delta);
     for (const { actor } of this.preview.instances.values())
-      actor.puppet.container.setVisible(!this.playback.previewing);
+      actor.puppet.container.setVisible(
+        !this.playback.previewing &&
+          !!this.document.workingScene &&
+          sceneLayer(this.document.workingScene, 'actors').visible,
+      );
     const camera = this.cameras.main;
     this.grid.clear();
     if (this.showGrid) {
@@ -443,7 +473,7 @@ class SceneStage extends Phaser.Scene {
     }
     const imageId = this.document.selectedImageId;
     const image = imageId ? this.artwork.objects.get(imageId) : undefined;
-    if (image?.visible) {
+    if (image?.visible && !this.document.isImageLocked(imageId!)) {
       const bounds = image.getBounds();
       const size = 10 / camera.zoom;
       this.overlay.lineStyle(2 / camera.zoom, 0xe5b35c).strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
@@ -451,7 +481,7 @@ class SceneStage extends Phaser.Scene {
     }
     const id = this.document.selectedActorId;
     const actor = id && (this.playback.actors?.get(id) ?? this.preview.instances.get(id)?.actor);
-    if (!actor) return;
+    if (!actor || !this.document.workingScene || !sceneLayer(this.document.workingScene, 'actors').visible) return;
     const { x, y } = actor.position;
     if (this.document.showFootContacts) {
       for (const contact of evaluatedFootContacts(actor.puppet)) {
@@ -488,6 +518,7 @@ export function SceneStageView({
   const [error, setError] = useState('');
   const [stage, setStage] = useState<SceneStage>();
   const [grid, setGrid] = useState(true);
+  const [previewScroll, setPreviewScroll] = useState<Point>({ x: 0, y: 0 });
   useLayoutEffect(() => {
     const scene = new SceneStage(document, registry, playback, setError);
     setStage(scene);
@@ -505,7 +536,7 @@ export function SceneStageView({
   }, [document, registry, playback]);
   return (
     <>
-      <div className="scene-stage-toolbar">
+      <div className="scene-stage-toolbar" data-guide-id={GUIDE_TARGETS.sceneParallaxPreview}>
         <label>
           <input
             type="checkbox"
@@ -517,10 +548,32 @@ export function SceneStageView({
           />{' '}
           Grid
         </label>
+        {(['x', 'y'] as const).map((axis) => (
+          <label key={axis}>
+            Preview camera {axis.toUpperCase()}
+            <input
+              type="number"
+              step="any"
+              value={previewScroll[axis]}
+              disabled={document.hasActiveGesture}
+              onChange={(event) => {
+                const value = event.target.valueAsNumber;
+                if (!Number.isFinite(value)) return;
+                const next = { ...previewScroll, [axis]: value };
+                setPreviewScroll(next);
+                stage?.setPreviewScroll(next);
+              }}
+            />
+          </label>
+        ))}
         <button
           type="button"
           onClick={() => {
-            if (stage?.sys.isActive()) stage.cameras.main.setZoom(1).centerOn(0, 0);
+            if (stage?.sys.isActive()) {
+              stage.setPreviewScroll({ x: 0, y: 0 });
+              setPreviewScroll({ x: 0, y: 0 });
+              stage.cameras.main.setZoom(1).centerOn(0, 0);
+            }
           }}
         >
           Reset view

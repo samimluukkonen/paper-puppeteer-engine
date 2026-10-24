@@ -34,6 +34,49 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
+    "layers": {
+      "minItems": 2,
+      "maxItems": 64,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "parallax": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": ["id", "name", "visible", "parallax"],
+        "additionalProperties": false
+      }
+    },
     "images": {
       "maxItems": 256,
       "type": "array",
@@ -55,6 +98,18 @@
           "image": {
             "type": "string",
             "pattern": "\\.(?:png|webp)$"
+          },
+          "layerId": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
           },
           "position": {
             "type": "object",

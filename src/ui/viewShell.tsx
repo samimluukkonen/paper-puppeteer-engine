@@ -72,28 +72,28 @@ export function ViewHeader({
   return (
     <>
       <header className="view-header">
-        <div className="view-header-top">
-          <a
-            className="wordmark"
-            href={`${root}project/`}
-            aria-label="Paper Puppeteer Engine"
-            onClick={
-              project
-                ? (event) => {
-                    event.preventDefault();
-                    project.navigate('project');
-                  }
-                : undefined
-            }
-          >
-            <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
-            <span className="wordmark-name">
-              Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
-            </span>
-          </a>
-          <span className="view-version">v{packageInfo.version}</span>
-        </div>
         <div className="view-header-main">
+          <div className="view-header-top">
+            <a
+              className="wordmark"
+              href={`${root}project/`}
+              aria-label="Paper Puppeteer Engine"
+              onClick={
+                project
+                  ? (event) => {
+                      event.preventDefault();
+                      project.navigate('project');
+                    }
+                  : undefined
+              }
+            >
+              <img className="mark" src={puppetLogo} width="44" height="44" alt="" />
+              <span className="wordmark-name">
+                Paper Puppeteer <span className="wordmark-sub">/ Engine</span>
+              </span>
+            </a>
+            <span className="view-version">v{packageInfo.version}</span>
+          </div>
           <div className="view-heading">
             <h1 ref={headingRef} tabIndex={-1}>
               {current.title}
@@ -134,37 +134,37 @@ export function ViewHeader({
               />
             )}
           </div>
-          <div className="view-header-guide">{featureGuide ?? <FeatureGuideButton />}</div>
-          <nav className="view-navigation" aria-label="Views">
-            {project ? (
-              <button type="button" onClick={() => project.navigate('project')}>
-                ← Project
-              </button>
-            ) : (
-              <a
-                href={`${root}project/`}
-                aria-label="Project Workspace"
-                aria-current={view === 'project' ? 'page' : undefined}
-              >
-                <FolderOpen size={16} aria-hidden="true" />
-                Project
-              </a>
-            )}
-            {Object.entries(views)
-              .filter(([id]) => id !== 'project')
-              .filter(([id]) => !project || (view !== 'scene' && (id === 'rig' || id === 'animation')))
-              .map(([id, item]) => (
-                <a
-                  key={id}
-                  href={`${root}${item.path}${project ? window.location.search : characterQuery}`}
-                  aria-current={id === view ? 'page' : undefined}
-                >
-                  <item.icon size={16} aria-hidden="true" />
-                  {item.title}
-                </a>
-              ))}
-          </nav>
         </div>
+        <div className="view-header-guide">{featureGuide ?? <FeatureGuideButton />}</div>
+        <nav className="view-navigation" aria-label="Views">
+          {project ? (
+            <button type="button" onClick={() => project.navigate('project')}>
+              ← Project
+            </button>
+          ) : (
+            <a
+              href={`${root}project/`}
+              aria-label="Project Workspace"
+              aria-current={view === 'project' ? 'page' : undefined}
+            >
+              <FolderOpen size={16} aria-hidden="true" />
+              Project
+            </a>
+          )}
+          {Object.entries(views)
+            .filter(([id]) => id !== 'project')
+            .filter(([id]) => !project || (view !== 'scene' && (id === 'rig' || id === 'animation')))
+            .map(([id, item]) => (
+              <a
+                key={id}
+                href={`${root}${item.path}${project ? window.location.search : characterQuery}`}
+                aria-current={id === view ? 'page' : undefined}
+              >
+                <item.icon size={16} aria-hidden="true" />
+                {item.title}
+              </a>
+            ))}
+        </nav>
       </header>
       {afterHeader}
       {project?.autosave && <AutosaveStatus autosave={project.autosave} />}

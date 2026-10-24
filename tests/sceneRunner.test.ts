@@ -7,6 +7,7 @@ import type { AnimationCompletion, FiredAnimationEvent } from '../src/engine/Ani
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { parseSceneDefinition, parseSceneJson, type SceneActionDefinition } from '../src/engine/SceneDefinition.js';
+import { DEFAULT_SCENE_LAYERS, sceneActorDepth } from '../src/engine/sceneLayers.js';
 import { SceneRunner, type SceneCue } from '../src/engine/SceneRunner.js';
 import { puppetScene } from './helpers/puppetScene.js';
 import { requestUrl } from './helpers/requestUrl.js';
@@ -119,6 +120,60 @@ function snapshot(runner: SceneRunner) {
     pose: actor.puppet.getBone('root').pose.x,
   }));
 }
+
+test('layer edits preserve playing Actor identity, movement, clock and whole-Puppet depth through restart', () => {
+  const assets = factory();
+  const playback = new SceneEditorPlayback();
+  const source = scene([move('a', 0, 1000)]);
+  playback.sync(source, true, assets.createActor);
+  playback.play();
+  playback.update(250);
+  const actor = playback.actors!.get('a')!;
+  const position = actor.position;
+  const layers = [{ id: 'foreground', name: 'Trees', visible: true, parallax: 1.2 }, ...DEFAULT_SCENE_LAYERS];
+  playback.sync({ ...source, layers }, true, assets.createActor);
+  assert.strictEqual(playback.actors!.get('a'), actor);
+  assert.equal(playback.time, 250);
+  assert.deepEqual(actor.position, position);
+  assert.equal(actor.puppet.container.depth, sceneActorDepth({ layers }, 0));
+  const hidden = layers.map((layer) => ({ ...layer, visible: layer.id !== 'actors' }));
+  playback.sync({ ...source, layers: hidden }, true, assets.createActor);
+  assert.isFalse(actor.puppet.container.visible);
+  playback.update(250);
+  assert.equal(actor.position.x, 50);
+  playback.sync({ ...source, layers }, true, assets.createActor);
+  assert.isTrue(actor.puppet.container.visible);
+  playback.restart();
+  assert.equal(playback.actors!.get('a')!.puppet.container.depth, sceneActorDepth({ layers }, 0));
+  assert.deepEqual(source.actors[0]!.position, { x: 0, y: 0 });
+  playback.dispose();
+});
+
+test('runtime Actor factory receives layer depth and visibility survives scene reconstruction', () => {
+  const assets = factory();
+  const source = {
+    ...scene(),
+    layers: [...DEFAULT_SCENE_LAYERS].reverse().map((layer) => ({ ...layer, visible: false })),
+  };
+  const depths: number[] = [];
+  const runner = new SceneRunner(source, {
+    createActor: (data, depth) => {
+      depths.push(depth);
+      const actor = assets.createActor(data);
+      actor.puppet.container.setDepth(depth);
+      return actor;
+    },
+  });
+  runners.push(runner);
+  assert.deepEqual(
+    depths,
+    source.actors.map((_, index) => sceneActorDepth(source, index)),
+  );
+  assert.isFalse(runner.actors.get('a')!.puppet.container.visible);
+  runner.seek(500);
+  assert.isFalse(runner.actors.get('a')!.puppet.container.visible);
+  assert.equal(runner.actors.get('b')!.puppet.container.depth, sceneActorDepth(source, 1));
+});
 
 test('start, pause, resume, speed, restart and stop use one scene clock', () => {
   const { runner } = fixture([move('a')]);

@@ -30,6 +30,62 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 export const sceneGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-backgrounds-layers',
+    'Backgrounds, Layers and Parallax',
+    'Import scene artwork, arrange it around Actors and preview layer parallax.',
+    scene,
+    [
+      step(
+        'import',
+        'Add a background image',
+        T.sceneAddBackground,
+        'After exiting this tour, choose + Add Background in Scene Artwork to import a PNG or static WebP. Each image is independent scene artwork with its own placement; character rigs and attachments stay unchanged. An empty scene is enough to start.',
+      ),
+      step(
+        'reuse',
+        'Reuse project artwork',
+        T.sceneProjectImage,
+        '+ Add Image From Project offers imported scene images and, inside a project, character package artwork. Choose an image to create another independent element. This tour does not open a picker or import anything.',
+      ),
+      step(
+        'placement',
+        'Position and scale artwork',
+        T.sceneImageTransform,
+        'Select an image in Scene Artwork or Scene Layers. While stopped, drag it on the stage and use its lower-right corner to scale. Numeric Position X/Y sets its center; Apply image transform commits position and scale together. Escape cancels a drag; Undo/Redo restores completed edits. If no image is selected, this section explains how to begin. This tour keeps your current selection.',
+      ),
+      step(
+        'layers',
+        'Organize background and foreground layers',
+        T.sceneLayers,
+        '+ Add Layer creates an artwork layer. Set its name with Apply layer, then use each image row’s Layer menu to assign it. The hierarchy lists frontmost layers first and selects obscured elements. Put mountains behind forest artwork and trees in front of the Actors band. Each Actor remains a whole Puppet; artwork cannot split its bones or interleave individual Actors.',
+      ),
+      step(
+        'order',
+        'Control depth, visibility and locks',
+        T.sceneLayerOrder,
+        'Forward / Backward moves a layer; row arrows order images or Actors within their band. Visible hides artwork without deleting it. Lock protects images from canvas and inspector edits for this editor session. Removing an artwork layer moves its images into Background and keeps assets, as one Undo/Redo action. Background and Actors cannot be removed. Ground guides and selected handles remain above artwork.',
+      ),
+      step(
+        'parallax',
+        'Set layer parallax',
+        T.sceneLayerParallax,
+        'Each artwork layer has a Parallax field committed with Apply layer. Use 0 for fixed scrolling, 1 for normal world scrolling, a fraction for slower backgrounds, or a value above 1 for faster foregrounds. For example, try 0.2 for mountains, 0.5 for forest and 1.2 for foreground trees. The Actors band always uses 1, and authored movement paths stay unchanged.',
+      ),
+      step(
+        'preview',
+        'Preview scrolling independently of placement',
+        T.sceneParallaxPreview,
+        'After exiting this tour, change Preview camera X/Y to inspect parallax, including during choreography playback. Editor wheel zoom and middle/right/Alt-drag panning remain ordinary navigation. Neither navigation nor preview scroll edits image positions or creates history entries. Reset view clears preview scroll and navigation. The tour changes none of these values.',
+      ),
+      step(
+        'save',
+        'Save artwork with the scene',
+        T.scenePackage,
+        'Download scene JSON stores image references, layer order, visibility and parallax. Download scene package includes the image and character binaries for portable handoff; Export Project preserves them in the workspace ZIP. Editor-only locks, selection and preview camera values are not exported. Clean unused images retains assets needed by scene history.',
+      ),
+    ],
+  ),
+  guide(
     'scene-grounding-characters',
     'Grounding Characters',
     'Snap independent Actors using their evaluated bone-local contacts.',
@@ -267,7 +323,7 @@ export const sceneGuides: readonly GuideDefinition[] = [
         'package',
         'Package for the runtime',
         T.scenePackage,
-        'Download scene package includes scene.json and its referenced character files. The standalone scene.html example loads JSON or an exported ZIP through SceneLoader and SceneRunner. The editor imports JSON; ZIP import is available in the runtime example.',
+        'Download scene package includes scene.json, referenced character files and scene artwork, retaining layer order and parallax. SceneLoader.loadPackage loads the exported ZIP at runtime. The editor imports scene JSON with its image references; Export Project includes artwork in the workspace ZIP.',
       ),
     ],
   ),

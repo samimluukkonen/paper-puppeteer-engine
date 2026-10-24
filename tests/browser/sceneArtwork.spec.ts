@@ -217,6 +217,18 @@ test('existing project images and WebP background survive project export, reopen
   });
   await frame.getByLabel('Position X', { exact: true }).fill('10');
   await frame.getByRole('button', { name: 'Apply image transform', exact: true }).click();
+  await frame.locator('.scene-layers summary').click();
+  await frame.getByRole('button', { name: '+ Add Layer', exact: true }).click();
+  await frame.getByLabel('Name for layer-1', { exact: true }).fill('Far forest');
+  await frame.getByLabel('Parallax for layer-1', { exact: true }).fill('0.5');
+  await frame
+    .getByLabel('Name for layer-1', { exact: true })
+    .locator('..')
+    .locator('..')
+    .getByRole('button', { name: 'Apply layer' })
+    .click();
+  await frame.getByLabel('Layer for image-2', { exact: true }).selectOption('layer-1');
+  await frame.getByRole('button', { name: 'Move Far forest backward', exact: true }).click();
   await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
   await expect(frame.locator('.scene-preview-error')).toHaveCount(0);
   await frame.getByRole('button', { name: '← Project', exact: true }).click();
@@ -229,6 +241,9 @@ test('existing project images and WebP background survive project export, reopen
   const workspace = await importProjectPackage(archive);
   expect(workspace.scenes.workingScene?.images).toHaveLength(2);
   expect(workspace.scenes.workingScene?.actors).toHaveLength(1);
+  expect(workspace.scenes.workingScene?.layers?.map((layer) => layer.id)).toEqual(['background', 'layer-1', 'actors']);
+  expect(workspace.scenes.workingScene?.layers?.[1]).toMatchObject({ name: 'Far forest', parallax: 0.5 });
+  expect(workspace.scenes.workingScene?.images?.[1]?.layerId).toBe('layer-1');
   await page.reload();
   await page
     .getByRole('dialog', { name: 'Recover unsaved work?' })
@@ -245,6 +260,8 @@ test('existing project images and WebP background survive project export, reopen
   await restored.locator('.scene-artwork summary').click();
   await restored.getByRole('button', { name: /forest.webp · image-2/ }).click();
   await expect(restored.getByLabel('Position X', { exact: true })).toHaveValue('10');
+  await restored.locator('.scene-layers summary').click();
+  await expect(restored.getByLabel('Parallax for layer-1', { exact: true })).toHaveValue('0.5');
   await restored.getByRole('button', { name: 'Play', exact: true }).click();
   await restored.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(restored.locator('.scene-preview-error')).toHaveCount(0);
@@ -253,4 +270,151 @@ test('existing project images and WebP background survive project export, reopen
   expect(colors.blue).toBeGreaterThan(1000);
   expect(colors.red).toBeGreaterThan(10);
   await page.screenshot({ path: test.info().outputPath('scene-artwork-project-reopened.png') });
+});
+
+test('layers compose foreground over Actors with parallax picking, locks, history and scene reload', async ({
+  page,
+}) => {
+  await page.goto('scene-editor/');
+  const source = {
+    version: 2,
+    id: 'layers',
+    name: 'Layered forest',
+    duration: 2000,
+    actors: [
+      {
+        id: 'hero',
+        character: { manifest: '../characters/demo-puppet/character.json' },
+        position: { x: 0, y: 100 },
+        animation: 'idle',
+      },
+    ],
+    actions: [{ id: 'walk', type: 'move', actorId: 'hero', time: 0, duration: 1000, destination: { x: 100, y: 100 } }],
+  };
+  await page
+    .getByLabel('Open scene JSON')
+    .setInputFiles({ name: 'layers.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(source)) });
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await page.locator('.scene-artwork summary').click();
+  await page
+    .getByLabel('Import scene artwork')
+    .setInputFiles({ name: 'forest.png', mimeType: 'image/png', buffer: await imageBytes(page, 600, 400, '#174bc7') });
+  await page
+    .getByLabel('Import scene artwork')
+    .setInputFiles({ name: 'tree.png', mimeType: 'image/png', buffer: await imageBytes(page, 80, 250, '#e02020') });
+  await page.getByLabel('Position X', { exact: true }).fill('100');
+  await page.getByRole('button', { name: 'Apply image transform', exact: true }).click();
+  await page.locator('.scene-layers summary').click();
+  await page.getByRole('button', { name: '+ Add Layer', exact: true }).click();
+  await page.getByLabel('Name for layer-1', { exact: true }).fill('Foreground trees');
+  await page.getByLabel('Parallax for layer-1', { exact: true }).fill('1.2');
+  const settings = page.getByLabel('Name for layer-1', { exact: true }).locator('..').locator('..');
+  await settings.getByRole('button', { name: 'Apply layer' }).click();
+  await page.getByLabel('Layer for image-2', { exact: true }).selectOption('layer-1');
+  await page.getByLabel('Grid', { exact: true }).uncheck();
+  const canvas = page.locator('#scene-stage-canvas canvas');
+  const tree = async () => {
+    await waitForPreviewPaint(page);
+    return page.evaluate(
+      async (url) => {
+        const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+        const pixels = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const context = pixels.getContext('2d')!;
+        context.drawImage(bitmap, 0, 0);
+        const data = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+        let count = 0,
+          sumX = 0,
+          sumY = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i] === 224 && data[i + 1] === 32 && data[i + 2] === 32) {
+            count++;
+            sumX += (i / 4) % bitmap.width;
+            sumY += Math.floor(i / 4 / bitmap.width);
+          }
+        }
+        bitmap.close();
+        return { count, x: sumX / count, y: sumY / count };
+      },
+      `data:image/png;base64,${(await canvas.screenshot()).toString('base64')}`,
+    );
+  };
+  const before = await tree();
+  expect(before.count).toBeGreaterThan(1000);
+  await page.getByRole('button', { name: 'Move Foreground trees backward', exact: true }).click();
+  await page.getByRole('button', { name: 'Move Foreground trees backward', exact: true }).click();
+  expect((await tree()).count).toBe(0); // Opaque forest now covers the tree.
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await tree()).count).toBeGreaterThan(1000);
+  await page.getByLabel('Preview camera X', { exact: true }).fill('100');
+  const box = (await canvas.boundingBox())!;
+  const sx = box.width / 1000,
+    sy = box.height / 700;
+  const shifted = await tree();
+  expect(shifted.x - before.x).toBeCloseTo(-120 * sx, 0);
+  const cameraOnly = await downloadJson(page);
+  expect(cameraOnly.images?.[1]?.position).toEqual({ x: 100, y: 0 });
+  expect(cameraOnly.actors).toEqual(source.actors);
+  // Select the Actor through an overlapping foreground, then select the frontmost image on canvas.
+  await page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true }).click();
+  const center = { x: box.x + box.width / 2 - 20 * sx, y: box.y + box.height / 2 - 60 * sy };
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + 30 * sx, center.y, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await page.getByLabel('Position X', { exact: true }).inputValue()))
+    .toBeCloseTo(130, 3);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByLabel('Position X', { exact: true })).toHaveValue('100');
+  // Lock blocks authored edits while retaining hierarchy selection and normal camera navigation.
+  await page.getByLabel('Lock Foreground trees', { exact: true }).check();
+  await page.locator('.scene-layers').getByRole('button', { name: 'image-2', exact: true }).click();
+  await expect(page.getByLabel('Position X', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Layer for image-2', { exact: true })).toBeDisabled();
+  await page.getByLabel('Lock Foreground trees', { exact: true }).uncheck();
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.wheel(0, -200);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(center.x + 30, center.y + 20);
+  await page.mouse.up({ button: 'middle' });
+  await waitForPreviewPaint(page);
+  const zoomedTree = await tree();
+  await page.mouse.move(box.x + zoomedTree.x, box.y + zoomedTree.y - 40 * sy);
+  await page.mouse.down();
+  await page.mouse.move(box.x + zoomedTree.x + 20 * sx, box.y + zoomedTree.y - 40 * sy, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await page.getByLabel('Position X', { exact: true }).inputValue()))
+    .toBeCloseTo(100 + 20 / Math.exp(0.2), 3);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const navigationOnly = await downloadJson(page);
+  expect(navigationOnly.images).toEqual(cameraOnly.images);
+  expect(navigationOnly.actors).toEqual(source.actors);
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  await expect(page.getByLabel('Preview camera X', { exact: true })).toHaveValue('0');
+  await page.getByLabel('Show Foreground trees', { exact: true }).uncheck();
+  expect((await tree()).count).toBe(0);
+  await page.getByLabel('Show Foreground trees', { exact: true }).check();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const playhead = await page.getByLabel('Playhead (s)', { exact: true }).inputValue();
+  await page.getByLabel('Show Foreground trees', { exact: true }).uncheck();
+  await expect(page.getByLabel('Playhead (s)', { exact: true })).toHaveValue(playhead);
+  await page.getByLabel('Show Foreground trees', { exact: true }).check();
+  const waiting = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download scene package', exact: true }).click();
+  const buffer = await readFile(await (await waiting).path());
+  const restored = await validateScenePackage(decodePackageZip(new Uint8Array(buffer)));
+  expect(restored.definition.layers).toEqual(cameraOnly.layers);
+  expect(restored.definition.images?.[1]?.layerId).toBe('layer-1');
+  await page.getByLabel('Open scene JSON').setInputFiles({
+    name: 'layers.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(cameraOnly)),
+  });
+  await expect(page.getByRole('status')).toContainText('Scene imported.');
+  await expect(page.locator('.scene-preview-error')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('scene-layers.png') });
 });

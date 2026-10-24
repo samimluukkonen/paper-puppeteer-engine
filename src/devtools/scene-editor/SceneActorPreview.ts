@@ -5,6 +5,7 @@ import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneActorDefinition } from '../../engine/SceneDefinition.js';
+import { sceneActorDepth, sceneLayer } from '../../engine/sceneLayers.js';
 import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
 import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { actorGroundOffset } from './actorGrounding.js';
@@ -59,7 +60,9 @@ export class SceneActorPreview {
           this.appearance(entry.actor, data, definition);
         }
         entry.actor.setFacing(data.facing ?? 'right').setPosition(data.position.x, data.position.y);
-        entry.actor.puppet.container.setDepth(depth);
+        entry.actor.puppet.container
+          .setDepth(sceneActorDepth(document, depth))
+          .setVisible(sceneLayer(document, 'actors').visible);
         entry.data = data;
       } catch (error) {
         this.instances.get(data.id)?.actor.dispose();

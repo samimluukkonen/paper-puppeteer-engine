@@ -186,7 +186,7 @@ async function loadSession(
       if (!bytes) return Promise.reject(new Error(`Missing scene image "${reference}".`));
       return Promise.resolve(bytes);
     });
-    artwork.sync(prepared.resolved.definition.images);
+    artwork.sync(prepared.resolved.definition.images, prepared.resolved.definition.layers);
     await artwork.ready();
     controller.signal.throwIfAborted();
     runner = new SceneRunner(prepared.resolved.definition, {

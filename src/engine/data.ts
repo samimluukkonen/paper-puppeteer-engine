@@ -33,6 +33,7 @@ export type {
   SceneDefinition,
   SceneActorDefinition,
   SceneImageDefinition,
+  SceneLayerDefinition,
   SceneActionDefinition,
   SceneCharacterReference,
   SceneCharacterAssets,

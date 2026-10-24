@@ -8,6 +8,7 @@ import {
   type SceneActorDefinition,
   type SceneDefinition,
 } from './SceneDefinition.js';
+import { sceneActorDepth, sceneLayer } from './sceneLayers.js';
 import { assertFinite } from './types.js';
 
 export type SceneRunnerStatus =
@@ -228,12 +229,13 @@ export class SceneRunner {
     this.failure = undefined;
     try {
       this.definition.actors.forEach((data, depth) => {
-        const actor = this.options.createActor(data, depth);
+        const actor = this.options.createActor(data, sceneActorDepth(this.definition, depth));
         if (actor.isDisposed || actor.id !== data.id || actor.puppetOwnership !== 'owned') {
           actor.dispose();
           throw new Error(`Scene Actor "${data.id}" must be a fresh, live, owned instance with the authored ID.`);
         }
         this.instances.set(data.id, actor);
+        actor.puppet.container.setVisible(sceneLayer(this.definition, 'actors').visible);
         actor.puppet.animationPlayer.setPreviewMode(!runtime);
         actor.setPosition(data.position.x, data.position.y).setFacing(data.facing ?? 'right');
         if (data.skin !== undefined) actor.setSkin(data.skin);

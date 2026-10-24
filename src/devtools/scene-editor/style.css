@@ -358,3 +358,61 @@
   width: auto;
   min-height: 0;
 }
+
+.scene-layers > summary {
+  margin-bottom: 16px;
+}
+.scene-layer-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.scene-layer-list > li {
+  border-top: 1px solid var(--border-default);
+  padding: 12px 0;
+}
+.scene-layer-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px auto;
+  gap: 8px;
+  align-items: end;
+}
+.scene-inspector .scene-layer-settings label {
+  margin: 0;
+}
+.scene-layer-element {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.scene-layer-element > button {
+  width: auto;
+  flex-shrink: 0;
+}
+.scene-layer-element > button:first-child {
+  flex: 1;
+  text-align: left;
+  min-width: 0;
+}
+.scene-layer-element select {
+  max-width: 120px;
+}
+.scene-inspector .scene-layers input[type="checkbox"] {
+  width: auto;
+}
+.scene-inspector .scene-layers .scene-artwork-commands label {
+  display: flex;
+  flex-direction: row;
+  margin: 0;
+  align-items: center;
+  gap: 4px;
+}
+.scene-artwork fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.scene-stage-toolbar input[type="number"] {
+  width: 72px;
+}

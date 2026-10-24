@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { projectEditorContext } from '../project/projectBridge.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 /** Collapsed inspector uses the same binary registry as project imports and recovery. */
@@ -40,6 +41,7 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
         <button
           type="button"
           className="workspace-primary"
+          data-guide-id={GUIDE_TARGETS.sceneAddBackground}
           disabled={busy}
           onClick={() => {
             setReplacement(false);
@@ -50,6 +52,7 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
         </button>
         <button
           type="button"
+          data-guide-id={GUIDE_TARGETS.sceneProjectImage}
           disabled={busy}
           onClick={() => {
             setReplacement(false);
@@ -142,6 +145,7 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
       {selected && (
         <form
           key={selected.id}
+          data-guide-id={GUIDE_TARGETS.sceneImageTransform}
           onSubmit={(event) => {
             event.preventDefault();
             const values = new FormData(event.currentTarget);
@@ -152,71 +156,81 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
             });
           }}
         >
-          <p className="workspace-caption">
-            Selected image: {selected.id}. Position is the image center in scene pixels.
-          </p>
-          {(
-            [
-              ['Position X', 'x', selected.position.x],
-              ['Position Y', 'y', selected.position.y],
-              ['Scale X', 'scaleX', selected.scale.x],
-              ['Scale Y', 'scaleY', selected.scale.y],
-            ] as const
-          ).map(([label, name, value]) => (
-            <label key={`${selected.id}-${name}-${value}`}>
-              {label}
+          <fieldset disabled={document.isImageLocked(selected.id)}>
+            <p className="workspace-caption">
+              Selected image: {selected.id}. Position is the image center in scene pixels.
+            </p>
+            {(
+              [
+                ['Position X', 'x', selected.position.x],
+                ['Position Y', 'y', selected.position.y],
+                ['Scale X', 'scaleX', selected.scale.x],
+                ['Scale Y', 'scaleY', selected.scale.y],
+              ] as const
+            ).map(([label, name, value]) => (
+              <label key={`${selected.id}-${name}-${value}`}>
+                {label}
+                <input
+                  type="number"
+                  name={name}
+                  step="any"
+                  required
+                  defaultValue={value}
+                  {...(name.startsWith('scale') ? { min: Number.MIN_VALUE } : {})}
+                />
+              </label>
+            ))}
+            <button type="submit">Apply image transform</button>
+            <label className="scene-artwork-visibility">
               <input
-                type="number"
-                name={name}
-                step="any"
-                required
-                defaultValue={value}
-                {...(name.startsWith('scale') ? { min: Number.MIN_VALUE } : {})}
-              />
+                type="checkbox"
+                checked={selected.visible}
+                onChange={(event) => document.updateImage(selected.id, { visible: event.target.checked })}
+              />{' '}
+              Visible
             </label>
-          ))}
-          <button type="submit">Apply image transform</button>
-          <label className="scene-artwork-visibility">
-            <input
-              type="checkbox"
-              checked={selected.visible}
-              onChange={(event) => document.updateImage(selected.id, { visible: event.target.checked })}
-            />{' '}
-            Visible
-          </label>
-          {!document.images.has(selected.image) && <p role="alert">Missing image. Replace it before exporting.</p>}
-          <div className="scene-artwork-commands">
-            <button
-              type="button"
-              onClick={() => document.updateImage(selected.id, { position: { x: 0, y: 0 }, scale: { x: 1, y: 1 } })}
-            >
-              Reset transforms
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                setReplacement(true);
-                input.current?.click();
-              }}
-            >
-              Replace Image
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                setReplacement(true);
-                setChoosing(true);
-              }}
-            >
-              Replace from project
-            </button>
-            <button type="button" className="workspace-danger" onClick={() => document.removeImage(selected.id)}>
-              Remove Element
-            </button>
-          </div>
+            {!document.images.has(selected.image) && <p role="alert">Missing image. Replace it before exporting.</p>}
+            <div className="scene-artwork-commands">
+              <button
+                type="button"
+                onClick={() => document.updateImage(selected.id, { position: { x: 0, y: 0 }, scale: { x: 1, y: 1 } })}
+              >
+                Reset transforms
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setReplacement(true);
+                  input.current?.click();
+                }}
+              >
+                Replace Image
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setReplacement(true);
+                  setChoosing(true);
+                }}
+              >
+                Replace from project
+              </button>
+              <button type="button" className="workspace-danger" onClick={() => document.removeImage(selected.id)}>
+                Remove Element
+              </button>
+            </div>
+          </fieldset>
+          {document.isImageLocked(selected.id) && (
+            <p className="workspace-caption">Unlock this image’s layer in Scene Layers to edit it.</p>
+          )}
         </form>
+      )}
+      {!selected && (
+        <p className="workspace-caption" data-guide-id={GUIDE_TARGETS.sceneImageTransform}>
+          Add or select an image to edit its position, scale and visibility. Select obscured artwork in Scene Layers.
+        </p>
       )}
       <button
         type="button"

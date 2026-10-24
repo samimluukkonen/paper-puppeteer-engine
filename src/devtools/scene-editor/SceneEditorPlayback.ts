@@ -1,4 +1,5 @@
 import { equalJsonData } from '../../engine/equalJsonData.js';
+import { sceneActorDepth, sceneLayer } from '../../engine/sceneLayers.js';
 import type { SceneRunnerOptions } from '../../engine/SceneRunner.js';
 import { SceneRunner } from '../../engine/SceneRunner.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
@@ -52,10 +53,11 @@ export class SceneEditorPlayback {
   sync(source: ReadonlyScene | null, ready: boolean, createActor: SceneRunnerOptions['createActor']): void {
     if (this.source === source && this.runner && ready) return;
     if (this.source && source && this.runner && ready) {
-      const { images: _previousImages, ...previous } = this.source;
-      const { images: _nextImages, ...next } = source;
+      const { images: _previousImages, layers: _previousLayers, ...previous } = this.source;
+      const { images: _nextImages, layers: _nextLayers, ...next } = source;
       if (equalJsonData(previous, next)) {
         this.source = source;
+        this.syncLayers();
         return;
       }
     }
@@ -73,6 +75,19 @@ export class SceneEditorPlayback {
       });
     else this.notify();
   }
+  private syncLayers(): void {
+    const source = this.source;
+    if (!source || !this.runner) return;
+    const visible = this.previewing && sceneLayer(source, 'actors').visible;
+    source.actors.forEach((actor, index) => {
+      const container = this.runner?.actors.get(actor.id)?.puppet.container;
+      if (!container) return;
+      const depth = sceneActorDepth(source, index);
+      // Phaser queues a display-list sort even when setDepth receives the current value.
+      if (container.depth !== depth) container.setDepth(depth);
+      if (container.visible !== visible) container.setVisible(visible);
+    });
+  }
   private showAuthoring(): void {
     if (this.runner?.status === 'stopped')
       for (const actor of this.runner.actors.values()) actor.puppet.container.setVisible(false);
@@ -81,6 +96,7 @@ export class SceneEditorPlayback {
     this.message = '';
     try {
       operation();
+      this.syncLayers();
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);
     }

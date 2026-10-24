@@ -51,6 +51,10 @@
   margin: 0 0 8px;
   font-size: 17px;
 }
+.guide-step-card > h2:focus {
+  /* Keep announcement focus on the title without styling it as an interactive control. */
+  outline: none;
+}
 .guide-step-card h3 {
   font-size: 15px;
 }

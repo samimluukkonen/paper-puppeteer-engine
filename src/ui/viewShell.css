@@ -8,6 +8,11 @@
   padding: 24px 0;
 }
 .view-header {
+  display: grid;
+  /* Equal side tracks center the guide on the full header. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
   padding: 20px 0;
   border-bottom: 1px solid var(--border-default);
 }
@@ -19,8 +24,15 @@
   gap: 16px;
 }
 .view-header-main {
-  margin-top: 14px;
-  flex-wrap: wrap;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 24px;
+}
+.view-header-top {
+  flex-shrink: 0;
+}
+.view-heading {
+  min-width: 0;
 }
 .view-version {
   padding: 2px 7px;
@@ -102,6 +114,10 @@
 .view-navigation {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  justify-self: end;
+  min-width: 0;
+  max-width: 100%;
   gap: 6px;
   font-size: 12px;
 }
@@ -118,7 +134,7 @@
 }
 .view-header-guide {
   display: flex;
-  flex: 1;
+  justify-self: center;
   justify-content: center;
 }
 .view-header-guide:empty {

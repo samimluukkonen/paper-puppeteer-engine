@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { afterEach, assert, expect, test, vi } from 'vitest';
 import type { SceneImageDefinition } from '../src/engine/SceneDefinition.js';
 import { SceneImageLayer } from '../src/engine/SceneImageLayer.js';
+import { DEFAULT_SCENE_LAYERS, sceneActorDepth } from '../src/engine/sceneLayers.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';
 
 class TestImage {
@@ -19,6 +20,8 @@ class TestObject {
   visible = true;
   alpha = 1;
   depth = 0;
+  scrollFactorX = 1;
+  scrollFactorY = 1;
   destroyed = false;
   constructor(key: string) {
     this.texture = { key };
@@ -184,4 +187,34 @@ test('failed decoding is actionable, retryable and releases each failed lease', 
   assert.equal(layer.objects.size, 1);
   layer.dispose();
   assert.equal(revoke.mock.calls.length, 2);
+});
+
+test('shared renderer applies layer depth, visibility and native parallax without changing authored data', async () => {
+  const { scene, objects } = stage();
+  const layers = [...DEFAULT_SCENE_LAYERS, { id: 'foreground', name: 'Trees', visible: true, parallax: 1.2 }];
+  const elements = [image, { ...image, id: 'tree', layerId: 'foreground' }];
+  const authored = JSON.stringify(elements);
+  const layer = new SceneImageLayer(scene, bytes);
+  layer.sync(elements, layers);
+  await layer.ready();
+  assert.isBelow(objects[0]!.depth, sceneActorDepth({ layers }, 0));
+  assert.isAbove(objects[1]!.depth, sceneActorDepth({ layers }, 255));
+  assert.equal(objects[1]!.scrollFactorX, 1.2);
+  assert.equal(objects[1]!.scrollFactorY, 1.2);
+  layer.sync(
+    elements,
+    layers.map((entry) => ({ ...entry, visible: false })),
+  );
+  assert.isFalse(objects[0]!.visible);
+  assert.isFalse(objects[1]!.visible);
+  layer.sync(elements, [...layers].reverse());
+  assert.isBelow(objects[1]!.depth, objects[0]!.depth);
+  // Editor uses only explicit cinematic scroll for compensation. Native camera pan is separate.
+  layer.sync(elements, layers, { x: 100, y: 50 });
+  assert.closeTo(objects[1]!.x, image.position.x - 20, 1e-9);
+  assert.closeTo(objects[1]!.y, image.position.y - 10, 1e-9);
+  assert.equal(objects[1]!.scrollFactorX, 1);
+  assert.equal(JSON.stringify(elements), authored);
+  assert.lengthOf(objects, 2);
+  layer.dispose();
 });

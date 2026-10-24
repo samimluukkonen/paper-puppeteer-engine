@@ -4,7 +4,7 @@
 
 Open a scene and expand **Scene Artwork** in the inspector. **Add Background** opens a compact PNG/static WebP picker. **Add Image From Project** offers previously imported scene images and current character package images, including committed character artwork replacements. Choosing an image creates an independent scene element; it does not modify rig attachments. Merely opening the picker does not change the project.
 
-Select an image in the list or click its visible bounds on the stage. Drag to position its center in scene-world pixels. Drag the lower-right corner handle to scale each axis around that center. Wheel zoom and middle/right/Alt-drag panning use the existing stage coordinate adapter. Actors have click priority where they overlap artwork. Placement gestures are available while the stage shows authored placement; stop playback to return there. Numeric transforms and visibility remain available during playback without resetting Actors or their clock.
+Select an image in the list or click its visible bounds on the stage. Drag to position its center in scene-world pixels. Drag the lower-right corner handle to scale each axis around that center. Wheel zoom and middle/right/Alt-drag panning use the existing stage coordinate adapter. Canvas hits follow layer depth; selected handles take priority. Select obscured elements in Scene Layers. Placement gestures are available while the stage shows authored placement; stop playback to return there. Numeric transforms and visibility remain available during playback without resetting Actors or their clock.
 
 **Apply image transform** commits the four numeric fields together. Scales must be positive and finite. **Reset transforms** restores position `(0, 0)` and scale `(1, 1)`. **Visible** toggles rendering. **Replace Image** imports a new binary for just the selected element; **Replace from project** uses the existing library. **Remove Element** removes its placement. Every completed drag is one Undo/Redo operation; Escape, lost pointer capture, navigation and teardown cancel a provisional drag. Inspector disclosures start collapsed. There are no mobile layouts.
 
@@ -12,7 +12,7 @@ Images stay in the library after removal so another scene or Undo/Redo can reuse
 
 ## Authored data and rendering
 
-Scene format **2** gains an optional `images` array. Older scenes omit it and load without migration. Each element stores a stable element `id`, stable PNG/WebP `image` path, center `position`, positive `scale`, `visible`, integer background `order` (0–255), and optional `opacity` (0–1). All artwork renders behind Actors; equal orders preserve authored array order. No Phaser object, texture key or Blob URL is serialized.
+Scene format **2** gains an optional `images` array. Older scenes omit it and load without migration. Each element stores a stable element `id`, stable PNG/WebP `image` path, center `position`, positive `scale`, `visible`, integer background `order` (0–255), and optional `opacity` (0–1). Artwork belongs to ordered [scene layers](scene-layers.md); legacy scenes default to artwork behind Actors. Equal image orders within a layer preserve authored array order. No Phaser object, texture key or Blob URL is serialized.
 
 `SceneEditorDocument` owns immutable snapshots, image selection and grouped image gestures. Its `SceneImageRegistry` owns detached binaries and content-based paths. React's `SceneArtworkPanel` issues document commands. Phaser's `SceneImageLayer` reconciles independent image objects and private texture leases, shared by the editor stage and `SceneLoader`. Transform/visibility changes reuse textures. Background edits preserve character rigs, Actor definitions, runtime Actor identity and playback time.
 
@@ -20,7 +20,7 @@ Local file imports reuse `importSprite`, image headers, dimension/byte limits an
 
 ## Saving and handoff
 
-**Download scene JSON** stores references only. It cannot put imported images onto your hosting server or overwrite repository files. Use **Download scene package** for a portable scene and its required artwork/characters. That ZIP rebases image references under `images/` in a detached copy. `SceneLoader.loadPackage` restores images behind Actors and owns their private textures until disposal. Hosted `SceneLoader.load` / `fromDefinition` resolve image paths relative to the scene JSON; a host may supply `SceneAssetOptions.loadImage` for a binary cache.
+**Download scene JSON** stores references only. It cannot put imported images onto your hosting server or overwrite repository files. Use **Download scene package** for a portable scene and its required artwork/characters. That ZIP rebases image references under `images/` in a detached copy. `SceneLoader.loadPackage` restores image layers and Actor depth and owns their private textures until disposal. Hosted `SceneLoader.load` / `fromDefinition` resolve image paths relative to the scene JSON; a host may supply `SceneAssetOptions.loadImage` for a binary cache.
 
 **Export Project** includes the scene image registry in project format 1 and maps logical image paths to physical ZIP resources. Identical image content is stored once, including images shared with character packages. Import restores original scene references, transforms, visibility and binaries. Autosave uses the same complete project payload; standalone scene recovery opens a recovered Project Workspace with its artwork. Downloads and local drafts are separate checkpoints.
 
@@ -30,7 +30,7 @@ Local file imports reuse `importSprite`, image headers, dimension/byte limits an
 
 Local-only `tests/browser/sceneArtwork.spec.ts` exercises PNG import with an animated Actor, canvas move/scale, zoom/pan, Escape, Undo/Redo, visibility, playback/scrubbing, JSON/scene ZIP downloads, actual local-draft recovery, existing character image selection, WebP import, project ZIP reopening and rendered foreground/background pixels. These checks run on desktop against development and production paths. They are automated browser verification; separate human acceptance remains available through the workflow above.
 
-No v1.2.2 plan is present. Parallax, camera animation, advanced layer editing, image painting, lighting, physics, transitions and dialogue/audio remain outside this release; no later feature scope is implied.
+v1.2.2 adds [visual layers, depth and parallax](scene-layers.md). Camera animation, image painting, lighting, physics, transitions and dialogue/audio remain outside this release.
 
 ## Implementation files and APIs
 

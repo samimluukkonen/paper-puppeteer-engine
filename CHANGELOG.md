@@ -37,6 +37,18 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.2.2
+
+Hide the focus outline on programmatically focused Feature Guide titles while retaining title announcements, modal focus handling and visible keyboard focus on guide controls.
+
+Center the shared Feature Guide on the full header using equal-width side columns, keeping its position independent of project context and right-side navigation size.
+
+Add an eight-step **Backgrounds, Layers and Parallax** Feature Guide in the shared Scene catalog, covering PNG/WebP import, project image reuse, placement, layer ordering/locks, parallax preview and portable saving. Reveal real controls with empty-selection guidance while preserving artwork, selection, history and playback.
+
+Add Scene Layers with stable identities, foreground-first hierarchy controls, rename/reorder, image reassignment and ordering, visibility, editor-only artwork locks and safe layer removal into Background. Keep Actors in one movable band with intact Puppet containers. Reuse scene history, recovery and project/standalone packaging with backward-compatible scene-format-2 defaults.
+
+Add per-artwork-layer parallax using Phaser scroll factors at runtime and separate view-only preview camera scroll in Scene Editor. Keep authored transforms and choreography independent of camera navigation, hit-test displayed artwork at every zoom, and retain ground guides and selection handles above artwork. Add unit and local desktop browser regressions; update the scene schema and [layer guide](docs/scene-layers.md).
+
 ## 1.2.1
 
 Add independent Scene Artwork with local PNG/static WebP import and existing project image selection. Place images behind Actors with world-space dragging, a corner scale handle, numeric transforms, visibility, replacement, reset and removal. Keep inspector sections collapsed and group canvas gestures into one Undo/Redo operation with Escape cancellation. Artwork edits preserve Actor data, runtime instances and playback time.

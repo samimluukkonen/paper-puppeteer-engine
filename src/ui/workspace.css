@@ -9,7 +9,7 @@
   padding-bottom: 12px;
 }
 .workspace-shell .view-header {
-  display: flex;
+  display: grid;
   gap: 24px;
   align-items: center;
   justify-content: space-between;
@@ -35,10 +35,11 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .workspace-shell .view-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 18px;
 }
@@ -65,7 +66,7 @@
   margin: 0;
 }
 .workspace-shell .view-navigation {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   flex-shrink: 0;
   margin-left: auto;
 }

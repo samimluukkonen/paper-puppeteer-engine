@@ -22,6 +22,7 @@ import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.j
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneGroundPanel } from './SceneGroundPanel.js';
 import { bindSceneShortcuts } from './SceneKeyboardController.js';
+import { SceneLayersPanel } from './SceneLayersPanel.js';
 import { ScenePlaybackInspector } from './ScenePlaybackInspector.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
@@ -374,6 +375,7 @@ export function SceneEditorView({
           {scene ? (
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
+              <SceneLayersPanel key={`layers-${scene.id}`} document={document} />
               <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />
               <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />
               <ScenePlaybackInspector

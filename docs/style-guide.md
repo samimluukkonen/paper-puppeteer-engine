@@ -16,6 +16,8 @@ Official references: [Primer Product UI](https://primer.style/product/), [founda
 
 All pages must use `ViewHeader`. Do not copy its markup into a page or restyle the Project header independently. A page may supply its title/context, Feature Guide content and controls below the header through the shared component. Keep the shared logo, version badge, navigation icons, active-page indicator and focus treatment.
 
+Keep Feature Guide centered on the full header with equal-width side columns. Changes to heading, project context or right-side navigation must not shift its horizontal center; side content wraps within its own column as needed.
+
 Use `FeatureGuideButton` and `FeatureGuideCatalog` for every Feature Guide entry point. Keep the same category tabs, guide cards, descriptions and launch controls. Project asset selection belongs inside the shared catalog; the target editor checks live requirements before starting the selected tour. Do not add a separate page-specific guide picker.
 
 ## Page hierarchy and density

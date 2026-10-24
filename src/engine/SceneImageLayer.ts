@@ -2,7 +2,8 @@ import type Phaser from 'phaser';
 import type { CharacterTextureBudget } from './characterTextureLimits.js';
 import { decodeImage } from './decodeImage.js';
 import type { DeepReadonly } from './readonlyData.js';
-import type { SceneImageDefinition } from './SceneDefinition.js';
+import type { SceneImageDefinition, SceneLayerDefinition } from './SceneDefinition.js';
+import { parallaxPosition, sceneImageDepth, sceneLayer } from './sceneLayers.js';
 import { createSceneTextureBudget } from './sceneTextureBudget.js';
 
 let layerSerial = 0;
@@ -19,6 +20,8 @@ export class SceneImageLayer {
   private readonly pending = new Map<string, Promise<void>>();
   private readonly failures = new Map<string, string>();
   private elements: readonly DeepReadonly<SceneImageDefinition>[] = [];
+  private layers: readonly DeepReadonly<SceneLayerDefinition>[] | undefined;
+  private cinematicScroll: { x: number; y: number } | undefined;
   private alive = true;
   private readonly prefix = `scene_artwork_${++layerSerial}_`;
   private serial = 0;
@@ -31,9 +34,15 @@ export class SceneImageLayer {
   get error(): string {
     return [...this.failures.values()].join('\n');
   }
-  sync(elements: readonly DeepReadonly<SceneImageDefinition>[] = []): void {
+  sync(
+    elements: readonly DeepReadonly<SceneImageDefinition>[] = [],
+    layers?: readonly DeepReadonly<SceneLayerDefinition>[],
+    cinematicScroll?: { x: number; y: number },
+  ): void {
     if (!this.alive) return;
     this.elements = elements;
+    this.layers = layers;
+    this.cinematicScroll = cinematicScroll;
     const ids = new Set(elements.map((element) => element.id));
     for (const [id, object] of this.objects)
       if (!ids.has(id)) {
@@ -59,13 +68,18 @@ export class SceneImageLayer {
           object = this.scene.add.image(0, 0, lease.key);
           this.objects.set(element.id, object);
         }
+        const layer = sceneLayer({ layers }, element.layerId);
+        const position = cinematicScroll
+          ? parallaxPosition(element.position, layer.parallax, cinematicScroll)
+          : element.position;
+        object.scrollFactorX = object.scrollFactorY = cinematicScroll ? 1 : layer.parallax;
         object
           .setTexture(lease.key)
-          .setPosition(element.position.x, element.position.y)
+          .setPosition(position.x, position.y)
           .setScale(element.scale.x, element.scale.y)
-          .setVisible(element.visible)
+          .setVisible(element.visible && layer.visible)
           .setAlpha(element.opacity ?? 1)
-          .setDepth(-100 + (element.order + index / 257) / 256);
+          .setDepth(sceneImageDepth({ layers }, element, index));
       } else if (!this.pending.has(element.image) && !this.failures.has(element.image)) {
         // Store the request before it can complete and trigger a reconciliation.
         const request = Promise.resolve()
@@ -81,7 +95,7 @@ export class SceneImageLayer {
             if (this.pending.get(element.image) !== request) return;
             this.pending.delete(element.image);
             if (this.alive) {
-              this.sync(this.elements);
+              this.sync(this.elements, this.layers, this.cinematicScroll);
               this.changed([...this.failures.values()].join('\n'));
             }
           });
@@ -118,7 +132,7 @@ export class SceneImageLayer {
   }
   retry(): void {
     this.failures.clear();
-    this.sync(this.elements);
+    this.sync(this.elements, this.layers, this.cinematicScroll);
   }
   private release(reference: string, lease: TextureLease): void {
     this.textures.delete(reference);
@@ -138,5 +152,7 @@ export class SceneImageLayer {
     this.pending.clear();
     this.failures.clear();
     this.elements = [];
+    this.layers = undefined;
+    this.cinematicScroll = undefined;
   }
 }
