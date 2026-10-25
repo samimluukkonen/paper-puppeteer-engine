@@ -20,6 +20,7 @@ export class AnimationEditorRootHandle {
     private readonly scene: Phaser.Scene,
     private readonly state: AnimationEditorState,
     private readonly puppet: Puppet,
+    private readonly backgroundDrag?: (pointer: Phaser.Input.Pointer) => void,
   ) {
     this.graphics = scene.add.graphics().setDepth(puppet.container.depth + 6);
     scene.input.on('pointermove', this.move);
@@ -83,13 +84,17 @@ export class AnimationEditorRootHandle {
     if (this.drag) return true;
     if (pointer.button !== 0) return false;
     // Root mode consumes left clicks before ground, contact, IK or bone picking.
-    if (this.drag || !this.state.rootMotionVisible || !this.interactive || !this.puppet.container.visible) return true;
+    if (this.drag || !this.state.rootMotionVisible || !this.puppet.container.visible) return true;
     const matrix = this.matrix();
     const root = this.state.rootPosition;
     const point = rootPositionToWorld(root, matrix);
     const camera = this.scene.cameras.main;
     const world = camera.getWorldPoint(pointer.x, pointer.y);
-    if (Math.hypot(point.x - world.x, point.y - world.y) * camera.zoom > 22) return true;
+    if (Math.hypot(point.x - world.x, point.y - world.y) * camera.zoom > 22) {
+      this.backgroundDrag?.(pointer);
+      return true;
+    }
+    if (!this.interactive) return true;
     const start = pointerToRootPosition(pointer, camera, matrix);
     if (!start || !this.state.beginRootMotionDrag()) return true;
     this.drag = { id: pointer.id, matrix, offset: { x: root.x - start.x, y: root.y - start.y }, moved: false };

@@ -51,7 +51,6 @@ export class RootMotionController {
       ?.addEventListener('click', () => this.run(() => this.state?.duplicateRootKey()), options);
     for (const [id, setting] of [
       ['root-edit-mode', 'editing'],
-      ['root-show-motion', 'visible'],
       ['root-show-trajectory', 'trajectory'],
     ] as const)
       this.app
@@ -61,6 +60,20 @@ export class RootMotionController {
           (event) => this.state?.setRootMotionView({ [setting]: (event.target as HTMLInputElement).checked }),
           options,
         );
+    for (const id of ['root-displacement-mode', 'root-loop-mode'])
+      this.app.querySelector<HTMLSelectElement>(`#${id}`)?.addEventListener(
+        'change',
+        () => {
+          const mode = this.app.querySelector<HTMLSelectElement>('#root-displacement-mode')!.value;
+          const loop = this.app.querySelector<HTMLSelectElement>('#root-loop-mode')!.value;
+          if (
+            (mode === 'authored' || mode === 'preview' || mode === 'none') &&
+            (loop === 'reset' || loop === 'continuous')
+          )
+            this.state?.setWorldDisplacementView(mode, loop);
+        },
+        options,
+      );
     this.app.querySelector('#root-position-form')?.addEventListener(
       'submit',
       (event) => {
@@ -217,11 +230,17 @@ export class RootMotionController {
     }
     for (const [id, checked] of [
       ['root-edit-mode', state.rootMotionEditing],
-      ['root-show-motion', state.rootMotionVisible],
       ['root-show-trajectory', state.rootTrajectoryVisible],
     ] as const) {
       const input = this.app.querySelector<HTMLInputElement>(`#${id}`);
       if (input) input.checked = checked;
+    }
+    for (const [id, value] of [
+      ['root-displacement-mode', state.worldDisplacementMode],
+      ['root-loop-mode', state.rootLoopMode],
+    ] as const) {
+      const select = this.app.querySelector<HTMLSelectElement>(`#${id}`);
+      if (select) select.value = value;
     }
     const values: Record<string, number | undefined> = {
       'root-x': state.rootPosition.x,
@@ -239,7 +258,9 @@ export class RootMotionController {
       if (input && document.activeElement !== input) input.value = value === undefined ? '' : String(value);
     }
     this.app
-      .querySelectorAll<HTMLInputElement | HTMLButtonElement>('#root-motion-panel input, #root-motion-panel button')
+      .querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
+        '#root-motion-panel input, #root-motion-panel button, #root-motion-panel select',
+      )
       .forEach((input) => {
         input.disabled =
           !state.workingAnimation ||

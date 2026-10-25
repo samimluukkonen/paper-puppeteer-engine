@@ -63,7 +63,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'review',
         'Review and save a sword attack',
-        'Keep the anticipation and sword cut on skeletal keys. Author a root start at 0, a step to 80 and a final hold at 80. Scrub and play to see pelvis bob and feet travel over fixed ground. Loop preview returns to the first authored position. Show authored root motion and Show root trajectory only change the view. Undo/Redo restores authored edits; animation export, reload and character packages retain root keys and curves. Runtime application measures displacement from the first sample, so start at zero for matching placement.',
+        'Keep the anticipation and sword cut on skeletal keys. Author a root start at 0, a step to 80 and a final hold at 80. Scrub and play to see pelvis bob and feet travel over fixed ground. Root loop behavior chooses reset or continuous travel with Loop preview. World displacement selects Authored Root Motion, Preview-Only Displacement or No World Displacement; movement is never added twice. Show root trajectory only changes the view. Undo/Redo restores authored edits; animation export, reload and character packages retain root keys and curves. Preview and runtime measure displacement from the first sample, transformed once by facing and scale.',
         targets.animationRootMotion,
       ),
     ],
@@ -80,7 +80,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'enable',
         'Keep authored motion and opt into displacement',
-        'As Authored is the default: no additional movement is applied, and root/pelvis/bone motion stays authored. After exiting this tour, deliberately enable additional preview displacement to add world movement. Root translation is not extracted or replaced, so account for motion already in the clip. Enable Environment Preview above the canvas for a static background; an image is optional. This tour only reveals controls and changes no settings or animation data.',
+        'Authored Root Motion is the default. After exiting this tour, select Use Preview-Only Displacement to view a temporary world trajectory instead of authored root translation. No World Displacement suppresses both. Skeletal and IK tracks still play in every mode; no authored keys change. Enable Environment Preview above the canvas for a static background; an image is optional. This tour only reveals controls and changes no settings or animation data.',
         targets.animationDisplacementEnable,
       ),
       step(
@@ -116,7 +116,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'reset',
         'Disable, reset and keep the right data',
-        'Uncheck Enable additional preview displacement to restore the preview origin while retaining the trajectory and all authored skeletal motion. Reset trajectory clears points, restores defaults and disables displacement. Each clip retains its own trajectory, motion mode and Loop preview preference. Local drafts recover these settings and artwork as a project after refresh. Project ZIPs preserve them; production animation JSON and character ZIPs exclude them. Animation Undo/Redo remains dedicated to authored data. This guide never enables, resets or saves anything for you.',
+        'Uncheck Use Preview-Only Displacement to return to Authored Root Motion, or select No World Displacement in Root Motion. All preview points and authored skeletal motion remain intact. Reset trajectory clears points and restores Authored Root Motion. Preview Copy to Root Motion offers an explicit converted preview; Apply Copy replaces root keys in one Undo operation while retaining the preview points. Each clip retains its own trajectory, motion mode and Loop preview preference. Local drafts recover these settings and artwork as a project after refresh. Project ZIPs preserve them; production animation JSON and character ZIPs exclude them. Animation Undo/Redo remains dedicated to authored data. This guide never enables, resets or saves anything for you.',
         targets.animationDisplacementReset,
       ),
     ],
@@ -163,7 +163,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'camera-mode',
         'Choose Fixed or Follow Character',
-        'After exiting, open Preview Camera inside Environment Preview. Fixed keeps the selected world center steady so steps, jumps and walk cycles travel across the background. Follow Character adds the optional preview displacement to that center: the character stays framed while world artwork scrolls in the viewport. It follows the outer preview placement; authored root and bone motion remain inside the skeleton. Configure additional movement with the separate Preview Displacement guide. No image or trajectory is required to read this tour.',
+        'After exiting, open Preview Camera inside Environment Preview. Fixed keeps the selected world center steady so steps, jumps and walk cycles travel across the background. Follow Character adds the selected authored or preview-only world displacement to that center: the character stays framed while world artwork scrolls in the viewport. Root Motion selects one movement mode; skeletal translation stays inside the skeleton. Facing and scale affect authored root travel once, while preview-only offsets use world pixels. No image or trajectory is required to read this tour.',
         targets.animationEnvironmentCameraMode,
       ),
       step(
@@ -175,7 +175,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'playback',
         'Use the shared playback controls',
-        'After exiting, use the existing Play/Pause, Restart, Speed and Loop preview controls. Pose, preview displacement, ground contacts and camera share the same animation clock. Pause holds the preview. Restart returns to the configured beginning and keeps the current play/pause state. Each loop resets displacement to its configured first position, including a nonzero start; continuous travel over repeated loops is unavailable. Stepped playback holds pose, displacement and camera together. The guide never starts, pauses or restarts playback for you.',
+        'After exiting, use the existing Play/Pause, Restart, Speed and Loop preview controls. Pose, preview displacement, ground contacts and camera share the same animation clock. Pause holds the preview. Restart returns to the configured beginning and keeps the current play/pause state. Preview-only loops reset to their first position. Authored root loops use Reset each cycle or Continuous travel in Root Motion; continuous travel adds each cycle’s end-minus-start offset. Direct seeking starts in cycle zero. No frame integrates displacement twice. Stepped playback holds pose, displacement and camera together. The guide never starts, pauses or restarts playback for you.',
         targets.animationPlayback,
       ),
       step(

@@ -1,8 +1,9 @@
+import type { Affine } from '../../engine/affineMath.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
-import { evaluatePreviewDisplacement, motionPreviewSampleTime } from './motionPreview.js';
 import type { MotionPreviewController } from './MotionPreviewController.js';
 import { previewCameraCenter } from './previewCamera.js';
+import { evaluateWorldDisplacement } from './worldDisplacement.js';
 
 interface Camera {
   scrollX: number;
@@ -20,31 +21,34 @@ export class EnvironmentPreviewCamera {
   private applied: { x: number; y: number; zoom: number; width: number; height: number } | undefined;
   private readonly releases: (() => void)[];
   private disposed = false;
+  private editing = false;
 
   constructor(
     private readonly camera: Camera,
     private readonly state: AnimationEditorState,
     private readonly environment: EnvironmentPreviewController,
     private readonly motion: MotionPreviewController,
+    private readonly placement: () => Affine = () => ({ a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 }),
   ) {
     this.releases = [state.subscribe(this.sync), environment.subscribe(this.sync), motion.subscribe(this.sync)];
     this.sync();
   }
 
   private displacement() {
-    return evaluatePreviewDisplacement(
-      this.motion.getSnapshot().settings,
-      motionPreviewSampleTime(this.state.previewAnimation, this.state.previewTimeMilliseconds),
-    );
+    return evaluateWorldDisplacement(this.state, this.motion.getSnapshot().settings, this.placement());
   }
 
   private readonly sync = (): void => {
-    if (this.disposed || this.state.rootMotionEditing) return;
+    if (this.disposed) return;
     const { settings, camera: config } = this.environment.getSnapshot();
     if (!settings.enabled || !this.state.animationAuthoringEnabled) {
       this.restore();
+      this.editing = false;
       return;
     }
+    // Frame the local authoring cycle once on entry, then release the camera while editing.
+    if (this.state.rootMotionEditing && this.editing) return;
+    this.editing = this.state.rootMotionEditing;
     const camera = this.camera;
     this.saved ??= { x: camera.scrollX, y: camera.scrollY, zoom: camera.zoom };
     const center = previewCameraCenter(config, this.state.previewAnimation ? this.displacement() : { x: 0, y: 0 });
@@ -62,7 +66,7 @@ export class EnvironmentPreviewCamera {
 
   /** Retain native pan/wheel navigation as preview configuration, including a follow offset. */
   render(): void {
-    if (this.disposed || !this.applied) return;
+    if (this.disposed || this.state.rootMotionEditing || !this.applied) return;
     const camera = this.camera;
     const previous = this.applied;
     if (camera.width !== previous.width || camera.height !== previous.height) {
@@ -76,6 +80,7 @@ export class EnvironmentPreviewCamera {
         zoom: camera.zoom,
       });
     }
+    this.sync();
   }
 
   private restore(): void {

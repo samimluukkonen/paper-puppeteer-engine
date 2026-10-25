@@ -372,31 +372,34 @@ test('ghost samples and exported JSON exclude drafts; hide/lock do not author, a
   }
 });
 
-test.each(['middle-button', 'background'] as const)('%s pan and wheel zoom do not dirty animation', (gesture) => {
-  const f = fixture();
-  try {
-    const start = f.pointer({ x: 0, y: 0 }, 1, 1);
-    if (gesture === 'background') {
-      f.handles.setVisible(false);
-      f.handles.setInteractive(false);
-      f.handles.startPan(start);
-    } else f.handles.pointerDown(start);
-    const scroll = f.camera.scrollX;
-    f.input.emit('pointermove', { id: start.id, x: start.x + 17, y: start.y });
-    assert.approximately(f.camera.scrollX, scroll - 10, 1e-8);
-    f.input.emit('pointerupoutside', start);
-    const released = f.camera.scrollX;
-    f.input.emit('pointermove', { id: start.id, x: start.x + 34, y: start.y });
-    assert.equal(f.camera.scrollX, released);
-    const zoom = f.camera.zoom;
-    f.input.emit('wheel', start, [], 0, -200);
-    assert.isAbove(f.camera.zoom, zoom);
-    assert.isFalse(f.state.dirty);
-    assert.isNull(f.state.ikTargetDrag);
-  } finally {
-    f.dispose();
-  }
-});
+test.each(['visible', 'hidden'] as const)(
+  'middle-button pan with %s targets and wheel zoom do not dirty animation',
+  (visibility) => {
+    const f = fixture();
+    try {
+      const start = f.pointer({ x: 0, y: 0 }, 1, 1);
+      if (visibility === 'hidden') {
+        f.handles.setVisible(false);
+        f.handles.setInteractive(false);
+      }
+      f.handles.pointerDown(start);
+      const scroll = f.camera.scrollX;
+      f.input.emit('pointermove', { id: start.id, x: start.x + 17, y: start.y });
+      assert.approximately(f.camera.scrollX, scroll - 10, 1e-8);
+      f.input.emit('pointerupoutside', start);
+      const released = f.camera.scrollX;
+      f.input.emit('pointermove', { id: start.id, x: start.x + 34, y: start.y });
+      assert.equal(f.camera.scrollX, released);
+      const zoom = f.camera.zoom;
+      f.input.emit('wheel', start, [], 0, -200);
+      assert.isAbove(f.camera.zoom, zoom);
+      assert.isFalse(f.state.dirty);
+      assert.isNull(f.state.ikTargetDrag);
+    } finally {
+      f.dispose();
+    }
+  },
+);
 
 test('provider ownership acquired during dragging cancels the gesture, preserves mix drafts and keeps its target', () => {
   const f = fixture();
@@ -512,3 +515,79 @@ test('opt-in ground snapping changes only an explicit IK drag draft until Set Ta
     f.dispose();
   }
 });
+
+test.each(['left', 'right'] as const)(
+  'background placement moves the entire %s-facing character through playback without camera, key or history edits',
+  (facing) => {
+    const f = fixture();
+    try {
+      f.puppet.container.setScale(2);
+      f.puppet.setFacing(facing);
+      f.state.setRootPosition({ x: 0, y: 0 }, 0);
+      f.state.setRootPosition({ x: 80, y: 0 }, 1);
+      f.state.setCurrentTime(0.5);
+      f.state.selectBone('upper');
+      f.handles.setVisible(false);
+      f.handles.setInteractive(false);
+      const original = f.state.exportJson();
+      const history = f.state.historyLength;
+      const selection = f.state.selectedBoneId;
+      const before = { x: f.puppet.container.x, y: f.puppet.container.y };
+      const camera = { x: f.camera.scrollX, y: f.camera.scrollY, zoom: f.camera.zoom };
+      const start = f.pointer({ x: 0, y: 0 });
+      f.handles.startCharacterDrag(start);
+      f.input.emit('pointermove', { id: start.id, x: start.x + 2, y: start.y + 2 });
+      close(f.puppet.container, before);
+      f.handles.pointerDown(f.pointer({ x: 0, y: 0 }, 2));
+      f.input.emit('pointermove', { id: 2, x: start.x + 100, y: start.y });
+      close(f.puppet.container, before);
+      f.input.emit('pointermove', { id: start.id, x: start.x + 34, y: start.y + 17 });
+      close(f.puppet.container, { x: before.x + 20, y: before.y + 10 });
+      f.input.emit('pointermove', { id: start.id, x: start.x, y: start.y });
+      close(f.puppet.container, before);
+      f.input.emit('pointermove', { id: start.id, x: start.x + 34, y: start.y + 17 });
+      f.input.emit('pointerupoutside', start);
+      f.input.emit('pointermove', { id: start.id, x: start.x + 100, y: start.y });
+      f.preview.refresh(true);
+      close(f.puppet.container, { x: before.x + 20, y: before.y + 10 });
+      f.state.setCurrentTime(1);
+      close(f.puppet.container, { x: before.x + 20 + (facing === 'left' ? -80 : 80), y: before.y + 10 });
+      assert.deepEqual({ x: f.camera.scrollX, y: f.camera.scrollY, zoom: f.camera.zoom }, camera);
+      assert.equal(f.state.selectedBoneId, selection);
+      assert.equal(f.state.exportJson(), original);
+      assert.equal(f.state.historyLength, history);
+      assert.equal(JSON.stringify(f.clip), f.original);
+      assert.isTrue(f.state.selectAnimation('other', { keepChanges: true }));
+      close(f.puppet.container, { x: 120, y: 90 });
+      assert.isTrue(f.state.selectAnimation('reach', { keepChanges: true }));
+      close(f.puppet.container, { x: before.x + 20 + (facing === 'left' ? -80 : 80), y: before.y + 10 });
+    } finally {
+      f.dispose();
+    }
+  },
+);
+
+test.each(['blur', 'escape', 'clip switch', 'rig mode', 'dispose'] as const)(
+  'background placement stops on %s',
+  (ending) => {
+    const f = fixture();
+    try {
+      const start = f.pointer({ x: 0, y: 0 });
+      f.handles.startCharacterDrag(start);
+      f.input.emit('pointermove', { id: start.id, x: start.x + 34, y: start.y });
+      const offset = f.state.previewPlacementOffset;
+      if (ending === 'blur') f.browser.dispatchEvent(new Event('blur'));
+      else if (ending === 'escape') f.browser.dispatchEvent(Object.assign(new Event('keydown'), { key: 'Escape' }));
+      else if (ending === 'clip switch') f.state.selectAnimation('other');
+      else if (ending === 'rig mode') f.state.setEditorMode('rig');
+      else f.handles.dispose();
+      f.input.emit('pointermove', { id: start.id, x: start.x + 68, y: start.y });
+      assert.strictEqual(f.state.previewPlacementOffset, offset);
+      assert.isFalse(f.handles.gestureActive);
+      assert.isFalse(f.state.dirty);
+      assert.equal(f.state.historyLength, 0);
+    } finally {
+      f.dispose();
+    }
+  },
+);

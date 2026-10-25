@@ -202,7 +202,7 @@ test('animation environment imports share project assets and survive project pac
   await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
   await motion.getByLabel('Offset X', { exact: true }).fill('45');
   await motion.getByRole('button', { name: 'Apply point 1', exact: true }).click();
-  await motion.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+  await motion.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true }).check();
   await frame.locator('#preview-loop').click();
   await expect(frame.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(frame.locator('#animation-undo')).toBeDisabled();
@@ -288,7 +288,7 @@ test('standalone preview-only edits and artwork recover after refresh without au
   await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
   await motion.getByLabel('Offset Y', { exact: true }).fill('-70');
   await motion.getByRole('button', { name: 'Apply point 1', exact: true }).click();
-  await motion.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+  await motion.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true }).check();
   expect(await exported(page)).toBe(original);
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await page.getByRole('tab', { name: 'Local draft', exact: true }).click();

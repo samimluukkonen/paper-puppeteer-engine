@@ -24,6 +24,7 @@ export class AnimationEditorIKHandles {
   private pointerId: number | undefined;
   private offset: Point | undefined;
   private pan: Point | undefined;
+  private characterDrag: { start: Point; origin: Readonly<Point>; session: number; moved: boolean } | undefined;
   private disposed = false;
 
   constructor(
@@ -43,6 +44,11 @@ export class AnimationEditorIKHandles {
     window.addEventListener?.('visibilitychange', this.visibilityChanged, true);
     this.unsubscribe = state.subscribe(() => {
       if (this.offset && !state.ikTargetDrag) this.release();
+      if (
+        this.characterDrag &&
+        (!state.animationAuthoringEnabled || state.sessionRevision !== this.characterDrag.session)
+      )
+        this.release();
     });
     this.refreshAvailability();
   }
@@ -191,7 +197,25 @@ export class AnimationEditorIKHandles {
     return true;
   }
 
-  /** Empty-background drags share the camera gesture lifetime with middle-button panning. */
+  /** Left background drag changes only preview placement; middle drag remains camera navigation. */
+  startCharacterDrag(pointer: Phaser.Input.Pointer): void {
+    if (
+      this.disposed ||
+      this.pointerId !== undefined ||
+      !this.state.animationAuthoringEnabled ||
+      !this.puppet.container.visible
+    )
+      return;
+    this.pointerId = pointer.id;
+    this.characterDrag = {
+      start: { x: pointer.x, y: pointer.y },
+      origin: this.state.previewPlacementOffset,
+      session: this.state.sessionRevision,
+      moved: false,
+    };
+  }
+
+  /** Middle-button camera navigation shares the pointer gesture lifetime with preview placement. */
   startPan(pointer: Phaser.Input.Pointer): void {
     if (this.disposed || this.pointerId !== undefined) return;
     this.pointerId = pointer.id;
@@ -200,6 +224,16 @@ export class AnimationEditorIKHandles {
 
   private pointerMove = (pointer: Phaser.Input.Pointer): void => {
     if (pointer.id !== this.pointerId) return;
+    if (this.characterDrag) {
+      const { start, origin } = this.characterDrag;
+      const dx = pointer.x - start.x;
+      const dy = pointer.y - start.y;
+      if (!this.characterDrag.moved && Math.hypot(dx, dy) <= 4) return;
+      this.characterDrag.moved = true;
+      const zoom = this.scene.cameras.main.zoom;
+      this.state.setPreviewPlacementOffset(origin.x + dx / zoom, origin.y + dy / zoom);
+      return;
+    }
     if (this.pan) {
       panCamera(this.scene.cameras.main, pointer.x - this.pan.x, pointer.y - this.pan.y);
       this.pan = { x: pointer.x, y: pointer.y };
@@ -240,6 +274,7 @@ export class AnimationEditorIKHandles {
     this.pointerId = undefined;
     this.offset = undefined;
     this.pan = undefined;
+    this.characterDrag = undefined;
   }
   private cancel = (): void => {
     this.state.cancelIKTargetDrag();

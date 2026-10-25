@@ -28,6 +28,8 @@ export const animationPreviewPreferencesSchema = z.strictObject({
       z.strictObject({
         motion: z.strictObject({
           enabled: z.boolean(),
+          displacementMode: z.enum(['authored', 'preview', 'none']).optional(),
+          rootLoopMode: z.enum(['reset', 'continuous']).optional(),
           positionKeys: z
             .array(
               z.strictObject({

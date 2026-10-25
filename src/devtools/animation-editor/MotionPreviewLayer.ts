@@ -35,7 +35,10 @@ export class MotionPreviewLayer {
     let previous: { x: number; y: number } | undefined;
     for (const time of times) {
       const offset = evaluatePreviewDisplacement(settings, time);
-      const point = { x: CHARACTER_PREVIEW_ORIGIN.x + offset.x, y: CHARACTER_PREVIEW_ORIGIN.y + offset.y };
+      const point = {
+        x: CHARACTER_PREVIEW_ORIGIN.x + this.state.previewPlacementOffset.x + offset.x,
+        y: CHARACTER_PREVIEW_ORIGIN.y + this.state.previewPlacementOffset.y + offset.y,
+      };
       if (previous) this.graphics.lineBetween(previous.x, previous.y, point.x, point.y);
       this.graphics.strokeCircle(point.x, point.y, 3 / zoom);
       previous = point;

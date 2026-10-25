@@ -52,7 +52,7 @@ for (const configured of [false, true]) {
       await point.getByRole('button', { name: 'Apply point 2', exact: true }).click();
       await panel.getByLabel('Trajectory interpolation', { exact: true }).selectOption('stepped');
       await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).uncheck();
-      await panel.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+      await panel.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true }).check();
       await page.locator('#animation-facing').selectOption('left');
       await panel.locator('summary').click();
     }

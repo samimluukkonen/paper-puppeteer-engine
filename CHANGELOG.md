@@ -91,6 +91,14 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.7-4
+
+Match Rig Editor background dragging in Animation Editor: left drag moves only the preview character placement, including during root editing; middle drag pans the camera. Retain placement across clip/view changes and rig rebuilds without changing keys, history or exports, and move preview trajectory guides with that placement.
+
+Integrate authored root travel with the existing stationary Environment Preview background, ground and foot markers. Add mutually exclusive Authored Root Motion, Preview-Only Displacement and No World Displacement modes; share absolute world displacement between Puppet placement and fixed/follow cameras. Match runtime start-normalized coordinates and facing/scale/rotation, preserve deterministic silent scrubbing, and offer reset or continuous authored loops without frame accumulation. Retain per-clip mode/loop preferences in project metadata and recovery, including legacy trajectory migration.
+
+Add explicit Preview Copy to Root Motion and Apply Copy with replacement feedback, detached playback/scrub comparison, affine/interpolation conversion, one Undo/Redo transaction and retained preview points. Reject nonzero trajectory starts, singular transforms and stale placement/proposals. Update guides and documentation, cover root/IK/marker/camera/loop/source immutability and conversion regressions, and keep browser checks local-only. Preserve the higher package/lockfile version 1.2.6.
+
 ## 1.1.7-3
 
 Add dedicated Root Motion Position X/Y timeline rows, numeric key creation/editing/retiming/deletion/duplication, and root channels in the existing Graph Editor with outgoing interpolation and Bézier tangents. Preserve skeletal, pelvis and IK tracks and animation format 1. Preview authored offsets through the puppet's placement/facing/scale transform over fixed ground; retain shared scrubbing, stepped samples and clip-local looping.

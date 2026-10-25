@@ -8,6 +8,7 @@ export const PREVIEW_PLAYBACK_SPEEDS = [0.25, 0.5, 1, 1.5, 2] as const;
 /** Sole continuous editor clock; authored milliseconds avoid lossy event-boundary unit round trips. */
 export class AnimationEditorPlayback {
   private time: Milliseconds = 0;
+  private elapsed: Milliseconds = 0;
   private playing = false;
   private loop = false;
   private speed = 1;
@@ -24,6 +25,9 @@ export class AnimationEditorPlayback {
   }
   get currentTimeMilliseconds(): Milliseconds {
     return this.time;
+  }
+  get elapsedTimeMilliseconds(): Milliseconds {
+    return this.elapsed;
   }
   get isPlaying(): boolean {
     return this.playing;
@@ -44,6 +48,7 @@ export class AnimationEditorPlayback {
   /** New animation sessions retain preview preferences but release clock and pointer state. */
   reset(): void {
     this.time = 0;
+    this.elapsed = 0;
     this.playing = false;
     this.scrubbing = false;
     this.startPending = true;
@@ -65,7 +70,8 @@ export class AnimationEditorPlayback {
     const duration = this.duration();
     const next = clampTime(time, duration);
     const playing = this.playing && duration > 0 && (this.scrubbing || this.loop || next < duration);
-    if (next === this.time && playing === this.playing) return false;
+    if (next === this.time && next === this.elapsed && playing === this.playing) return false;
+    this.elapsed = next;
     if (next !== this.time) this.startPending = next === 0 && !this.scrubbing;
     this.time = next;
     this.playing = playing;
@@ -96,7 +102,7 @@ export class AnimationEditorPlayback {
     if (!this.scrubbing) return false;
     this.scrubbing = false;
     this.startPending = false;
-    this.setCurrentTimeMilliseconds(this.time);
+    if (!this.loop && this.time >= this.duration()) this.playing = false;
     return true;
   }
 
@@ -106,6 +112,7 @@ export class AnimationEditorPlayback {
     if (this.playing || !(duration > 0)) return false;
     if (this.time >= duration) {
       this.time = 0;
+      this.elapsed = 0;
       this.startPending = true;
     }
     this.playing = true;
@@ -134,6 +141,7 @@ export class AnimationEditorPlayback {
     const duration = this.duration();
     if (!(duration > 0)) return this.setCurrentTimeMilliseconds(0);
     const distance = toMilliseconds(deltaSeconds) * this.speed;
+    const previousElapsed = this.elapsed;
     const end = this.time + distance;
     let next = end;
     if (this.loop) {
@@ -150,7 +158,10 @@ export class AnimationEditorPlayback {
       }
     }
     const changed = this.setCurrentTimeMilliseconds(next);
+    // Retain an absolute clock for continuous root loops; pose/event timing stays clip-local.
+    const elapsed = this.loop ? previousElapsed + distance : this.time;
+    if (Number.isFinite(elapsed) && Number.isSafeInteger(Math.floor(elapsed / duration))) this.elapsed = elapsed;
     this.startPending = false;
-    return changed;
+    return changed || this.elapsed !== previousElapsed;
   }
 }

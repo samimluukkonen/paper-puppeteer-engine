@@ -11,11 +11,29 @@ export function RootMotionPanel() {
         <input id="root-edit-mode" type="checkbox" /> Edit Root Motion
       </label>
       <label>
-        <input id="root-show-motion" type="checkbox" defaultChecked /> Show authored root motion
+        World displacement
+        <select id="root-displacement-mode" aria-label="World displacement" defaultValue="authored">
+          <option value="authored">Authored Root Motion</option>
+          <option value="preview">Preview-Only Displacement</option>
+          <option value="none">No World Displacement</option>
+        </select>
       </label>
       <label>
         <input id="root-show-trajectory" type="checkbox" defaultChecked /> Show root trajectory
       </label>
+      <label>
+        Root loop behavior
+        <select id="root-loop-mode" aria-label="Root loop behavior" defaultValue="reset">
+          <option value="reset">Reset each cycle</option>
+          <option value="continuous">Continuous travel</option>
+        </select>
+      </label>
+      <p className="workspace-caption">
+        Authored travel uses the first root sample as its origin, transformed once by facing, scale and rotation.
+        Continuous travel adds each cycle's end-minus-start displacement when Loop preview is enabled. Direct seeking
+        starts in the first cycle. Editing the root shows that cycle and pauses camera follow. No World Displacement
+        retains skeletal motion, including bone translation.
+      </p>
       <form id="root-position-form" className="root-motion-fields">
         <label>
           Position X<input id="root-x" type="number" step="any" />

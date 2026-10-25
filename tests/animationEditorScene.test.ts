@@ -72,12 +72,16 @@ test('ground reference stays in preview world through scaling, facing, clip swit
     const originalContainerX = puppet.container.x;
     const rootBefore = state.workingAnimation!;
     state.setRootPosition({ x: 80, y: -20 });
+    assert.equal(puppet.container.x, originalContainerX, 'the first sample defines the displacement origin');
+    state.setCurrentTime(0.5);
+    state.setRootPosition({ x: 160, y: -20 });
     assert.equal(puppet.container.x, originalContainerX + 80);
     assert.equal(scene.groundGuide.getSnapshot().guide.y, 500);
     assert.strictEqual(state.workingAnimation!.tracks, rootBefore.tracks);
     assert.strictEqual(state.workingAnimation!.ikTracks, rootBefore.ikTracks);
     state.undo();
     assert.equal(puppet.container.x, originalContainerX);
+    state.undo();
     puppet.container.setScale(1.7);
     scene.setFacing('left');
     const otherClip = state.animationIds.find((id) => id !== state.selectedAnimationId);
@@ -1008,4 +1012,67 @@ test('shutdown during ready does not install an environment camera or retain pre
   environment.update({ enabled: true });
   assert.deepEqual(error.mock.calls, []);
   environment.dispose();
+});
+
+test('background drag places the character over a fixed world, including root mode and Rig/Animation rebuilds', async () => {
+  vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
+  vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);
+  const ready = vi.fn();
+  const error = vi.fn();
+  const scene = new AnimationEditorScene(ready, error);
+  const fixture = puppetScene();
+  const input = new EventEmitter();
+  const camera = {
+    zoom: 2,
+    scrollX: 42,
+    scrollY: -30,
+    width: 800,
+    height: 600,
+    getWorldPoint: (x: number, y: number) => ({ x: x / 2 + 42, y: y / 2 - 30 }),
+  };
+  Object.assign(scene, { add: fixture.add, textures: fixture.textures, input, cameras: { main: camera } });
+  scene.create();
+  await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
+  try {
+    const state = Reflect.get(scene, 'state') as AnimationEditorState;
+    state.setRootPosition({ x: 0, y: 0 }, 0);
+    state.setRootPosition({ x: 80, y: 0 }, 1);
+    state.setCurrentTime(0.5);
+    const original = state.exportJson();
+    const history = state.historyLength;
+    const puppet = Reflect.get(scene, 'puppet') as Puppet;
+    const drag = () => {
+      input.emit('pointerdown', { id: 1, button: 0, x: 20, y: 20 });
+      input.emit('pointermove', { id: 1, x: 80, y: -20 });
+      input.emit('pointerupoutside', { id: 1 });
+    };
+    drag();
+    assert.deepEqual(state.previewPlacementOffset, { x: 30, y: -20 });
+    assert.equal(puppet.container.x, 450);
+    assert.equal(puppet.container.y, 415);
+    state.setRootMotionView({ editing: true });
+    drag();
+    assert.deepEqual(state.previewPlacementOffset, { x: 60, y: -40 });
+    assert.isFalse(state.rootMotionDragActive);
+    state.setRootMotionView({ editing: false });
+    // This scene harness has no Rig Editor screen renderer; exercise its real placement/history bridge.
+    vi.spyOn(scene.rigEditor!, 'enable').mockImplementation(() => {});
+    state.setEditorMode('rig');
+    scene.rigEditor!.moveCharacter(460, 445);
+    state.setEditorMode('animation');
+    assert.deepEqual(state.previewPlacementOffset, { x: 80, y: 10 });
+    assert.equal(puppet.container.x, 500);
+    assert.equal(puppet.container.y, 445);
+    scene.reloadRig(scene.rigEditor!.state.recoveryDraft);
+    const rebuilt = Reflect.get(scene, 'puppet') as Puppet;
+    assert.equal(rebuilt.container.x, 500);
+    assert.equal(rebuilt.container.y, 445);
+    assert.equal(camera.scrollX, 42);
+    assert.equal(camera.scrollY, -30);
+    assert.equal(state.exportJson(), original);
+    assert.equal(state.historyLength, history);
+    assert.deepEqual(error.mock.calls, []);
+  } finally {
+    scene.events.emit('shutdown');
+  }
 });

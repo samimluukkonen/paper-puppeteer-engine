@@ -134,7 +134,7 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     const panel = page.locator('.motion-preview-panel');
     await expect(panel).not.toHaveAttribute('open');
     await panel.locator(':scope > summary').click();
-    const enable = panel.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true });
+    const enable = panel.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true });
     await expect(enable).not.toBeChecked();
     await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).uncheck();
     const keys =

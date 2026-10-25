@@ -4,7 +4,10 @@ import type { MotionPreviewController } from './MotionPreviewController.js';
 import { toMilliseconds, toSeconds } from './timeUnits.js';
 
 export function MotionPreviewPanel({ controller }: { controller: MotionPreviewController }) {
-  const { settings, ready, clipId, message } = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
+  const { settings, ready, clipId, message, copying } = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+  );
   return (
     <details className="motion-preview-panel">
       <summary>Preview displacement</summary>
@@ -15,11 +18,11 @@ export function MotionPreviewPanel({ controller }: { controller: MotionPreviewCo
             checked={settings.enabled}
             onChange={(event) => controller.update({ enabled: event.target.checked })}
           />{' '}
-          Enable additional preview displacement
+          Use Preview-Only Displacement
         </label>
         <p className="workspace-caption">
-          {settings.enabled ? 'Additive world displacement' : 'As Authored — no additional movement'}. Skeletal root
-          motion stays authored. Enable deliberately when motion already includes translation.
+          Select Authored Root Motion, Preview-Only Displacement or No World Displacement in Root Motion. Preview-only
+          travel replaces authored root translation in the preview; skeletal and IK tracks still play.
         </p>
         <p className="workspace-caption">
           X moves right, Y down in world pixels, independent of facing and scale. Times are animation seconds; stepped
@@ -106,6 +109,22 @@ export function MotionPreviewPanel({ controller }: { controller: MotionPreviewCo
             onClick={() => controller.reset()}
           >
             Reset trajectory
+          </button>
+        </div>
+        <p className="workspace-caption">
+          Copy Preview Trajectory to Root Motion converts world pixels through the current facing, rotation and scale.
+          Start the trajectory at X 0, Y 0. Preview first; applying replaces existing root keys and retains these
+          points.
+        </p>
+        <div className="animation-history">
+          <button type="button" disabled={!settings.positionKeys.length} onClick={() => controller.previewCopy()}>
+            Preview Copy to Root Motion
+          </button>
+          <button type="button" disabled={!copying} onClick={() => controller.commitCopy()}>
+            Apply Copy — Replace Root Keys
+          </button>
+          <button type="button" disabled={!copying} onClick={() => controller.cancelCopy()}>
+            Cancel copy preview
           </button>
         </div>
       </fieldset>

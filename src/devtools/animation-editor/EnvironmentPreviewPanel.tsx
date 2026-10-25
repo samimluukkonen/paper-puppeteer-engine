@@ -225,13 +225,15 @@ export function EnvironmentPreviewPanel({
           </div>
         </form>
         <p className="workspace-caption">
-          Camera X/Y set the world center. Follow adds preview displacement to that center. Pan and wheel zoom adjust
-          the preview camera. Zoom out to 0.1 to inspect travel beyond the background; movement is never clamped.
+          Camera X/Y set the world center. Follow adds the selected world displacement to that center. Pan and wheel
+          zoom adjust the preview camera. Zoom out to 0.1 to inspect travel beyond the background; movement is never
+          clamped.
         </p>
       </details>
       <p className="workspace-caption">
-        Use the timeline's Play/Pause, Restart, speed, loop and scrub controls. Each loop resets displacement to its
-        configured beginning; continuous travel is unavailable.
+        Use the timeline's Play/Pause, Restart, speed, loop and scrub controls. Preview-only loops reset to their
+        configured beginning. Authored root loops can reset or travel continuously, using Root Motion's loop behavior
+        setting.
       </p>
       <button type="button" data-guide-id={GUIDE_TARGETS.animationEnvironmentReset} onClick={() => controller.reset()}>
         Reset Environment

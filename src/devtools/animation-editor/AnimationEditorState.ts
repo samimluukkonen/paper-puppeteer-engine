@@ -84,7 +84,8 @@ import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js
 import { AnimationEditorTimelineSnapping, type TimelineSnapSettings } from './timelineSnapping.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
-import { getValidatedEditorAnimation } from './validatedAnimation.js';
+import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
+import type { RootLoopMode, WorldDisplacementMode } from './worldDisplacement.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
@@ -103,11 +104,47 @@ export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  private placementOffset: Readonly<Point> = Object.freeze({ x: 0, y: 0 });
+  /** Session-only preview placement, independent of authored keys, history and camera navigation. */
+  get previewPlacementOffset(): Readonly<Point> {
+    return this.placementOffset;
+  }
+  setPreviewPlacementOffset(x: number, y: number): void {
+    if (![x, y].every(Number.isFinite) || (x === this.placementOffset.x && y === this.placementOffset.y)) return;
+    this.placementOffset = Object.freeze({ x, y });
+    this.notify();
+  }
+
   rootMotionSelected = false;
   rootMotionProperty: RootMotionProperty = 'x';
   selectedRootKey: RootKeySelection | null = null;
   rootMotionEditing = false;
-  rootMotionVisible = true;
+  private displacementMode: WorldDisplacementMode = 'authored';
+  private rootLoop: RootLoopMode = 'reset';
+  get worldDisplacementMode(): WorldDisplacementMode {
+    return this.displacementMode;
+  }
+  get rootLoopMode(): RootLoopMode {
+    return this.rootLoop;
+  }
+  get rootMotionVisible(): boolean {
+    return this.displacementMode === 'authored';
+  }
+  get previewElapsedTimeMilliseconds(): number {
+    return this.previewAnimation === this.workingAnimation || this.trajectoryCopyActive
+      ? this.playback.elapsedTimeMilliseconds
+      : this.previewTimeMilliseconds;
+  }
+  setWorldDisplacementView(mode: WorldDisplacementMode, loop = this.rootLoop): void {
+    if (mode === this.displacementMode && loop === this.rootLoop) return;
+    this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.displacementMode = mode;
+      this.rootLoop = loop;
+      if (mode !== 'authored') this.rootMotionEditing = false;
+      this.notify();
+    });
+  }
   rootTrajectoryVisible = true;
   private rootGesture: { base: ReadonlyAnimation; preview: ReadonlyAnimation; point?: RootMotionOffset } | null = null;
 
@@ -129,11 +166,11 @@ export class AnimationEditorState {
     this.batchNotifications(() => {
       this.cancelTimelineDrag();
       if (patch.editing !== undefined) this.rootMotionEditing = patch.editing;
-      if (patch.visible !== undefined) this.rootMotionVisible = patch.visible;
+      if (patch.visible !== undefined) this.displacementMode = patch.visible ? 'authored' : 'none';
       if (patch.visible === false) this.rootMotionEditing = false;
       if (patch.trajectory !== undefined) this.rootTrajectoryVisible = patch.trajectory;
       if (patch.editing === true) {
-        this.rootMotionVisible = true;
+        this.displacementMode = 'authored';
         this.selectRootMotion(this.rootMotionProperty);
       }
       this.notify();
@@ -237,6 +274,40 @@ export class AnimationEditorState {
     });
   }
 
+  private trajectoryCopy: { base: ReadonlyAnimation; rig: Rig; animation: ReadonlyAnimation } | null = null;
+  get trajectoryCopyActive(): boolean {
+    return !!this.trajectoryCopy && this.trajectoryCopy.base === this.working && this.trajectoryCopy.rig === this.rig;
+  }
+  previewTrajectoryCopy(rootMotion: NonNullable<ReadonlyAnimation['rootMotion']>): boolean {
+    if (!this.working || !this.rig || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits) return false;
+    const animation = validateEditedAnimation({ ...this.working, rootMotion }, this.working, this.rig);
+    this.batchNotifications(() => {
+      this.pause();
+      this.cancelCleanupPreview();
+      this.cancelVariationPreview();
+      this.rootMotionEditing = false;
+      this.trajectoryCopy = { base: this.working!, rig: this.rig!, animation };
+      this.setWorldDisplacementView('authored');
+      this.notify();
+    });
+    return true;
+  }
+  cancelTrajectoryCopy(): boolean {
+    if (!this.trajectoryCopy) return false;
+    this.trajectoryCopy = null;
+    this.notify();
+    return true;
+  }
+  commitTrajectoryCopy(): boolean {
+    if (!this.trajectoryCopyActive || this.hasPendingAnimationEdits || !this.animationAuthoringEnabled) return false;
+    return this.batchNotifications(() => {
+      const animation = this.trajectoryCopy!.animation;
+      this.trajectoryCopy = null;
+      this.pause();
+      return this.installWorkingAnimation(animation);
+    });
+  }
+
   private cleanupPreview: { base: ReadonlyAnimation; rig: Rig; animation: ReadonlyAnimation; timeMs: number } | null =
     null;
 
@@ -331,6 +402,7 @@ export class AnimationEditorState {
   /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
   get previewAnimation(): ReadonlyAnimation | null {
     return (
+      (this.trajectoryCopyActive ? this.trajectoryCopy!.animation : undefined) ??
       (this.cleanupPreviewActive ? this.cleanupPreview!.animation : undefined) ??
       this.variationPreview?.animation ??
       this.rootGesture?.preview ??
@@ -1288,6 +1360,15 @@ export class AnimationEditorState {
       return;
     }
     if (
+      this.trajectoryCopy &&
+      (!this.trajectoryCopyActive ||
+        !this.animationAuthoringEnabled ||
+        this.hasPendingAnimationEdits ||
+        !this.rootMotionVisible ||
+        this.rootMotionEditing)
+    )
+      this.trajectoryCopy = null;
+    if (
       this.cleanupPreview &&
       (!this.cleanupPreviewActive || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits || this.isPlaying)
     )
@@ -1643,6 +1724,7 @@ export class AnimationEditorState {
     this.clearRootSelection();
     this.rootMotionEditing = false;
     this.cleanupPreview = null;
+    this.trajectoryCopy = null;
     this.variationPreview = null;
     this.cancelGraphEdit();
     this.posePreview = null;

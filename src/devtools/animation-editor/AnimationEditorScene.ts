@@ -287,11 +287,11 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
     if (this.rigMode) return;
-    if (this.rootHandle?.pointerDown(pointer)) return;
     if (this.ikHandles?.gestureActive) {
       this.ikHandles.pointerDown(pointer);
       return;
     }
+    if (this.rootHandle?.pointerDown(pointer)) return;
     if (this.groundHandle?.pointerDown(pointer)) return;
     if (this.footContacts.visible && pointer.button === 0) {
       const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -317,7 +317,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       }
     }
     if (nearest) this.state.selectBone(nearest);
-    else this.ikHandles?.startPan(pointer);
+    else this.ikHandles?.startCharacterDrag(pointer);
   }
 
   setIKHandlesVisible(visible: boolean): void {
@@ -351,7 +351,9 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   private createIKHandles(state: AnimationEditorState, puppet: Puppet): AnimationEditorIKHandles {
-    this.rootHandle = new AnimationEditorRootHandle(this, state, puppet);
+    this.rootHandle = new AnimationEditorRootHandle(this, state, puppet, (pointer) =>
+      this.ikHandles?.startCharacterDrag(pointer),
+    );
     this.rootHandle.setInteractive(this.ikHandlesInteractive && !this.rigMode);
     return new AnimationEditorIKHandles(this, state, puppet, {
       guide: () => this.groundGuide.getSnapshot().guide,
@@ -582,10 +584,20 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state = state;
       this.definition = definition;
       const rigState = documents.rig;
+      const syncRigPlacement = () => {
+        if (!state.animationAuthoringEnabled && !this.rebuildingRig)
+          state.setPreviewPlacementOffset(
+            puppet!.container.x - CHARACTER_PREVIEW_ORIGIN.x,
+            puppet!.container.y - CHARACTER_PREVIEW_ORIGIN.y,
+          );
+      };
       this.rigEditor = new RigEditor(
         this,
         puppet,
-        () => this.onRigChange(),
+        () => {
+          syncRigPlacement();
+          this.onRigChange();
+        },
         rigState,
         [
           ...(definition.rig.ik ?? []),
@@ -609,6 +621,7 @@ export class AnimationEditorScene extends Phaser.Scene {
               state.updatePreviewRig(nextRig);
             }
           }
+          syncRigPlacement();
           if (state.editorMode !== 'rig') preview?.refresh(true);
         },
         () => state.packageAnimations().map((clip) => getCompiledPreviewClip(clip, state.rig!)),
@@ -708,6 +721,7 @@ export class AnimationEditorScene extends Phaser.Scene {
           state,
           this.options.environment,
           this.motionPreview,
+          () => this.puppet!.container.getWorldTransformMatrix(),
         );
     } catch (error) {
       this.environmentCamera?.dispose();

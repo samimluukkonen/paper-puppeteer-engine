@@ -192,10 +192,16 @@ test('root timeline drag and Escape preserve one-step history and keyboard selec
     });
   });
   await page.goto('animation-editor/');
+  await page.bringToFront();
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   const original = page.getByRole('button', { name: 'Select Root Motion x key at 0.5 s', exact: true });
-  const box = (await original.boundingBox())!;
-  const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const markerPoint = async () => {
+    await original.focus();
+    await waitForPreviewPaint(page);
+    const box = (await original.boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  const start = await markerPoint();
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(start.x + 70, start.y, { steps: 5 });
@@ -203,9 +209,10 @@ test('root timeline drag and Escape preserve one-step history and keyboard selec
   await page.mouse.up();
   await expect(original).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#animation-undo')).toBeDisabled();
-  await page.mouse.move(start.x, start.y);
+  const resumed = await markerPoint();
+  await page.mouse.move(resumed.x, resumed.y);
   await page.mouse.down();
-  await page.mouse.move(start.x + 70, start.y, { steps: 5 });
+  await page.mouse.move(resumed.x + 70, resumed.y, { steps: 5 });
   await page.mouse.up();
   await expect(original).toHaveCount(0);
   const selected = page.locator('.timeline-root-track[data-root-property="x"] [data-primary="true"]');

@@ -285,3 +285,47 @@ test('preview schema rejects transient URLs and invalid trajectories while legac
     f.dispose();
   }
 });
+
+test('exclusive modes and root loop behavior survive clip switches and metadata restoration, including legacy preferences', () => {
+  const f = fixture();
+  try {
+    const original = f.state.workingAnimation;
+    f.state.setWorldDisplacementView('none', 'continuous');
+    const saved = animationPreviewPreferencesSchema.parse(f.binding.preferences);
+    f.state.selectAnimation('jump');
+    assert.equal(f.state.worldDisplacementMode, 'authored');
+    assert.equal(f.state.rootLoopMode, 'reset');
+    f.state.selectAnimation('cut');
+    assert.equal(f.state.worldDisplacementMode, 'none');
+    assert.equal(f.state.rootLoopMode, 'continuous');
+    f.motion.restorePreferences(saved.animations);
+    assert.equal(f.state.worldDisplacementMode, 'none');
+    assert.equal(f.state.rootLoopMode, 'continuous');
+    f.motion.restorePreferences({
+      cut: {
+        loop: true,
+        motion: {
+          enabled: true,
+          positionKeys: [{ time: 0, offsetX: 50, offsetY: -10 }],
+          interpolation: 'linear',
+          showTrajectory: true,
+        },
+      },
+    });
+    assert.equal(
+      f.state.worldDisplacementMode,
+      'preview',
+      'legacy enabled trajectories never add authored root travel',
+    );
+    assert.equal(f.state.rootLoopMode, 'reset');
+    assert.isTrue(f.state.previewLoop);
+    const capture = f.motion.capturePreferences();
+    f.state.play();
+    f.state.advancePlayback(3.5);
+    assert.deepEqual(f.motion.capturePreferences(), capture, 'frame-clock updates do not edit saved preferences');
+    assert.strictEqual(f.state.workingAnimation, original);
+    assert.equal(f.state.historyLength, 0);
+  } finally {
+    f.dispose();
+  }
+});

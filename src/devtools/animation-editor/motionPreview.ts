@@ -1,6 +1,7 @@
 import { evaluateCurveProgress } from '../../engine/animationCurves.js';
 import { interpolateNumber, quantizePlaybackTime } from '../../engine/animationMath.js';
 import type { ReadonlyAnimation } from './AnimationEditorState.js';
+import type { RootLoopMode, WorldDisplacementMode } from './worldDisplacement.js';
 
 export interface PreviewPositionKey {
   /** Animation milliseconds, matching authored clip and preview sample times. */
@@ -11,6 +12,9 @@ export interface PreviewPositionKey {
 
 export interface MotionPreviewSettings {
   readonly enabled: boolean;
+  /** Optional for legacy saved preferences; enabled trajectories migrate to preview mode. */
+  readonly displacementMode?: WorldDisplacementMode | undefined;
+  readonly rootLoopMode?: RootLoopMode | undefined;
   readonly positionKeys: readonly PreviewPositionKey[];
   readonly interpolation: 'linear' | 'stepped';
   readonly showTrajectory: boolean;
@@ -18,6 +22,8 @@ export interface MotionPreviewSettings {
 
 export const DEFAULT_MOTION_PREVIEW: MotionPreviewSettings = Object.freeze({
   enabled: false,
+  displacementMode: 'authored',
+  rootLoopMode: 'reset',
   positionKeys: Object.freeze([]),
   interpolation: 'linear',
   showTrajectory: true,

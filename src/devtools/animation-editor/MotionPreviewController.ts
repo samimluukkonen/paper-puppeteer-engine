@@ -1,3 +1,4 @@
+import type { Affine } from '../../engine/affineMath.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
@@ -8,13 +9,18 @@ import {
   type MotionPreviewSettings,
   type PreviewPositionKey,
 } from './motionPreview.js';
+import { previewTrajectoryToRootMotion } from './previewTrajectoryCopy.js';
+import { rootMotionMatrix } from './rootMotionCoordinates.js';
 
-/** Clip-specific editor preferences; never writes animation documents or authored history. */
+/** Owns clip preview preferences and detached copy proposals; explicit commits delegate to session history. */
 export class MotionPreviewController {
   private state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
   private readonly loops = new Map<string, boolean>();
   private observedLoop = false;
+  private synchronizing = false;
+  private placement: (() => Affine) | undefined;
+  private copy: { placement: Affine; previousMode: AnimationEditorState['worldDisplacementMode'] } | undefined;
   private readonly clips = new Map<string, MotionPreviewSettings>();
   private readonly listeners = new Set<() => void>();
   private snapshot: Readonly<{
@@ -23,12 +29,14 @@ export class MotionPreviewController {
     ready: boolean;
     settings: MotionPreviewSettings;
     message: string;
+    copying: boolean;
   }> = Object.freeze({
     clipId: null as string | null,
     duration: 0,
     ready: false,
     settings: DEFAULT_MOTION_PREVIEW,
     message: '',
+    copying: false,
   });
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -43,10 +51,30 @@ export class MotionPreviewController {
     this.unbind();
     this.state = state;
     const sync = () => {
+      if (this.synchronizing) return;
+      if (this.copy && !state.trajectoryCopyActive) {
+        this.copy = undefined;
+        this.publish({ copying: false });
+      }
       const clipId = state.selectedAnimationId;
       const duration = state.workingAnimation?.duration ?? 0;
       const ready = !!clipId && state.animationAuthoringEnabled;
       if (clipId === this.snapshot.clipId && duration === this.snapshot.duration && ready === this.snapshot.ready) {
+        const settings = this.snapshot.settings;
+        if (
+          clipId &&
+          (state.worldDisplacementMode !== (settings.displacementMode ?? (settings.enabled ? 'preview' : 'authored')) ||
+            state.rootLoopMode !== (settings.rootLoopMode ?? 'reset'))
+        ) {
+          const next = Object.freeze({
+            ...settings,
+            displacementMode: state.worldDisplacementMode,
+            rootLoopMode: state.rootLoopMode,
+            enabled: state.worldDisplacementMode === 'preview',
+          });
+          this.clips.set(clipId, next);
+          this.publish({ settings: next });
+        }
         if (clipId && state.previewLoop !== this.observedLoop) {
           this.observedLoop = state.previewLoop;
           this.loops.set(clipId, state.previewLoop);
@@ -56,17 +84,94 @@ export class MotionPreviewController {
       }
       const loop = clipId !== this.snapshot.clipId ? (clipId && this.loops.get(clipId)) || false : state.previewLoop;
       this.observedLoop = loop;
+      const settings = (clipId && this.clips.get(clipId)) || DEFAULT_MOTION_PREVIEW;
+      this.applyView(settings);
       this.publish({
         clipId,
         duration,
         ready,
-        settings: (clipId && this.clips.get(clipId)) || DEFAULT_MOTION_PREVIEW,
+        settings,
         message: '',
       });
       if (loop !== state.previewLoop) state.setPreviewLoop(loop);
     };
     this.release = state.subscribe(sync);
     sync();
+  }
+  private applyView(settings: MotionPreviewSettings): void {
+    this.synchronizing = true;
+    try {
+      this.state?.setWorldDisplacementView(
+        settings.displacementMode ?? (settings.enabled ? 'preview' : 'authored'),
+        settings.rootLoopMode ?? 'reset',
+      );
+    } finally {
+      this.synchronizing = false;
+    }
+  }
+  attachPlacement(provider: () => Affine): () => void {
+    this.placement = provider;
+    return () => {
+      if (this.placement === provider) {
+        this.cancelCopy();
+        this.placement = undefined;
+      }
+    };
+  }
+  previewCopy(): boolean {
+    this.cancelCopy();
+    const state = this.state;
+    const placement = this.placement?.();
+    if (!state || !placement || !state.workingAnimation) return false;
+    try {
+      const settings = this.snapshot.settings;
+      const root = previewTrajectoryToRootMotion(settings, state.workingAnimation.duration, placement);
+      const previousMode = state.worldDisplacementMode;
+      if (!state.previewTrajectoryCopy(root)) {
+        this.publish({ message: 'Commit or cancel temporary animation edits before previewing a trajectory copy.' });
+        return false;
+      }
+      this.copy = { placement: rootMotionMatrix(placement, { x: 0, y: 0 }), previousMode };
+      this.publish({
+        copying: true,
+        message:
+          'Previewing copied root motion. Scrub or play before applying. Applying replaces all existing root-motion keys in one Undo operation.',
+      });
+      return true;
+    } catch (error) {
+      this.publish({ message: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+  }
+  cancelCopy(): void {
+    const copy = this.copy;
+    this.copy = undefined;
+    if (!copy) return;
+    const owned = this.state?.trajectoryCopyActive;
+    this.state?.cancelTrajectoryCopy();
+    if (owned) this.state?.setWorldDisplacementView(copy.previousMode);
+    this.publish({ copying: false, message: '' });
+  }
+  commitCopy(): boolean {
+    const copy = this.copy;
+    const placement = this.placement?.();
+    if (!copy || !placement || !this.state?.trajectoryCopyActive) return false;
+    if (['a', 'b', 'c', 'd'].some((key) => placement[key as keyof Affine] !== copy.placement[key as keyof Affine])) {
+      this.cancelCopy();
+      this.publish({ message: 'Character facing, rotation or scale changed. Preview the copy again before applying.' });
+      return false;
+    }
+    // The proposal is validated and committed through the document's single history transaction.
+    const applied = this.state.commitTrajectoryCopy();
+    if (applied) {
+      this.copy = undefined;
+      this.publish({
+        copying: false,
+        message:
+          'Preview trajectory copied to root motion. Original preview points are retained. Undo restores the previous root keys.',
+      });
+    }
+    return applied;
   }
   capturePreferences(): DeepReadonly<AnimationPreviewPreferences['animations']> {
     const ids = new Set([...this.clips.keys(), ...this.loops.keys()]);
@@ -81,6 +186,7 @@ export class MotionPreviewController {
     );
   }
   restorePreferences(preferences: DeepReadonly<AnimationPreviewPreferences['animations']>): void {
+    this.cancelCopy();
     this.clips.clear();
     this.loops.clear();
     for (const [id, preference] of Object.entries(preferences)) {
@@ -89,13 +195,23 @@ export class MotionPreviewController {
     }
     const id = this.snapshot.clipId;
     this.observedLoop = (id && this.loops.get(id)) || false;
-    this.publish({ settings: (id && this.clips.get(id)) || DEFAULT_MOTION_PREVIEW });
+    const settings = (id && this.clips.get(id)) || DEFAULT_MOTION_PREVIEW;
+    this.applyView(settings);
+    this.publish({ settings });
     if (this.state && this.state.previewLoop !== this.observedLoop) this.state.setPreviewLoop(this.observedLoop);
   }
   update(patch: Partial<MotionPreviewSettings>): boolean {
+    this.cancelCopy();
     const { clipId, ready, settings } = this.snapshot;
     if (!clipId || !ready) return false;
-    const next = { ...settings, ...patch };
+    const displacementMode =
+      patch.displacementMode ??
+      (patch.enabled === undefined
+        ? (settings.displacementMode ?? (settings.enabled ? 'preview' : 'authored'))
+        : patch.enabled
+          ? 'preview'
+          : 'authored');
+    const next = { ...settings, ...patch, displacementMode, enabled: displacementMode === 'preview' };
     const keys = [...next.positionKeys].sort((a, b) => a.time - b.time);
     if (keys.length > 10000) {
       this.publish({ message: 'Use at most 10,000 preview position points per animation.' });
@@ -110,6 +226,7 @@ export class MotionPreviewController {
       positionKeys: Object.freeze(keys.map((key) => Object.freeze({ ...key }))),
     });
     this.clips.set(clipId, frozen);
+    this.applyView(frozen);
     this.publish({ settings: frozen, message: '' });
     return true;
   }
@@ -145,13 +262,21 @@ export class MotionPreviewController {
     this.update(DEFAULT_MOTION_PREVIEW);
   }
   unbind(): void {
+    this.cancelCopy();
     this.release?.();
     this.release = undefined;
     this.state = undefined;
     this.clips.clear();
     this.loops.clear();
     this.observedLoop = false;
-    this.publish({ clipId: null, duration: 0, ready: false, settings: DEFAULT_MOTION_PREVIEW, message: '' });
+    this.publish({
+      clipId: null,
+      duration: 0,
+      ready: false,
+      settings: DEFAULT_MOTION_PREVIEW,
+      message: '',
+      copying: false,
+    });
   }
   dispose(): void {
     this.unbind();

@@ -82,7 +82,7 @@ for (const configured of [false, true]) {
       await point.getByLabel('Offset X', { exact: true }).fill('60');
       await point.getByLabel('Offset Y', { exact: true }).fill('-30');
       await point.getByRole('button', { name: 'Apply point 2', exact: true }).click();
-      await motion.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+      await motion.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true }).check();
       await motion.locator('summary').click();
       await page.locator('#playback-speed').selectOption('0.5');
       await page.locator('#preview-loop').click();
