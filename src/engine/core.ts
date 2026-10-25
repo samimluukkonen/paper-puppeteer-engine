@@ -13,6 +13,9 @@ export type {
 } from './AnimationClip.js';
 export { compileClip, sampleProperty } from './AnimationClip.js';
 export type { CurveHandle, PropertyCurve, PropertyCurves } from './animationCurves.js';
+export type { RootMotionDefinition, RootMotionKey, RootMotionOffset, RootMotionProperty } from './rootMotion.js';
+export { ROOT_MOTION_PROPERTIES, sampleRootMotion, evaluateRootMotion } from './rootMotion.js';
+export { rootMotionDefinitionSchema, rootMotionKeySchema } from './schemas.js';
 export type {
   AnimationCompletion,
   FiredAnimationEvent,

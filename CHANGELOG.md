@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.7-1
+
+Add optional authored X/Y root-motion tracks with independently timed sparse channels and existing linear, stepped and bounded Bézier property curves. Validate strict structures, finite values, duration bounds, ordering, duplicate times and curve ownership; include root keys in external import workload limits. Preserve root motion in deterministic animation JSON, character/project packages, compiled immutable snapshots and whole-clip variation timing. Retain animation format 1 and the higher package/lockfile version 1.2.6.
+
+Expose pure raw-offset and start-normalized displacement samplers without changing Actor placement or skeletal/IK playback. Document the actual transform hierarchy, canonical facing convention, start/end/loop semantics and preview separation in the [root-motion guide](docs/root-motion.md). Add data, curve, compatibility, ownership, playback and package round-trip regressions. Runtime application, editor controls and Environment Preview integration remain deferred.
+
 ## 1.1.6-4
 
 Persist Environment Preview as optional project editor preferences: shared character background placement, visibility, ground and default camera, with per-animation trajectories, displacement mode and Loop preview. Include preferences and real PNG/WebP assets in project ZIPs and complete standalone/project local recovery drafts. Keep animation JSON, character ZIPs, animation Undo/Redo and scene choreography unchanged; preserve the higher package/lockfile version `1.2.6`.

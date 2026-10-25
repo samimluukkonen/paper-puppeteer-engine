@@ -22,7 +22,7 @@ export interface JsonWorkloadLimitOptions {
   maxAttachments?: number;
   /** Maximum IK constraints per externally loaded rig. Defaults to 256. */
   maxIKConstraints?: number;
-  /** Maximum bone and IK keyframe rows combined, across all loaded clips. Defaults to 100000. */
+  /** Maximum bone, IK and root-motion keyframe rows combined across all loaded clips. Defaults to 100000. */
   maxKeyframes?: number;
   /** Maximum authored events combined across all loaded clips. Defaults to 10000. */
   maxEvents?: number;
@@ -114,6 +114,10 @@ export class JsonWorkloadBudget {
   }
 
   checkAnimation(input: unknown): void {
+    const rootKeys = ownValue(ownValue(input, 'rootMotion'), 'translationKeys');
+    if (Array.isArray(rootKeys)) this.keyframes += rootKeys.length;
+    if (this.keyframes > this.limits.maxKeyframes)
+      throw new JsonInputLimitError(`Animation data exceeds the ${this.limits.maxKeyframes}-keyframe limit.`);
     const events = ownValue(input, 'events');
     if (Array.isArray(events)) {
       this.events += events.length;

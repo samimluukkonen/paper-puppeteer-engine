@@ -146,6 +146,16 @@ const ikCurvesSchema = z.strictObject({
   mix: propertyCurveSchema.exactOptional(),
 });
 
+export const rootMotionKeySchema = z.strictObject({
+  time: finiteNumber.nonnegative(),
+  x: finiteNumber.exactOptional(),
+  y: finiteNumber.exactOptional(),
+  curves: z
+    .strictObject({ x: propertyCurveSchema.exactOptional(), y: propertyCurveSchema.exactOptional() })
+    .exactOptional(),
+});
+export const rootMotionDefinitionSchema = z.strictObject({ translationKeys: z.array(rootMotionKeySchema) });
+
 export const keyframeSchema = z.object({
   time: finiteNumber,
   ...transformFields,
@@ -177,6 +187,7 @@ export const animationClipSchema = z.object({
   loop: z.boolean(),
   interpolation: z.literal('linear').exactOptional(),
   tracks: identifierRecord(z.array(keyframeSchema)),
+  rootMotion: rootMotionDefinitionSchema.exactOptional(),
   ikTracks: identifierRecord(z.array(ikKeyframeSchema)).exactOptional(),
   disabledIKConstraints: z.array(identifierSchema).exactOptional(),
   events: z.array(animationEventSchema).exactOptional(),

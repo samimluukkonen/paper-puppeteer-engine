@@ -32,6 +32,7 @@ export function createAnimationVariation(
       name: options.name,
       duration: copy.duration * scale,
       tracks: Object.fromEntries(Object.entries(copy.tracks).map(([id, rows]) => [id, scaleRows(rows)])),
+      ...(copy.rootMotion ? { rootMotion: { translationKeys: scaleRows(copy.rootMotion.translationKeys) } } : {}),
       ...(copy.ikTracks
         ? { ikTracks: Object.fromEntries(Object.entries(copy.ikTracks).map(([id, rows]) => [id, scaleRows(rows)])) }
         : {}),

@@ -10,6 +10,7 @@ import { ikAnimationProperties, type IKAnimationProperty, type IKKeyframe } from
 import { copyJsonData } from './jsonData.js';
 import { freezeData, isFullyFrozen, readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
+import type { RootMotionDefinition } from './rootMotion.js';
 import { animationClipSchema, identifierSchema, ikKeyframeSchema, keyframeSchema } from './schemas.js';
 import type { JointTransform, TransformProperty } from './types.js';
 import { assertFinite, transformProperties } from './types.js';
@@ -31,6 +32,8 @@ export interface AnimationClip {
   /** Optional clip-level default; omitting it also uses linear interpolation. */
   interpolation?: Interpolation;
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
+  /** Authored animation-local X/Y offsets. Pose evaluation never applies these to placement. */
+  rootMotion?: RootMotionDefinition;
   /** Constraint-name keyed sparse rows. Positions are puppet-local, before placement/facing/scale. */
   ikTracks?: Readonly<Record<string, readonly IKKeyframe[]>>;
   /** Clip-local suppression, including runtime targets/providers; absent means ordinary rig IK. */
@@ -75,6 +78,7 @@ export interface CompiledClip {
   readonly duration: number;
   readonly loop: boolean;
   readonly tracks: readonly CompiledTrack[];
+  readonly rootMotion?: RootMotionDefinition;
   readonly ikTracks?: readonly CompiledIKTrack[];
   readonly disabledIKConstraints?: readonly string[];
   readonly events: readonly Readonly<AnimationEvent>[];
@@ -185,6 +189,25 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
     duration: clip.duration,
     loop: clip.loop,
     tracks: Object.freeze(clip.tracks.map(ownCompiledTrack)),
+    ...(clip.rootMotion
+      ? {
+          rootMotion: freezeData({
+            translationKeys: clip.rootMotion.translationKeys.map((key) => ({
+              time: key.time,
+              ...(key.x === undefined ? {} : { x: key.x }),
+              ...(key.y === undefined ? {} : { y: key.y }),
+              ...(key.curves === undefined
+                ? {}
+                : {
+                    curves: {
+                      ...(key.curves.x ? { x: copyPropertyCurve(key.curves.x) } : {}),
+                      ...(key.curves.y ? { y: copyPropertyCurve(key.curves.y) } : {}),
+                    },
+                  }),
+            })),
+          }),
+        }
+      : {}),
     ...(clip.ikTracks ? { ikTracks: Object.freeze(clip.ikTracks.map(ownCompiledIKTrack)) } : {}),
     ...(clip.disabledIKConstraints ? { disabledIKConstraints: Object.freeze([...clip.disabledIKConstraints]) } : {}),
     events: Object.freeze(
@@ -253,6 +276,7 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
     duration: clip.duration,
     loop: clip.loop,
     tracks,
+    ...(clip.rootMotion ? { rootMotion: clip.rootMotion } : {}),
     ...(clip.ikTracks ? { ikTracks } : {}),
     ...(clip.disabledIKConstraints ? { disabledIKConstraints: clip.disabledIKConstraints } : {}),
     events,

@@ -9,6 +9,7 @@ import {
 import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
 import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput.js';
 import type { Rig } from '../../engine/Rig.js';
+import { ROOT_MOTION_PROPERTIES } from '../../engine/rootMotion.js';
 import { transformProperties } from '../../engine/types.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
@@ -63,6 +64,7 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
       animation.duration,
       ...Object.values(animation.tracks).flatMap((keys) => keys.map((key) => key.time)),
       ...Object.values(animation.ikTracks ?? {}).flatMap((keys) => keys.map((key) => key.time)),
+      ...(animation.rootMotion?.translationKeys ?? []).map((key) => key.time),
       ...(animation.events ?? []).map((event) => event.time),
     ]),
   ].sort((a, b) => a - b);
@@ -95,6 +97,22 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
     ...(animation.disabledIKConstraints === undefined
       ? {}
       : { disabledIKConstraints: [...animation.disabledIKConstraints].sort() }),
+    ...(animation.rootMotion === undefined
+      ? {}
+      : {
+          rootMotion: {
+            translationKeys: animation.rootMotion.translationKeys.map((key) => ({
+              time: timeValue(key.time),
+              ...(key.curves === undefined ? {} : { curves: orderCurves(key.curves, ROOT_MOTION_PROPERTIES) }),
+              ...Object.fromEntries(
+                ROOT_MOTION_PROPERTIES.filter((property) => key[property] !== undefined).map((property) => [
+                  property,
+                  normalizeNumber(key[property]!),
+                ]),
+              ),
+            })),
+          },
+        }),
     tracks: Object.fromEntries(
       Object.keys(animation.tracks)
         .sort()

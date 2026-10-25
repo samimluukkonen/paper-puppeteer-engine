@@ -176,6 +176,16 @@ export function checkAnimationReferences(
   report: ReportValidationIssue,
 ): void {
   // Timeline rules remain checkable even when character assembly has no valid skeleton.
+  if (clip.rootMotion) {
+    const keys = clip.rootMotion.translationKeys;
+    const path = 'rootMotion.translationKeys';
+    for (const [index, key] of keys.entries()) {
+      if (key.x === undefined && key.y === undefined)
+        report({ severity: 'error', path: `${path}[${index}]`, message: 'Root motion keyframe needs x or y.' });
+    }
+    checkKeyframeTimeline(keys, clip.duration, path, report);
+    checkPropertyCurves(keys, path, report);
+  }
   const boneIds = rig ? new Set(rig.bones.map((bone) => bone.id)) : undefined;
   for (const [bone, keys] of Object.entries(clip.tracks)) {
     if (boneIds && !boneIds.has(bone))
