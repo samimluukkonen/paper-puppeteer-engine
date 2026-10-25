@@ -31,6 +31,7 @@ import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
 
 export type ReadonlyScene = DeepReadonly<SceneDefinition>;
@@ -113,8 +114,7 @@ export class SceneEditorDocument {
   readonly getSnapshot = (): number => this.revision;
   private notify(): void {
     this.revision++;
-    // oxlint-disable-next-line unicorn/no-useless-spread -- Subscription changes apply to the next notification.
-    for (const listener of [...this.listeners]) listener();
+    notifySubscribers(this.listeners, 'Scene document subscribers failed.');
   }
   private get entry(): SceneEntry | undefined {
     return this.selected === null ? undefined : this.entries.get(this.selected);

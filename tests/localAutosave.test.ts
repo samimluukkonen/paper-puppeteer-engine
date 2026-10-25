@@ -71,6 +71,31 @@ function fixture() {
   };
 }
 
+test('throwing status subscribers cannot interrupt saves or prevent later revisions from saving', async () => {
+  const reporter = vi.fn();
+  vi.stubGlobal('reportError', reporter);
+  const f = fixture();
+  const notified = vi.fn();
+  f.autosave.subscribe(() => {
+    throw new Error('Status UI failed.');
+  });
+  f.autosave.subscribe(notified);
+  try {
+    await f.autosave.flush();
+    assert.match(f.autosave.getSnapshot(), /^Local draft saved/);
+    f.edit('2');
+    await f.autosave.flush();
+    assert.deepEqual(
+      f.storage.saved.map(({ revision }) => revision),
+      ['1', '2'],
+    );
+    assert.equal(notified.mock.calls.length, 5);
+    assert.equal(reporter.mock.calls.length, 5);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test('debounces authored edits and captures the final revision', async () => {
   const f = fixture();
   await vi.advanceTimersByTimeAsync(600);

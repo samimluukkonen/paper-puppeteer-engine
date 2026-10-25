@@ -2,6 +2,7 @@ import { inspectImageHeader } from '../../engine/imageHeader.js';
 import { sceneImageReferenceSchema } from '../../engine/SceneDefinition.js';
 import { createSceneTextureBudget } from '../../engine/sceneTextureBudget.js';
 import { importSprite } from '../shared/artwork/spriteImport.js';
+import { notifySubscribers } from '../shared/subscriberNotifications.js';
 
 export interface SceneImageAsset {
   readonly reference: string;
@@ -22,7 +23,7 @@ export class SceneImageRegistry {
   readonly getSnapshot = (): number => this.revision;
   private notify(): void {
     this.revision++;
-    for (const listener of Array.from(this.listeners)) listener();
+    notifySubscribers(this.listeners, 'Scene image subscribers failed.');
   }
   get entries(): readonly SceneImageAsset[] {
     return [...this.assets.values()].map(({ bytes: _bytes, ...asset }) => asset);

@@ -19,6 +19,7 @@ import {
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { sceneFingerprint } from '../shared/sceneFingerprint.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
+import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { parseProjectDefinition, type ProjectDefinition } from './ProjectDefinition.js';
 import {
   assetDependents,
@@ -92,7 +93,7 @@ export class ProjectWorkspace {
   readonly getSnapshot = (): number => this.revision;
   readonly refresh = (): void => {
     this.revision++;
-    for (const listener of Array.from(this.listeners)) listener();
+    notifySubscribers(this.listeners, 'Project subscribers failed.');
   };
   get definition(): DeepReadonly<ProjectDefinition> {
     const images = this.scenes.images.entries.map((asset) => ({

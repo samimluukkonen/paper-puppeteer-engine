@@ -1,4 +1,5 @@
 import type { PackageFiles } from '../package/characterPackage.js';
+import { notifySubscribers } from '../subscriberNotifications.js';
 import { type DraftStorage, storageError } from './LocalDraftStore.js';
 
 export interface AutosaveSource {
@@ -38,7 +39,7 @@ export class LocalAutosave {
   private publish(message: string): void {
     if (message === this.message || this.stopped) return;
     this.message = message;
-    for (const listener of Array.from(this.listeners)) listener();
+    notifySubscribers(this.listeners, 'Autosave subscribers failed.');
   }
   private savedMessage(revision: string): string {
     return `Local draft saved · export a ZIP for a disk copy${this.exportedRevision === revision ? ' · Explicitly exported' : ''}`;

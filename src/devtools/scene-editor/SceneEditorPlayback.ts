@@ -2,6 +2,7 @@ import { equalJsonData } from '../../engine/equalJsonData.js';
 import { sceneActorDepth, sceneLayer } from '../../engine/sceneLayers.js';
 import type { SceneRunnerOptions } from '../../engine/SceneRunner.js';
 import { SceneRunner } from '../../engine/SceneRunner.js';
+import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
 
 /** View-only playback session. Phaser binds the isolated Actor factory and supplies deltas.
@@ -22,8 +23,7 @@ export class SceneEditorPlayback {
   readonly getSnapshot = (): number => this.revision;
   private notify(): void {
     this.revision++;
-    // oxlint-disable-next-line unicorn/no-useless-spread -- Subscription changes apply to the next notification.
-    for (const listener of [...this.listeners]) listener();
+    notifySubscribers(this.listeners, 'Scene playback subscribers failed.');
   }
   get time(): number {
     return this.runner?.time ?? 0;

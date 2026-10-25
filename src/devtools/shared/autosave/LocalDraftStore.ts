@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { validatePackageFiles } from '../../../engine/packageZip.js';
 import type { PackageFiles } from '../package/characterPackage.js';
+import { notifySubscribers } from '../subscriberNotifications.js';
 
 export const DRAFT_DATABASE = 'paper-puppeteer-recovery';
 export const DRAFT_RETENTION = 2;
@@ -63,7 +64,7 @@ export class LocalDraftStore implements DraftStorage {
     return () => this.listeners.delete(listener);
   };
   private changed(): void {
-    for (const listener of Array.from(this.listeners)) listener();
+    notifySubscribers(this.listeners, 'Local draft subscribers failed.');
   }
   private readonly locks = new Map<
     string,

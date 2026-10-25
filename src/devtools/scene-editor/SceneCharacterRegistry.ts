@@ -3,6 +3,7 @@ import { CharacterLoader } from '../../engine/CharacterLoader.js';
 import { sceneCharacterAssetPath } from '../../engine/SceneAssets.js';
 import { sceneCharacterReferenceSchema } from '../../engine/SceneDefinition.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
+import { notifySubscribers } from '../shared/subscriberNotifications.js';
 
 /** Permanent package references use the same catalog and manifest convention as the character editors. */
 export const sceneCharacterChoices = characterCatalog.map((entry) => ({
@@ -51,7 +52,7 @@ export class SceneCharacterRegistry {
         this.lifetime.signal.throwIfAborted();
         this.definitions.set(manifest, definition);
         this.revision++;
-        for (const listener of Array.from(this.listeners)) listener();
+        notifySubscribers(this.listeners, 'Scene character subscribers failed.');
         return definition;
       })
       .finally(() => this.pending.delete(manifest));
