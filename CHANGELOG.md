@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Release owned Actors and transition resources when SceneRunner initialization callbacks fail, preserving both initialization and cleanup errors.
+
 - Give restored scene images fresh resource/decode requests and ignore cancelled obsolete results, preventing rapid removal/Undo from leaving artwork stuck in an error state.
 
 - Preflight the complete expanded project resource budget before copying imported character binaries, and enforce the same 100 MiB budget on exports.

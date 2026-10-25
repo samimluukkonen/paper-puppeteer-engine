@@ -121,6 +121,72 @@ function snapshot(runner: SceneRunner) {
   }));
 }
 
+test.each(['camera', 'transition', 'pause'] as const)(
+  'failed construction releases every owned Actor after an initial %s callback failure',
+  (phase) => {
+    const assets = factory();
+    const failure = new Error(`Initial ${phase} failed.`);
+    const overlay = { setTransition: vi.fn() };
+    const fail = (): never => {
+      throw failure;
+    };
+    let thrown: unknown;
+    try {
+      new SceneRunner(scene(), {
+        createActor: (data, depth) => {
+          const actor = assets.createActor(data);
+          actor.puppet.container.setDepth(depth);
+          if (phase === 'pause') vi.spyOn(actor, 'pauseAnimation').mockImplementation(fail);
+          return actor;
+        },
+        transitionOverlay: overlay,
+        ...(phase === 'camera' ? { onCamera: fail } : {}),
+        ...(phase === 'transition' ? { onTransition: fail } : {}),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    if (phase === 'transition') {
+      assert.instanceOf(thrown, AggregateError);
+      assert.strictEqual(thrown.cause, failure);
+    } else assert.strictEqual(thrown, failure);
+    assert.equal(assets.created.length, 2);
+    assert.isTrue(assets.created.every((actor) => actor.isDisposed && actor.puppet.isDestroyed));
+    assert.isAtLeast(overlay.setTransition.mock.calls.length, 1);
+  },
+);
+
+test('constructor cleanup releases remaining Actors even when one disposal fails', () => {
+  const assets = factory();
+  const failure = new Error('Camera failed.');
+  const cleanupFailure = new Error('Actor cleanup failed.');
+  let thrown: unknown;
+  try {
+    new SceneRunner(scene(), {
+      createActor: (data) => {
+        const actor = assets.createActor(data);
+        if (assets.created.length === 1) {
+          const dispose = actor.dispose.bind(actor);
+          vi.spyOn(actor, 'dispose').mockImplementation(() => {
+            dispose();
+            throw cleanupFailure;
+          });
+        }
+        return actor;
+      },
+      onCamera: () => {
+        throw failure;
+      },
+    });
+  } catch (error) {
+    thrown = error;
+  }
+  assert.instanceOf(thrown, AggregateError);
+  assert.strictEqual(thrown.cause, cleanupFailure);
+  assert.strictEqual(thrown.errors[0], failure);
+  assert.isTrue(assets.created.every((actor) => actor.isDisposed && actor.puppet.isDestroyed));
+});
+
 test('layer edits preserve playing Actor identity, movement, clock and whole-Puppet depth through restart', () => {
   const assets = factory();
   const playback = new SceneEditorPlayback();

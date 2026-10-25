@@ -108,9 +108,21 @@ export class SceneRunner {
         this.ends.set(time, ends);
       }
     }
-    this.rebuild(false);
-    for (const actor of this.instances.values()) actor.pauseAnimation();
-    this.syncCamera();
+    try {
+      this.rebuild(false);
+      for (const actor of this.instances.values()) actor.pauseAnimation();
+      this.syncCamera();
+    } catch (error) {
+      // A failed constructor cannot return a disposable owner to the host.
+      try {
+        this.dispose();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], 'Scene initialization and cleanup failed.', {
+          cause: cleanupError,
+        });
+      }
+      throw error;
+    }
   }
   get actors(): ReadonlyMap<string, Actor> {
     return this.instances;
