@@ -1,3 +1,4 @@
+import { sceneAssetCatalog } from '../../engine/SceneAssets.js';
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { projectEditorContext } from '../project/projectBridge.js';
@@ -15,7 +16,12 @@ const project = projectEditorContext();
 const registry = new SceneCharacterRegistry(project ? (manifest) => project.loadCharacter(manifest) : undefined);
 const scenes =
   project?.scenes ??
-  new SceneEditorDocument({}, (manifest) => registry.get(manifest)?.animations.map((clip) => clip.name));
+  new SceneEditorDocument({
+    getCharacterAssets: (manifest) => {
+      const definition = registry.get(manifest);
+      return definition ? sceneAssetCatalog(new Map([[manifest, definition]])).get(manifest) : undefined;
+    },
+  });
 const guides = new GuideLauncher(sceneGuideHost(scenes));
 const unmount = mountView(
   host,

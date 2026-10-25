@@ -71,6 +71,7 @@ export class SceneRunner {
   private readonly ends = new Map<number, DeepReadonly<SceneActionDefinition>[]>();
   private nextBoundary = 1;
   private readonly activeAnimations = new Map<string, number>();
+  private readonly rootMotionActors = new Set<string>();
   private readonly ownedAnimations = new Map<string, number>();
   private readonly activeMoves = new Map<string, { actionId: string; requestId: number }>();
   private generation = 0;
@@ -254,6 +255,7 @@ export class SceneRunner {
     this.generation++;
     for (const release of this.releases.splice(0)) release();
     this.activeAnimations.clear();
+    this.rootMotionActors.clear();
     this.ownedAnimations.clear();
     this.activeMoves.clear();
     const previous = this.instances;
@@ -283,7 +285,7 @@ export class SceneRunner {
         }
         this.instances.set(data.id, actor);
         actor.puppet.container.setVisible(sceneLayer(this.definition, 'actors').visible);
-        actor.puppet.animationPlayer.setPreviewMode(!runtime);
+        actor.puppet.animationPlayer.setPreviewMode(!runtime, { applyRootMotion: true });
         actor.setPosition(data.position.x, data.position.y).setFacing(data.facing ?? 'right');
         if (data.skin !== undefined) actor.setSkin(data.skin);
         if (data.animation !== undefined) actor.play(data.animation, { restart: true, fadeDuration: 0 });
@@ -311,6 +313,14 @@ export class SceneRunner {
       for (const action of this.actions) {
         if (action.type === 'animation' && !this.instances.get(action.actorId)!.puppet.hasAnimation(action.animation))
           throw new Error(`Action "${action.id}": unknown animation "${action.animation}".`);
+        if (
+          action.type === 'animation' &&
+          action.movementSource === 'rootMotion' &&
+          !this.instances.get(action.actorId)!.puppet.animationPlayer.hasRootMotion(action.animation)
+        )
+          throw new Error(
+            `Action "${action.id}": animation "${action.animation}" has no root-motion translation keys.`,
+          );
       }
     } catch (error) {
       this.release();
@@ -323,6 +333,7 @@ export class SceneRunner {
     const animations = new Map(this.ownedAnimations);
     const moves = new Map(this.activeMoves);
     this.activeAnimations.clear();
+    this.rootMotionActors.clear();
     this.ownedAnimations.clear();
     this.activeMoves.clear();
     this.ownCommand = true;
@@ -393,6 +404,14 @@ export class SceneRunner {
     }
   }
   private checkOwnership(): void {
+    // Non-looping animations may finish before their authored window. Preserve the scene's
+    // exclusive translation window even while the runtime holds that completed endpoint.
+    for (const id of this.rootMotionActors) {
+      if (this.instances.get(id)!.movementStatus?.status === 'moving') {
+        this.halt('interrupted');
+        return;
+      }
+    }
     for (const [id, request] of this.activeMoves) {
       const status = this.instances.get(id)!.movementStatus;
       if (status?.requestId !== request.requestId || (status.status !== 'moving' && status.status !== 'completed')) {
@@ -422,6 +441,7 @@ export class SceneRunner {
         const actor = this.instances.get(action.actorId)!;
         if (action.type === 'animation' && this.activeAnimations.has(actor.id)) {
           this.activeAnimations.delete(actor.id);
+          this.rootMotionActors.delete(actor.id);
           actor.stop();
         }
         if (action.type === 'move' && this.activeMoves.get(actor.id)?.actionId === action.id) {
@@ -441,7 +461,13 @@ export class SceneRunner {
                 selectedId = event.playbackId;
             });
             try {
-              actor.play(action.animation, { loop: action.loop, speed: action.speed, restart: true, fadeDuration: 0 });
+              actor.play(action.animation, {
+                loop: action.loop,
+                speed: action.speed,
+                restart: true,
+                fadeDuration: 0,
+                rootMotion: action.movementSource === 'rootMotion' ? 'apply' : 'ignore',
+              });
             } finally {
               unsubscribe();
             }
@@ -454,6 +480,7 @@ export class SceneRunner {
               return;
             }
             this.activeAnimations.set(actor.id, actor.puppet.getPlaybackStatus()!.playbackId);
+            if (action.movementSource === 'rootMotion') this.rootMotionActors.add(actor.id);
             this.ownedAnimations.set(actor.id, actor.puppet.getPlaybackStatus()!.playbackId);
             break;
           }

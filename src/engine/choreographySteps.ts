@@ -86,7 +86,13 @@ export function validateChoreographyStep(actor: Actor, step: ChoreographyStep): 
       break;
     case 'animation':
       // Enforce the finite, fresh base-channel contract for untyped callers as well.
-      validateOptions(step.options, ['speed', 'fadeDuration']);
+      validateOptions(step.options, ['speed', 'fadeDuration', 'rootMotion']);
+      if (
+        step.options?.rootMotion !== undefined &&
+        step.options.rootMotion !== 'ignore' &&
+        step.options.rootMotion !== 'apply'
+      )
+        throw new Error('Invalid root motion policy.');
       validateAnimation(actor, step.name);
       nonnegative(step.options?.speed === undefined ? 1 : step.options.speed, 'Animation speed');
       nonnegative(step.options?.fadeDuration === undefined ? 0 : step.options.fadeDuration, 'Fade duration');

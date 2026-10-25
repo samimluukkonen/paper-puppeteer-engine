@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import type Phaser from 'phaser';
 import { afterEach, assert, test, vi } from 'vitest';
 import { Actor } from '../src/engine/Actor.js';
-import { ChoreographySequence, type ChoreographyStep, Puppet } from '../src/engine/runtime.js';
+import { Choreography, ChoreographySequence, type ChoreographyStep, Puppet } from '../src/engine/runtime.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
 vi.mock('phaser', () => ({
@@ -559,3 +559,63 @@ test.each(['complete', 'cancel', 'dispose'] as const)(
     assert.deepEqual(steps, []);
   },
 );
+
+test('choreography root-motion steps hand off to movement and cancellation retains partial travel', async () => {
+  const { actor, puppet } = fixture();
+  puppet.addAnimation({
+    name: 'step',
+    duration: 100,
+    loop: false,
+    tracks: {},
+    rootMotion: {
+      translationKeys: [
+        { time: 0, x: 0 },
+        { time: 100, x: 80 },
+      ],
+    },
+  });
+  const sequence = new ChoreographySequence(actor)
+    .playAnimation('step', { rootMotion: 'apply' })
+    .moveTo(100, 0, { speed: 100 });
+  const pending = sequence.run();
+  puppet.update(100);
+  await flush();
+  assert.deepEqual(actor.position, { x: 80, y: 0 });
+  puppet.update(200);
+  assert.equal((await pending).status, 'completed');
+  assert.deepEqual(actor.position, { x: 100, y: 0 });
+  const cancelled = new ChoreographySequence(actor).playAnimation('step', { rootMotion: 'apply' });
+  const outcome = cancelled.run();
+  puppet.update(50);
+  cancelled.cancel();
+  assert.equal((await outcome).status, 'cancelled');
+  puppet.update(100);
+  assert.deepEqual(actor.position, { x: 140, y: 0 });
+});
+
+test('parallel choreography rejects root motion and movement for the same Actor before either starts', async () => {
+  const { actor, puppet } = fixture();
+  puppet.addAnimation({
+    name: 'step',
+    duration: 100,
+    loop: false,
+    tracks: {},
+    rootMotion: {
+      translationKeys: [
+        { time: 0, x: 0 },
+        { time: 100, x: 80 },
+      ],
+    },
+  });
+  const choreography = new Choreography([actor]);
+  const result = await choreography.run(
+    choreography.parallel([
+      choreography.actor(actor.id, [{ kind: 'animation', name: 'step', options: { rootMotion: 'apply' } }]),
+      choreography.actor(actor.id, [{ kind: 'move', x: 100, y: 0 }]),
+    ]),
+  );
+  assert.equal(result.status, 'failed');
+  assert.equal(actor.currentAnimation, undefined);
+  assert.deepEqual(actor.position, { x: 0, y: 0 });
+  choreography.dispose();
+});

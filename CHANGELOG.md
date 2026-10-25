@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.7-5
+
+Add explicit Scene-controlled or Animation root motion movement sources to animation clips, with evaluated read-only displacement and disabled rootless selections in the collapsed inspector. Default omitted fields to scene movement without rewriting legacy files. Reject overlapping translation owners for an Actor, including moves and root-motion clips; retain the existing animation-channel conflicts and allow adjacent windows and independent Actors.
+
+Reuse runtime root evaluation and Puppet transforms for facing/scale-aware travel, finite continuous loops, truncation, final-position holds and fresh origins at clip handoffs. Reconstruct arbitrary seeks through the existing boundary evaluator with root application enabled and gameplay events suppressed. Preserve cancellation/interruption positions, skeletal/IK channels, scene cameras/layers/ground, character root data and movement policy through JSON/project/portable packages. Enable the existing typed root-motion option in finite choreography animation steps with unchanged parallel Actor claims. Add unit and local desktop browser regressions and the [scene root-motion guide](docs/scene-root-motion.md). Retain package and lockfile version `1.2.6`.
+
 ## 1.1.7-4
 
 Match Rig Editor background dragging in Animation Editor: left drag moves only the preview character placement, including during root editing; middle drag pans the camera. Retain placement across clip/view changes and rig rebuilds without changing keys, history or exports, and move preview trajectory guides with that placement.

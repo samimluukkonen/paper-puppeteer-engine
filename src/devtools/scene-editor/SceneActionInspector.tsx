@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { evaluateRootMotionAtElapsedTime } from '../../engine/rootMotion.js';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
@@ -28,6 +29,20 @@ function ActionProperties({
   }, [action]);
   const actor = scene.actors.find((actor) => actor.id === draft.actorId);
   const clips = actor ? (registry.get(actor.character.manifest)?.animations ?? []) : [];
+  const animation = draft.type === 'animation' ? clips.find((clip) => clip.name === draft.animation) : undefined;
+  const hasRootMotion = !!animation?.rootMotion?.translationKeys.length;
+  let displacement: { x: number; y: number } | undefined;
+  let displacementError = '';
+  if (draft.type === 'animation' && animation && hasRootMotion) {
+    try {
+      displacement = evaluateRootMotionAtElapsedTime(animation, draft.duration * draft.speed, {
+        loop: draft.loop,
+        playback: { mode: 'smooth' },
+      });
+    } catch (error) {
+      displacementError = error instanceof Error ? error.message : String(error);
+    }
+  }
   const numberField = (label: string, value: number, update: (value: number) => void, min?: number) => (
     <label>
       {label}
@@ -50,6 +65,10 @@ function ActionProperties({
           try {
             if (draft.type === 'animation' && !clips.some((clip) => clip.name === draft.animation))
               throw new Error('Select a loaded animation for this Actor.');
+            if (draft.type === 'animation' && draft.movementSource === 'rootMotion' && !hasRootMotion)
+              throw new Error(
+                'This animation has no root-motion translation keys. Choose scene-controlled movement or author root motion in Animation Editor.',
+              );
             let next = draft;
             if (next.type === 'cue') {
               const { payload: _old, ...rest } = next;
@@ -98,6 +117,36 @@ function ActionProperties({
                 ))}
               </select>
             </label>
+            <label>
+              Movement source
+              <select
+                value={draft.movementSource ?? 'scene'}
+                onChange={(event) =>
+                  setDraft({ ...draft, movementSource: event.target.value === 'rootMotion' ? 'rootMotion' : 'scene' })
+                }
+              >
+                <option value="scene">Scene-controlled</option>
+                <option value="rootMotion" disabled={!hasRootMotion}>
+                  Animation root motion
+                </option>
+              </select>
+            </label>
+            {displacement ? (
+              <p className="workspace-caption">
+                Root displacement (animation-local, over this window): X: {displacement.x > 0 ? '+' : ''}
+                {displacement.x}; Y: {displacement.y > 0 ? '+' : ''}
+                {displacement.y}. Facing and scale at clip start transform this travel into the world.
+              </p>
+            ) : (
+              <p className="workspace-caption">
+                {displacementError ||
+                  'This animation has no root-motion translation keys. Author them in Animation Editor.'}
+              </p>
+            )}
+            <p className="workspace-caption">
+              Scene-controlled clips leave translation to scene movement. Animation root motion owns translation for the
+              full window; overlapping movement is rejected.
+            </p>
             <label>
               <input
                 type="checkbox"

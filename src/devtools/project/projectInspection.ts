@@ -243,6 +243,9 @@ export class ProjectInspector {
       const { rig, skins, animations, definition, replacements } = snapshot;
       catalog.set(entry.manifest, {
         animations: animations.map((clip) => clip.name),
+        rootMotionAnimations: animations
+          .filter((clip) => clip.rootMotion?.translationKeys.length)
+          .map((clip) => clip.name),
         skins: [...skins, ...(rig.skins ?? [])].map((skin) => skin.name),
       });
       attempt(

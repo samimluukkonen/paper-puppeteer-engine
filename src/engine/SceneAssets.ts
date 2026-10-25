@@ -33,6 +33,9 @@ export function sceneAssetCatalog(
       reference,
       {
         animations: character.animations.map((clip) => clip.name),
+        rootMotionAnimations: character.animations
+          .filter((clip) => clip.rootMotion?.translationKeys.length)
+          .map((clip) => clip.name),
         skins: character.rig.skins.map((skin) => skin.name),
       },
     ]),

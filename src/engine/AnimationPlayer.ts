@@ -114,14 +114,18 @@ export class AnimationPlayer {
   private paused = false;
   private disposed = false;
   private previewMode = false;
+  private previewRootMotion = false;
 
   /** Isolated preview reconstruction suppresses authored events and legacy completion
    * callbacks. Lifecycle outcomes still settle runtime waits and ownership policies.
    * Preview contexts must not install gameplay lifecycle listeners or scripted queues.
+   * Scene reconstruction can explicitly retain runtime translation; ordinary editor previews
+   * continue to suppress root-motion application, including skeletal sample calls.
    */
-  setPreviewMode(enabled: boolean): void {
+  setPreviewMode(enabled: boolean, options: { readonly applyRootMotion?: boolean } = {}): void {
     this.assertActive();
     this.previewMode = enabled;
+    this.previewRootMotion = enabled && options.applyRootMotion === true;
   }
 
   constructor(
@@ -259,6 +263,11 @@ export class AnimationPlayer {
 
   hasAnimation(name: string): boolean {
     return this.clips.has(name);
+  }
+
+  /** Metadata check for hosts that require authored translation before granting ownership. */
+  hasRootMotion(name: string): boolean {
+    return !!this.clips.get(name)?.rootMotion?.translationKeys.length;
   }
 
   /** Restart the clip unless restart:false keeps it active. Host hooks prepare after validation
@@ -805,7 +814,11 @@ export class AnimationPlayer {
       if (state?.playing) {
         const end = advanceAnimationTime(state, delta, this.speed);
         const unwrappedEnd = advanceAnimationTime({ ...state, time: state.unwrappedTime }, delta, this.speed);
-        if (state === this.layers.get('base')?.state && state.rootMotion === 'apply' && !this.previewMode)
+        if (
+          state === this.layers.get('base')?.state &&
+          state.rootMotion === 'apply' &&
+          (!this.previewMode || this.previewRootMotion)
+        )
           rootDisplacement = evaluateRootMotionAtElapsedTime(state.clip, unwrappedEnd, { playback: this.playback });
         if (!this.previewMode) eventBudget.addCrossings(state.clip, state.time, end, this.eventListeners.size);
       }

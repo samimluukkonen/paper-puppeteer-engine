@@ -99,6 +99,8 @@ export const sceneActionDefinitionSchema = z.discriminatedUnion('type', [
     duration: z.number().positive(),
     loop: z.boolean(),
     speed: z.number().positive(),
+    /** Omitted in legacy scenes: translation remains owned by scene movement actions. */
+    movementSource: z.enum(['scene', 'rootMotion']).exactOptional(),
   }),
   z.strictObject({
     ...actionTiming,
@@ -148,9 +150,12 @@ export type SceneCharacterReference = z.infer<typeof sceneCharacterReferenceSche
 export interface SceneCharacterAssets {
   readonly animations: readonly string[];
   readonly skins: readonly string[];
+  readonly rootMotionAnimations?: readonly string[];
 }
 export interface SceneValidationOptions {
   readonly characters?: ReadonlyMap<string, SceneCharacterAssets>;
+  /** Editors may validate against metadata as it becomes available without blocking scene opening. */
+  readonly getCharacterAssets?: (manifest: string) => SceneCharacterAssets | undefined;
   readonly images?: ReadonlySet<string>;
 }
 
@@ -191,6 +196,12 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   const scene = structuredClone(result.data);
   const report = (path: string, message: string): void => {
     issues.push({ severity: 'error', path, message });
+  };
+  const assetCache = new Map<string, SceneCharacterAssets | undefined>();
+  const characterAssets = (manifest: string): SceneCharacterAssets | undefined => {
+    if (!assetCache.has(manifest))
+      assetCache.set(manifest, options.characters?.get(manifest) ?? options.getCharacterAssets?.(manifest));
+    return assetCache.get(manifest);
   };
   for (const property of CAMERA_PROPERTIES) {
     const keys = scene.cameraTracks?.[property] ?? [];
@@ -252,7 +263,7 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
     const path = `actors[${index}]`;
     if (actors.has(actor.id)) report(`${path}.id`, `Duplicate actor ID "${actor.id}".`);
     actors.set(actor.id, actor);
-    const assets = options.characters?.get(actor.character.manifest);
+    const assets = characterAssets(actor.character.manifest);
     if (options.characters && !assets)
       report(`${path}.character.manifest`, `Unknown character "${actor.character.manifest}".`);
     if (assets && actor.animation !== undefined && !assets.animations.includes(actor.animation))
@@ -270,11 +281,20 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
     if (!actor) report(`${path}.actorId`, `Unknown actor "${action.actorId}".`);
     if (action.time > scene.duration) report(`${path}.time`, 'Action time must stay within the scene duration.');
     const end = action.time + sceneActionDuration(action);
+    if (sceneActionDuration(action) > 0 && end <= action.time)
+      report(`${path}.duration`, 'Action duration must advance scene time.');
     if (!Number.isFinite(end) || end > scene.duration)
       report(`${path}.duration`, 'Action end must stay within the scene duration.');
-    const assets = actor && options.characters?.get(actor.character.manifest);
+    const assets = actor && characterAssets(actor.character.manifest);
     if (assets && action.type === 'animation' && !assets.animations.includes(action.animation))
       report(`${path}.animation`, `Unknown animation "${action.animation}".`);
+    if (action.type === 'animation') {
+      const elapsed = action.duration * action.speed;
+      if (!Number.isFinite(elapsed) || elapsed <= 0)
+        report(`${path}.speed`, 'Scaled animation duration must be finite and positive.');
+      if (action.movementSource === 'rootMotion' && assets && !assets.rootMotionAnimations?.includes(action.animation))
+        report(`${path}.movementSource`, `Animation "${action.animation}" has no root-motion translation keys.`);
+    }
     if (action.type === 'face' && action.target.type === 'actor') {
       if (!actors.has(action.target.actorId))
         report(`${path}.target.actorId`, `Unknown target actor "${action.target.actorId}".`);
@@ -288,7 +308,9 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
           : action.type === 'face'
             ? 'facing'
             : null;
-    if (channel) {
+    const channels = channel ? [channel] : [];
+    if (action.type === 'animation' && action.movementSource === 'rootMotion') channels.push('position');
+    for (const channel of channels) {
       const key = JSON.stringify([action.actorId, channel]);
       const group = ownership.get(key) ?? [];
       group.push({ action, index });

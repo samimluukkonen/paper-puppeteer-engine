@@ -639,6 +639,10 @@
               "speed": {
                 "type": "number",
                 "exclusiveMinimum": 0
+              },
+              "movementSource": {
+                "type": "string",
+                "enum": ["scene", "rootMotion"]
               }
             },
             "required": ["id", "actorId", "time", "type", "animation", "duration", "loop", "speed"],

@@ -49,10 +49,27 @@ export class ProjectWorkspace {
   private readonly artwork = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly checkpoints = new Map<string, string>();
   private sceneCheckpoints = new Map<string, string>();
-  readonly scenes = new SceneEditorDocument({}, undefined, () =>
-    Object.values(this.previewPreferences).flatMap((preferences) =>
-      preferences.environment.image ? [preferences.environment.image] : [],
-    ),
+  readonly scenes = new SceneEditorDocument(
+    {
+      getCharacterAssets: (manifest) => {
+        const entry = this.metadata.characters.find((entry) => entry.manifest === manifest);
+        const character = entry && this.characters.get(entry.id);
+        if (!character || character.loading) return undefined;
+        const snapshot = this.workingCharacter(character);
+        return {
+          animations: snapshot.animations.map((clip) => clip.name),
+          rootMotionAnimations: snapshot.animations
+            .filter((clip) => clip.rootMotion?.translationKeys.length)
+            .map((clip) => clip.name),
+          skins: [...snapshot.skins, ...(snapshot.rig.skins ?? [])].map((skin) => skin.name),
+        };
+      },
+    },
+    undefined,
+    () =>
+      Object.values(this.previewPreferences).flatMap((preferences) =>
+        preferences.environment.image ? [preferences.environment.image] : [],
+      ),
   );
   private revision = 0;
   recoveryKey: string | undefined;
@@ -299,6 +316,9 @@ export class ProjectWorkspace {
           actor.character.manifest,
           {
             animations: snapshot.animations.map((clip) => clip.name),
+            rootMotionAnimations: snapshot.animations
+              .filter((clip) => clip.rootMotion?.translationKeys.length)
+              .map((clip) => clip.name),
             skins: [...snapshot.skins, ...(snapshot.rig.skins ?? [])].map((skin) => skin.name),
           },
         ];
