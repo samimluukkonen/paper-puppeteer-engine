@@ -58,6 +58,10 @@
 .guide-step-card h3 {
   font-size: 15px;
 }
+.guide-keyword {
+  color: var(--guide-keyword-fg);
+  font-weight: 600;
+}
 .guide-step-progress,
 .guide-step-policy {
   color: var(--fg-muted);

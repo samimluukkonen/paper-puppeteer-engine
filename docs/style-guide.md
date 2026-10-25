@@ -49,6 +49,8 @@ Use semantic CSS variables, not page-specific palette copies. Current dark-theme
 
 Use the shared system sans-serif stack; reserve `--font-mono` for JSON, IDs or numeric/code content where it aids reading. Keep normal letter spacing and sentence case. Existing compact chrome uses 11–13 px labels and 28 px minimum control height; use the shared heading rules rather than inventing a new scale. State and meaning must also be conveyed with words/icons, not color alone.
 
+Feature Guide step descriptions and practice instructions support `**keyword**` emphasis through the shared `GuideText` renderer. Emphasize a few essential control names, shortcuts or concepts per paragraph. Use semibold warm yellow text (`--guide-keyword-fg`) directly on the card surface for a clear distinction from surrounding text. The dedicated token keeps guide emphasis independent of warning and temporary-edit colors, and the weight preserves emphasis without color. Guide keywords are ordinary text, with no link, button or badge treatment. Other Markdown and HTML remain literal text.
+
 ## Controls and feedback
 
 - Use neutral buttons for ordinary commands, green `.workspace-primary` for create/add actions (including New Character, New Scene and Add Existing Character) and the main export action, and `.workspace-danger` for destructive cleanup/removal. Keep the same hover, disabled and focus behavior everywhere.

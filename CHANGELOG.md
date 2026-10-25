@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Highlight key controls, shortcuts and concepts throughout Feature Guide steps with semibold warm yellow text that stands out clearly against the dark cards.
+
 - Require Node.js 24.22.1 or newer for npm installs, matching the local development and CI pin.
 
 - Extract camera-key/cut, artwork/layer and transition commands from SceneEditorDocument into focused modules while retaining one document validation and history owner.

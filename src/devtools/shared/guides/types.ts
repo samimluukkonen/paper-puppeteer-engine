@@ -34,6 +34,7 @@ export type GuideInteraction =
       readonly mode: 'try-it';
       readonly practice: {
         readonly targetId: GuideTargetId;
+        /** Plain text with optional **keyword** emphasis. */
         readonly instruction: string;
         readonly changesProject: boolean;
         readonly prerequisites?: readonly GuidePrerequisite[];
@@ -44,6 +45,7 @@ export type GuideInteraction =
 export type GuideStep = GuideInteraction & {
   readonly id: string;
   readonly title: string;
+  /** Plain text with optional **keyword** emphasis; no HTML or general Markdown. */
   readonly description: string;
   readonly targetId: GuideTargetId;
   readonly prerequisites?: readonly GuidePrerequisite[];

@@ -4,6 +4,7 @@ import type { GuideController, GuideSnapshot } from '../devtools/shared/guides/G
 import type { GuideCommandResult, GuideTargetResolver } from '../devtools/shared/guides/types.js';
 import { containGuideInteraction } from './guideInteraction.js';
 import { placeGuideCard } from './guidePositioning.js';
+import { GuideText } from './GuideText.js';
 import { observeGuideTarget, type GuideTargetLayout } from './observeGuideTarget.js';
 import './guideSpotlight.css';
 
@@ -161,13 +162,17 @@ export function GuideSpotlight({
           Step {stepIndex + 1} of {guide.steps.length}
         </p>
         <h3>{step.title}</h3>
-        <p id={`${id}-explanation`}>{step.description}</p>
+        <p id={`${id}-explanation`}>
+          <GuideText>{step.description}</GuideText>
+        </p>
         <p id={`${id}-policy`} className="guide-step-policy">
-          {interactive
-            ? practice.instruction
-            : practice
-              ? 'Explain mode. Choose Try It to use the highlighted control, or continue with Next.'
-              : 'Read-only tour. Editor controls are paused for interaction; exit the guide to try them.'}
+          {interactive ? (
+            <GuideText>{practice.instruction}</GuideText>
+          ) : practice ? (
+            'Explain mode. Choose Try It to use the highlighted control, or continue with Next.'
+          ) : (
+            'Read-only tour. Editor controls are paused for interaction; exit the guide to try them.'
+          )}
         </p>
         {practice && !interactive && (
           <div>
