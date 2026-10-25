@@ -1,4 +1,12 @@
 /** Public renderer-independent APIs. Existing pure authoring and bake exports remain supported. */
+export {
+  AUDIO_CATEGORIES,
+  AUDIO_MAX_FILE_BYTES,
+  audioAssetDefinitionSchema,
+  inspectAudioData,
+  validateAudioAssetData,
+} from './AudioAsset.js';
+export type { AudioAssetDefinition, AudioCategory, AudioFormat } from './AudioAsset.js';
 export { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 export type {
   AnimationClip,

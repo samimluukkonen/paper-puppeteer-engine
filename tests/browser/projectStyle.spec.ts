@@ -87,6 +87,7 @@ test('project asset library is grouped and previewable, with spaced settings and
   for (const name of ['+ New Character', '+ New Scene', 'Add Existing Character'])
     await expect(page.getByRole('button', { name, exact: true })).toHaveCSS('background-color', 'rgb(35, 134, 54)');
   await expect(page.getByRole('button', { name: 'Remove', exact: true })).toHaveCSS('color', 'rgb(248, 81, 73)');
+  await expect(page.getByRole('button', { name: 'Remove', exact: true }).locator('svg.lucide-trash-2')).toBeVisible();
   const library = page.locator('.project-asset-library');
   await library.locator(':scope > summary').click();
   await expect(library.locator('.project-asset-group')).toHaveCount(5);
@@ -140,4 +141,15 @@ test('project asset library is grouped and previewable, with spaced settings and
   expect(apply.x - input.x - input.width).toBeGreaterThanOrEqual(8);
   expect(Math.abs(input.y + input.height - apply.y - apply.height)).toBeLessThanOrEqual(1);
   await settings.screenshot({ path: info.outputPath('project-settings.png') });
+  await page.getByRole('button', { name: '+ New Scene', exact: true }).click();
+  const scene = page.getByRole('dialog', { name: 'New Scene', exact: true });
+  await scene.getByLabel('Scene name').fill('Removal icons');
+  await scene.getByRole('button', { name: 'Create Scene', exact: true }).click();
+  const removals = page.getByRole('button', { name: 'Remove', exact: true });
+  await expect(removals).toHaveCount(2);
+  for (const removal of await removals.all()) {
+    await expect(removal.locator('svg.lucide-trash-2')).toBeVisible();
+    await expect(removal).toHaveCSS('gap', '6px');
+    expect((await removal.locator('svg').boundingBox())!.width).toBe(16);
+  }
 });

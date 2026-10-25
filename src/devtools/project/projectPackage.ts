@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { validateAudioAssetData } from '../../engine/AudioAsset.js';
+import { AudioAssetLoader, type AudioBackend } from '../../engine/AudioAssetLoader.js';
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import { characterManifestSchema, type CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { decodeImage } from '../../engine/decodeImage.js';
@@ -63,6 +65,12 @@ function preflightProjectFiles(
     const bytes = files.get(scene.path);
     if (bytes) count(bytes);
   }
+  for (const audio of metadata.audio ?? []) {
+    const bytes = files.get(audio.path);
+    if (!bytes) throw new Error(`Missing audio binary "${audio.path}". Reimport the original audio file.`);
+    validateAudioAssetData(audio, bytes);
+    count(bytes);
+  }
   return characters;
 }
 
@@ -114,6 +122,9 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
   const characters = new Map(metadata.characters.map(({ id }) => [id, workspace.captureCharacter(id)]));
   const imageAssets = new Map(
     workspace.scenes.images.entries.map((image) => [image.reference, workspace.scenes.images.read(image.reference)]),
+  );
+  const audioAssets = new Map(
+    (metadata.audio ?? []).map((entry) => [entry.path, workspace.audioSource(entry.id)!.bytes]),
   );
   const sources = new Map(
     metadata.characters.map(({ id }) => [id, characterFileFetcher(workspace.character(id).files)]),
@@ -178,6 +189,7 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
   metadata.scenes.forEach((entry, index) => {
     add(entry.path, encoder.encode(serializeSceneDefinition(scenes[index]!)));
   });
+  for (const [path, bytes] of audioAssets) add(path, bytes);
   json('project.json', {
     project: metadata,
     characters: records,
@@ -198,7 +210,11 @@ function archiveCharacterManifest(files: PackageFiles) {
 }
 
 /** Transactional import: no active project is touched until every document/dependency validates. */
-export async function importProjectPackage(files: PackageFiles): Promise<ProjectWorkspace> {
+export async function importProjectPackage(
+  files: PackageFiles,
+  options: { audioBackend?: AudioBackend; signal?: AbortSignal } = {},
+): Promise<ProjectWorkspace> {
+  options.signal?.throwIfAborted();
   validatePackageFiles(files);
   const manifestBytes = files.get('project.json');
   if (!manifestBytes) throw new Error('Missing project.json.');
@@ -213,7 +229,37 @@ export async function importProjectPackage(files: PackageFiles): Promise<Project
     throw new Error('Project character registrations do not match the manifest.');
   const characters = preflightProjectFiles(files, metadata, archive.characters, archive.images);
   const workspace = new ProjectWorkspace(metadata.name, metadata.id);
+  // Headless callers can inject a decoder; browser imports always check actual codec support.
+  const audioLoader =
+    options.audioBackend || typeof AudioContext !== 'undefined'
+      ? new AudioAssetLoader(() => undefined, options.audioBackend)
+      : undefined;
+  const audioDurations = new Map<string, number>();
+  try {
+    for (const entry of metadata.audio ?? []) {
+      options.signal?.throwIfAborted();
+      const bytes = files.get(entry.path)!; // Complete binary presence was preflighted before allocating copies.
+      if (audioLoader) {
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+          byte.toString(16).padStart(2, '0'),
+        ).join('');
+        let duration = audioDurations.get(digest);
+        if (duration === undefined) {
+          const decoded = await audioLoader.prepare(bytes, options.signal ?? AbortSignal.timeout(60_000));
+          duration = decoded.durationSeconds;
+          audioDurations.set(digest, duration);
+          audioLoader.clear();
+        }
+        // The decoder owns duration; an archive cannot override it with stale metadata.
+        options.signal?.throwIfAborted();
+        workspace.addAudio({ ...entry, durationSeconds: duration }, bytes);
+      } else workspace.addAudio(entry, bytes);
+    }
+  } finally {
+    audioLoader?.dispose();
+  }
   for (const entry of metadata.characters) {
+    options.signal?.throwIfAborted();
     const id = await workspace.addCharacter(characters.get(entry.id)!, entry.name);
     if (id !== entry.id) throw new Error(`Character ID mismatch for "${entry.id}".`);
   }
@@ -223,6 +269,7 @@ export async function importProjectPackage(files: PackageFiles): Promise<Project
     ),
   );
   for (const image of metadata.images ?? []) {
+    options.signal?.throwIfAborted();
     const physical = packagePath(archive.images?.[image.path] ?? image.path);
     const bytes = files.get(physical);
     if (!bytes) {
@@ -232,20 +279,26 @@ export async function importProjectPackage(files: PackageFiles): Promise<Project
     }
     workspace.scenes.images.register(`../${image.path}`, bytes, image.name);
     if (typeof Image !== 'undefined') {
-      const decoded = await decodeImage(bytes, new AbortController().signal);
+      const decoded = await decodeImage(bytes, options.signal ?? new AbortController().signal);
       decoded.dispose();
     }
   }
   // Install the original reference paths before resolving scene dependencies.
-  workspace.installImportedMetadata({ ...metadata, scenes: [] });
+  const importedMetadata = parseProjectDefinition({
+    ...metadata,
+    ...(metadata.audio ? { audio: workspace.definition.audio! } : {}),
+  });
+  workspace.installImportedMetadata({ ...importedMetadata, scenes: [] });
   for (const entry of metadata.scenes) {
+    options.signal?.throwIfAborted();
     const bytes = files.get(entry.path);
     if (!bytes) throw new Error(`Missing scene "${entry.path}".`);
     const scene = parseSceneJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     if (scene.id !== entry.id) throw new Error(`Scene ID mismatch for "${entry.id}".`);
     workspace.addScene(scene);
   }
-  workspace.installImportedMetadata(metadata);
+  workspace.installImportedMetadata(importedMetadata);
+  options.signal?.throwIfAborted();
   return workspace;
 }
 

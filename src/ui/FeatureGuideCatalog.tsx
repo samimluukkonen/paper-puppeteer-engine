@@ -6,7 +6,12 @@ import type {
   GuideEditor,
 } from '../devtools/shared/guides/types.js';
 
-const editors = { rig: 'Rig Editor', animation: 'Animation Editor', scene: 'Scene Editor' } as const;
+const editors = {
+  project: 'Project Workspace',
+  rig: 'Rig Editor',
+  animation: 'Animation Editor',
+  scene: 'Scene Editor',
+} as const;
 
 /** Identical catalog content for the Project workspace and retained editors. */
 export function FeatureGuideCatalog({
@@ -100,7 +105,7 @@ export function FeatureGuideCatalog({
       </div>
       <p id={`${id}-search-help`}>Search within the selected editor category.</p>
       {selection}
-      {editor !== 'scene' && !hasCharacter && !selection && (
+      {(editor === 'rig' || editor === 'animation') && !hasCharacter && !selection && (
         <p role="status">
           No character is loaded. Guides that need a character will be available after loading or creating one.
         </p>

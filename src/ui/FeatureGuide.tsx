@@ -65,7 +65,9 @@ export function FeatureGuide({
   useEffect(() => {
     if (!requestedGuide) return;
     const guide = launcher.registry.getGuideById(requestedGuide);
-    const ready = snapshot.context.capabilities.includes(guide?.editor === 'scene' ? 'tool:scene' : 'character');
+    const ready = snapshot.context.capabilities.includes(
+      guide?.editor === 'project' ? 'tool:project' : guide?.editor === 'scene' ? 'tool:scene' : 'character',
+    );
     if (!ready) return;
     setRequestedGuide(undefined);
     const result = launcher.launch(requestedGuide);

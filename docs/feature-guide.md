@@ -1,10 +1,12 @@
 # Using Feature Guide
 
-Open **Feature Guide** in an editor’s header. Choose **Rig Editor**, **Animation Editor**, or **Scene Editor**, find the feature you want to learn, and select **Start Guide**. Rig and Animation tours can switch within their shared character workspace. Scene tours run in Scene Editor’s independent workspace; use the Views links to move between workspaces after downloading unsaved work.
+Open **Feature Guide** in the shared header. Choose **Project Workspace**, **Rig Editor**, **Animation Editor**, or **Scene Editor**, find the feature you want to learn, and select **Start Guide**. Rig and Animation tours can switch within their shared character workspace. Project and Scene tours run in their respective workspaces; use the Views links to move between workspaces after downloading unsaved work.
 
 Guides appear in alphabetical order within each editor category. Use **Search guides** to filter titles and descriptions in the selected category; searches ignore capitalization and match all entered words. The search stays in place when switching categories. Choose **Clear search** to show the full category again.
 
 **Project Workspace** opens the same catalog. Choose an editor category and a character or scene, then start the guide. The selected editor opens and checks its live requirements. Create assets first with **+ New Character** or **+ New Scene** when the project is empty. The standalone character-creation tour is unavailable within project editors; use Project Workspace to create characters.
+
+Choose the **Project Workspace** category for **Importing and Managing Audio**, a seven-step Explain tour of WAV/MP3/OGG import, Music/Ambience/Sound effects/Voice categories, Play/Stop and preview volume, rename/removal, project Undo/Redo and portable saving. Create or import a project first; no character, scene or audio asset is required. The tour reveals Audio and the Project controls without importing files, changing assets or starting sound. See [Audio assets](audio-assets.md).
 
 Scene Editor offers twenty-three Explain tours, including creating a scene, Actors, animation clips, root motion, movement, timing, cameras, artwork and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
 

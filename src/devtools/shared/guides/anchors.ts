@@ -1,5 +1,11 @@
 /** Public targeting contract for guide data, React hosts, and optional canvas geometry providers. */
 export const GUIDE_TARGETS = {
+  projectAudio: 'project-audio',
+  projectAudioImport: 'project-audio-import',
+  projectAudioCategories: 'project-audio-categories',
+  projectAudioPreview: 'project-audio-preview',
+  projectHistory: 'project-history',
+  projectExport: 'project-export',
   sceneNew: 'scene-new',
   sceneProperties: 'scene-properties',
   sceneAddActor: 'scene-add-actor',

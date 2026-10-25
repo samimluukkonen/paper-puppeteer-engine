@@ -1,4 +1,11 @@
 /** Public Phaser runtime. Requires a browser and a host-owned Phaser scene. */
+export {
+  AudioAssetLoader,
+  WebAudioBackend,
+  AUDIO_MAX_DECODED_BYTES,
+  AUDIO_LOAD_TIMEOUT_MS,
+} from './AudioAssetLoader.js';
+export type { AudioBackend, AudioPlayback, DecodedAudioResource, AudioAssetSource } from './AudioAssetLoader.js';
 export { Actor, type ActorOptions, type ActorPosition, type ActorPuppetOwnership } from './Actor.js';
 export type {
   ActorLocomotion,

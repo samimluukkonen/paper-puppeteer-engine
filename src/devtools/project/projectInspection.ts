@@ -1,3 +1,4 @@
+import { validateAudioAssetData } from '../../engine/AudioAsset.js';
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import { validateCharacterDefinition, type CharacterManifest } from '../../engine/CharacterDefinition.js';
 import { CharacterTextureBudget } from '../../engine/characterTextureLimits.js';
@@ -18,6 +19,7 @@ import { parseProjectDefinition } from './ProjectDefinition.js';
 export type ValidationContext = 'draft' | 'export';
 export type AssetKind =
   | 'project'
+  | 'audio'
   | 'character'
   | 'rig'
   | 'bone'
@@ -59,6 +61,7 @@ export interface ProjectInspectionInput {
   readonly definition: unknown;
   readonly characters: ReadonlyMap<string, InspectionCharacter>;
   readonly scenes: ReadonlyMap<string, unknown>;
+  readonly audio?: ReadonlyMap<string, Uint8Array>;
 }
 export interface ProjectInspection {
   readonly context: ValidationContext;
@@ -224,6 +227,15 @@ export class ProjectInspector {
       dependencies.push({ from, to, label });
     };
     const catalog = new Map<string, SceneCharacterAssets>();
+    for (const entry of project.audio ?? []) {
+      const target = asset('audio', project.id, entry.id);
+      edge(asset('project', project.id), target, `Project "${project.name}" audio library`);
+      attempt(target, () => {
+        const bytes = input.audio?.get(entry.id);
+        if (!bytes) throw new Error(`Missing audio binary "${entry.path}". Reimport the original audio file.`);
+        validateAudioAssetData(entry, bytes);
+      });
+    }
     const referenceIds = new Map(project.characters.map((entry) => [entry.manifest, entry.id]));
     for (const entry of project.characters) {
       const target = asset('character', entry.id);

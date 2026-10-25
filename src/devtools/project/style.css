@@ -223,3 +223,39 @@
 .project-settings input {
   width: 100%;
 }
+.project-audio > summary svg {
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.project-audio-content {
+  margin-top: 16px;
+}
+.project-audio-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.project-audio-list {
+  list-style: none;
+  padding: 0 12px 12px;
+  margin: 0;
+}
+.project-audio-list > li {
+  padding: 12px 0;
+  border-top: 1px solid var(--border-muted);
+}
+.project-audio-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.project-audio-identity small {
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.project-audio-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

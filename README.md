@@ -23,7 +23,7 @@ Use [Animation Environment Preview](docs/animation-environment-preview.md) to ev
 
 The [Scene Editor](docs/scene-editor.md) at `/scene-editor/` provides independent scene documents, Actor placement, action timelines, Play/Pause/Restart/Stop, speed and deterministic scrubbing. Inspect runtime transforms without changing authored positions, saved state or Undo history. Download scenes before leaving the page.
 
-The [Project Workspace](docs/project-workspace.md) at `/project/` organizes characters, artwork, animations and scenes, retains editing sessions across navigation, and imports/exports complete project ZIPs. New projects start empty. Export a project ZIP to keep work after closing the tab.
+The [Project Workspace](docs/project-workspace.md) at `/project/` organizes characters, artwork, animations, scenes and [audio assets](docs/audio-assets.md), retains editing sessions across navigation, and imports/exports complete project ZIPs. New projects start empty. Export a project ZIP to keep work after closing the tab.
 
 The completed v0.5.5 [IK authoring workflow](docs/ik-animation-authoring.md) covers reaching, influence, supported timeline operations, serialization, compatibility and production verification.
 

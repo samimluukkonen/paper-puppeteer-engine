@@ -1,3 +1,13 @@
+import { abortable } from '../../engine/abortable.js';
+import { safeFilename } from '../../engine/assetFilename.js';
+import {
+  validateAudioAssetData,
+  type AudioAssetDefinition,
+  type AudioCategory,
+  inspectAudioData,
+  AUDIO_MAX_FILE_BYTES,
+} from '../../engine/AudioAsset.js';
+import type { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { equalJsonData } from '../../engine/equalJsonData.js';
@@ -48,6 +58,7 @@ export class ProjectWorkspace {
   private readonly characters = new Map<string, ProjectCharacter>();
   private readonly fingerprints = new Map<string, PackageFingerprints>();
   private readonly artwork = new Map<string, Uint8Array<ArrayBuffer>>();
+  private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly checkpoints = new Map<string, string>();
   private sceneCheckpoints = new Map<string, string>();
   readonly scenes = new SceneEditorDocument(
@@ -200,6 +211,99 @@ export class ProjectWorkspace {
     this.history.redo();
     this.refresh();
   }
+  audioSource(id: string) {
+    const definition = this.metadata.audio?.find((entry) => entry.id === id);
+    const bytes = this.audioFiles.get(id);
+    // Binary ownership stays in the project. Runtime callers receive a detached copy.
+    return definition && bytes ? { definition, bytes: new Uint8Array(bytes) } : undefined;
+  }
+  /** Low-level registration for validated packages. Browser imports decode before registration. */
+  addAudio(input: AudioAssetDefinition, bytes: Uint8Array<ArrayBuffer>): void {
+    const proposal = parseProjectDefinition({ ...this.metadata, audio: [...(this.metadata.audio ?? []), input] });
+    const definition = proposal.audio!.at(-1)!;
+    const paths = [
+      'project.json',
+      ...this.definition.characters.map((entry) => entry.manifest),
+      ...this.definition.scenes.map((entry) => entry.path),
+      ...(this.definition.images ?? []).map((entry) => entry.path),
+      ...(this.definition.audio ?? []).map((entry) => entry.path),
+    ].map((path) => path.toLowerCase());
+    const path = definition.path.toLowerCase();
+    if (paths.some((other) => path === other || path.startsWith(`${other}/`) || other.startsWith(`${path}/`)))
+      throw new Error(`Project file collision at "${definition.path}". Choose a different audio path.`);
+    if ([...this.audioFiles.keys()].some((id) => id.toLowerCase() === definition.id.toLowerCase()))
+      throw new Error(`Audio ID "${definition.id}" is retained by project history.`);
+    validateAudioAssetData(definition, bytes);
+    // Membership Undo retains immutable binaries, bounded by the existing package limits.
+    const retained = new Map<string, Uint8Array<ArrayBuffer>>(
+      [...this.audioFiles.values()].map((data, index) => [`retained/${index}`, data]),
+    );
+    retained.set(definition.path, bytes);
+    validatePackageFiles(retained);
+    this.audioFiles.set(definition.id, new Uint8Array(bytes));
+    this.change(proposal);
+  }
+  async importAudio(
+    file: File,
+    category: AudioCategory,
+    loader: AudioAssetLoader,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    if (!file || !file.size || file.size > AUDIO_MAX_FILE_BYTES)
+      throw new Error('Audio must contain 1 byte–10 MiB. Choose a smaller nonempty audio file.');
+    const active = signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000);
+    const bytes = new Uint8Array(await abortable(file.arrayBuffer(), active));
+    const format = inspectAudioData(bytes);
+    const decoded = await loader.prepare(bytes, active);
+    active.throwIfAborted();
+    const stem = safeFilename(file.name.replace(/\.[^.]+$/, '').replace(/[%#]/g, '_')).slice(0, 100) || 'audio';
+    const used = new Set([
+      ...(this.metadata.audio ?? []).map((entry) => entry.path.toLowerCase()),
+      ...this.metadata.characters.map((entry) => entry.manifest.toLowerCase()),
+      ...this.metadata.scenes.map((entry) => entry.path.toLowerCase()),
+      ...(this.definition.images ?? []).map((entry) => entry.path.toLowerCase()),
+    ]);
+    let path = `audio/${stem}.${format}`;
+    let suffix = 2;
+    while (used.has(path.toLowerCase())) path = `audio/${stem}-${suffix++}.${format}`;
+    const id = crypto.randomUUID();
+    this.addAudio(
+      {
+        id,
+        name:
+          file.name
+            .replace(/\.[^.]+$/, '')
+            .trim()
+            .slice(0, 200) || 'Audio',
+        path,
+        category,
+        durationSeconds: decoded.durationSeconds,
+      },
+      bytes,
+    );
+    return id;
+  }
+  updateAudio(id: string, patch: { name?: string; category?: AudioCategory }): void {
+    if (!this.metadata.audio?.some((entry) => entry.id === id)) throw new Error(`Unknown audio asset "${id}".`);
+    this.change({
+      ...this.metadata,
+      audio: this.metadata.audio.map((entry) =>
+        entry.id === id
+          ? { ...entry, ...patch, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}) }
+          : entry,
+      ),
+    });
+  }
+  removeAudio(id: string): void {
+    const dependents = this.dependents({ kind: 'audio', owner: this.metadata.id, id }).filter(
+      ({ from }) => from.kind !== 'project',
+    );
+    if (dependents.length)
+      throw new Error(
+        `Audio is in use: ${dependents.map((entry) => entry.label).join('; ')}. Remove its references first.`,
+      );
+    this.change({ ...this.metadata, audio: this.metadata.audio?.filter((entry) => entry.id !== id) ?? [] });
+  }
   private available(kind: 'characters' | 'scenes', id: string): void {
     if (this.metadata[kind].some((entry) => entry.id.toLowerCase() === id.toLowerCase()))
       throw new Error(`Duplicate ${kind} ID "${id}".`);
@@ -337,6 +441,7 @@ export class ProjectWorkspace {
       ? {
           ...this.definition,
           characters: this.metadata.characters.filter((entry) => references.has(entry.manifest)),
+          audio: [],
           scenes: [{ id: scene.id, path: 'scene.json' }],
         }
       : this.definition;
@@ -357,6 +462,7 @@ export class ProjectWorkspace {
         scenes: scene
           ? new Map([[scene.id, scene]])
           : new Map(metadata.scenes.map(({ id }) => [id, this.scenes.scene(id)])),
+        audio: this.audioFiles,
       },
       context,
       fresh,
@@ -394,6 +500,7 @@ export class ProjectWorkspace {
     const value = parseProjectDefinition(metadata);
     if (
       value.characters.some(({ id }) => !this.characters.has(id)) ||
+      value.audio?.some(({ id }) => !this.audioFiles.has(id)) ||
       value.scenes.some(({ id }) => !this.scenes.scene(id))
     )
       throw new Error('Project metadata references missing documents.');

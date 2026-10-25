@@ -31,22 +31,28 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-test.each([false, true])(
-  'spotlight cleanup restores focus and releases modal, observation and practice resources; practice=%s',
-  async (practice) => {
+test.each([
+  { practice: false, bodyOpener: false },
+  { practice: true, bodyOpener: false },
+  { practice: false, bodyOpener: true },
+])(
+  'spotlight cleanup restores focus and releases resources; practice=$practice, body opener=$bodyOpener',
+  async ({ practice, bodyOpener }) => {
     class ElementStub {
       isConnected = true;
       focus = vi.fn();
       closest = () => null;
     }
-    const opener = new ElementStub();
+    const entry = new ElementStub();
+    const body = new ElementStub();
+    const opener = bodyOpener ? body : entry;
     const dialog = { showModal: vi.fn(), show: vi.fn(), close: vi.fn() };
     const card = { getBoundingClientRect: () => ({ width: 360, height: 320 }) };
     const heading = { focus: vi.fn() };
     const disconnect = vi.fn();
     const observe = vi.fn();
     vi.stubGlobal('HTMLElement', ElementStub);
-    vi.stubGlobal('document', { activeElement: opener, body: {}, querySelector: vi.fn() });
+    vi.stubGlobal('document', { activeElement: opener, body, querySelector: vi.fn(() => entry) });
     vi.stubGlobal('window', { innerWidth: 1440, innerHeight: 1000 });
     vi.stubGlobal(
       'ResizeObserver',
@@ -78,7 +84,8 @@ test.each([false, true])(
     for (const release of cleanup) release?.();
     await Promise.resolve();
     assert.lengthOf(dialog.close.mock.calls, 2);
-    assert.deepEqual(opener.focus.mock.calls, [[{ preventScroll: true }]]);
+    assert.deepEqual(entry.focus.mock.calls, [[{ preventScroll: true }]]);
+    assert.lengthOf(body.focus.mock.calls, 0);
     assert.lengthOf(hooks.stopObserving.mock.calls, 1);
     assert.lengthOf(disconnect.mock.calls, 1);
     assert.lengthOf(hooks.releaseInteraction.mock.calls, practice ? 1 : 0);

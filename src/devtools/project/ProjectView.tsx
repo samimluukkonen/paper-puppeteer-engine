@@ -1,4 +1,4 @@
-import { Download, FolderInput, FolderOpen, FolderPlus, Redo2, ShieldCheck, Undo2 } from 'lucide-react';
+import { Download, FolderInput, FolderOpen, FolderPlus, Redo2, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { abortable } from '../../engine/abortable.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
@@ -13,10 +13,13 @@ import { EditorTabs } from '../../ui/EditorTabs.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
+import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage } from '../shared/package/characterPackage.js';
 import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
 import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
+import { ProjectAudioLibrary } from './ProjectAudioLibrary.js';
 import { ProjectEditorHosts, type ProjectEditorHost, type ProjectSession } from './ProjectEditorHosts.js';
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
 import { ProjectValidationError, type ProjectInspection, type ValidationContext } from './projectInspection.js';
@@ -43,6 +46,7 @@ export function ProjectView() {
   const operation = useRef(false);
   const transferLifetime = useRef(new AbortController());
   const projectRoot = useRef<HTMLDivElement>(null);
+  const [guideTargets] = useState(() => new GuideTargets(document));
   const projectHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (!active) projectHeading.current?.focus({ preventScroll: true });
@@ -268,6 +272,8 @@ export function ProjectView() {
           headingRef={projectHeading}
           featureGuide={
             <ProjectFeatureGuide
+              key={selected?.key ?? 'empty'}
+              targets={guideTargets}
               {...(workspace ? { project: workspace.definition } : {})}
               open={(kind, id, view, guideId) => run(() => openAsset(kind, id, view, true, guideId))}
             />
@@ -298,7 +304,14 @@ export function ProjectView() {
                     icon={<FolderInput size={16} aria-hidden="true" />}
                     accept=".zip"
                     disabled={busy}
-                    onFile={(file) => run(async () => addProject(await importProjectPackage(await readZip(file))))}
+                    onFile={(file) =>
+                      run(async () => {
+                        const signal = AbortSignal.any([transferLifetime.current.signal, AbortSignal.timeout(60_000)]);
+                        const imported = await importProjectPackage(await readZip(file), { signal });
+                        signal.throwIfAborted();
+                        addProject(imported);
+                      })
+                    }
                   />
                   <label>
                     <FolderOpen size={16} aria-hidden="true" />
@@ -326,6 +339,7 @@ export function ProjectView() {
                   {workspace && (
                     <>
                       <button
+                        data-guide-id={GUIDE_TARGETS.projectHistory}
                         disabled={busy || !workspace.history.canUndo}
                         onClick={() => attempt(() => workspace.undo())}
                       >
@@ -340,6 +354,7 @@ export function ProjectView() {
                         Redo Project
                       </button>
                       <button
+                        data-guide-id={GUIDE_TARGETS.projectExport}
                         disabled={busy}
                         title="Export project ZIP (Ctrl/Cmd+S)"
                         onClick={() => run(exportProject)}
@@ -476,10 +491,11 @@ export function ProjectView() {
                           Animation Editor
                         </button>
                         <button
-                          className="workspace-danger"
+                          className="workspace-danger workspace-button-with-icon"
                           disabled={busy}
                           onClick={() => attempt(() => workspace.remove('characters', entry.id))}
                         >
+                          <Trash2 size={16} aria-hidden="true" />
                           Remove
                         </button>
                       </div>
@@ -519,10 +535,11 @@ export function ProjectView() {
                           Scene Editor
                         </button>
                         <button
-                          className="workspace-danger"
+                          className="workspace-danger workspace-button-with-icon"
                           disabled={busy}
                           onClick={() => attempt(() => workspace.remove('scenes', entry.id))}
                         >
+                          <Trash2 size={16} aria-hidden="true" />
                           Remove
                         </button>
                       </div>
@@ -532,6 +549,14 @@ export function ProjectView() {
                 {!workspace.definition.scenes.length && <p>No scenes. New scenes start empty.</p>}
               </section>
             </div>
+            <ProjectAudioLibrary
+              key={selected.key}
+              workspace={workspace}
+              busy={busy}
+              active={!active}
+              run={run}
+              onStatus={setStatus}
+            />
             <section className="project-panel">
               <h2>Assets</h2>
               <p className="workspace-caption">

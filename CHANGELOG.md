@@ -55,6 +55,16 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.3.1
+
+Add optional typed audio registrations to the existing project asset system, with music, ambience, sound effect and voice categories, stable IDs, portable paths and decoded duration. Project Workspace imports content-checked, browser-decodable WAV/MP3/OGG files and provides collapsed counted categories, rename, category changes, removal with project Undo/Redo, Play/Stop and audition volume.
+
+Introduce a reusable Web Audio loader with ID resolution, content-based decode reuse, retryable failures, bounded decoded resources, cancellation and disposal. Integrate audio binaries with project validation/dependency guards, ZIP packaging and existing autosave/recovery. Keep legacy projects compatible and defer scene audio timelines and synchronization to v1.3.2. Add unit/integration and local browser regressions, public runtime/data APIs and the [audio asset guide](docs/audio-assets.md).
+
+Add a Project Workspace category to the shared Feature Guide catalog and a seven-step Importing and Managing Audio tour. Reveal import, categories, audition volume, asset management, Undo and export controls without changing authored assets or starting playback; require an open project, with no character, scene or audio prerequisites. Restore focus to Feature Guide after returning from the catalog and exiting a tour.
+
+Make audio names plain labels and use one row-level Play/Stop button, including cancellation while loading. Use filled, spaced transport icons and add trash icons to character, scene and audio Remove buttons throughout Project Workspace. Update the audio guide to explain both row-level Stop and the global Stop preview control.
+
 ## 1.2.6
 
 Harden the integrated cinematic workflow with a complete layered-artwork/two-Actor regression through camera keys, cuts, fades, Undo/Redo, browser autosave recovery, project export/reimport and standalone Phaser scene-package playback. Verify repeated arbitrary seeks, camera/parallax/fade sampling, silent passive seeking and runtime texture/object cleanup. Update the legacy action-timeline browser test to check Actor lanes independently of camera and transition rows. Keep legacy scene defaults and the existing scene-format-2 APIs.

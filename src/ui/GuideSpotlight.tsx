@@ -48,7 +48,14 @@ export function GuideSpotlight({
     return () => {
       element.close();
       queueMicrotask(() => {
-        if (opener?.isConnected && !opener.closest('[hidden], [inert], dialog:not([open])'))
+        // Catalog-to-tour handoff can leave body active after the original card is removed.
+        // Body cannot restore useful keyboard focus; return to the shared guide entry point.
+        if (
+          opener?.isConnected &&
+          opener !== document.body &&
+          opener !== document.documentElement &&
+          !opener.closest('[hidden], [inert], dialog:not([open])')
+        )
           opener.focus({ preventScroll: true });
         else
           document

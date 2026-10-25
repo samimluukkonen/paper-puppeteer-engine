@@ -17,7 +17,7 @@ test('workspace guides, editor identity, native focus, export access and live ri
   await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
   const projectGuide = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
   await expect(projectGuide).toContainText('Create a project and add a character');
-  await expect(projectGuide.locator('.feature-guide-categories button')).toHaveCount(3);
+  await expect(projectGuide.locator('.feature-guide-categories button')).toHaveCount(4);
   await expect(projectGuide.getByRole('button', { name: 'Start Guide: Creating Bones', exact: true })).toBeDisabled();
   await projectGuide.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'New Project', exact: true }).click();

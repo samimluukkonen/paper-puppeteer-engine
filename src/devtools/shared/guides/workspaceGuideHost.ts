@@ -59,6 +59,7 @@ export function workspaceGuideHost(options: {
       };
     },
     getNavigationAvailability: (editor) => {
+      if (editor === 'project') return { available: false, reason: 'Open Project Workspace to use project guides.' };
       if (editor === 'scene')
         return {
           available: false,

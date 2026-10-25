@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { audioAssetDefinitionSchema } from '../../engine/AudioAsset.js';
 import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import { packagePath } from '../../engine/packageZip.js';
 import { animationPreviewPreferencesSchema } from '../shared/animationPreviewPreferences.js';
@@ -9,6 +10,7 @@ export const projectDefinitionSchema = z.strictObject({
   version: z.literal(1),
   id: identity,
   name: identity,
+  audio: z.array(audioAssetDefinitionSchema).max(128).exactOptional(),
   characters: z.array(z.strictObject({ id: identity, name: identity, manifest: path })),
   images: z
     .array(z.strictObject({ id: identity, name: identity, path }))
@@ -27,7 +29,7 @@ export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>;
 
 export function parseProjectDefinition(input: unknown): ProjectDefinition {
   const project = projectDefinitionSchema.parse(input);
-  for (const entries of [project.characters, project.scenes, project.images ?? []]) {
+  for (const entries of [project.characters, project.scenes, project.images ?? [], project.audio ?? []]) {
     const ids = entries.map((entry) => entry.id.toLowerCase());
     if (new Set(ids).size !== ids.length) throw new Error('Duplicate project asset ID.');
   }
@@ -35,6 +37,7 @@ export function parseProjectDefinition(input: unknown): ProjectDefinition {
     ...project.characters.map((entry) => entry.manifest),
     ...project.scenes.map((entry) => entry.path),
     ...(project.images ?? []).map((entry) => entry.path),
+    ...(project.audio ?? []).map((entry) => entry.path),
   ];
   if (new Set(paths.map((entry) => entry.toLowerCase())).size !== paths.length)
     throw new Error('Duplicate project asset path.');

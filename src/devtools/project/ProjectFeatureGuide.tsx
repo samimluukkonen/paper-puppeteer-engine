@@ -1,19 +1,33 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { FeatureGuideButton } from '../../ui/FeatureGuide.js';
 import { FeatureGuideCatalog } from '../../ui/FeatureGuideCatalog.js';
+import { GuideSpotlight } from '../../ui/GuideSpotlight.js';
+import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
+import { projectGuideHost } from '../shared/guides/projectGuideHost.js';
 import { guideRegistry } from '../shared/guides/registry.js';
-import type { GuideEditor } from '../shared/guides/types.js';
+import type { GuideEditor, GuideTargetResolver } from '../shared/guides/types.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 
-/** Browse the shared catalog, then verify live prerequisites in the selected asset's editor. */
+/** Project tours run here; character/scene tours verify live prerequisites in their retained editor. */
 export function ProjectFeatureGuide({
   project,
+  targets,
   open,
 }: {
   project?: ProjectWorkspace['definition'];
+  targets: GuideTargetResolver;
   open: (kind: 'character' | 'scene', id: string, view: 'rig' | 'animation', guideId: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const currentProject = useRef(project);
+  currentProject.current = project;
+  const [launcher] = useState(() => new GuideLauncher(projectGuideHost(() => !!currentProject.current)));
+  const snapshot = useSyncExternalStore(
+    launcher.controller.subscribe,
+    launcher.controller.getSnapshot,
+    launcher.controller.getSnapshot,
+  );
+  useEffect(() => launcher.refresh(), [launcher, project]);
   const [error, setError] = useState('');
   const [editor, setEditor] = useState<GuideEditor>('rig');
   const [character, setCharacter] = useState('');
@@ -21,12 +35,14 @@ export function ProjectFeatureGuide({
   const characterId = project?.characters.some(({ id }) => id === character) ? character : project?.characters[0]?.id;
   const sceneId = project?.scenes.some(({ id }) => id === scene) ? scene : project?.scenes[0]?.id;
   const isScene = editor === 'scene';
+  const isProject = editor === 'project';
   const assetId = isScene ? sceneId : characterId;
   return (
     <>
       <FeatureGuideButton
         onOpen={() => {
           setError('');
+          launcher.refresh();
           dialog.current?.showModal();
         }}
       />
@@ -38,9 +54,17 @@ export function ProjectFeatureGuide({
           setEditor={setEditor}
           guides={guideRegistry.getGuidesForEditor(editor)}
           hasCharacter={!!characterId}
-          availableLabel="Requirements checked in editor"
+          availableLabel={isProject ? 'Available' : 'Requirements checked in editor'}
+          currentGuide={snapshot.status === 'active' ? snapshot.currentGuide : undefined}
+          onExit={() => launcher.controller.exit()}
           selection={
-            assetId ? (
+            isProject ? (
+              <p>
+                {project
+                  ? 'Project guides run here. No character or scene is required.'
+                  : 'Create or import a project to use project guides.'}
+              </p>
+            ) : assetId ? (
               <div className="feature-guide-asset">
                 <label>
                   {isScene ? 'Guide scene' : 'Guide character'}
@@ -63,6 +87,9 @@ export function ProjectFeatureGuide({
             )
           }
           getAvailability={(guideId) => {
+            if (isProject) return launcher.getAvailability(guideId);
+            if (snapshot.status === 'active')
+              return { available: false, reason: 'Exit the current guide before starting another.' };
             const standaloneRequirement = guideRegistry
               .getGuideById(guideId)
               ?.prerequisites?.find(({ capability }) => capability === 'tool:new-character');
@@ -72,6 +99,7 @@ export function ProjectFeatureGuide({
               : { available: false, reason: isScene ? 'Add a scene first.' : 'Add a character first.' };
           }}
           onStart={(guideId) => {
+            if (isProject) return launcher.launch(guideId);
             if (!assetId) return { ok: false, reason: 'Choose a project asset first.' };
             open(isScene ? 'scene' : 'character', assetId, editor === 'animation' ? 'animation' : 'rig', guideId);
             return { ok: true };
@@ -79,6 +107,19 @@ export function ProjectFeatureGuide({
           onClose={() => dialog.current?.close()}
         />
       </dialog>
+      {snapshot.status === 'active' && (
+        <GuideSpotlight
+          controller={launcher.controller}
+          snapshot={snapshot}
+          targets={targets}
+          onCatalog={() => {
+            launcher.controller.exit();
+            setEditor('project');
+            setError('');
+            dialog.current?.showModal();
+          }}
+        />
+      )}
     </>
   );
 }
