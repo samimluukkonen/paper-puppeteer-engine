@@ -87,7 +87,8 @@ export class GraphEditorController {
         this.cancelGesture();
         const state = this.getState();
         const channel = graphChannels(state).find((entry) => entry.property === this.property.value);
-        if (channel?.kind === 'bone') state.selectTimelineProperty(channel.id, channel.property);
+        if (channel?.kind === 'root') state.selectRootMotion(channel.property);
+        else if (channel?.kind === 'bone') state.selectTimelineProperty(channel.id, channel.property);
         else if (channel) state.selectIKConstraint(channel.id, channel.property);
       },
       options,
@@ -199,6 +200,8 @@ export class GraphEditorController {
   }
   private selectedTime(channel: GraphChannel): number | undefined {
     const state = this.getState();
+    if (channel.kind === 'root')
+      return state.selectedRootKey?.property === channel.property ? state.selectedRootKey.time : undefined;
     if (channel.kind === 'ik') {
       const key = state.selectedIKKeyframe;
       return key?.constraintId === channel.id && key.property === channel.property ? key.time : undefined;
@@ -277,7 +280,8 @@ export class GraphEditorController {
   }
   private select(ref: GraphKeyRef): void {
     const state = this.getState();
-    if (ref.channel.kind === 'bone')
+    if (ref.channel.kind === 'root') state.selectRootMotion(ref.channel.property, ref.time);
+    else if (ref.channel.kind === 'bone')
       state.selectKeyframe({ boneId: ref.channel.id, property: ref.channel.property, time: ref.time });
     else
       state.selectIKKeyframe({
@@ -448,6 +452,7 @@ export class GraphEditorController {
       view,
       state.selectedKeys,
       state.selectedIKKeyframe,
+      state.selectedRootKey,
       state.editorMode,
       this.width,
       this.height,
@@ -475,9 +480,11 @@ export class GraphEditorController {
         ...channels.map(
           (entry) =>
             new Option(
-              entry.kind === 'ik' && entry.property !== 'mix'
-                ? `IK target ${entry.property.toUpperCase()}`
-                : graphPropertyLabels[entry.property],
+              entry.kind === 'root'
+                ? `Root Position ${entry.property.toUpperCase()}`
+                : entry.kind === 'ik' && entry.property !== 'mix'
+                  ? `IK target ${entry.property.toUpperCase()}`
+                  : graphPropertyLabels[entry.property],
               entry.property,
             ),
         ),
@@ -487,7 +494,11 @@ export class GraphEditorController {
     this.property.disabled = !animation || !channel || !state.animationAuthoringEnabled;
     setText(
       this.element('#graph-target'),
-      channel ? `${channel.kind === 'ik' ? 'IK constraint' : 'Bone'}: ${channel.id}` : 'No track selected',
+      channel
+        ? channel.kind === 'root'
+          ? 'Root Motion'
+          : `${channel.kind === 'ik' ? 'IK constraint' : 'Bone'}: ${channel.id}`
+        : 'No track selected',
     );
     const keys = animation && channel ? graphDisplayKeys(animation, channel) : [];
     const selectedTime = channel ? this.selectedTime(channel) : undefined;
@@ -517,7 +528,7 @@ export class GraphEditorController {
     const empty = !animation
       ? 'Select an animation.'
       : !channel
-        ? 'Select a bone or IK constraint in the timeline or preview.'
+        ? 'Select a bone, root motion channel or IK constraint in the timeline or preview.'
         : !keys.length
           ? 'No keys on this property. Use the property inspector to set keys at the playhead.'
           : !selectedKey

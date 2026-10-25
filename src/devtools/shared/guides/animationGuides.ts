@@ -29,6 +29,46 @@ const step = (id: string, title: string, description: string, targetId: string):
 /** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
+    id: 'animation-root-motion',
+    title: 'Visual Root Motion',
+    description: 'Author whole-character travel with root position keys, a viewport handle and Graph Editor curves.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'controls',
+        'Author travel independently of the body',
+        'Root Motion stores real exported translation keys, separately from pelvis, bones and IK. After exiting this guide, set time to 0 and use Set position key with X = 0 and Y = 0. Inspector sections start collapsed; this tour only reveals controls.',
+        targets.animationRootMotion,
+      ),
+      step(
+        'timeline',
+        'Select and retime root keys',
+        'The Root Motion group above the skeletal tracks has Position X and Position Y rows. Select a key to seek to it; drag horizontally to retime with frame snapping, or hold Shift for free timing. Crossing another key is rejected. Delete removes one axis. Duplicate copies the selected axis one frame later, or to a different playhead time. Root keys never modify bone or IK keys.',
+        targets.animationTracks,
+      ),
+      step(
+        'handle',
+        'Move the entire character',
+        'After exiting, enable Edit Root Motion. At the forward step, add a position key; advance the playhead and drag the purple square at the character origin, or enter X = 80. Release creates one undo step for both axes. Escape cancels the drag. Facing and character scale transform the authored offsets; camera pan and zoom are inverted when dragging. Ground and camera stay fixed. Disable Edit Root Motion to return to ordinary bone and IK picking.',
+        targets.animationRootMotion,
+      ),
+      step(
+        'curves',
+        'Shape travel with the existing Graph Editor',
+        'Select a root Position X or Position Y key, then open Graph Editor. Its existing value/time controls, outgoing Linear, Stepped and Bezier interpolation, and tangent precision controls edit the selected root channel. The last key has no outgoing segment. Graph drags also commit one undo step and support Escape.',
+        targets.animationGraphProperty,
+      ),
+      step(
+        'review',
+        'Review and save a sword attack',
+        'Keep the anticipation and sword cut on skeletal keys. Author a root start at 0, a step to 80 and a final hold at 80. Scrub and play to see pelvis bob and feet travel over fixed ground. Loop preview returns to the first authored position. Show authored root motion and Show root trajectory only change the view. Undo/Redo restores authored edits; animation export, reload and character packages retain root keys and curves. Runtime application measures displacement from the first sample, so start at zero for matching placement.',
+        targets.animationRootMotion,
+      ),
+    ],
+  },
+  {
     id: 'animation-preview-displacement',
     title: 'Preview Displacement',
     description:

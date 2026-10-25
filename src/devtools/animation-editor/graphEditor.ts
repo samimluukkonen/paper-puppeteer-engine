@@ -12,10 +12,12 @@ import type { Rig } from '../../engine/Rig.js';
 import { transformProperties, type TransformProperty } from '../../engine/types.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { rootKeys } from './rootMotionEdits.js';
 import { toMilliseconds, toSeconds } from './timeUnits.js';
 import { validateEditedAnimation } from './validatedAnimation.js';
 
 export type GraphChannel =
+  | { readonly kind: 'root'; readonly id: 'Root Motion'; readonly property: 'x' | 'y' }
   | { readonly kind: 'bone'; readonly id: string; readonly property: TransformProperty }
   | { readonly kind: 'ik'; readonly id: string; readonly property: IKAnimationProperty };
 export interface GraphKeyRef {
@@ -47,6 +49,8 @@ export const graphPropertyLabels: Record<TransformProperty | IKAnimationProperty
   mix: 'IK influence',
 };
 export function graphChannels(state: AnimationEditorState): readonly GraphChannel[] {
+  if (state.rootMotionSelected)
+    return (['x', 'y'] as const).map((property) => ({ kind: 'root', id: 'Root Motion', property }));
   if (state.selectedIKConstraintId)
     return ikAnimationProperties.map((property) => ({ kind: 'ik', id: state.selectedIKConstraintId!, property }));
   if (state.selectedBoneId)
@@ -58,11 +62,17 @@ export function selectedGraphChannel(state: AnimationEditorState): GraphChannel 
   return (
     channels.find(
       (channel) =>
-        channel.property === (channel.kind === 'ik' ? state.selectedIKProperty : state.selectedTimelineProperty),
+        channel.property ===
+        (channel.kind === 'root'
+          ? state.rootMotionProperty
+          : channel.kind === 'ik'
+            ? state.selectedIKProperty
+            : state.selectedTimelineProperty),
     ) ?? channels[0]
   );
 }
 export function graphKeys(animation: ReadonlyAnimation, channel: GraphChannel): readonly PropertyKeyframe[] {
+  if (channel.kind === 'root') return rootKeys(animation, channel.property);
   if (channel.kind === 'bone')
     return (Object.hasOwn(animation.tracks, channel.id) ? animation.tracks[channel.id]! : []).flatMap((key) =>
       key[channel.property] === undefined ? [] : [propertyKeyframe(key, channel.property)],
@@ -151,15 +161,23 @@ export function editGraphKey(
     return result.sort((a, b) => a.time - b.time);
   };
   const next =
-    channel.kind === 'bone'
+    channel.kind === 'root'
       ? {
           ...animation,
-          tracks: { ...animation.tracks, [channel.id]: update(animation.tracks[channel.id]!, channel.property) },
+          rootMotion: { translationKeys: update(animation.rootMotion!.translationKeys, channel.property) },
         }
-      : {
-          ...animation,
-          ikTracks: { ...animation.ikTracks, [channel.id]: update(animation.ikTracks![channel.id]!, channel.property) },
-        };
+      : channel.kind === 'bone'
+        ? {
+            ...animation,
+            tracks: { ...animation.tracks, [channel.id]: update(animation.tracks[channel.id]!, channel.property) },
+          }
+        : {
+            ...animation,
+            ikTracks: {
+              ...animation.ikTracks,
+              [channel.id]: update(animation.ikTracks![channel.id]!, channel.property),
+            },
+          };
   return validateEditedAnimation(next, animation, rig);
 }
 /** Normalize tangent input before validating a preview. Time controls cannot cross. */

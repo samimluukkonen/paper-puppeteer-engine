@@ -69,6 +69,15 @@ test('ground reference stays in preview world through scaling, facing, clip swit
     assert.isFalse(state.dirty);
     assert.equal(state.historyLength, 0);
     assert.isFalse(rig.dirty);
+    const originalContainerX = puppet.container.x;
+    const rootBefore = state.workingAnimation!;
+    state.setRootPosition({ x: 80, y: -20 });
+    assert.equal(puppet.container.x, originalContainerX + 80);
+    assert.equal(scene.groundGuide.getSnapshot().guide.y, 500);
+    assert.strictEqual(state.workingAnimation!.tracks, rootBefore.tracks);
+    assert.strictEqual(state.workingAnimation!.ikTracks, rootBefore.ikTracks);
+    state.undo();
+    assert.equal(puppet.container.x, originalContainerX);
     puppet.container.setScale(1.7);
     scene.setFacing('left');
     const otherClip = state.animationIds.find((id) => id !== state.selectedAnimationId);

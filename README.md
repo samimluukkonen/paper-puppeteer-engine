@@ -109,6 +109,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [Using Feature Guide](docs/feature-guide.md)
 - [Schema inventory, compatibility policy and canonical serialization](docs/schema-compatibility.md)
 - [Root-motion data, runtime evaluation and application](docs/root-motion.md)
+- [Visual root-motion authoring and sword-attack walkthrough](docs/root-motion-authoring.md)
 
 | Guide                                                                | Contents                                                                                                   |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |

@@ -16,7 +16,7 @@ Scene / optional enclosing Phaser containers
 
 `Actor` is a facade over a Puppet, without a separate transform or evaluator. `Actor.position` uses the outer container's parent coordinates; `Actor.worldPosition` includes enclosing transforms. The rig explicitly names `Rig.root`; array order does not define it. A pelvis is an ordinary named bone and can itself be the skeleton root in a particular rig, but neither role identifies the Actor origin. Foot contacts are bone-local reference points transformed through the hierarchy, independent of all those origins.
 
-`AnimationClip` is the runtime authored contract; version-1 `AnimationJsonDefinition` adds file version metadata. `tracks` animate sparse bone-local transforms, and `ikTracks` animate Puppet-local targets/mix. The Animation timeline and Graph Editor address those bone/IK channels through the same property sampler. They do not expose root-motion channels in this milestone.
+`AnimationClip` is the runtime authored contract; version-1 `AnimationJsonDefinition` adds file version metadata. `tracks` animate sparse bone-local transforms, and `ikTracks` animate Puppet-local targets/mix. The Animation timeline and Graph Editor address those bone/IK channels through the same property sampler. They now expose dedicated root-motion channels; see [visual root-motion authoring](root-motion-authoring.md).
 
 Scene placement, choreography and `ActorMovement` explicitly move the Puppet's outer container. Skeletal pose evaluation does not. Facing-left sets the outer container's X scale negative. Editor pose/selected-key mirroring rewrites skeletal values using symmetry mappings; it is distinct from facing and leaves authored root motion alone.
 
@@ -26,7 +26,7 @@ Environment Preview uses the same Puppet with separate world-pixel preview traje
 
 An animation may contain `rootMotion: { translationKeys: [...] }`. Each sparse row has a millisecond `time`, optional finite `x` and `y` (at least one required), and optional outgoing `curves` for keyed X/Y properties. Curves reuse the existing linear default, stepped and bounded cubic Bézier schema and sampler. X and Y may be keyed at different times. An empty array is valid. Rotation and scale are excluded.
 
-Keys use the existing bone/IK identity convention: strictly increasing unique row times, with a channel identified by property and time. A row can hold both channels at one time; separate duplicate-time rows are rejected. There are no new key IDs or editing UI.
+Keys use the existing bone/IK identity convention: strictly increasing unique row times, with a channel identified by property and time. A row can hold both channels at one time; separate duplicate-time rows are rejected. There are no new key IDs. Dedicated timeline, inspector and Graph Editor controls author these channels.
 
 Values are absolute animation-local offsets, in the same units as the unscaled Puppet: positive X points right in the canonical right-facing character, positive Y points down. They are independent of pelvis, root-bone and IK coordinates. Displacement is evaluated from an initial placement, never added every frame.
 
@@ -100,11 +100,11 @@ Pure evaluators and types are exported through `/core`, `/runtime` and the root 
 
 The optional extension retains animation file version 1, following the existing curve/IK extension policy. Legacy files retain their omissions. Validation checks strict nested structures, finite coordinates/times, duration bounds, unique ascending times, supported curves, keyed-property ownership and monotonic Bézier time handles. JSON Schema describes shapes; the shared semantic validator checks ordering and duration relationships.
 
-Authored motion belongs to the animation. Compilation retains an independent frozen root-motion snapshot; pure sampling shares the property interpolation infrastructure. Actor/Puppet consume it only with explicit apply playback. Skeletal/IK evaluation, scene movement and preview displacement do not consume it automatically. No bone, pelvis, IK or Scene movement is extracted or converted. Preview settings remain separate.
+Authored motion belongs to the animation. Compilation retains an independent frozen root-motion snapshot; pure sampling shares the property interpolation infrastructure. Actor/Puppet consume it only with explicit apply playback. Skeletal/IK evaluation and scene movement do not consume it automatically. Animation Editor displays authored root offsets separately from optional additional preview displacement. No bone, pelvis, IK or Scene movement is extracted or converted. Preview settings remain separate.
 
 Animation JSON export, character packages and project assets preserve this track deterministically through their existing validation boundaries. Whole-clip variations scale root key times with duration; ordinary bone/IK edits preserve them. There is no React state, camera state or Phaser object in root-motion data.
 
-Root-motion timeline/Graph Editor controls, Environment Preview integration, scene clip ownership, collision/physics/pathfinding, root rotation/scaling, extraction and foot locking remain deferred. The package and lockfile remain at their higher 1.2.6 version.
+Animation Editor timeline/Graph Editor controls and its fixed-world preview are implemented in [v1.1.7-3](root-motion-authoring.md). Scene clip ownership, collision/physics/pathfinding, root rotation/scaling, extraction and foot locking remain deferred. The package and lockfile remain at their higher 1.2.6 version.
 
 ## Runtime implementation (v1.1.7-2)
 

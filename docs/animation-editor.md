@@ -9,6 +9,10 @@ Open `/animation-editor/` directly or choose **Animation Editor** in the shared 
 
 Expand **Character package** above the command bar to download the complete validated character ZIP, including applied sprite replacements, and reload/import it into an isolated production runtime preview. Individual JSON downloads retain their existing checkpoints and file placement workflow. See the [complete artist and package workflow](artist-workflow.md).
 
+## Author whole-character root motion
+
+Use the dedicated **Root Motion → Position X / Position Y** timeline rows and collapsed **Root Motion** inspector. Enable **Edit Root Motion** to drag the purple square at the character origin, or set numeric positions at the playhead. Root keys share the existing Graph Editor, interpolation, tangent and Undo/Redo infrastructure. Ground stays fixed, and pelvis/bone/IK keys remain independent. See the [visual root-motion guide](root-motion-authoring.md) for the complete sword-attack walkthrough and coordinate conventions. **Feature Guide → Animation Editor → Visual Root Motion** provides an in-app tour.
+
 ## Create an animation from scratch
 
 Load a character with a valid rig, then choose **+ New Animation** above the workspace. This works with no animation files and with no clip selected. Enter **Animation name / ID**, duration in seconds, FPS and loop preference. Defaults are one second, 12 FPS and loop enabled. The version-1 format uses `name` as its stable ID; there is no separate display-name field. New IDs start with a letter or number and contain only letters, numbers, hyphens or underscores. Duplicate IDs are rejected without changing the current document.

@@ -77,6 +77,7 @@ export const GUIDE_TARGETS = {
   rigGroundVisible: 'rig-ground-visible',
   rigGroundY: 'rig-ground-y',
   rigGroundReset: 'rig-ground-reset',
+  animationRootMotion: 'animation-root-motion',
   animationNew: 'animation-new',
   animationVariation: 'animation-variation',
   animationSelection: 'animation-selection',

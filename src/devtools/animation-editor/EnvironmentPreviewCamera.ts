@@ -39,7 +39,7 @@ export class EnvironmentPreviewCamera {
   }
 
   private readonly sync = (): void => {
-    if (this.disposed) return;
+    if (this.disposed || this.state.rootMotionEditing) return;
     const { settings, camera: config } = this.environment.getSnapshot();
     if (!settings.enabled || !this.state.animationAuthoringEnabled) {
       this.restore();

@@ -7,6 +7,7 @@ import { EventTrackController } from './EventTrackController.js';
 import { ikTrackKey, type IKKeyframeSelection } from './ikTimeline.js';
 import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
+import type { RootMotionController } from './RootMotionController.js';
 import { timeToTimelineX } from './timeline.js';
 import { summarizeKeyframeTimes } from './timelineSummaries.js';
 import { type KeyframeSelection, type TimelineTrack, timelineTrackKey } from './timelineTracks.js';
@@ -76,6 +77,7 @@ export class TimelineTracksController {
     private readonly lanes: HTMLElement,
     private readonly onKeyPointerDown: (event: PointerEvent, key: TimelineKey, marker: HTMLButtonElement) => void,
     onEventPointerDown?: (event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement) => void,
+    private readonly root?: RootMotionController,
   ) {
     this.events = new EventTrackController(onEventPointerDown);
   }
@@ -159,8 +161,8 @@ export class TimelineTracksController {
       this.tracks = tracks;
       const keys = new Set(tracks.map(trackKey));
       for (const key of this.rows.keys()) if (!keys.has(key)) this.rows.delete(key);
-      const labels: HTMLElement[] = [this.events.label];
-      const lanes: HTMLElement[] = [this.events.lane];
+      const labels: HTMLElement[] = [...(this.root?.labels ?? []), this.events.label];
+      const lanes: HTMLElement[] = [...(this.root?.lanes ?? []), this.events.lane];
       for (const track of tracks) {
         const key = trackKey(track);
         let row = this.rows.get(key);

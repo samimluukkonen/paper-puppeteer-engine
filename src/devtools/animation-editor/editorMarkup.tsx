@@ -40,6 +40,7 @@ import type { PoseLibraryController } from './PoseLibraryController.js';
 import { PoseLibraryPanel } from './PoseLibraryPanel.js';
 import { type RigTweakController, emptyRigTweakSnapshot, subscribeNoRigTweak } from './RigTweakController.js';
 import { RigTweakPanel } from './RigTweakPanel.js';
+import { RootMotionPanel } from './RootMotionPanel.js';
 
 /** React owns the shell; the timeline and inspector controllers own their host regions. */
 export function AnimationEditorView({
@@ -392,6 +393,7 @@ export function AnimationEditorView({
               <summary>Bones</summary>
               <div id="animation-bones" aria-label="Bone hierarchy"></div>
             </details>
+            <RootMotionPanel />
             <IKInspectorPanel controller={ikInspector} />
             <details className="animation-selection-details" data-guide-id={GUIDE_TARGETS.animationProperties}>
               <summary>Selection details</summary>

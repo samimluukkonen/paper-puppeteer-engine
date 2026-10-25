@@ -16,6 +16,7 @@ import { dispatchListeners, throwNotificationErrors } from '../../engine/notific
 import type { PoseDefinition } from '../../engine/Pose.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
+import { sampleRootMotion, type RootMotionProperty, type RootMotionOffset } from '../../engine/rootMotion.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import {
   type BoneSymmetryIssue,
@@ -74,7 +75,9 @@ import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime }
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import { previewMotionCleanup, type MotionDiagnosticOptions } from './motionDiagnostics.js';
+import { motionPreviewSampleTime } from './motionPreview.js';
 import { PoseLibrary } from './PoseLibrary.js';
+import { rootKeys, setRootKey, duplicateRootPropertyKey, type RootKeySelection } from './rootMotionEdits.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
@@ -100,6 +103,140 @@ export type EditorMode = 'animation' | 'rig-tweak' | 'rig';
 
 /** Coordinates authored edits with transient selection, drafts, gestures and preview playback. */
 export class AnimationEditorState {
+  rootMotionSelected = false;
+  rootMotionProperty: RootMotionProperty = 'x';
+  selectedRootKey: RootKeySelection | null = null;
+  rootMotionEditing = false;
+  rootMotionVisible = true;
+  rootTrajectoryVisible = true;
+  private rootGesture: { base: ReadonlyAnimation; preview: ReadonlyAnimation; point?: RootMotionOffset } | null = null;
+
+  get rootMotionDragActive(): boolean {
+    return this.rootGesture !== null;
+  }
+  get rootPosition(): RootMotionOffset {
+    return (
+      this.rootGesture?.point ??
+      (this.previewAnimation
+        ? sampleRootMotion(
+            this.previewAnimation,
+            motionPreviewSampleTime(this.previewAnimation, this.previewTimeMilliseconds),
+          )
+        : { x: 0, y: 0 })
+    );
+  }
+  setRootMotionView(patch: { editing?: boolean; visible?: boolean; trajectory?: boolean }): void {
+    this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      if (patch.editing !== undefined) this.rootMotionEditing = patch.editing;
+      if (patch.visible !== undefined) this.rootMotionVisible = patch.visible;
+      if (patch.visible === false) this.rootMotionEditing = false;
+      if (patch.trajectory !== undefined) this.rootTrajectoryVisible = patch.trajectory;
+      if (patch.editing === true) {
+        this.rootMotionVisible = true;
+        this.selectRootMotion(this.rootMotionProperty);
+      }
+      this.notify();
+    });
+  }
+  selectRootMotion(property: RootMotionProperty = 'x', time?: number): boolean {
+    if (!this.working || !['x', 'y'].includes(property)) return false;
+    if (time !== undefined && !rootKeys(this.working, property).some((key) => key.time / 1000 === time)) return false;
+    return this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.selection.selectBone(null);
+      this.rootMotionSelected = true;
+      this.rootMotionProperty = property;
+      this.selectedRootKey = time === undefined ? null : Object.freeze({ property, time });
+      if (time !== undefined) {
+        this.pause();
+        this.endScrub();
+        this.updateTime(time);
+      }
+      this.notify();
+      return true;
+    });
+  }
+  private clearRootSelection(): void {
+    const changed = this.rootMotionSelected || this.selectedRootKey !== null;
+    this.rootMotionSelected = false;
+    this.selectedRootKey = null;
+    if (changed) this.notify();
+  }
+  setRootPosition(values: Partial<RootMotionOffset>, time = this.currentTime): boolean {
+    if (!this.animationAuthoringEnabled || !this.working || !this.rig) return false;
+    return this.batchNotifications(() => {
+      let next = this.working!;
+      for (const property of ['x', 'y'] as const)
+        if (values[property] !== undefined) next = setRootKey(next, this.rig!, property, time * 1000, values[property]);
+      this.pause();
+      this.endScrub();
+      return this.installWorkingAnimation(next);
+    });
+  }
+  addRootPositionKey(): boolean {
+    return this.setRootPosition(this.rootPosition);
+  }
+  deleteRootKey(): boolean {
+    const key = this.selectedRootKey;
+    if (!key || !this.working || !this.rig || !this.animationAuthoringEnabled) return false;
+    return this.batchNotifications(() => {
+      const next = setRootKey(this.working!, this.rig!, key.property, key.time * 1000, undefined);
+      this.selectedRootKey = null;
+      return this.installWorkingAnimation(next);
+    });
+  }
+  duplicateRootKey(time = this.currentTime): boolean {
+    const key = this.selectedRootKey;
+    if (!key || !this.working || !this.rig || !this.animationAuthoringEnabled) return false;
+    const destination = time === key.time ? time + 1 / this.keyframeFPS : time;
+    if (
+      destination > this.duration ||
+      rootKeys(this.working, key.property).some((entry) => entry.time / 1000 === destination)
+    )
+      return false;
+    return this.batchNotifications(() => {
+      const next = duplicateRootPropertyKey(this.working!, this.rig!, key, destination);
+      if (!this.installWorkingAnimation(next)) return false;
+      return this.selectRootMotion(key.property, destination);
+    });
+  }
+  beginRootMotionDrag(): boolean {
+    if (!this.working || !this.animationAuthoringEnabled || !this.rootMotionEditing || !this.rootMotionVisible)
+      return false;
+    return this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.pause();
+      this.endScrub();
+      this.clearTransformDraft();
+      this.rootGesture = { base: this.working!, preview: this.working! };
+      this.notify();
+      return true;
+    });
+  }
+  previewRootMotionDrag(point: RootMotionOffset): boolean {
+    if (!this.rootGesture || !this.rig) return false;
+    let next = setRootKey(this.rootGesture.base, this.rig, 'x', this.currentTimeMilliseconds, point.x);
+    next = setRootKey(next, this.rig, 'y', this.currentTimeMilliseconds, point.y);
+    this.rootGesture = { ...this.rootGesture, preview: next, point: { ...point } };
+    this.notify();
+    return true;
+  }
+  cancelRootMotionDrag(): boolean {
+    if (!this.rootGesture) return false;
+    this.rootGesture = null;
+    this.notify();
+    return true;
+  }
+  commitRootMotionDrag(): boolean {
+    const gesture = this.rootGesture;
+    if (!gesture) return false;
+    return this.batchNotifications(() => {
+      this.rootGesture = null;
+      return gesture.base === this.working && this.installWorkingAnimation(gesture.preview);
+    });
+  }
+
   private cleanupPreview: { base: ReadonlyAnimation; rig: Rig; animation: ReadonlyAnimation; timeMs: number } | null =
     null;
 
@@ -196,6 +333,7 @@ export class AnimationEditorState {
     return (
       (this.cleanupPreviewActive ? this.cleanupPreview!.animation : undefined) ??
       this.variationPreview?.animation ??
+      this.rootGesture?.preview ??
       this.graphGesture?.preview ??
       this.working
     );
@@ -254,6 +392,8 @@ export class AnimationEditorState {
         false,
         channel.kind === 'bone' ? [{ boneId: channel.id, property: channel.property, time: gesture.time }] : undefined,
       );
+      if (changed && channel.kind === 'root')
+        this.selectedRootKey = Object.freeze({ property: channel.property, time: gesture.time });
       if (changed && channel.kind === 'ik')
         this.selection.setIKKey({
           kind: 'ik',
@@ -441,7 +581,14 @@ export class AnimationEditorState {
     this.playbackController = new AnimationEditorPlaybackController(this.document, this.selection, this.playback, {
       notify: () => this.notify(),
       navigate: (time) => this.setCurrentTime(time),
-      isDragging: () => !!(this.keyframeDrag || this.eventDrag || this.ikTargetDrag || this.graphEditActive),
+      isDragging: () =>
+        !!(
+          this.keyframeDrag ||
+          this.eventDrag ||
+          this.ikTargetDrag ||
+          this.graphEditActive ||
+          this.rootMotionDragActive
+        ),
     });
     this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, {
       install: (animation) => this.installWorkingAnimation(animation),
@@ -489,6 +636,7 @@ export class AnimationEditorState {
   /** Same-topology rig edits invalidate sampling, without installing animation snapshots. */
   updatePreviewRig(rig: Rig): void {
     if (rig === this.rig) return;
+    this.cancelRootMotionDrag();
     this.cancelGraphEdit();
     this.document.rig = rig;
     this.selection.updateRig(rig);
@@ -556,7 +704,10 @@ export class AnimationEditorState {
     return this.ik.selectedIKTargetValues;
   }
   selectIKConstraint(id: string, property: IKAnimationProperty | null = null): boolean {
-    return this.batchNotifications(() => this.ik.selectIKConstraint(id, property));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.ik.selectIKConstraint(id, property);
+    });
   }
   setTimelineIKExpanded(id: string, expanded: boolean): boolean {
     return this.batchNotifications(() => this.ik.setTimelineIKExpanded(id, expanded));
@@ -572,7 +723,10 @@ export class AnimationEditorState {
     return this.ik.findIKPropertyKeyframe(id, property, time);
   }
   selectIKKeyframe(ref: IKKeyframeSelection): boolean {
-    return this.batchNotifications(() => this.ik.selectIKKeyframe(ref));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.ik.selectIKKeyframe(ref);
+    });
   }
   cancelIKEdit(): void {
     return this.batchNotifications(() => this.ik.cancelIKEdit());
@@ -664,13 +818,20 @@ export class AnimationEditorState {
   }
   /** Transient navigation only: preview sampling never dispatches authored events. */
   selectAnimationEvent(ref: AnimationEventRef): boolean {
-    return this.batchNotifications(() => this.selectionCommands.selectAnimationEvent(ref));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.selectionCommands.selectAnimationEvent(ref);
+    });
   }
   clearEventSelection(): void {
     return this.batchNotifications(() => this.selectionCommands.clearEventSelection());
   }
   clearTimelineSelection(): void {
     return this.batchNotifications(() => {
+      if (this.selectedRootKey) {
+        this.selectedRootKey = null;
+        this.notify();
+      }
       if (this.selection.clearIKKey()) this.notify();
       this.selectionCommands.clearTimelineSelection();
     });
@@ -713,14 +874,17 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.duplicateSelectedEvent());
   }
   copyTimelineSelection(): boolean {
+    if (this.rootMotionSelected) return false;
     if (this.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
+    if (this.rootMotionSelected) return false;
     if (this.selectedIKConstraintId) return false;
     return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
+    if (this.rootMotionSelected) return this.duplicateRootKey();
     if (this.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
   }
@@ -755,12 +919,13 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
+    const root = this.cancelRootMotionDrag();
     const cleanup = this.cancelCleanupPreview();
     const variation = this.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event || ik || graph || variation || cleanup;
+    return this.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -847,28 +1012,55 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.keyframes.moveSelectedKeyframe(time));
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
+    if (this.rootMotionSelected && this.selectedRootKey) {
+      const key = this.selectedRootKey;
+      try {
+        return this.editGraphKey(
+          { channel: { kind: 'root', id: 'Root Motion', property: key.property }, time: key.time },
+          { time: key.time + (direction * (large ? 10 : 1)) / this.keyframeFPS },
+        );
+      } catch (error) {
+        this.document.reportError(error);
+        this.notify();
+        return false;
+      }
+    }
     if (!this.animationAuthoringEnabled) return false;
     return this.batchNotifications(() => this.keyframes.nudgeSelectedKeyframe(direction, large));
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
-    return this.batchNotifications(() => this.selectionCommands.selectKeyframe(selection, modifiers));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.selectionCommands.selectKeyframe(selection, modifiers);
+    });
   }
   clearKeyframeSelection(): void {
     return this.batchNotifications(() => {
+      if (this.selectedRootKey) {
+        this.selectedRootKey = null;
+        this.notify();
+      }
       if (this.selection.clearIKKey()) this.notify();
       this.selectionCommands.clearKeyframeSelection();
     });
   }
   /** Resolve externally supplied references before installing transient box selection. */
   selectKeyframes(keys: readonly KeyframeSelection[], additive = false): void {
-    return this.batchNotifications(() => this.selectionCommands.selectKeyframes(keys, additive));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.selectionCommands.selectKeyframes(keys, additive);
+    });
   }
   selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
-    return this.batchNotifications(() => this.selectionCommands.selectKeyframeMarquee(box, additive));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.selectionCommands.selectKeyframeMarquee(box, additive);
+    });
   }
   /** The toolbar and keyboard share the same typed selection dispatch. */
   deleteTimelineSelection(): boolean {
+    if (this.rootMotionSelected) return this.animationAuthoringEnabled && this.deleteRootKey();
     if (!this.animationAuthoringEnabled) return false;
     if (this.selectedEvent) return this.deleteSelectedEvent();
     if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
@@ -933,7 +1125,10 @@ export class AnimationEditorState {
   }
   /** Atomic bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
-    return this.batchNotifications(() => this.selectionCommands.selectTimelineProperty(boneId, property));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.selectionCommands.selectTimelineProperty(boneId, property);
+    });
   }
   /** Editor-only prospective local values, never serialized or recorded in history. */
   get boneTransformDraft(): Readonly<Partial<JointTransform>> {
@@ -947,7 +1142,10 @@ export class AnimationEditorState {
     return evaluated ? { ...evaluated, ...this.selection.draft } : undefined;
   }
   selectBone(id: string | null): boolean {
-    return this.batchNotifications(() => this.selectionCommands.selectBone(id));
+    return this.batchNotifications(() => {
+      this.clearRootSelection();
+      return this.selectionCommands.selectBone(id);
+    });
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
@@ -1037,7 +1235,8 @@ export class AnimationEditorState {
       !!this.keyframeDrag ||
       !!this.eventDrag ||
       !!this.ikTargetDrag ||
-      this.graphEditActive
+      this.graphEditActive ||
+      this.rootMotionDragActive
     );
   }
 
@@ -1417,6 +1616,13 @@ export class AnimationEditorState {
     if (!retainDraft) this.clearTransformDraft();
     this.updateTime(this.currentTime);
     if (selectedKeys) this.selection.setKeys(selectedKeys, selectedKeys[0] ?? null);
+    if (
+      this.selectedRootKey &&
+      !rootKeys(this.working!, this.selectedRootKey.property).some(
+        (key) => key.time / 1000 === this.selectedRootKey!.time,
+      )
+    )
+      this.selectedRootKey = null;
     this.selectionCommands.reconcile();
     this.notify();
     return true;
@@ -1433,6 +1639,9 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.cancelRootMotionDrag();
+    this.clearRootSelection();
+    this.rootMotionEditing = false;
     this.cleanupPreview = null;
     this.variationPreview = null;
     this.cancelGraphEdit();
@@ -1553,6 +1762,13 @@ export class AnimationEditorState {
     const changed = restore();
     if (changed) {
       this.updateTime(this.currentTime);
+      if (
+        this.selectedRootKey &&
+        !rootKeys(this.working!, this.selectedRootKey.property).some(
+          (key) => key.time / 1000 === this.selectedRootKey!.time,
+        )
+      )
+        this.selectedRootKey = null;
       this.selectionCommands.reconcile();
     }
     if (changed || cancelled) this.notify();

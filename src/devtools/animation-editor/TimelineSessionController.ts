@@ -227,6 +227,8 @@ export class TimelineSessionController {
       state.selectedKeys,
       state.selectedTarget,
       state.selectedIKKeyframe,
+      state.selectedRootKey,
+      state.rootMotionSelected,
       state.selectedEvent,
       state.timelineClipboard,
       state.timelineVisibility,
@@ -253,7 +255,8 @@ export class TimelineSessionController {
     if (this.redo.disabled !== !state.canRedo) this.redo.disabled = !state.canRedo;
     this.files.render();
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
-    const deleteDisabled = state.selectedKeys.length === 0 && !state.selectedIKKeyframe && !state.selectedEvent;
+    const deleteDisabled =
+      state.selectedKeys.length === 0 && !state.selectedIKKeyframe && !state.selectedEvent && !state.selectedRootKey;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
     setCommandAvailability(
       this.deleteKey,
@@ -284,7 +287,7 @@ export class TimelineSessionController {
       bakeReason,
       'Select IK constraints and sampling FPS, then preview before baking',
     );
-    const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
+    const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0) + (state.selectedRootKey ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
     setText(
       this.deleteKey,
@@ -294,30 +297,41 @@ export class TimelineSessionController {
           ? `Delete ${count} Selected Key${count === 1 ? '' : 's'}${hidden ? ` (${hidden} hidden)` : ''}`
           : 'Delete Selected Keys',
     );
-    const copyDisabled = !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
+    const copyDisabled =
+      state.rootMotionSelected || !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
-    if (this.duplicateKeys.disabled !== copyDisabled) this.duplicateKeys.disabled = copyDisabled;
+    if (this.duplicateKeys.disabled !== (state.rootMotionSelected ? !state.selectedRootKey : copyDisabled))
+      this.duplicateKeys.disabled = state.rootMotionSelected ? !state.selectedRootKey : copyDisabled;
     setText(this.copyKeys, state.selectedEvent ? 'Copy Event' : 'Copy Keys');
     setText(this.duplicateKeys, state.selectedEvent ? 'Duplicate Event' : 'Duplicate Keys');
     setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
-    const pasteDisabled = !!state.selectedIKConstraintId || !animation || !state.timelineClipboard;
+    const pasteDisabled =
+      state.rootMotionSelected || !!state.selectedIKConstraintId || !animation || !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
-    const clipboardReason = state.selectedIKConstraintId
-      ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
-      : copyDisabled
-        ? 'Select bone keys or an event first.'
-        : '';
+    const clipboardReason = state.rootMotionSelected
+      ? 'Root clipboard is unavailable; use Duplicate key.'
+      : state.selectedIKConstraintId
+        ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
+        : copyDisabled
+          ? 'Select bone keys or an event first.'
+          : '';
     setCommandAvailability(this.copyKeys, clipboardReason, 'Copy selection (Ctrl/Cmd+C in timeline)');
-    setCommandAvailability(this.duplicateKeys, clipboardReason, 'Duplicate selection (Ctrl/Cmd+D in timeline)');
+    setCommandAvailability(
+      this.duplicateKeys,
+      state.rootMotionSelected ? (state.selectedRootKey ? '' : 'Select a root key first.') : clipboardReason,
+      'Duplicate selection (Ctrl/Cmd+D in timeline)',
+    );
     setCommandAvailability(
       this.pasteKeys,
-      state.selectedIKConstraintId
-        ? 'Select a bone track or event track to paste.'
-        : !animation
-          ? 'Load a valid animation first.'
-          : !state.timelineClipboard
-            ? 'Copy bone keys or an event first.'
-            : '',
+      state.rootMotionSelected
+        ? 'Select a bone or event track to paste.'
+        : state.selectedIKConstraintId
+          ? 'Select a bone track or event track to paste.'
+          : !animation
+            ? 'Load a valid animation first.'
+            : !state.timelineClipboard
+              ? 'Copy bone keys or an event first.'
+              : '',
       'Paste at the playhead (Ctrl/Cmd+V in timeline)',
     );
     setText(

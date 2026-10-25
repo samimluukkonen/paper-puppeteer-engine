@@ -2,10 +2,13 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-The catalog contains twenty-one selectable tasks. Open **Feature Guide → Animation Editor**. Steps start as explanations; optional **Try It** exists for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+The catalog contains twenty-four selectable tasks. Open **Feature Guide → Animation Editor**. Steps start as explanations; optional **Try It** exists for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
 
 | Guide                           | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | ------------------------------- | ----: | ------------------------------------------------------------------------ |
+| Preview Displacement            |     7 | Selected clip; temporary additive world trajectory                       |
+| Environment Preview             |    10 | Selected clip; artwork is optional                                       |
+| Visual Root Motion              |     5 | Selected clip; works with empty/legacy clips and no root keys            |
 | Aligning Feet to Ground         |     5 | Selected clip; explains missing markers and optional existing foot IK    |
 | Using Ground Reference          |     5 | None; IK alignment is optional and explained through its actual control  |
 | Create a New Animation          |     5 | None; no JSON or existing clip required                                  |
@@ -37,7 +40,7 @@ IK tasks use the `ik` registry category; the other nineteen use `animation`. Ava
 | Area                | Stable `data-guide-id` anchors                                                                                                                                                                           |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Session             | `animation-new`, `animation-selection`, `animation-settings`, `animation-editor-mode`                                                                                                                    |
-| Inspector           | `animation-bones`, `animation-properties`, `animation-x-key`, `animation-interpolation`, `animation-ik-inspector`                                                                                        |
+| Inspector           | `animation-root-motion`, `animation-bones`, `animation-properties`, `animation-x-key`, `animation-interpolation`, `animation-ik-inspector`                                                               |
 | Timeline            | `animation-timeline`, `animation-tracks`, `animation-ruler`, `animation-current-time`, `animation-playback`, `animation-zoom`, `animation-track-navigation`, `animation-key-editing`, `animation-events` |
 | Graph               | `animation-graph-toggle`, `animation-graph-property`, `animation-graph-canvas`, `animation-graph-interpolation`, `animation-graph-tangents`, `animation-graph-keys`, `animation-graph-navigation`        |
 | Preview             | `animation-canvas`, `animation-onion`, `animation-onion-settings`, `animation-ik-options`                                                                                                                |

@@ -1,18 +1,22 @@
+import { localToWorld } from '../../engine/affineMath.js';
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { IKAnimationPose } from '../../engine/ik/AnimationIKPose.js';
 import { Joint } from '../../engine/Joint.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import type { Rig } from '../../engine/Rig.js';
+import { sampleRootMotion } from '../../engine/rootMotion.js';
 import type { JointTransform } from '../../engine/types.js';
 import { CHARACTER_PREVIEW_ORIGIN } from '../shared/previewPlacement.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { evaluatePreviewDisplacement, motionPreviewSampleTime } from './motionPreview.js';
 import type { MotionPreviewController } from './MotionPreviewController.js';
 import { getCompiledPreviewClip } from './previewClip.js';
+import { rootMotionMatrix } from './rootMotionCoordinates.js';
 
 /** Editor-owned runtime player samples the working copy; the puppet still owns rendering and IK. */
 export class AnimationEditorPreview {
   private disposed = false;
+  private readonly origin: { x: number; y: number };
   private player: AnimationPlayer | undefined;
   private rig: Rig | undefined;
   private joints: Map<string, Joint> | undefined;
@@ -32,6 +36,9 @@ export class AnimationEditorPreview {
       Partial<Pick<Puppet, 'container'>>,
     private readonly motion?: MotionPreviewController,
   ) {
+    this.origin = motion
+      ? CHARACTER_PREVIEW_ORIGIN
+      : { x: puppet.container?.x ?? CHARACTER_PREVIEW_ORIGIN.x, y: puppet.container?.y ?? CHARACTER_PREVIEW_ORIGIN.y };
     this.refresh();
     this.unsubscribe = state.subscribe(() => this.refresh());
     this.releaseMotion = motion?.subscribe(() => this.refresh());
@@ -43,15 +50,35 @@ export class AnimationEditorPreview {
     const time = animation ? this.state.previewTimeMilliseconds : 0;
     const sampledTime = motionPreviewSampleTime(animation, time);
     // The editor owns this top-level preview instance. Bone-local root keys remain untouched;
-    // world offsets are never multiplied by puppet scale or facing and never accumulate.
+    // additional preview world offsets stay unscaled; authored root offsets use placement/facing once.
     const container = this.puppet.container;
-    if (this.motion && container) {
+    if (container) {
       const offset =
-        this.state.animationAuthoringEnabled && animation
+        this.motion && this.state.animationAuthoringEnabled && animation
           ? evaluatePreviewDisplacement(this.motion.getSnapshot().settings, sampledTime)
           : { x: 0, y: 0 };
-      const x = CHARACTER_PREVIEW_ORIGIN.x + offset.x;
-      const y = CHARACTER_PREVIEW_ORIGIN.y + offset.y;
+      const origin = { x: this.origin.x + offset.x, y: this.origin.y + offset.y };
+      const root =
+        animation && this.state.animationAuthoringEnabled && this.state.rootMotionVisible
+          ? this.state.rootMotionDragActive
+            ? this.state.rootPosition
+            : sampleRootMotion(animation, sampledTime)
+          : { x: 0, y: 0 };
+      const point = localToWorld(
+        root,
+        rootMotionMatrix(
+          {
+            a: Math.cos(container.rotation) * container.scaleX,
+            b: Math.sin(container.rotation) * container.scaleX,
+            c: -Math.sin(container.rotation) * container.scaleY,
+            d: Math.cos(container.rotation) * container.scaleY,
+            tx: 0,
+            ty: 0,
+          },
+          origin,
+        ),
+      );
+      const { x, y } = point;
       if (container.x !== x || container.y !== y) {
         container.setPosition(x, y);
         force = true; // World-target IK and detached debug overlays must follow placement too.
@@ -139,7 +166,7 @@ export class AnimationEditorPreview {
     this.disposed = true;
     this.unsubscribe();
     this.releaseMotion?.();
-    if (this.motion) this.puppet.container?.setPosition(CHARACTER_PREVIEW_ORIGIN.x, CHARACTER_PREVIEW_ORIGIN.y);
+    this.puppet.container?.setPosition(this.origin.x, this.origin.y);
     this.puppet.setIKAnimationSource(undefined);
     this.player?.dispose();
     this.player = undefined;

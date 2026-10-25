@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.7-3
+
+Add dedicated Root Motion Position X/Y timeline rows, numeric key creation/editing/retiming/deletion/duplication, and root channels in the existing Graph Editor with outgoing interpolation and Bézier tangents. Preserve skeletal, pelvis and IK tracks and animation format 1. Preview authored offsets through the puppet's placement/facing/scale transform over fixed ground; retain shared scrubbing, stepped samples and clip-local looping.
+
+Add Edit Root Motion with an independent purple square origin handle, an optional sampled trajectory and key/selection markers. Convert camera/world coordinates back through the puppet's affine placement, pause the environment camera during root editing, commit one history snapshot per XY or graph drag, and cancel gestures with Escape or session/lifecycle changes. Add the Visual Root Motion Feature Guide, [artist walkthrough and architecture notes](docs/root-motion-authoring.md), unit regressions and a local desktop browser workflow. Retain the higher package/lockfile version 1.2.6.
+
 ## 1.1.7-2
 
 Add renderer-independent absolute local/elapsed root-motion evaluation and unwrapped-time deltas, with continuous net-cycle accumulation, playback quantization and finite/cycle-bound checks. Opt into base Actor/Puppet translation per play or queue request with `rootMotion: 'apply'`; preserve the default ignore policy, skeletal/IK channels and existing version-1 data. Apply absolute displacement once through the starting facing/scale/rotation transform before IK synchronization.

@@ -25,6 +25,7 @@ import { AnimationEditorGhostLayer, AnimationPoseOverlay } from './AnimationEdit
 import { AnimationEditorGroundHandle } from './AnimationEditorGroundHandle.js';
 import { AnimationEditorIKHandles } from './AnimationEditorIKHandles.js';
 import { AnimationEditorPreview } from './AnimationEditorPreview.js';
+import { AnimationEditorRootHandle } from './AnimationEditorRootHandle.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { EnvironmentPreviewCamera } from './EnvironmentPreviewCamera.js';
 import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
@@ -123,6 +124,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.onRigChange();
   }
   private puppet: Puppet | undefined;
+  private rootHandle: AnimationEditorRootHandle | undefined;
   private ikHandles: AnimationEditorIKHandles | undefined;
   private ikHandlesVisible = true;
   private ikHandlesInteractive = true;
@@ -186,6 +188,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.contactOverlay = undefined;
       this.state?.pause();
       this.state?.endScrub();
+      this.rootHandle?.dispose();
+      this.rootHandle = undefined;
       this.ikHandles?.dispose();
       this.ikHandles = undefined;
       this.groundHandle?.dispose();
@@ -214,13 +218,14 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.environmentCamera?.render();
+    if (!this.state?.rootMotionEditing) this.environmentCamera?.render();
     const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
     this.motionLayer?.render();
     this.syncMirrorPreview();
     this.syncBakePreview();
+    this.rootHandle?.render();
     this.ikHandles?.render();
     if (this.groundOverlay) {
       const guide = this.groundGuide.getSnapshot().guide;
@@ -282,6 +287,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   private selectPreviewBone(pointer: Phaser.Input.Pointer): void {
     if (this.rigMode) return;
+    if (this.rootHandle?.pointerDown(pointer)) return;
     if (this.ikHandles?.gestureActive) {
       this.ikHandles.pointerDown(pointer);
       return;
@@ -345,9 +351,11 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   private createIKHandles(state: AnimationEditorState, puppet: Puppet): AnimationEditorIKHandles {
+    this.rootHandle = new AnimationEditorRootHandle(this, state, puppet);
+    this.rootHandle.setInteractive(this.ikHandlesInteractive && !this.rigMode);
     return new AnimationEditorIKHandles(this, state, puppet, {
       guide: () => this.groundGuide.getSnapshot().guide,
-      dragging: () => this.groundHandle?.dragging ?? false,
+      dragging: () => !!this.groundHandle?.dragging || state.rootMotionDragActive,
     });
   }
   private refreshArtwork(): void {
@@ -371,12 +379,15 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
   setIKHandlesInteractive(interactive: boolean): void {
     this.ikHandlesInteractive = interactive;
+    this.rootHandle?.setInteractive(interactive && !this.rigMode);
     this.ikHandles?.setInteractive(interactive && !this.rigMode);
   }
   setFacing(facing: Facing): void {
     this.facing = facing;
     if (this.rigEditor) this.rigEditor.state.facing = facing;
+    this.state?.cancelRootMotionDrag();
     this.puppet?.setFacing(facing);
+    this.preview?.refresh(true);
     this.ghosts?.sync();
     this.syncMirrorPreview();
     this.syncBakePreview();
@@ -607,6 +618,8 @@ export class AnimationEditorScene extends Phaser.Scene {
           try {
             this.artwork?.bind(this, next, definition, () => this.refreshArtwork());
             this.groundGuide.cancelDrag();
+            this.rootHandle?.dispose();
+            this.rootHandle = undefined;
             this.ikHandles?.dispose();
             this.clearMirrorPreview();
             this.clearBakePreview();
@@ -723,6 +736,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.groundGuide.bind(null);
       this.clearMirrorPreview();
       this.clearBakePreview();
+      this.rootHandle?.dispose();
+      this.rootHandle = undefined;
       this.ikHandles?.dispose();
       this.ikHandles = undefined;
       ghosts?.dispose();

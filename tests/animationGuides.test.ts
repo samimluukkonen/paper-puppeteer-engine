@@ -27,8 +27,8 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains twenty-three bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 23);
+test('Animation Editor catalog contains twenty-four bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 24);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
