@@ -18,6 +18,7 @@ import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
 import { SceneActionInspector } from './SceneActionInspector.js';
 import { SceneActorsPanel } from './SceneActorsPanel.js';
 import { SceneArtworkPanel } from './SceneArtworkPanel.js';
+import { SceneAudioInspector } from './SceneAudioInspector.js';
 import { SceneCameraPanel } from './SceneCameraPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
@@ -86,6 +87,8 @@ export function SceneEditorView({
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const scene = document.workingScene;
   const project = projectEditorContext();
+  const [, refreshProject] = useState(0);
+  useEffect(() => project?.subscribe(() => refreshProject((revision) => revision + 1)), [project]);
   const [playback] = useState(() => new SceneEditorPlayback());
   const [autosave] = useState(() => {
     const id = crypto.randomUUID();
@@ -171,6 +174,13 @@ export function SceneEditorView({
   const assetOptions = (signal: AbortSignal) => ({
     baseUrl: window.location.href,
     signal,
+    loadAudio: (reference: string) => {
+      try {
+        return Promise.resolve(document.readAudio(reference));
+      } catch {
+        return readSceneResource(new URL(reference, window.location.href).href, fetch, PACKAGE_MAX_FILE_BYTES, signal);
+      }
+    },
     loadImage: (reference: string) =>
       document.images.has(reference)
         ? Promise.resolve(document.images.read(reference))
@@ -400,6 +410,7 @@ export function SceneEditorView({
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
               <SceneCameraPanel key={`camera-${scene.id}`} document={document} playback={playback} />
+              <SceneAudioInspector key={`audio-${scene.id}`} document={document} />
               <SceneTransitionPanel key={`transitions-${scene.id}`} document={document} />
               <SceneLayersPanel key={`layers-${scene.id}`} document={document} />
               <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />

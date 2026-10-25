@@ -1,3 +1,4 @@
+import { validateAudioAssetData } from './AudioAsset.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { CharacterLoader } from './CharacterLoader.js';
 import { CharacterTextureBudget } from './characterTextureLimits.js';
@@ -12,6 +13,7 @@ export interface SceneAssetOptions {
   /** URL of scene.json; relative character references resolve against this URL. */
   readonly baseUrl: string;
   readonly fetcher?: typeof fetch;
+  readonly loadAudio?: (reference: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly loadImage?: (reference: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly signal?: AbortSignal;
   /** Optional host cache. Must return a complete immutable CharacterDefinition. */
@@ -22,6 +24,7 @@ export interface ResolvedScene {
   readonly definition: DeepReadonly<SceneDefinition>;
   /** Keys are the exact stable references in the scene, rather than character/Actor IDs. */
   readonly characters: ReadonlyMap<string, CharacterDefinition>;
+  readonly audio?: ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
   readonly images?: ReadonlyMap<string, Uint8Array<ArrayBuffer>>;
 }
 
@@ -106,8 +109,22 @@ export async function resolveSceneDefinition(input: unknown, options: SceneAsset
       throw new Error(`Image format does not match path "${reference}".`);
     images.set(reference, bytes);
   }
+  const audio = new Map<string, Uint8Array<ArrayBuffer>>();
+  const audioIds = new Set(definition.audioClips?.map((clip) => clip.assetId));
+  for (const asset of definition.audioAssets ?? []) {
+    if (!audioIds.has(asset.id)) continue;
+    options.signal?.throwIfAborted();
+    const url = new URL(asset.path, options.baseUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Scene audio must use HTTP(S).');
+    const bytes = await (options.loadAudio?.(asset.path) ??
+      readSceneResource(url.href, options.fetcher ?? fetch, PACKAGE_MAX_FILE_BYTES, options.signal));
+    // AudioAssetDefinition's package validation expects confined paths; scene references may lead with ../.
+    validateAudioAssetData({ ...asset, path: asset.path.replace(/^(?:\.\.\/)+/, '') }, bytes);
+    audio.set(asset.id, bytes);
+  }
   options.signal?.throwIfAborted();
   return {
+    audio,
     images,
     definition: freezeData(parseSceneDefinition(definition, { characters: sceneAssetCatalog(characters) })),
     characters,

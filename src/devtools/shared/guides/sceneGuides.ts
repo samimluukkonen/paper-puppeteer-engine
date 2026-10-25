@@ -30,6 +30,68 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 const workflowGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-audio-timeline',
+    'Visual Audio Timeline',
+    'Arrange audio clips, trim source media and save volume, loops and fades with the scene.',
+    scene,
+    [
+      step(
+        'asset',
+        'Choose imported audio',
+        T.sceneAudioAsset,
+        'Import WAV, MP3 or OGG audio in Project Workspace, then open its Scene Editor. Audio asset lists that project’s audio library; standalone scenes list their imported audio references. If the list is empty, import audio in Project Workspace after exiting this tour. An empty scene is enough to explore every step; Actors and selected clips are optional. The tour only reveals controls and never imports, selects or plays audio.',
+      ),
+      step(
+        'tracks',
+        'Organize audio tracks',
+        T.sceneAudioAddTrack,
+        'Choose Track category, then Add audio track. Music, Ambience, Sound Effects and Voice are organizational labels: any track can contain any audio asset. Add multiple tracks of the same category when useful. Choose Audio track before adding a clip, or change Clip track in the selected clip’s inspector. The tour does not create tracks.',
+      ),
+      step(
+        'add',
+        'Place a clip at the playhead',
+        T.sceneAudioAddClip,
+        'After exiting, set Playhead (s), choose Audio asset and Audio track, then Add Audio Clip. A new clip starts at the playhead and uses decoded media duration, limited to remaining scene time; unknown media duration starts at one second. At scene end, move the playhead earlier. Clips always have finite bounds; adding or editing audio never silently extends the scene.',
+      ),
+      step(
+        'arrange',
+        'Arrange and overlap clips',
+        T.sceneAudioTracks,
+        'Click an audio clip to select it. Drag its body to move its scene start without changing the source offset. Snapping shares frames, playhead, Actor clip edges, camera keys, transitions and other audio edges; hold Alt to bypass it. Overlapping clips are allowed, including within one track, and appear on separate visible lanes. Empty audio rows are ready for your first track and clip after the tour.',
+      ),
+      step(
+        'trim',
+        'Trim without changing the source file',
+        T.sceneAudioTiming,
+        'Select a clip and open Audio clip to edit Start, Duration and Source offset in seconds, then Apply audio clip properties. Drag the left edge to advance source offset and start while keeping scene end fixed; drag the right edge to change duration. Media duration is the decoded file length, separate from clip duration and scene playhead time. Non-looping clips cannot read past media end. With no clip selected, this section explains how to begin; the tour never selects one.',
+      ),
+      step(
+        'playback',
+        'Set volume and bounded looping',
+        T.sceneAudioPlayback,
+        'Volume ranges from 0 to 100%; zero is valid. Loop repeats the source window from Source offset through media end, stopping at the finite clip end. Left trimming a loop changes its repeated source window; right trimming can extend it beyond media length within scene duration. Apply audio clip properties commits the edit. These are saved playback properties: synchronized audio playback and seeking arrive in v1.3.3. Use Project Workspace’s explicit audition separately.',
+      ),
+      step(
+        'fades',
+        'Author clip fades',
+        T.sceneAudioFades,
+        'Fade in and Fade out are durations in seconds at the clip’s scene edges; omitted values mean zero. Each fade must fit within clip duration. They describe linear gain ramps, and overlapping ramps multiply. Apply audio clip properties commits fades with the other properties. Audio fades are distinct from the scene’s full-frame color transitions. Waveform previews and synchronized fade playback are deferred.',
+      ),
+      step(
+        'history',
+        'Duplicate, delete and undo',
+        T.sceneAudioActions,
+        'Duplicate audio clip creates a new stable ID at the same time, preserving its asset, track, trim, volume, loop and fades; move the copy or choose another track afterward. Delete audio clip or Delete/Backspace removes the selection. Scene Undo/Redo restores edits. A completed drag is one history entry; Escape, blur, capture loss or a selection change cancels an unfinished gesture. The source audio file stays unchanged.',
+      ),
+      step(
+        'save',
+        'Save timing and audio together',
+        T.scenePackage,
+        'Download scene JSON preserves audio tracks, asset references, timing, source offsets, volume, loops and fades. Download scene package includes referenced audio binaries for portable handoff; Export Project and local recovery retain them too. Project dependency checks block removing audio used by a scene. Keep relative assets with JSON or download a ZIP. This tour preserves the scene, selection, playback, preview and Undo/Redo.',
+      ),
+    ],
+  ),
+  guide(
     'scene-root-motion',
     'Using Root Motion',
     'Choose animation-owned travel, resolve movement conflicts and retain the final Actor position.',

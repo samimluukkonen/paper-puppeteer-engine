@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Project Workspace can import, organize and audition background music, ambience, sound effects and prerecorded voices. Audio belongs to the existing project registry. Scene timeline placement and synchronized playback are deferred to v1.3.2.
+Project Workspace can import, organize and audition background music, ambience, sound effects and prerecorded voices. Audio belongs to the existing project registry. Scene timeline placement is available in the [v1.3.2 audio timeline](scene-audio-timeline.md); synchronized playback is deferred to v1.3.3.
 
 ## Import and audition
 
@@ -10,7 +10,7 @@ For an in-app tour, open **Feature Guide → Project Workspace → Importing and
 
 Open a project, expand **Audio**, choose **Import category**, then **Import Audio**. The Music, Ambience, Sound effects and Voice categories start collapsed and show their counts. Import does not start playback. Asset names are plain labels. Click **Play** on a row to audition it; the same button becomes **Stop** while loading or playing. Click **Stop** on that row to end or cancel its preview. **Stop preview** at the top stops the current asset too. Preview volume affects only audition. Closing a category stops its preview. Closing Audio, changing projects or closing the workspace releases the audition resources; entering an editor stops audition.
 
-Use **Rename** to edit the display name, or the row's **Category** selector to move an asset. Neither operation changes its stable ID or file path. **Remove** removes membership; **Undo Project** restores the asset and its original bytes. Rename and category edits use the same project history. The shared dependency graph guards removal when non-project dependents exist; this milestone introduces no scene audio references.
+Use **Rename** to edit the display name, or the row's **Category** selector to move an asset. Neither operation changes its stable ID or file path. **Remove** removes membership; **Undo Project** restores the asset and its original bytes. Rename and category edits use the same project history. The shared dependency graph guards removal when non-project dependents exist; scene audio clips now create those dependencies.
 
 Imports accept WAV, MP3 and OGG containers with a codec that the current browser's Web Audio decoder supports. PCM WAV is a useful fallback for unsupported encodings. File contents, rather than the extension or MIME type, identify the container, and decoding must succeed before registration. Renaming an extension does not convert audio. Corrupt data, unsupported codecs and denied playback produce inline feedback. Playback starts from an explicit click and resumes the browser AudioContext in that gesture; import, recovery and passive view updates never start sound.
 
@@ -96,4 +96,4 @@ All 10 selected shared modal/practice browser checks passed in 1.7 minutes after
 
 ## Deferred v1.3.2 work
 
-Audio timeline clips/lanes, scene references and dependency edges, placement/trimming controls and synchronization with scene playback/seeking remain future work. This foundation does not add dialogue UI, recording, waveform editing, synthesis, cloud storage or voice generation.
+[Scene audio clips, tracks, references and trimming](scene-audio-timeline.md) are available in v1.3.2. Synchronization with scene playback/seeking remains future work (v1.3.3). This foundation does not add dialogue UI, recording, waveform editing, synthesis, cloud storage or voice generation.

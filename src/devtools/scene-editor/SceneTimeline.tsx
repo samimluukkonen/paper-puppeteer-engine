@@ -1,14 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
+import type { SceneAudioClip } from '../../engine/sceneAudio.js';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { SceneAudioControls, SceneAudioTracks } from './SceneAudioTimeline.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument, SceneActionInput } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { ScenePlaybackControls, SceneTimeInput, ScenePlayhead, ScenePlaybackError } from './ScenePlaybackControls.js';
-import { buildSceneTracks, layoutSceneActions, snapSceneTime } from './timelineActions.js';
+import { buildSceneTracks, layoutSceneActions, snapSceneTime, editAudioClipOnTimeline } from './timelineActions.js';
 
 type Drag = {
   pointer: number;
@@ -31,6 +33,14 @@ export function SceneTimeline({
 }) {
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
   const viewport = useRef<HTMLDivElement>(null);
+  const audioGesture = useRef<{
+    pointer: number;
+    x: number;
+    clip: SceneAudioClip;
+    edge: 'move' | 'start' | 'end';
+    width: number;
+    valid: boolean;
+  } | null>(null);
   const gesture = useRef<Drag | null>(null);
   const cameraGesture = useRef<{
     pointer: number;
@@ -69,6 +79,8 @@ export function SceneTimeline({
   }, []);
   useEffect(() => {
     const cancel = (): void => {
+      audioGesture.current = null;
+      document.cancelAudioDrag();
       gesture.current = null;
       cameraGesture.current = null;
       scrub.current = null;
@@ -80,7 +92,7 @@ export function SceneTimeline({
       if (
         event.key === 'Escape' &&
         !blocksEditorShortcut(event) &&
-        (gesture.current || cameraGesture.current || scrub.current !== null)
+        (audioGesture.current || gesture.current || cameraGesture.current || scrub.current !== null)
       ) {
         event.preventDefault();
         cancel();
@@ -222,6 +234,7 @@ export function SceneTimeline({
         keys; drag to move their time. Set Camera Cut holds the preceding shot until this key; edit the new shot in
         Cinematic Camera. Select fades to edit start, duration and color in Transition properties.
       </p>
+      <SceneAudioControls document={document} playback={playback} />
       <ScenePlaybackError playback={playback} />
       {scene.actors.length > 0 && !scene.actions.length && (
         <p className="workspace-caption">
@@ -248,6 +261,21 @@ export function SceneTimeline({
                 timelineXToTime(offset, seconds, width) * 1000,
                 width,
                 -1000,
+                snap && !event.altKey,
+              ),
+            );
+            return;
+          }
+          const audioDrag = audioGesture.current;
+          if (audioDrag?.pointer === event.pointerId) {
+            audioDrag.valid = document.changeAudioDrag(
+              editAudioClipOnTimeline(
+                scene,
+                audioDrag.clip,
+                audioDrag.edge,
+                ((event.clientX - audioDrag.x) / audioDrag.width) * scene.duration,
+                audioDrag.width,
+                playback.time,
                 snap && !event.altKey,
               ),
             );
@@ -302,6 +330,14 @@ export function SceneTimeline({
         }}
         onPointerUp={(event) => {
           scrub.current = null;
+          const audioDrag = audioGesture.current;
+          if (audioDrag?.pointer === event.pointerId) {
+            audioGesture.current = null;
+            if (audioDrag.valid) document.endAudioDrag();
+            else document.cancelAudioDrag();
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            return;
+          }
           const cameraDrag = cameraGesture.current;
           if (cameraDrag?.pointer === event.pointerId) {
             cameraGesture.current = null;
@@ -312,6 +348,8 @@ export function SceneTimeline({
           }
           const drag = gesture.current;
           if (!drag || drag.pointer !== event.pointerId) return;
+          audioGesture.current = null;
+          document.cancelAudioDrag();
           gesture.current = null;
           if (drag.valid) document.endActionDrag();
           else document.cancelActionDrag();
@@ -319,6 +357,8 @@ export function SceneTimeline({
         }}
         onPointerCancel={() => {
           scrub.current = null;
+          audioGesture.current = null;
+          document.cancelAudioDrag();
           gesture.current = null;
           document.cancelActionDrag();
           cameraGesture.current = null;
@@ -326,6 +366,8 @@ export function SceneTimeline({
         }}
         onLostPointerCapture={() => {
           scrub.current = null;
+          audioGesture.current = null;
+          document.cancelAudioDrag();
           gesture.current = null;
           document.cancelActionDrag();
           cameraGesture.current = null;
@@ -527,6 +569,29 @@ export function SceneTimeline({
               ))}
             </div>
           </div>
+          <SceneAudioTracks
+            scene={scene}
+            document={document}
+            width={width}
+            x={x}
+            beginDrag={(event, clip) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              viewport.current?.focus();
+              playback.pause();
+              if (!document.beginAudioDrag(clip.id)) return;
+              viewport.current?.setPointerCapture(event.pointerId);
+              const edge = (event.target as HTMLElement).dataset.audioEdge;
+              audioGesture.current = {
+                pointer: event.pointerId,
+                x: event.clientX,
+                clip: { ...clip },
+                edge: edge === 'start' || edge === 'end' ? edge : 'move',
+                width,
+                valid: true,
+              };
+            }}
+          />
           <ScenePlayhead playback={playback} duration={scene.duration} width={width} />
         </div>
       </div>

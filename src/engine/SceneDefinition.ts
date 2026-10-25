@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { audioAssetDefinitionSchema, type AudioAssetDefinition } from './AudioAsset.js';
 import { canonicalJson } from './authoredSerialization.js';
 import { CAMERA_PROPERTIES, cameraTracksSchema } from './cameraAnimation.js';
 import { cinematicCameraSchema, CINEMATIC_CAMERA_MIN_ZOOM, CINEMATIC_CAMERA_MAX_ZOOM } from './cinematicCamera.js';
 import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
+import { sceneAudioClipSchema, sceneAudioTrackSchema } from './sceneAudio.js';
 import { sceneTransitionSchema } from './sceneTransitions.js';
 import { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 import { identifierSchema } from './schemas.js';
@@ -126,12 +128,22 @@ export const sceneActionDefinitionSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
+export const sceneAudioAssetSchema = audioAssetDefinitionSchema.extend({
+  path: z
+    .string()
+    .regex(/\.(?:wav|mp3|ogg)$/i)
+    .refine(safeSceneManifest, 'Use a stable audio path without aliases or internal traversal.'),
+});
+
 export const sceneDefinitionSchema = z.strictObject({
   version: z.literal(SCENE_FORMAT_VERSION),
   id: sceneIdentifier,
   name: sceneIdentifier,
   /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
   duration: z.number().positive(),
+  audioAssets: z.array(sceneAudioAssetSchema).max(128).exactOptional(),
+  audioTracks: z.array(sceneAudioTrackSchema).max(128).exactOptional(),
+  audioClips: z.array(sceneAudioClipSchema).max(4000).exactOptional(),
   camera: cinematicCameraSchema.exactOptional(),
   cameraTracks: cameraTracksSchema.exactOptional(),
   transitions: z.array(sceneTransitionSchema).max(1000).exactOptional(),
@@ -157,6 +169,8 @@ export interface SceneValidationOptions {
   /** Editors may validate against metadata as it becomes available without blocking scene opening. */
   readonly getCharacterAssets?: (manifest: string) => SceneCharacterAssets | undefined;
   readonly images?: ReadonlySet<string>;
+  /** Supplied project catalog is authoritative for existence and decoded duration. */
+  readonly getAudioAssets?: () => readonly AudioAssetDefinition[];
 }
 
 export class SceneValidationError extends Error {
@@ -171,6 +185,9 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   // Bound raw collections before walking/cloning entries or allocating schema issues.
   if (input !== null && typeof input === 'object') {
     for (const [field, limit] of [
+      ['audioAssets', 128],
+      ['audioTracks', 128],
+      ['audioClips', 4000],
       ['layers', 64],
       ['images', 256],
       ['transitions', 1000],
@@ -217,6 +234,51 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
         report(`${path}.value`, 'Camera zoom keys must stay between 0.1 and 8.');
       if (key.curve?.mode === 'bezier' && key.curve.control1.x > key.curve.control2.x)
         report(`${path}.curve`, 'Bézier time handles must be monotonic.');
+    }
+  }
+  const audioIds = new Set<string>();
+  for (const [index, asset] of (scene.audioAssets ?? []).entries()) {
+    if (audioIds.has(asset.id)) report(`audioAssets[${index}].id`, 'Audio asset IDs must be unique.');
+    audioIds.add(asset.id);
+  }
+  const audioCatalog = new Map(
+    (options.getAudioAssets?.() ?? scene.audioAssets ?? []).map((asset) => [asset.id, asset]),
+  );
+  const audioTrackIds = new Set<string>();
+  for (const [index, track] of (scene.audioTracks ?? []).entries()) {
+    if (audioTrackIds.has(track.id)) report(`audioTracks[${index}].id`, 'Audio track IDs must be unique.');
+    audioTrackIds.add(track.id);
+  }
+  const audioClipIds = new Set<string>();
+  for (const [index, clip] of (scene.audioClips ?? []).entries()) {
+    const path = `audioClips[${index}]`;
+    if (audioClipIds.has(clip.id)) report(`${path}.id`, 'Audio clip IDs must be unique.');
+    audioClipIds.add(clip.id);
+    const asset = audioCatalog.get(clip.assetId);
+    if (!asset) report(`${path}.assetId`, `Missing audio asset "${clip.assetId}". Import or replace it before saving.`);
+    if (!audioIds.has(clip.assetId)) report(`${path}.assetId`, 'Missing scene audio asset reference.');
+    const reference = scene.audioAssets?.find((entry) => entry.id === clip.assetId);
+    if (
+      asset &&
+      reference &&
+      options.getAudioAssets &&
+      reference.path.replace(/^(?:\.\.\/)+/, '') !== asset.path.replace(/^(?:\.\.\/)+/, '')
+    )
+      report(`${path}.assetId`, 'Scene audio path differs from its project registration.');
+    if (!audioTrackIds.has(clip.trackId)) report(`${path}.trackId`, 'Choose an existing audio track.');
+    const end = clip.time + clip.duration;
+    if (!Number.isFinite(end) || end <= clip.time || end > scene.duration)
+      report(`${path}.duration`, 'Audio clip end must advance time and stay within scene duration.');
+    for (const field of ['fadeIn', 'fadeOut'] as const)
+      if ((clip[field] ?? 0) > clip.duration) report(`${path}.${field}`, 'Fade duration cannot exceed clip duration.');
+    const mediaDuration = asset?.durationSeconds === undefined ? undefined : asset.durationSeconds * 1000;
+    if (!Number.isFinite(clip.sourceOffset + clip.duration))
+      report(`${path}.sourceOffset`, 'Source range must be finite.');
+    if (mediaDuration !== undefined) {
+      if (clip.sourceOffset >= mediaDuration)
+        report(`${path}.sourceOffset`, 'Source offset must be before the media end.');
+      if (!clip.loop && clip.sourceOffset + clip.duration > mediaDuration + 0.000001)
+        report(`${path}.duration`, 'Non-looping trim range exceeds the media duration.');
     }
   }
   const transitionIds = new Set<string>();

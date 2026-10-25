@@ -63,6 +63,7 @@ export class ProjectWorkspace {
   private sceneCheckpoints = new Map<string, string>();
   readonly scenes = new SceneEditorDocument(
     {
+      getAudioAssets: () => (this.metadata.audio ?? []).map((asset) => ({ ...asset, path: `../${asset.path}` })),
       getCharacterAssets: (manifest) => {
         const entry = this.metadata.characters.find((entry) => entry.manifest === manifest);
         const character = entry && this.characters.get(entry.id);
@@ -82,6 +83,7 @@ export class ProjectWorkspace {
       Object.values(this.previewPreferences).flatMap((preferences) =>
         preferences.environment.image ? [preferences.environment.image] : [],
       ),
+    (id) => this.audioFiles.get(id),
   );
   private revision = 0;
   recoveryKey: string | undefined;
@@ -432,6 +434,7 @@ export class ProjectWorkspace {
     return parseSceneDefinition(scene, {
       characters,
       images: new Set(this.scenes.images.entries.map((image) => image.reference)),
+      getAudioAssets: () => this.metadata.audio ?? [],
     });
   }
   /** Only committed authored revisions call this; playback and selection need no validation. */
@@ -441,7 +444,7 @@ export class ProjectWorkspace {
       ? {
           ...this.definition,
           characters: this.metadata.characters.filter((entry) => references.has(entry.manifest)),
-          audio: [],
+          audio: this.metadata.audio ?? [],
           scenes: [{ id: scene.id, path: 'scene.json' }],
         }
       : this.definition;

@@ -34,6 +34,155 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
+    "audioAssets": {
+      "maxItems": 128,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "\\.(?:wav|mp3|ogg)$"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["music", "ambience", "sfx", "voice"]
+          },
+          "durationSeconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": ["id", "name", "path", "category"],
+        "additionalProperties": false
+      }
+    },
+    "audioTracks": {
+      "maxItems": 128,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": ["music", "ambience", "sfx", "voice"]
+          }
+        },
+        "required": ["id", "name", "category"],
+        "additionalProperties": false
+      }
+    },
+    "audioClips": {
+      "maxItems": 4000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "trackId": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "sourceOffset": {
+            "type": "number",
+            "minimum": 0
+          },
+          "volume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "loop": {
+            "type": "boolean"
+          },
+          "fadeIn": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fadeOut": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": ["id", "assetId", "trackId", "time", "duration", "sourceOffset", "volume", "loop"],
+        "additionalProperties": false
+      }
+    },
     "camera": {
       "type": "object",
       "properties": {

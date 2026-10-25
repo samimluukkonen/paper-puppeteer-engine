@@ -64,6 +64,29 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
           document.images.read(reference),
           document.images.entries.find((asset) => asset.reference === reference)?.name,
         );
+      const audioAliases = new Map<string, { id: string; path: string }>();
+      const reservedAudioIds = new Set(
+        scenes.flatMap((scene) => (scene.audioAssets ?? []).map((asset) => asset.id.toLowerCase())),
+      );
+      const usedAudioIds = new Set<string>();
+      for (const scene of scenes)
+        for (const asset of scene.audioAssets ?? []) {
+          if (!scene.audioClips?.some((clip) => clip.assetId === asset.id)) continue;
+          const key = JSON.stringify([asset.id, asset.path]);
+          if (audioAliases.has(key)) continue;
+          let id = asset.id;
+          if (usedAudioIds.has(id.toLowerCase())) {
+            let index = 2;
+            do {
+              id = `${asset.id.slice(0, 170)}-recovery-${index++}`;
+            } while (reservedAudioIds.has(id.toLowerCase()));
+            reservedAudioIds.add(id.toLowerCase());
+          }
+          usedAudioIds.add(id.toLowerCase());
+          const path = `audio/recovery-${audioAliases.size + 1}.${asset.path.split('.').at(-1)!}`;
+          workspace.addAudio({ ...asset, id, path }, document.readAudio(asset.path));
+          audioAliases.set(key, { id, path: `../${path}` });
+        }
       const references = new Map<string, string>();
       const manifests = [...new Set(scenes.flatMap((scene) => scene.actors.map((actor) => actor.character.manifest)))];
       const definitions = new Map<string, Awaited<ReturnType<typeof registry.load>>>();
@@ -107,6 +130,21 @@ export function sceneDraftSource(document: SceneEditorDocument, registry: SceneC
       for (const scene of scenes)
         workspace.addScene({
           ...parseSceneDefinition(scene),
+          ...(scene.audioAssets
+            ? {
+                audioAssets: scene.audioAssets
+                  .filter((asset) => scene.audioClips?.some((clip) => clip.assetId === asset.id))
+                  .map((asset) => ({ ...asset, ...audioAliases.get(JSON.stringify([asset.id, asset.path]))! })),
+              }
+            : {}),
+          ...(scene.audioClips
+            ? {
+                audioClips: scene.audioClips.map((clip) => {
+                  const asset = scene.audioAssets!.find((asset) => asset.id === clip.assetId)!;
+                  return { ...clip, assetId: audioAliases.get(JSON.stringify([asset.id, asset.path]))!.id };
+                }),
+              }
+            : {}),
           actors: scene.actors.map((actor) => ({
             ...actor,
             character: { manifest: references.get(actor.character.manifest)! },

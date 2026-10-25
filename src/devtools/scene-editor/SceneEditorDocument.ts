@@ -1,3 +1,4 @@
+import type { AudioAssetDefinition, AudioCategory } from '../../engine/AudioAsset.js';
 import {
   CAMERA_PROPERTIES,
   evaluateCameraAtTime,
@@ -12,6 +13,7 @@ import {
 } from '../../engine/cinematicCamera.js';
 import { equalJsonData } from '../../engine/equalJsonData.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
+import type { SceneAudioClip } from '../../engine/sceneAudio.js';
 import {
   createEmptyScene,
   parseSceneDefinition,
@@ -32,6 +34,7 @@ import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { SceneArtworkCommands } from './SceneArtworkCommands.js';
+import { SceneAudioCommands } from './SceneAudioCommands.js';
 import { SceneCameraCommands } from './SceneCameraCommands.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
 import { SceneTransitionCommands } from './SceneTransitionCommands.js';
@@ -56,6 +59,7 @@ interface SceneEntry {
   selectedActor: string | null;
   selectedAction: string | null;
   selectedTransition: string | null;
+  selectedAudioClip: string | null;
   readonly history: SnapshotHistory<ReadonlyScene>;
 }
 
@@ -65,6 +69,9 @@ export class SceneEditorDocument {
   private readonly entries = new Map<string, SceneEntry>();
   private selected: string | null = null;
   private revision = 0;
+  private dragAudio: string | null = null;
+  private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
+  private readonly audioCommands = new SceneAudioCommands(this, () => this.finishLayerGestures());
   private dragAction: string | null = null;
   private dragActor: string | null = null;
   private dragCamera = false;
@@ -95,6 +102,7 @@ export class SceneEditorDocument {
     private readonly validation: SceneValidationOptions = {},
     private readonly animationIds?: (manifest: string) => readonly string[] | undefined,
     private readonly retainedImageReferences?: () => Iterable<string>,
+    private readonly readProjectAudio?: (id: string) => Uint8Array<ArrayBuffer> | undefined,
   ) {}
 
   private parse(input: unknown): SceneDefinition {
@@ -216,6 +224,7 @@ export class SceneEditorDocument {
       selectedActor: null,
       selectedAction: null,
       selectedTransition: null,
+      selectedAudioClip: null,
       history: new SnapshotHistory(
         () => entry.working,
         (snapshot) => {
@@ -224,6 +233,7 @@ export class SceneEditorDocument {
         equalJsonData,
       ),
     };
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();
@@ -252,6 +262,7 @@ export class SceneEditorDocument {
   /** Selecting retains all documents, saved baselines and undo/redo histories. */
   selectScene(id: string): boolean {
     if (!this.entries.has(id)) return this.reportError(new Error(`Unknown scene "${id}".`));
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();
@@ -375,9 +386,11 @@ export class SceneEditorDocument {
     this.cancelCameraDrag();
     this.cancelImageDrag();
     this.cancelActorDrag();
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     if (!this.entry) return;
     this.entry.selectedTransition = null;
+    this.entry.selectedAudioClip = null;
     this.entry.cameraSelected = selected;
     this.entry.selectedCameraKey = null;
     if (selected) {
@@ -487,6 +500,7 @@ export class SceneEditorDocument {
     this.endImageDrag();
     this.endCameraDrag();
     this.endActorDrag();
+    this.endAudioDrag();
     this.endActionDrag();
   }
   addLayer(): boolean {
@@ -512,10 +526,12 @@ export class SceneEditorDocument {
     if (!this.entry || (id !== null && !this.workingScene?.images?.some((image) => image.id === id))) return;
     this.cancelCameraDrag();
     this.cancelActorDrag();
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     if (id !== this.selectedImageId) this.cancelImageDrag();
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
+    this.entry.selectedAudioClip = null;
     this.entry.selectedImage = id;
     this.entry.selectedActor = null;
     this.entry.selectedAction = null;
@@ -569,6 +585,7 @@ export class SceneEditorDocument {
   }
   get hasActiveGesture(): boolean {
     return (
+      this.dragAudio !== null ||
       this.dragCamera ||
       this.dragCameraKey ||
       this.dragImage !== null ||
@@ -581,11 +598,13 @@ export class SceneEditorDocument {
     this.cancelCameraDrag();
     this.cancelImageDrag();
     if (id !== this.selectedActorId) this.cancelActorDrag();
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.entry.selectedAction = null;
     this.entry.selectedImage = null;
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
+    this.entry.selectedAudioClip = null;
     this.entry.selectedActor = id;
     this.notify();
   }
@@ -596,6 +615,7 @@ export class SceneEditorDocument {
     return id;
   }
   addActor(manifest: string, position = { x: 0, y: 0 }): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -609,6 +629,7 @@ export class SceneEditorDocument {
     return true;
   }
   updateActor(id: string, patch: Partial<SceneActorDefinition>): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -631,6 +652,7 @@ export class SceneEditorDocument {
     return changed;
   }
   setActorAppearance(id: string, property: 'animation' | 'skin', value: string | null): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -649,6 +671,7 @@ export class SceneEditorDocument {
     });
   }
   duplicateActor(id: string): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -684,6 +707,7 @@ export class SceneEditorDocument {
     );
   }
   removeActor(id: string, options: { removeActions?: boolean } = {}): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -705,6 +729,7 @@ export class SceneEditorDocument {
     });
   }
   reorderActor(id: string, offset: -1 | 1): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -719,6 +744,7 @@ export class SceneEditorDocument {
     return this.replaceScene({ ...scene, actors });
   }
   beginActorDrag(id: string): boolean {
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();
@@ -817,6 +843,68 @@ export class SceneEditorDocument {
     this.notify();
   }
 
+  /** Project assets remain owned by Project Workspace; standalone imports retain binaries by stable path. */
+  get audioAssets(): readonly AudioAssetDefinition[] {
+    return this.validation.getAudioAssets?.() ?? this.workingScene?.audioAssets ?? [];
+  }
+  registerAudio(reference: string, bytes: Uint8Array<ArrayBuffer>): void {
+    this.audioFiles.set(reference, new Uint8Array(bytes));
+  }
+  readAudio(reference: string): Uint8Array<ArrayBuffer> {
+    const asset = this.audioAssets.find((asset) => asset.path === reference);
+    const bytes = (asset && this.readProjectAudio?.(asset.id)) ?? this.audioFiles.get(reference);
+    if (!bytes) throw new Error(`Missing audio binary "${reference}". Reimport the scene with its audio files.`);
+    return new Uint8Array(bytes);
+  }
+  get selectedAudioClip(): Readonly<SceneAudioClip> | null {
+    return this.workingScene?.audioClips?.find((clip) => clip.id === this.entry?.selectedAudioClip) ?? null;
+  }
+  selectAudioClip(id: string | null): void {
+    if (!this.entry || (id !== null && !this.workingScene?.audioClips?.some((clip) => clip.id === id))) return;
+    this.selectActor(null);
+    this.entry.selectedAudioClip = id;
+    this.notify();
+  }
+  addAudioTrack(category: AudioCategory): boolean {
+    return this.audioCommands.addTrack(category);
+  }
+  addAudioClip(input: Omit<SceneAudioClip, 'id'>): boolean {
+    return this.audioCommands.addClip(input);
+  }
+  updateAudioClip(id: string, patch: Partial<Omit<SceneAudioClip, 'id'>>): boolean {
+    if (!this.dragAudio) this.finishLayerGestures();
+    return this.audioCommands.updateClip(id, patch);
+  }
+  removeAudioClip(id: string): boolean {
+    return this.audioCommands.removeClip(id);
+  }
+  duplicateAudioClip(id: string): boolean {
+    const clip = this.workingScene?.audioClips?.find((clip) => clip.id === id);
+    return clip ? this.addAudioClip({ ...clip }) : false;
+  }
+  beginAudioDrag(id: string): boolean {
+    this.selectAudioClip(id);
+    if (this.selectedAudioClip?.id !== id) return false;
+    this.entry!.history.beginOperation();
+    this.dragAudio = id;
+    return true;
+  }
+  changeAudioDrag(clip: SceneAudioClip): boolean {
+    return this.dragAudio === clip.id ? this.audioCommands.updateClip(clip.id, clip) : false;
+  }
+  endAudioDrag(): void {
+    if (!this.dragAudio) return;
+    this.dragAudio = null;
+    this.entry?.history.endOperation();
+    this.notify();
+  }
+  cancelAudioDrag(): void {
+    if (!this.dragAudio) return;
+    this.dragAudio = null;
+    this.entry?.history.cancelOperation();
+    this.notify();
+  }
+
   get selectedActionId(): string | null {
     const id = this.entry?.selectedAction;
     return this.workingScene?.actions.some((action) => action.id === id) ? id! : null;
@@ -842,6 +930,7 @@ export class SceneEditorDocument {
   selectAction(id: string | null): void {
     const action = this.workingScene?.actions.find((action) => action.id === id);
     if (!this.entry || (id !== null && !action)) return;
+    this.cancelAudioDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();
     this.cancelActorDrag();
@@ -849,6 +938,7 @@ export class SceneEditorDocument {
     this.entry.selectedImage = null;
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
+    this.entry.selectedAudioClip = null;
     this.entry.selectedAction = id;
     if (action) this.entry.selectedActor = action.actorId;
     this.notify();
@@ -862,6 +952,7 @@ export class SceneEditorDocument {
     this.endImageDrag();
     this.endCameraDrag();
     this.endActorDrag();
+    this.endAudioDrag();
     this.endActionDrag();
     const scene = this.workingScene;
     if (!scene) return false;
@@ -874,6 +965,7 @@ export class SceneEditorDocument {
     this.endImageDrag();
     this.endCameraDrag();
     this.endActorDrag();
+    this.endAudioDrag();
     this.endActionDrag();
     return this.replaceAction(id, input);
   }
@@ -888,6 +980,7 @@ export class SceneEditorDocument {
     this.endImageDrag();
     this.endCameraDrag();
     this.endActorDrag();
+    this.endAudioDrag();
     this.endActionDrag();
     const scene = this.workingScene;
     if (!scene?.actions.some((action) => action.id === id)) return false;
@@ -902,6 +995,7 @@ export class SceneEditorDocument {
     this.cancelImageDrag();
     this.cancelCameraDrag();
     this.cancelActorDrag();
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     if (!this.workingScene?.actions.some((action) => action.id === id)) return false;
     this.selectAction(id);
@@ -926,6 +1020,7 @@ export class SceneEditorDocument {
   }
 
   updateProperties(properties: { name?: string; duration?: number }): boolean {
+    this.endAudioDrag();
     this.endActionDrag();
     this.endImageDrag();
     this.endCameraDrag();
@@ -933,6 +1028,7 @@ export class SceneEditorDocument {
     return this.replaceScene({ ...this.workingScene, ...properties });
   }
   undo(): boolean {
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();
@@ -941,6 +1037,7 @@ export class SceneEditorDocument {
     return this.success();
   }
   redo(): boolean {
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();
@@ -951,6 +1048,7 @@ export class SceneEditorDocument {
   revertScene(options: { discardChanges?: boolean } = {}): boolean {
     const entry = this.entry;
     if (!entry || (this.dirty && !options.discardChanges)) return false;
+    this.cancelAudioDrag();
     this.cancelActionDrag();
     this.cancelImageDrag();
     this.cancelCameraDrag();

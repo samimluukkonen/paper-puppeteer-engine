@@ -435,11 +435,18 @@ export class ProjectInspector {
         : [];
       const catalogKey = canonicalJson(references.map((reference) => [reference, catalog.get(reference) ?? null]));
       const imageReferences = new Set(project.images?.map((image) => `../${image.path}`));
-      const key = canonicalJson([source ?? null, catalogKey, [...imageReferences]]);
+      const key = canonicalJson([source ?? null, catalogKey, [...imageReferences], project.audio ?? []]);
       let cached = this.scenes.get(entry.id);
       if (cached?.key !== key) {
         checked.scenes++;
-        cached = { key, issues: validateSceneDefinition(source, { characters: catalog, images: imageReferences }) };
+        cached = {
+          key,
+          issues: validateSceneDefinition(source, {
+            characters: catalog,
+            images: imageReferences,
+            getAudioAssets: () => project.audio ?? [],
+          }),
+        };
         this.scenes.set(entry.id, cached);
       }
       for (const issue of cached.issues) {
@@ -465,6 +472,8 @@ export class ProjectInspector {
       const scene = parsed.data;
       if (scene.id !== entry.id)
         add(target, `Scene "${scene.name}" has a different ID from its project registration.`, 'id', 'error', 'scene');
+      for (const clip of scene.audioClips ?? [])
+        edge(target, asset('audio', project.id, clip.assetId), `Scene "${scene.name}", audio clip "${clip.id}"`);
       const actors = new Map(scene.actors.map((item) => [item.id, item]));
       for (const item of scene.actors) {
         const from = asset('actor', entry.id, item.id);

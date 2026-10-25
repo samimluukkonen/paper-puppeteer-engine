@@ -48,3 +48,5 @@ export type { CinematicCameraState, CameraViewport, CinematicCameraTarget } from
 
 export type { CameraProperty, CameraKeyframe, CameraTracks } from './cameraAnimation.js';
 export type { SceneTransition, SceneTransitionState, SceneTransitionTarget } from './sceneTransitions.js';
+
+export type { SceneAudioClip, SceneAudioTrack } from './sceneAudio.js';

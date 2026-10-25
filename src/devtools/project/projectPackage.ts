@@ -344,6 +344,16 @@ export async function buildProjectScenePackage(
     image.image = path;
   }
   for (const actor of scene.actors) actor.character.manifest = references.get(actor.character.manifest)!;
+  if (scene.audioAssets)
+    scene.audioAssets = scene.audioAssets
+      .filter((asset) => scene.audioClips?.some((clip) => clip.assetId === asset.id))
+      .map((asset, index) => {
+        const source = workspace.audioSource(asset.id);
+        if (!source) throw new Error(`Missing audio asset "${asset.id}".`);
+        const path = `audio/clip-${index + 1}.${source.definition.path.split('.').at(-1)!}`;
+        files.set(path, source.bytes);
+        return { ...source.definition, path };
+      });
   files.set('scene.json', encoder.encode(serializeSceneDefinition(scene)));
   await validateScenePackage(files).catch((error: unknown) => {
     throw packageExportFailure(report, { kind: 'scene', owner: scene.id, id: scene.id }, error);

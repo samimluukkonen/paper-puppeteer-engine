@@ -31,6 +31,7 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
       );
   }
   for (const image of scene.images ?? []) packagePath(image.image);
+  for (const asset of scene.audioAssets ?? []) packagePath(asset.path);
   const fetcher: typeof fetch = (input) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
     const bytes =
@@ -158,6 +159,14 @@ export async function buildScenePackage(input: unknown, options: SceneAssetOptio
     add(path, bytes);
   }
   for (const image of scene.images ?? []) image.image = imagePaths.get(image.image)!;
+  if (scene.audioAssets)
+    scene.audioAssets = scene.audioAssets
+      .filter((asset) => resolved.audio?.has(asset.id))
+      .map((asset, index) => {
+        const path = `audio/clip-${index + 1}.${asset.path.split('.').at(-1)!}`;
+        add(path, resolved.audio!.get(asset.id)!);
+        return { ...asset, path };
+      });
   add('scene.json', encoder.encode(serializeSceneDefinition(scene)));
   await validateScenePackage(files, options.signal);
   return files;

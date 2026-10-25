@@ -1,4 +1,5 @@
 import { safeFilename } from '../../engine/assetFilename.js';
+import { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';
 import { decodeImage } from '../../engine/decodeImage.js';
 import { resolveSceneDefinition, sceneAssetCatalog, type SceneAssetOptions } from '../../engine/SceneAssets.js';
 import { parseSceneDefinition, parseSceneJson, serializeSceneDefinition } from '../../engine/SceneDefinition.js';
@@ -26,12 +27,37 @@ export async function importSceneJson(
   }
   const scene = parseSceneDefinition(resolved.definition);
   for (const image of scene.images ?? []) image.image = images.get(image.image)!;
+  const audio = new Map<string, Uint8Array<ArrayBuffer>>();
+  const loader = typeof AudioContext === 'undefined' ? undefined : new AudioAssetLoader(() => undefined);
+  try {
+    for (const asset of scene.audioAssets ?? []) {
+      const bytes = resolved.audio?.get(asset.id);
+      if (!bytes) continue;
+      if (loader) {
+        const decoded = await loader.prepare(bytes, options.signal);
+        asset.durationSeconds = decoded.durationSeconds;
+        loader.clear();
+      }
+      // Content-address local binaries so another import cannot overwrite a retained scene's audio.
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
+      asset.path = `../audio/${digest}.${asset.path.split('.').at(-1)!}`;
+      audio.set(asset.path, bytes);
+    }
+  } finally {
+    loader?.dispose();
+  }
+  // Decoded media duration is authoritative; reject illegal trims before registering any data.
+  parseSceneDefinition(scene);
+
   options.signal?.throwIfAborted();
   // Do not install assets until replacement has been accepted.
   if (document.needsImportConfirmation(resolved.definition.id) && !confirmDiscard?.()) return false;
   document.images.registerAll(
     new Map(proposal.entries.map((image) => [image.reference, proposal.read(image.reference)])),
   );
+  for (const [reference, bytes] of audio) document.registerAudio(reference, bytes);
   return document.importJson(serializeSceneDefinition(scene), { confirmDiscard: () => true });
 }
 

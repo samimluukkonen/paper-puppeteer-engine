@@ -54,6 +54,9 @@ export class SceneEditorPlayback {
     if (this.source === source && this.runner && ready) return;
     if (this.source && source && this.runner && ready) {
       const {
+        audioAssets: _previousAudioAssets,
+        audioTracks: _previousAudioTracks,
+        audioClips: _previousAudioClips,
         images: _previousImages,
         layers: _previousLayers,
         camera: _previousCamera,
@@ -62,6 +65,9 @@ export class SceneEditorPlayback {
         ...previous
       } = this.source;
       const {
+        audioAssets: _nextAudioAssets,
+        audioTracks: _nextAudioTracks,
+        audioClips: _nextAudioClips,
         images: _nextImages,
         layers: _nextLayers,
         camera: _nextCamera,

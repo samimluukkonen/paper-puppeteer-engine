@@ -1,4 +1,5 @@
 import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
+import { trimSceneAudioClip, type SceneAudioClip } from '../../engine/sceneAudio.js';
 import { sceneActionDuration } from '../../engine/SceneDefinition.js';
 import { resolveTimelineSnap } from '../animation-editor/timelineSnapping.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
@@ -22,6 +23,7 @@ export function snapSceneTime(
   min = 0,
   max = scene.duration,
   excludeCameraKey?: { property: CameraProperty; id: string },
+  excludeAudioClipId?: string,
 ): number {
   return (
     resolveTimelineSnap(
@@ -33,6 +35,12 @@ export function snapSceneTime(
         minTime: min / 1000,
         maxTime: max / 1000,
         targets: [
+          ...(scene.audioClips ?? [])
+            .filter((clip) => clip.id !== excludeAudioClipId)
+            .flatMap((clip) => [
+              { type: 'keyframe' as const, time: clip.time / 1000 },
+              { type: 'keyframe' as const, time: (clip.time + clip.duration) / 1000 },
+            ]),
           ...(scene.transitions ?? []).flatMap((effect) => [
             { type: 'keyframe' as const, time: effect.time / 1000 },
             { type: 'keyframe' as const, time: (effect.time + effect.duration) / 1000 },
@@ -70,4 +78,46 @@ export function layoutSceneActions(actions: ReadonlyScene['actions'], duration: 
       ends[lane] = action.time + Math.max(sceneActionDuration(action), markerWidth);
       return { action, lane: lane + 2 };
     });
+}
+
+/** Overlapping clips occupy separate visible lanes within their organizational track. */
+export function layoutAudioClips(clips: readonly Readonly<SceneAudioClip>[], duration: number, width: number) {
+  const ends: number[] = [];
+  return [...clips]
+    .sort((a, b) => a.time - b.time)
+    .map((clip) => {
+      let lane = ends.findIndex((end) => end <= clip.time);
+      if (lane < 0) lane = ends.length;
+      ends[lane] = clip.time + Math.max(clip.duration, width > 0 ? (duration * 12) / width : 0);
+      return { clip, lane };
+    });
+}
+
+export function editAudioClipOnTimeline(
+  scene: ReadonlyScene,
+  clip: Readonly<SceneAudioClip>,
+  edge: 'move' | 'start' | 'end',
+  delta: number,
+  width: number,
+  playhead: number,
+  snap: boolean,
+): SceneAudioClip {
+  const mediaDuration = scene.audioAssets?.find((asset) => asset.id === clip.assetId)?.durationSeconds;
+  const mediaEnd = mediaDuration === undefined ? undefined : mediaDuration * 1000;
+  const proposed = (edge === 'end' ? clip.time + clip.duration : clip.time) + delta;
+  let min = edge === 'end' ? clip.time + 0.001 : 0;
+  let max =
+    edge === 'move'
+      ? scene.duration - clip.duration
+      : edge === 'start'
+        ? clip.time + clip.duration - 0.001
+        : scene.duration;
+  if (edge === 'start') {
+    min = Math.max(0, clip.time - clip.sourceOffset);
+    if (mediaEnd !== undefined) max = Math.min(max, clip.time + mediaEnd - clip.sourceOffset - 0.001);
+  }
+  if (edge === 'end' && !clip.loop && mediaEnd !== undefined)
+    max = Math.min(max, clip.time + mediaEnd - clip.sourceOffset);
+  const time = snapSceneTime(scene, null, proposed, width, playhead, snap, min, max, undefined, clip.id);
+  return edge === 'move' ? { ...clip, time } : trimSceneAudioClip(clip, edge, time);
 }

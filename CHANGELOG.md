@@ -57,6 +57,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.3.2
+
+Add a nine-step **Visual Audio Timeline** Feature Guide to the shared Scene catalog. Reveal asset selection, track organization, clip placement, overlap/snapping, non-destructive trims, volume/finite loops, fades, duplication/deletion/history and portable saving. Support empty scenes and selected clips without requiring Actors or audio, preserve authored data, selection, playback/preview and Undo/Redo, and add unit and local desktop browser coverage.
+
+Add visual audio clips to Scene Editor's existing timeline, sharing its ruler, clock, coordinate utilities, snapping, selection and grouped scene Undo/Redo. Support multiple Music, Ambience, Sound Effects and Voice tracks, overlapping clips, asset/track selection, movement, non-destructive trims at either edge, duplication and deletion, volume, bounded loops and fade properties in a collapsed inspector. Preserve playback position while authoring audio.
+
+Extend scene-format-2 with optional audio assets, tracks and clips; validate stable identities, references, media trim bounds, volume, fades and finite scene bounds without changing legacy scenes or silently changing scene duration. Include scene audio in dependency inspection/removal guards, JSON, project and standalone ZIP exports, imports and autosave/recovery. Isolate imported binaries by content and preserve conflicting standalone asset identities through recovery aliases. Export the pure audio model/schemas and trim helper, regenerate the scene schema and add unit/integration and local desktop browser coverage. Document authoring and trim/loop/fade semantics in the [scene audio timeline guide](docs/scene-audio-timeline.md). Defer waveform visualization and synchronized playback (v1.3.3).
+
 ## 1.3.1
 
 Add optional typed audio registrations to the existing project asset system, with music, ambience, sound effect and voice categories, stable IDs, portable paths and decoded duration. Project Workspace imports content-checked, browser-decodable WAV/MP3/OGG files and provides collapsed counted categories, rename, category changes, removal with project Undo/Redo, Play/Stop and audition volume.
