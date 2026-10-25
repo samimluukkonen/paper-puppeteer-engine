@@ -7,6 +7,7 @@ import { inspectVersion, shapeIssues, type ValidationResult } from './externalDa
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
 import { sceneAudioClipSchema, sceneAudioTrackSchema } from './sceneAudio.js';
+import { sceneDialogueLineSchema } from './sceneDialogue.js';
 import { sceneTransitionSchema } from './sceneTransitions.js';
 import { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 import { identifierSchema } from './schemas.js';
@@ -144,6 +145,7 @@ export const sceneDefinitionSchema = z.strictObject({
   audioAssets: z.array(sceneAudioAssetSchema).max(128).exactOptional(),
   audioTracks: z.array(sceneAudioTrackSchema).max(128).exactOptional(),
   audioClips: z.array(sceneAudioClipSchema).max(4000).exactOptional(),
+  dialogue: z.array(sceneDialogueLineSchema).max(4000).exactOptional(),
   camera: cinematicCameraSchema.exactOptional(),
   cameraTracks: cameraTracksSchema.exactOptional(),
   transitions: z.array(sceneTransitionSchema).max(1000).exactOptional(),
@@ -188,6 +190,7 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
       ['audioAssets', 128],
       ['audioTracks', 128],
       ['audioClips', 4000],
+      ['dialogue', 4000],
       ['layers', 64],
       ['images', 256],
       ['transitions', 1000],
@@ -332,6 +335,31 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
       report(`${path}.animation`, `Unknown animation "${actor.animation}".`);
     if (assets && actor.skin !== undefined && !assets.skins.includes(actor.skin))
       report(`${path}.skin`, `Unknown skin "${actor.skin}".`);
+  }
+  const dialogueIds = new Set<string>();
+  const dialogue = (scene.dialogue ?? []).map((line, index) => ({ line, index }));
+  dialogue.sort((a, b) => a.line.time - b.line.time);
+  let dialogueEnd = -1;
+  for (const { line, index } of dialogue) {
+    const path = `dialogue[${index}]`;
+    if (dialogueIds.has(line.id)) report(`${path}.id`, 'Dialogue line IDs must be unique.');
+    dialogueIds.add(line.id);
+    if (line.actorId !== undefined && !actors.has(line.actorId))
+      report(
+        `${path}.actorId`,
+        `Missing Actor "${line.actorId}". Choose an existing Actor or change the line to narration.`,
+      );
+    if (line.voiceClipId !== undefined && !audioClipIds.has(line.voiceClipId))
+      report(
+        `${path}.voiceClipId`,
+        `Missing voice clip "${line.voiceClipId}". Choose an existing audio clip or clear the voice reference.`,
+      );
+    const end = line.time + line.duration;
+    if (!Number.isFinite(end) || end <= line.time || end > scene.duration)
+      report(`${path}.duration`, 'Dialogue end must advance time and stay within scene duration.');
+    if (line.time < dialogueEnd)
+      report(`${path}.time`, 'Dialogue intervals must not overlap. Move or shorten this line.');
+    dialogueEnd = Math.max(dialogueEnd, end);
   }
   const identities = new Set<string>();
   const ownership = new Map<string, { action: SceneActionDefinition; index: number }[]>();

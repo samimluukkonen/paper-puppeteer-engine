@@ -57,3 +57,6 @@ export { loadSceneCharacter, type SceneCharacterLoadOptions } from './loadSceneC
 
 export { SceneLoader, type SceneLoadOptions, type LoadedScene } from './SceneLoader.js';
 export { SceneTransitionOverlay } from './SceneTransitionOverlay.js';
+
+export type { SceneDialogueLine } from './sceneDialogue.js';
+export { sceneDialogueLineSchema, getDialogueLineAtTime, dialogueSpeaker } from './sceneDialogue.js';

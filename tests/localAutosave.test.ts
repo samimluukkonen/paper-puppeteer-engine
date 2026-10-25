@@ -353,6 +353,7 @@ test('scene gestures expose no autosavable revision until commit; cancellation r
   assert.equal(workspace.autosaveRevision, revision);
 });
 
+// Packaging and hashing this large fixture can exceed the default five seconds on desktop hosts.
 test('project and standalone recovery fingerprint scenes whose combined JSON exceeds 10 MiB', async () => {
   vi.useRealTimers();
   const draft = createNewCharacter({ id: 'hero', name: 'Hero' });
@@ -398,7 +399,7 @@ test('project and standalone recovery fingerprint scenes whose combined JSON exc
   } finally {
     registry.dispose();
   }
-});
+}, 15_000);
 
 test('rig, animation and binary sprites survive a complete detached crash recovery', async () => {
   vi.useRealTimers();

@@ -250,7 +250,7 @@ See the [runtime integration guide](runtime-integration.md#project-and-scene-han
 
 ## v0.9 production hardening
 
-Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers twenty-two Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
+Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers twenty-six Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
 
 Playback subscriptions are confined to clock controls, the playhead and an expanded runtime inspector. Authored clip rows no longer rebuild on every Phaser frame. Initial-placement animation sampling suppresses gameplay events and uses explicit hard cuts. Teardown clears ownership and attempts all Actor cleanup even when a callback fails. Runtime scene windows remain hard cuts, and scene/character format versions remain 2/1.
 
@@ -259,3 +259,7 @@ See [visual layers, depth and parallax](scene-layers.md) for foreground/backgrou
 ## Cinematic framing
 
 Use the collapsed **Cinematic Camera** inspector to author a center and zoom independently of editor pan/zoom, frame an Actor, or preview the 1000 × 700 audience view. See the [Cinematic Camera guide](cinematic-camera.md) for coordinate conventions, parallax, persistence and runtime camera application.
+
+## Dialogue and subtitle authoring
+
+The **Dialogue** timeline track and collapsed **Dialogue line** inspector support multiline plain text, scene-local Actor speakers, optional labels and voice-clip metadata, timing, duplication, deletion and scene Undo/Redo. Lines use non-overlapping half-open intervals within scene duration. JSON, portable ZIPs and recovery preserve dialogue without changing legacy scene data. See the [dialogue authoring guide](scene-dialogue.md) for the workflow, schema, reference repair and timing rules. Subtitle rendering is deferred.

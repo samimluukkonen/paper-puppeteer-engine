@@ -21,6 +21,7 @@ import { SceneArtworkPanel } from './SceneArtworkPanel.js';
 import { SceneAudioInspector } from './SceneAudioInspector.js';
 import { SceneCameraPanel } from './SceneCameraPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
+import { SceneDialogueInspector } from './SceneDialogueInspector.js';
 import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneGroundPanel } from './SceneGroundPanel.js';
@@ -426,6 +427,7 @@ export function SceneEditorView({
             <>
               <SceneProperties key={scene.id} scene={scene} document={document} />
               <SceneCameraPanel key={`camera-${scene.id}`} document={document} playback={playback} />
+              <SceneDialogueInspector key={`dialogue-${scene.id}`} document={document} />
               <SceneAudioInspector key={`audio-${scene.id}`} document={document} />
               <SceneTransitionPanel key={`transitions-${scene.id}`} document={document} />
               <SceneLayersPanel key={`layers-${scene.id}`} document={document} />

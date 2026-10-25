@@ -27,6 +27,7 @@ import {
   type SceneDefinition,
   type SceneValidationOptions,
 } from '../../engine/SceneDefinition.js';
+import type { SceneDialogueLine } from '../../engine/sceneDialogue.js';
 import type { SceneTransition } from '../../engine/sceneTransitions.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
@@ -36,6 +37,7 @@ import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { SceneArtworkCommands } from './SceneArtworkCommands.js';
 import { SceneAudioCommands } from './SceneAudioCommands.js';
 import { SceneCameraCommands } from './SceneCameraCommands.js';
+import { SceneDialogueCommands, type SceneDialoguePatch } from './SceneDialogueCommands.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
 import { SceneTransitionCommands } from './SceneTransitionCommands.js';
 
@@ -60,6 +62,7 @@ interface SceneEntry {
   selectedAction: string | null;
   selectedTransition: string | null;
   selectedAudioClip: string | null;
+  selectedDialogueLine: string | null;
   readonly history: SnapshotHistory<ReadonlyScene>;
 }
 
@@ -72,6 +75,7 @@ export class SceneEditorDocument {
   private dragAudio: string | null = null;
   private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly audioCommands = new SceneAudioCommands(this, () => this.finishLayerGestures());
+  private readonly dialogueCommands = new SceneDialogueCommands(this, () => this.finishLayerGestures());
   private dragAction: string | null = null;
   private dragActor: string | null = null;
   private dragCamera = false;
@@ -225,6 +229,7 @@ export class SceneEditorDocument {
       selectedAction: null,
       selectedTransition: null,
       selectedAudioClip: null,
+      selectedDialogueLine: null,
       history: new SnapshotHistory(
         () => entry.working,
         (snapshot) => {
@@ -391,6 +396,7 @@ export class SceneEditorDocument {
     if (!this.entry) return;
     this.entry.selectedTransition = null;
     this.entry.selectedAudioClip = null;
+    this.entry.selectedDialogueLine = null;
     this.entry.cameraSelected = selected;
     this.entry.selectedCameraKey = null;
     if (selected) {
@@ -532,6 +538,7 @@ export class SceneEditorDocument {
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
     this.entry.selectedAudioClip = null;
+    this.entry.selectedDialogueLine = null;
     this.entry.selectedImage = id;
     this.entry.selectedActor = null;
     this.entry.selectedAction = null;
@@ -605,6 +612,7 @@ export class SceneEditorDocument {
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
     this.entry.selectedAudioClip = null;
+    this.entry.selectedDialogueLine = null;
     this.entry.selectedActor = id;
     this.notify();
   }
@@ -640,6 +648,9 @@ export class SceneEditorDocument {
     const changed = this.replaceScene({
       ...scene,
       actors: scene.actors.map((actor) => (actor.id === id ? { ...actor, ...patch } : actor)),
+      ...(scene.dialogue
+        ? { dialogue: scene.dialogue.map((line) => (line.actorId === id ? { ...line, actorId: nextId } : line)) }
+        : {}),
       actions: scene.actions.map((action) => ({
         ...action,
         actorId: action.actorId === id ? nextId : action.actorId,
@@ -714,6 +725,13 @@ export class SceneEditorDocument {
     this.endActorDrag();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return false;
+    const dialogue = scene.dialogue?.filter((line) => line.actorId === id) ?? [];
+    if (dialogue.length)
+      return this.reportError(
+        new Error(
+          `Actor "${id}" speaks in dialogue line(s) ${dialogue.map((line) => line.id).join(', ')}. Reassign those lines or change them to narration before removing this Actor.`,
+        ),
+      );
     if (this.actorReferences(id).length && !options.removeActions)
       return this.reportError(
         new Error(`Actor "${id}" is referenced by scene actions. Remove those actions explicitly first.`),
@@ -856,6 +874,28 @@ export class SceneEditorDocument {
     if (!bytes) throw new Error(`Missing audio binary "${reference}". Reimport the scene with its audio files.`);
     return new Uint8Array(bytes);
   }
+  get selectedDialogueLine(): Readonly<SceneDialogueLine> | null {
+    return this.workingScene?.dialogue?.find((line) => line.id === this.entry?.selectedDialogueLine) ?? null;
+  }
+  selectDialogueLine(id: string | null): void {
+    if (!this.entry || (id !== null && !this.workingScene?.dialogue?.some((line) => line.id === id))) return;
+    this.selectActor(null);
+    this.entry.selectedDialogueLine = id;
+    this.notify();
+  }
+  addDialogueLine(input: Omit<SceneDialogueLine, 'id'>): boolean {
+    return this.dialogueCommands.add(input);
+  }
+  updateDialogueLine(id: string, patch: SceneDialoguePatch): boolean {
+    return this.dialogueCommands.update(id, patch);
+  }
+  duplicateDialogueLine(id: string): boolean {
+    return this.dialogueCommands.duplicate(id);
+  }
+  removeDialogueLine(id: string): boolean {
+    return this.dialogueCommands.remove(id);
+  }
+
   get selectedAudioClip(): Readonly<SceneAudioClip> | null {
     return this.workingScene?.audioClips?.find((clip) => clip.id === this.entry?.selectedAudioClip) ?? null;
   }
@@ -942,6 +982,7 @@ export class SceneEditorDocument {
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
     this.entry.selectedAudioClip = null;
+    this.entry.selectedDialogueLine = null;
     this.entry.selectedAction = id;
     if (action) this.entry.selectedActor = action.actorId;
     this.notify();

@@ -52,3 +52,5 @@ export type { SceneTransition, SceneTransitionState, SceneTransitionTarget } fro
 export type { SceneAudioClip, SceneAudioTrack } from './sceneAudio.js';
 
 export type { ActiveSceneAudioClip } from './sceneAudio.js';
+
+export type { SceneDialogueLine } from './sceneDialogue.js';

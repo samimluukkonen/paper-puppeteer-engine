@@ -35,6 +35,10 @@ export function snapSceneTime(
         minTime: min / 1000,
         maxTime: max / 1000,
         targets: [
+          ...(scene.dialogue ?? []).flatMap((line) => [
+            { type: 'keyframe' as const, time: line.time / 1000 },
+            { type: 'keyframe' as const, time: (line.time + line.duration) / 1000 },
+          ]),
           ...(scene.audioClips ?? [])
             .filter((clip) => clip.id !== excludeAudioClipId)
             .flatMap((clip) => [

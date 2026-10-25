@@ -15,6 +15,7 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
         document.cancelActorDrag();
         document.cancelActionDrag();
       } else if (document.cameraSelected) document.selectCamera(false);
+      else if (document.selectedDialogueLine) document.selectDialogueLine(null);
       else if (document.selectedAudioClip) document.selectAudioClip(null);
       else if (document.selectedTransition) document.selectTransition(null);
       else if (document.selectedImageId) document.selectImage(null);
@@ -36,6 +37,10 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       if (event.repeat) return;
+      if (document.selectedDialogueLine) {
+        document.removeDialogueLine(document.selectedDialogueLine.id);
+        return;
+      }
       if (document.selectedAudioClip) {
         document.removeAudioClip(document.selectedAudioClip.id);
         return;

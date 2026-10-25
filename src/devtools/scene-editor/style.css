@@ -480,3 +480,7 @@
   left: 0;
   right: auto;
 }
+
+.scene-dialogue-line {
+  cursor: pointer;
+}

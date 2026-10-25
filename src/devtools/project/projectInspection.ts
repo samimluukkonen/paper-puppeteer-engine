@@ -32,7 +32,8 @@ export type AssetKind =
   | 'pose'
   | 'scene'
   | 'actor'
-  | 'action';
+  | 'action'
+  | 'dialogue';
 /** Names are scoped by character or scene, never treated as globally unique. */
 export interface AssetReference {
   readonly kind: AssetKind;
@@ -451,6 +452,8 @@ export class ProjectInspector {
       }
       for (const issue of cached.issues) {
         const scene = parsed.success ? parsed.data : undefined;
+        const dialogueIndex = issue.path?.match(/^dialogue\[(\d+)\]/)?.[1];
+        const line = dialogueIndex === undefined ? undefined : scene?.dialogue?.[Number(dialogueIndex)];
         const actorIndex = issue.path?.match(/^actors\[(\d+)\]/)?.[1];
         const actionIndex = issue.path?.match(/^actions\[(\d+)\]/)?.[1];
         const actor = actorIndex === undefined ? undefined : scene?.actors[Number(actorIndex)];
@@ -459,7 +462,9 @@ export class ProjectInspector {
           ? `, Actor "${actor.id}"`
           : action
             ? `, action "${action.id}" on Actor "${action.actorId}"`
-            : '';
+            : line
+              ? `, dialogue "${line.id}"`
+              : '';
         add(
           target,
           `Scene "${scene?.name ?? entry.id}"${location}: ${issue.message}`,
@@ -474,6 +479,19 @@ export class ProjectInspector {
         add(target, `Scene "${scene.name}" has a different ID from its project registration.`, 'id', 'error', 'scene');
       for (const clip of scene.audioClips ?? [])
         edge(target, asset('audio', project.id, clip.assetId), `Scene "${scene.name}", audio clip "${clip.id}"`);
+      for (const line of scene.dialogue ?? []) {
+        const from = asset('dialogue', entry.id, line.id);
+        edge(target, from, `Scene "${scene.name}"`);
+        if (line.actorId)
+          edge(from, asset('actor', entry.id, line.actorId), `Scene "${scene.name}", dialogue "${line.id}" speaker`);
+        const voice = scene.audioClips?.find((clip) => clip.id === line.voiceClipId);
+        if (voice)
+          edge(
+            from,
+            asset('audio', project.id, voice.assetId),
+            `Scene "${scene.name}", dialogue "${line.id}" voice reference`,
+          );
+      }
       const actors = new Map(scene.actors.map((item) => [item.id, item]));
       for (const item of scene.actors) {
         const from = asset('actor', entry.id, item.id);

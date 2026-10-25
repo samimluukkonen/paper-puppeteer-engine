@@ -183,6 +183,69 @@
         "additionalProperties": false
       }
     },
+    "dialogue": {
+      "maxItems": 4000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "actorId": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          },
+          "speakerName": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000
+          },
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "voiceClipId": {
+            "type": "string",
+            "minLength": 1,
+            "allOf": [
+              {
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              {
+                "pattern": "\\S"
+              }
+            ]
+          }
+        },
+        "required": ["id", "text", "time", "duration"],
+        "additionalProperties": false
+      }
+    },
     "camera": {
       "type": "object",
       "properties": {

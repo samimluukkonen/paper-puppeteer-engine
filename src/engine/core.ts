@@ -266,3 +266,6 @@ export {
 } from './sceneAudio.js';
 
 export type { ActiveSceneAudioClip } from './sceneAudio.js';
+
+export type { SceneDialogueLine } from './sceneDialogue.js';
+export { sceneDialogueLineSchema, getDialogueLineAtTime, dialogueSpeaker } from './sceneDialogue.js';

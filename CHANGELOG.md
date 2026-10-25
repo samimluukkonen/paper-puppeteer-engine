@@ -67,6 +67,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.3.4
+
+Add a nine-step **Dialogue & Subtitle Authoring** Feature Guide to the shared Scene catalog. Reveal real creation, timeline, text, speaker, timing, voice-reference, history and saving controls, with helpful empty states and no Actor or dialogue prerequisites beyond an open scene. Preserve authored data, selection, playback/preview and history; cover the tour with unit and local desktop browser regressions.
+
+Add timed dialogue/subtitle authoring to Scene Editor with a dedicated Dialogue track and initially collapsed inspector. Author multiline Unicode plain text, narration, scene-local Actor speakers, explicit labels, start/duration and optional voice-clip metadata; select, duplicate into the next fitting gap, delete and Undo/Redo through the existing scene document. Preserve speaker links on Actor renames and give actionable reference errors before removing speaking Actors or referenced audio clips.
+
+Extend scene-format-2 with optional `dialogue` data and public schemas/types plus a pure active-line evaluator. Reject overlapping half-open intervals, invalid references and out-of-scene bounds atomically while keeping adjacent lines and legacy scenes compatible. Preserve dialogue through canonical JSON, project/standalone ZIPs and autosave/recovery; include speakers/voice assets in project inspection and dialogue edges in shared timeline snapping. Keep subtitle playback UI deferred. Update version metadata and the [dialogue authoring guide](docs/scene-dialogue.md); add unit/integration and local desktop browser regressions.
+
 ## 1.3.3
 
 Add a nine-step **Audio Playback & Synchronization** Feature Guide to the shared Scene catalog, covering scene clips, browser unlock/retry, play/pause, silent seeking, speed/pitch, preview mute, restart/stop and portable saving. Reveal real controls with no audio or Actor prerequisites beyond an open scene, preserve authored data, selection, playhead, speed, mute, preview and history, and verify tours never unlock browser audio or start sound. Add focused unit and local desktop browser coverage alongside the Visual Audio Timeline tour.

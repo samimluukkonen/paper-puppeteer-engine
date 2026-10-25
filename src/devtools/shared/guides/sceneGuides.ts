@@ -30,6 +30,68 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 const workflowGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-dialogue-authoring',
+    'Dialogue & Subtitle Authoring',
+    'Write timed dialogue, assign Actor speakers and save portable subtitles with optional voice references.',
+    scene,
+    [
+      step(
+        'add',
+        'Add a dialogue line',
+        T.sceneDialogueAdd,
+        'After exiting this tour, set **Playhead (s)** and choose **Add Dialogue Line**. A selected Actor becomes the speaker; otherwise the line starts as narration. The initial interval lasts up to two seconds, bounded by the next line and scene end. Move the playhead earlier at scene end. Only an open scene is required; the tour never creates lines or selects Actors.',
+      ),
+      step(
+        'track',
+        'Select a line on the timeline',
+        T.sceneDialogueTrack,
+        'The **Dialogue** track shares the scene ruler and playhead with actions, camera keys, transitions and audio. Each clip shows its speaker and text. After exiting, click a line to pause and select it, then open **Dialogue line** in the inspector. Edit timing in the inspector; dialogue edges also participate in shared snapping. Empty rows are ready for your first line. The tour preserves selection and playback.',
+      ),
+      step(
+        'text',
+        'Write multiline text in any language',
+        T.sceneDialogueText,
+        '**Dialogue text** accepts multiple lines, Japanese and other Unicode text. Intentional line breaks and whitespace are preserved. Text is literal plain text, never executable markup. Empty text is allowed while drafting. Use **Apply dialogue properties** to commit the complete edit. With no line selected, this section explains how to begin; the guide never creates or edits text.',
+      ),
+      step(
+        'speaker',
+        'Choose an Actor or narration',
+        T.sceneDialogueSpeaker,
+        '**Speaker Actor** selects a scene-local Actor instance, not a character definition. Two Actors using the same character can speak independently. Choose **Narration (no Actor)** for an unassociated line. **Speaker label** overrides the Actor ID or default Narrator label without changing identity. Actor renames retain speaker links; reassign lines or convert them to narration before removing a speaking Actor.',
+      ),
+      step(
+        'timing',
+        'Set timing and resolve overlaps',
+        T.sceneDialogueTiming,
+        '**Dialogue start** and **Dialogue duration** use seconds in the inspector. Apply dialogue properties validates the whole proposal. Duration must be positive and the line must end within scene duration. Only **one subtitle at a time** is allowed: overlapping intervals are rejected, even for different speakers. Adjacent lines are valid; the next line owns the exact shared boundary. Move or shorten a conflicting line, or explicitly extend the scene. The tour changes no timing.',
+      ),
+      step(
+        'voice',
+        'Organize an optional voice reference',
+        T.sceneDialogueVoice,
+        '**Voice reference** optionally links an existing scene audio clip. It is **metadata**: it never starts sound, moves the clip or changes dialogue timing. Arrange voice playback on the **audio timeline** using its own start, trim, volume, loops and fades. Clear or replace a line’s voice reference before deleting that clip or its track. None is valid, and an empty scene needs no audio to explore this step.',
+      ),
+      step(
+        'history',
+        'Duplicate, delete and undo lines',
+        T.sceneDialogueActions,
+        '**Duplicate dialogue line** assigns a new stable ID and places the copy in the next gap after the source that fits its entire duration. If no gap fits, move or shorten lines, or extend the scene. **Delete dialogue line**, or Delete/Backspace outside text controls, removes the selection. Scene **Undo/Redo** restores text, speaker and timing edits. The tour never invokes these commands or alters history.',
+      ),
+      step(
+        'time',
+        'Understand deterministic subtitle timing',
+        T.sceneTime,
+        'Dialogue uses **scene time** without pausing for player input. A line’s interval includes its start and excludes its end, so seeking to the same time identifies the same authored line. **Subtitle playback display is deferred**: Play and scrubbing preview scene visuals and audio, but do not draw dialogue text yet. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
+      ),
+      step(
+        'save',
+        'Save dialogue with the scene',
+        T.scenePackage,
+        '**Download scene JSON** preserves text, line breaks, speaker IDs, labels, timing and voice references. **Download scene package** includes the referenced character and audio files for portable handoff. **Export Project** and local recovery retain dialogue too. JSON alone needs its referenced assets alongside it. Exit the guide before editing; authored data, selection, playhead, speed, mute, preview and Undo/Redo are preserved.',
+      ),
+    ],
+  ),
+  guide(
     'scene-audio-synchronization',
     'Audio Playback & Synchronization',
     'Hear scene audio, recover browser sound, seek silently and control preview speed and mute.',

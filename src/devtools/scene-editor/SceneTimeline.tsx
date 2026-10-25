@@ -7,6 +7,7 @@ import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animati
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneAudioControls, SceneAudioTracks } from './SceneAudioTimeline.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
+import { SceneDialogueControls, SceneDialogueTrack } from './SceneDialogueTimeline.js';
 import type { ReadonlyScene, SceneEditorDocument, SceneActionInput } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { ScenePlaybackControls, SceneTimeInput, ScenePlayhead, ScenePlaybackError } from './ScenePlaybackControls.js';
@@ -234,6 +235,7 @@ export function SceneTimeline({
         keys; drag to move their time. Set Camera Cut holds the preceding shot until this key; edit the new shot in
         Cinematic Camera. Select fades to edit start, duration and color in Transition properties.
       </p>
+      <SceneDialogueControls document={document} playback={playback} />
       <SceneAudioControls document={document} playback={playback} />
       <ScenePlaybackError playback={playback} />
       {scene.actors.length > 0 && !scene.actions.length && (
@@ -569,6 +571,7 @@ export function SceneTimeline({
               ))}
             </div>
           </div>
+          <SceneDialogueTrack scene={scene} document={document} playback={playback} width={width} x={x} />
           <SceneAudioTracks
             scene={scene}
             document={document}
