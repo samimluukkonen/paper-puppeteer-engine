@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Upgrade lucide-react to 1.61.0, oxlint-tsgolint to 7.0.2005 and Vite to 8.3.5, keeping direct dependency versions pinned and the npm lockfile synchronized.
+
 - Add a trash button beside each scene audio track. Remove empty tracks immediately; confirm removing populated tracks and their clips, preserve source assets and sibling tracks, stop removed playback voices, and restore the whole removal with one Undo. Update the audio guide and cover cancellation, history and playback cleanup.
 
 - Give Scene Editor inspector sections the shared Animation Editor panel styling, with complete borders, shaded headers, distinct content backgrounds and spacing between sections. Keep layer fields readable at the minimum inspector width.
