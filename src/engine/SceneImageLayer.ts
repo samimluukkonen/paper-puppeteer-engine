@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { abortable } from './abortable.js';
 import type { CharacterTextureBudget } from './characterTextureLimits.js';
 import { decodeImage } from './decodeImage.js';
 import type { DeepReadonly } from './readonlyData.js';
@@ -12,12 +13,16 @@ interface TextureLease {
   controller: AbortController;
   dispose?: () => void;
 }
+interface ImageRequest {
+  controller: AbortController;
+  promise: Promise<void>;
+}
 
 /** Owns only its private textures and independent image objects. Actors never enter this layer. */
 export class SceneImageLayer {
   readonly objects = new Map<string, Phaser.GameObjects.Image>();
   private readonly textures = new Map<string, TextureLease>();
-  private readonly pending = new Map<string, Promise<void>>();
+  private readonly pending = new Map<string, ImageRequest>();
   private readonly failures = new Map<string, string>();
   private elements: readonly DeepReadonly<SceneImageDefinition>[] = [];
   private layers: readonly DeepReadonly<SceneLayerDefinition>[] | undefined;
@@ -58,6 +63,12 @@ export class SceneImageLayer {
       }
     }
     const references = new Set(elements.map((element) => element.image));
+    for (const [reference, request] of this.pending)
+      if (!references.has(reference)) {
+        // Invalidate before aborting: a restored reference owns a fresh request.
+        this.pending.delete(reference);
+        request.controller.abort();
+      }
     for (const reference of this.failures.keys()) if (!references.has(reference)) this.failures.delete(reference);
     for (const [reference, lease] of this.textures) if (!references.has(reference)) this.release(reference, lease);
     for (const [index, element] of elements.entries()) {
@@ -85,34 +96,39 @@ export class SceneImageLayer {
         if (object.depth !== depth) object.setDepth(depth);
       } else if (!this.pending.has(element.image) && !this.failures.has(element.image)) {
         // Store the request before it can complete and trigger a reconciliation.
-        const request = Promise.resolve()
-          .then(() => this.prepare(element.image))
-          .catch((error: unknown) => {
-            if (this.alive && this.elements.some((image) => image.image === element.image))
-              this.failures.set(
-                element.image,
-                `${element.image}: ${error instanceof Error ? error.message : String(error)}`,
-              );
-          })
-          .finally(() => {
-            if (this.pending.get(element.image) !== request) return;
-            this.pending.delete(element.image);
-            if (this.alive) {
-              this.sync(this.elements, this.layers, this.cinematicScroll);
-              this.changed([...this.failures.values()].join('\n'));
-            }
-          });
+        const controller = new AbortController();
+        const request: ImageRequest = {
+          controller,
+          promise: Promise.resolve()
+            .then(() => this.prepare(element.image, controller))
+            .catch((error: unknown) => {
+              if (this.alive && this.pending.get(element.image) === request)
+                this.failures.set(
+                  element.image,
+                  `${element.image}: ${error instanceof Error ? error.message : String(error)}`,
+                );
+            })
+            .finally(() => {
+              if (this.pending.get(element.image) !== request) return;
+              this.pending.delete(element.image);
+              if (this.alive) {
+                this.sync(this.elements, this.layers, this.cinematicScroll);
+                this.changed([...this.failures.values()].join('\n'));
+              }
+            }),
+        };
         this.pending.set(element.image, request);
       }
     }
   }
-  private async prepare(reference: string): Promise<void> {
-    const bytes = await this.load(reference);
+  private async prepare(reference: string, controller: AbortController): Promise<void> {
+    controller.signal.throwIfAborted();
+    const bytes = await abortable(this.load(reference), controller.signal);
+    controller.signal.throwIfAborted();
     if (!this.alive || !this.elements.some((image) => image.image === reference)) return;
     const budget = createSceneTextureBudget();
     budget.checkImage(reference, bytes);
     const key = `${this.prefix}${++this.serial}`;
-    const controller = new AbortController();
     const lease: TextureLease = { key, controller };
     this.textures.set(reference, lease);
     try {
@@ -131,7 +147,7 @@ export class SceneImageLayer {
     }
   }
   async ready(): Promise<void> {
-    await Promise.all(this.pending.values());
+    await Promise.all([...this.pending.values()].map((request) => request.promise));
     if (this.failures.size) throw new Error([...this.failures.values()].join('\n'));
   }
   retry(): void {
@@ -154,6 +170,7 @@ export class SceneImageLayer {
     for (const object of this.objects.values()) object.destroy();
     this.objects.clear();
     for (const [reference, lease] of this.textures) this.release(reference, lease);
+    for (const request of this.pending.values()) request.controller.abort();
     this.pending.clear();
     this.failures.clear();
     this.elements = [];

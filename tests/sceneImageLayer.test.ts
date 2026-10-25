@@ -173,6 +173,77 @@ test('shutdown releases an in-flight decode; late work never installs a texture'
   assert.equal(layer.objects.size, 0);
 });
 
+test('removing and restoring an image during decoding gives the restored image a fresh lease', async () => {
+  const { scene, textures, revoke } = stage();
+  let decoding = (): void => {};
+  const started = new Promise<void>((resolve) => {
+    decoding = resolve;
+  });
+  let complete = (): void => {};
+  vi.stubGlobal(
+    'Image',
+    class extends TestImage {
+      override decode = () => {
+        decoding();
+        return new Promise<void>((resolve) => {
+          complete = resolve;
+        });
+      };
+    },
+  );
+  const layer = new SceneImageLayer(scene, bytes, () => {}, new CharacterTextureBudget({ maxTotalImagePixels: 1 }));
+  try {
+    layer.sync([image]);
+    await started;
+    layer.sync([]);
+    vi.stubGlobal('Image', TestImage);
+    layer.sync([image]);
+    await layer.ready();
+    complete();
+    await Promise.resolve();
+    assert.equal(layer.error, '');
+    assert.equal(layer.objects.size, 1);
+    assert.equal(textures.size, 2);
+    assert.equal(revoke.mock.calls.length, 1);
+  } finally {
+    layer.dispose();
+  }
+  assert.equal(revoke.mock.calls.length, 2);
+});
+
+test('restoring an image replaces a stalled resource request and ignores its late failure', async () => {
+  const { scene } = stage();
+  let started = (): void => {};
+  const loading = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let rejectOld = (_error: Error): void => {};
+  let requests = 0;
+  const layer = new SceneImageLayer(scene, () => {
+    if (requests++ > 0) return bytes();
+    started();
+    return new Promise<Uint8Array<ArrayBuffer>>((_resolve, reject) => {
+      rejectOld = reject;
+    });
+  });
+  try {
+    layer.sync([image]);
+    await loading;
+    const obsolete = layer.ready();
+    layer.sync([]);
+    layer.sync([image]);
+    await layer.ready();
+    await obsolete;
+    rejectOld(new Error('Obsolete download failed.'));
+    await Promise.resolve();
+    assert.equal(requests, 2);
+    assert.equal(layer.error, '');
+    assert.equal(layer.objects.size, 1);
+  } finally {
+    layer.dispose();
+  }
+});
+
 test('failed decoding is actionable, retryable and releases each failed lease', async () => {
   const { scene, textures, revoke } = stage();
   class BrokenImage extends TestImage {

@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Give restored scene images fresh resource/decode requests and ignore cancelled obsolete results, preventing rapid removal/Undo from leaving artwork stuck in an error state.
+
 - Preflight the complete expanded project resource budget before copying imported character binaries, and enforce the same 100 MiB budget on exports.
 
 - Sort Feature Guide entries alphabetically in every editor category and add shared title/description search, result counts and clear/no-results feedback in Project Workspace and the editors.
