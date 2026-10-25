@@ -72,6 +72,8 @@ The [v0.6.3 shared character workspace](react-editor-workflow-verification.md) m
 
 `RigStructureCommands` builds hierarchy edits and checks bone/slot dependencies. `RigArtworkCommands` validates attachment and skin edits and skin exports. Both install proposals through `RigEditorState`, which retains the shared snapshot/history boundary, validation, recovery, saved baselines and preview selection.
 
+`SceneCameraCommands`, `SceneArtworkCommands` and `SceneTransitionCommands` build the scene editor's camera-key/cut, artwork/layer and transition proposals. They install changes through `SceneEditorDocument.replaceScene()`; the document remains the sole snapshot, validation, gesture, selection and Undo/Redo owner. The existing document methods delegate to these command modules, preserving the view/runtime API and notification order.
+
 The authoring application build emits separate Phaser and React vendor chunks. Changes to application modules retain the vendor chunk hashes, so browsers can reuse cached runtimes across application releases. The library build continues to leave Phaser external for the consuming application to supply.
 
 The engine stays independent of React. Engine and animation editor subscriber notifications use stable listener snapshots and report failures after remaining listeners run; runtime disposal still stops delivery. Rig and animation state, history, import/export, and the existing controller-managed inspector/timeline regions remain in their current modules. Those regions are stable hosts in React components; keep their child content under one owner when migrating additional controls. Layout preferences never enter authored JSON.

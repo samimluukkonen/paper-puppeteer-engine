@@ -25,14 +25,16 @@ import {
   type SceneDefinition,
   type SceneValidationOptions,
 } from '../../engine/SceneDefinition.js';
-import { sceneLayers } from '../../engine/sceneLayers.js';
 import type { SceneTransition } from '../../engine/sceneTransitions.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { SceneArtworkCommands } from './SceneArtworkCommands.js';
+import { SceneCameraCommands } from './SceneCameraCommands.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
+import { SceneTransitionCommands } from './SceneTransitionCommands.js';
 
 export type ReadonlyScene = DeepReadonly<SceneDefinition>;
 export interface ActorGroundContact {
@@ -73,6 +75,13 @@ export class SceneEditorDocument {
   private dragImage: string | null = null;
   private readonly lockedLayers = new Map<string, Set<string>>();
   readonly images = new SceneImageRegistry();
+  private readonly cameraCommands = new SceneCameraCommands(this);
+  private readonly artworkCommands = new SceneArtworkCommands(
+    this,
+    () => this.finishLayerGestures(),
+    () => this.dragImage !== null,
+  );
+  private readonly transitionCommands = new SceneTransitionCommands(this, () => this.finishLayerGestures());
   private groundOffsets: ReadonlyMap<string, number> = new Map();
   private groundContacts: ReadonlyMap<string, readonly ActorGroundContact[]> = new Map();
   private readonly selectedContacts = new Map<string, string>();
@@ -320,19 +329,7 @@ export class SceneEditorDocument {
   /** Explicit capture; channels at the same time are replaced without duplicating keys. */
   setCameraKey(time = this.cameraTime?.() ?? 0, values: Partial<CinematicCameraState> = this.cinematicCamera): boolean {
     if (!this.dragCamera) this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene) return false;
-    const tracks = { ...scene.cameraTracks };
-    for (const property of CAMERA_PROPERTIES) {
-      if (values[property] === undefined) continue;
-      const keys = tracks[property] ?? [];
-      const existing = keys.find((key) => Math.abs(key.time - time) < 1e-6);
-      let index = 1;
-      while (keys.some((key) => key.id === `camera-key-${index}`)) index++;
-      const next = { ...existing, id: existing?.id ?? `camera-key-${index}`, time, value: values[property] };
-      tracks[property] = [...keys.filter((key) => key !== existing), next].sort((a, b) => a.time - b.time);
-    }
-    return this.replaceScene({ ...scene, cameraTracks: tracks });
+    return this.cameraCommands.setCameraKey(time, values);
   }
   /** A cut uses the existing camera owner: each preceding channel key holds until
    * this shot's key. A time-zero baseline prevents first-key pre-roll changing the old shot.
@@ -340,67 +337,19 @@ export class SceneEditorDocument {
    */
   setCameraCut(time = this.cameraTime?.() ?? 0, values: CinematicCameraState = this.cinematicCamera): boolean {
     this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene) return false;
-    const tracks = { ...scene.cameraTracks };
-    for (const property of CAMERA_PROPERTIES) {
-      let keys = [...(tracks[property] ?? [])];
-      const nextId = (): string => {
-        let index = 1;
-        while (keys.some((key) => key.id === `camera-key-${index}`)) index++;
-        return `camera-key-${index}`;
-      };
-      if (time > 0 && !keys.some((key) => key.time < time))
-        keys.push({ id: nextId(), time: 0, value: evaluateCameraAtTime(scene, 0)[property] });
-      const existing = keys.find((key) => key.time === time);
-      const shot = { ...existing, id: existing?.id ?? nextId(), time, value: values[property] };
-      keys = [...keys.filter((key) => key.time !== time), shot].sort((a, b) => a.time - b.time);
-      let before = -1;
-      for (let index = 0; index < keys.length; index++) if (keys[index]!.time < time) before = index;
-      if (before >= 0) keys[before] = { ...keys[before]!, curve: { mode: 'stepped' } };
-      tracks[property] = keys;
-    }
-    if (!this.replaceScene({ ...scene, cameraTracks: tracks })) return false;
-    this.setCameraKeyEditing(true);
-    return true;
+    return this.cameraCommands.setCameraCut(time, values);
   }
   updateCameraKey(property: CameraProperty, id: string, patch: Partial<Omit<CameraKeyframe, 'id'>>): boolean {
     if (!this.dragCameraKey) this.finishLayerGestures();
-    const scene = this.workingScene;
-    const keys = scene?.cameraTracks?.[property];
-    if (!scene || !keys?.some((key) => key.id === id)) return false;
-    return this.replaceScene({
-      ...scene,
-      cameraTracks: {
-        ...scene.cameraTracks,
-        [property]: keys.map((key) => (key.id === id ? { ...key, ...patch } : key)).sort((a, b) => a.time - b.time),
-      },
-    });
+    return this.cameraCommands.updateCameraKey(property, id, patch);
   }
   removeCameraKey(property: CameraProperty, id: string): boolean {
     this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene?.cameraTracks?.[property]?.some((key) => key.id === id)) return false;
-    return this.replaceScene({
-      ...scene,
-      cameraTracks: { ...scene.cameraTracks, [property]: scene.cameraTracks[property].filter((key) => key.id !== id) },
-    });
+    return this.cameraCommands.removeCameraKey(property, id);
   }
   duplicateCameraKey(property: CameraProperty, id: string, time: number): boolean {
     this.finishLayerGestures();
-    const scene = this.workingScene;
-    const keys = scene?.cameraTracks?.[property];
-    const key = keys?.find((key) => key.id === id);
-    if (!scene || !key || !keys) return false;
-    let index = 1;
-    while (keys.some((key) => key.id === `camera-key-${index}`)) index++;
-    const next = { ...key, id: `camera-key-${index}`, time };
-    const result = this.replaceScene({
-      ...scene,
-      cameraTracks: { ...scene.cameraTracks, [property]: [...keys, next].sort((a, b) => a.time - b.time) },
-    });
-    if (result) this.selectCameraKey(property, next.id);
-    return result;
+    return this.cameraCommands.duplicateCameraKey(property, id, time);
   }
   beginCameraKeyDrag(property: CameraProperty, id: string): boolean {
     this.selectCameraKey(property, id);
@@ -541,74 +490,23 @@ export class SceneEditorDocument {
     this.endActionDrag();
   }
   addLayer(): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene) return false;
-    const layers = sceneLayers(scene);
-    let index = 1;
-    while (layers.some((layer) => layer.id === `layer-${index}`)) index++;
-    return this.replaceScene({
-      ...scene,
-      layers: [...layers, { id: `layer-${index}`, name: `Layer ${index}`, visible: true, parallax: 1 }],
-    });
+    return this.artworkCommands.addLayer();
   }
   updateLayer(id: string, patch: Partial<Omit<SceneLayerDefinition, 'id'>>): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene || !sceneLayers(scene).some((layer) => layer.id === id)) return false;
-    return this.replaceScene({
-      ...scene,
-      layers: sceneLayers(scene).map((layer) => (layer.id === id ? { ...layer, ...patch } : layer)),
-    });
+    return this.artworkCommands.updateLayer(id, patch);
   }
   reorderLayer(id: string, offset: -1 | 1): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene) return false;
-    const layers = [...sceneLayers(scene)];
-    const index = layers.findIndex((layer) => layer.id === id);
-    const target = index + offset;
-    if (index < 0 || target < 0 || target >= layers.length) return false;
-    [layers[index], layers[target]] = [layers[target]!, layers[index]!];
-    return this.replaceScene({ ...scene, layers });
+    return this.artworkCommands.reorderLayer(id, offset);
   }
   /** Safe deletion: retain all elements and assets, moving artwork into Background in one history entry. */
   removeLayer(id: string): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene || id === 'background' || id === 'actors' || this.isLayerLocked(id) || this.isLayerLocked('background'))
-      return false;
-    if (!sceneLayers(scene).some((layer) => layer.id === id)) return false;
-    return this.replaceScene({
-      ...scene,
-      layers: sceneLayers(scene).filter((layer) => layer.id !== id),
-      ...(scene.images
-        ? { images: scene.images.map((image) => (image.layerId === id ? { ...image, layerId: 'background' } : image)) }
-        : {}),
-    });
+    return this.artworkCommands.removeLayer(id);
   }
   assignImageLayer(id: string, layerId: string): boolean {
-    this.finishLayerGestures();
-    if (this.isLayerLocked(layerId)) return false;
-    return this.updateImage(id, { layerId });
+    return this.artworkCommands.assignImageLayer(id, layerId);
   }
   reorderImage(id: string, offset: -1 | 1): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    const image = scene?.images?.find((image) => image.id === id);
-    if (!scene || !image || this.isImageLocked(id)) return false;
-    const siblings = (scene.images ?? [])
-      .filter((entry) => (entry.layerId ?? 'background') === (image.layerId ?? 'background'))
-      .sort((a, b) => a.order - b.order);
-    const index = siblings.findIndex((entry) => entry.id === id);
-    const target = index + offset;
-    if (target < 0 || target >= siblings.length) return false;
-    [siblings[index], siblings[target]] = [siblings[target]!, siblings[index]!];
-    const orders = new Map(siblings.map((entry, order) => [entry.id, order]));
-    return this.replaceScene({
-      ...scene,
-      images: scene.images!.map((entry) => (orders.has(entry.id) ? { ...entry, order: orders.get(entry.id)! } : entry)),
-    });
+    return this.artworkCommands.reorderImage(id, offset);
   }
   selectImage(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.images?.some((image) => image.id === id))) return;
@@ -624,58 +522,13 @@ export class SceneEditorDocument {
     this.notify();
   }
   addImage(reference: string): boolean {
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
-    this.endActionDrag();
-    const scene = this.workingScene;
-    if (!scene) return false;
-    if (this.isLayerLocked('background'))
-      return this.reportError(new Error('Unlock Background before adding artwork.'));
-    if (!this.images.has(reference)) return this.reportError(new Error(`Missing image "${reference}".`));
-    let index = 1;
-    while (scene.images?.some((image) => image.id === `image-${index}`)) index++;
-    const id = `image-${index}`;
-    if (
-      !this.replaceScene({
-        ...scene,
-        images: [
-          ...(scene.images ?? []),
-          {
-            id,
-            image: reference,
-            position: { x: 0, y: 0 },
-            scale: { x: 1, y: 1 },
-            visible: true,
-            order: Math.min(255, scene.images?.length ?? 0),
-          },
-        ],
-      })
-    )
-      return false;
-    this.selectImage(id);
-    return true;
+    return this.artworkCommands.addImage(reference);
   }
   updateImage(id: string, patch: Partial<Omit<SceneImageDefinition, 'id'>>): boolean {
-    if (this.isImageLocked(id) || (patch.layerId && this.isLayerLocked(patch.layerId))) return false;
-    if (!this.dragImage) {
-      this.endCameraDrag();
-      this.endActorDrag();
-      this.endActionDrag();
-    }
-    const scene = this.workingScene;
-    if (!scene?.images?.some((image) => image.id === id)) return false;
-    return this.replaceScene({
-      ...scene,
-      images: scene.images.map((image) => (image.id === id ? { ...image, ...patch } : image)),
-    });
+    return this.artworkCommands.updateImage(id, patch);
   }
   removeImage(id: string): boolean {
-    if (this.isImageLocked(id)) return false;
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene?.images?.some((image) => image.id === id)) return false;
-    return this.replaceScene({ ...scene, images: scene.images.filter((image) => image.id !== id) });
+    return this.artworkCommands.removeImage(id);
   }
   beginImageDrag(id: string): boolean {
     if (this.isImageLocked(id)) return false;
@@ -978,30 +831,13 @@ export class SceneEditorDocument {
     this.notify();
   }
   addTransition(input: Omit<SceneTransition, 'id'>): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene) return false;
-    let index = 1;
-    while (scene.transitions?.some((effect) => effect.id === `transition-${index}`)) index++;
-    const id = `transition-${index}`;
-    if (!this.replaceScene({ ...scene, transitions: [...(scene.transitions ?? []), { ...input, id }] })) return false;
-    this.selectTransition(id);
-    return true;
+    return this.transitionCommands.addTransition(input);
   }
   updateTransition(id: string, patch: Partial<Omit<SceneTransition, 'id'>>): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene?.transitions?.some((effect) => effect.id === id)) return false;
-    return this.replaceScene({
-      ...scene,
-      transitions: scene.transitions.map((effect) => (effect.id === id ? { ...effect, ...patch, id } : effect)),
-    });
+    return this.transitionCommands.updateTransition(id, patch);
   }
   removeTransition(id: string): boolean {
-    this.finishLayerGestures();
-    const scene = this.workingScene;
-    if (!scene?.transitions?.some((effect) => effect.id === id)) return false;
-    return this.replaceScene({ ...scene, transitions: scene.transitions.filter((effect) => effect.id !== id) });
+    return this.transitionCommands.removeTransition(id);
   }
   selectAction(id: string | null): void {
     const action = this.workingScene?.actions.find((action) => action.id === id);
