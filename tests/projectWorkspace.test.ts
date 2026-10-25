@@ -66,6 +66,41 @@ test.each([257, 101])('project import bounds %s logical aliases before copying s
   }
 });
 
+test('project import preflights the combined allocation of aliases across characters before any binary copies', async () => {
+  const project = new ProjectWorkspace('Film');
+  for (const id of ['one', 'two']) await project.addCharacter(await emptyCharacter(id));
+  const files = new Map((await buildProjectPackage(project)).files);
+  const archive = JSON.parse(new TextDecoder().decode(files.get('project.json'))) as {
+    characters: { files: Record<string, string> }[];
+  };
+  const shared = new Uint8Array(6 * 1024 * 1024);
+  files.set('shared.bin', shared);
+  for (const character of archive.characters)
+    for (let index = 0; index < 9; ++index) character.files[`aliases/copy-${index}.bin`] = 'shared.bin';
+  files.set('project.json', new TextEncoder().encode(JSON.stringify(archive)));
+  const Native = Uint8Array;
+  let copies = 0;
+  vi.stubGlobal(
+    'Uint8Array',
+    new Proxy(Native, {
+      construct(target, args): Uint8Array<ArrayBuffer> {
+        if (args[0] === shared) {
+          copies++;
+          throw new Error('Binary copied before project preflight.');
+        }
+        return Reflect.construct(target, args) as Uint8Array<ArrayBuffer>;
+      },
+    }),
+  );
+  try {
+    await expect(importProjectPackage(files)).rejects.toThrow(/Expanded project resources exceed 100 MiB/);
+    assert.equal(copies, 0);
+    assert.equal(project.definition.characters.length, 2);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test('plain JSON crosses retained editor realms while classes and accessors remain invalid', () => {
   const foreign: unknown = runInNewContext('({ version: 2, nested: { x: 12 }, array: [{ y: 10 }] })');
   const issues: ValidationIssue[] = [];

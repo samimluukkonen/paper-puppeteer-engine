@@ -3,7 +3,7 @@ import { canonicalJson } from '../../engine/authoredSerialization.js';
 import { characterManifestSchema, type CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { decodeImage } from '../../engine/decodeImage.js';
 import { assertJsonInputSize } from '../../engine/jsonInput.js';
-import { packagePath, validatePackageFiles } from '../../engine/packageZip.js';
+import { PACKAGE_MAX_BYTES, packagePath, validatePackageFiles } from '../../engine/packageZip.js';
 import { parseSceneJson, serializeSceneDefinition } from '../../engine/SceneDefinition.js';
 import { buildScenePackage, validateScenePackage } from '../../engine/ScenePackage.js';
 import type { ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
@@ -23,6 +23,48 @@ const archiveSchema = z.strictObject({
   images: z.record(z.string(), z.string()).exactOptional(),
 });
 const encoder = new TextEncoder();
+
+/** Resolve aliases and bound the complete expanded project before any owner copies bytes. */
+function preflightProjectFiles(
+  files: PackageFiles,
+  metadata: z.infer<typeof projectDefinitionSchema>,
+  records: z.infer<typeof archiveSchema>['characters'],
+  images: Record<string, string> = {},
+): ReadonlyMap<string, PackageFiles> {
+  let expandedBytes = files.get('project.json')?.byteLength ?? 0;
+  const count = (bytes: Uint8Array): void => {
+    expandedBytes += bytes.byteLength;
+    if (expandedBytes > PACKAGE_MAX_BYTES) throw new Error('Expanded project resources exceed 100 MiB.');
+  };
+  const characters = new Map<string, PackageFiles>();
+  const registrations = new Map(records.map((record) => [record.id, record]));
+  for (const entry of metadata.characters) {
+    const record = registrations.get(entry.id);
+    if (!record) throw new Error(`Missing character registration "${entry.id}".`);
+    const characterFiles = new Map<string, Uint8Array<ArrayBuffer>>();
+    for (const [local, physical] of Object.entries(record.files)) {
+      packagePath(local);
+      packagePath(physical);
+      const bytes = files.get(physical);
+      if (!bytes) throw new Error(`Missing project resource "${physical}".`);
+      characterFiles.set(local, bytes);
+    }
+    if (record.files['character.json'] !== entry.manifest) throw new Error('Character manifest path mismatch.');
+    validatePackageFiles(characterFiles);
+    for (const bytes of characterFiles.values()) count(bytes);
+    characters.set(entry.id, characterFiles);
+  }
+  for (const image of metadata.images ?? []) {
+    const bytes = files.get(packagePath(images[image.path] ?? image.path));
+    // Missing optional preview images retain the importer's existing repair behavior.
+    if (bytes) count(bytes);
+  }
+  for (const scene of metadata.scenes) {
+    const bytes = files.get(scene.path);
+    if (bytes) count(bytes);
+  }
+  return characters;
+}
 
 /** Normalize hosted sibling artwork through the existing scene packager, preserving source IDs. */
 export async function packageHostedCharacter(
@@ -143,6 +185,7 @@ export async function buildProjectPackage(workspace: ProjectWorkspace, signal?: 
   });
   try {
     validatePackageFiles(files);
+    preflightProjectFiles(files, metadata, records, imageMapping);
   } catch (error) {
     throw packageExportFailure(report, { kind: 'project', owner: metadata.id, id: metadata.id }, error);
   }
@@ -168,20 +211,10 @@ export async function importProjectPackage(files: PackageFiles): Promise<Project
     new Set(archive.characters.map(({ id }) => id)).size !== archive.characters.length
   )
     throw new Error('Project character registrations do not match the manifest.');
+  const characters = preflightProjectFiles(files, metadata, archive.characters, archive.images);
   const workspace = new ProjectWorkspace(metadata.name, metadata.id);
   for (const entry of metadata.characters) {
-    const record = archive.characters.find(({ id }) => id === entry.id);
-    if (!record) throw new Error(`Missing character registration "${entry.id}".`);
-    const characterFiles = new Map<string, Uint8Array<ArrayBuffer>>();
-    for (const [local, physical] of Object.entries(record.files)) {
-      packagePath(local);
-      packagePath(physical);
-      const bytes = files.get(physical);
-      if (!bytes) throw new Error(`Missing project resource "${physical}".`);
-      characterFiles.set(local, bytes);
-    }
-    if (record.files['character.json'] !== entry.manifest) throw new Error('Character manifest path mismatch.');
-    const id = await workspace.addCharacter(characterFiles, entry.name);
+    const id = await workspace.addCharacter(characters.get(entry.id)!, entry.name);
     if (id !== entry.id) throw new Error(`Character ID mismatch for "${entry.id}".`);
   }
   const previewImages = new Set(
