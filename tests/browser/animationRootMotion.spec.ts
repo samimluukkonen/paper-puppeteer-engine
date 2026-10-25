@@ -147,26 +147,28 @@ test('artist authors a root step with the timeline, numeric controls, real handl
   expect((await download(page)).rootMotion).toEqual(withCurve.rootMotion);
 });
 
-test('Visual Root Motion guide reveals real controls while preserving legacy data and view preferences', async ({
-  page,
-}) => {
-  await page.goto('animation-editor/');
-  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  const before = await download(page);
-  const guide = guideRegistry.getGuideById('animation-root-motion')!;
-  await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
-  await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
-  const tour = page.getByRole('dialog', { name: guide.title, exact: true });
-  for (const [index, step] of guide.steps.entries()) {
-    await expect(tour).toContainText(`Step ${index + 1} of ${guide.steps.length}`);
-    await expect(page.locator(`[data-guide-id="${step.targetId}"]`)).toBeVisible();
-    await expect(tour.locator('.guide-spotlight-hole')).toBeVisible();
-    await tour.getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true }).click();
-  }
-  await expect(tour).toHaveCount(0);
-  await expect(page.locator('#root-edit-mode')).not.toBeChecked();
-  expect(await download(page)).toEqual(before);
-});
+for (const guideId of ['animation-root-motion', 'animation-root-vs-pelvis']) {
+  test(`${guideId} guide reveals real controls while preserving legacy data and view preferences`, async ({ page }) => {
+    await page.goto('animation-editor/');
+    await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+    const before = await download(page);
+    const guide = guideRegistry.getGuideById(guideId)!;
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+    const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+    for (const [index, step] of guide.steps.entries()) {
+      await expect(tour).toContainText(`Step ${index + 1} of ${guide.steps.length}`);
+      await expect(page.locator(`[data-guide-id="${step.targetId}"]`)).toBeVisible();
+      await expect(tour.locator('.guide-spotlight-hole')).toBeVisible();
+      await tour
+        .getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true })
+        .click();
+    }
+    await expect(tour).toHaveCount(0);
+    await expect(page.locator('#root-edit-mode')).not.toBeChecked();
+    expect(await download(page)).toEqual(before);
+  });
+}
 
 test('root timeline drag and Escape preserve one-step history and keyboard selection for duplication/deletion', async ({
   page,

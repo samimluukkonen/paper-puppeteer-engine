@@ -10,6 +10,8 @@ The [v0.8 Actor report](release-notes-v0.8.md#performance) records `VITE_PROFILE
 
 Measurements below record earlier implementation comparisons on individual machines. They explain the corresponding changes and are not performance baselines for the current checkout. Rerun the commands to measure your workload and hardware.
 
+For root-motion hardening, run `VITE_PROFILE=1 npx vitest run tests/rootMotion.profile.test.ts --maxWorkers=1 --reporter=verbose` separately from other suites. It measures normal/root playback, 1,001 root keys, twenty looping moving scene Actors, Graph Editor commits and rapid scrubbing. The [root-motion report](root-motion-hardening.md) records observations and scope; the minimal Phaser scene excludes GPU and browser layout costs.
+
 The [v0.6.5 release report](release-readiness.md#performance-observations) records current candidate observations for small/complex characters, multiple Puppets, dense timelines, onion skinning, IK, scrubbing and replacement decoding. Run CPU and browser diagnostics separately, without other test suites competing for the machine. The repeated package/runtime lifetime diagnostic is also available with `VITE_PROFILE=1 npx vitest run tests/releaseReadiness.test.ts --maxWorkers=1 --reporter=verbose`; ordinary runs still assert object/listener cleanup without timing thresholds.
 
 ## Project and scene production baseline

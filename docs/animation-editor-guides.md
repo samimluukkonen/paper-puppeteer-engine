@@ -2,13 +2,14 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-The catalog contains twenty-four selectable tasks. Open **Feature Guide → Animation Editor**. Steps start as explanations; optional **Try It** exists for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
+The catalog contains twenty-five selectable tasks. Open **Feature Guide → Animation Editor**. Steps start as explanations; optional **Try It** exists for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. Inspector disclosures start collapsed and open only when a step reveals them.
 
 | Guide                           | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | ------------------------------- | ----: | ------------------------------------------------------------------------ |
 | Preview Displacement            |     7 | Selected clip; temporary additive world trajectory                       |
 | Environment Preview             |    10 | Selected clip; artwork is optional                                       |
-| Visual Root Motion              |     5 | Selected clip; works with empty/legacy clips and no root keys            |
+| Creating Root Motion            |     5 | Selected clip; works with empty/legacy clips and no root keys            |
+| Root Motion vs Pelvis Animation |     3 | Selected clip; explains arbitrary pelvis/body bone names                 |
 | Aligning Feet to Ground         |     5 | Selected clip; explains missing markers and optional existing foot IK    |
 | Using Ground Reference          |     5 | None; IK alignment is optional and explained through its actual control  |
 | Create a New Animation          |     5 | None; no JSON or existing clip required                                  |
@@ -31,7 +32,7 @@ The catalog contains twenty-four selectable tasks. Open **Feature Guide → Anim
 | Rig-Tweak Mode                  |     4 | None; explains entering the mode without entering it for the artist      |
 | Exporting Animations            |     4 | Selected clip                                                            |
 
-IK tasks use the `ik` registry category; the other nineteen use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
+IK tasks use the `ik` registry category; the other twenty-three use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
 
 ## Target contract
 

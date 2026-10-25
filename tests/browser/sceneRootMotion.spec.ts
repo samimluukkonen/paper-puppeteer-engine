@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
 
@@ -76,6 +77,18 @@ test('two-Actor root-motion authoring, playback, conflict rejection, scrubbing a
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Movement source', exact: true })).toHaveValue('scene');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Movement source', exact: true })).toHaveValue('rootMotion');
+  const guide = guideRegistry.getGuideById('scene-root-motion')!;
+  await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+  await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+  const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+  for (const [index, step] of guide.steps.entries()) {
+    await expect(tour).toContainText(`Step ${index + 1} of ${guide.steps.length}`);
+    await expect(page.locator(`[data-guide-id="${step.targetId}"]`)).toBeVisible();
+    await expect(tour.locator('.guide-spotlight-hole')).toBeVisible();
+    await tour.getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true }).click();
+  }
+  await expect(page.getByLabel('Scene playback status')).toContainText('stopped');
   await expect(page.getByRole('combobox', { name: 'Movement source', exact: true })).toHaveValue('rootMotion');
   await page.getByText('Runtime preview', { exact: true }).click();
   const position = page.getByText('Position', { exact: true }).locator('+ dd');

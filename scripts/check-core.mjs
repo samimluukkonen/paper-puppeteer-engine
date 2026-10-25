@@ -10,6 +10,8 @@ const {
   CharacterLoader,
   compileClip,
   evaluateClip,
+  evaluateRootMotionAtElapsedTime,
+  getRootMotionDelta,
   Joint,
   Rig,
   solveTwoBoneIK,
@@ -60,6 +62,45 @@ player.addAnimation(clip);
 player.play('test');
 player.update(500);
 assert.equal(joints.get(rig.root).pose.x, 5);
+// Authored travel survives serialization and works through the actual installed /core entry.
+const rootClip = serialization.parseAnimationClip(
+  {
+    version: 1,
+    ...clip,
+    rootMotion: {
+      translationKeys: [
+        { time: 0, x: 10, y: 20 },
+        { time: 1000, x: 90, y: -20 },
+      ],
+    },
+  },
+  rig,
+);
+assert.deepEqual(evaluateRootMotionAtElapsedTime(rootClip, 2500, { loop: true }), { x: 200, y: -100 });
+assert.deepEqual(getRootMotionDelta(rootClip, 1100, 900, { loop: true }), { x: -16, y: 8 });
+const placement = { x: 100, y: 200 };
+let origin = { ...placement };
+const rootPlayer = new AnimationPlayer(rig, new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)])), [], {
+  validate() {},
+  begin() {
+    origin = { ...placement };
+  },
+  apply(displacement) {
+    // A host transforms canonical offsets once; this example faces left at scale 2.
+    placement.x = origin.x - displacement.x * 2;
+    placement.y = origin.y + displacement.y * 2;
+  },
+});
+rootPlayer.addAnimation(rootClip);
+rootPlayer.play(rootClip.name, { rootMotion: 'apply', loop: true });
+rootPlayer.update(2500);
+assert.deepEqual(placement, { x: -300, y: 0 });
+rootPlayer.sample(100);
+assert.deepEqual(placement, { x: -300, y: 0 }, 'Skeletal sampling cannot apply translation twice.');
+rootPlayer.stop();
+rootPlayer.update(500);
+assert.deepEqual(placement, { x: -300, y: 0 });
+rootPlayer.dispose();
 const controller = new AnimationStateController(player, {
   initialState: 'idle',
   states: { idle: { animation: 'test', loop: true }, action: { animation: 'test' } },

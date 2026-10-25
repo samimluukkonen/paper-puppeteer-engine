@@ -183,6 +183,10 @@ export function diagnoseMotion(
   const findings: MotionFinding[] = [];
   const candidates: CleanupCandidate[] = [];
   const notes: string[] = [];
+  if (source.rootMotion?.translationKeys.length)
+    notes.push(
+      'Root Motion curves are preserved but not analyzed or cleaned up. Inspect their X/Y curves in Graph Editor.',
+    );
   const protectedIds = protectedBones(rig);
   for (const track of [
     ...compiled.tracks.map((track) => ({ kind: 'bone' as const, id: track.bone, properties: track.properties })),

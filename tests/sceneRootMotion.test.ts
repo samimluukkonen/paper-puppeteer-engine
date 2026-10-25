@@ -1,4 +1,5 @@
 import { afterEach, assert, test, vi } from 'vitest';
+import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
@@ -6,6 +7,7 @@ import { evaluatedFootContacts } from '../src/devtools/shared/footContactGround.
 import { Actor } from '../src/engine/Actor.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { Puppet } from '../src/engine/Puppet.js';
+import { Rig } from '../src/engine/Rig.js';
 import { sceneAssetCatalog } from '../src/engine/SceneAssets.js';
 import {
   parseSceneDefinition,
@@ -306,7 +308,23 @@ test('invalid policies, timing, unbounded looping and rootless selections fail b
 
 test('portable scene exports retain root tracks, policy, evaluated travel and asset validation', async () => {
   const assets = assetFixture();
-  assets.documents['animations/wave.json'] = { ...animations[1], version: 1, name: 'wave' };
+  const editor = new AnimationEditorState(new Rig({ root: 'root', bones: [{ id: 'root' }] }));
+  assert.isTrue(editor.createAnimation({ name: 'wave', durationSeconds: 1, loop: false }));
+  editor.setBonePropertyKeyframe('root', 'rotation', -0.3, 0.25);
+  editor.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.6);
+  editor.setRootPosition({ x: 0, y: 0 }, 0);
+  editor.setRootPosition({ x: 0, y: 0 }, 0.25);
+  editor.setRootPosition({ x: 80, y: 0 }, 0.6);
+  editor.setRootPosition({ x: 80, y: 0 }, 1);
+  editor.editGraphKey(
+    { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.25 },
+    {
+      curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } },
+    },
+  );
+  const authored = editor.workingAnimation!;
+  editor.reloadCurrentExport({ confirmDiscard: () => true });
+  assets.documents['animations/wave.json'] = JSON.parse(editor.exportJson());
   const data = scene([clip('step', 0, 'wave')]);
   for (const actor of data.actors) {
     actor.character.manifest = 'characters/hero/character.json';
@@ -315,7 +333,8 @@ test('portable scene exports retain root tracks, policy, evaluated travel and as
   const files = await buildScenePackage(data, assets);
   const resolved = await validateScenePackage(files);
   const definition = [...resolved.characters.values()][0]!;
-  assert.deepEqual(definition.animations[0]!.rootMotion, animations[1]!.rootMotion);
+  assert.deepEqual(definition.animations[0]!.rootMotion, authored.rootMotion);
+  assert.deepEqual(definition.animations[0]!.tracks, authored.tracks);
   assert.deepEqual(
     parseSceneDefinition(resolved.definition, { characters: sceneAssetCatalog(resolved.characters) }).actions,
     data.actions,

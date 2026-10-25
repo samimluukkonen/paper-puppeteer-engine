@@ -1,0 +1,115 @@
+# Root motion: everyday workflow and hardening (v1.1.7-6)
+
+[All guides](../README.md#guides) · [Visual authoring](root-motion-authoring.md) · [Scene ownership](scene-root-motion.md) · [Runtime API](root-motion.md)
+
+Root motion moves the whole character across the world. The pelvis stays a normal skeletal bone: use it for body weight, anticipation and bobbing, while Root Motion Position X/Y describe travel. Neither system extracts movement from the other. You can complete the authoring and scene workflow with the editor controls, without TypeScript.
+
+## v1.1.7 readiness
+
+The supported translation workflow is implemented and the automated gates pass: visual X/Y authoring, independent pelvis/bone/IK posing, Graph Editor, fixed-world and Environment Preview displacement, explicit scene ownership, continuous loops, deterministic seeking, recovery and portable runtime consumption. This milestone adds tutorials, diagnostics, preservation checks and documentation without another animation subsystem. Human artist acceptance remains unperformed; the deferred capabilities below are unchanged.
+
+## Sword attack with a forward step
+
+1. In Project Workspace, create/open a project and open the character in Animation Editor. Use **New animation** to create the clip; choose Smooth in Clip settings for continuous motion.
+2. With **Edit Root Motion** off, select your pelvis/body bone in **Bones** and key anticipation. Key the legs stepping and the arm/sword cut with the ordinary position/rotation controls. Your rig determines the bone names.
+3. Open **Root Motion**. At 0 s, enter Position X = 0 and Y = 0 and choose **Set position key**. At 0.25 s, choose **Add root position key** to hold through anticipation. At 0.6 s, set X = 80 and Y = 0. At the end, set the same values to hold the landing. Alternatively enable **Edit Root Motion** and drag the purple square at the origin; release commits both axes together and Escape cancels.
+4. Select a Position X key in the Root Motion timeline group and open **Graph Editor**. Adjust the outgoing interpolation or Bézier tangents for acceleration through the step. The Y channel is independent. The last key has no outgoing segment. These edits preserve all bone and IK keys; Undo/Redo includes curve edits and handle drags.
+5. Enable **Show Ground Reference** and **Show foot contact markers** in the ground controls. Ground remains fixed in world space. Markers show their final post-IK world X/Y and signed ground distance. A foot near ground is not automatically a planted foot; there is no contact timing or automatic locking.
+6. Optionally enable **Environment Preview** and select/import background artwork. **Fixed** camera shows travel through the world; **Follow Character** follows the selected displacement while background world placement stays fixed. Root editing pauses camera follow. Scrub both directions, play, pause and restart. Returning to the same seek time reconstructs the same position.
+7. Compare **Authored Root Motion** with **No World Displacement**: body posing remains identical. **Preview-Only Displacement** replaces authored root travel with a temporary world trajectory. It is not added to it. **Preview Copy to Root Motion** followed by **Apply Copy** is the explicit conversion workflow.
+8. Undo/Redo an edit, save the local draft, **Download animation JSON**, and use **Reload Current Export** to check keys and curves. Download a character package for portable character handoff; a project ZIP additionally retains preview settings and artwork. A local draft alone is not a portable backup.
+9. In Scene Editor, add the character as an Actor, add/select an animation action, and open **Action properties · animation**. Choose the clip, set **Movement source → Animation root motion**, then **Apply action properties**. A clip without root keys disables this choice.
+10. Play beyond the clip end and inspect **Runtime preview → Position**. An Actor starting at X=100, right-facing scale 1, ends at X=180 after this step. A following idle retains that position. Download scene JSON or a scene package and reopen it; a scene package includes the character animation data for standalone SceneLoader/SceneRunner playback.
+
+Use **Feature Guide → Animation Editor → Creating Root Motion** and **Root Motion vs Pelvis Animation**, or **Feature Guide → Scene Editor → Using Root Motion** for short tours. Tours reveal actual controls and preserve selection, keys, history and playback; perform the described actions after exiting.
+
+## Other motions and common mistakes
+
+| Scenario          | Authoring and expected behavior                                                                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backward dodge    | Negative X moves backward relative to canonical right facing. Left facing reverses X once. Do not negate keys again because the character faces left.                                                                                       |
+| Jump              | Negative Y lifts the Actor; return Y to its initial value for landing. Existing skeletal leg posing and local IK remain independent.                                                                                                        |
+| Walk cycle        | End X minus start X is travel per cycle. Choose **Continuous travel** with **Loop preview** for accumulating travel; **Reset each cycle** deliberately returns to the start in the editor. Scene/runtime apply playback accumulates cycles. |
+| Stationary attack | Omit root keys, choose **No World Displacement** for preview, or keep the scene clip **Scene-controlled**. Skeletal movement continues.                                                                                                     |
+| Two Actors        | One can use Animation root motion while another uses a scene move action. Ownership is per Actor.                                                                                                                                           |
+
+Do not put the same forward displacement in both the pelvis and root tracks: descendants would receive both. Do not run `moveTo`/`walkTo` alongside apply playback on one Actor. Scene move actions and root-motion clips cannot overlap on the same Actor; adjacent windows are valid. Use **Scene-controlled** when a scene move should own travel. Root translation owns the entire explicit clip window, including its final-pose hold. Cancellation keeps travel already applied; Scene Editor Stop restores authored placement.
+
+A nonzero first root value is allowed: travel is measured from the first sample, preventing an initial teleport. Authored reset keys remain resets; the runtime never invents forward travel. A non-looping clip holds its endpoint if the action window is longer, and truncates if shorter. Subsequent root clips capture a fresh origin. Queues capture completed endpoints but retain the existing behavior of discarding frame overshoot at a queue boundary. Crossfades use incoming root travel at full weight; they blend skeletal/IK poses without blending trajectories.
+
+## Coordinate audit and tool contract
+
+The actual chain is authored unscaled X/Y → start-normalized displacement → captured facing/scale/rotation → outer Puppet placement → skeletal root/pelvis → bone hierarchy and IK → projected sprites and world foot markers. Parent transforms then project Actor-local placement into world space. Camera pan/zoom only affect presentation and handle picking. Root editing inverts the full outer affine. Ground, image transforms and world IK targets retain their own coordinates; local IK travels with the character, while a deliberately fixed world target compensates for movement normally.
+
+| Tool/API                                                     | Root-motion contract                                                                                                                                                                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pose Library                                                 | Captures/applies skeletal FK values only. Preserves root keys; Actor displacement is not stored in a pose.                                                                                                                      |
+| Mirror Current Pose / Mirror Selected Keys                   | Mirrors configured bone properties and preserves root keys/curves unchanged. Facing reverses runtime travel; edit X explicitly for a different authored trajectory.                                                             |
+| Animation Variations                                         | Duplicates root data with independent ownership; scales root times together with duration, bone keys, IK and events. Values and normalized curve controls are preserved.                                                        |
+| Motion Diagnostics / cleanup                                 | Analyzes bone/IK channels and cleans eligible bone keys. Reports that root curves are preserved but ignored; use Graph Editor to inspect them.                                                                                  |
+| IK authoring / baking                                        | Local targets remain skeletal-local. Baking changes generated bone channels and constraint suppression, preserving root keys and events. It does not bake world travel into the pelvis.                                         |
+| Animation events / lifecycle                                 | Root placement is applied before pose/IK synchronization and callbacks. Completion retains placement; stop releases translation ownership. Wait-only abort leaves playback running; owned stop-on-abort retains partial travel. |
+| Scene seeking / follow camera                                | Reconstructs from authored initial Actors through ordered boundaries; suppresses gameplay events during reconstruction. Follow uses evaluated Actor world placement.                                                            |
+| `sampleRootMotion`, `evaluateRootMotion`, elapsed/delta APIs | Pure sampling; never moves an Actor. Raw offsets differ from normalized travel. Elapsed evaluation uses unwrapped milliseconds and adds completed net cycles.                                                                   |
+
+Animation format 1 adds optional `rootMotion.translationKeys`: sparse millisecond keys with independent X/Y and optional per-axis outgoing Linear, Stepped or Bézier curves. Scene format 2 adds optional `movementSource`; omission remains scene-controlled. Legacy omissions survive round trips. Compiled clips own frozen copies; no camera, handles, preview preferences or Phaser objects enter runtime animation data. Root edits share the existing document/history boundary and evaluator rather than a new animation subsystem.
+
+Committed root curves survive animation drafts/recovery, animation JSON, character ZIPs, project ZIPs and scene packages. Unfinished handle/graph proposals stay provisional: unloading saves the last committed snapshot. Recovery installs an undoable authored snapshot. Preview preferences remain in their project/draft metadata and outside production character animation fields.
+
+## Verification scope
+
+The regressions cover legacy parsing, sampling/loops/transforms, handle and Graph Editor edits, Undo/Redo, preview cameras/ground, tool preservation, draft recovery during pending gestures, package round trips, scene conflicts/seek/cancellation, standalone core consumers and cleanup. Local desktop browser workflows exercise real controls and rendered handles. Automated browser interaction is not a claim of human artist acceptance.
+
+The optional profile command is `VITE_PROFILE=1 npx vitest run tests/rootMotion.profile.test.ts --maxWorkers=1 --reporter=verbose`. It compares normal/root playback, 1,001 keys, 20 moving scene Actors, repeated Graph Editor commits and rapid scrubbing using the shipped rig and real engine projection with a minimal scene. Measurements exclude GPU/browser layout and do not impose timing thresholds. Run separately from other test commands. Canvas diagnostics already reuse graphics and throttle foot-marker text notifications to ten per second; hidden contacts do not trigger per-frame React rendering. Optimize only after measuring a relevant issue.
+
+See the verification results below for the actual checks performed for this milestone. Package and lockfile retain the higher version **1.2.6**; this milestone is recorded under **1.1.7-6**.
+
+## Performance observations
+
+Local CPU measurements on 2026-10-25 used one worker, seven warmed batches and the shipped demo skeleton. Playback and scrubbing used 300 operations per batch; the more expensive graph transaction used 30. Each graph operation begins a preview, edits one root value, commits and undoes it, including preview recompilation. These are operation costs, not rendered frame rates.
+
+| Workload                                                                        | Median ms/operation |
+| ------------------------------------------------------------------------------- | ------------------: |
+| Normal looping playback, one Puppet                                             |              0.0369 |
+| Applied root playback, two root keys                                            |              0.0392 |
+| Applied root playback, 1,001 root keys                                          |              0.0347 |
+| Twenty scene Actors with looping root travel, complete SceneRunner update batch |              0.6884 |
+| Rapid editor scrubbing, 1,001 root keys                                         |              0.0320 |
+| Graph preview/edit/commit/undo, 1,001 root keys                                 |             19.2479 |
+
+Small differences between playback samples are measurement/JIT variation, not evidence that dense keys improve speed. No runtime bottleneck was demonstrated here, so no speculative optimization was added. The dense graph transaction is substantially more expensive than sampling; measure actual pointer-edit latency with production clips before changing the shared validation/history boundary. GPU costs, browser layout and React rendering are outside this CPU fixture. The graph diagnostic uses fewer transactions and an explicit 30-second test timeout to accommodate the complete edit/history workload.
+
+## Files and APIs
+
+- `animationGuides.ts` and `sceneGuides.ts`: retain the existing root tour ID, rename it Creating Root Motion, and add pelvis/scene tours with existing anchors. No automatic selection or data edits.
+- `FootContactGroundPanel.tsx`: expose the controller’s existing post-IK world coordinates alongside geometric ground distances. The existing controller owns optional visibility and throttled text notifications.
+- `MirrorToolsPanel.tsx` and `motionDiagnostics.ts`: state the preservation/ignore contract in tool feedback. Public runtime APIs and file formats remain unchanged in this milestone.
+- `rootMotionHardening.test.ts`, recovery/scene/guide regressions and local root browser suites: check independent data ownership through tools, gestures, persistence and scene consumption.
+- `rootMotion.profile.test.ts`: optional local CPU measurements. `scripts/check-core.mjs`: exercise serialized root data, continuous loops, reverse deltas and an explicit facing/scale application host through the built and packed `/core` entry.
+- Artist, guide catalog and profiling documentation plus README/changelog: link the actual workflow and correct stale scene-support limitations. Package and lockfile already agree on 1.2.6 and require no version change.
+
+## Known limitations
+
+Automatic pelvis-displacement extraction, root rotation/scaling, automatic foot planting, foot locking, contact-timing authoring, physics locomotion, collision/pathfinding, advanced root blending and motion matching are deferred. Root clipboard/group selection is also outside the existing single-axis authoring tools. Use explicit movement ownership and inspect foot/world trajectories when combining dynamic body motion and travel. The remaining acceptance recommendation is a human artist rehearsal of the complete project-to-runtime workflow with production artwork.
+
+## Actual manual verification
+
+No hands-on human artist session was performed. The local Playwright runs exercised real desktop controls, pointer gestures, rendered handles, playback and package downloads in development and production. I inspected the generated Animation Editor screenshot showing the root handle, Bézier curve and shared editor chrome. That visual review does not replace a human rehearsal with production art. The browser scope is the root-motion/environment/scene and foot-contact suites listed below; the entire browser catalog was not rerun.
+
+## Exact verification results
+
+Completed locally on 2026-10-25. All commands below exited 0. Test runners ran sequentially, each with one worker. Production application builds still emit the two existing Lucide `use client` bundling warnings.
+
+| Exact command                                                                                                                                                                                                                      | Result                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run typecheck`                                                                                                                                                                                                                | Passed, including the final focused-check/build sequence.                                                                                                                      |
+| `npm run test -- --maxWorkers=1`                                                                                                                                                                                                   | 3,713 passed, 53 skipped; 212 files passed, seven skipped; 132.45 s. Optional profiles account for six of the skips.                                                           |
+| `npx vitest run tests/rootMotionHardening.test.ts tests/animationDraftRecoveryController.test.ts tests/sceneRootMotion.test.ts tests/animationGuides.test.ts tests/sceneGuides.test.ts tests/guideRegistry.test.ts --maxWorkers=1` | 55 passed across six files after the final diagnostic presentation change.                                                                                                     |
+| `npm run check`                                                                                                                                                                                                                    | Formatting, lint and strict TypeScript passed.                                                                                                                                 |
+| `npm run build`                                                                                                                                                                                                                    | Application, library, declarations and built standalone Node entry checks passed.                                                                                              |
+| `npm run check:version`                                                                                                                                                                                                            | Package, lockfile and changelog agree on 1.2.6.                                                                                                                                |
+| `npm run test:package`                                                                                                                                                                                                             | Offline packed consumer passed documentation links, Node/runtime entry points, declarations, runtime example and browser isolation, including the new root-motion host checks. |
+| `VITE_PROFILE=1 npx vitest run tests/rootMotion.profile.test.ts --maxWorkers=1 --reporter=verbose`                                                                                                                                 | Six profiles passed; 7.41 s. Final measurements above include actual SceneRunner choreography with twenty Actors.                                                              |
+| `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationRootMotion.spec.ts tests/browser/animationRootEnvironment.spec.ts tests/browser/sceneRootMotion.spec.ts --workers=1`                                         | 16 passed across desktop development/production; 5.0 min.                                                                                                                      |
+| `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/footContactGroundIntegration.spec.ts tests/browser/footContactProductionWorkflow.spec.ts --workers=1`                                                                 | Six passed across desktop development/production; 1.5 min. Includes displayed world coordinates and the artist rig-to-IK-to-portable-scene workflow.                           |
+| `git diff --check`                                                                                                                                                                                                                 | Passed.                                                                                                                                                                        |

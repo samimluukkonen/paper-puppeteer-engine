@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.7-6
+
+Complete root-motion hardening with Creating Root Motion, Root Motion vs Pelvis Animation and Using Root Motion Feature Guides using existing controls without authoring data. Show optional post-IK world X/Y foot diagnostics and explain that ground proximity does not identify planted contacts. Clarify that bone mirroring preserves root curves and Motion Diagnostics ignores them.
+
+Add pending root-graph/handle autosave recovery, tool preservation, world-contact and authored-export-to-scene-runtime regressions, plus installed core-consumer root playback checks. Add optional sequential CPU profiles for normal/root playback, dense keys, graph edits, scrubbing and multiple looping characters. Document the complete artist workflow, coordinate chain, movement ownership, lifecycle/loop contracts and deferred capabilities in the [hardening report](docs/root-motion-hardening.md). Retain the higher package/lockfile version `1.2.6`.
+
 ## 1.1.7-5
 
 Add explicit Scene-controlled or Animation root motion movement sources to animation clips, with evaluated read-only displacement and disabled rootless selections in the collapsed inspector. Default omitted fields to scene movement without rewriting legacy files. Reject overlapping translation owners for an Actor, including moves and root-motion clips; retain the existing animation-channel conflicts and allow adjacent windows and independent Actors.

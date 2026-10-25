@@ -30,6 +30,44 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 const workflowGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-root-motion',
+    'Using Root Motion',
+    'Choose animation-owned travel, resolve movement conflicts and retain the final Actor position.',
+    action,
+    [
+      step(
+        'clip',
+        'Select an animation clip',
+        T.sceneTimeline,
+        'After exiting this tour, select an animation action on the Actor timeline. If a move, wait, face or cue is selected, select or add an animation action first. Author and save root Position X/Y keys in Animation Editor before choosing the clip here. This tour preserves selection, playback and authored data.',
+      ),
+      step(
+        'source',
+        'Choose the movement source',
+        T.sceneActionProperties,
+        'Open Action properties · animation. Set Movement source to Animation root motion, then Apply action properties. Scene-controlled is the default and ignores root translation. The root option is disabled for clips without root keys. The read-only Root displacement reports animation-local X/Y over the window; facing and scale at clip start transform it once.',
+      ),
+      step(
+        'preview',
+        'Preview the travel',
+        T.scenePlayback,
+        'After exiting, use Play and Pause, or Playhead (s) to scrub forward and backward. Duration bounds travel; non-looping clips hold their endpoint and Loop within duration accumulates complete cycles. Seeking reconstructs from initial Actor placement, so returning to the same time gives the same position. The tour never starts playback or seeks.',
+      ),
+      step(
+        'conflicts',
+        'Resolve competing translation owners',
+        T.sceneActionProperties,
+        'An Animation root motion clip owns translation throughout its full action window, including an endpoint hold. Overlapping move actions or another root clip on that Actor are rejected without changing either action. Shorten or move an action, or choose Scene-controlled when scene movement should own travel. Adjacent actions and independent Actors are allowed.',
+      ),
+      step(
+        'finish',
+        'Confirm and preserve the final position',
+        T.sceneStage,
+        'After playback passes the clip end, open Runtime preview to inspect Position. A +80 step from X=100 ends at X=180 at right-facing scale 1; a following idle holds it. Cancel retains applied travel; Stop restores authored placement. Download scene JSON preserves Movement source; Download scene package also includes character root keys for standalone runtime playback.',
+      ),
+    ],
+  ),
+  guide(
     'scene-cuts-fades',
     'Cinematic Cuts, Fades & Transitions',
     'Cut between camera shots and author color fades with deterministic seeking on the scene timeline.',

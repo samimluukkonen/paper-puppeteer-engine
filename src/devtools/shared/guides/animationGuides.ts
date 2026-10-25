@@ -30,7 +30,7 @@ const step = (id: string, title: string, description: string, targetId: string):
 export const animationGuides: readonly GuideDefinition[] = [
   {
     id: 'animation-root-motion',
-    title: 'Visual Root Motion',
+    title: 'Creating Root Motion',
     description: 'Author whole-character travel with root position keys, a viewport handle and Graph Editor curves.',
     editor: 'animation',
     category: 'animation',
@@ -64,6 +64,34 @@ export const animationGuides: readonly GuideDefinition[] = [
         'review',
         'Review and save a sword attack',
         'Keep the anticipation and sword cut on skeletal keys. Author a root start at 0, a step to 80 and a final hold at 80. Scrub and play to see pelvis bob and feet travel over fixed ground. Root loop behavior chooses reset or continuous travel with Loop preview. World displacement selects Authored Root Motion, Preview-Only Displacement or No World Displacement; movement is never added twice. Show root trajectory only changes the view. Undo/Redo restores authored edits; animation export, reload and character packages retain root keys and curves. Preview and runtime measure displacement from the first sample, transformed once by facing and scale.',
+        targets.animationRootMotion,
+      ),
+    ],
+  },
+  {
+    id: 'animation-root-vs-pelvis',
+    title: 'Root Motion vs Pelvis Animation',
+    description: 'Keep body posing on bones and whole-character translation on independent root tracks.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'bone',
+        'Find the pelvis in your skeleton',
+        'After exiting this tour, select your pelvis or body bone in Bones. Bone names depend on your rig. The pelvis remains an ordinary skeletal bone; its keys pose the body relative to its parent. This tour never selects a bone or changes keys.',
+        targets.animationBones,
+      ),
+      step(
+        'pose',
+        'Animate body movement within the skeleton',
+        'Use the selected bone’s position and rotation fields and property key buttons for anticipation, pelvis bob, leg stepping and sword poses. Translating the pelvis can move its descendants, but does not move the outer Actor. Keep these skeletal keys when adding travel.',
+        targets.animationProperties,
+      ),
+      step(
+        'root',
+        'Move the Actor independently',
+        'Open Root Motion and enable Edit Root Motion after exiting. Position X/Y and the purple square move the whole character before the normal skeleton and IK pass. Facing and scale transform travel once. Compare Authored Root Motion with No World Displacement: the same body poses remain. Ground and background stay fixed; do not also add matching pelvis travel or a scene move for the same displacement.',
         targets.animationRootMotion,
       ),
     ],

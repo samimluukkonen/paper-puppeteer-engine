@@ -48,6 +48,7 @@ test('preview and explicitly apply contact IK keys, then undo/redo and scrub wit
   await panel.getByRole('combobox', { name: 'Foot IK constraint', exact: true }).selectOption('rightLegIK');
   const distances = panel.getByRole('list', { name: 'Contact ground distances' });
   await expect(distances).toContainText('Main sole');
+  await expect(distances).toContainText(/World X -?[\d.]+, Y -?[\d.]+/);
   const y = panel.getByRole('spinbutton', { name: 'Ground Y', exact: true });
   const distance = Number(
     (await distances.getByText('Main sole', { exact: false }).innerText()).match(/: ([-\d.]+)/)![1],

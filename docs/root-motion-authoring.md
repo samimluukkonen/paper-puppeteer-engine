@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides) · [Animation Editor](animation-editor.md) · [Runtime root motion](root-motion.md)
 
-Root motion translates the whole character independently of its skeleton. Use it for steps, lunges, jumps and dodges while keeping pelvis bob, arm swings and weapon poses in ordinary bone tracks. Open **Feature Guide → Animation Editor → Visual Root Motion** for the five-step in-app tour. The tour reveals controls without changing your animation.
+Root motion translates the whole character independently of its skeleton. Use it for steps, lunges, jumps and dodges while keeping pelvis bob, arm swings and weapon poses in ordinary bone tracks. Open **Feature Guide → Animation Editor → Creating Root Motion** for the five-step in-app tour. The tour reveals controls without changing your animation.
 
 ## Controls
 
@@ -36,7 +36,7 @@ The editor and runtime both measure displacement from the first root sample. The
 
 Ground and background remain fixed in world coordinates. Fixed camera holds its configured center; Follow Character uses the same evaluated world displacement as the Puppet, including facing, scale and rotation. The background scrolls on screen under Follow while retaining its world transform. Existing foot markers show final post-IK world positions and signed ground distance; they do not establish planted contacts or change IK.
 
-Preview-only trajectories use world pixels independent of facing/scale, and replace authored root translation during preview. **No World Displacement** suppresses both translation sources while keeping skeletal animation. See [trajectory copying](motion-preview.md) for the explicit preview/apply workflow. Root trajectories and handles never become exported character artwork. There is no root extraction, physics, foot locking, root rotation/scaling or scene choreography authoring here.
+Preview-only trajectories use world pixels independent of facing/scale, and replace authored root translation during preview. **No World Displacement** suppresses both translation sources while keeping skeletal animation. See [trajectory copying](motion-preview.md) for the explicit preview/apply workflow. Root trajectories and handles never become exported character artwork. Use [Scene root motion](scene-root-motion.md) for scene choreography. Root extraction, physics, foot locking and root rotation/scaling are deferred. See the [integration and hardening report](root-motion-hardening.md) for tool compatibility and the complete artist workflow.
 
 ## Implementation and verification
 

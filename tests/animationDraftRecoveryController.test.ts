@@ -127,7 +127,7 @@ test('binds source identity and updates edits/playback without replacing recover
   controller.dispose();
 });
 
-test.each(['field', 'graph'] as const)(
+test.each(['field', 'graph', 'root-graph', 'root-handle'] as const)(
   'unload preserves the last committed snapshot while a %s preview is pending, before debounce',
   (preview) => {
     vi.useFakeTimers();
@@ -174,12 +174,28 @@ test.each(['field', 'graph'] as const)(
       controller.bind(state, 'hero');
       state.setAuthoredPlaybackMode('stepped');
       state.setAuthoredFPS(17);
+      if (preview.startsWith('root-')) {
+        state.setRootPosition({ x: 0, y: 0 }, 0);
+        state.setRootPosition({ x: 80, y: -20 }, 1);
+        state.editGraphKey(
+          { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0 },
+          { curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } } },
+        );
+      }
       const committed = state.workingAnimation;
       if (preview === 'field') {
         state.selectBone('root');
         state.setTemporaryBoneProperty('x', 123);
+      } else if (preview === 'root-handle') {
+        state.setRootMotionView({ editing: true });
+        assert.isTrue(state.beginRootMotionDrag());
+        state.previewRootMotionDrag({ x: 123, y: -456 });
       } else {
-        state.beginGraphEdit({ channel: { kind: 'bone', id: 'root', property: 'x' }, time: 0 });
+        const channel =
+          preview === 'root-graph'
+            ? { kind: 'root' as const, id: 'Root Motion' as const, property: 'x' as const }
+            : { kind: 'bone' as const, id: 'root', property: 'x' as const };
+        state.beginGraphEdit({ channel, time: 0 });
         state.previewGraphEdit({ value: 123 });
       }
       assert.isTrue(state.hasPendingAnimationEdits);

@@ -61,7 +61,8 @@ export function FootContactGroundPanel({
             const distance = contactGroundDistance(contact.world, guide.y, controller.tolerance);
             return (
               <li key={contact.id}>
-                {contact.name} ({contact.id}): {distance.distance.toFixed(3)} · {distance.relation}
+                {contact.name} ({contact.id}): {distance.distance.toFixed(3)} · {distance.relation} · World X{' '}
+                {contact.world.x.toFixed(3)}, Y {contact.world.y.toFixed(3)}
               </li>
             );
           })}
@@ -95,7 +96,8 @@ export function FootContactGroundPanel({
       <p className="workspace-caption">
         Alignment previews a tinted pose and contact. Apply saves X/Y target keys at the playhead as one animation
         Undo/Redo edit. Positive distance is below ground; negative is above (Y grows downward). Target world X stays
-        fixed. Limited alignments cannot be applied.
+        fixed. Limited alignments cannot be applied. Marker positions are measured after IK in world space; proximity to
+        ground does not identify a planted foot. No contact timing or automatic foot locking is applied.
       </p>
       {(controller.feedback || controller.disabledReason) && (
         <p role="status">{controller.feedback || controller.disabledReason}</p>

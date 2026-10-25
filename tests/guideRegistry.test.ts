@@ -35,6 +35,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
     getGuidesForEditor('animation').map(({ id }) => id),
     [
       'animation-root-motion',
+      'animation-root-vs-pelvis',
       'animation-preview-displacement',
       'animation-environment-preview',
       'animation-ground-reference',

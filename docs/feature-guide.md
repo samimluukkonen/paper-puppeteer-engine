@@ -6,11 +6,13 @@ Guides appear in alphabetical order within each editor category. Use **Search gu
 
 **Project Workspace** opens the same catalog. Choose an editor category and a character or scene, then start the guide. The selected editor opens and checks its live requirements. Create assets first with **+ New Character** or **+ New Scene** when the project is empty. The standalone character-creation tour is unavailable within project editors; use Project Workspace to create characters.
 
-Scene Editor offers eight Explain tours: creating a scene, adding/positioning Actors, animation clips, movement, timing, preview and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
+Scene Editor offers twenty-three Explain tours, including creating a scene, Actors, animation clips, root motion, movement, timing, cameras, artwork and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
 
 Animation Editor offers **Environment Preview**, a ten-step Explain tour of static image import/selection, world transforms, shared ground alignment, fixed/follow cameras, playback, seeking and local recovery/project saving. It works with an empty selected animation and no background image. The tour reveals controls without changing preview settings or authored motion. See [Animation Environment Preview](animation-environment-preview.md).
 
-**Preview Displacement** is a seven-step Animation tour of additive opt-in, time/X/Y points, segment interpolation, synchronized playback, the spatial trajectory and reset/saving. It supports an empty selected clip without points, artwork or IK. The tour preserves settings, authored motion, playhead and history. See [Animation preview displacement](motion-preview.md).
+**Preview Displacement** is a seven-step Animation tour of preview-only opt-in, time/X/Y points, segment interpolation, synchronized playback, the spatial trajectory and reset/saving. It supports an empty selected clip without points, artwork or IK. The tour preserves settings, authored motion, playhead and history. See [Animation preview displacement](motion-preview.md).
+
+**Creating Root Motion** and **Root Motion vs Pelvis Animation** explain independent root X/Y tracks, skeletal posing, fixed-world preview and Graph Editor curves. **Using Root Motion** in Scene Editor explains Movement source, conflicts, looping and final Actor position. These tours only reveal controls. See the [root-motion workflow](root-motion-hardening.md).
 
 The bright outline identifies the real control or panel. The dimmed area is protected from accidental interaction. **Explain** steps describe controls without changing your project. **Back**, **Next**, and **Finish** move through explanations; **Exit** or **Escape** closes the guide. Inspector sections start collapsed and open as their controls are explained.
 

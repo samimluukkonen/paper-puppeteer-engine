@@ -104,7 +104,7 @@ Authored motion belongs to the animation. Compilation retains an independent fro
 
 Animation JSON export, character packages and project assets preserve this track deterministically through their existing validation boundaries. Whole-clip variations scale root key times with duration; ordinary bone/IK edits preserve them. There is no React state, camera state or Phaser object in root-motion data.
 
-Animation Editor timeline/Graph Editor controls and its fixed-world preview are implemented in [v1.1.7-3](root-motion-authoring.md). Scene clip ownership, collision/physics/pathfinding, root rotation/scaling, extraction and foot locking remain deferred. The package and lockfile remain at their higher 1.2.6 version.
+Animation Editor timeline/Graph Editor controls and its fixed-world preview are implemented in [v1.1.7-3](root-motion-authoring.md). Scene clip ownership is implemented in [Scene root motion](scene-root-motion.md). Collision/physics/pathfinding, root rotation/scaling, extraction and foot locking remain deferred. The package and lockfile remain at their higher 1.2.6 version.
 
 ## Runtime implementation (v1.1.7-2)
 

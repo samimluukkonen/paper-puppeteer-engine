@@ -181,7 +181,10 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
           ))}
         </fieldset>
         <p className="animation-mirror-destination">{direction.help}</p>
-        <p>{state.scope} Only authored source properties are copied; temporary edits and IK are excluded.</p>
+        <p>
+          {state.scope} Only authored source bone properties are copied; temporary edits and IK are excluded. Root
+          Motion keys and curves stay unchanged. Use facing to reverse whole-character travel.
+        </p>
         <div data-guide-id={GUIDE_TARGETS.animationMirrorActions} className="animation-mirror-actions">
           <button
             type="button"

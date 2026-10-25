@@ -112,6 +112,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [Visual root-motion authoring and sword-attack walkthrough](docs/root-motion-authoring.md)
 - [Root motion and Environment Preview integration](docs/root-motion-environment-preview.md)
 - [Scene root motion, ownership and choreography](docs/scene-root-motion.md)
+- [Root-motion workflow, tool compatibility and hardening](docs/root-motion-hardening.md)
 
 | Guide                                                                | Contents                                                                                                   |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
