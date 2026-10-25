@@ -8,7 +8,7 @@ Pushes to `master` build and deploy the authoring tools through [the Pages workf
 
 ## Install and run
 
-Requires Node.js **24 or newer** and npm. Local development and CI use **24.19.0**, pinned in [.nvmrc](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.nvmrc). Run `nvm use` if you use nvm.
+Requires Node.js **24.22.1 or newer** and npm. Local development and CI use **24.22.1**, pinned in [.nvmrc](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.nvmrc). Run `nvm use` if you use nvm.
 
 ```bash
 npm install
