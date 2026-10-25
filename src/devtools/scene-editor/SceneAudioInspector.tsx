@@ -143,8 +143,8 @@ export function SceneAudioInspector({ document }: { document: SceneEditorDocumen
       </div>
       <div data-guide-id={GUIDE_TARGETS.sceneAudioPlayback}>
         <p className="workspace-caption">
-          A selected clip exposes Volume and Loop. Looping stays within the finite clip duration; synchronized scene
-          audio playback arrives in v1.3.3.
+          A selected clip exposes Volume and Loop. Looping stays within the finite clip duration. Audio follows the
+          scene clock during playback. Passive scrubbing stays silent.
         </p>
       </div>
       <div data-guide-id={GUIDE_TARGETS.sceneAudioFades}>

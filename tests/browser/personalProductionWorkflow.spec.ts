@@ -4,7 +4,7 @@ import { buildProjectPackage, importProjectPackage } from '../../src/devtools/pr
 import { loadPackageDefinition } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
-import { test } from './fixtures.js';
+import { inspectorControl, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -171,7 +171,7 @@ test('personal production: new project and artwork → rig/IK/keys → scene →
   await scene.getByRole('button', { name: 'Create Scene', exact: true }).click();
   frame = await editor(page, 'Scene Editor');
   await expect(frame.locator('.scene-inspector details[open]')).toHaveCount(0);
-  await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(frame, '[data-guide-id="scene-add-actor"]')).click();
   await frame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })

@@ -50,3 +50,5 @@ export type { CameraProperty, CameraKeyframe, CameraTracks } from './cameraAnima
 export type { SceneTransition, SceneTransitionState, SceneTransitionTarget } from './sceneTransitions.js';
 
 export type { SceneAudioClip, SceneAudioTrack } from './sceneAudio.js';
+
+export type { ActiveSceneAudioClip } from './sceneAudio.js';

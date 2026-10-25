@@ -868,6 +868,9 @@ export class SceneEditorDocument {
   addAudioTrack(category: AudioCategory): boolean {
     return this.audioCommands.addTrack(category);
   }
+  removeAudioTrack(id: string, options: { removeClips?: boolean } = {}): boolean {
+    return this.audioCommands.removeTrack(id, options);
+  }
   addAudioClip(input: Omit<SceneAudioClip, 'id'>): boolean {
     return this.audioCommands.addClip(input);
   }

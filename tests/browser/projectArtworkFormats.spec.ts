@@ -1,6 +1,6 @@
 import { expect, type Frame, type Page } from '@playwright/test';
 import { encodePackageZip } from '../../src/engine/packageZip.js';
-import { test } from './fixtures.js';
+import { inspectorControl, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -66,7 +66,7 @@ test('static WebP opens in rig, animation and scene editors and survives project
   await dialog.getByRole('button', { name: 'Create Scene', exact: true }).click();
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const scene = await editor(page);
-  await scene.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(scene, '[data-guide-id="scene-add-actor"]')).click();
   await scene
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })

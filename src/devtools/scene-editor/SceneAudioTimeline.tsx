@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { AUDIO_CATEGORIES, type AudioCategory } from '../../engine/AudioAsset.js';
 import type { SceneAudioClip } from '../../engine/sceneAudio.js';
@@ -103,7 +104,7 @@ export function SceneAudioControls({
       >
         Add Audio Clip
       </button>
-      <span className="workspace-caption">Audio timing is saved; synchronized playback comes in v1.3.3.</span>
+      <span className="workspace-caption">Play follows scene timing. Passive scrubbing is silent.</span>
     </div>
   );
 }
@@ -130,19 +131,39 @@ export function SceneAudioTracks({
         )}
       </div>
       {(scene.audioTracks ?? []).map((track) => {
-        const layout = layoutAudioClips(
-          (scene.audioClips ?? []).filter((clip) => clip.trackId === track.id),
-          scene.duration,
-          width,
-        );
+        const clips = (scene.audioClips ?? []).filter((clip) => clip.trackId === track.id);
+        const layout = layoutAudioClips(clips, scene.duration, width);
         return (
           <div
             className="scene-track-row"
             key={track.id}
             style={{ height: Math.max(1, ...layout.map(({ lane }) => lane + 1)) * 26 + 8 }}
           >
-            <span className="scene-track-label" title={AUDIO_TRACK_NAMES[track.category]}>
-              {track.name}
+            <span className="scene-track-label scene-audio-track-label" title={AUDIO_TRACK_NAMES[track.category]}>
+              <span className="scene-audio-track-name" title={track.name}>
+                {track.name}
+              </span>
+              <button
+                type="button"
+                className="workspace-danger scene-audio-track-remove"
+                aria-label={`Remove audio track ${track.name}`}
+                title={`Remove audio track ${track.name}`}
+                disabled={document.hasActiveGesture}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (
+                    clips.length &&
+                    !window.confirm(
+                      `Remove audio track "${track.name}" and its ${clips.length} ${clips.length === 1 ? 'clip' : 'clips'}? This can be undone.`,
+                    )
+                  )
+                    return;
+                  document.removeAudioTrack(track.id, { removeClips: true });
+                }}
+              >
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
             </span>
             <div className="scene-track-lane" style={{ width }} aria-label={`${track.name} audio clips`}>
               {layout.map(({ clip, lane }) => {

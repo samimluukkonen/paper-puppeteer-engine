@@ -1,4 +1,5 @@
 import { equalJsonData } from '../../engine/equalJsonData.js';
+import type { SceneAudioOptions } from '../../engine/SceneAudioController.js';
 import { sceneActorDepth, sceneLayer } from '../../engine/sceneLayers.js';
 import type { SceneRunnerOptions } from '../../engine/SceneRunner.js';
 import { SceneRunner } from '../../engine/SceneRunner.js';
@@ -15,6 +16,9 @@ export class SceneEditorPlayback {
   private revision = 0;
   private rate = 1;
   private message = '';
+  private audioOptions: SceneAudioOptions | undefined;
+  private transportGeneration = 0;
+  private muted = false;
   private readonly listeners = new Set<() => void>();
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -37,6 +41,15 @@ export class SceneEditorPlayback {
   get error(): string {
     return this.message;
   }
+  get audioStatus(): string {
+    return this.runner?.audio?.status ?? 'disabled';
+  }
+  get audioError(): string {
+    return this.runner?.audio?.error ?? '';
+  }
+  get audioMuted(): boolean {
+    return this.muted;
+  }
   get speed(): number {
     return this.rate;
   }
@@ -50,7 +63,12 @@ export class SceneEditorPlayback {
   /** Selection notifications reuse the same immutable snapshot and keep playback running.
    * Artwork-only edits retain the current Actors and clock. Other authored edits/switches reset playback to initial placement; incomplete assets disable it.
    */
-  sync(source: ReadonlyScene | null, ready: boolean, createActor: SceneRunnerOptions['createActor']): void {
+  sync(
+    source: ReadonlyScene | null,
+    ready: boolean,
+    createActor: SceneRunnerOptions['createActor'],
+    audio?: SceneAudioOptions,
+  ): void {
     if (this.source === source && this.runner && ready) return;
     if (this.source && source && this.runner && ready) {
       const {
@@ -77,19 +95,26 @@ export class SceneEditorPlayback {
       } = source;
       if (equalJsonData(previous, next)) {
         this.source = source;
+        this.transportGeneration++;
+        this.runner.audio?.setScene(source);
+        this.runner.audio?.sync(this.time, this.status === 'playing', this.rate);
         this.syncLayers();
+        this.notify();
         return;
       }
     }
     if (this.source === source && !this.runner && !ready) return;
     this.runner?.dispose();
+    this.transportGeneration++;
     this.runner = undefined;
     this.source = source;
     this.factory = createActor;
+    this.audioOptions = audio;
     this.message = '';
     if (source && ready)
       this.command(() => {
-        this.runner = new SceneRunner(source, { createActor });
+        this.runner = new SceneRunner(source, { createActor, ...(audio ? { audio } : {}) });
+        if (this.runner.audio) this.runner.audio.muted = this.muted;
         this.runner.speed = this.rate;
         this.showAuthoring();
       });
@@ -123,21 +148,70 @@ export class SceneEditorPlayback {
     this.notify();
   }
   play(): void {
-    this.command(() => this.runner?.play());
+    this.start(false);
   }
   pause(): void {
+    this.transportGeneration++;
     this.command(() => this.runner?.pause());
   }
   restart(): void {
-    this.command(() => this.runner?.restart());
+    this.start(true);
+  }
+  private start(restart: boolean): void {
+    const runner = this.runner;
+    if (!runner) return;
+    const generation = ++this.transportGeneration;
+    const operation = () => (restart ? runner.restart() : runner.play());
+    const audio = runner.audio;
+    if (!audio || audio.muted || audio.status === 'disabled' || audio.status === 'ready') {
+      this.command(operation);
+      return;
+    }
+    // unlock() resumes synchronously here, inside the Play gesture.
+    const pending = audio.unlock();
+    this.notify();
+    void pending.then(
+      () => {
+        if (this.runner === runner && generation === this.transportGeneration) this.command(operation);
+      },
+      () => {
+        if (this.runner === runner) this.notify();
+      },
+    );
+  }
+  enableAudio(): void {
+    const runner = this.runner;
+    if (!runner?.audio) return;
+    const pending = runner.audio.unlock();
+    this.notify();
+    void pending.then(
+      () => {
+        if (this.runner === runner)
+          this.command(() => runner.audio?.sync(this.time, this.status === 'playing', this.rate));
+      },
+      () => {
+        if (this.runner === runner) this.notify();
+      },
+    );
+  }
+  setAudioMuted(muted: boolean): void {
+    this.muted = muted;
+    this.command(() => {
+      if (this.runner?.audio) {
+        this.runner.audio.muted = muted;
+        this.runner.audio.sync(this.time, this.status === 'playing', this.rate);
+      }
+    });
   }
   stop(): void {
+    this.transportGeneration++;
     this.command(() => {
       this.runner?.stop();
       this.showAuthoring();
     });
   }
   seek(time: number): void {
+    this.transportGeneration++;
     this.command(() => this.runner?.seek(time));
   }
   setSpeed(speed: number): void {
@@ -158,9 +232,10 @@ export class SceneEditorPlayback {
     if (!this.source || !this.factory) return;
     const source = this.source;
     this.source = null;
-    this.sync(source, true, this.factory);
+    this.sync(source, true, this.factory, this.audioOptions);
   }
   dispose(): void {
+    this.transportGeneration++;
     const runner = this.runner;
     this.runner = undefined;
     this.source = null;

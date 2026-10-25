@@ -19,7 +19,7 @@ import { artworkFixture } from './helpers/scenePackageFixtures.js';
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {
   const document = new SceneEditorDocument();
   const launcher = new GuideLauncher(sceneGuideHost(document));
-  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 24);
+  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 25);
   assert.deepEqual(launcher.getAvailability('scene-creating'), { available: true });
   assert.isFalse(launcher.getAvailability('scene-adding-actor').available);
   assert.isFalse(launcher.getAvailability('scene-backgrounds-layers').available);
@@ -27,6 +27,8 @@ test('scene tours gate missing documents and selections, and explain tours prese
   assert.isFalse(launcher.getAvailability('scene-camera-keyframes').available);
   assert.isFalse(launcher.getAvailability('scene-cuts-fades').available);
   assert.isFalse(launcher.getAvailability('scene-audio-timeline').available);
+  assert.isFalse(launcher.getAvailability('scene-audio-synchronization').available);
+  assert.equal(launcher.getPrerequisiteGuide('scene-audio-synchronization')?.id, 'scene-creating');
   assert.equal(launcher.getPrerequisiteGuide('scene-audio-timeline')?.id, 'scene-creating');
   assert.equal(launcher.getPrerequisiteGuide('scene-cuts-fades')?.id, 'scene-creating');
   assert.equal(launcher.getPrerequisiteGuide('scene-camera-keyframes')?.id, 'scene-creating');
@@ -40,6 +42,7 @@ test('scene tours gate missing documents and selections, and explain tours prese
   assert.isTrue(launcher.getAvailability('scene-camera-keyframes').available);
   assert.isTrue(launcher.getAvailability('scene-cuts-fades').available);
   assert.isTrue(launcher.getAvailability('scene-audio-timeline').available);
+  assert.isTrue(launcher.getAvailability('scene-audio-synchronization').available);
   assert.isTrue(launcher.getAvailability('scene-ground-reference').available);
   assert.isFalse(launcher.getAvailability('scene-positioning').available);
   document.addActor('../characters/demo/character.json');
@@ -338,103 +341,128 @@ test('cuts and fades guide exposes real targets in empty and selected-effect sta
   }
 });
 
-test('audio timeline guide resolves unique real controls with empty and selected clips while preserving history and view state', () => {
-  const document = new SceneEditorDocument();
-  document.createScene({ id: 'audio-tour', duration: 4000 });
-  const launcher = new GuideLauncher(sceneGuideHost(document));
-  const guide = guideRegistry.getGuideById('scene-audio-timeline')!;
-  assert.equal(guide.title, 'Visual Audio Timeline');
-  assert.lengthOf(guide.steps, 9);
-  assert.deepEqual(
-    guide.prerequisites?.map(({ capability }) => capability),
-    ['tool:scene'],
-  );
-  const registry = new SceneCharacterRegistry();
-  const playback = new SceneEditorPlayback();
-  const inspect = (populated: boolean) => {
-    const html =
-      renderToStaticMarkup(createElement(SceneAudioInspector, { document })) +
-      renderToStaticMarkup(
-        createElement(SceneTimeline, { scene: document.workingScene!, document, registry, playback }),
-      );
-    for (const id of [
-      GUIDE_TARGETS.sceneAudioAsset,
-      GUIDE_TARGETS.sceneAudioAddTrack,
-      GUIDE_TARGETS.sceneAudioAddClip,
-      GUIDE_TARGETS.sceneAudioTracks,
-      GUIDE_TARGETS.sceneAudioProperties,
-      GUIDE_TARGETS.sceneAudioTiming,
-      GUIDE_TARGETS.sceneAudioPlayback,
-      GUIDE_TARGETS.sceneAudioFades,
-      GUIDE_TARGETS.sceneAudioActions,
-    ])
-      assert.lengthOf([...html.matchAll(new RegExp(`data-guide-id="${id}"`, 'g'))], 1);
-    assert.notInclude(html, '<details open');
-    assert.include(html, populated ? 'Source offset (seconds)' : 'No clips yet?');
-    const before = document.workingScene;
-    const json = document.exportJson();
-    const state = () => [
-      document.selectedAudioClip,
-      document.selectedActorId,
-      document.selectedActionId,
-      document.selectedImageId,
-      document.selectedCameraKey,
-      document.cameraSelected,
-      document.cameraPreviewing,
-      document.cameraOverlays,
-      document.canUndo,
-      document.canRedo,
-      document.cinematicCamera,
-      playback.time,
-      playback.status,
-    ];
-    const view = state();
-    assert.isTrue(launcher.launch(guide.id).ok);
-    assert.isTrue(launcher.controller.next().ok);
-    assert.isTrue(launcher.controller.previous().ok);
-    assert.isTrue(launcher.controller.restart().ok);
-    for (const [index, step] of guide.steps.entries()) {
-      assert.equal(step.preparation, 'reveal-target');
-      assert.notEqual(step.mode, 'try-it');
-      if (index) assert.isTrue(launcher.controller.next().ok);
+test.each(['scene-audio-timeline', 'scene-audio-synchronization'] as const)(
+  '%s resolves unique real controls with empty and selected clips while preserving history and view state',
+  (guideId) => {
+    const document = new SceneEditorDocument();
+    document.createScene({ id: 'audio-tour', duration: 4000 });
+    const launcher = new GuideLauncher(sceneGuideHost(document));
+    const guide = guideRegistry.getGuideById(guideId)!;
+    assert.equal(
+      guide.title,
+      guideId === 'scene-audio-timeline' ? 'Visual Audio Timeline' : 'Audio Playback & Synchronization',
+    );
+    assert.lengthOf(guide.steps, 9);
+    assert.deepEqual(
+      guide.prerequisites?.map(({ capability }) => capability),
+      ['tool:scene'],
+    );
+    const registry = new SceneCharacterRegistry();
+    const playback = new SceneEditorPlayback();
+    const inspect = (populated: boolean) => {
+      playback.sync(document.workingScene, true, () => {
+        throw new Error('The audio guide fixture has no Actors.');
+      });
+      if (populated) {
+        playback.seek(1000);
+        playback.setSpeed(0.5);
+        playback.setAudioMuted(true);
+      }
+      const html =
+        renderToStaticMarkup(createElement(SceneAudioInspector, { document })) +
+        renderToStaticMarkup(
+          createElement(SceneTimeline, { scene: document.workingScene!, document, registry, playback }),
+        );
+      for (const id of [
+        GUIDE_TARGETS.sceneAudioAsset,
+        GUIDE_TARGETS.sceneAudioAddTrack,
+        GUIDE_TARGETS.sceneAudioAddClip,
+        GUIDE_TARGETS.sceneAudioTracks,
+        GUIDE_TARGETS.sceneAudioProperties,
+        GUIDE_TARGETS.sceneAudioTiming,
+        GUIDE_TARGETS.sceneAudioPlayback,
+        GUIDE_TARGETS.sceneAudioFades,
+        GUIDE_TARGETS.sceneAudioActions,
+        GUIDE_TARGETS.scenePlayback,
+        GUIDE_TARGETS.sceneTime,
+        GUIDE_TARGETS.sceneAudioStatus,
+        GUIDE_TARGETS.sceneAudioMute,
+        GUIDE_TARGETS.scenePlaybackSpeed,
+        GUIDE_TARGETS.sceneRestart,
+        GUIDE_TARGETS.sceneStop,
+      ])
+        assert.lengthOf([...html.matchAll(new RegExp(`data-guide-id="${id}"`, 'g'))], 1);
+      assert.notInclude(html, '<details open');
+      assert.include(html, populated ? 'Source offset (seconds)' : 'No clips yet?');
+      const before = document.workingScene;
+      const json = document.exportJson();
+      const state = () => [
+        document.selectedAudioClip,
+        document.selectedActorId,
+        document.selectedActionId,
+        document.selectedImageId,
+        document.selectedCameraKey,
+        document.cameraSelected,
+        document.cameraPreviewing,
+        document.cameraOverlays,
+        document.canUndo,
+        document.canRedo,
+        document.cinematicCamera,
+        playback.time,
+        playback.status,
+        playback.speed,
+        playback.audioMuted,
+        playback.audioStatus,
+        playback.audioError,
+      ];
+      const view = state();
+      assert.isTrue(launcher.launch(guide.id).ok);
+      assert.isTrue(launcher.controller.next().ok);
+      assert.isTrue(launcher.controller.previous().ok);
+      assert.isTrue(launcher.controller.restart().ok);
+      for (const [index, step] of guide.steps.entries()) {
+        assert.equal(step.preparation, 'reveal-target');
+        assert.notEqual(step.mode, 'try-it');
+        if (index) assert.isTrue(launcher.controller.next().ok);
+      }
+      assert.isTrue(launcher.controller.finish().ok);
+      assert.strictEqual(document.workingScene, before);
+      assert.equal(document.exportJson(), json);
+      assert.deepEqual(state(), view);
+    };
+    try {
+      inspect(false);
+      document.replaceScene({
+        ...document.workingScene,
+        audioAssets: [{ id: 'tone', name: 'Tone', category: 'voice', path: 'audio/tone.wav', durationSeconds: 2 }],
+        audioTracks: [{ id: 'voice', name: 'Voice', category: 'voice' }],
+        audioClips: [
+          {
+            id: 'voice-clip',
+            assetId: 'tone',
+            trackId: 'voice',
+            time: 500,
+            duration: 3000,
+            sourceOffset: 100,
+            volume: 0.4,
+            loop: true,
+            fadeIn: 200,
+            fadeOut: 300,
+          },
+        ],
+      });
+      document.setCameraTimeProvider(() => 1000);
+      document.setCameraPreview(true);
+      document.setCameraOverlays(true);
+      document.selectAudioClip('voice-clip');
+      document.updateAudioClip('voice-clip', { volume: 0.6 });
+      document.undo();
+      launcher.refresh();
+      inspect(true);
+      assert.isTrue(document.canRedo);
+    } finally {
+      registry.dispose();
+      playback.dispose();
     }
-    assert.isTrue(launcher.controller.finish().ok);
-    assert.strictEqual(document.workingScene, before);
-    assert.equal(document.exportJson(), json);
-    assert.deepEqual(state(), view);
-  };
-  try {
-    inspect(false);
-    document.replaceScene({
-      ...document.workingScene,
-      audioAssets: [{ id: 'tone', name: 'Tone', category: 'voice', path: 'audio/tone.wav', durationSeconds: 2 }],
-      audioTracks: [{ id: 'voice', name: 'Voice', category: 'voice' }],
-      audioClips: [
-        {
-          id: 'voice-clip',
-          assetId: 'tone',
-          trackId: 'voice',
-          time: 500,
-          duration: 3000,
-          sourceOffset: 100,
-          volume: 0.4,
-          loop: true,
-          fadeIn: 200,
-          fadeOut: 300,
-        },
-      ],
-    });
-    document.setCameraTimeProvider(() => 1000);
-    document.setCameraPreview(true);
-    document.setCameraOverlays(true);
-    document.selectAudioClip('voice-clip');
-    document.updateAudioClip('voice-clip', { volume: 0.6 });
-    document.undo();
-    launcher.refresh();
-    inspect(true);
-    assert.isTrue(document.canRedo);
-  } finally {
-    registry.dispose();
-    playback.dispose();
-  }
-});
+  },
+);

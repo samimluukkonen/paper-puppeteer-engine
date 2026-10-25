@@ -68,9 +68,6 @@
 .scene-actor-list button[aria-pressed="true"] {
   border-color: var(--accent-fg);
 }
-.scene-add-actor {
-  margin-bottom: 12px;
-}
 .scene-actor-actions,
 .scene-audio-actions {
   display: flex;
@@ -121,13 +118,6 @@
 .scene-transfer-commands {
   display: contents;
 }
-.scene-inspector details {
-  padding: 12px 0;
-  border-top: 1px solid var(--border-default);
-}
-.scene-inspector summary {
-  cursor: pointer;
-}
 .scene-errors {
   color: var(--danger-fg);
   max-height: 110px;
@@ -150,6 +140,7 @@
   display: flex;
   flex-direction: column;
   padding: 12px;
+  overflow: auto;
 }
 .scene-timeline-toolbar {
   display: flex;
@@ -161,6 +152,10 @@
 .scene-timeline-toolbar h2 {
   margin: 0;
 }
+.scene-playback-status {
+  min-width: 116px;
+  font-variant-numeric: tabular-nums;
+}
 .scene-timeline-toolbar input[type="number"] {
   width: 75px;
 }
@@ -169,8 +164,8 @@
 }
 .scene-timeline-viewport {
   overflow: auto;
-  flex: 1;
-  /* Wrapped desktop toolbars must leave the tracks free to shrink and scroll. */
+  /* Preserve usable tracks when wrapped desktop controls require the panel to scroll. */
+  flex: 1 0 120px;
   min-height: 0;
   outline-color: var(--accent-fg);
 }
@@ -374,9 +369,13 @@
 }
 .scene-layer-settings {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 80px auto;
+  grid-template-columns: minmax(0, 1fr) 80px;
   gap: 8px;
   align-items: end;
+}
+.scene-layer-settings > button {
+  grid-column: 1 / -1;
+  justify-self: start;
 }
 .scene-inspector .scene-layer-settings label {
   margin: 0;
@@ -455,6 +454,27 @@
   padding-inline: 10px;
   background: var(--bg-subtle);
   border-color: var(--accent-fg);
+}
+.scene-audio-track-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 8px;
+}
+.scene-audio-track-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scene-audio-track-remove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
 }
 .scene-audio-trim-start {
   left: 0;

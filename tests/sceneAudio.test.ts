@@ -112,6 +112,53 @@ test('all track categories allow multiple tracks and intentional overlaps on the
   ]);
 });
 
+test('empty tracks can be removed and restored without altering audio clips or media', () => {
+  const doc = document();
+  doc.addAudioTrack('music');
+  const before = doc.workingScene;
+  expect(doc.removeAudioTrack('music-1')).toBe(true);
+  expect(doc.workingScene!.audioTracks!.map((track) => track.id)).toEqual(['sfx-1']);
+  expect(doc.workingScene!.audioClips).toEqual([clip]);
+  expect(doc.readAudio(asset.path)).toEqual(bytes());
+  expect(doc.undo()).toBe(true);
+  expect(doc.workingScene).toBe(before);
+  expect(doc.redo()).toBe(true);
+  expect(doc.workingScene!.audioTracks).toHaveLength(1);
+});
+
+test('removing a populated track requires explicit clip removal and preserves rejected proposals', () => {
+  const doc = document();
+  const before = doc.workingScene;
+  expect(doc.removeAudioTrack('missing')).toBe(false);
+  expect(doc.removeAudioTrack('sfx-1')).toBe(false);
+  expect(doc.validationIssues[0]!.message).toContain('contains clips');
+  expect(doc.workingScene).toBe(before);
+  expect(doc.canUndo).toBe(false);
+});
+
+test('track and overlapping clips are removed in one history entry, preserving sibling tracks and source assets', () => {
+  const doc = document();
+  doc.duplicateAudioClip('clip');
+  doc.addAudioTrack('ambience');
+  doc.addAudioClip({ ...clip, trackId: 'ambience-1', time: 2000 });
+  doc.selectAudioClip('clip');
+  const before = doc.workingScene;
+  expect(doc.removeAudioTrack('sfx-1', { removeClips: true })).toBe(true);
+  expect(doc.selectedAudioClip).toBeNull();
+  expect(doc.workingScene!.audioTracks!.map((track) => track.id)).toEqual(['ambience-1']);
+  expect(doc.workingScene!.audioClips).toHaveLength(1);
+  expect(doc.workingScene!.audioClips![0]!.trackId).toBe('ambience-1');
+  expect(doc.workingScene!.audioAssets).toEqual(before!.audioAssets);
+  expect(doc.readAudio(asset.path)).toEqual(bytes());
+  expect(doc.undo()).toBe(true);
+  expect(doc.workingScene).toBe(before);
+  expect(doc.selectedAudioClip?.id).toBe('clip');
+  expect(doc.redo()).toBe(true);
+  expect(doc.workingScene!.audioTracks).toHaveLength(1);
+  expect(doc.workingScene!.audioClips).toHaveLength(1);
+  expect(validateSceneDefinition(doc.workingScene)).toEqual([]);
+});
+
 test('one complete audio drag creates one undo transaction; invalid proposals and cancelled drags preserve history', () => {
   const doc = document();
   const initial = doc.workingScene;

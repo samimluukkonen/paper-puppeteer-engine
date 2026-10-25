@@ -90,6 +90,18 @@ export function SceneEditorView({
   const [, refreshProject] = useState(0);
   useEffect(() => project?.subscribe(() => refreshProject((revision) => revision + 1)), [project]);
   const [playback] = useState(() => new SceneEditorPlayback());
+  useEffect(() => {
+    const pause = (): void => playback.pause();
+    const hidden = (): void => {
+      if (globalThis.document.visibilityState === 'hidden') pause();
+    };
+    window.addEventListener('pagehide', pause);
+    globalThis.document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('pagehide', pause);
+      globalThis.document.removeEventListener('visibilitychange', hidden);
+    };
+  }, [playback]);
   const [autosave] = useState(() => {
     const id = crypto.randomUUID();
     return project
@@ -404,7 +416,11 @@ export function SceneEditorView({
             </div>
           )}
         </section>
-        <aside id="scene-inspector" className="scene-inspector" aria-label="Scene inspector">
+        <aside
+          id="scene-inspector"
+          className="scene-inspector workspace-inspector-sections"
+          aria-label="Scene inspector"
+        >
           <h2>Inspector</h2>
           {scene ? (
             <>

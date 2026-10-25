@@ -6,13 +6,17 @@ For an in-app tour, open **Feature Guide → Scene Editor → Visual Audio Timel
 
 Import audio in Project Workspace, open a scene, choose **Track category** and **Add audio track** below the scene timeline controls. Choose **Audio asset**, choose **Audio track**, position the playhead and click **Add Audio Clip**. New clips use the decoded media duration, limited explicitly to the remaining scene time; unknown media duration starts at one second. Music, Ambience, Sound Effects and Voice are organizational categories. Add several tracks of any category and overlap any clips, including clips on the same track. Overlaps get separate visible lanes.
 
+To remove a track, click the **trash button beside its name** in the timeline. Empty tracks disappear immediately. If a track contains clips, confirm removing the track and all its clips, or cancel to keep them. **Undo** restores the track and clips together; Redo removes them again. Other tracks and the original audio assets/files stay available. Removing a playing clip stops its preview voice. To keep a clip, change its **Clip track** in the inspector before removing the old track.
+
+When Undo restores the last removed track during playback, ready audio resumes at the current scene position using the existing browser unlock. If the browser suspended sound or new assets need loading, use **Enable audio**.
+
 Select a clip to reveal its initially collapsed **Audio clip** inspector. Drag its body to move in scene time. Drag its left edge to change start, source offset and duration while keeping its scene end fixed; extend left only as far as source offset zero. Drag the right edge to change duration while keeping start and offset fixed. Snapping shares frames, playhead, Actor clip edges, camera keys, transitions and other audio edges with the existing timeline. Hold Alt to bypass snapping. One completed drag is one scene Undo/Redo entry; Escape, lost pointer capture, window blur and selection/session changes cancel an unfinished gesture.
 
 The inspector changes asset, track, start, duration, source offset, volume (0–100%), looping and fades. **Apply audio clip properties** commits one validated edit. **Duplicate audio clip** creates a new ID at the same time, preserving properties; drag the copy to another time or assign another track. **Delete audio clip** and the Delete/Backspace shortcut remove the selected clip. Scene Undo/Redo retains the original media bytes.
 
-All scene timing and source offsets are milliseconds in JSON; the UI displays seconds. `durationSeconds` describes decoded media length and is separate from the clip's scene duration and current scene playback time. Trimming never changes an audio file. A non-looping clip requires `sourceOffset + duration <= mediaDuration` when duration is known. A loop repeats the remaining source window, from `sourceOffset` through media end, within the finite authored clip interval. Left trimming a loop changes that repeated window, and cannot advance its source offset beyond the media end. Right trimming a loop can extend its scene duration past media length, within scene bounds. No custom loop points, infinite end policy or playback-rate parameters are supported.
+All scene timing and source offsets are milliseconds in JSON; the UI displays seconds. `durationSeconds` describes decoded media length and is separate from the clip's scene duration and current scene playback time. Trimming never changes an audio file. A non-looping clip requires `sourceOffset + duration <= mediaDuration` when duration is known. A loop repeats the remaining source window, from `sourceOffset` through media end, within the finite authored clip interval. Left trimming a loop changes that repeated window, and cannot advance its source offset beyond the media end. Right trimming a loop can extend its scene duration past media length, within scene bounds. No custom loop points or infinite end policy are supported. The scene transport speed applies to audio as well as visual playback.
 
-`fadeIn` and `fadeOut` are optional durations (omitted means zero), each bounded by clip duration. They describe linear gain ramps at the clip's scene edges; overlapping ramps multiply. Volume zero is valid. This phase saves these playback properties; synchronized playback, seeking and actual fade evaluation arrive in v1.3.3. Project Workspace's existing explicit audio audition is available independently. Scene playback and passive scrubbing do not start sound. Lightweight waveform previews are deferred; clips remain editable without decoding waveforms.
+`fadeIn` and `fadeOut` are optional durations (omitted means zero), each bounded by clip duration. They describe linear gain ramps at the clip's scene edges; overlapping ramps multiply. Volume zero is valid. Scene playback evaluates these properties through Web Audio on the scene clock. **Play** enables audio from a browser user gesture; **Enable audio** retries blocked or failed loading. **Mute preview audio** silences scene playback. Passive scrubbing stays silent; Play after seeking starts only currently active clips from their source-relative positions. Project Workspace's explicit audio audition remains independent. See the [audio playback guide](scene-audio-playback.md) for standalone use, speed and drift limits. Lightweight waveform previews are deferred; clips remain editable without decoding waveforms.
 
 The scene-format-2 document gains optional arrays:
 
@@ -74,4 +78,15 @@ Verification: `npm run check` and `npm run build` pass. The focused scene/audio/
 
 ```bash
 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneAudioGuide.spec.ts --workers=1
+```
+
+### Track removal verification
+
+Track removal shares SceneEditorDocument validation and scene history. Populated tracks require explicit permission to remove their clips; one snapshot removes only that track and its clips, retaining sibling tracks, asset registrations and encoded bytes. Unit coverage checks empty/unknown tracks, rejected removal, overlapping clips, selection, Undo/Redo and decoded-audio reuse after restoring the last track. Browser coverage checks confirmation/cancellation, empty and populated tracks, source-asset retention and stopping/restoring voices during playback.
+
+`npm run check` and `npm run build` pass. The focused unit run passes 68 tests across three files in 3.79 seconds. All eight local Chrome audio authoring/playback checks pass across development and production in 1.1 minutes; the track-label trash control was inspected in the desktop screenshot.
+
+```bash
+npx vitest run tests/sceneAudio.test.ts tests/sceneAudioPlayback.test.ts tests/sceneGuides.test.ts --maxWorkers=1
+PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneAudio.spec.ts tests/browser/sceneAudioPlayback.spec.ts --workers=1
 ```

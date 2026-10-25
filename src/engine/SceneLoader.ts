@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { Actor } from './Actor.js';
+import type { AudioBackend } from './AudioAssetLoader.js';
 import { CharacterDefinition, characterManifestSchema } from './CharacterDefinition.js';
 import { applyCinematicCamera, type CinematicCameraTarget, type CameraViewport } from './cinematicCamera.js';
 import type { RigJsonDefinition } from './externalData.js';
@@ -18,6 +19,8 @@ import { createSceneTextureBudget } from './sceneTextureBudget.js';
 import { SceneTransitionOverlay } from './SceneTransitionOverlay.js';
 
 export interface SceneLoadOptions {
+  /** Optional exclusively owned backend; Web Audio is the default. */
+  readonly audioBackend?: AudioBackend;
   readonly fetcher?: typeof fetch;
   readonly signal?: AbortSignal;
   readonly onCue?: SceneRunnerOptions['onCue'];
@@ -129,6 +132,7 @@ export const SceneLoader = {
             definition: resolved.definition,
             characters,
             ...(resolved.images ? { images: resolved.images } : {}),
+            ...(resolved.audio ? { audio: resolved.audio } : {}),
           },
           dispose,
         };
@@ -203,6 +207,16 @@ async function loadSession(
     controller.signal.throwIfAborted();
     if (prepared.resolved.definition.transitions?.length) transitions = new SceneTransitionOverlay(scene);
     runner = new SceneRunner(prepared.resolved.definition, {
+      audio: {
+        ...(options.audioBackend ? { backend: options.audioBackend } : {}),
+        resolve: (id) => {
+          const asset = prepared.resolved.definition.audioAssets?.find((entry) => entry.id === id);
+          const bytes = prepared.resolved.audio?.get(id);
+          return asset && bytes
+            ? { definition: { ...asset, path: asset.path.replace(/^(?:\.\.\/)+/, '') }, bytes }
+            : undefined;
+        },
+      },
       ...(transitions ? { transitionOverlay: transitions } : {}),
       onCamera: (state) => {
         transitions?.setCamera(state);

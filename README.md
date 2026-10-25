@@ -21,7 +21,7 @@ The [Animation Editor](docs/animation-editor.md) at `/animation-editor/` support
 
 Use [Animation Environment Preview](docs/animation-environment-preview.md) to evaluate any animation against a static project image, with world-space transforms and the shared ground reference. Choose authored root travel, a temporary [preview displacement trajectory](docs/motion-preview.md), or no world displacement. Fixed/follow cameras and reset/continuous root loops share the same evaluated movement; preview never changes animation keys.
 
-The [Scene Editor](docs/scene-editor.md) at `/scene-editor/` provides independent scene documents, Actor placement, action timelines, [visual audio clips](docs/scene-audio-timeline.md), Play/Pause/Restart/Stop, speed and deterministic scrubbing. Inspect runtime transforms without changing authored positions, saved state or Undo history. Download scenes before leaving the page.
+The [Scene Editor](docs/scene-editor.md) at `/scene-editor/` provides independent scene documents, Actor placement, action timelines, [visual audio clips](docs/scene-audio-timeline.md) with [synchronized playback](docs/scene-audio-playback.md), Play/Pause/Restart/Stop, speed and deterministic scrubbing. Inspect runtime transforms without changing authored positions, saved state or Undo history. Download scenes before leaving the page.
 
 The [Project Workspace](docs/project-workspace.md) at `/project/` organizes characters, artwork, animations, scenes and [audio assets](docs/audio-assets.md), retains editing sessions across navigation, and imports/exports complete project ZIPs. New projects start empty. Export a project ZIP to keep work after closing the tab.
 
@@ -144,6 +144,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 | [Atomic IK bake commit](docs/ik-bake-commit.md)                      | Whole-clip key replacement, runtime constraint deactivation, validation and exact Undo/Redo                |
 | [IK bake production fidelity](docs/ik-bake-hardening.md)             | Key/midpoint/endpoint tolerances, sampling quality, runtime transitions, editing and loader regressions    |
 | [IK and object attachments](docs/ik.md)                              | Two-bone solving, transforms, foot planting, katana grips, and attached props                              |
+| [Scene audio playback](docs/scene-audio-playback.md)                 | Scene clock, browser unlock, speed, silent scrubbing, drift correction and standalone audio                |
 | [Development and package usage](docs/development.md)                 | Checks, browser tests, architecture, packaging, and Node APIs                                              |
 | [Performance profiling](docs/profiling.md)                           | Local CPU/browser profiles, workloads, and historical measurements                                         |
 | [v0.6 release readiness](docs/release-readiness.md)                  | Release gates, regression results, resource and performance observations, outstanding risks                |

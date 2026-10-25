@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
+import { inspectorControl } from './fixtures.js';
 
 test('artist creates two-package scene visually, previews, retimes, reloads and exports a portable runtime artifact', async ({
   page,
@@ -32,7 +33,7 @@ test('artist creates two-package scene visually, previews, retimes, reloads and 
     await openProperties();
   };
   for (const [index, character] of ['demo-puppet', 'random-paperdoll-sketch'].entries()) {
-    await page.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+    await (await inspectorControl(page, '[data-guide-id="scene-add-actor"]')).click();
     const add = page.getByRole('dialog', { name: 'Add Actor', exact: true });
     await add.getByLabel('Workspace character').selectOption(`../characters/${character}/character.json`);
     await add.getByRole('button', { name: 'Add actor', exact: true }).click();

@@ -4,7 +4,7 @@ import type { LocalDraftStore } from '../../src/devtools/shared/autosave/LocalDr
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { inspectorControl, test } from './fixtures.js';
 
 declare global {
   interface Window {
@@ -89,7 +89,7 @@ test('refresh recovers artwork, committed rig, animation and scene edits then ex
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const sceneFrame = await (await page.locator('iframe:visible').elementHandle())?.contentFrame();
   if (!sceneFrame) throw new Error('No scene editor frame.');
-  await sceneFrame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(sceneFrame, '[data-guide-id="scene-add-actor"]')).click();
   await sceneFrame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })

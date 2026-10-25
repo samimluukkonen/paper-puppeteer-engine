@@ -30,6 +30,68 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 const workflowGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-audio-synchronization',
+    'Audio Playback & Synchronization',
+    'Hear scene audio, recover browser sound, seek silently and control preview speed and mute.',
+    scene,
+    [
+      step(
+        'clips',
+        'Prepare music and effects',
+        T.sceneAudioTracks,
+        'Audio clips share the **scene clock** with Actor animation, movement, camera shots, fades and cues. Overlapping music and effects play together with their authored volume, source offsets, loops and fades. If the rows are empty, use the **Visual Audio Timeline** guide after this tour to import and arrange clips. Only an open scene is required here; this tour never starts sound or changes playback.',
+      ),
+      step(
+        'unlock',
+        'Enable browser audio and recover errors',
+        T.sceneAudioStatus,
+        '**Audio: disabled** means there are no clips; **locked** means sound needs a user action. After exiting, click **Play** to enable sound and load clips, or **Enable audio** beside this status to prepare audio without moving the playhead. Loading becomes ready when sound is available. If the browser blocks sound or decoding fails, allow sound or reimport a supported WAV, MP3 or OGG file, then retry Enable audio. It appears when audio is locked or has an error.',
+      ),
+      step(
+        'play',
+        'Play and pause on the scene timeline',
+        T.scenePlayback,
+        'After exiting, click **Play** to hear clips at their authored times. The button becomes **Pause**, which stops audible voices and holds scene time. Play resumes active clips at their current source-relative positions, including loop and fade progress. Clips that have already ended are not replayed. The guide only highlights this control; it never presses Play, resumes browser audio or pauses your preview.',
+      ),
+      step(
+        'seek',
+        'Scrub silently and listen from the middle',
+        T.sceneTime,
+        '**Playhead (s)** and ruler scrubbing pause playback and remain **silent**, even when crossing effect starts repeatedly. After exiting, seek to the middle of a clip, then use Play to hear its remaining portion from the correct source offset. Effects ending before the selected time stay silent. Visual poses, root motion, camera framing and fades update at the same selected scene time. This tour does not seek.',
+      ),
+      step(
+        'speed',
+        'Change preview speed with sound',
+        T.scenePlaybackSpeed,
+        '**Speed** applies to scene visuals and audio together, from 0.25× through 2×. Slower playback takes longer; faster playback finishes sooner. Audio **pitch changes with speed**; there is no pitch-preserving stretch mode. Return to 1× to assess the intended sound. Speed is a preview preference and does not change authored clip times or the exported scene. The tour preserves your current speed.',
+      ),
+      step(
+        'mute',
+        'Mute the scene preview',
+        T.sceneAudioMute,
+        '**Mute preview audio** stops scene sound while visual playback continues. Unmuting resumes ready audio at the current scene position; if sound is locked or unavailable, use Enable audio after exiting. Mute does not edit clip volume, the source file or exported audio. Project Workspace audition has its own controls. This tour leaves the mute setting unchanged.',
+      ),
+      step(
+        'restart',
+        'Replay the scene from zero',
+        T.sceneRestart,
+        'After exiting, **Restart** returns the scene clock to zero and starts playback again, replacing the previous voices. Opening music starts again and later effects wait for their authored times. A muted preview stays muted. If audio needs loading or browser permission, Restart prepares sound through that user action before starting. Restart is a transport command; it does not edit your scene or Undo/Redo.',
+      ),
+      step(
+        'stop',
+        'Stop sound and return to editing',
+        T.sceneStop,
+        '**Stop** silences owned audio, returns the playhead to zero and restores initial Actor placement for editing. Scene completion also ends its sound. Switching scenes, leaving the project editor or closing the scene releases its audio; hiding the editor page pauses playback. Use Play explicitly when you return. The tour never invokes Stop or changes the current playback state.',
+      ),
+      step(
+        'save',
+        'Keep sound with the scene',
+        T.scenePackage,
+        '**Download scene package** includes referenced audio binaries and authored timing, trims, volume, loops and fades for portable playback. JSON alone keeps relative references; keep the files alongside it. **Export Project** and local recovery also retain audio. A standalone player must provide its own user-action audio enable control. Preview speed and mute are not exported. Exit this guide before trying playback; your scene, selection, playhead, preview and history are preserved.',
+      ),
+    ],
+  ),
+  guide(
     'scene-audio-timeline',
     'Visual Audio Timeline',
     'Arrange audio clips, trim source media and save volume, loops and fades with the scene.',
@@ -57,7 +119,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'arrange',
         'Arrange and overlap clips',
         T.sceneAudioTracks,
-        'Click an audio clip to select it. **Drag its body** to move its scene start without changing the source offset. Snapping shares frames, playhead, Actor clip edges, camera keys, transitions and other audio edges; hold **Alt** to bypass it. **Overlapping clips** are allowed, including within one track, and appear on separate visible lanes. Empty audio rows are ready for your first track and clip after the tour.',
+        'Click an audio clip to select it. **Drag its body** to move its scene start without changing the source offset. Snapping shares frames, playhead, Actor clip edges, camera keys, transitions and other audio edges; hold **Alt** to bypass it. **Overlapping clips** are allowed, including within one track, and appear on separate visible lanes. Use the **trash button** beside a track name to remove it. A track containing clips asks before removing them too; one **Undo** restores the track and clips. Empty audio rows are ready for your first track and clip after the tour.',
       ),
       step(
         'trim',
@@ -69,13 +131,13 @@ const workflowGuides: readonly GuideDefinition[] = [
         'playback',
         'Set volume and bounded looping',
         T.sceneAudioPlayback,
-        '**Volume** ranges from 0 to 100%; zero is valid. **Loop** repeats the source window from **Source offset** through media end, stopping at the finite clip end. Left trimming a loop changes its repeated source window; right trimming can extend it beyond media length within scene duration. Apply audio clip properties commits the edit. These are saved playback properties: synchronized audio playback and seeking arrive in v1.3.3. Use Project Workspace’s explicit audition separately.',
+        '**Volume** ranges from 0 to 100%; zero is valid. **Loop** repeats the source window from **Source offset** through media end, stopping at the finite clip end. Left trimming a loop changes its repeated source window; right trimming can extend it beyond media length within scene duration. Apply audio clip properties commits the edit. Use **Play** to enable browser audio and hear clips on the scene clock. **Pause**, **Stop** and passive scrubbing are silent; playback resumes active clips from the selected time. **Mute preview audio** silences the scene; **Enable audio** retries browser restrictions or loading failures.',
       ),
       step(
         'fades',
         'Author clip fades',
         T.sceneAudioFades,
-        '**Fade in** and **Fade out** are durations in seconds at the clip’s scene edges; omitted values mean zero. Each fade must fit within clip duration. They describe linear gain ramps, and overlapping ramps multiply. **Apply audio clip properties** commits fades with the other properties. Audio fades are distinct from the scene’s full-frame color transitions. Waveform previews and synchronized fade playback are deferred.',
+        '**Fade in** and **Fade out** are durations in seconds at the clip’s scene edges; omitted values mean zero. Each fade must fit within clip duration. They describe linear gain ramps, and overlapping ramps multiply. **Apply audio clip properties** commits fades with the other properties. Audio fades are distinct from the scene’s full-frame color transitions. Audio fades follow scene playback, including speed changes and playback after seeking. Waveform previews are deferred.',
       ),
       step(
         'history',
@@ -471,7 +533,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'add',
         'Choose a character package',
         T.sceneAddActor,
-        'Choose **+ Add Actor**, then a workspace character or permanent character manifest JSON reference. Add the same package twice for two independent Actors.',
+        'Open **Scene actors** in the inspector and choose **+ Add Actor**, then a workspace character or permanent character manifest JSON reference. Add the same package twice for two independent Actors.',
       ),
       step(
         'actors',

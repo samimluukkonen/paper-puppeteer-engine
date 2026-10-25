@@ -1,5 +1,5 @@
 import { expect, type Frame, type Page } from '@playwright/test';
-import { test } from './fixtures.js';
+import { inspectorControl, test } from './fixtures.js';
 test.use({ actionTimeout: 15_000 });
 
 async function activeFrame(page: Page): Promise<Frame> {
@@ -118,7 +118,7 @@ test('workspace guides, editor identity, native focus, export access and live ri
   await sceneCatalog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(sceneFrame.locator('.scene-inspector details[open]')).toHaveCount(0);
   await expect(sceneFrame.getByRole('region', { name: 'Editor context' })).toContainText('Scene: Opening');
-  await sceneFrame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(sceneFrame, '[data-guide-id="scene-add-actor"]')).click();
   await sceneFrame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })

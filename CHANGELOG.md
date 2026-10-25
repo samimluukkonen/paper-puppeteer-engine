@@ -4,6 +4,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Add a trash button beside each scene audio track. Remove empty tracks immediately; confirm removing populated tracks and their clips, preserve source assets and sibling tracks, stop removed playback voices, and restore the whole removal with one Undo. Update the audio guide and cover cancellation, history and playback cleanup.
+
+- Give Scene Editor inspector sections the shared Animation Editor panel styling, with complete borders, shaded headers, distinct content backgrounds and spacing between sections. Keep layer fields readable at the minimum inspector width.
+
+- Group Add Actor inside the Scene actors inspector section alongside the actor list, and keep its Feature Guide reveal and project/standalone workflows working with the initially collapsed section.
+
 - Highlight key controls, shortcuts and concepts throughout Feature Guide steps with semibold warm yellow text that stands out clearly against the dark cards.
 
 - Require Node.js 24.22.1 or newer for npm installs, matching the local development and CI pin.
@@ -58,6 +64,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Share pending import and export guards between the editors.
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
+
+## 1.3.3
+
+Add a nine-step **Audio Playback & Synchronization** Feature Guide to the shared Scene catalog, covering scene clips, browser unlock/retry, play/pause, silent seeking, speed/pitch, preview mute, restart/stop and portable saving. Reveal real controls with no audio or Actor prerequisites beyond an open scene, preserve authored data, selection, playhead, speed, mute, preview and history, and verify tours never unlock browser audio or start sound. Add focused unit and local desktop browser coverage alongside the Visual Audio Timeline tour.
+
+Play overlapping scene music, ambience and effects from the authoritative SceneRunner clock using a reusable audio controller and the existing Web Audio asset loader. Export a pure active-clip evaluator, respect source offsets, finite loop windows, volume and multiplicative fades, and reconcile drift above 80 ms with bounded resynchronization. Support playback speed through Web Audio rate changes, including their pitch effect.
+
+Keep passive seeking silent and resume only currently active clips from their correct offsets. Stop owned voices on pause, stop, restart, completion, cancellation, scene/project switching and disposal. Add visible audio status, gesture-driven Play/Enable audio, retryable loading/decode failures and preview mute; pause hidden editor pages. Reuse hosted and ZIP audio resolution for standalone SceneLoader consumers without React. Update version metadata, authoring guidance and runtime documentation; add deterministic backend/lifecycle and local desktop browser regressions. See the [audio playback guide](docs/scene-audio-playback.md) for timing limits and verification.
 
 ## 1.3.2
 

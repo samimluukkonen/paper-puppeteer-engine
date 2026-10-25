@@ -53,6 +53,23 @@ export class SceneAudioCommands {
     this.state.selectAudioClip(id);
     return true;
   }
+  removeTrack(id: string, options: { removeClips?: boolean } = {}): boolean {
+    this.finishGestures();
+    const scene = this.state.workingScene;
+    if (!scene?.audioTracks?.some((track) => track.id === id)) return false;
+    const clips = scene.audioClips ?? [];
+    if (clips.some((clip) => clip.trackId === id) && !options.removeClips)
+      return this.state.reportError(
+        new Error(
+          'This audio track contains clips. Move or remove them first, or confirm removing the track and its clips.',
+        ),
+      );
+    return this.state.replaceScene({
+      ...scene,
+      audioTracks: scene.audioTracks.filter((track) => track.id !== id),
+      ...(scene.audioClips ? { audioClips: clips.filter((clip) => clip.trackId !== id) } : {}),
+    });
+  }
   updateClip(id: string, patch: Partial<Omit<SceneAudioClip, 'id'>>): boolean {
     const scene = this.state.workingScene;
     if (!scene?.audioClips?.some((clip) => clip.id === id)) return false;

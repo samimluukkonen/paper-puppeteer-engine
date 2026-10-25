@@ -5,14 +5,36 @@ export interface AudioPlayback {
   stop(): void;
   setVolume(volume: number): void;
 }
+/** Seconds at the backend boundary; authored scene data remains milliseconds. */
+export interface TimelineAudioOptions {
+  readonly offset: number;
+  readonly remaining: number;
+  readonly rate: number;
+  readonly volume: number;
+  readonly loop: boolean;
+  readonly loopStart: number;
+  readonly loopEnd: number;
+  readonly elapsed: number;
+  readonly duration: number;
+  readonly fadeIn: number;
+  readonly fadeOut: number;
+}
+export interface TimelineAudioPlayback extends AudioPlayback {
+  /** Unwrapped media seconds consumed since this voice started, including loops. */
+  readonly elapsed: number;
+  readonly ended: boolean;
+}
 export interface DecodedAudioResource {
   readonly durationSeconds: number;
   readonly byteLength: number;
   play(volume: number, ended: () => void): AudioPlayback;
+  /** Optional for legacy audition-only adapters. Scene playback reports unsupported adapters. */
+  playTimeline?(options: TimelineAudioOptions): TimelineAudioPlayback;
   dispose(): void;
 }
 /** Injectable browser/backend boundary; no React or Phaser scene ownership. */
 export interface AudioBackend {
+  readonly running?: boolean;
   decode(bytes: Uint8Array<ArrayBuffer>): Promise<DecodedAudioResource>;
   resume(): Promise<void>;
   dispose(): void;
@@ -28,6 +50,9 @@ export const AUDIO_LOAD_TIMEOUT_MS = 60_000;
 export class WebAudioBackend implements AudioBackend {
   private context: AudioContext | undefined;
   private closed = false;
+  get running(): boolean {
+    return this.context?.state === 'running';
+  }
   private getContext(): AudioContext {
     if (this.closed) throw new Error('Audio backend is disposed.');
     if (typeof AudioContext === 'undefined')
@@ -40,6 +65,80 @@ export class WebAudioBackend implements AudioBackend {
     return {
       durationSeconds: buffer.duration,
       byteLength: buffer.length * buffer.numberOfChannels * 4,
+      playTimeline: (options) => {
+        if (!buffer || this.closed || context.state !== 'running')
+          throw new Error('Audio is unavailable or blocked. Click Play to enable audio.');
+        const source = context.createBufferSource();
+        const gain = context.createGain();
+        const fadeIn = context.createGain();
+        const fadeOut = context.createGain();
+        source.buffer = buffer;
+        source.playbackRate.value = options.rate;
+        source.loop = options.loop;
+        source.loopStart = options.loopStart;
+        source.loopEnd = options.loopEnd;
+        gain.gain.value = options.volume;
+        source.connect(gain);
+        gain.connect(fadeIn);
+        fadeIn.connect(fadeOut);
+        fadeOut.connect(context.destination);
+        const start = context.currentTime;
+        // Separate linear gains multiply when fade intervals overlap.
+        fadeIn.gain.setValueAtTime(options.fadeIn ? Math.min(1, options.elapsed / options.fadeIn) : 1, start);
+        if (options.fadeIn > options.elapsed)
+          fadeIn.gain.linearRampToValueAtTime(1, start + (options.fadeIn - options.elapsed) / options.rate);
+        const fadeOutStart = options.duration - options.fadeOut;
+        fadeOut.gain.setValueAtTime(options.fadeOut ? Math.min(1, options.remaining / options.fadeOut) : 1, start);
+        if (options.fadeOut) {
+          if (fadeOutStart > options.elapsed)
+            fadeOut.gain.setValueAtTime(1, start + (fadeOutStart - options.elapsed) / options.rate);
+          fadeOut.gain.linearRampToValueAtTime(0, start + options.remaining / options.rate);
+        }
+        let ended = false;
+        const release = () => {
+          if (ended) return;
+          ended = true;
+          source.onended = null;
+          source.disconnect();
+          gain.disconnect();
+          fadeIn.disconnect();
+          fadeOut.disconnect();
+          source.buffer = null;
+        };
+        source.onended = release;
+        try {
+          source.start(start, options.offset);
+          source.stop(start + options.remaining / options.rate);
+        } catch (error) {
+          try {
+            source.stop();
+          } catch {
+            /* Source may not have started. */
+          }
+          release();
+          throw error;
+        }
+        return {
+          get elapsed() {
+            return (context.currentTime - start) * options.rate;
+          },
+          get ended() {
+            return ended;
+          },
+          stop: () => {
+            if (!ended) {
+              try {
+                source.stop();
+              } finally {
+                release();
+              }
+            }
+          },
+          setVolume: (value) => {
+            gain.gain.value = value;
+          },
+        };
+      },
       play: (volume, ended) => {
         if (!buffer || this.closed) throw new Error('Audio resource is disposed.');
         const source = context.createBufferSource();
@@ -114,6 +213,17 @@ export class AudioAssetLoader {
     backend?: AudioBackend,
   ) {
     this.backend = backend ?? new WebAudioBackend();
+  }
+  get running(): boolean {
+    return this.backend.running ?? true;
+  }
+  /** Invoke synchronously from a user gesture, before awaiting decoding. */
+  unlock(): Promise<void> {
+    this.lifetime.signal.throwIfAborted();
+    return abortable(
+      this.backend.resume(),
+      AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(AUDIO_LOAD_TIMEOUT_MS)]),
+    );
   }
   async prepare(bytes: Uint8Array<ArrayBuffer>, signal?: AbortSignal): Promise<DecodedAudioResource> {
     const active = AbortSignal.any([this.lifetime.signal, this.cacheLifetime.signal, ...(signal ? [signal] : [])]);

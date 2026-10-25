@@ -142,12 +142,17 @@ test('visual actor placement, appearance, duplication, cancellation and document
   const assetRequests: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => {
-    if (request.url().includes('/characters/')) assetRequests.push(request.url());
+    // Autosave may fetch artwork independently; switching scenes must reuse character metadata.
+    if (request.url().includes('/characters/') && new URL(request.url()).pathname.endsWith('.json'))
+      assetRequests.push(request.url());
   });
   await page.goto('scene-editor/');
   await createScene(page, 'placement');
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  const actors = page.locator('[data-guide-id="scene-actors"]');
+  await actors.locator(':scope > summary').click();
   const add = async () => {
-    await page.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+    await actors.getByRole('button', { name: '+ Add Actor', exact: true }).click();
     await page
       .getByRole('dialog', { name: 'Add Actor', exact: true })
       .getByRole('button', { name: 'Add actor', exact: true })
@@ -156,7 +161,7 @@ test('visual actor placement, appearance, duplication, cancellation and document
   };
   await add();
   await add();
-  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(1);
   const canvas = page.locator('#scene-stage-canvas canvas');
   await expect(canvas).toBeVisible();
   await page.getByText('Actor properties', { exact: true }).click();
@@ -175,7 +180,7 @@ test('visual actor placement, appearance, duplication, cancellation and document
     animation: 'idle',
     skin: 'alternate',
   });
-  await page.getByText('Scene actors (2)', { exact: true }).click();
+  await expect(actors).toHaveAttribute('open');
   await page.getByRole('button', { name: 'actor-1 → demo-puppet', exact: true }).click();
   await page.getByText('Actor properties', { exact: true }).click();
   await page.getByLabel('Initial X', { exact: true }).fill('-200');

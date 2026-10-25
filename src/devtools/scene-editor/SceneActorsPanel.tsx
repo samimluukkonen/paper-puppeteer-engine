@@ -128,19 +128,19 @@ export function SceneActorsPanel({
   const selectedIndex = scene.actors.findIndex((actor) => actor.id === document.selectedActorId);
   return (
     <>
-      <button
-        type="button"
-        className="scene-add-actor"
-        data-guide-id={GUIDE_TARGETS.sceneAddActor}
-        onClick={() => {
-          setError('');
-          dialog.current?.showModal();
-        }}
-      >
-        + Add Actor
-      </button>
       <details data-guide-id={GUIDE_TARGETS.sceneActors}>
         <summary>Scene actors ({scene.actors.length})</summary>
+        <button
+          type="button"
+          className="workspace-primary"
+          data-guide-id={GUIDE_TARGETS.sceneAddActor}
+          onClick={() => {
+            setError('');
+            dialog.current?.showModal();
+          }}
+        >
+          + Add Actor
+        </button>
         <ul className="scene-actor-list">
           {scene.actors.map((actor) => (
             <li key={actor.id}>

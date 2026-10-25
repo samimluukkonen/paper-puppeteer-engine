@@ -8,7 +8,7 @@ import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parallaxPosition, sceneActorDepth, sceneImageDepth } from '../../src/engine/sceneLayers.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
 import { evaluateTransitionAtTime } from '../../src/engine/sceneTransitions.js';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { inspectorControl, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 let consumerScript = '';
@@ -101,7 +101,7 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
   }
   await frame.getByRole('button', { name: 'Move Mountains backward', exact: true }).click();
   for (let i = 0; i < 2; i++) {
-    await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+    await (await inspectorControl(frame, '[data-guide-id="scene-add-actor"]')).click();
     await frame
       .getByRole('dialog', { name: 'Add Actor', exact: true })
       .getByRole('button', { name: 'Add actor', exact: true })

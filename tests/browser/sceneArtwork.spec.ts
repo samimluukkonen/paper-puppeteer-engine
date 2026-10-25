@@ -201,6 +201,7 @@ test('existing project images and WebP background survive project export, reopen
   await dialog.getByRole('button', { name: 'Create Scene', exact: true }).click();
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const frame = await activeEditor(page);
+  await frame.locator('[data-guide-id="scene-actors"] > summary').click();
   await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
   await frame
     .getByRole('dialog', { name: 'Add Actor', exact: true })

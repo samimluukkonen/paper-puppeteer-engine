@@ -89,4 +89,11 @@ export { encodePackageZip, decodePackageZip } from './packageZip.js';
 export type { CameraProperty, CameraKeyframe, CameraTracks } from './cameraAnimation.js';
 
 export type { SceneAudioClip, SceneAudioTrack } from './sceneAudio.js';
-export { sceneAudioClipSchema, sceneAudioTrackSchema, trimSceneAudioClip } from './sceneAudio.js';
+export {
+  sceneAudioClipSchema,
+  sceneAudioTrackSchema,
+  trimSceneAudioClip,
+  getActiveAudioClipsAtTime,
+} from './sceneAudio.js';
+
+export type { ActiveSceneAudioClip } from './sceneAudio.js';

@@ -116,6 +116,35 @@ test('audio timeline authors finite clips, trims both ends, groups drag undo and
   const portable = await validateScenePackage(files);
   expect(portable.definition.audioClips).toEqual(authored.audioClips);
   expect(portable.audio!.get('tone')).toEqual(new Uint8Array(tone));
+  const removeVoice = page.getByRole('button', { name: 'Remove audio track Voice 1', exact: true });
+  const cancelRemoval = page.waitForEvent('dialog').then(async (dialog) => {
+    const message = dialog.message();
+    await dialog.dismiss();
+    expect(message).toContain('and its 1 clip');
+  });
+  await Promise.all([cancelRemoval, removeVoice.click()]);
+  await expect(clips).toHaveCount(3);
+  await expect(page.getByLabel('Audio track', { exact: true }).locator('option')).toHaveCount(2);
+  const confirmRemoval = page.waitForEvent('dialog').then((dialog) => dialog.accept());
+  await Promise.all([confirmRemoval, removeVoice.click()]);
+  await expect(clips).toHaveCount(2);
+  await expect(removeVoice).toHaveCount(0);
+  await expect(page.getByLabel('Audio asset', { exact: true })).toContainText('Tone');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(clips).toHaveCount(3);
+  await expect(removeVoice).toBeVisible();
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(clips).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Track category', exact: true }).selectOption('ambience');
+  await page.getByRole('button', { name: 'Add audio track', exact: true }).click();
+  const removeEmpty = page.getByRole('button', { name: 'Remove audio track Ambience 1', exact: true });
+  await removeEmpty.click();
+  await expect(removeEmpty).toHaveCount(0);
+  await expect(clips).toHaveCount(2);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(removeEmpty).toBeVisible();
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(removeEmpty).toHaveCount(0);
 });
 
 test('Project Workspace audio catalog feeds the retained Scene Editor and guards used asset removal', async ({

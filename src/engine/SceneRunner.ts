@@ -8,6 +8,7 @@ import {
 } from './cinematicCamera.js';
 import { throwNotificationErrors } from './notifications.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
+import { SceneAudioController, type SceneAudioOptions } from './SceneAudioController.js';
 import {
   parseSceneDefinition,
   sceneActionDuration,
@@ -41,6 +42,8 @@ export interface SceneCue {
   readonly payload?: unknown;
 }
 export interface SceneRunnerOptions {
+  /** Optional exclusive audio owner. Call runner.audio.unlock() from a user gesture before play. */
+  readonly audio?: SceneAudioOptions;
   /** Return a fresh, exclusively owned Actor with autoUpdate:false, no state policy,
    * gameplay lifecycle/update listeners, queued commands, or procedural IK target providers. The runner
    * disposes these isolated contexts on seek/restart. Shared character assets are fine.
@@ -63,6 +66,7 @@ export interface SceneRunnerOptions {
  */
 export class SceneRunner {
   readonly definition: DeepReadonly<SceneDefinition>;
+  readonly audio: SceneAudioController | undefined;
   private instances = new Map<string, Actor>();
   private releases: (() => void)[] = [];
   private readonly actions: DeepReadonly<SceneActionDefinition>[];
@@ -89,6 +93,7 @@ export class SceneRunner {
     private readonly options: SceneRunnerOptions,
   ) {
     this.definition = freezeData(parseSceneDefinition(input));
+    this.audio = options.audio ? new SceneAudioController(this.definition, options.audio) : undefined;
     this.actions = [...this.definition.actions].sort((a, b) => a.time - b.time);
     this.boundaries = [
       ...new Set([
@@ -141,6 +146,7 @@ export class SceneRunner {
     return applyCinematicCamera(camera, this.cinematicCamera, viewport);
   }
   private syncCamera(): void {
+    this.audio?.sync(this.cursor, this.state === 'playing', this.rate);
     const camera = this.options.camera;
     if (camera) this.applyCamera(camera.target, camera.viewport?.());
     this.options.onCamera?.(this.cinematicCamera);
@@ -163,6 +169,7 @@ export class SceneRunner {
     assertFinite(value, 'Scene speed');
     if (value <= 0) throw new Error('Scene speed must be positive.');
     this.rate = value;
+    this.audio?.sync(this.cursor, this.state === 'playing', this.rate);
   }
 
   play(): void {
@@ -177,11 +184,13 @@ export class SceneRunner {
       actor.puppet.animationPlayer.setPreviewMode(false);
       actor.resumeAnimation();
     }
+    this.audio?.sync(this.cursor, true, this.rate);
   }
   pause(): void {
     this.assertActive();
     if (this.state !== 'playing') return;
     this.state = 'paused';
+    this.audio?.stop();
     if (!this.stepping) for (const actor of this.instances.values()) actor.pauseAnimation();
   }
   restart(): void {
@@ -244,8 +253,12 @@ export class SceneRunner {
     try {
       this.release();
     } finally {
-      this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
-      this.options.onTransition?.(CLEAR_SCENE_TRANSITION);
+      try {
+        this.audio?.dispose();
+      } finally {
+        this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
+        this.options.onTransition?.(CLEAR_SCENE_TRANSITION);
+      }
     }
   }
 
@@ -264,6 +277,12 @@ export class SceneRunner {
     }
   }
   private release(): void {
+    const errors: unknown[] = [];
+    try {
+      this.audio?.stop();
+    } catch (error) {
+      errors.push(error);
+    }
     this.generation++;
     for (const release of this.releases.splice(0)) release();
     this.activeAnimations.clear();
@@ -272,7 +291,6 @@ export class SceneRunner {
     this.activeMoves.clear();
     const previous = this.instances;
     this.instances = new Map();
-    const errors: unknown[] = [];
     for (const actor of previous.values()) {
       try {
         actor.dispose();
@@ -350,6 +368,11 @@ export class SceneRunner {
     this.activeMoves.clear();
     this.ownCommand = true;
     const errors: unknown[] = [];
+    try {
+      this.audio?.stop();
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       for (const actor of this.instances.values()) {
         if (!actor.isDisposed) {

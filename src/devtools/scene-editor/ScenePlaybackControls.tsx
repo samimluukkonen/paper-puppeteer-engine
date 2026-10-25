@@ -16,15 +16,26 @@ export function ScenePlaybackControls({ playback }: { playback: SceneEditorPlayb
       >
         {playback.status === 'playing' ? 'Pause' : 'Play'}
       </button>
-      <button type="button" disabled={!playback.ready} onClick={() => playback.restart()}>
+      <button
+        type="button"
+        data-guide-id={GUIDE_TARGETS.sceneRestart}
+        disabled={!playback.ready}
+        onClick={() => playback.restart()}
+      >
         Restart
       </button>
-      <button type="button" disabled={!playback.ready} onClick={() => playback.stop()}>
+      <button
+        type="button"
+        data-guide-id={GUIDE_TARGETS.sceneStop}
+        disabled={!playback.ready}
+        onClick={() => playback.stop()}
+      >
         Stop
       </button>
       <label>
         Speed
         <select
+          data-guide-id={GUIDE_TARGETS.scenePlaybackSpeed}
           aria-label="Scene playback speed"
           value={playback.speed}
           onChange={(event) => playback.setSpeed(Number(event.target.value))}
@@ -36,9 +47,27 @@ export function ScenePlaybackControls({ playback }: { playback: SceneEditorPlayb
           ))}
         </select>
       </label>
-      <span aria-label="Scene playback status">
+      <span className="scene-playback-status" aria-label="Scene playback status">
         {playback.status} · {(playback.time / 1000).toFixed(2)} s
       </span>
+      <label data-guide-id={GUIDE_TARGETS.sceneAudioMute}>
+        <input
+          type="checkbox"
+          checked={playback.audioMuted}
+          onChange={(event) => playback.setAudioMuted(event.target.checked)}
+        />
+        Mute preview audio
+      </label>
+      <span data-guide-id={GUIDE_TARGETS.sceneAudioStatus} aria-label="Scene audio status">
+        Audio: {playback.audioStatus}
+        {playback.audioMuted ? ' · muted' : ''}
+      </span>
+      {['locked', 'error'].includes(playback.audioStatus) && (
+        <button type="button" onClick={() => playback.enableAudio()}>
+          Enable audio
+        </button>
+      )}
+      {playback.audioError && <span role="alert">{playback.audioError}</span>}
     </>
   );
 }

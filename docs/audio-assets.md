@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Project Workspace can import, organize and audition background music, ambience, sound effects and prerecorded voices. Audio belongs to the existing project registry. Scene timeline placement is available in the [v1.3.2 audio timeline](scene-audio-timeline.md); synchronized playback is deferred to v1.3.3.
+Project Workspace can import, organize and audition background music, ambience, sound effects and prerecorded voices. Audio belongs to the existing project registry. Scene timeline placement is available in the [v1.3.2 audio timeline](scene-audio-timeline.md); synchronized playback is available through the [v1.3.3 scene audio controller](scene-audio-playback.md).
 
 ## Import and audition
 
@@ -94,6 +94,6 @@ The unit run passed 9 files and 58 tests in 4.30 s. All 6 audio-guide browser ch
 
 All 10 selected shared modal/practice browser checks passed in 1.7 minutes after the focus restoration change, including real key authoring with Undo/Redo, catalog return, target recovery and input cleanup. The existing project-to-editor guide launch workflow and the remaining catalog/spotlight browser regressions also passed during the broader verification run.
 
-## Deferred v1.3.2 work
+## Scene playback and remaining scope
 
-[Scene audio clips, tracks, references and trimming](scene-audio-timeline.md) are available in v1.3.2. Synchronization with scene playback/seeking remains future work (v1.3.3). This foundation does not add dialogue UI, recording, waveform editing, synthesis, cloud storage or voice generation.
+[Scene audio clips, tracks, references and trimming](scene-audio-timeline.md) are available in v1.3.2. Synchronization, silent seeking and standalone scene playback are available in the [v1.3.3 playback guide](scene-audio-playback.md). This foundation does not add dialogue UI, recording, waveform editing, synthesis, cloud storage or voice generation.

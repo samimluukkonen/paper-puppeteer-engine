@@ -6,6 +6,13 @@ export {
   AUDIO_LOAD_TIMEOUT_MS,
 } from './AudioAssetLoader.js';
 export type { AudioBackend, AudioPlayback, DecodedAudioResource, AudioAssetSource } from './AudioAssetLoader.js';
+export type { TimelineAudioOptions, TimelineAudioPlayback } from './AudioAssetLoader.js';
+export {
+  SceneAudioController,
+  SCENE_AUDIO_DRIFT_TOLERANCE_MS,
+  SCENE_AUDIO_CORRECTION_INTERVAL_MS,
+} from './SceneAudioController.js';
+export type { SceneAudioOptions, SceneAudioStatus } from './SceneAudioController.js';
 export { Actor, type ActorOptions, type ActorPosition, type ActorPuppetOwnership } from './Actor.js';
 export type {
   ActorLocomotion,

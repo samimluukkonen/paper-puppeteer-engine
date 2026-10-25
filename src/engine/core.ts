@@ -258,4 +258,11 @@ export { evaluateTransitionAtTime, sceneTransitionSchema, CLEAR_SCENE_TRANSITION
 export type { SceneTransition, SceneTransitionState, SceneTransitionTarget } from './sceneTransitions.js';
 
 export type { SceneAudioClip, SceneAudioTrack } from './sceneAudio.js';
-export { sceneAudioClipSchema, sceneAudioTrackSchema, trimSceneAudioClip } from './sceneAudio.js';
+export {
+  sceneAudioClipSchema,
+  sceneAudioTrackSchema,
+  trimSceneAudioClip,
+  getActiveAudioClipsAtTime,
+} from './sceneAudio.js';
+
+export type { ActiveSceneAudioClip } from './sceneAudio.js';

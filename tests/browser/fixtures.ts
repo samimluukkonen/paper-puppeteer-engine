@@ -1,4 +1,4 @@
-import { test as base, expect, type Locator, type Page } from '@playwright/test';
+import { test as base, expect, type Frame, type Locator, type Page } from '@playwright/test';
 
 /** UI commands install poses synchronously; allow Phaser to paint before taking a pixel baseline. */
 export async function waitForPreviewPaint(page: Page): Promise<void> {
@@ -8,7 +8,7 @@ export async function waitForPreviewPaint(page: Page): Promise<void> {
 }
 
 /** Follow inspector disclosures through their visible summaries before using a control. */
-export async function inspectorControl(page: Page, selector: string): Promise<Locator> {
+export async function inspectorControl(page: Page | Frame, selector: string): Promise<Locator> {
   const control = page.locator(selector);
   await control.first().waitFor({ state: 'attached' });
   for (const panel of await control.first().locator('xpath=ancestor::details').all()) {

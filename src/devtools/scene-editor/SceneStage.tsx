@@ -139,6 +139,7 @@ class SceneStage extends Phaser.Scene {
       this.syncCamera();
       this.syncArtwork();
       if (!document) {
+        this.playback.dispose();
         this.preview.dispose();
         this.document.setActorGroundOffsets(new Map());
         this.document.setActorGroundContacts(new Map());
@@ -165,6 +166,16 @@ class SceneStage extends Phaser.Scene {
               puppet.destroy();
               throw error;
             }
+          },
+          {
+            resolve: (id) => {
+              const asset = this.document.audioAssets.find((entry) => entry.id === id);
+              if (!asset) return undefined;
+              return {
+                definition: { ...asset, path: asset.path.replace(/^(?:\.\.\/)+/, '') },
+                bytes: this.document.readAudio(asset.path),
+              };
+            },
           },
         );
         this.preview.sync(document, this.definitions);

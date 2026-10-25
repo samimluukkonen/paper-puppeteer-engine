@@ -4,7 +4,7 @@ import { importProjectPackage } from '../../src/devtools/project/projectPackage.
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationFileAction, test } from './fixtures.js';
+import { inspectorControl, animationFileAction, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -171,7 +171,7 @@ test('complete v1.1 React workflow: project, poses, graph, variation, cleanup, r
   await scene.getByLabel('Scene name').fill('Wave scene');
   await scene.getByRole('button', { name: 'Create Scene', exact: true }).click();
   frame = await editor(page, 'Scene Editor');
-  await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(frame, '[data-guide-id="scene-add-actor"]')).click();
   await frame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })

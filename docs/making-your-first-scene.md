@@ -8,7 +8,7 @@ Scene Editor arranges existing character packages into a scripted scene. Rig Edi
 
 1. Open **Scene Editor** from the header, or visit `/scene-editor/` on your local server.
 2. Choose **New Scene**. Use `first-scene` as the **Scene ID**, choose a name, set **Duration (seconds)** to `5`, and choose **Create scene**. IDs stay stable after creation.
-3. Choose **+ Add Actor**. Select **Demo puppet** in **Workspace character**, then **Add actor**. Repeat with **Random paperdoll sketch**, or add the same package again. Each instance has its own position, skin, pose and playback clock.
+3. Open **Scene actors** in the inspector and choose **+ Add Actor**. Select **Demo puppet** in **Workspace character**, then **Add actor**. Repeat with **Random paperdoll sketch**, or add the same package again. Each instance has its own position, skin, pose and playback clock.
 4. Expand **Actor properties** for the selected Actor. Set **Initial X** to `180` and **Initial Y** to `0`, then **Apply actor properties**. Set **Initial animation** to `idle` and **Facing** to `Left`.
 5. Select `actor-1` using its timeline track label, expand **Actor properties**, and set **Initial X** to `-180`, **Initial Y** to `0`, **Initial animation** to `idle`, and **Facing** to `Right`.
 

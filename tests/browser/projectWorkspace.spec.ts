@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Frame, type Page } from '@playwright/test';
-import { test } from './fixtures.js';
+import { inspectorControl, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -43,7 +43,7 @@ test('project validation reports broken dependencies, blocks export, opens the a
   await scene.getByRole('button', { name: 'Create Scene', exact: true }).click();
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const frame = await activeEditor(page);
-  await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(frame, '[data-guide-id="scene-add-actor"]')).click();
   await frame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })
@@ -128,7 +128,7 @@ test('project authoring retains editor owners, switches projects and round trips
   await expect(page.locator('iframe:visible')).toHaveCount(1);
   const sceneFrame = await activeEditor(page);
   await expect(sceneFrame.locator('.scene-inspector details[open]')).toHaveCount(0);
-  await sceneFrame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
+  await (await inspectorControl(sceneFrame, '[data-guide-id="scene-add-actor"]')).click();
   await sceneFrame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })
