@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Enforce one Vitest worker and sequential test files in the shared configuration for default local and CI commands.
+
 - Release owned Actors and transition resources when SceneRunner initialization callbacks fail, preserving both initialization and cleanup errors.
 
 - Give restored scene images fresh resource/decode requests and ignore cancelled obsolete results, preventing rapid removal/Undo from leaving artwork stuck in an error state.

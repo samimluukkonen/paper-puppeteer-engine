@@ -6,7 +6,7 @@
 
 Use Node.js **24 or newer**. [.nvmrc](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/.nvmrc) pins **24.19.0** for `nvm use` and CI. The repository enables `engine-strict` so npm dependency installs reject unsupported Node versions.
 
-Run test commands sequentially with one worker per runner. Do not run suites concurrently or increase worker counts: parallel test execution causes substantial slowdown on this host. Keep Playwright at one worker; for direct invocations, use `npx playwright test --workers=1` and `npx vitest run --maxWorkers=1`. Revisit this preference only if the user explicitly changes it.
+Run test commands sequentially with one worker per runner. Do not run suites concurrently or increase worker counts: parallel test execution causes substantial slowdown on this host. Vitest enforces one worker and disables file parallelism in its shared configuration, including `npm test`, watch mode and CI. Keep Playwright at one worker; for direct invocations, use `npx playwright test --workers=1` and `npx vitest run --maxWorkers=1`. Revisit this preference only if the user explicitly changes it.
 
 ```bash
 npm run typecheck
