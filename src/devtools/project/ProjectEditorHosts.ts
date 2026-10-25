@@ -147,6 +147,7 @@ export class ProjectEditorHosts {
     let lastAuthoredRevision = workspace.autosaveRevision;
     const context: ProjectEditorContext = {
       autosave: session.autosave,
+      projectId: workspace.definition.id,
       get projectName() {
         return workspace.definition.name;
       },
@@ -177,6 +178,15 @@ export class ProjectEditorHosts {
           }
         : { scenes: workspace.scenes }),
       imageAssets: workspace.scenes.images,
+      ...(kind === 'character'
+        ? {
+            get animationPreviewPreferences() {
+              return workspace.animationPreviewPreferences(id);
+            },
+            saveAnimationPreviewPreferences: (preferences: unknown) =>
+              workspace.setAnimationPreviewPreferences(id, preferences),
+          }
+        : {}),
       choices,
       changed: () => {
         const revision = workspace.autosaveRevision;

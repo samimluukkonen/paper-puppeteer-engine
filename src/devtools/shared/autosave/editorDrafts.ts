@@ -1,10 +1,14 @@
 import { canonicalJson } from '../../../engine/authoredSerialization.js';
 import { characterManifestSchema } from '../../../engine/CharacterDefinition.js';
+import { freezeData, type DeepReadonly } from '../../../engine/readonlyData.js';
 import { parseSceneDefinition } from '../../../engine/SceneDefinition.js';
 import { buildProjectPackage, packageHostedCharacter } from '../../project/projectPackage.js';
 import { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
 import type { SceneCharacterRegistry } from '../../scene-editor/SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from '../../scene-editor/SceneEditorDocument.js';
+import type { SceneImageRegistry } from '../../scene-editor/SceneImageRegistry.js';
+import { animationPreviewPreferencesSchema } from '../animationPreviewPreferences.js';
+import type { AnimationPreviewPreferences } from '../animationPreviewPreferences.js';
 import { draftSource } from '../draftSource.js';
 import {
   buildCharacterPackage,
@@ -26,10 +30,20 @@ function samePackage(first: PackageFiles, second: PackageFiles): boolean {
 }
 
 /** Standalone drafts use the same complete portable project payload as project recovery. */
-export async function buildCharacterDraft(input: PackageSnapshot, id: string, signal?: AbortSignal) {
+export async function buildCharacterDraft(
+  input: PackageSnapshot,
+  id: string,
+  signal?: AbortSignal,
+  preview?: { preferences: DeepReadonly<AnimationPreviewPreferences>; images: SceneImageRegistry },
+) {
   const snapshot = capturePackage(input);
+  // Capture metadata and binaries before the asynchronous character package work.
+  const preferences = preview && freezeData(animationPreviewPreferencesSchema.parse(preview.preferences));
+  const images = preview?.images.entries.map((image) => ({ ...image, bytes: preview.images.read(image.reference) }));
   const workspace = new ProjectWorkspace(snapshot.rig.name ?? snapshot.definition.id, id);
   await workspace.addCharacter(await buildCharacterPackage(snapshot, undefined, signal));
+  if (preferences) workspace.setAnimationPreviewPreferences(snapshot.definition.id, preferences);
+  for (const image of images ?? []) workspace.scenes.images.register(image.reference, image.bytes, image.name);
   return (await buildProjectPackage(workspace, signal)).files;
 }
 

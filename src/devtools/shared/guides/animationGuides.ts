@@ -76,7 +76,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'reset',
         'Disable, reset and keep the right data',
-        'Uncheck Enable additional preview displacement to restore the preview origin while retaining the trajectory and all authored skeletal motion. Reset trajectory clears points, restores defaults and disables displacement. Each clip retains its own settings while switching animations in this editor session; reload releases them. Animation Undo/Redo, JSON, recovery, character ZIPs and project ZIPs exclude these preview settings. Imported project background images can still be saved in the project ZIP. This guide never enables, resets or saves anything for you.',
+        'Uncheck Enable additional preview displacement to restore the preview origin while retaining the trajectory and all authored skeletal motion. Reset trajectory clears points, restores defaults and disables displacement. Each clip retains its own trajectory, motion mode and Loop preview preference. Local drafts recover these settings and artwork as a project after refresh. Project ZIPs preserve them; production animation JSON and character ZIPs exclude them. Animation Undo/Redo remains dedicated to authored data. This guide never enables, resets or saves anything for you.',
         targets.animationDisplacementReset,
       ),
     ],
@@ -99,7 +99,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'import',
         'Import or browse project artwork',
-        'Import Image accepts PNG or static WebP. In a project, Load project character images also offers existing character artwork in Background. Imported project images enter the shared image library and can be reused by other animations. Standalone imports last for this editor session. No image is required to read this guide.',
+        'Import Image accepts PNG or static WebP. In a project, Load project character images also offers existing character artwork in Background. Imported project images enter the shared image library and can be reused by other animations. Standalone local drafts also retain artwork; recover the draft as a project and export a project ZIP for a portable copy. No image is required to read this guide.',
         targets.animationEnvironmentImport,
       ),
       step(
@@ -129,7 +129,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'camera-framing',
         'Set framing, zoom or reset the camera',
-        'Camera X/Y set the world center, starting at (380, 435); Follow adds displacement to that center. Enter values and choose Apply preview camera. Zoom accepts 0.1 to 4; zoom out to inspect travel beyond the image. Wheel zooms and middle drag pans the same session camera, including a framing offset in Follow mode. Movement is never clamped to the background. Reset Camera restores Fixed, center (380, 435) and zoom 1 without changing animation time, trajectory or background placement. This tour only reveals these controls.',
+        'Camera X/Y set the world center, starting at (380, 435); Follow adds displacement to that center. Enter values and choose Apply preview camera. Zoom accepts 0.1 to 4; zoom out to inspect travel beyond the image. Wheel zooms and middle drag pans the same preview camera, including a framing offset in Follow mode. Movement is never clamped to the background. Reset Camera restores Fixed, center (380, 435) and zoom 1 without changing animation time, trajectory or background placement. This tour only reveals these controls.',
         targets.animationEnvironmentCameraTransform,
       ),
       step(
@@ -147,7 +147,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'reset-save',
         'Reset and keep the right assets',
-        'Disabling Environment Preview or entering Rig Editor/Rig Tweak restores the ordinary editor viewport. Return to Animation mode and enable Environment Preview to reuse its camera settings. Camera and environment settings are session-only; reload resets them, and animation Undo/Redo, JSON, recovery and character ZIPs exclude them. Clear background removes the selection without deleting the shared image. Reset Environment also resets the camera and disables the mode while preserving the ground guide and library. Download a project ZIP to keep imported project images; it does not save preview camera settings. This guide never resets or saves anything for you.',
+        'Disabling Environment Preview or entering Rig Editor/Rig Tweak restores the ordinary editor viewport. Return to Animation mode and enable Environment Preview to reuse its camera settings. Background placement, ground and default camera are shared character preferences; displacement and Loop preview belong to each clip. Local drafts recover them after refresh, and project ZIPs keep them when reopened. Production animation JSON, character ZIPs and animation Undo/Redo exclude these editor preferences. Clear background removes the selection without deleting the shared image. Reset Environment also resets the camera and disables the mode while preserving the ground guide and library. Download a project ZIP to keep the preferences and images. Standalone local drafts recover into Project Workspace for this export. This guide never resets or saves anything for you.',
         targets.animationEnvironmentReset,
       ),
     ],

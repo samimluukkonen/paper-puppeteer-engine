@@ -23,8 +23,8 @@ export function MotionPreviewPanel({ controller }: { controller: MotionPreviewCo
         </p>
         <p className="workspace-caption">
           X moves right, Y down in world pixels, independent of facing and scale. Times are animation seconds; stepped
-          playback holds the same pose and displacement sample. These points last for this clip in this editor session
-          only.
+          playback holds the same pose and displacement sample. Points and Loop preview belong to this clip’s editor
+          preferences and survive local recovery and project ZIPs.
         </p>
         <label data-guide-id={GUIDE_TARGETS.animationDisplacementInterpolation}>
           Trajectory interpolation

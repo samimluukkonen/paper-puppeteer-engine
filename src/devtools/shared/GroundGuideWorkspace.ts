@@ -107,6 +107,14 @@ export class GroundGuideWorkspace {
     this.install({ workspaceId, guide, persistenceMessage });
   }
 
+  /** Install portable project preferences without recording a user edit or writing browser-specific metadata. */
+  restore(guide: GroundGuide): void {
+    this.cancelDrag();
+    const validated = Object.freeze(groundGuideSchema.parse(guide));
+    if (this.snapshot.workspaceId !== null) this.histories.delete(this.snapshot.workspaceId);
+    this.install({ ...this.snapshot, guide: validated, persistenceMessage: '' });
+  }
+
   update(patch: Partial<GroundGuide>): void {
     this.cancelDrag();
     const { workspaceId, guide: previous } = this.snapshot;

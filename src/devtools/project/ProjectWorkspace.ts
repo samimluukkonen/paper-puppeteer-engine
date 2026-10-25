@@ -5,6 +5,10 @@ import { validatePackageFiles } from '../../engine/packageZip.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import { createEmptyScene, parseSceneDefinition, type SceneDefinition } from '../../engine/SceneDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
+import {
+  animationPreviewPreferencesSchema,
+  type AnimationPreviewPreferences,
+} from '../shared/animationPreviewPreferences.js';
 import { draftSource } from '../shared/draftSource.js';
 import {
   capturePackage,
@@ -37,13 +41,19 @@ export interface ProjectCharacter {
 /** Membership history retains resources, so undo never recreates or overwrites a document. */
 export class ProjectWorkspace {
   private metadata: DeepReadonly<ProjectDefinition>;
+  private previewPreferences: DeepReadonly<NonNullable<ProjectDefinition['editorPreferences']>['animationPreview']> =
+    {};
   private saved: DeepReadonly<ProjectDefinition> | undefined;
   private readonly characters = new Map<string, ProjectCharacter>();
   private readonly fingerprints = new Map<string, PackageFingerprints>();
   private readonly artwork = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly checkpoints = new Map<string, string>();
   private sceneCheckpoints = new Map<string, string>();
-  readonly scenes = new SceneEditorDocument();
+  readonly scenes = new SceneEditorDocument({}, undefined, () =>
+    Object.values(this.previewPreferences).flatMap((preferences) =>
+      preferences.environment.image ? [preferences.environment.image] : [],
+    ),
+  );
   private revision = 0;
   recoveryKey: string | undefined;
   private readonly listeners = new Set<() => void>();
@@ -74,7 +84,24 @@ export class ProjectWorkspace {
       path: asset.reference.replace(/^(?:\.\.\/)+/, ''),
     }));
     const { images: _images, ...metadata } = this.metadata;
-    return images.length ? { ...metadata, images } : metadata;
+    return {
+      ...metadata,
+      ...(images.length ? { images } : {}),
+      ...(Object.keys(this.previewPreferences).length
+        ? { editorPreferences: { animationPreview: this.previewPreferences } }
+        : {}),
+    };
+  }
+  animationPreviewPreferences(id: string): DeepReadonly<AnimationPreviewPreferences> | undefined {
+    return this.previewPreferences[id];
+  }
+  /** Preferences have no animation or membership Undo entries. Ground retains its own preference history. */
+  setAnimationPreviewPreferences(id: string, input: unknown): void {
+    this.character(id);
+    const preferences = freezeData(animationPreviewPreferencesSchema.parse(input));
+    if (equalJsonData(preferences, this.previewPreferences[id])) return;
+    this.previewPreferences = { ...this.previewPreferences, [id]: preferences };
+    this.refresh();
   }
   /** Recovery never claims that a browser snapshot was written to disk. */
   markRecovered(key: string): void {
@@ -349,7 +376,9 @@ export class ProjectWorkspace {
       value.scenes.some(({ id }) => !this.scenes.scene(id))
     )
       throw new Error('Project metadata references missing documents.');
-    this.metadata = freezeData(value);
+    const { editorPreferences, ...documents } = value;
+    this.previewPreferences = freezeData(editorPreferences?.animationPreview ?? {});
+    this.metadata = freezeData(documents);
     this.markExported(
       value,
       new Map(value.characters.map(({ id }) => [id, this.captureCharacter(id)])),

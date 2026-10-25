@@ -52,6 +52,17 @@ export class EnvironmentPreviewController {
   updateCamera(patch: Partial<PreviewCameraSettings>): void {
     this.publish({ camera: updatePreviewCamera(this.snapshot.camera, patch) });
   }
+  restorePreferences(settings: EnvironmentPreviewSettings, camera: PreviewCameraSettings): void {
+    this.request?.abort();
+    this.request = undefined;
+    this.publish({
+      settings: updateEnvironmentPreview(DEFAULT_ENVIRONMENT_PREVIEW, settings),
+      camera: updatePreviewCamera(DEFAULT_PREVIEW_CAMERA, camera),
+      busy: false,
+      message: '',
+      error: '',
+    });
+  }
   resetCamera(): void {
     this.publish({ camera: DEFAULT_PREVIEW_CAMERA });
   }

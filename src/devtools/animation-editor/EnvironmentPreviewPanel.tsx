@@ -226,7 +226,7 @@ export function EnvironmentPreviewPanel({
         </form>
         <p className="workspace-caption">
           Camera X/Y set the world center. Follow adds preview displacement to that center. Pan and wheel zoom adjust
-          this session's camera. Zoom out to 0.1 to inspect travel beyond the background; movement is never clamped.
+          the preview camera. Zoom out to 0.1 to inspect travel beyond the background; movement is never clamped.
         </p>
       </details>
       <p className="workspace-caption">
@@ -237,10 +237,10 @@ export function EnvironmentPreviewPanel({
         Reset Environment
       </button>
       <p className="workspace-caption">
-        Environment settings last for this editor session.{' '}
+        Background, camera, ground and clip displacement preferences are included in local recovery drafts.{' '}
         {project
-          ? 'Imported images are kept in the project image library; download the project ZIP to save them.'
-          : 'Standalone image imports last for this editor session.'}
+          ? 'Download a project ZIP to keep preferences and shared images.'
+          : 'Recover a local draft as a project, then export a project ZIP for a portable copy. Character ZIPs and animation JSON contain production data only.'}
       </p>
       {busy && <p role="status">Loading environment images…</p>}
       {message && <p role="status">{message}</p>}

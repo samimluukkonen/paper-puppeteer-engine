@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import { packagePath } from '../../engine/packageZip.js';
+import { animationPreviewPreferencesSchema } from '../shared/animationPreviewPreferences.js';
 
 const identity = z.string().min(1).max(200).regex(/\S/);
 const path = z.string().transform((value) => packagePath(value));
@@ -12,6 +13,13 @@ export const projectDefinitionSchema = z.strictObject({
   images: z
     .array(z.strictObject({ id: identity, name: identity, path }))
     .max(1024)
+    .exactOptional(),
+  editorPreferences: z
+    .strictObject({
+      animationPreview: z
+        .record(identity, animationPreviewPreferencesSchema)
+        .refine((entries) => Object.keys(entries).length <= 1024, 'Too many character preview preferences.'),
+    })
     .exactOptional(),
   scenes: z.array(z.strictObject({ id: identity, path })),
 });

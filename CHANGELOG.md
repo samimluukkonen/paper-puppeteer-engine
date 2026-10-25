@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.6-4
+
+Persist Environment Preview as optional project editor preferences: shared character background placement, visibility, ground and default camera, with per-animation trajectories, displacement mode and Loop preview. Include preferences and real PNG/WebP assets in project ZIPs and complete standalone/project local recovery drafts. Keep animation JSON, character ZIPs, animation Undo/Redo and scene choreography unchanged; preserve the higher package/lockfile version `1.2.6`.
+
+Protect preview backgrounds during Scene Editor image cleanup, retain shared assets when clearing/resetting a preview, reject temporary image URLs in portable preferences, and recover characters with an actionable missing-background state when optional preview artwork is unavailable. Update existing Feature Guides and saving instructions. Add persistence, asset ownership, source-isolation, loop and subscription regressions plus local desktop browser refresh/recovery/export/reimport checks. See the [integration report](docs/animation-environment-readiness.md) for validation and remaining limitations.
+
 ## 1.1.6-3
 
 Extend the existing **Environment Preview** Feature Guide to ten steps with fixed/follow camera selection, world center/zoom/reset, shared playback and loop reset, deterministic silent scrubbing and session-only viewport restoration. Reveal the real collapsed camera controls without changing settings, playback, history or authored data; cover empty and configured previews with unit and local desktop browser regressions.

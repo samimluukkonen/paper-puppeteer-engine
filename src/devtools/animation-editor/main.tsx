@@ -19,6 +19,7 @@ import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame } from '../shared/editorGame.js';
+import { defaultGroundGuide } from '../shared/groundGuide.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
 import { GuideTargets } from '../shared/guides/GuideTargets.js';
@@ -31,6 +32,7 @@ import { bindWorkspaceNavigation, workspaceView } from '../shared/WorkspaceNavig
 import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { AnimationPreviewPreferencesBinding } from './AnimationPreviewPreferences.js';
 import { AnimationVariationController } from './AnimationVariationController.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
@@ -207,6 +209,7 @@ function CharacterWorkspace() {
 }
 const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   let autosave: LocalAutosave | undefined;
+  let previewPreferences: AnimationPreviewPreferencesBinding | undefined;
   const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
   const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
   const releaseRigExport = bindExportShortcut(rigApp, () =>
@@ -319,6 +322,21 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
           workspaceRoutes?.navigate(view);
         },
       );
+      previewPreferences?.dispose();
+      if (projectContext) {
+        groundGuide.bind(`project:${projectContext.projectId}:character:${id}`);
+        groundGuide.restore(defaultGroundGuide('animation-preview-world'));
+      }
+      previewPreferences = new AnimationPreviewPreferencesBinding(
+        environment,
+        motionPreview,
+        groundGuide,
+        projectContext?.animationPreviewPreferences,
+        (preferences) => {
+          projectContext?.saveAnimationPreviewPreferences?.(preferences);
+          autosave?.update();
+        },
+      );
       guides.refresh();
       newAnimation.bind(state);
       variations.bind(state);
@@ -384,9 +402,21 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
           const snapshot = editorScene.packageSnapshot();
           return {
             name: snapshot.rig.name ?? id,
-            revision: canonicalJson(fingerprints.compute(snapshot)),
-            dirty: packages.hasUnsavedChanges,
-            build: (signal) => buildCharacterDraft(editorScene.packageSnapshot(), projectId, signal),
+            revision: canonicalJson({
+              character: fingerprints.compute(snapshot),
+              preview: previewPreferences?.preferences,
+              images: environment.images.getSnapshot(),
+            }),
+            dirty: packages.hasUnsavedChanges || !!previewPreferences?.dirty,
+            build: (signal) =>
+              buildCharacterDraft(
+                editorScene.packageSnapshot(),
+                projectId,
+                signal,
+                previewPreferences
+                  ? { preferences: previewPreferences.preferences, images: environment.images }
+                  : undefined,
+              ),
           };
         });
         autosave.start();
@@ -404,6 +434,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       movePreview?.();
     },
     (message) => {
+      previewPreferences?.dispose();
+      previewPreferences = undefined;
       projectContext?.characterLoadFailed();
       stateOwner = undefined;
       guides.refresh();
@@ -528,6 +560,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   });
 
   return () => {
+    previewPreferences?.dispose();
     autosave?.dispose();
     clearInterval(pollAutosave);
     window.removeEventListener('pagehide', leaveLocal);

@@ -8,7 +8,7 @@ Guides appear in alphabetical order within each editor category. Use **Search gu
 
 Scene Editor offers eight Explain tours: creating a scene, adding/positioning Actors, animation clips, movement, timing, preview and export. Prerequisites track the open scene, selected Actor and selected action. Tours reveal existing controls without editing data or starting playback. See [Making Your First Scene](making-your-first-scene.md).
 
-Animation Editor offers **Environment Preview**, a seven-step Explain tour of static image import/selection, world transforms, shared ground alignment, viewport navigation and session/project saving. It works with an empty selected animation and no background image. The tour reveals controls without changing preview settings or authored motion. See [Animation Environment Preview](animation-environment-preview.md).
+Animation Editor offers **Environment Preview**, a ten-step Explain tour of static image import/selection, world transforms, shared ground alignment, fixed/follow cameras, playback, seeking and local recovery/project saving. It works with an empty selected animation and no background image. The tour reveals controls without changing preview settings or authored motion. See [Animation Environment Preview](animation-environment-preview.md).
 
 **Preview Displacement** is a seven-step Animation tour of additive opt-in, time/X/Y points, segment interpolation, synchronized playback, the spatial trajectory and reset/saving. It supports an empty selected clip without points, artwork or IK. The tour preserves settings, authored motion, playhead and history. See [Animation preview displacement](motion-preview.md).
 

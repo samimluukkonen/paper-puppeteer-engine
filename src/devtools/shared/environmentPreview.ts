@@ -1,6 +1,6 @@
 import type { SceneImageDefinition } from '../../engine/SceneDefinition.js';
 
-/** Session-only presentation. Never part of a rig, animation, Puppet or scene document. */
+/** Editor preferences. Never part of a rig, animation, Puppet or scene document. */
 export interface EnvironmentPreviewSettings {
   readonly enabled: boolean;
   readonly image: string | null;

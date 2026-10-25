@@ -84,6 +84,7 @@ export class SceneEditorDocument {
   constructor(
     private readonly validation: SceneValidationOptions = {},
     private readonly animationIds?: (manifest: string) => readonly string[] | undefined,
+    private readonly retainedImageReferences?: () => Iterable<string>,
   ) {}
 
   private parse(input: unknown): SceneDefinition {
@@ -702,7 +703,7 @@ export class SceneEditorDocument {
   }
   /** Sources, checkpoints, undo, redo and active gestures all keep their binary dependencies. */
   cleanupImages(): number {
-    const retained = new Set<string>();
+    const retained = new Set<string>(this.retainedImageReferences?.());
     for (const entry of this.entries.values())
       for (const scene of [entry.source, entry.saved, entry.working, ...entry.history.retainedSnapshots])
         for (const image of scene.images ?? []) retained.add(image.image);

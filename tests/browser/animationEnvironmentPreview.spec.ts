@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Frame, type Page } from '@playwright/test';
 import { importProjectPackage } from '../../src/devtools/project/projectPackage.js';
 import { decodePackageZip, encodePackageZip } from '../../src/engine/packageZip.js';
 import { test, waitForPreviewPaint } from './fixtures.js';
@@ -29,7 +29,7 @@ async function backgroundBytes(page: Page, format = 'image/png') {
   );
 }
 
-async function bluePixels(page: Page) {
+async function bluePixels(page: Page | Frame) {
   const png = await page.locator('#animation-stage canvas').screenshot();
   return page.evaluate(
     async (data) => {
@@ -191,8 +191,31 @@ test('animation environment imports share project assets and survive project pac
   await expect(panel.getByRole('status')).toContainText('forest.webp imported');
   const reference = await panel.getByLabel('Background', { exact: true }).inputValue();
   await panel.getByRole('checkbox', { name: 'Environment Preview', exact: true }).check();
+  await panel.getByLabel('Background X', { exact: true }).fill('380');
+  await panel.getByLabel('Background Y', { exact: true }).fill('435');
+  await panel.getByRole('button', { name: 'Apply background transform', exact: true }).click();
+  await panel.getByRole('checkbox', { name: 'Show Ground Reference', exact: true }).check();
+  await panel.locator('.environment-camera-panel summary').click();
+  await panel.getByLabel('Preview camera mode').selectOption('follow');
+  const motion = frame.locator('.motion-preview-panel');
+  await motion.locator('summary').click();
+  await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
+  await motion.getByLabel('Offset X', { exact: true }).fill('45');
+  await motion.getByRole('button', { name: 'Apply point 1', exact: true }).click();
+  await motion.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+  await frame.locator('#preview-loop').click();
   await expect(frame.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(frame.locator('#animation-undo')).toBeDisabled();
   await frame.getByRole('button', { name: '← Project', exact: true }).click();
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+  await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
+  page.on('dialog', (dialog) => {
+    void dialog.accept();
+  });
+  await page.reload();
+  const recovery = page.getByRole('dialog', { name: 'Recover unsaved work?', exact: true });
+  await recovery.getByRole('button', { name: 'Recover Draft', exact: true }).click();
+  await expect(recovery).not.toBeVisible();
   const waiting = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Project', exact: true }).click();
   const archive = decodePackageZip(new Uint8Array(await readFile(await (await waiting).path())));
@@ -200,10 +223,94 @@ test('animation environment imports share project assets and survive project pac
   expect(workspace.definition.scenes).toHaveLength(0);
   expect(workspace.scenes.images.entries).toHaveLength(2);
   expect(workspace.scenes.images.has(reference)).toBe(true);
+  expect(workspace.animationPreviewPreferences('hero')).toMatchObject({
+    environment: { enabled: true, image: reference, x: 380, y: 435 },
+    camera: { mode: 'follow' },
+    ground: { enabled: true },
+    animations: {
+      idle: { loop: true, motion: { enabled: true, positionKeys: [{ time: 0, offsetX: 45, offsetY: 0 }] } },
+    },
+  });
   const clip = workspace.captureCharacter('hero').animations[0]!;
   expect(clip.tracks).toEqual({});
   expect(JSON.stringify(clip)).not.toContain('environment');
+  // Re-import the actual downloaded ZIP and verify restored owners through the public controls.
+  await page.getByLabel('Import Project', { exact: true }).setInputFiles({
+    name: 'environment.zip',
+    mimeType: 'application/zip',
+    buffer: Buffer.from(encodePackageZip(archive)),
+  });
+  await expect(page.getByText('Project metadata: Exported', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Rig Editor', exact: true }).click();
+  const restoredFrame = await (await page.locator('iframe:visible').elementHandle())?.contentFrame();
+  if (!restoredFrame) throw new Error('Missing restored editor frame.');
+  await expect(restoredFrame.locator('#validation')).toHaveText('Validation: OK');
+  await restoredFrame.getByRole('link', { name: 'Animation Editor', exact: true }).click();
+  const restoredPanel = restoredFrame.locator('.environment-preview-panel');
+  await expect(restoredPanel).not.toHaveAttribute('open');
+  await restoredPanel.locator(':scope > summary').click();
+  await expect(restoredPanel.getByLabel('Background', { exact: true })).toHaveValue(reference);
+  await expect(restoredPanel.getByLabel('Background X', { exact: true })).toHaveValue('380');
+  await expect(restoredPanel.getByRole('checkbox', { name: 'Show Ground Reference', exact: true })).toBeChecked();
+  await restoredPanel.locator('.environment-camera-panel summary').click();
+  await expect(restoredPanel.getByLabel('Preview camera mode')).toHaveValue('follow');
+  await restoredFrame.locator('.motion-preview-panel summary').click();
+  await expect(restoredFrame.locator('.motion-preview-panel').getByLabel('Offset X', { exact: true })).toHaveValue(
+    '45',
+  );
+  await expect(restoredFrame.locator('#preview-loop')).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => bluePixels(restoredFrame)).toBeGreaterThan(1000);
+  await expect(restoredFrame.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
+
+test('standalone preview-only edits and artwork recover after refresh without authored animation changes', async ({
+  page,
+}) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await page.locator('#animation-selection').selectOption('walk');
+  const original = await exported(page);
+  const panel = page.locator('.environment-preview-panel');
+  await panel.locator(':scope > summary').click();
+  await panel.getByLabel('Import environment image').setInputFiles({
+    name: 'standalone-floor.png',
+    mimeType: 'image/png',
+    buffer: await backgroundBytes(page),
+  });
+  await expect(panel.getByRole('status')).toContainText('imported');
+  const reference = await panel.getByLabel('Background', { exact: true }).inputValue();
+  await panel.getByRole('checkbox', { name: 'Environment Preview', exact: true }).check();
+  await panel.getByLabel('Background X', { exact: true }).fill('380');
+  await panel.getByLabel('Background Y', { exact: true }).fill('435');
+  await panel.getByRole('button', { name: 'Apply background transform', exact: true }).click();
+  const motion = page.locator('.motion-preview-panel');
+  await motion.locator('summary').click();
+  await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
+  await motion.getByLabel('Offset Y', { exact: true }).fill('-70');
+  await motion.getByRole('button', { name: 'Apply point 1', exact: true }).click();
+  await motion.getByRole('checkbox', { name: 'Enable additional preview displacement', exact: true }).check();
+  expect(await exported(page)).toBe(original);
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+  await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
+  await page.reload();
+  await page
+    .getByRole('dialog', { name: 'Recover unsaved work?', exact: true })
+    .getByRole('button', { name: 'Recover Draft', exact: true })
+    .click();
+  await expect(page.getByRole('button', { name: 'Rig Editor', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Rig Editor', exact: true }).click();
+  const frame = await (await page.locator('iframe:visible').elementHandle())?.contentFrame();
+  if (!frame) throw new Error('Missing recovered character frame.');
+  await expect(frame.locator('#validation')).toHaveText('Validation: OK');
   await frame.getByRole('link', { name: 'Animation Editor', exact: true }).click();
-  await expect(panel.getByLabel('Background', { exact: true })).toHaveValue(reference);
+  await frame.locator('#animation-selection').selectOption('walk');
+  const restored = frame.locator('.environment-preview-panel');
+  await restored.locator(':scope > summary').click();
+  await expect(restored.getByLabel('Background', { exact: true })).toHaveValue(reference);
+  await expect(restored.getByRole('checkbox', { name: 'Environment Preview', exact: true })).toBeChecked();
+  await frame.locator('.motion-preview-panel summary').click();
+  await expect(frame.locator('.motion-preview-panel').getByLabel('Offset Y', { exact: true })).toHaveValue('-70');
+  await expect.poll(() => bluePixels(frame)).toBeGreaterThan(1000);
+  await expect(frame.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });

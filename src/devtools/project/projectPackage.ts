@@ -184,10 +184,19 @@ export async function importProjectPackage(files: PackageFiles): Promise<Project
     const id = await workspace.addCharacter(characterFiles, entry.name);
     if (id !== entry.id) throw new Error(`Character ID mismatch for "${entry.id}".`);
   }
+  const previewImages = new Set(
+    Object.values(metadata.editorPreferences?.animationPreview ?? {}).map(
+      (preferences) => preferences.environment.image,
+    ),
+  );
   for (const image of metadata.images ?? []) {
     const physical = packagePath(archive.images?.[image.path] ?? image.path);
     const bytes = files.get(physical);
-    if (!bytes) throw new Error(`Missing project image "${image.path}".`);
+    if (!bytes) {
+      // An optional preview reference may be repaired in the editor; scene dependencies still validate below.
+      if (previewImages.has(`../${image.path}`)) continue;
+      throw new Error(`Missing project image "${image.path}".`);
+    }
     workspace.scenes.images.register(`../${image.path}`, bytes, image.name);
     if (typeof Image !== 'undefined') {
       const decoded = await decodeImage(bytes, new AbortController().signal);

@@ -1,3 +1,5 @@
+import type { DeepReadonly } from '../../engine/readonlyData.js';
+import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import {
   DEFAULT_MOTION_PREVIEW,
@@ -7,10 +9,12 @@ import {
   type PreviewPositionKey,
 } from './motionPreview.js';
 
-/** Session-only, clip-specific preferences; no document, history, autosave or export writes. */
+/** Clip-specific editor preferences; never writes animation documents or authored history. */
 export class MotionPreviewController {
   private state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
+  private readonly loops = new Map<string, boolean>();
+  private observedLoop = false;
   private readonly clips = new Map<string, MotionPreviewSettings>();
   private readonly listeners = new Set<() => void>();
   private snapshot: Readonly<{
@@ -42,8 +46,16 @@ export class MotionPreviewController {
       const clipId = state.selectedAnimationId;
       const duration = state.workingAnimation?.duration ?? 0;
       const ready = !!clipId && state.animationAuthoringEnabled;
-      if (clipId === this.snapshot.clipId && duration === this.snapshot.duration && ready === this.snapshot.ready)
+      if (clipId === this.snapshot.clipId && duration === this.snapshot.duration && ready === this.snapshot.ready) {
+        if (clipId && state.previewLoop !== this.observedLoop) {
+          this.observedLoop = state.previewLoop;
+          this.loops.set(clipId, state.previewLoop);
+          this.publish({});
+        }
         return;
+      }
+      const loop = clipId !== this.snapshot.clipId ? (clipId && this.loops.get(clipId)) || false : state.previewLoop;
+      this.observedLoop = loop;
       this.publish({
         clipId,
         duration,
@@ -51,15 +63,44 @@ export class MotionPreviewController {
         settings: (clipId && this.clips.get(clipId)) || DEFAULT_MOTION_PREVIEW,
         message: '',
       });
+      if (loop !== state.previewLoop) state.setPreviewLoop(loop);
     };
     this.release = state.subscribe(sync);
     sync();
+  }
+  capturePreferences(): DeepReadonly<AnimationPreviewPreferences['animations']> {
+    const ids = new Set([...this.clips.keys(), ...this.loops.keys()]);
+    return Object.fromEntries(
+      [...ids].map((id) => [
+        id,
+        {
+          motion: this.clips.get(id) ?? DEFAULT_MOTION_PREVIEW,
+          loop: this.loops.get(id) ?? false,
+        },
+      ]),
+    );
+  }
+  restorePreferences(preferences: DeepReadonly<AnimationPreviewPreferences['animations']>): void {
+    this.clips.clear();
+    this.loops.clear();
+    for (const [id, preference] of Object.entries(preferences)) {
+      this.clips.set(id, preference.motion);
+      this.loops.set(id, preference.loop);
+    }
+    const id = this.snapshot.clipId;
+    this.observedLoop = (id && this.loops.get(id)) || false;
+    this.publish({ settings: (id && this.clips.get(id)) || DEFAULT_MOTION_PREVIEW });
+    if (this.state && this.state.previewLoop !== this.observedLoop) this.state.setPreviewLoop(this.observedLoop);
   }
   update(patch: Partial<MotionPreviewSettings>): boolean {
     const { clipId, ready, settings } = this.snapshot;
     if (!clipId || !ready) return false;
     const next = { ...settings, ...patch };
     const keys = [...next.positionKeys].sort((a, b) => a.time - b.time);
+    if (keys.length > 10000) {
+      this.publish({ message: 'Use at most 10,000 preview position points per animation.' });
+      return false;
+    }
     if (!validPreviewPositionKeys(keys) || !['linear', 'stepped'].includes(next.interpolation)) {
       this.publish({ message: 'Use finite X/Y values and unique, nonnegative point times.' });
       return false;
@@ -108,6 +149,8 @@ export class MotionPreviewController {
     this.release = undefined;
     this.state = undefined;
     this.clips.clear();
+    this.loops.clear();
+    this.observedLoop = false;
     this.publish({ clipId: null, duration: 0, ready: false, settings: DEFAULT_MOTION_PREVIEW, message: '' });
   }
   dispose(): void {

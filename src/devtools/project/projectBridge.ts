@@ -1,12 +1,15 @@
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneEditorDocument, ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
 import type { SceneImageRegistry } from '../scene-editor/SceneImageRegistry.js';
+import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import type { PackageSnapshot, PackageFiles } from '../shared/package/characterPackage.js';
 
 /** Same-origin retained editor hosts reuse the existing applications and their single owners. */
 export interface ProjectEditorContext {
   readonly autosave?: LocalAutosave;
+  readonly projectId?: string;
   readonly projectName: string;
   readonly assetName: string;
   subscribe: (listener: () => void) => () => void;
@@ -18,6 +21,8 @@ export interface ProjectEditorContext {
   readonly scenes?: SceneEditorDocument;
   readonly imageAssets?: SceneImageRegistry;
   readonly choices: readonly { id: string; label: string; manifest: string }[];
+  readonly animationPreviewPreferences?: DeepReadonly<AnimationPreviewPreferences> | undefined;
+  saveAnimationPreviewPreferences?(preferences: DeepReadonly<AnimationPreviewPreferences>): void;
   changed(): void;
   characterLoadFailed(): void;
   loadProjectImages?(
