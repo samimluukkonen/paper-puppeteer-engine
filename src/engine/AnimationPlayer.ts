@@ -22,6 +22,12 @@ import type {
   PlaybackWaitResult,
 } from './PlaybackLifecycle.js';
 import type { Rig } from './Rig.js';
+import {
+  evaluateRootMotionAtElapsedTime,
+  type RootMotionApplication,
+  type RootMotionOffset,
+  type RootMotionPolicy,
+} from './rootMotion.js';
 import { assertFinite } from './types.js';
 
 export interface PlayAnimationOptions extends QueueAnimationOptions {
@@ -122,6 +128,7 @@ export class AnimationPlayer {
     private readonly rig: Rig,
     private joints: ReadonlyMap<string, Joint>,
     compiledClips: readonly CompiledClip[] = [],
+    private rootMotionApplication?: RootMotionApplication,
   ) {
     // Reuse compiled tracks, but check their references against this player's rig.
     for (const clip of compiledClips) {
@@ -153,6 +160,27 @@ export class AnimationPlayer {
   }
   get elapsedTime(): number {
     return this.layers.get('base')?.state?.time ?? 0;
+  }
+  /** Total elapsed base playback, including completed cycles. Sampling does not change this clock. */
+  get unwrappedElapsedTime(): number {
+    return this.layers.get('base')?.state?.unwrappedTime ?? 0;
+  }
+  /** Paused playback retains translation ownership; completed/stopped playback releases it. */
+  get isApplyingRootMotion(): boolean {
+    const state = this.layers.get('base')?.state;
+    return state?.rootMotion === 'apply' && state.playing;
+  }
+
+  /** Pure, playback-aware absolute displacement for deterministic seeking by external tools.
+   * Does not change placement, skeletal poses, clocks, events or the application baseline.
+   */
+  sampleRootMotion(elapsedTime: number): RootMotionOffset {
+    this.assertActive();
+    assertFinite(elapsedTime, 'Root motion elapsed time');
+    const state = this.layers.get('base')?.state;
+    return state
+      ? evaluateRootMotionAtElapsedTime(state.clip, elapsedTime, { playback: this.playback })
+      : { x: 0, y: 0 };
   }
   /** Duration in milliseconds of the active base clip, or zero when none is selected. */
   get duration(): number {
@@ -399,13 +427,16 @@ export class AnimationPlayer {
     if (fade < 0) throw new Error('Fade duration cannot be negative.');
     const speed = options.speed ?? 1;
     validateSpeed(speed);
+    const rootMotion = this.validateRootMotionPolicy(options.rootMotion, layerName);
     if (options.restart === false && this.layers.get(layerName)?.state?.clip.name === name) {
+      // Retained playback keeps its original policy and baseline.
       select?.(this.layers.get(layerName)!.state!, layerName);
       if (layerName === 'base' && !fromQueue) this.discardQueue();
       synchronizePose?.();
       return;
     }
     if (select) this.assertWaitable(clip);
+    if (rootMotion === 'apply') this.rootMotionApplication!.validate();
     const events = this.previewMode ? [] : collectAnimationStartEvents(clip, layerName, this.eventListeners.size);
     if (layerName === 'base' && !fromQueue) this.discardQueue();
     preparePose?.();
@@ -429,7 +460,15 @@ export class AnimationPlayer {
     const lifecycle: PlaybackLifecycleEvent[] = [];
     // The outgoing clock may survive as a visual fade source, but its playback ends now.
     if (layer.state) this.finishPlayback(layer.state, layerName, 'interrupted', lifecycle);
-    layer.state = { playbackId: this.nextPlaybackId++, clip, time: 0, speed, playing: true };
+    layer.state = {
+      playbackId: this.nextPlaybackId++,
+      clip,
+      time: 0,
+      unwrappedTime: 0,
+      rootMotion,
+      speed,
+      playing: true,
+    };
     lifecycle.push({ ...this.playbackStatus(layer.state, layerName), type: 'started' });
     layer.transition = source ? { source, elapsed: 0, duration: fade, ...(ikSource ? { ikSource } : {}) } : undefined;
     layer.stopped = false;
@@ -437,6 +476,7 @@ export class AnimationPlayer {
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
       () => {
+        if (layerName === 'base' && rootMotion === 'apply') this.rootMotionApplication!.begin();
         if (layerName === 'base' && !source) this.resetPose();
         this.applyCurrentPose();
         synchronizePose?.();
@@ -502,6 +542,7 @@ export class AnimationPlayer {
       this.stopQueue();
       return;
     }
+    if (first.options?.rootMotion === 'apply') this.rootMotionApplication!.validate();
     this.discardQueue();
     for (const request of validated) this.pendingQueue.push(request);
     this.playAnimation(first.name, first.options, preparePose, synchronizePose, true);
@@ -519,15 +560,34 @@ export class AnimationPlayer {
     if (typeof options !== 'object' || options === null || Array.isArray(options))
       throw new Error('Invalid animation queue options.');
     for (const key of Object.keys(options)) {
-      if (key !== 'fadeDuration' && key !== 'speed') throw new Error(`Unsupported queue option "${key}".`);
+      if (key !== 'fadeDuration' && key !== 'speed' && key !== 'rootMotion')
+        throw new Error(`Unsupported queue option "${key}".`);
     }
     const fadeDuration = options.fadeDuration === undefined ? 0 : options.fadeDuration;
     assertFinite(fadeDuration, 'Fade duration');
     if (fadeDuration < 0) throw new Error('Fade duration cannot be negative.');
     const speed = options.speed === undefined ? 1 : options.speed;
     validateSpeed(speed);
+    this.validateRootMotionPolicy(options.rootMotion, 'base');
     new AnimationEventBudget('start').addStartEvents(clip, this.eventListeners.size);
-    return Object.freeze({ name: clip.name, options: Object.freeze({ fadeDuration, speed }) });
+    return Object.freeze({
+      name: clip.name,
+      options: Object.freeze({
+        fadeDuration,
+        speed,
+        ...(options.rootMotion === undefined ? {} : { rootMotion: options.rootMotion }),
+      }),
+    });
+  }
+
+  private validateRootMotionPolicy(policy: RootMotionPolicy | undefined, layer: string): RootMotionPolicy {
+    if (policy !== undefined && policy !== 'ignore' && policy !== 'apply')
+      throw new Error('Unsupported root motion policy.');
+    if (policy === 'apply') {
+      if (layer !== 'base') throw new Error('Only the base animation may apply root motion.');
+      if (!this.rootMotionApplication) throw new Error('Applying root motion requires a runtime application host.');
+    }
+    return policy ?? 'ignore';
   }
 
   private discardQueue(): void {
@@ -569,6 +629,7 @@ export class AnimationPlayer {
       synchronizePose?.();
       return;
     }
+    if (this.layers.get('base')?.state?.rootMotion === 'apply') this.rootMotionApplication!.validate();
     // Restart is one notification boundary, including every selected layer.
     const eventBudget = new AnimationEventBudget('restart');
     const events: FiredAnimationEvent[] = [];
@@ -584,9 +645,17 @@ export class AnimationPlayer {
     const lifecycle: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {
       if (!layer.state) continue;
-      const { clip, speed } = layer.state;
+      const { clip, speed, rootMotion } = layer.state;
       this.finishPlayback(layer.state, name, 'interrupted', lifecycle);
-      layer.state = { playbackId: this.nextPlaybackId++, clip, time: 0, speed, playing: true };
+      layer.state = {
+        playbackId: this.nextPlaybackId++,
+        clip,
+        time: 0,
+        unwrappedTime: 0,
+        rootMotion,
+        speed,
+        playing: true,
+      };
       lifecycle.push({ ...this.playbackStatus(layer.state, name), type: 'started' });
       layer.transition = undefined;
       layer.stopped = false;
@@ -594,6 +663,7 @@ export class AnimationPlayer {
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
       () => {
+        if (this.layers.get('base')?.state?.rootMotion === 'apply') this.rootMotionApplication!.begin();
         this.applyCurrentPose();
         synchronizePose?.();
       },
@@ -729,15 +799,21 @@ export class AnimationPlayer {
     if (!advancing) return false;
     // Validate every clock and the total catch-up work before mutating any layer.
     const eventBudget = new AnimationEventBudget();
+    let rootDisplacement: RootMotionOffset | undefined;
     for (const layer of this.layers.values()) {
       const state = layer.state;
       if (state?.playing) {
         const end = advanceAnimationTime(state, delta, this.speed);
+        const unwrappedEnd = advanceAnimationTime({ ...state, time: state.unwrappedTime }, delta, this.speed);
+        if (state === this.layers.get('base')?.state && state.rootMotion === 'apply' && !this.previewMode)
+          rootDisplacement = evaluateRootMotionAtElapsedTime(state.clip, unwrappedEnd, { playback: this.playback });
         if (!this.previewMode) eventBudget.addCrossings(state.clip, state.time, end, this.eventListeners.size);
       }
       const source = layer.transition?.source;
-      if (!layer.stopped && source && !(source instanceof Map) && source.playing)
+      if (!layer.stopped && source && !(source instanceof Map) && source.playing) {
         advanceAnimationTime(source, delta, this.speed);
+        advanceAnimationTime({ ...source, time: source.unwrappedTime }, delta, this.speed);
+      }
     }
     preparePose?.();
     const events: FiredAnimationEvent[] = [];
@@ -755,6 +831,7 @@ export class AnimationPlayer {
     this.finishPoseChange(
       () => {
         try {
+          if (rootDisplacement) this.rootMotionApplication!.apply(rootDisplacement);
           this.applyCurrentPose();
           synchronizePose?.();
         } finally {
@@ -799,6 +876,7 @@ export class AnimationPlayer {
     const previous = state.time;
     const end = advanceAnimationTime(state, delta, this.speed);
     if (end === previous) return;
+    state.unwrappedTime = advanceAnimationTime({ ...state, time: state.unwrappedTime }, delta, this.speed);
     if (layer && events && !this.previewMode) {
       for (const event of collectAnimationEvents(state.clip, previous, end, layer)) events.push(event);
     }
@@ -973,6 +1051,7 @@ export class AnimationPlayer {
     this.eventListeners.clear();
     this.completionListeners.clear();
     this.clips.clear();
+    this.rootMotionApplication = undefined;
     this.layers.clear();
     this.poseEvaluator.dispose();
     this.joints = new Map();

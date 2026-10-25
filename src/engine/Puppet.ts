@@ -31,6 +31,7 @@ import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetPoseController, type SyncPoseOptions } from './PuppetPoseController.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
+import type { RootMotionOffset } from './rootMotion.js';
 import { SlotDebug } from './SlotDebug.js';
 import { SlotState } from './SlotState.js';
 import type { AttachmentOptions, Facing, RigDefinition, SkinDefinition, SpriteAttachmentDefinition } from './types.js';
@@ -94,6 +95,8 @@ export class Puppet {
   private destroyed = false;
   private readonly destroyListeners = new Set<() => void>();
   private readonly updateListeners = new Set<(deltaMilliseconds: number) => void>();
+  private movementTranslation: { owner: object } | undefined;
+  private rootMotionOrigin: { x: number; y: number; a: number; b: number; c: number; d: number } | undefined;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -164,7 +167,27 @@ export class Puppet {
       (id) => this.getBone(id).container,
       (id, slotId) => (slotId === undefined ? this.renderer.getMount(id) : this.renderer.getSlotMount(slotId)),
     );
-    this.animationPlayer = new AnimationPlayer(this.rig, this.bones, compiledAnimations);
+    this.animationPlayer = new AnimationPlayer(this.rig, this.bones, compiledAnimations, {
+      validate: () => {
+        if (this.movementTranslation)
+          throw new Error('Root motion conflicts with active moveTo/walkTo translation. Cancel movement first.');
+        for (const value of [
+          this.container.x,
+          this.container.y,
+          this.container.rotation,
+          this.container.scaleX,
+          this.container.scaleY,
+        ])
+          assertFinite(value, 'Root motion starting transform');
+      },
+      begin: () => {
+        const { x, y, rotation, scaleX, scaleY } = this.container;
+        const cos = Math.cos(rotation),
+          sin = Math.sin(rotation);
+        this.rootMotionOrigin = { x, y, a: cos * scaleX, b: sin * scaleX, c: -sin * scaleY, d: cos * scaleY };
+      },
+      apply: (displacement) => this.applyRootMotion(displacement),
+    });
     this.renderSlots();
     this.poseController = new PuppetPoseController(
       this.bones,
@@ -204,6 +227,29 @@ export class Puppet {
 
   get currentAnimation(): string | undefined {
     return this.animationPlayer.currentAnimation;
+  }
+
+  /** Internal shared translation lease. Replacements by the same movement controller are atomic. */
+  claimMovementTranslation(owner: object): () => void {
+    if (this.animationPlayer.isApplyingRootMotion)
+      throw new Error('moveTo/walkTo conflicts with active root motion. Stop or replace playback first.');
+    if (this.movementTranslation && this.movementTranslation.owner !== owner)
+      throw new Error('Puppet translation already has an active movement owner.');
+    const lease = { owner };
+    this.movementTranslation = lease;
+    return () => {
+      if (this.movementTranslation === lease) this.movementTranslation = undefined;
+    };
+  }
+
+  private applyRootMotion(displacement: RootMotionOffset): void {
+    const origin = this.rootMotionOrigin!;
+    const x = origin.x + origin.a * displacement.x + origin.c * displacement.y;
+    const y = origin.y + origin.b * displacement.x + origin.d * displacement.y;
+    assertFinite(x, 'Root motion Actor x');
+    assertFinite(y, 'Root motion Actor y');
+    // Use the same outer transform as Actor.setPosition. The player synchronizes pose/IK next.
+    this.container.setPosition(x, y);
   }
   get isDestroyed(): boolean {
     return this.destroyed;
@@ -750,6 +796,8 @@ export class Puppet {
     if (this.destroyed) return;
     this.destroyed = true;
     this.updateListeners.clear();
+    this.movementTranslation = undefined;
+    this.rootMotionOrigin = undefined;
     this.ikAnimationSource = undefined;
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onSceneUpdate, this);

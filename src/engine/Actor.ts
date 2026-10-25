@@ -103,6 +103,8 @@ export class Actor {
 
   setPosition(x: number, y: number): this {
     this.assertActive();
+    if (this.puppet.animationPlayer.isApplyingRootMotion)
+      throw new Error('setPosition conflicts with active root motion. Stop or replace playback first.');
     assertFinite(x, 'Actor x');
     assertFinite(y, 'Actor y');
     this.puppet.container.setPosition(x, y);

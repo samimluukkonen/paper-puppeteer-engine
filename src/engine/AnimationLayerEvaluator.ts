@@ -5,6 +5,7 @@ import { AnimationIKEvaluator, type IKAnimationPose } from './ik/AnimationIKPose
 import type { Joint } from './Joint.js';
 import type { PlaybackInstanceId, PlaybackOutcome } from './PlaybackLifecycle.js';
 import type { Rig } from './Rig.js';
+import type { RootMotionPolicy } from './rootMotion.js';
 import { type TransformProperty, transformProperties } from './types.js';
 
 export interface AnimationState {
@@ -12,6 +13,9 @@ export interface AnimationState {
   outcome?: PlaybackOutcome;
   clip: CompiledClip;
   time: number;
+  /** Unwrapped playback time, distinct from the local skeletal/event clock. */
+  unwrappedTime: number;
+  rootMotion: RootMotionPolicy;
   speed: number;
   playing: boolean;
 }

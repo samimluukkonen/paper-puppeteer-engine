@@ -108,7 +108,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [v0.9 Scene Editor readiness and verification](docs/scene-editor-readiness.md)
 - [Using Feature Guide](docs/feature-guide.md)
 - [Schema inventory, compatibility policy and canonical serialization](docs/schema-compatibility.md)
-- [Authored root-motion data and transform semantics](docs/root-motion.md)
+- [Root-motion data, runtime evaluation and application](docs/root-motion.md)
 
 | Guide                                                                | Contents                                                                                                   |
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |

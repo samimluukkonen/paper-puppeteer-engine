@@ -91,6 +91,12 @@ Add independent Scene Artwork with local PNG/static WebP import and existing pro
 
 Extend scene format 2 with optional image elements and project format 1 with an image registry. Reuse guarded image decoding, package paths and ZIP services; deduplicate project binaries with character artwork, retain Undo/Redo asset dependencies, recover artwork through autosave and include images in standalone scene packages and runtime loading. Reject missing references, invalid transforms, image/path collisions and unsupported or corrupt artwork before browser production exports. Update the scene JSON Schema, release metadata and [artwork guide](docs/scene-artwork.md); add data, lifecycle and local desktop browser regressions. Parallax, camera animation and advanced layers remain deferred.
 
+## 1.1.7-2
+
+Add renderer-independent absolute local/elapsed root-motion evaluation and unwrapped-time deltas, with continuous net-cycle accumulation, playback quantization and finite/cycle-bound checks. Opt into base Actor/Puppet translation per play or queue request with `rootMotion: 'apply'`; preserve the default ignore policy, skeletal/IK channels and existing version-1 data. Apply absolute displacement once through the starting facing/scale/rotation transform before IK synchronization.
+
+Define pause, stop, restart, cancellation, completion, queue and incoming-only crossfade semantics without undoing applied travel. Reject conflicts with moveTo/walkTo and manual Actor placement, retain pure deterministic sampling, and document authored reset limitations and standalone application hosts in the [root-motion guide](docs/root-motion.md). Add runtime, loop, lifecycle, transform, IK, ownership and compatibility regressions. Retain package/lockfile version 1.2.6.
+
 ## 1.1.7-1
 
 Add optional authored X/Y root-motion tracks with independently timed sparse channels and existing linear, stepped and bounded Bézier property curves. Validate strict structures, finite values, duration bounds, ordering, duplicate times and curve ownership; include root keys in external import workload limits. Preserve root motion in deterministic animation JSON, character/project packages, compiled immutable snapshots and whole-clip variation timing. Retain animation format 1 and the higher package/lockfile version 1.2.6.

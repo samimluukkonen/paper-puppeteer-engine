@@ -57,6 +57,7 @@ interface MovementRequest {
   controller?: AnimationStateController;
   unsubscribeUpdate?: () => void;
   unsubscribeAbort?: () => void;
+  releaseTranslation?: () => void;
 }
 
 function point(x: number, y: number): Readonly<Point> {
@@ -102,8 +103,14 @@ export class ActorMovement {
     }
 
     const previousLocomotion = this.current?.controller?.isActive ? this.current.locomotion : undefined;
+    const releaseTranslation = this.puppet.claimMovementTranslation(this);
     // A walking replacement suppresses the intermediate idle start.
-    this.finish('interrupted', false);
+    try {
+      this.finish('interrupted', false);
+    } catch (error) {
+      releaseTranslation();
+      throw error;
+    }
     const start = this.position();
     return new Promise<ActorMovementResult>((resolve, reject) => {
       const request: MovementRequest = {
@@ -114,6 +121,7 @@ export class ActorMovement {
         resolve,
         locomotion,
         faceMovement: !!locomotion && options.faceMovement === true,
+        releaseTranslation,
       };
       this.current = request;
       this.latest = Object.freeze({ requestId: request.requestId, status: 'moving' });
@@ -270,6 +278,7 @@ export class ActorMovement {
   }
 
   private release(request: MovementRequest): void {
+    request.releaseTranslation?.();
     request.unsubscribeUpdate?.();
     request.unsubscribeAbort?.();
     request.controller?.dispose();
