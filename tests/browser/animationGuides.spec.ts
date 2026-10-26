@@ -1,7 +1,14 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationFileAction, animationHierarchy, animationMenuControl, test, inspectorControl } from './fixtures.js';
+import {
+  timelineControl,
+  animationFileAction,
+  animationHierarchy,
+  animationMenuControl,
+  test,
+  inspectorControl,
+} from './fixtures.js';
 
 const guides = guideRegistry.getGuidesForEditor('animation');
 test.setTimeout(240_000);
@@ -164,7 +171,7 @@ test('spotlights follow timeline zoom, scroll, expansion, selection, inspector a
 }) => {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
-  await page.locator('#timeline-zoom').selectOption('4');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('4');
   await (await animationMenuControl(page, '#timeline-expand-all')).click();
   let tour = await launch(page, 'Timeline Navigation');
   await tour.getByRole('button', { name: 'Next', exact: true }).click();

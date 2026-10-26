@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
-import { animationControl, animationFileAction, test } from './fixtures.js';
+import { timelineControl, animationControl, animationFileAction, test } from './fixtures.js';
 
 async function openGraph(page: Page) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -98,7 +98,7 @@ test('graph key selection, precision editing, collisions and keyboard deletion s
   await openGraph(page);
   await page.getByRole('button', { name: 'Select root x graph key at 0.5 s', exact: true }).click();
   await expect(page.locator('#graph-key-time')).toHaveValue('0.5');
-  await page.locator('#timeline-snap-enabled').check();
+  await (await timelineControl(page, '#timeline-snap-enabled')).check();
   const point = await page.locator('.graph-key[data-graph-key="1"]').boundingBox();
   if (!point) throw new Error('Missing graph key');
   await page.mouse.move(point.x + point.width / 2, point.y + point.height / 2);

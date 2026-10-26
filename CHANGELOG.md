@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Reclaim vertical timeline space with a compact shared tab bar alongside playback and time controls. Start Tracks & keys, View and Snapping panels collapsed; preserve mounted controls, preferences, shortcuts and Feature Guide reveal.
+
 - Replace Animation Editor inspector disclosures with shared wrapping, keyboard-accessible tabs. Start on Bones, preserve mounted panels and drafts across tabs and Rig Tweak mode, and reveal the relevant tab for selections and Feature Guides.
 
 - Replace Rig Editor inspector disclosures with shared keyboard-accessible tabs that wrap onto multiple rows. Keep panels mounted, show the selected Hierarchy contents on first load, and reveal the relevant tab for Feature Guides.

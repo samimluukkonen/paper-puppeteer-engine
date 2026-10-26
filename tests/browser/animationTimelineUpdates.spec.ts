@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, test, inspectorControl } from './fixtures.js';
+import { timelineControl, animationHierarchy, test, inspectorControl } from './fixtures.js';
 
 test('playback updates time without mutating authored rows, inspectors, or file controls', async ({ page }) => {
   await page.goto('animation-editor/');
@@ -116,7 +116,7 @@ test('dense collapsed summaries follow zoom while individual keys retain exact t
   await expect.poll(() => summaries.count()).toBeGreaterThan(0);
   const collapsedCount = await summaries.count();
   expect(collapsedCount).toBeLessThan(513);
-  await page.locator('#timeline-zoom').selectOption('8');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('8');
   // Pixel grouping depends on the available desktop lane width, even at maximum zoom.
   await expect.poll(() => summaries.count()).toBeGreaterThan(collapsedCount);
   expect(await summaries.count()).toBeLessThanOrEqual(513);
@@ -127,7 +127,7 @@ test('dense collapsed summaries follow zoom while individual keys retain exact t
   expect(
     await keys.evaluateAll((markers) => markers.map((marker) => Number(marker.getAttribute('data-time')))),
   ).toEqual(Array.from({ length: 513 }, (_, index) => (index * 10) / 1000));
-  await page.locator('#timeline-zoom').selectOption('1');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('1');
   await expect(keys).toHaveCount(513);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await expect(page.locator('#animation-undo')).toBeDisabled();

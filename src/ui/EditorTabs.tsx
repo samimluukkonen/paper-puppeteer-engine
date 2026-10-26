@@ -19,12 +19,15 @@ export function EditorTabs({
   defaultExpanded = true,
   controlsLabel = 'editor controls',
   wrap = false,
+  toolbar,
 }: {
   label: string;
   tabs: readonly EditorTab[];
   defaultExpanded?: boolean;
   controlsLabel?: string;
   wrap?: boolean;
+  /** Persistent controls beside the tabs, including while panels are collapsed. */
+  toolbar?: ReactNode;
 }) {
   const visibleTabs = tabs.filter((tab) => !tab.hidden);
   const [selected, setActive] = useState(tabs[0]!.id);
@@ -48,7 +51,7 @@ export function EditorTabs({
   };
   return (
     <div ref={root} className={`editor-tabs${wrap ? ' editor-tabs-wrap' : ''}`}>
-      <div className="editor-tabs-heading">
+      <div className={`editor-tabs-heading${toolbar ? ' editor-tabs-heading-with-toolbar' : ''}`}>
         <div role="tablist" aria-label={label} aria-orientation="horizontal">
           {visibleTabs.map((tab, index) => {
             const Icon = tab.icon ? icons[tab.icon] : undefined;
@@ -87,6 +90,7 @@ export function EditorTabs({
             );
           })}
         </div>
+        {toolbar}
         <button
           type="button"
           className="editor-tabs-collapse"

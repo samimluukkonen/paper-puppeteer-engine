@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationMenuControl, test, inspectorControl } from './fixtures.js';
+import { timelineControl, animationHierarchy, animationMenuControl, test, inspectorControl } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -63,7 +63,7 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
       Math.max(height!, Math.ceil(preview.y + preview.height)),
     );
     const ruler = (await page.locator('#timeline-ruler').boundingBox())!;
-    await page.locator('#timeline-add-event').click();
+    await (await timelineControl(page, '#timeline-add-event')).click();
     await expect(page.locator('#animation-event-inspector')).toBeVisible();
     await expect(page.locator('#animation-bone-inspector')).toBeHidden();
     expect((await page.locator('#timeline-ruler').boundingBox())!.y).toBe(ruler.y);
@@ -224,7 +224,7 @@ test('timeline context actions retain selected groups and Escape returns focus w
   await (await animationMenuControl(page, '#timeline-paste-keys')).click();
   await expect(page.getByRole('button', { name: 'Select root x key at 0.5 s', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select root x key at 1.5 s', exact: true })).toBeVisible();
-  await page.locator('#timeline-add-event').click();
+  await (await timelineControl(page, '#timeline-add-event')).click();
   await page.locator('.timeline-event').click({ button: 'right' });
   await expect(page.locator('#timeline-delete-key')).toHaveText('Delete Event');
   await page.locator('#timeline-delete-key').click();
@@ -285,8 +285,8 @@ test('panel dividers support keyboard and pointer resizing and reset without aut
   const stage = (await page.locator('#animation-stage').boundingBox())!;
   expect(stage.width / stage.height).toBeCloseTo(210 / 297, 3);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('#timeline-zoom').selectOption('4');
-  await page.locator('#timeline-filter').selectOption('keyed');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('4');
+  await (await timelineControl(page, '#timeline-filter')).selectOption('keyed');
   await (await animationMenuControl(page, '#animation-reset-layout')).click();
   await expect(divider).toHaveAttribute('aria-valuenow', String(initialShare));
   await expect(labels).toHaveAttribute('aria-valuenow', '240');
@@ -320,7 +320,7 @@ test('zoom and horizontal scrolling preserve time projection and key drag coordi
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
   await page.getByRole('button', { name: 'Select root x key at 0 s', exact: true }).click();
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
-  await page.locator('#timeline-zoom').selectOption('2');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('2');
   await page.locator('.timeline-inset').evaluate((element) => {
     // Keep the middle key visible even when the portrait preview leaves a narrow timeline.
     element.scrollLeft = element.querySelector('#timeline')!.getBoundingClientRect().width * 0.25;
@@ -358,16 +358,16 @@ test('collapsed timing summaries and filters preserve empty-track authoring and 
   await openEditor(page);
   expect(await page.locator('.timeline-summary').count()).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Select bone root', exact: true }).click();
-  await page.locator('#timeline-filter').selectOption('selected');
+  await (await timelineControl(page, '#timeline-filter')).selectOption('selected');
   await expect(page.locator('.timeline-track-label.timeline-bone-track:visible')).toHaveCount(1);
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
   await page.getByRole('button', { name: 'Select root x track', exact: true }).click();
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
-  await page.locator('#timeline-filter').selectOption('keyed');
+  await (await timelineControl(page, '#timeline-filter')).selectOption('keyed');
   await expect(page.locator('.timeline-track-label[data-bone-id="root"][data-property="x"]')).toBeVisible();
   await page.locator('#animation-undo').click();
   await expect(page.locator('.timeline-track-label[data-bone-id="root"][data-property="x"]')).toBeHidden();
-  await page.locator('#timeline-filter').selectOption('all');
+  await (await timelineControl(page, '#timeline-filter')).selectOption('all');
   await expect(page.locator('.timeline-track-label[data-bone-id="root"][data-property="x"]')).toBeVisible();
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
 });
@@ -379,7 +379,7 @@ test('narrow screens keep timing visible and open the inspector as a dismissible
   await expect(page.locator('#animation-preview-divider')).toBeHidden();
   expect((await page.locator('#timeline-ruler').boundingBox())!.y).toBeLessThan(768);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(850);
-  await page.locator('#timeline-add-event').click();
+  await (await timelineControl(page, '#timeline-add-event')).click();
   await expect(page.locator('#animation-event-inspector')).toBeVisible();
   await expect(page.locator('#animation-inspector-toggle')).toHaveAttribute('aria-expanded', 'true');
   await page.locator('#animation-inspector-close').click();

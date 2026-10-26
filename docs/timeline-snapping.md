@@ -4,6 +4,8 @@
 
 v0.5.7.3 adds **Enable Snapping** and independent **Frames**, **Keyframes**, **Events** and **Playhead** controls to the Animation Editor. Snapping starts disabled, preserving continuous editing; all target types are initially selected. Preferences belong to the loaded editor session, survive animation changes/imports, and never enter animation JSON, dirty state or Undo history.
 
+Open the timeline’s **Snapping** tab to enable snapping and choose its targets. These preferences remain active when switching tabs or collapsing timeline tools.
+
 Drag a bone key or animation event near a target to align its authored time. A dashed green vertical guide and `Snap: Event @ 0.750 s` label show the active target. The guide uses the same content-time/pixel projection as markers and disappears when the pointer leaves tolerance, snapping is bypassed, or the gesture ends or is cancelled. Hold **Shift** after starting a drag to bypass snapping; releasing Shift restores it even without moving the pointer. Existing Shift-click range selection remains available.
 
 Targets include authored bone and IK property markers on collapsed or filtered tracks, all animation events, and the playhead time captured **before** drag selection seeks to the anchor. Preview clock updates do not move this captured target. Frames use authored stepped FPS, or the existing 10 FPS fallback for smooth clips. Preview speed and ruler tick spacing do not define the frame grid. Off-grid clip endpoints remain reachable through ordinary boundary clamping. When a pointer reaches or overshoots a hard clip/group bound, the bound takes precedence and only a target at that exact bound can display a guide.

@@ -131,21 +131,14 @@ export async function rigCanvasProjection(page: Page) {
   };
 }
 
-/** Follow the visible disclosure before interacting with a secondary animation command. */
+/** Reveal timeline tabs and menus through their visible controls. */
+export async function timelineControl(page: Page, selector: string): Promise<Locator> {
+  return inspectorControl(page, selector);
+}
+
+/** Reveal the tab and disclosure containing a secondary animation command. */
 export async function animationMenuControl(page: Page, selector: string): Promise<Locator> {
-  const control = page.locator(selector);
-  const menuIds = await control.evaluate((element) => {
-    const ids: string[] = [];
-    for (let parent = element.parentElement; parent; parent = parent.parentElement)
-      if (parent.matches('details[data-workspace-menu]')) ids.unshift(parent.id);
-    return ids;
-  });
-  for (const id of menuIds) {
-    const menu = page.locator(`#${id}`);
-    if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open)))
-      await menu.locator(':scope > summary').click();
-  }
-  return control;
+  return inspectorControl(page, selector);
 }
 
 export async function toggleAnimationToolPanel(page: Page, tool: 'mirror' | 'bake'): Promise<void> {

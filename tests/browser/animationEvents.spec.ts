@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, test } from './fixtures.js';
+import { timelineControl, animationMenuControl, test } from './fixtures.js';
 
 async function openEditor(page: Page, empty = false) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -198,7 +198,7 @@ test('event creation, field commits, JSON validation, same-time edits and exact 
   // Keyboard scrubbing uses continuous time and avoids dependence on pixel rounding.
   for (let i = 0; i < 7; i++) await page.keyboard.press('Shift+ArrowRight');
   for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
-  await page.locator('#timeline-add-event').click();
+  await (await timelineControl(page, '#timeline-add-event')).click();
   await expect(event(page, 'event')).toHaveAttribute('data-time', /0\.75/);
   const name = page.locator('#animation-event-name');
   const data = page.locator('#animation-event-data');
@@ -251,8 +251,9 @@ test('event drag uses shared snap policy, follows playhead, nudges, cancels and 
   const marker = event(page, 'step-left');
   const time = page.locator('#animation-event-time');
   const ruler = page.locator('#timeline-ruler');
-  await page.locator('#timeline-snap-enabled').check();
-  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
+  await (await timelineControl(page, '#timeline-snap-enabled')).check();
+  for (const mode of ['keyframes', 'events', 'playhead'])
+    await (await timelineControl(page, `#timeline-snap-${mode}`)).uncheck();
   async function dragTo(target: number, commit = true, bypass = false) {
     const bounds = (await page.locator('#timeline').boundingBox())!;
     const box = (await marker.boundingBox())!;

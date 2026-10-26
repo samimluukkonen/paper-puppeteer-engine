@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { selectAnimationBone, animationControl, animationFileAction, test } from './fixtures.js';
+import { timelineControl, selectAnimationBone, animationControl, animationFileAction, test } from './fixtures.js';
 
 const animation = {
   version: 1,
@@ -134,7 +134,7 @@ test('paste and downloaded file imports restore authored data, timeline and rend
   await page.getByRole('button', { name: 'Select root x key at 0 s', exact: true }).click();
   await page.keyboard.press('ArrowRight');
   await (await animationControl(page, '#animation-interpolation')).selectOption('');
-  await page.locator('#timeline-add-event').click();
+  await (await timelineControl(page, '#timeline-add-event')).click();
   await page.locator('#animation-event-name').fill('afterImport');
   await page.locator('#animation-event-name').press('Tab');
   const edited = (await download(page)).json;
@@ -193,7 +193,7 @@ test('import cancels an active marquee and clears temporary event inspector edit
   await expect(page.locator('.timeline-marquee')).toHaveCount(0);
   await page.mouse.up();
   await expect(page.locator('.timeline-keyframe[aria-pressed="true"]')).toHaveCount(0);
-  await page.locator('#timeline-add-event').click();
+  await (await timelineControl(page, '#timeline-add-event')).click();
   await page.locator('#animation-event-data').fill('{invalid');
   await Promise.all([
     page.waitForEvent('dialog').then((dialog) => dialog.accept()),

@@ -51,7 +51,8 @@ a {
 }
 .animation-session-selection > label,
 .timeline-toolbar label,
-.timeline-track-controls label {
+.timeline-track-controls label,
+.timeline-secondary-controls label {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -609,6 +610,27 @@ a {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 8px;
+  font-size: 12px;
+}
+.timeline-panel > .editor-tabs {
+  margin-bottom: 8px;
+}
+.timeline-panel .timeline-toolbar {
+  flex: 1;
+  margin: 0;
+  padding: 4px 0;
+}
+.timeline-panel > .editor-tabs > [role="tabpanel"] {
+  padding: 8px;
+}
+.timeline-panel .timeline-track-controls {
+  margin: 0;
+}
+.timeline-secondary-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
 }
 .timeline-track-controls {
@@ -1549,7 +1571,6 @@ a {
 
 /* Graph shares the timeline's document, selection and playback controls. */
 .timeline-panel.graph-active > .timeline-inset,
-.timeline-panel.graph-active > .timeline-track-controls,
 .timeline-panel.graph-active > #timeline-filter-empty,
 .timeline-panel.graph-active .timeline-zoom-controls {
   display: none;

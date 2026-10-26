@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, test } from './fixtures.js';
+import { timelineControl, animationMenuControl, test } from './fixtures.js';
 
 async function openEditor(page: Page, duration = 10000): Promise<void> {
   await page.route('**/animations/idle.json', async (route) => {
@@ -68,7 +68,7 @@ test('pointer zoom, pan, zoomed scrubbing and dragging retain the shared time pr
   await page
     .getByRole('button', { name: 'Expand rightArmIK properties', exact: true })
     .evaluate((element) => (element as HTMLElement).click());
-  await page.locator('#timeline-zoom').selectOption('4');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('4');
   await jump(page, '5');
   const inset = (await page.locator('.timeline-inset').boundingBox())!;
   const labels = (await page.locator('.timeline-label-column').boundingBox())!;
@@ -111,7 +111,7 @@ test('pointer zoom, pan, zoomed scrubbing and dragging retain the shared time pr
     .poll(() => page.locator('#timeline-ruler').getAttribute('aria-valuenow').then(Number))
     .toBeCloseTo(scrubTime, 5);
   await checkAlignment(page);
-  await page.locator('#timeline-zoom').selectOption('4');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('4');
   await jump(page, '5');
   const marker = page.getByRole('button', { name: 'Select root x key at 4 s', exact: true });
   const box = (await marker.boundingBox())!;
@@ -145,7 +145,7 @@ test('fit includes hidden keys across properties; time and frame jumps, shortcut
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
   await page.getByRole('button', { name: 'Select root x key at 4 s', exact: true }).click();
   await page.getByRole('button', { name: 'Select root y key at 5 s', exact: true }).click({ modifiers: ['Control'] });
-  await page.locator('#timeline-search').fill('no matches');
+  await (await timelineControl(page, '#timeline-search')).fill('no matches');
   await (await animationMenuControl(page, '#timeline-fit-selection')).click();
   await expect(page.locator('#timeline-zoom')).toHaveValue('8');
   const bounds = (await page.locator('.timeline-inset').boundingBox())!;
@@ -189,7 +189,7 @@ test('fit includes hidden keys across properties; time and frame jumps, shortcut
 
 test('playhead follow can be disabled and scrolls near an edge when enabled', async ({ page }) => {
   await openEditor(page);
-  await page.locator('#timeline-zoom').selectOption('8');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('8');
   await (await animationMenuControl(page, '#timeline-follow')).uncheck();
   await page.locator('#play-pause').click();
   await expect
@@ -205,7 +205,7 @@ test('playhead follow can be disabled and scrolls near an edge when enabled', as
 
 test('empty animation selection keeps zero-duration navigation finite and controls disabled', async ({ page }) => {
   await openEditor(page);
-  await page.locator('#timeline-zoom').selectOption('128');
+  await (await timelineControl(page, '#timeline-zoom')).selectOption('128');
   await page.locator('#animation-selection').selectOption('');
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuemax', '0');

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { timelineControl, test } from './fixtures.js';
 
 const key = (page: Page, time: number) =>
   page.locator(`.timeline-track-lane[data-bone-id="root"][data-property="x"] .timeline-keyframe[data-time="${time}"]`);
@@ -38,11 +38,11 @@ async function openEditor(page: Page) {
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
-  await page.locator('#timeline-snap-enabled').check();
+  await (await timelineControl(page, '#timeline-snap-enabled')).check();
 }
 async function only(page: Page, mode: string) {
   for (const setting of ['frames', 'keyframes', 'events', 'playhead'])
-    await page.locator(`#timeline-snap-${setting}`).setChecked(setting === mode);
+    await (await timelineControl(page, `#timeline-snap-${setting}`)).setChecked(setting === mode);
 }
 async function start(page: Page, time = 0.2) {
   const marker = key(page, time);
@@ -75,7 +75,7 @@ for (const zoom of ['1', '2', '4']) {
   }) => {
     test.setTimeout(60000);
     await openEditor(page);
-    await page.locator('#timeline-zoom').selectOption(zoom);
+    await (await timelineControl(page, '#timeline-zoom')).selectOption(zoom);
     for (const [mode, type, time] of [
       ['frames', 'frame', 0.4],
       ['keyframes', 'keyframe', 0.5],
@@ -125,7 +125,7 @@ for (const zoom of ['1', '2', '4']) {
       await expect(key(page, 0.2)).toHaveCount(1);
       await expect(guide(page)).toBeHidden();
     }
-    await page.locator('#timeline-snap-enabled').uncheck();
+    await (await timelineControl(page, '#timeline-snap-enabled')).uncheck();
     const y = await start(page);
     await move(page, 0.66, y);
     await expect(guide(page)).toBeHidden();

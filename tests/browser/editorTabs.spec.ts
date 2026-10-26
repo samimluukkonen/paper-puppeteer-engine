@@ -1,5 +1,87 @@
 import { expect } from '@playwright/test';
-import { test } from './fixtures.js';
+import { test, timelineControl } from './fixtures.js';
+
+test('timeline tabs preserve filters and preferences, support keys and keep playback visible', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  const timeline = page.getByRole('region', { name: 'Animation timeline', exact: true });
+  const tabs = timeline.getByRole('tablist', { name: 'Timeline tools' });
+  const tracks = tabs.getByRole('tab', { name: 'Tracks & keys', exact: true });
+  const view = tabs.getByRole('tab', { name: 'View', exact: true });
+  const snapping = tabs.getByRole('tab', { name: 'Snapping', exact: true });
+  const search = page.locator('#timeline-search');
+  const searchHost = await search.elementHandle();
+  await expect(tracks).toHaveAttribute('aria-selected', 'true');
+  await expect(timeline.getByRole('tabpanel')).toHaveCount(0);
+  expect((await timeline.locator('.editor-tabs-heading').boundingBox())!.height).toBeLessThanOrEqual(44);
+  const inset = page.locator('.timeline-inset');
+  const initialHeight = (await inset.boundingBox())!.height;
+  await tracks.click();
+  await expect(timeline.getByRole('tabpanel')).toHaveCount(1);
+  await search.fill('root');
+  await tracks.focus();
+  await tracks.press('ArrowRight');
+  await expect(view).toBeFocused();
+  await page.locator('#timeline-zoom').selectOption('4');
+  await view.focus();
+  await view.press('End');
+  await expect(snapping).toBeFocused();
+  await page.locator('#timeline-snap-enabled').check();
+  await page.locator('#timeline-snap-events').uncheck();
+  await snapping.focus();
+  await snapping.press('ArrowRight');
+  await expect(tracks).toBeFocused();
+  await expect(search).toHaveValue('root');
+  expect(await search.evaluate((element, original) => element === original, searchHost)).toBe(true);
+  const expandedHeight = (await inset.boundingBox())!.height;
+  expect(initialHeight).toBeGreaterThan(expandedHeight + 20);
+  await timeline.getByRole('button', { name: 'Collapse timeline tools', exact: true }).click();
+  await expect(timeline.getByRole('tabpanel')).toHaveCount(0);
+  expect((await inset.boundingBox())!.height).toBeGreaterThan(expandedHeight + 20);
+  for (const id of ['play-pause', 'reset-time', 'preview-loop', 'timeline-time-input', 'graph-toggle'])
+    await expect(page.locator(`#${id}`)).toBeVisible();
+  await page.locator('#timeline-ruler').focus();
+  await page.locator('#timeline-ruler').press('-');
+  await expect(page.locator('#timeline-zoom')).toHaveValue('2');
+  await view.click();
+  await expect(page.locator('#timeline-zoom')).toHaveValue('2');
+  await view.press('ArrowRight');
+  await expect(page.locator('#timeline-snap-enabled')).toBeChecked();
+  await expect(page.locator('#timeline-snap-events')).not.toBeChecked();
+  await snapping.press('Home');
+  await expect(tracks).toBeFocused();
+  await expect(search).toHaveValue('root');
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+  await expect(page.locator('#animation-undo')).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+  await timeline.getByRole('button', { name: 'Collapse timeline tools', exact: true }).click();
+  await page.screenshot({ path: info.outputPath('animation-timeline-tabs.png') });
+});
+
+test('timeline guides reveal the appropriate tool tab after collapse', async ({ page }) => {
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  await expect(page.getByRole('button', { name: 'Expand timeline tools', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Guide: Timeline Navigation', exact: true }).click();
+  const tour = page.getByRole('dialog', { name: 'Timeline Navigation', exact: true });
+  const next = tour.getByRole('button', { name: 'Next', exact: true });
+  for (let step = 0; step < 3; step++) await next.click();
+  const tabs = page.getByRole('tablist', { name: 'Timeline tools' });
+  await expect(tabs.getByRole('tab', { name: 'View', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#timeline-zoom')).toBeVisible();
+  await expect(tour.getByRole('status')).toHaveCount(0);
+  await next.click();
+  await expect(tabs.getByRole('tab', { name: 'Tracks & keys', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#timeline-search')).toBeVisible();
+  await next.click();
+  await expect(tabs.getByRole('tab', { name: 'View', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await tour.getByRole('button', { name: 'Finish', exact: true }).click();
+  await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
+});
 
 test('rig inspector tabs wrap, preserve drafts and support keyboard navigation', async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -127,7 +209,7 @@ test('animation inspector tabs wrap, retain drafts and skip inactive mode tabs',
   await expect(page.locator('#animation-selection-empty')).toBeVisible();
   await inspector.getByRole('button', { name: 'Collapse inspector sections', exact: true }).click();
   // Event creation must reveal Selection details before focusing the new field.
-  await page.getByRole('button', { name: '+ Event', exact: true }).click();
+  await (await timelineControl(page, '#timeline-add-event')).click();
   await expect(selection).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#animation-event-name')).toBeFocused();
   await expect(page.locator('#animation-event-name')).toHaveValue('event');

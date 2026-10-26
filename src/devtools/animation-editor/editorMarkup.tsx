@@ -567,267 +567,299 @@ export function AnimationEditorView({
           aria-label="Animation timeline"
           inert={tweaking}
         >
-          <div className="timeline-toolbar" aria-label="Playback and timing">
-            <h2>Timeline</h2>
-            <button
-              id="graph-toggle"
-              type="button"
-              aria-pressed="false"
-              aria-controls="graph-editor"
-              data-guide-id={GUIDE_TARGETS.animationGraphToggle}
-            >
-              Graph Editor
-            </button>
-            <div
-              data-guide-id={GUIDE_TARGETS.animationPlayback}
-              className="timeline-control-group"
-              role="group"
-              aria-label="Playback"
-            >
-              <button
-                id="reset-time"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Restart"
-                title="Restart (Home)"
-                aria-keyshortcuts="Home"
-              >
-                <EditorIcon name="restart" />
-                <span className="editor-sr-only">Restart</span>
-              </button>
-              <button
-                id="play-pause"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Play"
-                title="Play (Space)"
-                aria-keyshortcuts="Space"
-              >
-                <EditorIcon name="play" />
-                <EditorIcon name="pause" />
-                <span className="editor-sr-only" data-control-label>
-                  Play
-                </span>
-              </button>
-              <button
-                id="preview-loop"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Loop preview"
-                title="Loop preview"
-                aria-pressed="false"
-              >
-                <EditorIcon name="loop" />
-                <span className="editor-sr-only">Loop preview</span>
-              </button>
-            </div>
-            <div className="timeline-control-group" role="group" aria-label="Key navigation">
-              <button
-                id="timeline-previous-key"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Previous Key"
-                title="Previous key ([)"
-                aria-keyshortcuts="["
-              >
-                <EditorIcon name="previousKey" />
-                <span className="editor-sr-only">Previous Key</span>
-              </button>
-              <button
-                id="timeline-next-key"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Next Key"
-                title="Next key (])"
-                aria-keyshortcuts="]"
-              >
-                <EditorIcon name="nextKey" />
-                <span className="editor-sr-only">Next Key</span>
-              </button>
-            </div>
-            <label className="timeline-time-control">
-              Time (s){' '}
-              <input
-                id="timeline-time-input"
-                data-guide-id={GUIDE_TARGETS.animationTime}
-                type="number"
-                min="0"
-                step="any"
-                aria-label="Current time in seconds"
-              />
-            </label>
-            <label id="timeline-frame-control" className="timeline-time-control" hidden>
-              Frame <input id="timeline-frame-input" type="number" min="0" step="1" aria-label="Current frame" />
-            </label>
-            <label>
-              Speed{' '}
-              <select id="playback-speed" defaultValue="1">
-                {PREVIEW_PLAYBACK_SPEEDS.map((speed) => (
-                  <option key={speed} value={speed}>
-                    {speed}×
-                  </option>
-                ))}
-              </select>
-            </label>
-            <fieldset className="timeline-snapping">
-              <legend>Snapping</legend>
-              {(
-                [
-                  ['enabled', 'Enable Snapping'],
-                  ['frames', 'Frames'],
-                  ['keyframes', 'Keyframes'],
-                  ['events', 'Events'],
-                  ['playhead', 'Playhead'],
-                ] as const
-              ).map(([setting, label]) => (
-                <label key={setting}>
+          <EditorTabs
+            label="Timeline tools"
+            controlsLabel="timeline tools"
+            defaultExpanded={false}
+            wrap
+            toolbar={
+              <div className="timeline-toolbar" aria-label="Playback and timing">
+                <h2 className="editor-sr-only">Timeline</h2>
+                <button
+                  id="graph-toggle"
+                  type="button"
+                  aria-pressed="false"
+                  aria-controls="graph-editor"
+                  data-guide-id={GUIDE_TARGETS.animationGraphToggle}
+                >
+                  Graph Editor
+                </button>
+                <div
+                  data-guide-id={GUIDE_TARGETS.animationPlayback}
+                  className="timeline-control-group"
+                  role="group"
+                  aria-label="Playback"
+                >
+                  <button
+                    id="reset-time"
+                    className="editor-icon-button"
+                    type="button"
+                    aria-label="Restart"
+                    title="Restart (Home)"
+                    aria-keyshortcuts="Home"
+                  >
+                    <EditorIcon name="restart" />
+                    <span className="editor-sr-only">Restart</span>
+                  </button>
+                  <button
+                    id="play-pause"
+                    className="editor-icon-button"
+                    type="button"
+                    aria-label="Play"
+                    title="Play (Space)"
+                    aria-keyshortcuts="Space"
+                  >
+                    <EditorIcon name="play" />
+                    <EditorIcon name="pause" />
+                    <span className="editor-sr-only" data-control-label>
+                      Play
+                    </span>
+                  </button>
+                  <button
+                    id="preview-loop"
+                    className="editor-icon-button"
+                    type="button"
+                    aria-label="Loop preview"
+                    title="Loop preview"
+                    aria-pressed="false"
+                  >
+                    <EditorIcon name="loop" />
+                    <span className="editor-sr-only">Loop preview</span>
+                  </button>
+                </div>
+                <div className="timeline-control-group" role="group" aria-label="Key navigation">
+                  <button
+                    id="timeline-previous-key"
+                    className="editor-icon-button"
+                    type="button"
+                    aria-label="Previous Key"
+                    title="Previous key ([)"
+                    aria-keyshortcuts="["
+                  >
+                    <EditorIcon name="previousKey" />
+                    <span className="editor-sr-only">Previous Key</span>
+                  </button>
+                  <button
+                    id="timeline-next-key"
+                    className="editor-icon-button"
+                    type="button"
+                    aria-label="Next Key"
+                    title="Next key (])"
+                    aria-keyshortcuts="]"
+                  >
+                    <EditorIcon name="nextKey" />
+                    <span className="editor-sr-only">Next Key</span>
+                  </button>
+                </div>
+                <label className="timeline-time-control">
+                  Time (s){' '}
                   <input
-                    id={`timeline-snap-${setting}`}
-                    type="checkbox"
-                    aria-label={label}
-                    defaultChecked={setting !== 'enabled'}
+                    id="timeline-time-input"
+                    data-guide-id={GUIDE_TARGETS.animationTime}
+                    type="number"
+                    min="0"
+                    step="any"
+                    aria-label="Current time in seconds"
                   />
-                  {setting === 'enabled' ? 'Snap' : setting === 'keyframes' ? 'Keys' : label}
                 </label>
-              ))}
-            </fieldset>
-            <div
-              data-guide-id={GUIDE_TARGETS.animationZoom}
-              className="timeline-control-group timeline-zoom-controls"
-              role="group"
-              aria-label="Timeline zoom"
-            >
-              <button
-                id="timeline-zoom-out"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Zoom out"
-                title="Zoom out (−)"
-                aria-keyshortcuts="-"
-              >
-                <EditorIcon name="minus" />
-              </button>
-              <label>
-                Zoom{' '}
-                <select id="timeline-zoom">
-                  <option value="1">Fit</option>
-                  <option value="2">2×</option>
-                  <option value="4">4×</option>
-                  <option value="8">8×</option>
-                  <option value="16">16×</option>
-                  <option value="32">32×</option>
-                  <option value="64">64×</option>
-                  <option value="128">128×</option>
-                  <option id="timeline-custom-zoom" value="custom" hidden>
-                    Custom
-                  </option>
-                </select>
-              </label>
-              <button
-                id="timeline-zoom-in"
-                className="editor-icon-button"
-                type="button"
-                aria-label="Zoom in"
-                title="Zoom in (+)"
-                aria-keyshortcuts="+"
-              >
-                <EditorIcon name="plus" />
-              </button>
-            </div>
-            <output id="current-time" aria-label="Current time"></output>
-          </div>
-          <div
-            data-guide-id={GUIDE_TARGETS.animationTrackNavigation}
-            className="timeline-track-controls"
-            aria-label="Track navigation"
-          >
-            <label>
-              Search tracks{' '}
-              <input
-                id="timeline-search"
-                type="search"
-                placeholder="Bone, property, IK, events"
-                aria-describedby="timeline-filter-status"
-              />
-            </label>
-            <label>
-              Tracks{' '}
-              <select id="timeline-filter">
-                <option value="all">Show All Tracks</option>
-                <option value="keyed">Keyed Tracks Only</option>
-                <option value="selected">Selected Target Only</option>
-              </select>
-            </label>
-            <button id="timeline-add-event" data-guide-id={GUIDE_TARGETS.animationEvents} type="button">
-              + Event
-            </button>
-            <EditorMenu id="timeline-edit-menu" label="Edit" guideTargetId={GUIDE_TARGETS.animationKeyEditing}>
-              <button
-                id="timeline-copy-keys"
-                type="button"
-                aria-keyshortcuts="Control+C Meta+C"
-                title="Copy selected event or keys (Ctrl/Cmd+C in timeline)"
-              >
-                Copy Keys
-              </button>
-              <button
-                id="timeline-paste-keys"
-                type="button"
-                aria-keyshortcuts="Control+V Meta+V"
-                title="Paste at playhead (Ctrl/Cmd+V in timeline)"
-              >
-                Paste Keys
-              </button>
-              <button
-                id="timeline-duplicate-keys"
-                type="button"
-                aria-keyshortcuts="Control+D Meta+D"
-                title="Duplicate selected event or keys (Ctrl/Cmd+D in timeline)"
-              >
-                Duplicate Keys
-              </button>
-              <button id="timeline-delete-key" type="button" aria-keyshortcuts="Delete Backspace">
-                Delete Selected Keys
-              </button>
-            </EditorMenu>
-            <EditorMenu id="timeline-tracks-menu" label="Tracks">
-              <label>
-                <input id="timeline-show-ik" type="checkbox" defaultChecked /> IK tracks
-              </label>
-              <label>
-                <input id="timeline-show-events" type="checkbox" defaultChecked /> Event track
-              </label>
-              <button id="timeline-clear-filters" type="button">
-                Clear Filters
-              </button>
-              <button id="timeline-expand-all" type="button">
-                Expand All
-              </button>
-              <button id="timeline-collapse-all" type="button">
-                Collapse All
-              </button>
-              <button id="timeline-expand-selected" type="button">
-                Expand Selected
-              </button>
-            </EditorMenu>
-            <EditorMenu id="timeline-view-menu" label="View">
-              <button id="timeline-fit-animation" type="button" aria-keyshortcuts="F">
-                Fit Entire Animation
-              </button>
-              <button id="timeline-fit-selection" type="button">
-                Fit Selected Keyframes
-              </button>
-              <button id="timeline-center-playhead" type="button">
-                Center Playhead
-              </button>
-              <label>
-                <input id="timeline-follow" type="checkbox" defaultChecked /> Follow playhead
-              </label>
-            </EditorMenu>
-            <button id="timeline-reveal-selection" type="button" hidden>
-              Reveal Selection
-            </button>
-          </div>
+                <label id="timeline-frame-control" className="timeline-time-control" hidden>
+                  Frame <input id="timeline-frame-input" type="number" min="0" step="1" aria-label="Current frame" />
+                </label>
+                <label>
+                  Speed{' '}
+                  <select id="playback-speed" defaultValue="1">
+                    {PREVIEW_PLAYBACK_SPEEDS.map((speed) => (
+                      <option key={speed} value={speed}>
+                        {speed}×
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <output id="current-time" aria-label="Current time"></output>
+              </div>
+            }
+            tabs={[
+              {
+                id: 'timeline-tracks-tools',
+                label: 'Tracks & keys',
+                content: (
+                  <div
+                    data-guide-id={GUIDE_TARGETS.animationTrackNavigation}
+                    className="timeline-track-controls"
+                    aria-label="Track navigation"
+                  >
+                    <label>
+                      Search tracks{' '}
+                      <input
+                        id="timeline-search"
+                        type="search"
+                        placeholder="Bone, property, IK, events"
+                        aria-describedby="timeline-filter-status"
+                      />
+                    </label>
+                    <label>
+                      Tracks{' '}
+                      <select id="timeline-filter">
+                        <option value="all">Show All Tracks</option>
+                        <option value="keyed">Keyed Tracks Only</option>
+                        <option value="selected">Selected Target Only</option>
+                      </select>
+                    </label>
+                    <button id="timeline-add-event" data-guide-id={GUIDE_TARGETS.animationEvents} type="button">
+                      + Event
+                    </button>
+                    <EditorMenu id="timeline-edit-menu" label="Edit" guideTargetId={GUIDE_TARGETS.animationKeyEditing}>
+                      <button
+                        id="timeline-copy-keys"
+                        type="button"
+                        aria-keyshortcuts="Control+C Meta+C"
+                        title="Copy selected event or keys (Ctrl/Cmd+C in timeline)"
+                      >
+                        Copy Keys
+                      </button>
+                      <button
+                        id="timeline-paste-keys"
+                        type="button"
+                        aria-keyshortcuts="Control+V Meta+V"
+                        title="Paste at playhead (Ctrl/Cmd+V in timeline)"
+                      >
+                        Paste Keys
+                      </button>
+                      <button
+                        id="timeline-duplicate-keys"
+                        type="button"
+                        aria-keyshortcuts="Control+D Meta+D"
+                        title="Duplicate selected event or keys (Ctrl/Cmd+D in timeline)"
+                      >
+                        Duplicate Keys
+                      </button>
+                      <button id="timeline-delete-key" type="button" aria-keyshortcuts="Delete Backspace">
+                        Delete Selected Keys
+                      </button>
+                    </EditorMenu>
+                    <EditorMenu id="timeline-tracks-menu" label="Tracks">
+                      <label>
+                        <input id="timeline-show-ik" type="checkbox" defaultChecked /> IK tracks
+                      </label>
+                      <label>
+                        <input id="timeline-show-events" type="checkbox" defaultChecked /> Event track
+                      </label>
+                      <button id="timeline-clear-filters" type="button">
+                        Clear Filters
+                      </button>
+                      <button id="timeline-expand-all" type="button">
+                        Expand All
+                      </button>
+                      <button id="timeline-collapse-all" type="button">
+                        Collapse All
+                      </button>
+                      <button id="timeline-expand-selected" type="button">
+                        Expand Selected
+                      </button>
+                    </EditorMenu>
+                    <button id="timeline-reveal-selection" type="button" hidden>
+                      Reveal Selection
+                    </button>
+                  </div>
+                ),
+              },
+              {
+                id: 'timeline-view-tools',
+                label: 'View',
+                content: (
+                  <div className="timeline-secondary-controls" aria-label="Timeline view">
+                    <div
+                      data-guide-id={GUIDE_TARGETS.animationZoom}
+                      className="timeline-control-group timeline-zoom-controls"
+                      role="group"
+                      aria-label="Timeline zoom"
+                    >
+                      <button
+                        id="timeline-zoom-out"
+                        className="editor-icon-button"
+                        type="button"
+                        aria-label="Zoom out"
+                        title="Zoom out (−)"
+                        aria-keyshortcuts="-"
+                      >
+                        <EditorIcon name="minus" />
+                      </button>
+                      <label>
+                        Zoom{' '}
+                        <select id="timeline-zoom">
+                          <option value="1">Fit</option>
+                          <option value="2">2×</option>
+                          <option value="4">4×</option>
+                          <option value="8">8×</option>
+                          <option value="16">16×</option>
+                          <option value="32">32×</option>
+                          <option value="64">64×</option>
+                          <option value="128">128×</option>
+                          <option id="timeline-custom-zoom" value="custom" hidden>
+                            Custom
+                          </option>
+                        </select>
+                      </label>
+                      <button
+                        id="timeline-zoom-in"
+                        className="editor-icon-button"
+                        type="button"
+                        aria-label="Zoom in"
+                        title="Zoom in (+)"
+                        aria-keyshortcuts="+"
+                      >
+                        <EditorIcon name="plus" />
+                      </button>
+                    </div>
+                    <EditorMenu id="timeline-view-menu" label="Navigation">
+                      <button id="timeline-fit-animation" type="button" aria-keyshortcuts="F">
+                        Fit Entire Animation
+                      </button>
+                      <button id="timeline-fit-selection" type="button">
+                        Fit Selected Keyframes
+                      </button>
+                      <button id="timeline-center-playhead" type="button">
+                        Center Playhead
+                      </button>
+                      <label>
+                        <input id="timeline-follow" type="checkbox" defaultChecked /> Follow playhead
+                      </label>
+                    </EditorMenu>
+                  </div>
+                ),
+              },
+              {
+                id: 'timeline-snapping-tools',
+                label: 'Snapping',
+                content: (
+                  <div className="timeline-secondary-controls">
+                    <fieldset className="timeline-snapping">
+                      <legend>Snapping</legend>
+                      {(
+                        [
+                          ['enabled', 'Enable Snapping'],
+                          ['frames', 'Frames'],
+                          ['keyframes', 'Keyframes'],
+                          ['events', 'Events'],
+                          ['playhead', 'Playhead'],
+                        ] as const
+                      ).map(([setting, label]) => (
+                        <label key={setting}>
+                          <input
+                            id={`timeline-snap-${setting}`}
+                            type="checkbox"
+                            aria-label={label}
+                            defaultChecked={setting !== 'enabled'}
+                          />
+                          {setting === 'enabled' ? 'Snap' : setting === 'keyframes' ? 'Keys' : label}
+                        </label>
+                      ))}
+                    </fieldset>
+                  </div>
+                ),
+              },
+            ]}
+          />
           <p id="timeline-filter-status" role="status" hidden></p>
           <p id="timeline-selection-status" role="status" hidden></p>
           <p id="timeline-filter-empty" className="timeline-empty" hidden>

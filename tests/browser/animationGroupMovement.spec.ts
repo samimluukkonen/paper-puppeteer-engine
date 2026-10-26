@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { timelineControl, test } from './fixtures.js';
 
 const lane = (page: Page, bone = 'root', property = 'x') =>
   page.locator(`#timeline-tracks .timeline-track-lane[data-bone-id="${bone}"][data-property="${property}"]`);
@@ -72,8 +72,9 @@ test('marquee group previews all markers, follows clicked primary, replaces coll
   await marquee(page);
   await expect(selected(page)).toHaveCount(5);
   // Pointer/marker centers use fractional CSS pixels; snap to exercise exact collisions.
-  await page.locator('#timeline-snap-enabled').check();
-  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
+  await (await timelineControl(page, '#timeline-snap-enabled')).check();
+  for (const mode of ['keyframes', 'events', 'playhead'])
+    await (await timelineControl(page, `#timeline-snap-${mode}`)).uncheck();
   const y = await beginDrag(page, 0.5);
   await movePointer(page, 0.9, y);
   await expect.poll(() => time(page)).toBeCloseTo(0.9, 2);
@@ -121,8 +122,9 @@ test('group boundaries, frame snapping and Escape retain spacing, original prima
 }) => {
   await openEditor(page);
   await marquee(page);
-  await page.locator('#timeline-snap-enabled').check();
-  for (const mode of ['keyframes', 'events', 'playhead']) await page.locator(`#timeline-snap-${mode}`).uncheck();
+  await (await timelineControl(page, '#timeline-snap-enabled')).check();
+  for (const mode of ['keyframes', 'events', 'playhead'])
+    await (await timelineControl(page, `#timeline-snap-${mode}`)).uncheck();
   let y = await beginDrag(page, 0.35, 'torso', 'rotation');
   await movePointer(page, 0.697, y);
   await expect.poll(() => time(page)).toBe(0.7);

@@ -2,11 +2,13 @@
 
 [All guides](../README.md#guides)
 
+The timeline keeps playback, key navigation and time inputs beside its **Tracks & keys**, **View** and **Snapping** tabs in one compact bar. Tool panels start collapsed to leave more vertical space for tracks; click a tab when needed and collapse it again with the chevron. **View** contains zoom, fit, centering and follow controls. Switching tabs preserves controls and preferences, and Feature Guides reveal the relevant tab.
+
 The Animation Editor keeps navigation outside authored animation data and Undo/Redo. Zoom, scroll, fit, follow and time/frame jumps preserve selected keys, animation times, source/working snapshots and exports.
 
 ## Zoom and pan
 
-On narrow screens, open **Navigation** for the fit, center, follow and zoom buttons.
+Open **View** for zoom controls and the fit, center and follow menu.
 
 Use **+ / −** or the Zoom menu for 1× (Fit) through 128× horizontal scale. Buttons and menu changes anchor the playhead's viewport position, clamped to the nearest edge when it is offscreen. **Ctrl/Cmd + mouse wheel** uses continuous zoom anchored at the pointer. Scroll boundaries can prevent exact anchoring near the start/end. All dimensions use measured CSS pixels, including fractional dimensions at browser zoom levels.
 
