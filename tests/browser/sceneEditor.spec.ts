@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
+import { sceneInspectorGroup } from './fixtures.js';
 
 async function createScene(page: Page, id: string) {
   await page.getByRole('button', { name: 'New Scene', exact: true }).click();
@@ -150,6 +151,7 @@ test('visual actor placement, appearance, duplication, cancellation and document
   await createScene(page, 'placement');
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
   const actors = page.locator('[data-guide-id="scene-actors"]');
+  await sceneInspectorGroup(page, 'Actors');
   await actors.locator(':scope > summary').click();
   const add = async () => {
     await actors.getByRole('button', { name: '+ Add Actor', exact: true }).click();

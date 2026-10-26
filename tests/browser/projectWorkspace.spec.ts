@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Frame, type Page } from '@playwright/test';
-import { inspectorControl, test } from './fixtures.js';
+import { sceneInspectorGroup, inspectorControl, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -135,6 +135,7 @@ test('project authoring retains editor owners, switches projects and round trips
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const reopened = await activeEditor(page);
   await expect(reopened.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await sceneInspectorGroup(reopened, 'Actors');
   await reopened.getByText('Scene actors (1)', { exact: true }).click();
   await expect(reopened.getByRole('button', { name: /^actor-1 →/ })).toBeVisible();
   await reopened.getByRole('button', { name: '← Project', exact: true }).click();

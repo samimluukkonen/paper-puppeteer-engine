@@ -4,7 +4,7 @@ import { importProjectPackage } from '../../src/devtools/project/projectPackage.
 import { decodePackageZip, encodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 async function imageBytes(page: Page, width: number, height: number, color: string, format = 'image/png') {
@@ -81,6 +81,7 @@ test('background PNG placement, scale handle, zoom/pan, cancellation, playback, 
     .setInputFiles({ name: 'forest.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(source)) });
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-artwork summary').click();
   await page
     .getByLabel('Import scene artwork')
@@ -160,6 +161,7 @@ test('background PNG placement, scale handle, zoom/pan, cancellation, playback, 
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const recovered = await activeEditor(page);
   await expect(recovered.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await sceneInspectorGroup(recovered, 'Artwork');
   await recovered.locator('.scene-artwork summary').click();
   await recovered.getByRole('button', { name: /forest.png · image-1/ }).click();
   await expect(recovered.getByLabel('Position X', { exact: true })).toHaveValue('60');
@@ -201,12 +203,14 @@ test('existing project images and WebP background survive project export, reopen
   await dialog.getByRole('button', { name: 'Create Scene', exact: true }).click();
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const frame = await activeEditor(page);
+  await sceneInspectorGroup(frame, 'Actors');
   await frame.locator('[data-guide-id="scene-actors"] > summary').click();
   await frame.getByRole('button', { name: '+ Add Actor', exact: true }).click();
   await frame
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })
     .click();
+  await sceneInspectorGroup(frame, 'Artwork');
   await frame.locator('.scene-artwork summary').click();
   await frame.getByRole('button', { name: '+ Add Image From Project', exact: true }).click();
   await expect(frame.getByLabel('Project image', { exact: true })).toBeEnabled();
@@ -218,6 +222,7 @@ test('existing project images and WebP background survive project export, reopen
   });
   await frame.getByLabel('Position X', { exact: true }).fill('10');
   await frame.getByRole('button', { name: 'Apply image transform', exact: true }).click();
+  await sceneInspectorGroup(frame, 'Artwork');
   await frame.locator('.scene-layers summary').click();
   await frame.getByRole('button', { name: '+ Add Layer', exact: true }).click();
   await frame.getByLabel('Name for layer-1', { exact: true }).fill('Far forest');
@@ -258,9 +263,11 @@ test('existing project images and WebP background survive project export, reopen
   const restored = await activeEditor(page);
   await expect(restored.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
   await expect(restored.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await sceneInspectorGroup(restored, 'Artwork');
   await restored.locator('.scene-artwork summary').click();
   await restored.getByRole('button', { name: /forest.webp · image-2/ }).click();
   await expect(restored.getByLabel('Position X', { exact: true })).toHaveValue('10');
+  await sceneInspectorGroup(restored, 'Artwork');
   await restored.locator('.scene-layers summary').click();
   await expect(restored.getByLabel('Parallax for layer-1', { exact: true })).toHaveValue('0.5');
   await restored.getByRole('button', { name: 'Play', exact: true }).click();
@@ -297,6 +304,7 @@ test('layers compose foreground over Actors with parallax picking, locks, histor
     .setInputFiles({ name: 'layers.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(source)) });
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-artwork summary').click();
   await page
     .getByLabel('Import scene artwork')
@@ -306,6 +314,7 @@ test('layers compose foreground over Actors with parallax picking, locks, histor
     .setInputFiles({ name: 'tree.png', mimeType: 'image/png', buffer: await imageBytes(page, 80, 250, '#e02020') });
   await page.getByLabel('Position X', { exact: true }).fill('100');
   await page.getByRole('button', { name: 'Apply image transform', exact: true }).click();
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-layers summary').click();
   await page.getByRole('button', { name: '+ Add Layer', exact: true }).click();
   await page.getByLabel('Name for layer-1', { exact: true }).fill('Foreground trees');

@@ -22,6 +22,17 @@ export async function inspectorControl(page: Page | Frame, selector: string): Pr
   return control;
 }
 
+/** Switch scene inspector groups without changing their disclosure state. */
+export async function sceneInspectorGroup(
+  page: Page | Frame,
+  group: 'Scene' | 'Actors' | 'Camera' | 'Artwork' | 'Dialogue' | 'Audio' | 'Transitions',
+): Promise<void> {
+  await page
+    .getByRole('tablist', { name: 'Scene inspector groups' })
+    .getByRole('tab', { name: group, exact: true })
+    .click();
+}
+
 /** Reveal the hierarchy tab in the active Rig Editor or Rig Tweak inspector. */
 export async function rigHierarchy(page: Page): Promise<Locator> {
   if (await page.locator('#editor-app').isVisible()) {

@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 
@@ -35,6 +35,7 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
     .setInputFiles({ name: 'camera.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(source)) });
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-artwork summary').click();
   const imageFiles: Buffer[] = [];
   for (const [name, color] of [
@@ -62,8 +63,10 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
   }
   await page.getByLabel('Position X', { exact: true }).fill('200');
   await page.getByRole('button', { name: 'Apply image transform', exact: true }).click();
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-layers summary').click();
   await page.getByLabel('Layer for image-2', { exact: true }).selectOption('foreground');
+  await sceneInspectorGroup(page, 'Camera');
   await page.locator('.scene-camera > summary').click();
   await page.getByLabel('Center X', { exact: true }).fill('100');
   await page.getByLabel('Camera zoom', { exact: true }).fill('1.5');
@@ -83,7 +86,9 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByLabel('Center X', { exact: true })).toHaveValue('100');
   // Actor framing uses real rendered bounds and leaves the Actor untouched.
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true }).click();
+  await sceneInspectorGroup(page, 'Camera');
   await page.getByRole('button', { name: 'Frame Selected Actor', exact: true }).click();
   expect(Number(await page.getByLabel('Center X', { exact: true }).inputValue())).toBeLessThan(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -166,6 +171,7 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
   await page
     .getByLabel('Open scene JSON')
     .setInputFiles({ name: 'camera.json', mimeType: 'application/json', buffer: data });
+  await sceneInspectorGroup(page, 'Camera');
   await page.locator('.scene-camera > summary').click();
   await expect(page.getByLabel('Center X', { exact: true })).toHaveValue('100');
   await expect(page.getByLabel('Camera zoom', { exact: true })).toHaveValue('1.5');

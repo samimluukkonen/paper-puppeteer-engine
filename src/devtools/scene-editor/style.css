@@ -88,7 +88,14 @@
 .scene-inspector {
   grid-column: 3;
   grid-row: 1 / -1;
+  min-width: 0;
   overflow: auto;
+}
+.scene-inspector-groups > .editor-tabs > [role="tabpanel"] {
+  padding: 12px;
+}
+.scene-inspector-groups > .editor-tabs > [role="tabpanel"] > details:last-child {
+  margin-bottom: 0;
 }
 .scene-workspace h2 {
   font-size: 15px;

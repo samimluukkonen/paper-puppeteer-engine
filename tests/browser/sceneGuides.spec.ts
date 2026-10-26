@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
+import { sceneInspectorGroup } from './fixtures.js';
 
 test('scene catalog gates empty selections and all tours resolve real controls without authoring', async ({ page }) => {
   const errors: string[] = [];
@@ -108,9 +109,11 @@ test('background guide reveals selected locked artwork without changing the scen
     buffer: Buffer.from(JSON.stringify(source)),
   });
   await expect(page.getByRole('status')).toContainText('Scene imported.');
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-artwork summary').click();
   const image = page.locator('.scene-artwork .scene-artwork-list button');
   await image.click();
+  await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-layers summary').click();
   await page.getByLabel('Lock Forest', { exact: true }).check();
   const downloadScene = async (): Promise<unknown> => {
@@ -183,8 +186,10 @@ for (const populated of [false, true]) {
     const toolbar = page.locator('.scene-stage-toolbar');
     if (populated) {
       await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+      await sceneInspectorGroup(page, 'Artwork');
       await page.locator('.scene-layers summary').click();
       await page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true }).click();
+      await sceneInspectorGroup(page, 'Camera');
       await page.locator('.scene-camera > summary').click();
       await page.getByRole('button', { name: 'Select Cinematic Camera', exact: true }).click();
       await toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true }).click();
@@ -228,6 +233,7 @@ for (const populated of [false, true]) {
       await expect(page.getByLabel('Playhead (s)', { exact: true })).toHaveValue('0.5');
       await expect(page.getByLabel('Scene playback status')).toContainText('paused');
       await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
+      await sceneInspectorGroup(page, 'Artwork');
       await expect(page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true })).toHaveAttribute(
         'aria-pressed',
         'true',
@@ -290,6 +296,7 @@ for (const populated of [false, true]) {
     await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
     if (populated) {
       await page.getByRole('button', { name: 'Camera x key at 0 s', exact: true }).click();
+      await sceneInspectorGroup(page, 'Camera');
       await page.locator('.scene-camera > summary').click();
       await page.locator('.scene-camera-key-inspector > summary').click();
       await page.getByLabel('Camera key interpolation', { exact: true }).selectOption('stepped');
@@ -391,6 +398,7 @@ for (const populated of [false, true]) {
     const toolbar = page.locator('.scene-stage-toolbar');
     const selected = page.getByRole('button', { name: 'Fade out at 3 s', exact: true });
     if (populated) {
+      await sceneInspectorGroup(page, 'Camera');
       await page.locator('.scene-camera > summary').click();
       await page.getByLabel('Camera Key Edit mode', { exact: true }).check();
       await page.getByLabel('Playhead (s)', { exact: true }).fill('1.5');

@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 
@@ -73,6 +73,7 @@ test('two-Actor cinematic cuts and fades author, seek, cover foreground, undo an
   const time = page.getByLabel('Playhead (s)', { exact: true });
   await time.fill('3');
   await page.getByRole('button', { name: 'Set Camera Cut', exact: true }).click();
+  await sceneInspectorGroup(page, 'Camera');
   await page.locator('.scene-camera > summary').click();
   await page.getByLabel('Center X', { exact: true }).fill('180');
   await page.getByLabel('Camera zoom', { exact: true }).fill('2');

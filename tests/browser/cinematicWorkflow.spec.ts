@@ -8,7 +8,7 @@ import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parallaxPosition, sceneActorDepth, sceneImageDepth } from '../../src/engine/sceneLayers.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
 import { evaluateTransitionAtTime } from '../../src/engine/sceneTransitions.js';
-import { inspectorControl, test, waitForPreviewPaint } from './fixtures.js';
+import { sceneInspectorGroup, inspectorControl, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 let consumerScript = '';
@@ -61,6 +61,7 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
   };
   let frame = await editor();
   await expect(frame.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await sceneInspectorGroup(frame, 'Artwork');
   await frame.locator('.scene-artwork > summary').click();
   for (const [name, width, height, color] of [
     ['sky', 1800, 1000, '#174bc7'],
@@ -83,6 +84,7 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
   }
   await frame.getByLabel('Position X', { exact: true }).fill('280');
   await frame.getByRole('button', { name: 'Apply image transform', exact: true }).click();
+  await sceneInspectorGroup(frame, 'Artwork');
   await frame.locator('.scene-layers > summary').click();
   for (const [id, name, parallax, image] of [
     ['layer-1', 'Mountains', '0.2', 'image-2'],
@@ -128,6 +130,7 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
   }
   const time = () => frame.getByLabel('Playhead (s)', { exact: true });
   await frame.getByRole('button', { name: 'Set Camera Key', exact: true }).click();
+  await sceneInspectorGroup(frame, 'Camera');
   await frame.locator('.scene-camera > summary').click();
   await time().fill('2');
   await frame.getByLabel('Center X', { exact: true }).fill('100');

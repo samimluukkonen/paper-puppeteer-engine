@@ -15,67 +15,16 @@ import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
-import { SceneActionInspector } from './SceneActionInspector.js';
-import { SceneActorsPanel } from './SceneActorsPanel.js';
-import { SceneArtworkPanel } from './SceneArtworkPanel.js';
-import { SceneAudioInspector } from './SceneAudioInspector.js';
-import { SceneCameraPanel } from './SceneCameraPanel.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
-import { SceneDialogueInspector } from './SceneDialogueInspector.js';
-import type { SceneEditorDocument, ReadonlyScene } from './SceneEditorDocument.js';
+import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
-import { SceneGroundPanel } from './SceneGroundPanel.js';
+import { SceneInspector } from './SceneInspector.js';
 import { bindSceneShortcuts } from './SceneKeyboardController.js';
-import { SceneLayersPanel } from './SceneLayersPanel.js';
-import { ScenePlaybackInspector } from './ScenePlaybackInspector.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
 import { exportSceneJson, importSceneJson, sceneExportFilename } from './SceneTransfer.js';
-import { SceneTransitionPanel } from './SceneTransitionPanel.js';
 import { SceneWorkspaceLayoutController } from './SceneWorkspaceLayoutController.js';
 import './style.css';
-
-function SceneProperties({ scene, document }: { scene: ReadonlyScene; document: SceneEditorDocument }) {
-  const [name, setName] = useState(scene.name);
-  const [duration, setDuration] = useState(String(scene.duration / 1000));
-  useEffect(() => {
-    setName(scene.name);
-    setDuration(String(scene.duration / 1000));
-  }, [scene]);
-  return (
-    <details data-guide-id={GUIDE_TARGETS.sceneProperties}>
-      <summary>Scene properties</summary>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          document.updateProperties({ name, duration: duration.trim() ? Number(duration) * 1000 : NaN });
-        }}
-      >
-        <label>
-          Scene ID
-          <input value={scene.id} readOnly />
-        </label>
-        <p className="workspace-caption">Assigned when the scene is created.</p>
-        <label>
-          Name
-          <input value={name} required onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label>
-          Duration (seconds)
-          <input
-            type="number"
-            min="0.001"
-            step="any"
-            required
-            value={duration}
-            onChange={(event) => setDuration(event.target.value)}
-          />
-        </label>
-        <button type="submit">Apply properties</button>
-      </form>
-    </details>
-  );
-}
 
 /** React owns the workspace. The document and authored format have no React or Phaser dependency. */
 export function SceneEditorView({
@@ -424,30 +373,7 @@ export function SceneEditorView({
         >
           <h2>Inspector</h2>
           {scene ? (
-            <>
-              <SceneProperties key={scene.id} scene={scene} document={document} />
-              <SceneCameraPanel key={`camera-${scene.id}`} document={document} playback={playback} />
-              <SceneDialogueInspector key={`dialogue-${scene.id}`} document={document} />
-              <SceneAudioInspector key={`audio-${scene.id}`} document={document} />
-              <SceneTransitionPanel key={`transitions-${scene.id}`} document={document} />
-              <SceneLayersPanel key={`layers-${scene.id}`} document={document} />
-              <SceneArtworkPanel key={`artwork-${scene.id}`} document={document} />
-              <SceneGroundPanel key={`ground-${scene.id}`} document={document} playback={playback} />
-              <ScenePlaybackInspector
-                key={`preview-${scene.id}`}
-                playback={playback}
-                actorId={document.selectedActorId}
-              />
-              <SceneActionInspector key={`actions-${scene.id}`} scene={scene} document={document} registry={registry} />
-              <SceneActorsPanel key={`actors-${scene.id}`} scene={scene} document={document} registry={registry} />
-              <details>
-                <summary>Document contents</summary>
-                <p>
-                  {scene.actors.length} actors · {scene.actions.length} scheduled actions
-                </p>
-                <p>Actor array order controls preview depth. Actions are preserved in downloads.</p>
-              </details>
-            </>
+            <SceneInspector key={scene.id} scene={scene} document={document} registry={registry} playback={playback} />
           ) : (
             <p>Select a scene to inspect its properties.</p>
           )}

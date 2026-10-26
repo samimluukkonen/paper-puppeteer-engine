@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Organize the Scene Editor inspector into shared wrapping tabs for Scene, Actors, Camera, Artwork, Dialogue, Audio and Transitions. Keep sections collapsed initially, retain drafts across tabs and reveal the relevant group for selections and Feature Guides.
+
 - Reclaim vertical timeline space with a compact shared tab bar alongside playback and time controls. Start Tracks & keys, View and Snapping panels collapsed; preserve mounted controls, preferences, shortcuts and Feature Guide reveal.
 
 - Replace Animation Editor inspector disclosures with shared wrapping, keyboard-accessible tabs. Start on Bones, preserve mounted panels and drafts across tabs and Rig Tweak mode, and reveal the relevant tab for selections and Feature Guides.

@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 
@@ -28,6 +28,7 @@ test('camera keys, curves, timeline dragging, deterministic scrubbing, independe
     .setInputFiles({ name: 'camera.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(source)) });
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await sceneInspectorGroup(page, 'Camera');
   await page.locator('.scene-camera > summary').click();
   const timeline = page.locator('.scene-timeline-toolbar');
   const inspector = page.locator('.scene-camera');

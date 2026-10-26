@@ -1,5 +1,73 @@
 import { expect } from '@playwright/test';
-import { test, timelineControl } from './fixtures.js';
+import { inspectorControl, sceneInspectorGroup, test, timelineControl } from './fixtures.js';
+
+test('scene inspector groups wrap, preserve drafts and reveal selections after collapse', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('scene-editor/');
+  await page.getByRole('button', { name: 'New Scene', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'New Scene' })
+    .getByRole('button', { name: 'Create scene', exact: true })
+    .click();
+  const inspector = page.getByRole('complementary', { name: 'Scene inspector' });
+  const tabs = inspector.getByRole('tablist', { name: 'Scene inspector groups' });
+  const scene = tabs.getByRole('tab', { name: 'Scene', exact: true });
+  const actors = tabs.getByRole('tab', { name: 'Actors', exact: true });
+  await expect(scene).toHaveAttribute('aria-selected', 'true');
+  await expect(inspector.locator('details[open]')).toHaveCount(0);
+  await expect(inspector.getByRole('tabpanel')).toHaveCount(1);
+  await inspector.getByText('Scene properties', { exact: true }).click();
+  const name = inspector.getByLabel('Name', { exact: true });
+  const original = await name.elementHandle();
+  await name.fill('Unfinished scene name');
+  await scene.press('ArrowRight');
+  await expect(actors).toBeFocused();
+  await expect(actors).toHaveAttribute('aria-selected', 'true');
+  await expect(inspector.locator('[data-guide-id="scene-actors"]')).not.toHaveAttribute('open');
+  await actors.press('End');
+  await expect(tabs.getByRole('tab', { name: 'Transitions', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(scene).toBeFocused();
+  await expect(name).toHaveValue('Unfinished scene name');
+  expect(await name.evaluate((element, initial) => element === initial, original)).toBe(true);
+  await scene.press('End');
+  await page.keyboard.press('Home');
+  await expect(scene).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await (
+    await inspectorControl(page, '[data-guide-id="scene-actors"]')
+  )
+    .getByRole('button', { name: '+ Add Actor', exact: true })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Add Actor', exact: true })
+    .getByRole('button', { name: 'Add actor', exact: true })
+    .click();
+  await expect(actors).toHaveAttribute('aria-selected', 'true');
+  await expect(inspector.locator('[data-guide-id="scene-actor-properties"]')).not.toHaveAttribute('open');
+  await sceneInspectorGroup(page, 'Scene');
+  await inspector.getByRole('button', { name: 'Collapse inspector groups', exact: true }).click();
+  await expect(inspector.getByRole('tabpanel')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add action', exact: true }).click();
+  await expect(actors).toHaveAttribute('aria-selected', 'true');
+  await expect(inspector.getByRole('tabpanel', { name: 'Actors', exact: true })).toBeVisible();
+  await expect(inspector.locator('[data-guide-id="scene-action-properties"]')).not.toHaveAttribute('open');
+  await page.locator('#scene-inspector-divider').focus();
+  await page.locator('#scene-inspector-divider').press('Home');
+  expect(
+    await tabs
+      .getByRole('tab')
+      .evaluateAll((buttons) => new Set(buttons.map((b) => b.getBoundingClientRect().top)).size),
+  ).toBeGreaterThan(1);
+  const bounds = (await tabs.boundingBox())!;
+  for (const tab of await tabs.getByRole('tab').all()) {
+    const box = (await tab.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+  await page.screenshot({ path: info.outputPath('scene-inspector-groups.png') });
+});
 
 test('timeline tabs preserve filters and preferences, support keys and keep playback visible', async ({
   page,
