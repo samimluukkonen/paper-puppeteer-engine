@@ -71,6 +71,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
     await time.press('Enter');
   };
   await (await animationHierarchy(page)).getByRole('button', { name: 'leftUpperArm', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   for (const [at, rotation] of [
     ['0', '-20'],
     ['1', '25'],

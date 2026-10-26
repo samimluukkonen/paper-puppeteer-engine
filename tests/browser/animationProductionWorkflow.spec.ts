@@ -6,6 +6,7 @@ import {
   animationControl,
   animationFileAction,
   test,
+  inspectorControl,
 } from './fixtures.js';
 
 async function editRoot(page: Page, value: string) {
@@ -59,6 +60,7 @@ test('revert restores loaded source after export and pauses/resets preview witho
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   const x = page.locator('#animation-bone-fields input[data-property="x"]');
   const original = await x.inputValue();
   await editRoot(page, '130');
@@ -78,6 +80,7 @@ test('revert restores loaded source after export and pauses/resets preview witho
   await expect(page.locator('#animation-undo')).toBeDisabled();
   await expect(page.locator('#animation-redo')).toBeDisabled();
   await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   await expect(x).toHaveValue(original);
   expect(fetchedAssets).toEqual([]);
 });

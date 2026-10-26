@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Replace Animation Editor inspector disclosures with shared wrapping, keyboard-accessible tabs. Start on Bones, preserve mounted panels and drafts across tabs and Rig Tweak mode, and reveal the relevant tab for selections and Feature Guides.
+
 - Replace Rig Editor inspector disclosures with shared keyboard-accessible tabs that wrap onto multiple rows. Keep panels mounted, show the selected Hierarchy contents on first load, and reveal the relevant tab for Feature Guides.
 
 - Upgrade lucide-react to 1.61.0, oxlint-tsgolint to 7.0.2005 and Vite to 8.3.5, keeping direct dependency versions pinned and the npm lockfile synchronized.

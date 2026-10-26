@@ -126,6 +126,7 @@ test('build a new character, import and align artwork, animate, export and reloa
   await animationDialog.getByRole('button', { name: 'Create Animation', exact: true }).click();
   await expect(page.locator('.timeline-keyframe')).toHaveCount(0);
   await (await animationHierarchy(page)).getByRole('button', { name: 'branch', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   for (const [time, rotation] of [
     ['0', '0'],
     ['0.5', '90'],

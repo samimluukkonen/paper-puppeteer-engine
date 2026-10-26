@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { test, waitForPreviewPaint, inspectorControl } from './fixtures.js';
 
 async function seek(page: Page, time: number) {
   await page.locator('#timeline-time-input').fill(String(time));
@@ -105,7 +105,7 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     await page.locator('#animation-selection').selectOption(clip);
     const original = await exported(page);
     const environment = page.locator('.environment-preview-panel');
-    await environment.locator(':scope > summary').click();
+    await inspectorControl(page, '.environment-preview-panel');
     const background = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 700;
@@ -129,11 +129,11 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     await environment.getByLabel('Background X', { exact: true }).fill('380');
     await environment.getByLabel('Background Y', { exact: true }).fill('300');
     await environment.getByRole('button', { name: 'Apply background transform', exact: true }).click();
-    await environment.locator(':scope > summary').click();
+    await inspectorControl(page, '.environment-preview-panel');
 
     const panel = page.locator('.motion-preview-panel');
-    await expect(panel).not.toHaveAttribute('open');
-    await panel.locator(':scope > summary').click();
+    await expect(panel).toBeHidden();
+    await inspectorControl(page, '.motion-preview-panel');
     const enable = panel.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true });
     await expect(enable).not.toBeChecked();
     await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).uncheck();
@@ -172,8 +172,8 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
       expect(await pixelDifference(page, await canvas.screenshot(), authored)).toBe(0);
     }
     await enable.check();
-    await panel.locator(':scope > summary').click();
-    await environment.locator(':scope > summary').click();
+    await inspectorControl(page, '.motion-preview-panel');
+    await inspectorControl(page, '.environment-preview-panel');
     const camera = environment.locator('.environment-camera-panel');
     await expect(camera).not.toHaveAttribute('open');
     await camera.locator('summary').click();
@@ -184,7 +184,7 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     let fixed: Buffer | undefined;
     for (const mode of ['fixed', 'follow']) {
       await camera.getByLabel('Preview camera mode').selectOption(mode);
-      await environment.locator(':scope > summary').click();
+      await inspectorControl(page, '.environment-preview-panel');
       await seek(page, 0.425);
       const target = await canvas.screenshot();
       await test.info().attach(`${mode}-camera`, { body: target, contentType: 'image/png' });
@@ -211,7 +211,7 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
       await page.locator('#reset-time').click();
       await waitForPreviewPaint(page);
       expect(await pixelDifference(page, await canvas.screenshot(), beginning)).toBe(0);
-      await environment.locator(':scope > summary').click();
+      await inspectorControl(page, '.environment-preview-panel');
       await expect(environment.getByLabel('Background X', { exact: true })).toHaveValue('380');
       await expect(environment.getByLabel('Background Y', { exact: true })).toHaveValue('300');
       await expect(camera.getByLabel('Camera X', { exact: true })).toHaveValue('380');
@@ -220,8 +220,8 @@ for (const scenario of ['sword cut', 'jump', 'walk'] as const) {
     await camera.getByRole('button', { name: 'Reset Camera', exact: true }).click();
     await expect(camera.getByLabel('Zoom', { exact: true })).toHaveValue('1');
     await expect(camera.getByLabel('Preview camera mode')).toHaveValue('fixed');
-    await environment.locator(':scope > summary').click();
-    await panel.locator(':scope > summary').click();
+    await inspectorControl(page, '.environment-preview-panel');
+    await inspectorControl(page, '.motion-preview-panel');
     await page.locator('#playback-speed').selectOption('1');
     await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).check();
     await page.locator('#play-pause').click();

@@ -26,13 +26,7 @@ async function activeEditor(page: Page): Promise<Frame> {
   return frame;
 }
 async function reveal(frame: Frame, selector: string) {
-  const control = frame.locator(selector).first();
-  await control.waitFor({ state: 'attached' });
-  for (const details of await control.locator('xpath=ancestor::details').all()) {
-    if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open)))
-      await details.locator(':scope > summary').click();
-  }
-  return control;
+  return inspectorControl(frame, selector);
 }
 const saved = (page: Page) => expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
 

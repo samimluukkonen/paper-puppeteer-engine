@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationMenuControl, test } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test, inspectorControl } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -80,11 +80,12 @@ test('desktop authoring fits the viewport and event selection leaves the ruler i
 test('compact property actions preserve drafts, keyed state and history', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openEditor(page);
-  await expect(page.locator('.animation-selection-details')).not.toHaveAttribute('open');
+  await expect(page.locator('.animation-selection-details')).toBeHidden();
   await expect(page.locator('#animation-inspector details[open]')).toHaveCount(0);
   await expect(page.locator('#animation-bone-empty')).toBeHidden();
   await expect(page.locator('#animation-bone-fields')).toBeHidden();
   await (await animationHierarchy(page)).locator('.tree-entry').first().click();
+  await inspectorControl(page, '#animation-bone-inspector');
   const input = page.locator('#animation-bone-fields input[data-property="x"]');
   const diamond = page.getByRole('button', { name: 'Set X key', exact: true });
   await expect(diamond).toHaveText('◇');

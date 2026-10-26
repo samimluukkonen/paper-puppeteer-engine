@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, type Frame, type Page } from '@playwright/test';
 import { importProjectPackage } from '../../src/devtools/project/projectPackage.js';
 import { decodePackageZip, encodePackageZip } from '../../src/engine/packageZip.js';
-import { test, waitForPreviewPaint } from './fixtures.js';
+import { test, waitForPreviewPaint, inspectorControl } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -55,10 +55,10 @@ test('environment imports PNG/WebP, aligns a static world background, preserves 
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   const panel = page.locator('.environment-preview-panel');
-  await expect(panel).not.toHaveAttribute('open');
+  await expect(panel).toBeHidden();
   await page.locator('#animation-selection').selectOption('walk');
   const original = await exported(page);
-  await panel.locator(':scope > summary').click();
+  await inspectorControl(page, '.environment-preview-panel');
   await panel
     .getByLabel('Import environment image')
     .setInputFiles({ name: 'forest.png', mimeType: 'image/png', buffer: await backgroundBytes(page) });
@@ -139,7 +139,7 @@ test('environment imports PNG/WebP, aligns a static world background, preserves 
   await page.reload();
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await expect(toggle).not.toBeChecked();
-  await expect(panel).not.toHaveAttribute('open');
+  await expect(panel).toBeHidden();
 });
 
 test('animation environment imports share project assets and survive project packaging without authoring a scene', async ({
@@ -180,7 +180,7 @@ test('animation environment imports share project assets and survive project pac
   await expect(frame.locator('#validation')).toHaveText('Validation: OK');
   await frame.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   const panel = frame.locator('.environment-preview-panel');
-  await panel.locator(':scope > summary').click();
+  await inspectorControl(frame, '.environment-preview-panel');
   await panel.getByRole('button', { name: 'Load project character images', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Project images are available');
   await panel.getByLabel('Background', { exact: true }).selectOption('project:hero:paper.png');
@@ -198,7 +198,7 @@ test('animation environment imports share project assets and survive project pac
   await panel.locator('.environment-camera-panel summary').click();
   await panel.getByLabel('Preview camera mode').selectOption('follow');
   const motion = frame.locator('.motion-preview-panel');
-  await motion.locator('summary').click();
+  await inspectorControl(frame, '.motion-preview-panel');
   await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
   await motion.getByLabel('Offset X', { exact: true }).fill('45');
   await motion.getByRole('button', { name: 'Apply point 1', exact: true }).click();
@@ -247,14 +247,14 @@ test('animation environment imports share project assets and survive project pac
   await expect(restoredFrame.locator('#validation')).toHaveText('Validation: OK');
   await restoredFrame.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   const restoredPanel = restoredFrame.locator('.environment-preview-panel');
-  await expect(restoredPanel).not.toHaveAttribute('open');
-  await restoredPanel.locator(':scope > summary').click();
+  await expect(restoredPanel).toBeHidden();
+  await inspectorControl(restoredFrame, '.environment-preview-panel');
   await expect(restoredPanel.getByLabel('Background', { exact: true })).toHaveValue(reference);
   await expect(restoredPanel.getByLabel('Background X', { exact: true })).toHaveValue('380');
   await expect(restoredPanel.getByRole('checkbox', { name: 'Show Ground Reference', exact: true })).toBeChecked();
   await restoredPanel.locator('.environment-camera-panel summary').click();
   await expect(restoredPanel.getByLabel('Preview camera mode')).toHaveValue('follow');
-  await restoredFrame.locator('.motion-preview-panel summary').click();
+  await inspectorControl(restoredFrame, '.motion-preview-panel');
   await expect(restoredFrame.locator('.motion-preview-panel').getByLabel('Offset X', { exact: true })).toHaveValue(
     '45',
   );
@@ -271,7 +271,7 @@ test('standalone preview-only edits and artwork recover after refresh without au
   await page.locator('#animation-selection').selectOption('walk');
   const original = await exported(page);
   const panel = page.locator('.environment-preview-panel');
-  await panel.locator(':scope > summary').click();
+  await inspectorControl(page, '.environment-preview-panel');
   await panel.getByLabel('Import environment image').setInputFiles({
     name: 'standalone-floor.png',
     mimeType: 'image/png',
@@ -284,7 +284,7 @@ test('standalone preview-only edits and artwork recover after refresh without au
   await panel.getByLabel('Background Y', { exact: true }).fill('435');
   await panel.getByRole('button', { name: 'Apply background transform', exact: true }).click();
   const motion = page.locator('.motion-preview-panel');
-  await motion.locator('summary').click();
+  await inspectorControl(page, '.motion-preview-panel');
   await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
   await motion.getByLabel('Offset Y', { exact: true }).fill('-70');
   await motion.getByRole('button', { name: 'Apply point 1', exact: true }).click();
@@ -306,10 +306,10 @@ test('standalone preview-only edits and artwork recover after refresh without au
   await frame.getByRole('link', { name: 'Animation Editor', exact: true }).click();
   await frame.locator('#animation-selection').selectOption('walk');
   const restored = frame.locator('.environment-preview-panel');
-  await restored.locator(':scope > summary').click();
+  await inspectorControl(frame, '.environment-preview-panel');
   await expect(restored.getByLabel('Background', { exact: true })).toHaveValue(reference);
   await expect(restored.getByRole('checkbox', { name: 'Environment Preview', exact: true })).toBeChecked();
-  await frame.locator('.motion-preview-panel summary').click();
+  await inspectorControl(frame, '.motion-preview-panel');
   await expect(frame.locator('.motion-preview-panel').getByLabel('Offset Y', { exact: true })).toHaveValue('-70');
   await expect.poll(() => bluePixels(frame)).toBeGreaterThan(1000);
   await expect(frame.locator('#animation-dirty')).toHaveText('No unsaved changes');

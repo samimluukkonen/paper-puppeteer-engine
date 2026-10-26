@@ -6,7 +6,7 @@ Root motion translates the whole character independently of its skeleton. Use it
 
 ## Controls
 
-The timeline starts with a distinct **Root Motion** group and **Position X / Position Y** rows above skeletal and IK tracks. These rows also appear for old or empty animations; selecting them does not create data. Open the initially collapsed **Root Motion** inspector for numeric controls.
+The timeline starts with a distinct **Root Motion** group and **Position X / Position Y** rows above skeletal and IK tracks. These rows also appear for old or empty animations; selecting them does not create data. Open the **Root Motion** inspector tab for numeric controls.
 
 - **Add root position key** stores both evaluated coordinates at the playhead. **Set position key** stores the entered Position X/Y in one Undo operation. Existing values on those axes at that time are replaced.
 - Select an axis key in the timeline to select its channel and seek to its time. Drag horizontally to retime; frame snapping follows the existing timeline setting, and Shift bypasses it. Neighbor crossings/collisions are rejected, preserving other-axis keys. Escape cancels a drag. **Key time (s)**, **Key value**, and **Apply key** provide precise edits.

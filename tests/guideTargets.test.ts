@@ -132,6 +132,36 @@ test('tab targets request a UI reveal while hidden retained editors stay inactiv
   assert.lengthOf(dispatchEvent.mock.calls, 1, 'do not reveal an inactive retained editor');
 });
 
+test('tab reveal scrolls after React shows its target and skips a panel hidden again before commit', async () => {
+  const item = anchor('ground');
+  const panel = anchor('tab-panel');
+  const chrome = anchor('tabs');
+  panel.attributes.set('data-editor-tab-panel', 'animation-inspector-ground');
+  item.node.parentElement = panel.element;
+  panel.node.parentElement = chrome.element;
+  Object.assign(item.node, { isConnected: true });
+  Object.assign(panel.node, { dispatchEvent: vi.fn(() => true) });
+  let hidden = true;
+  item.node.closest.mockImplementation((selector) =>
+    (selector === '[hidden]' || selector === '[hidden], [inert]') && hidden ? panel.element : null,
+  );
+  const targets = new GuideTargets(root([item.element]).parent);
+  assert.isTrue(targets.reveal('ground'));
+  assert.lengthOf(item.node.scrollIntoView.mock.calls, 0);
+  hidden = false;
+  await Promise.resolve();
+  assert.lengthOf(item.node.scrollIntoView.mock.calls, 1, 'scroll the newly visible target');
+  hidden = true;
+  assert.isTrue(targets.reveal('ground'));
+  await Promise.resolve();
+  assert.lengthOf(item.node.scrollIntoView.mock.calls, 1, 'do not scroll a tab that remains hidden');
+  assert.isTrue(targets.reveal('ground'));
+  Object.assign(item.node, { isConnected: false });
+  hidden = false;
+  await Promise.resolve();
+  assert.lengthOf(item.node.scrollIntoView.mock.calls, 1, 'do not scroll after teardown');
+});
+
 test('geometry providers support canvas regions, live measurement, explicit reveal, and safe cleanup', () => {
   const host = root([]);
   const targets = new GuideTargets(host.parent);

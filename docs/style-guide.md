@@ -28,7 +28,7 @@ Use `FeatureGuideButton` and `FeatureGuideCatalog` for every Feature Guide entry
 - Asset libraries use collapsed, counted categories and separate readable rows. Constrain image previews to fixed boxes with `object-fit: contain`; release preview object URLs when the category closes. Do not render inventories as comma-separated paragraphs.
 - Project Workspace and editors use shared `EditorTabs` for Edit, Character package (character editors) and Local draft controls. Start on Project or Edit, keep inactive panels mounted, and allow the controls to collapse for more canvas space. Use arrow keys/Home/End within the tab list; Feature Guides reveal their target tab.
 - Keep related actions together in a command bar and use bordered lists/panels for assets. Avoid extra nested boxes, large empty banners, oversized titles and decorative cards.
-- Rig Editor inspector sections use shared `EditorTabs` with wrapping tab rows and the Hierarchy contents visible initially. Keep other inspector disclosures and project details collapsed initially. Opening a section is view state, independent of authored Undo/Redo and export data.
+- Rig and Animation Editor inspector sections use shared `EditorTabs` with wrapping tab rows and the Hierarchy (Rig) or Bones (Animation) contents visible initially. Keep mode-specific panels mounted while hiding their tabs. Keep other inspector disclosures and project details collapsed initially. Opening a section is view state, independent of authored Undo/Redo and export data.
 - Target desktop windows only. Do not add mobile layouts or mobile verification without an explicit change to repository policy.
 
 ## Color and typography

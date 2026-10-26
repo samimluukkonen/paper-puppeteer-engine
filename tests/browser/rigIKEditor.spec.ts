@@ -196,10 +196,11 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   const targetX = tweakIK.getByLabel('Target X', { exact: true });
   await targetX.fill('15');
   await targetX.blur();
-  await page.locator('#tweak-undo').click();
+  await (await inspectorControl(page, '#tweak-undo')).click();
   await expect(targetX).toHaveValue('0');
-  await page.locator('#tweak-redo').click();
+  await (await inspectorControl(page, '#tweak-redo')).click();
   await expect(targetX).toHaveValue('15');
+  await inspectorControl(page, '#animation-inspector section[aria-label="IK constraints"]');
   await tweakIK.getByLabel('Enabled', { exact: true }).uncheck();
   await tweakIK.getByLabel('Enabled', { exact: true }).check();
   await page.locator('#editor-mode').selectOption('animation');

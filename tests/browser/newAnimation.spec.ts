@@ -3,7 +3,14 @@ import { expect, type Page } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
-import { animationControl, animationFileAction, animationHierarchy, animationMenuControl, test } from './fixtures.js';
+import {
+  animationControl,
+  animationFileAction,
+  animationHierarchy,
+  animationMenuControl,
+  test,
+  inspectorControl,
+} from './fixtures.js';
 
 async function create(page: Page, name: string) {
   await page.locator('#animation-new').click();
@@ -47,6 +54,7 @@ test('rig with no animation files: create, author, play, export, reload and pack
   await expect(page.locator('.timeline-keyframe, .timeline-event')).toHaveCount(0);
   expect((await canvas.screenshot({ path: test.info().outputPath('created.png') })).equals(bindPose)).toBe(true);
   await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   for (const [time, rotation] of [
     ['0', '0'],
     ['0.5', '30'],
@@ -74,6 +82,7 @@ test('rig with no animation files: create, author, play, export, reload and pack
   await create(page, 'second');
   await page.locator('#animation-selection').selectOption('idle');
   await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   await animationFileAction(page, '#animation-import-file', (control) =>
     control.setInputFiles({ name: 'idle.json', mimeType: 'application/json', buffer: Buffer.from(json) }),
   );

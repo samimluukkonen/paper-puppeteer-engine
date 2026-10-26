@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { toSeconds } from './timeUnits.js';
 
@@ -27,7 +28,9 @@ export class EventInspectorController {
     this.add.addEventListener(
       'click',
       () => {
-        if (this.getState().createAnimationEvent()) {
+        // Commit tab visibility before focusing the newly created event field.
+        const created = flushSync(() => this.getState().createAnimationEvent());
+        if (created) {
           this.name.focus();
           this.name.select();
         }
@@ -102,10 +105,6 @@ export class EventInspectorController {
     this.remove.disabled = !event;
     this.time.max = String(state.duration);
     if (event === this.event && state.selectedEvent === this.ref) return;
-    if (event && state.selectedEvent !== this.ref) {
-      const details = this.app.querySelector<HTMLDetailsElement>('.animation-selection-details');
-      if (details) details.open = true;
-    }
     this.event = event;
     this.ref = state.selectedEvent;
     this.reset(state);

@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
-import { animationFileAction, test } from './fixtures.js';
+import { animationFileAction, test, inspectorControl } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 const guide = guideRegistry.getGuideById('animation-preview-displacement')!;
@@ -39,9 +39,9 @@ for (const configured of [false, true]) {
     await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
     await page.locator('#animation-selection').selectOption('walk');
     const panel = page.locator('.motion-preview-panel');
-    await expect(panel).not.toHaveAttribute('open');
+    await expect(panel).toBeHidden();
     if (configured) {
-      await panel.locator('summary').click();
+      await inspectorControl(page, '.motion-preview-panel');
       await panel.getByRole('button', { name: 'Add position point', exact: true }).click();
       await page.locator('#timeline-time-input').fill('0.6');
       await page.locator('#timeline-time-input').press('Enter');
@@ -54,7 +54,7 @@ for (const configured of [false, true]) {
       await panel.getByRole('checkbox', { name: 'Show preview trajectory', exact: true }).uncheck();
       await panel.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true }).check();
       await page.locator('#animation-facing').selectOption('left');
-      await panel.locator('summary').click();
+      await inspectorControl(page, '.motion-preview-panel');
     }
     const json = async () => {
       const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });

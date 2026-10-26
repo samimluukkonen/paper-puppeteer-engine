@@ -22,14 +22,14 @@ export async function inspectorControl(page: Page | Frame, selector: string): Pr
   return control;
 }
 
-/** Reveal the rig hierarchy tab; Rig Tweak retains its existing visible tree. */
+/** Reveal the hierarchy tab in the active Rig Editor or Rig Tweak inspector. */
 export async function rigHierarchy(page: Page): Promise<Locator> {
-  await page.locator('#editor-app:visible, .rig-tweak-panel:visible').first().waitFor();
   if (await page.locator('#editor-app').isVisible()) {
     await inspectorControl(page, '#hierarchy');
     return page.locator('#hierarchy');
   }
-  return page.getByRole('tree');
+  await inspectorControl(page, '#tweak-hierarchy');
+  return page.locator('#tweak-hierarchy');
 }
 
 /** Selecting an already selected bone would now toggle it off. */
@@ -45,14 +45,12 @@ export async function animationIKInspector(page: Page): Promise<Locator> {
   return page.locator('#animation-ik-inspector');
 }
 
-/** Expand the inspector's initially collapsed bone hierarchy before using its controls. */
+/** Expand the inspector's bone hierarchy tab before using its controls. */
 export async function animationHierarchy(page: Page): Promise<Locator> {
   const settings = page.locator('#animation-clip-settings');
   if (await settings.evaluate((element) => (element as HTMLDetailsElement).open))
     await settings.locator(':scope > summary').click();
-  const panel = page.locator('.animation-bone-list');
-  if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open)))
-    await panel.locator(':scope > summary').click();
+  await inspectorControl(page, '#animation-bones');
   return page.locator('#animation-bones');
 }
 
@@ -61,6 +59,7 @@ export async function selectAnimationBone(page: Page, name: string): Promise<voi
   const entry = (await animationHierarchy(page)).getByRole('button', { name, exact: true });
   if ((await entry.getAttribute('aria-pressed')) === 'true') await entry.focus();
   else await entry.click();
+  await inspectorControl(page, '#animation-bone-inspector');
 }
 
 /** Calibrate the fitted rig camera from visible joint references, without private scene hooks. */

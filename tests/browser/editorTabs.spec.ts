@@ -62,6 +62,92 @@ test('rig inspector tabs wrap, preserve drafts and support keyboard navigation',
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
 });
 
+test('animation inspector tabs wrap, retain drafts and skip inactive mode tabs', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
+  const inspector = page.locator('#animation-inspector');
+  const tabs = inspector.getByRole('tablist', { name: 'Animation inspector sections' });
+  const bones = tabs.getByRole('tab', { name: 'Bones', exact: true });
+  const selection = tabs.getByRole('tab', { name: 'Selection details', exact: true });
+  await expect(bones).toHaveAttribute('aria-selected', 'true');
+  await expect(inspector.getByRole('tabpanel')).toHaveCount(1);
+  await expect(inspector.getByRole('tabpanel', { name: 'Bones', exact: true })).toBeVisible();
+  const hierarchy = page.locator('#animation-bones');
+  const hierarchyHost = await hierarchy.elementHandle();
+  await hierarchy.getByRole('button', { name: 'head', exact: true }).click();
+  await expect(bones).toHaveAttribute('aria-selected', 'true');
+  await hierarchy.getByRole('button', { name: 'head', exact: true }).press('ArrowDown');
+  await expect(hierarchy.locator(':focus')).toHaveCount(1);
+  await selection.click();
+  const x = page.locator('#animation-bone-fields input[data-property="x"]');
+  await x.fill('23');
+  await expect(x).toHaveAttribute('data-temporary', 'true');
+  const fieldHost = await x.elementHandle();
+  await tabs.getByRole('tab', { name: 'Environment Preview', exact: true }).click();
+  const camera = inspector.locator('.environment-camera-panel');
+  await expect(camera).not.toHaveAttribute('open');
+  await camera.locator('summary').click();
+  await camera.getByLabel('Camera X', { exact: true }).fill('417');
+  await selection.click();
+  await expect(x).toHaveValue('23');
+  await tabs.getByRole('tab', { name: 'Environment Preview', exact: true }).click();
+  await expect(camera.getByLabel('Camera X', { exact: true })).toHaveValue('417');
+  await selection.click();
+  await page.locator('#animation-cancel-transform').click();
+  await tabs.getByRole('tab', { name: 'Environment Preview', exact: true }).click();
+  await page.locator('#editor-mode').selectOption('rig-tweak');
+  await expect(tabs.getByRole('tab', { name: 'Rig Tweak', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.getByRole('tab')).toHaveCount(3);
+  await tabs.getByRole('tab', { name: 'Rig Tweak', exact: true }).focus();
+  await page.keyboard.press('End');
+  await expect(tabs.getByRole('tab', { name: 'Attachments & skins', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Rig Tweak', exact: true })).toBeFocused();
+  await page.locator('#editor-mode').selectOption('animation');
+  await tabs.getByRole('tab', { name: 'Environment Preview', exact: true }).click();
+  await expect(camera.getByLabel('Camera X', { exact: true })).toHaveValue('417');
+  expect(await hierarchy.evaluate((element, initial) => element === initial, hierarchyHost)).toBe(true);
+  expect(await x.evaluate((element, initial) => element === initial, fieldHost)).toBe(true);
+  await bones.focus();
+  await bones.press('ArrowRight');
+  await expect(selection).toBeFocused();
+  await selection.press('End');
+  await expect(tabs.getByRole('tab', { name: 'Artwork import & replacement', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(bones).toBeFocused();
+  await inspector.getByRole('button', { name: 'Collapse inspector sections', exact: true }).click();
+  await expect(inspector.getByRole('tabpanel')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Select root motion', exact: true }).click();
+  await expect(tabs.getByRole('tab', { name: 'Root Motion', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: 'Select IK target rightArmIK', exact: true }).click();
+  await expect(tabs.getByRole('tab', { name: 'IK target', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#animation-ik-inspector')).toBeVisible();
+  await selection.click();
+  await expect(page.locator('#animation-selection-empty')).toBeVisible();
+  await inspector.getByRole('button', { name: 'Collapse inspector sections', exact: true }).click();
+  // Event creation must reveal Selection details before focusing the new field.
+  await page.getByRole('button', { name: '+ Event', exact: true }).click();
+  await expect(selection).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#animation-event-name')).toBeFocused();
+  await expect(page.locator('#animation-event-name')).toHaveValue('event');
+  await page.locator('#animation-preview-divider').focus();
+  await page.locator('#animation-preview-divider').press('End');
+  expect(
+    await tabs
+      .getByRole('tab')
+      .evaluateAll((buttons) => new Set(buttons.map((b) => b.getBoundingClientRect().top)).size),
+  ).toBeGreaterThan(1);
+  const bounds = (await tabs.boundingBox())!;
+  for (const tab of await tabs.getByRole('tab').all()) {
+    const box = (await tab.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+  await page.screenshot({ path: info.outputPath('animation-inspector-wrapped-tabs.png') });
+});
+
 for (const editor of ['rig', 'animation', 'scene'] as const) {
   test(`${editor} tabs preserve controls, support keys and reclaim desktop height`, async ({ page }) => {
     const errors: string[] = [];

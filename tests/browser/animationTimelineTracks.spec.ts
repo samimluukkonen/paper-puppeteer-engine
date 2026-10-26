@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, test } from './fixtures.js';
+import { animationHierarchy, test, inspectorControl } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -24,6 +24,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   await timeline.press('Shift+ArrowRight');
   const initialTime = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
   await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   await expect(labels.getByRole('button', { name: 'Select bone rightForearm', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -62,6 +63,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   // Camera fitting changes the projected root position. Locate its rendered selection ring,
   // switch selection away, then pick that same point through the actual canvas input path.
   await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   let rootPoint: { x: number; y: number } | null = null;
   await expect
     .poll(async () => {

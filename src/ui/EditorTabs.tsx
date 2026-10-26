@@ -6,6 +6,8 @@ export interface EditorTab {
   label: string;
   icon?: 'edit' | 'package' | 'draft' | 'project';
   content: ReactNode;
+  /** Hide mode-specific tabs while retaining their controller hosts and drafts. */
+  hidden?: boolean;
 }
 
 const icons = { edit: PencilLine, package: Package, draft: HardDrive, project: FolderOpen };
@@ -24,14 +26,16 @@ export function EditorTabs({
   controlsLabel?: string;
   wrap?: boolean;
 }) {
-  const [active, setActive] = useState(tabs[0]!.id);
+  const visibleTabs = tabs.filter((tab) => !tab.hidden);
+  const [selected, setActive] = useState(tabs[0]!.id);
+  const active = visibleTabs.some((tab) => tab.id === selected) ? selected : visibleTabs[0]!.id;
   const [expanded, setExpanded] = useState(defaultExpanded);
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = root.current!;
     const reveal = (event: Event) => {
       const id = (event as CustomEvent<string>).detail;
-      if (!tabs.some((tab) => tab.id === id)) return;
+      if (!tabs.some((tab) => tab.id === id && !tab.hidden)) return;
       setActive(id);
       setExpanded(true);
     };
@@ -46,7 +50,7 @@ export function EditorTabs({
     <div ref={root} className={`editor-tabs${wrap ? ' editor-tabs-wrap' : ''}`}>
       <div className="editor-tabs-heading">
         <div role="tablist" aria-label={label} aria-orientation="horizontal">
-          {tabs.map((tab, index) => {
+          {visibleTabs.map((tab, index) => {
             const Icon = tab.icon ? icons[tab.icon] : undefined;
             return (
               <button
@@ -62,19 +66,19 @@ export function EditorTabs({
                   if (event.altKey || event.ctrlKey || event.metaKey) return;
                   const next =
                     event.key === 'ArrowRight'
-                      ? (index + 1) % tabs.length
+                      ? (index + 1) % visibleTabs.length
                       : event.key === 'ArrowLeft'
-                        ? (index + tabs.length - 1) % tabs.length
+                        ? (index + visibleTabs.length - 1) % visibleTabs.length
                         : event.key === 'Home'
                           ? 0
                           : event.key === 'End'
-                            ? tabs.length - 1
+                            ? visibleTabs.length - 1
                             : -1;
                   if (next < 0) return;
                   event.preventDefault();
                   event.stopPropagation();
-                  select(tabs[next]!.id);
-                  root.current?.querySelector<HTMLButtonElement>(`[id="${tabs[next]!.id}-tab"]`)?.focus();
+                  select(visibleTabs[next]!.id);
+                  root.current?.querySelector<HTMLButtonElement>(`[id="${visibleTabs[next]!.id}-tab"]`)?.focus();
                 }}
               >
                 {Icon && <Icon size={14} aria-hidden="true" />}
@@ -102,7 +106,7 @@ export function EditorTabs({
           role="tabpanel"
           aria-labelledby={`${tab.id}-tab`}
           data-editor-tab-panel={tab.id}
-          hidden={!expanded || active !== tab.id}
+          hidden={tab.hidden || !expanded || active !== tab.id}
           tabIndex={0}
         >
           {tab.content}

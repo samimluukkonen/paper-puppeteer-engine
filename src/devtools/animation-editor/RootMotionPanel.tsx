@@ -2,8 +2,7 @@ import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 
 export function RootMotionPanel() {
   return (
-    <details id="root-motion-panel" data-guide-id={GUIDE_TARGETS.animationRootMotion}>
-      <summary>Root Motion</summary>
+    <div id="root-motion-panel" data-guide-id={GUIDE_TARGETS.animationRootMotion}>
       <p>
         Move the whole character independently of bones and IK. X points right; Y points down before facing and scale.
       </p>
@@ -78,6 +77,6 @@ export function RootMotionPanel() {
         wheel zooms.
       </p>
       <p id="root-motion-status" role="status" />
-    </details>
+    </div>
   );
 }

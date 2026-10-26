@@ -355,6 +355,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       let selectedIK = state.selectedIKConstraintId;
       let selectedBone = state.selectedBoneId;
       let selectedEvent = state.selectedEvent;
+      let selectedRoot = state.rootMotionSelected;
+      let selectedRootKey = state.selectedRootKey;
       let selectedKeys = state.selectedKeys;
       let authoringMode = state.editorMode;
       releaseWorkspaceSelection = state.subscribe(() => {
@@ -369,12 +371,33 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
           (state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK) ||
           (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
           (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
-          (state.selectedKeys.length && state.selectedKeys !== selectedKeys)
+          (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
+          (state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey))
         )
           workspace.revealInspector();
+        if (!app.hidden && state.editorMode !== 'rig-tweak') {
+          const id =
+            state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey)
+              ? 'animation-inspector-root'
+              : state.selectedEvent && state.selectedEvent !== selectedEvent
+                ? 'animation-inspector-selection'
+                : state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK
+                  ? 'animation-inspector-ik'
+                  : state.selectedBoneId &&
+                      state.selectedBoneId !== selectedBone &&
+                      !app.querySelector('#animation-bones:focus-within')
+                    ? 'animation-inspector-selection'
+                    : undefined;
+          if (id)
+            app
+              .querySelector(`[data-editor-tab-panel="${id}"]`)
+              ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
+        }
         selectedIK = state.selectedIKConstraintId;
         selectedBone = state.selectedBoneId;
         selectedEvent = state.selectedEvent;
+        selectedRoot = state.rootMotionSelected;
+        selectedRootKey = state.selectedRootKey;
         selectedKeys = state.selectedKeys;
       });
       if (!projectContext) recovery.bind(state, id);

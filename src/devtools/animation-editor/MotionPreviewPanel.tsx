@@ -9,8 +9,7 @@ export function MotionPreviewPanel({ controller }: { controller: MotionPreviewCo
     controller.getSnapshot,
   );
   return (
-    <details className="motion-preview-panel">
-      <summary>Preview displacement</summary>
+    <div className="motion-preview-panel">
       <fieldset disabled={!ready}>
         <label data-guide-id={GUIDE_TARGETS.animationDisplacementEnable}>
           <input
@@ -130,6 +129,6 @@ export function MotionPreviewPanel({ controller }: { controller: MotionPreviewCo
       </fieldset>
       {!clipId && <p className="workspace-caption">Select an animation to edit its preview trajectory.</p>}
       {message && <p role="alert">{message}</p>}
-    </details>
+    </div>
   );
 }

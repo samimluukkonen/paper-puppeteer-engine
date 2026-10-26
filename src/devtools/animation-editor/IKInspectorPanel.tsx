@@ -10,9 +10,10 @@ export function IKInspectorPanel({ controller }: { controller: IKInspectorContro
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   useEffect(() => () => controller.cancel(), [controller]);
   return (
-    <section id="animation-ik-inspector" aria-label="IK target keyframing" hidden={!state.constraintId}>
-      <details data-guide-id={GUIDE_TARGETS.animationIK}>
-        <summary>IK target: {state.constraintId}</summary>
+    <section id="animation-ik-inspector" aria-label="IK target keyframing">
+      <div data-guide-id={GUIDE_TARGETS.animationIK}>
+        <h3>{state.constraintId ? `IK target: ${state.constraintId}` : 'Select an IK target'}</h3>
+        {!state.constraintId && <p>Select an IK target in the preview or timeline to edit its properties.</p>}
         <p>Absolute puppet-local coordinates, before facing and camera projection. Influence ranges from 0 to 1.</p>
         {state.disabledReason && <p role="status">{state.disabledReason}</p>}
         <button
@@ -92,7 +93,7 @@ export function IKInspectorPanel({ controller }: { controller: IKInspectorContro
           Y together at the held playhead. Escape during dragging restores the previous preview. Circles at the limb
           show the solved contact position. Disable fixed IK preview to manipulate authored targets.
         </p>
-      </details>
+      </div>
     </section>
   );
 }

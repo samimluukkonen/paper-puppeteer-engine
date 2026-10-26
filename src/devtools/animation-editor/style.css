@@ -286,6 +286,18 @@ a {
   overflow-y: auto;
   font-size: 12px;
 }
+#animation-inspector > .editor-tabs > [role="tabpanel"] {
+  padding: 12px;
+}
+#animation-inspector .rig-ik-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+#animation-inspector .rig-ik-panel .rig-ik-content {
+  padding-top: 0;
+}
 .animation-inspector-heading {
   display: flex;
   align-items: center;

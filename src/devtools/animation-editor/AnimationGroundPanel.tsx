@@ -21,7 +21,7 @@ export function AnimationGroundPanel({
   const ik = useSyncExternalStore(ikInspector.subscribe, ikInspector.getSnapshot, ikInspector.getSnapshot);
   const { guide } = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot, workspace.getSnapshot);
   return (
-    <GroundGuideControls workspace={workspace} showSnapping>
+    <GroundGuideControls workspace={workspace} showSnapping embedded>
       {contacts && <FootContactGroundPanel controller={contacts} workspace={workspace} />}
       <button
         type="button"

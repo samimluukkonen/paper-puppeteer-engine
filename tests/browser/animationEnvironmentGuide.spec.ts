@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
-import { animationFileAction, test } from './fixtures.js';
+import { animationFileAction, test, inspectorControl } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 const guide = guideRegistry.getGuideById('animation-environment-preview')!;
@@ -47,10 +47,10 @@ for (const configured of [false, true]) {
     await page.locator('#animation-selection').selectOption('walk');
     const panel = page.locator('.environment-preview-panel');
     const camera = panel.locator('.environment-camera-panel');
-    await expect(panel).not.toHaveAttribute('open');
+    await expect(panel).toBeHidden();
     await expect(camera).not.toHaveAttribute('open');
     if (configured) {
-      await panel.locator(':scope > summary').click();
+      await inspectorControl(page, '.environment-preview-panel');
       await panel.getByLabel('Import environment image').setInputFiles({
         name: 'paper-torso.png',
         mimeType: 'image/png',
@@ -71,9 +71,9 @@ for (const configured of [false, true]) {
       await camera.getByRole('button', { name: 'Apply preview camera', exact: true }).click();
       await camera.getByLabel('Camera X', { exact: true }).fill('417');
       await camera.locator('summary').click();
-      await panel.locator(':scope > summary').click();
+      await inspectorControl(page, '.environment-preview-panel');
       const motion = page.locator('.motion-preview-panel');
-      await motion.locator('summary').click();
+      await inspectorControl(page, '.motion-preview-panel');
       await motion.getByRole('button', { name: 'Add position point', exact: true }).click();
       await page.locator('#timeline-time-input').fill('0.6');
       await page.locator('#timeline-time-input').press('Enter');
@@ -83,7 +83,7 @@ for (const configured of [false, true]) {
       await point.getByLabel('Offset Y', { exact: true }).fill('-30');
       await point.getByRole('button', { name: 'Apply point 2', exact: true }).click();
       await motion.getByRole('checkbox', { name: 'Use Preview-Only Displacement', exact: true }).check();
-      await motion.locator('summary').click();
+      await inspectorControl(page, '.motion-preview-panel');
       await page.locator('#playback-speed').selectOption('0.5');
       await page.locator('#preview-loop').click();
       await page.locator('#animation-facing').selectOption('left');

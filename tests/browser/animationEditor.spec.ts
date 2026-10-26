@@ -1,6 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema, characterManifestSchema } from '../../src/engine/schemas.js';
-import { animationHierarchy, animationControl, test, selectRigEntry, waitForPreviewPaint } from './fixtures.js';
+import {
+  animationHierarchy,
+  animationControl,
+  test,
+  selectRigEntry,
+  waitForPreviewPaint,
+  inspectorControl,
+} from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -442,6 +449,7 @@ test('playback advances without measuring layout or rewriting unchanged editor c
   });
   await openEditor(page);
   await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   await page.locator('#play-pause').click();
   await expect(page.locator('#play-pause')).toHaveText('Pause');
   const work = await page.evaluate(async () => {

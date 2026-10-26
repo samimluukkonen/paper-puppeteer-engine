@@ -79,7 +79,7 @@ test('artist authors a root step with the timeline, numeric controls, real handl
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   const panel = page.locator('#root-motion-panel');
-  await expect(panel).not.toHaveAttribute('open');
+  await expect(panel).toBeHidden();
   await (await inspectorControl(page, '#root-add-key')).click();
   await expect(page.getByRole('button', { name: 'Select Root Motion x key at 0 s', exact: true })).toBeVisible();
   await seek(page, '0.25');

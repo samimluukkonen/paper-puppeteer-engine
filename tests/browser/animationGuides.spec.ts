@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { animationFileAction, animationHierarchy, animationMenuControl, test } from './fixtures.js';
+import { animationFileAction, animationHierarchy, animationMenuControl, test, inspectorControl } from './fixtures.js';
 
 const guides = guideRegistry.getGuidesForEditor('animation');
 test.setTimeout(240_000);
@@ -71,6 +71,7 @@ for (const existing of [true, false]) {
     const before = await loggedClip();
     if (existing) {
       await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+      await inspectorControl(page, '#animation-bone-inspector');
       await page.locator('#animation-bone-fields input[data-property="x"]').fill('23');
       await page.getByRole('button', { name: 'Set X key', exact: true }).click();
     }

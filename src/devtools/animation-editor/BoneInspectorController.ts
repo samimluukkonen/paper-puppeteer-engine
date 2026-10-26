@@ -181,6 +181,10 @@ export class BoneInspectorController {
     const section = this.title.closest<HTMLElement>('#animation-bone-inspector');
     // This controller owns bone-panel visibility for every selection kind.
     if (section) section.hidden = !!state?.selectedIKConstraintId || !!state?.selectedEvent;
+    const selectionEmpty = this.title
+      .closest('.animation-selection-details')
+      ?.querySelector<HTMLElement>('#animation-selection-empty');
+    if (selectionEmpty) selectionEmpty.hidden = !state?.selectedIKConstraintId;
     const navigated =
       force ||
       this.bone !== state?.selectedBoneId ||
@@ -190,12 +194,7 @@ export class BoneInspectorController {
     const previousDraft = this.draft;
     this.draft = state?.boneTransformDraft;
     this.scrubbing = state?.isScrubbing;
-    const previousBone = this.bone;
     this.bone = state?.selectedBoneId;
-    if (this.bone && previousBone !== undefined && previousBone !== this.bone) {
-      const details = this.title.closest<HTMLDetailsElement>('.animation-selection-details');
-      if (details) details.open = true;
-    }
     this.time = state?.currentTime;
     this.animation = state?.previewAnimation;
     setText(this.title, this.bone ? `Bone: ${this.bone}` : 'Select a bone');

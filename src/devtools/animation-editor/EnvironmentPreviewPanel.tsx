@@ -42,8 +42,7 @@ export function EnvironmentPreviewPanel({
   const input = useRef<HTMLInputElement>(null);
   const missing = !!settings.image && !controller.images.has(settings.image);
   return (
-    <details className="environment-preview-panel">
-      <summary>Environment Preview</summary>
+    <div className="environment-preview-panel">
       <EnvironmentPreviewToggle controller={controller} />
       <label>
         Background
@@ -249,6 +248,6 @@ export function EnvironmentPreviewPanel({
       {(missing || error) && (
         <p role="alert">{missing ? 'Missing background image. Select or import another image.' : error}</p>
       )}
-    </details>
+    </div>
   );
 }

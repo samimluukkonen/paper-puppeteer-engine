@@ -368,91 +368,187 @@ export function AnimationEditorView({
               Close
             </button>
           </div>
-          {rigTweak && <RigTweakPanel active={tweaking} />}
-          {attachments && tweaking && <RigIKPanel controller={attachments} />}
-          {attachments && <AttachmentPanel controller={attachments} authoring={tweaking} defaultOpen={false} />}
-          <div hidden={tweaking} inert={tweaking}>
-            {motionPreview && <MotionPreviewPanel controller={motionPreview} />}
-            {environment && groundGuide && (
-              <EnvironmentPreviewPanel
-                controller={environment}
-                ground={groundGuide}
-                project={projectEnvironment}
-                loadProjectImages={loadProjectImages}
-              />
-            )}
-            {groundGuide && alignGroundTarget && (
-              <AnimationGroundPanel
-                workspace={groundGuide}
-                ikInspector={ikInspector}
-                alignTarget={alignGroundTarget}
-                {...(footContacts ? { contacts: footContacts } : {})}
-              />
-            )}
-            <details className="animation-bone-list" data-guide-id={GUIDE_TARGETS.animationBones}>
-              <summary>Bones</summary>
-              <div id="animation-bones" aria-label="Bone hierarchy"></div>
-            </details>
-            <RootMotionPanel />
-            <IKInspectorPanel controller={ikInspector} />
-            <details className="animation-selection-details" data-guide-id={GUIDE_TARGETS.animationProperties}>
-              <summary>Selection details</summary>
-              <section id="animation-bone-inspector" aria-label="Bone keyframing">
-                <h2 id="animation-bone-title">Select a bone</h2>
-                <p id="animation-bone-empty">Select a bone in the preview or hierarchy to edit its properties.</p>
-                <fieldset id="animation-bone-fields" aria-label="Animated local transform"></fieldset>
-                <button id="animation-cancel-transform" type="button">
-                  Cancel edits
-                </button>
-                <p className="animation-field-help">
-                  Yellow fields are temporary. Click ◇ to set a key; ◆ updates an existing key. Use ⋯ to delete a key.
-                </p>
-              </section>
-              <section id="animation-event-inspector" aria-label="Selected animation event" hidden>
-                <h3>Event</h3>
-                <label>
-                  Time (seconds) <input id="animation-event-time" type="number" min="0" step="any" />
-                </label>
-                <label>
-                  Name <input id="animation-event-name" type="text" required />
-                </label>
-                <div id="animation-event-payload">
-                  <label>
-                    Data (JSON; blank removes data){' '}
-                    <textarea
-                      id="animation-event-data"
-                      rows={4}
-                      spellCheck="false"
-                      aria-describedby="animation-event-help animation-event-error"
-                    ></textarea>
-                  </label>
-                </div>
-                <p id="animation-event-help">
-                  Commit on blur or Enter. JSON uses Ctrl/Cmd+Enter. Escape resets the field drafts.
-                </p>
-                <p id="animation-event-error" role="alert"></p>
-                <button id="animation-delete-event" type="button" aria-keyshortcuts="Delete Backspace">
-                  Delete Event
-                </button>
-              </section>
-            </details>
-
-            {artwork && <ArtworkPanel controller={artwork} />}
-            <details className="animation-key-details">
-              <summary>Key details</summary>
-              <div className="timeline-interpolation" data-guide-id={GUIDE_TARGETS.animationInterpolation}>
-                <label>
-                  Selected key interpolation{' '}
-                  <select id="timeline-interpolation" aria-describedby="timeline-interpolation-help" disabled>
-                    <option value="">—</option>
-                    {interpolationOptions}
-                  </select>
-                </label>
-                <span id="timeline-interpolation-help">Select a key to inspect its outgoing interpolation.</span>
-                <span className="timeline-interpolation-legend">◆ Linear outgoing segment · ◇ No outgoing segment</span>
-              </div>
-            </details>
-          </div>
+          <EditorTabs
+            label="Animation inspector sections"
+            controlsLabel="inspector sections"
+            wrap
+            tabs={[
+              {
+                id: 'animation-inspector-bones',
+                label: 'Bones',
+                hidden: tweaking,
+                content: (
+                  <div className="animation-bone-list" data-guide-id={GUIDE_TARGETS.animationBones}>
+                    <div id="animation-bones" aria-label="Bone hierarchy" />
+                  </div>
+                ),
+              },
+              {
+                id: 'animation-inspector-selection',
+                label: 'Selection details',
+                hidden: tweaking,
+                content: (
+                  <div className="animation-selection-details" data-guide-id={GUIDE_TARGETS.animationProperties}>
+                    <p id="animation-selection-empty" hidden>
+                      Select a bone or animation event to inspect its properties. Use the IK target tab for IK controls.
+                    </p>
+                    <section id="animation-bone-inspector" aria-label="Bone keyframing">
+                      <h2 id="animation-bone-title">Select a bone</h2>
+                      <p id="animation-bone-empty">Select a bone in the preview or hierarchy to edit its properties.</p>
+                      <fieldset id="animation-bone-fields" aria-label="Animated local transform"></fieldset>
+                      <button id="animation-cancel-transform" type="button">
+                        Cancel edits
+                      </button>
+                      <p className="animation-field-help">
+                        Yellow fields are temporary. Click ◇ to set a key; ◆ updates an existing key. Use ⋯ to delete a
+                        key.
+                      </p>
+                    </section>
+                    <section id="animation-event-inspector" aria-label="Selected animation event" hidden>
+                      <h3>Event</h3>
+                      <label>
+                        Time (seconds) <input id="animation-event-time" type="number" min="0" step="any" />
+                      </label>
+                      <label>
+                        Name <input id="animation-event-name" type="text" required />
+                      </label>
+                      <div id="animation-event-payload">
+                        <label>
+                          Data (JSON; blank removes data){' '}
+                          <textarea
+                            id="animation-event-data"
+                            rows={4}
+                            spellCheck="false"
+                            aria-describedby="animation-event-help animation-event-error"
+                          ></textarea>
+                        </label>
+                      </div>
+                      <p id="animation-event-help">
+                        Commit on blur or Enter. JSON uses Ctrl/Cmd+Enter. Escape resets the field drafts.
+                      </p>
+                      <p id="animation-event-error" role="alert"></p>
+                      <button id="animation-delete-event" type="button" aria-keyshortcuts="Delete Backspace">
+                        Delete Event
+                      </button>
+                    </section>
+                  </div>
+                ),
+              },
+              {
+                id: 'animation-inspector-ik',
+                label: 'IK target',
+                hidden: tweaking,
+                content: <IKInspectorPanel controller={ikInspector} />,
+              },
+              {
+                id: 'animation-inspector-root',
+                label: 'Root Motion',
+                hidden: tweaking,
+                content: <RootMotionPanel />,
+              },
+              {
+                id: 'animation-inspector-key',
+                label: 'Key details',
+                hidden: tweaking,
+                content: (
+                  <div className="animation-key-details">
+                    <div className="timeline-interpolation" data-guide-id={GUIDE_TARGETS.animationInterpolation}>
+                      <label>
+                        Selected key interpolation{' '}
+                        <select id="timeline-interpolation" aria-describedby="timeline-interpolation-help" disabled>
+                          <option value="">—</option>
+                          {interpolationOptions}
+                        </select>
+                      </label>
+                      <span id="timeline-interpolation-help">Select a key to inspect its outgoing interpolation.</span>
+                      <span className="timeline-interpolation-legend">
+                        ◆ Linear outgoing segment · ◇ No outgoing segment
+                      </span>
+                    </div>
+                  </div>
+                ),
+              },
+              ...(motionPreview
+                ? [
+                    {
+                      id: 'animation-inspector-displacement',
+                      label: 'Preview displacement',
+                      hidden: tweaking,
+                      content: <MotionPreviewPanel controller={motionPreview} />,
+                    },
+                  ]
+                : []),
+              ...(environment && groundGuide
+                ? [
+                    {
+                      id: 'animation-inspector-environment',
+                      label: 'Environment Preview',
+                      hidden: tweaking,
+                      content: (
+                        <EnvironmentPreviewPanel
+                          controller={environment}
+                          ground={groundGuide}
+                          project={projectEnvironment}
+                          loadProjectImages={loadProjectImages}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
+              ...(groundGuide && alignGroundTarget
+                ? [
+                    {
+                      id: 'animation-inspector-ground',
+                      label: 'Ground reference',
+                      hidden: tweaking,
+                      content: (
+                        <AnimationGroundPanel
+                          workspace={groundGuide}
+                          ikInspector={ikInspector}
+                          alignTarget={alignGroundTarget}
+                          {...(footContacts ? { contacts: footContacts } : {})}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
+              ...(rigTweak
+                ? [
+                    {
+                      id: 'animation-inspector-rig-tweak',
+                      label: 'Rig Tweak',
+                      hidden: !tweaking,
+                      content: <RigTweakPanel active={tweaking} />,
+                    },
+                  ]
+                : []),
+              ...(attachments
+                ? [
+                    {
+                      id: 'animation-inspector-rig-ik',
+                      label: 'IK constraints',
+                      hidden: !tweaking,
+                      content: <RigIKPanel controller={attachments} embedded />,
+                    },
+                    {
+                      id: 'animation-inspector-attachments',
+                      label: 'Attachments & skins',
+                      content: <AttachmentPanel controller={attachments} authoring={tweaking} embedded />,
+                    },
+                  ]
+                : []),
+              ...(artwork
+                ? [
+                    {
+                      id: 'animation-inspector-artwork',
+                      label: 'Artwork import & replacement',
+                      hidden: tweaking,
+                      content: <ArtworkPanel controller={artwork} embedded />,
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </aside>
         <div
           id="animation-workspace-divider"

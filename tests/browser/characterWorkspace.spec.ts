@@ -49,6 +49,7 @@ test('artist workflow retains one canvas, documents, artwork and history between
   await expect(page.locator('.package-tools summary')).toContainText('Assets: Modified');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
   await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   await page.locator('#animation-bone-fields input[data-property="x"]').fill('14');
   await page.getByRole('button', { name: 'Set X key', exact: true }).click();
   await page.locator('#animation-selection').selectOption('walk');
@@ -58,7 +59,7 @@ test('artist workflow retains one canvas, documents, artwork and history between
   await expect(page.locator('#tweak-inspector input[data-scope="bone"][data-field="y"]')).toHaveValue('77');
   await page.locator('#tweak-undo').click();
   await page.locator('#tweak-redo').click();
-  await page.locator('#attachment-panel > summary').click();
+  await inspectorControl(page, '#attachment-panel');
   const skin = page.locator('#attachment-panel').getByLabel('Active skin', { exact: true });
   const skins = await skin
     .locator('option')

@@ -103,10 +103,9 @@ for (const scenario of ['sword step', 'jump', 'walk'] as const) {
     await page.locator('#animation-show-bones').uncheck();
     await page.getByRole('button', { name: 'Select root motion', exact: true }).click();
     await (await inspectorControl(page, '#root-show-trajectory')).uncheck();
-    const mode = page.locator('#root-displacement-mode');
-    await expect(mode).toHaveValue('authored');
+    await expect(page.locator('#root-displacement-mode')).toHaveValue('authored');
     const environment = page.locator('.environment-preview-panel');
-    await environment.locator(':scope > summary').click();
+    await inspectorControl(page, '.environment-preview-panel');
     const bytes = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 800;
@@ -133,6 +132,7 @@ for (const scenario of ['sword step', 'jump', 'walk'] as const) {
     const dx = scenario === 'jump' ? 0 : 80;
     const dy = scenario === 'jump' ? -100 : 0;
     for (const cameraMode of ['fixed', 'follow']) {
+      await inspectorControl(page, '.environment-camera-panel');
       await camera.getByLabel('Preview camera mode').selectOption(cameraMode);
       await seek(page, 0);
       const start = await positions(page);
@@ -153,14 +153,15 @@ for (const scenario of ['sword step', 'jump', 'walk'] as const) {
         expect(landed[1]).toEqual(start[1]);
         await seek(page, sampleTime);
       }
-      await mode.selectOption('none');
+      await (await inspectorControl(page, '#root-displacement-mode')).selectOption('none');
       const stationary = await positions(page);
       expectPixelDelta(end[0]!.x - stationary[0]!.x, cameraMode === 'fixed' ? dx : 0);
       expectPixelDelta(end[0]!.y - stationary[0]!.y, cameraMode === 'fixed' ? dy : 0);
       // Returning to authored mode restores the exact same rendered root/world coordinates.
-      await mode.selectOption('authored');
+      await (await inspectorControl(page, '#root-displacement-mode')).selectOption('authored');
       expect(await positions(page)).toEqual(end);
     }
+    await inspectorControl(page, '.environment-camera-panel');
     await camera.getByLabel('Preview camera mode').selectOption('fixed');
     if (scenario === 'sword step') {
       await seek(page, 0);
@@ -188,17 +189,17 @@ for (const scenario of ['sword step', 'jump', 'walk'] as const) {
       expectPixelDelta(placed[0]!.y - before[0]!.y, 30);
       expect(placed[1]).toEqual(before[1]);
       expect(await exported(page)).toEqual(original);
-      await page.locator('#root-edit-mode').check();
+      await (await inspectorControl(page, '#root-edit-mode')).check();
       await moveCharacter(-40, -30);
       const restored = await positions(page);
       expectPixelDelta(restored[0]!.x - placed[0]!.x, -40);
       expectPixelDelta(restored[0]!.y - placed[0]!.y, -30);
       expect(restored[1]).toEqual(before[1]);
-      await page.locator('#root-edit-mode').uncheck();
+      await (await inspectorControl(page, '#root-edit-mode')).uncheck();
       expect(await exported(page)).toEqual(original);
     }
     if (scenario === 'walk') {
-      await page.locator('#root-loop-mode').selectOption('continuous');
+      await (await inspectorControl(page, '#root-loop-mode')).selectOption('continuous');
       await seek(page, 0);
       const start = await positions(page);
       await page.locator('#preview-loop').click();
@@ -214,7 +215,7 @@ for (const scenario of ['sword step', 'jump', 'walk'] as const) {
     expect(await exported(page)).toEqual(original);
     if (scenario === 'sword step') {
       const panel = page.locator('.motion-preview-panel');
-      await panel.locator(':scope > summary').click();
+      await inspectorControl(page, '.motion-preview-panel');
       await seek(page, 0);
       await panel.getByRole('button', { name: 'Add position point', exact: true }).click();
       await seek(page, 1);
@@ -222,12 +223,13 @@ for (const scenario of ['sword step', 'jump', 'walk'] as const) {
       const last = panel.getByRole('form', { name: 'Preview point 2', exact: true });
       await last.getByLabel('Offset X').fill('160');
       await last.getByRole('button', { name: 'Apply point 2', exact: true }).click();
-      await mode.selectOption('preview');
+      await (await inspectorControl(page, '#root-displacement-mode')).selectOption('preview');
       const temporary = await positions(page);
-      await mode.selectOption('authored');
+      await (await inspectorControl(page, '#root-displacement-mode')).selectOption('authored');
       const authored = await positions(page);
       expectPixelDelta(temporary[0]!.x - authored[0]!.x, 80);
       expect(temporary[1]).toEqual(authored[1]);
+      await inspectorControl(page, '.motion-preview-panel');
       await panel.getByRole('button', { name: 'Preview Copy to Root Motion', exact: true }).click();
       await expect(panel.getByRole('alert')).toContainText('replaces all existing');
       expect(await exported(page)).toEqual(original);

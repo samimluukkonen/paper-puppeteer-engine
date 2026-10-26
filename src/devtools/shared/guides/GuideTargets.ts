@@ -104,7 +104,17 @@ export class GuideTargets implements GuideTargetResolver {
       for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
         if (ancestor.tagName === 'DETAILS') ancestor.setAttribute('open', '');
       }
-      if (!hidden) element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      const scroll = (): void => {
+        if (!element.closest('[hidden], [inert]'))
+          element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      };
+      if (!hidden) scroll();
+      else
+        // React commits the revealed tab after the request. Scroll its target once layout is available,
+        // including when a previous inspector panel left the scroll container at a different position.
+        queueMicrotask(() => {
+          if (element.isConnected) scroll();
+        });
       return true;
     } catch {
       return false;

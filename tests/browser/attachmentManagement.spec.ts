@@ -97,9 +97,9 @@ test('skin switching during animation and rig authoring preserve animation JSON 
   await panel.getByLabel('Skin name', { exact: true }).fill('animation-outfit');
   await panel.getByRole('button', { name: 'Create skin', exact: true }).click();
   await panel.getByLabel('Assigned attachment', { exact: true }).selectOption('rightHandGrip');
-  await page.locator('#tweak-undo').click();
+  await (await inspectorControl(page, '#tweak-undo')).click();
   await expect(panel.getByLabel('Assigned attachment', { exact: true })).toHaveValue('rightHandDefault');
-  await page.locator('#tweak-redo').click();
+  await (await inspectorControl(page, '#tweak-redo')).click();
   await expect(panel.getByLabel('Assigned attachment', { exact: true })).toHaveValue('rightHandGrip');
   await expect(page.locator('#timeline-time-input')).toHaveValue(paused);
   await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('animation');

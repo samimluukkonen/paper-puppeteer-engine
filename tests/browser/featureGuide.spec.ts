@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
-import { animationHierarchy, selectRigEntry, test } from './fixtures.js';
+import { animationHierarchy, selectRigEntry, test, inspectorControl } from './fixtures.js';
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -162,6 +162,7 @@ test('pending animation previews disable cross-editor guides without discarding 
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toContainText('Validation: OK');
   await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+  await inspectorControl(page, '#animation-bone-inspector');
   const x = page.locator('#animation-bone-fields input[data-property="x"]');
   await x.fill('27');
   await x.press('Tab');

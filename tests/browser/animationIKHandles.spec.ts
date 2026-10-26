@@ -6,6 +6,7 @@ import {
   animationFileAction,
   test,
   animationIKInspector,
+  inspectorControl,
 } from './fixtures.js';
 
 /** Locate the selected Phaser crosshair from its rendered pixels, without runtime test hooks. */
@@ -99,11 +100,12 @@ test('hand and foot handles preview, cancel, commit two keys, animate and retain
     const originalY = Number(await y.inputValue());
     const start = await targetPoint(page);
     await (await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true }).click();
+    await inspectorControl(page, '#animation-bone-inspector');
     const originalCanvas = await canvas.screenshot();
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
     await expect(inspector).toBeVisible();
-    await expect(inspector.locator(':scope > details > summary')).toContainText(id);
+    await expect(inspector.getByRole('heading', { level: 3 })).toContainText(id);
     await page.mouse.move(start.x + 35, start.y - 25, { steps: 6 });
     await expect(x).toHaveAttribute('data-temporary', 'true');
     await expect(ruler).toHaveAttribute('aria-valuenow', '0');

@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { animationHierarchy, animationMenuControl, test, selectRigEntry } from './fixtures.js';
+import { animationHierarchy, animationMenuControl, test, selectRigEntry, inspectorControl } from './fixtures.js';
 
 for (const view of [
   { route: 'rig-editor/', prefix: 'rig', stage: '#editor-stage', ready: '#validation', text: 'Validation: OK' },
@@ -71,6 +71,7 @@ for (const view of [
       await expect(page.locator('#dirty-status')).toContainText('Unsaved changes');
     } else if (view.prefix === 'animation') {
       await (await animationHierarchy(page)).getByRole('button', { name: 'head', exact: true }).click();
+      await inspectorControl(page, '#animation-bone-inspector');
       await page.locator('#animation-bone-fields [data-property="x"]').fill('12');
       await page.getByRole('button', { name: 'Set X key', exact: true }).click();
       await expect(page.locator('#animation-dirty')).toHaveText('Unsaved changes');

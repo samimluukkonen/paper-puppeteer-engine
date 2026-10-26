@@ -16,19 +16,13 @@ async function editor(page: Page, name = 'Animation Editor') {
   return frame;
 }
 async function reveal(frame: Frame, selector: string) {
-  const control = frame.locator(selector).first();
-  for (const details of await control.locator('xpath=ancestor::details').all()) {
-    if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open)))
-      await details.locator(':scope > summary').click();
-  }
-  if (await control.evaluate((node) => node instanceof HTMLDetailsElement && !node.open))
-    await control.locator(':scope > summary').click();
-  return control;
+  return inspectorControl(frame, selector);
 }
 async function selectBone(frame: Frame, id: string) {
   await reveal(frame, '#animation-bones');
   const bone = frame.locator('#animation-bones').getByRole('button', { name: id, exact: true });
   if ((await bone.getAttribute('aria-pressed')) !== 'true') await bone.click();
+  await inspectorControl(frame, '#animation-bone-inspector');
 }
 async function key(frame: Frame, time: string, value: string) {
   await frame.locator('#timeline-time-input').fill(time);
