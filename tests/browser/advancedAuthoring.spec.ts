@@ -4,7 +4,7 @@ import { importProjectPackage } from '../../src/devtools/project/projectPackage.
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { inspectorControl, animationFileAction, test } from './fixtures.js';
+import { sceneTimelineGroup, inspectorControl, animationFileAction, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -170,6 +170,7 @@ test('complete v1.1 React workflow: project, poses, graph, variation, cleanup, r
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })
     .click();
+  await sceneTimelineGroup(frame, 'Actions');
   await frame.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('animation');
   await frame.getByRole('button', { name: 'Add action', exact: true }).click();
   await reveal(frame, '[data-guide-id="scene-action-properties"]');

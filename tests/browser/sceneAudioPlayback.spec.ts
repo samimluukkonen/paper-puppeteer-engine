@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
-import { test } from './fixtures.js';
+import { sceneTimelineGroup, test } from './fixtures.js';
 
 test('scene audio follows Play, pause, seek, speed, mute, restart and scene switching', async ({ page }) => {
   await page.addInitScript(() => {
@@ -131,6 +131,7 @@ test('scene audio follows Play, pause, seek, speed, mute, restart and scene swit
   expect(first).toMatchObject({ loop: true, loopStart: 0.25, manualStop: true });
   await time.fill('3.45');
   const before = (await observations()).length;
+  await sceneTimelineGroup(page, 'View');
   await page.getByLabel('Scene playback speed', { exact: true }).selectOption('0.5');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(async () => (await observations()).length).toBeGreaterThanOrEqual(before + 3);
@@ -142,11 +143,13 @@ test('scene audio follows Play, pause, seek, speed, mute, restart and scene swit
   expect(resumed[2]!.offset).toBeCloseTo(0.55, 1);
   await time.fill('4.2');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await sceneTimelineGroup(page, 'Audio');
   await page.getByLabel('Mute preview audio', { exact: true }).check();
   expect((await observations()).at(-1)!.manualStop).toBe(true);
   const muted = (await observations()).length;
   await page.getByRole('button', { name: 'Restart', exact: true }).click();
   expect((await observations()).length).toBe(muted);
+  await sceneTimelineGroup(page, 'Audio');
   await page.getByLabel('Mute preview audio', { exact: true }).uncheck();
   await expect.poll(async () => (await observations()).length).toBeGreaterThan(muted);
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
@@ -239,9 +242,11 @@ test('blocked browser audio is visible and recovers through an explicit Enable a
   await expect(status).toHaveText('Audio: locked');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(status).toHaveText('Audio: error');
+  await sceneTimelineGroup(page, 'Audio');
   await expect(page.getByRole('alert')).toContainText('Browser blocked audio');
   await expect(page.getByLabel('Scene playback status', { exact: true })).toContainText('stopped');
   expect(await page.evaluate(() => Reflect.get(window, 'sceneAudioStarts') as number)).toBe(0);
+  await sceneTimelineGroup(page, 'Audio');
   await page.getByRole('button', { name: 'Enable audio', exact: true }).click();
   await expect(status).toHaveText('Audio: ready');
   expect(await page.evaluate(() => Reflect.get(window, 'sceneAudioStarts') as number)).toBe(0);

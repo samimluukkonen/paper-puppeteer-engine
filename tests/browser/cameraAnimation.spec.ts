@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
+import { sceneTimelineGroup, sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 
@@ -30,9 +30,10 @@ test('camera keys, curves, timeline dragging, deterministic scrubbing, independe
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
   await sceneInspectorGroup(page, 'Camera');
   await page.locator('.scene-camera > summary').click();
-  const timeline = page.locator('.scene-timeline-toolbar');
+  const timeline = page.getByRole('region', { name: 'Scene timeline', exact: true });
   const inspector = page.locator('.scene-camera');
   const time = page.getByLabel('Playhead (s)', { exact: true });
+  await sceneTimelineGroup(page, 'Camera');
   await timeline.getByRole('button', { name: 'Set Camera Key', exact: true }).click();
   await expect(page.getByLabel('Camera Key Edit mode', { exact: true })).toBeChecked();
   await time.fill('3');

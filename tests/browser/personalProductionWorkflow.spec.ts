@@ -4,7 +4,7 @@ import { buildProjectPackage, importProjectPackage } from '../../src/devtools/pr
 import { loadPackageDefinition } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
-import { inspectorControl, test } from './fixtures.js';
+import { sceneTimelineGroup, inspectorControl, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -173,6 +173,7 @@ test('personal production: new project and artwork → rig/IK/keys → scene →
   const properties = frame.locator('[data-guide-id="scene-action-properties"]');
   const addAction = async (kind: string, time: string) => {
     await frame.getByLabel('Playhead (s)', { exact: true }).fill(time);
+    await sceneTimelineGroup(frame, 'Actions');
     await frame.getByRole('combobox', { name: 'Action type', exact: true }).selectOption(kind);
     await frame.getByRole('button', { name: 'Add action', exact: true }).click();
     if (!(await properties.evaluate((node) => (node as HTMLDetailsElement).open)))

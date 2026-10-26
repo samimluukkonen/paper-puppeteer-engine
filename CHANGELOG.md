@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Reclaim Scene Editor timeline space with shared collapsible Actions, Camera, Transitions, Dialogue, Audio and View tabs. Start tool panels collapsed, keep compact playback and playhead controls visible, retain mounted settings and reveal controls for Feature Guides.
+
 - Organize the Scene Editor inspector into shared wrapping tabs for Scene, Actors, Camera, Artwork, Dialogue, Audio and Transitions. Keep sections collapsed initially, retain drafts across tabs and reveal the relevant group for selections and Feature Guides.
 
 - Reclaim vertical timeline space with a compact shared tab bar alongside playback and time controls. Start Tracks & keys, View and Snapping panels collapsed; preserve mounted controls, preferences, shortcuts and Feature Guide reveal.

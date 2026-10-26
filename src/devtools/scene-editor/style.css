@@ -156,8 +156,28 @@
   align-items: center;
   font-size: 11px;
 }
-.scene-timeline-toolbar h2 {
-  margin: 0;
+.scene-timeline > .editor-tabs {
+  margin-bottom: 8px;
+}
+.scene-timeline > .editor-tabs > [role="tabpanel"] {
+  padding: 8px;
+}
+.scene-timeline-transport {
+  flex: 1;
+  padding: 4px 0;
+}
+.scene-timeline-transport > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+}
+.scene-timeline-help {
+  margin-top: 8px;
+}
+.scene-timeline-help summary {
+  cursor: pointer;
+  font-size: 11px;
 }
 .scene-playback-status {
   min-width: 116px;

@@ -8,7 +8,7 @@ import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parallaxPosition, sceneActorDepth, sceneImageDepth } from '../../src/engine/sceneLayers.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
 import { evaluateTransitionAtTime } from '../../src/engine/sceneTransitions.js';
-import { sceneInspectorGroup, inspectorControl, test, waitForPreviewPaint } from './fixtures.js';
+import { sceneTimelineGroup, sceneInspectorGroup, inspectorControl, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 let consumerScript = '';
@@ -115,6 +115,7 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
   }
   await frame.getByLabel('Playhead (s)', { exact: true }).fill('0');
   for (const kind of ['move', 'animation', 'cue']) {
+    await sceneTimelineGroup(frame, 'Actions');
     await frame.getByRole('combobox', { name: 'Action type', exact: true }).selectOption(kind);
     await frame.getByRole('button', { name: 'Add action', exact: true }).click();
     const properties = frame.locator('[data-guide-id="scene-action-properties"]');
@@ -129,6 +130,7 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
     await frame.getByRole('button', { name: 'Apply action properties', exact: true }).click();
   }
   const time = () => frame.getByLabel('Playhead (s)', { exact: true });
+  await sceneTimelineGroup(frame, 'Camera');
   await frame.getByRole('button', { name: 'Set Camera Key', exact: true }).click();
   await sceneInspectorGroup(frame, 'Camera');
   await frame.locator('.scene-camera > summary').click();
@@ -137,13 +139,16 @@ test('cinematic project: artwork, layers, Actors, keys, cuts/fades, recovery, ex
   await frame.getByLabel('Camera zoom', { exact: true }).fill('1.4');
   await frame.getByRole('button', { name: 'Apply camera key', exact: true }).click();
   await time().fill('3');
+  await sceneTimelineGroup(frame, 'Camera');
   await frame.getByRole('button', { name: 'Set Camera Cut', exact: true }).click();
   await frame.getByLabel('Center X', { exact: true }).fill('-80');
   await frame.getByLabel('Camera zoom', { exact: true }).fill('1.8');
   await frame.getByRole('button', { name: 'Apply camera key', exact: true }).click();
   await time().fill('0');
+  await sceneTimelineGroup(frame, 'Transitions');
   await frame.getByRole('button', { name: 'Add effect', exact: true }).click();
   await time().fill('4');
+  await sceneTimelineGroup(frame, 'Transitions');
   await frame.getByRole('combobox', { name: 'Effect type', exact: true }).selectOption('fade-out');
   await frame.getByRole('button', { name: 'Add effect', exact: true }).click();
   await frame.getByRole('button', { name: 'Undo', exact: true }).click();

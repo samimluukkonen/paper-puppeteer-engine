@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
-import { test } from './fixtures.js';
+import { sceneTimelineGroup, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -85,7 +85,9 @@ for (const guideId of ['scene-audio-timeline', 'scene-audio-synchronization'] as
       const toolbar = page.locator('.scene-stage-toolbar');
       if (populated) {
         await selected.click();
+        await sceneTimelineGroup(page, 'View');
         await page.getByLabel('Scene playback speed', { exact: true }).selectOption('0.5');
+        await sceneTimelineGroup(page, 'Audio');
         await page.getByLabel('Mute preview audio', { exact: true }).check();
         await page.locator('.scene-inspector summary').filter({ hasText: 'Audio clip · Tone' }).click();
         await page.getByLabel('Volume (%)', { exact: true }).fill('60');

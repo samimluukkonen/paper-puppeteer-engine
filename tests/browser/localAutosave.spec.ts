@@ -4,7 +4,7 @@ import type { LocalDraftStore } from '../../src/devtools/shared/autosave/LocalDr
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { inspectorControl, test } from './fixtures.js';
+import { sceneTimelineGroup, inspectorControl, test } from './fixtures.js';
 
 declare global {
   interface Window {
@@ -88,6 +88,7 @@ test('refresh recovers artwork, committed rig, animation and scene edits then ex
     .getByRole('dialog', { name: 'Add Actor', exact: true })
     .getByRole('button', { name: 'Add actor', exact: true })
     .click();
+  await sceneTimelineGroup(sceneFrame, 'Actions');
   await sceneFrame.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('wait');
   await sceneFrame.getByRole('button', { name: 'Add action', exact: true }).click();
   await sceneFrame.getByText('Action properties · wait', { exact: true }).click();

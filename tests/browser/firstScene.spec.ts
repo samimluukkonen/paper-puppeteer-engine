@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
-import { inspectorControl } from './fixtures.js';
+import { sceneTimelineGroup, inspectorControl } from './fixtures.js';
 
 test('artist creates two-package scene visually, previews, retimes, reloads and exports a portable runtime artifact', async ({
   page,
@@ -28,6 +28,7 @@ test('artist creates two-package scene visually, previews, retimes, reloads and 
   };
   const addAction = async (kind: string, at: number) => {
     await time.fill(String(at));
+    await sceneTimelineGroup(page, 'Actions');
     await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption(kind);
     await page.getByRole('button', { name: 'Add action', exact: true }).click();
     await openProperties();
@@ -97,6 +98,7 @@ test('artist creates two-package scene visually, previews, retimes, reloads and 
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await sceneTimelineGroup(page, 'View');
   await page.getByLabel('Scene playback speed').selectOption('2');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByLabel('Scene playback status')).toContainText('completed', { timeout: 15000 });

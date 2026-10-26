@@ -3,6 +3,7 @@ import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnima
 import type { SceneAudioClip } from '../../engine/sceneAudio.js';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
+import { EditorTabs } from '../../ui/EditorTabs.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneAudioControls, SceneAudioTracks } from './SceneAudioTimeline.js';
@@ -10,7 +11,14 @@ import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import { SceneDialogueControls, SceneDialogueTrack } from './SceneDialogueTimeline.js';
 import type { ReadonlyScene, SceneEditorDocument, SceneActionInput } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
-import { ScenePlaybackControls, SceneTimeInput, ScenePlayhead, ScenePlaybackError } from './ScenePlaybackControls.js';
+import {
+  ScenePlaybackControls,
+  ScenePlaybackSpeed,
+  SceneAudioPlaybackControls,
+  SceneTimeInput,
+  ScenePlayhead,
+  ScenePlaybackError,
+} from './ScenePlaybackControls.js';
 import { buildSceneTracks, layoutSceneActions, snapSceneTime, editAudioClipOnTimeline } from './timelineActions.js';
 
 type Drag = {
@@ -135,117 +143,182 @@ export function SceneTimeline({
   const x = (time: number): number => timeToTimelineX(time / 1000, seconds, width);
   return (
     <>
-      <div className="scene-timeline-toolbar">
-        <h2>Scene timeline</h2>
-        <ScenePlaybackControls playback={playback} />
-        <button
-          type="button"
-          data-guide-id={GUIDE_TARGETS.sceneCameraSetKey}
-          disabled={document.hasActiveGesture}
-          onClick={() => {
-            playback.pause();
-            document.setCameraKey(playback.time);
-            document.setCameraKeyEditing(true);
-          }}
-        >
-          Set Camera Key
-        </button>
-        <button
-          type="button"
-          data-guide-id={GUIDE_TARGETS.sceneCameraCut}
-          disabled={document.hasActiveGesture}
-          onClick={() => {
-            playback.pause();
-            document.setCameraCut(playback.time);
-          }}
-        >
-          Set Camera Cut
-        </button>
-        <label>
-          Effect type
-          <select
-            value={fadeType}
-            onChange={(event) => setFadeType(event.target.value === 'fade-in' ? 'fade-in' : 'fade-out')}
-          >
-            <option value="fade-in">Fade in</option>
-            <option value="fade-out">Fade out</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className="workspace-primary"
-          data-guide-id={GUIDE_TARGETS.sceneAddTransition}
-          disabled={document.hasActiveGesture || playback.time >= scene.duration}
-          onClick={() => {
-            playback.pause();
-            document.addTransition({
-              type: fadeType,
-              time: playback.time,
-              duration: Math.min(1000, scene.duration - playback.time),
-              color: '#000000',
-            });
-          }}
-        >
-          Add effect
-        </button>
-        <label>
-          Action type
-          <select
-            data-guide-id={GUIDE_TARGETS.sceneActionType}
-            value={kind}
-            onChange={(event) => setKind(event.target.value as typeof kind)}
-          >
-            <option value="animation">Play animation</option>
-            <option value="move">Move to position</option>
-            <option value="face">Change facing</option>
-            <option value="wait">Wait / hold</option>
-            <option value="cue">Scene cue</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          data-guide-id={GUIDE_TARGETS.sceneAddAction}
-          disabled={!actor || (kind === 'animation' && !animations.length)}
-          onClick={add}
-        >
-          Add action
-        </button>
-        <label>
-          <input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} />
-          Snap
-        </label>
-        <label>
-          Zoom
-          <input
-            data-guide-id={GUIDE_TARGETS.sceneZoom}
-            aria-label="Timeline zoom"
-            type="range"
-            min="1"
-            max="8"
-            step="0.25"
-            value={zoom}
-            onChange={(event) => setZoom(Number(event.target.value))}
-          />
-        </label>
-        <SceneTimeInput playback={playback} duration={scene.duration} />
-      </div>
-      <p className="workspace-caption">
-        Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses snapping. Scroll
-        to pan. Scrubbing pauses playback. Stop restores initial placement for stage editing. Camera diamonds select
-        keys; drag to move their time. Set Camera Cut holds the preceding shot until this key; edit the new shot in
-        Cinematic Camera. Select fades to edit start, duration and color in Transition properties.
-      </p>
-      <SceneDialogueControls document={document} playback={playback} />
-      <SceneAudioControls document={document} playback={playback} />
+      <EditorTabs
+        label="Scene timeline tools"
+        controlsLabel="scene timeline controls"
+        defaultExpanded={false}
+        toolbar={
+          <div className="scene-timeline-toolbar scene-timeline-transport" aria-label="Scene playback controls">
+            <ScenePlaybackControls playback={playback} />
+            <SceneTimeInput playback={playback} duration={scene.duration} />
+          </div>
+        }
+        tabs={[
+          {
+            id: 'scene-timeline-actions',
+            label: 'Actions',
+            content: (
+              <>
+                <div className="scene-timeline-toolbar">
+                  <label>
+                    Action type
+                    <select
+                      data-guide-id={GUIDE_TARGETS.sceneActionType}
+                      value={kind}
+                      onChange={(event) => setKind(event.target.value as typeof kind)}
+                    >
+                      <option value="animation">Play animation</option>
+                      <option value="move">Move to position</option>
+                      <option value="face">Change facing</option>
+                      <option value="wait">Wait / hold</option>
+                      <option value="cue">Scene cue</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="workspace-primary"
+                    data-guide-id={GUIDE_TARGETS.sceneAddAction}
+                    disabled={!actor || (kind === 'animation' && !animations.length)}
+                    onClick={add}
+                  >
+                    Add action
+                  </button>
+                </div>
+                {scene.actors.length > 0 && !scene.actions.length && (
+                  <p className="workspace-caption">
+                    No timeline clips. Select an Actor, choose an Action type, then Add action.
+                    {actor &&
+                      !animations.length &&
+                      ' This character has no animations; create one in Animation Editor or choose Move, Wait, Change facing or Scene cue.'}
+                  </p>
+                )}
+              </>
+            ),
+          },
+          {
+            id: 'scene-timeline-camera',
+            label: 'Camera',
+            content: (
+              <div className="scene-timeline-toolbar">
+                <button
+                  type="button"
+                  data-guide-id={GUIDE_TARGETS.sceneCameraSetKey}
+                  disabled={document.hasActiveGesture}
+                  onClick={() => {
+                    playback.pause();
+                    document.setCameraKey(playback.time);
+                    document.setCameraKeyEditing(true);
+                  }}
+                >
+                  Set Camera Key
+                </button>
+                <button
+                  type="button"
+                  data-guide-id={GUIDE_TARGETS.sceneCameraCut}
+                  disabled={document.hasActiveGesture}
+                  onClick={() => {
+                    playback.pause();
+                    document.setCameraCut(playback.time);
+                  }}
+                >
+                  Set Camera Cut
+                </button>
+              </div>
+            ),
+          },
+          {
+            id: 'scene-timeline-transitions',
+            label: 'Transitions',
+            content: (
+              <div className="scene-timeline-toolbar">
+                <label>
+                  Effect type
+                  <select
+                    value={fadeType}
+                    onChange={(event) => setFadeType(event.target.value === 'fade-in' ? 'fade-in' : 'fade-out')}
+                  >
+                    <option value="fade-in">Fade in</option>
+                    <option value="fade-out">Fade out</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="workspace-primary"
+                  data-guide-id={GUIDE_TARGETS.sceneAddTransition}
+                  disabled={document.hasActiveGesture || playback.time >= scene.duration}
+                  onClick={() => {
+                    playback.pause();
+                    document.addTransition({
+                      type: fadeType,
+                      time: playback.time,
+                      duration: Math.min(1000, scene.duration - playback.time),
+                      color: '#000000',
+                    });
+                  }}
+                >
+                  Add effect
+                </button>
+              </div>
+            ),
+          },
+          {
+            id: 'scene-timeline-dialogue',
+            label: 'Dialogue',
+            content: <SceneDialogueControls document={document} playback={playback} />,
+          },
+          {
+            id: 'scene-timeline-audio',
+            label: 'Audio',
+            content: (
+              <>
+                <SceneAudioControls document={document} playback={playback} />
+                <div className="scene-timeline-toolbar">
+                  <SceneAudioPlaybackControls playback={playback} />
+                </div>
+              </>
+            ),
+          },
+          {
+            id: 'scene-timeline-view',
+            label: 'View',
+            content: (
+              <>
+                <div className="scene-timeline-toolbar">
+                  <label>
+                    <input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} />
+                    Snap
+                  </label>
+                  <label>
+                    Zoom
+                    <input
+                      data-guide-id={GUIDE_TARGETS.sceneZoom}
+                      aria-label="Timeline zoom"
+                      type="range"
+                      min="1"
+                      max="8"
+                      step="0.25"
+                      value={zoom}
+                      onChange={(event) => setZoom(Number(event.target.value))}
+                    />
+                  </label>
+                  <ScenePlaybackSpeed playback={playback} />
+                </div>
+                <details className="scene-timeline-help">
+                  <summary>Timeline help</summary>
+                  <p className="workspace-caption">
+                    Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses
+                    snapping. Scroll to pan. Scrubbing pauses playback. Stop restores initial placement for stage
+                    editing. Camera diamonds select keys; drag to move their time. Set Camera Cut holds the preceding
+                    shot until this key; edit the new shot in Cinematic Camera. Select fades to edit start, duration and
+                    color in Transition properties.
+                  </p>
+                </details>
+              </>
+            ),
+          },
+        ]}
+      />
       <ScenePlaybackError playback={playback} />
-      {scene.actors.length > 0 && !scene.actions.length && (
-        <p className="workspace-caption">
-          No timeline clips. Select an Actor, choose an Action type, then Add action.
-          {actor &&
-            !animations.length &&
-            ' This character has no animations; create one in Animation Editor or choose Move, Wait, Change facing or Scene cue.'}
-        </p>
-      )}
       <div
         ref={viewport}
         className="scene-timeline-viewport"

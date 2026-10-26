@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
-import { test } from './fixtures.js';
+import { sceneTimelineGroup, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -99,7 +99,9 @@ for (const populated of [false, true]) {
       await page.getByRole('button', { name: 'Apply dialogue properties', exact: true }).click();
       await page.getByRole('button', { name: 'Undo', exact: true }).click();
       await page.getByLabel('Playhead (s)', { exact: true }).fill('1.25');
+      await sceneTimelineGroup(page, 'View');
       await page.getByLabel('Scene playback speed', { exact: true }).selectOption('0.5');
+      await sceneTimelineGroup(page, 'Audio');
       await page.getByLabel('Mute preview audio', { exact: true }).check();
       await toolbar.getByRole('button', { name: 'Preview Through Camera', exact: true }).click();
       await page.getByLabel('Editor overlays', { exact: true }).check();

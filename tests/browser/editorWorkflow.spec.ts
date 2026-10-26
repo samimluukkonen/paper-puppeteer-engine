@@ -1,5 +1,5 @@
 import { expect, type Frame, type Page } from '@playwright/test';
-import { inspectorControl, test } from './fixtures.js';
+import { sceneTimelineGroup, inspectorControl, test } from './fixtures.js';
 test.use({ actionTimeout: 15_000 });
 
 async function activeFrame(page: Page): Promise<Frame> {
@@ -124,6 +124,7 @@ test('workspace guides, editor identity, native focus, export access and live ri
     .getByRole('button', { name: 'Add actor', exact: true })
     .click();
   await expect(sceneFrame.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await sceneTimelineGroup(sceneFrame, 'Actions');
   await sceneFrame.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('wait');
   await sceneFrame.getByRole('button', { name: 'Add action', exact: true }).click();
   const tracks = sceneFrame.getByLabel('Action tracks', { exact: true });

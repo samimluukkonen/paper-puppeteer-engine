@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { test } from './fixtures.js';
+import { sceneTimelineGroup, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -90,8 +90,10 @@ test('audio timeline authors finite clips, trims both ends, groups drag undo and
   await expect(clips).toHaveCount(1);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(clips).toHaveCount(2);
+  await sceneTimelineGroup(page, 'Audio');
   await page.getByRole('combobox', { name: 'Track category', exact: true }).selectOption('voice');
   await page.getByRole('button', { name: 'Add audio track', exact: true }).click();
+  await sceneTimelineGroup(page, 'Audio');
   await page.getByLabel('Audio track', { exact: true }).selectOption('voice-1');
   await page.getByRole('button', { name: 'Add Audio Clip', exact: true }).click();
   await expect(clips).toHaveCount(3);
@@ -135,6 +137,7 @@ test('audio timeline authors finite clips, trims both ends, groups drag undo and
   await expect(removeVoice).toBeVisible();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(clips).toHaveCount(2);
+  await sceneTimelineGroup(page, 'Audio');
   await page.getByRole('combobox', { name: 'Track category', exact: true }).selectOption('ambience');
   await page.getByRole('button', { name: 'Add audio track', exact: true }).click();
   const removeEmpty = page.getByRole('button', { name: 'Remove audio track Ambience 1', exact: true });
@@ -168,9 +171,11 @@ test('Project Workspace audio catalog feeds the retained Scene Editor and guards
   await sceneDialog.getByRole('button', { name: 'Create Scene', exact: true }).click();
   await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const frame = page.frameLocator('iframe:visible');
+  await sceneTimelineGroup(frame, 'Audio');
   await frame.getByRole('combobox', { name: 'Track category', exact: true }).selectOption('ambience');
   await frame.getByRole('button', { name: 'Add audio track', exact: true }).click();
   await expect(frame.getByLabel('Audio asset', { exact: true })).toContainText('tone');
+  await sceneTimelineGroup(frame, 'Audio');
   await frame.getByRole('button', { name: 'Add Audio Clip', exact: true }).click();
   await expect(frame.locator('.scene-audio-clip')).toHaveCount(1);
   await frame.getByRole('button', { name: '← Project', exact: true }).click();

@@ -1,4 +1,4 @@
-import { test as base, expect, type Frame, type Locator, type Page } from '@playwright/test';
+import { test as base, expect, type Frame, type FrameLocator, type Locator, type Page } from '@playwright/test';
 
 /** UI commands install poses synchronously; allow Phaser to paint before taking a pixel baseline. */
 export async function waitForPreviewPaint(page: Page): Promise<void> {
@@ -29,6 +29,17 @@ export async function sceneInspectorGroup(
 ): Promise<void> {
   await page
     .getByRole('tablist', { name: 'Scene inspector groups' })
+    .getByRole('tab', { name: group, exact: true })
+    .click();
+}
+
+/** Reveal secondary scene timeline commands without changing authored state. */
+export async function sceneTimelineGroup(
+  page: Page | Frame | FrameLocator,
+  group: 'Actions' | 'Camera' | 'Transitions' | 'Dialogue' | 'Audio' | 'View',
+): Promise<void> {
+  await page
+    .getByRole('tablist', { name: 'Scene timeline tools' })
     .getByRole('tab', { name: group, exact: true })
     .click();
 }

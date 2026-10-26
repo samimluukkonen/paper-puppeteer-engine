@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
+import { sceneTimelineGroup, sceneInspectorGroup, test, waitForPreviewPaint } from './fixtures.js';
 
 test.use({ actionTimeout: 15000 });
 
@@ -72,6 +72,7 @@ test('two-Actor cinematic cuts and fades author, seek, cover foreground, undo an
   await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
   const time = page.getByLabel('Playhead (s)', { exact: true });
   await time.fill('3');
+  await sceneTimelineGroup(page, 'Camera');
   await page.getByRole('button', { name: 'Set Camera Cut', exact: true }).click();
   await sceneInspectorGroup(page, 'Camera');
   await page.locator('.scene-camera > summary').click();
@@ -80,6 +81,7 @@ test('two-Actor cinematic cuts and fades author, seek, cover foreground, undo an
   await page.getByRole('button', { name: 'Apply camera key', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Camera cut at 3 s', exact: true })).toBeVisible();
   await time.fill('0');
+  await sceneTimelineGroup(page, 'Transitions');
   await page.getByRole('button', { name: 'Add effect', exact: true }).click();
   const fadeSummary = page.getByText('Transition properties · Fade in', { exact: true });
   await expect(fadeSummary.locator('..')).not.toHaveAttribute('open');
@@ -87,6 +89,7 @@ test('two-Actor cinematic cuts and fades author, seek, cover foreground, undo an
   await page.getByLabel('Fade duration (seconds)', { exact: true }).fill('2');
   await page.getByRole('button', { name: 'Apply transition properties', exact: true }).click();
   await time.fill('5');
+  await sceneTimelineGroup(page, 'Transitions');
   await page.getByRole('combobox', { name: 'Effect type', exact: true }).selectOption('fade-out');
   await page.getByRole('button', { name: 'Add effect', exact: true }).click();
   const track = page.getByLabel('Scene transitions', { exact: true });

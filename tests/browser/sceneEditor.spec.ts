@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
-import { sceneInspectorGroup } from './fixtures.js';
+import { sceneTimelineGroup, sceneInspectorGroup } from './fixtures.js';
 
 async function createScene(page: Page, id: string) {
   await page.getByRole('button', { name: 'New Scene', exact: true }).click();
@@ -257,6 +257,7 @@ test('visual scene timeline edits clips, markers, properties, grouped history an
   for (const actor of ['a', 'b']) await expect(page.getByLabel(`${actor} actions`, { exact: true })).toBeVisible();
   const tracks = page.getByLabel('Action tracks', { exact: true });
   await tracks.getByRole('button', { name: 'a', exact: true }).click();
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('move');
   await page.getByRole('button', { name: 'Add action', exact: true }).click();
   const movement = page.getByRole('button', { name: 'a: move action-1', exact: true });
@@ -306,10 +307,13 @@ test('visual scene timeline edits clips, markers, properties, grouped history an
   await expect(page.getByRole('button', { name: 'a: move action-2', exact: true })).toBeVisible();
   // A second Actor can own the same channel at the same time.
   await tracks.getByRole('button', { name: 'b', exact: true }).click();
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('button', { name: 'Add action', exact: true }).click();
   await expect(page.getByRole('button', { name: 'b: move action-3', exact: true })).toBeVisible();
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('animation');
   await expect(page.getByRole('button', { name: 'Add action', exact: true })).toBeEnabled();
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('button', { name: 'Add action', exact: true }).click();
   await page.getByText('Action properties · animation', { exact: true }).click();
   expect(
@@ -318,6 +322,7 @@ test('visual scene timeline edits clips, markers, properties, grouped history an
   await page.getByRole('combobox', { name: 'Animation ID', exact: true }).selectOption('walk');
   await page.getByLabel('Loop within duration', { exact: true }).check();
   await page.getByRole('button', { name: 'Apply action properties' }).click();
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('cue');
   await page.getByRole('button', { name: 'Add action', exact: true }).click();
   await page.getByText('Action properties · cue', { exact: true }).click();
@@ -330,6 +335,7 @@ test('visual scene timeline edits clips, markers, properties, grouped history an
   expect(result.actions[4]).toMatchObject({ type: 'cue', name: 'arrived', payload: { location: 'door' } });
   await page.getByRole('button', { name: 'Delete action', exact: true }).click();
   expect((await downloadScene(page)).actions).toHaveLength(4);
+  await sceneTimelineGroup(page, 'View');
   await page.getByLabel('Timeline zoom', { exact: true }).fill('4');
   expect(await tracks.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
   expect(errors).toEqual([]);
@@ -456,6 +462,7 @@ test('two-character encounter playback, pause, restart, deterministic scrubbing 
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(status).toContainText('stopped');
   await expect(time).toHaveValue('0');
+  await sceneTimelineGroup(page, 'View');
   await page.getByLabel('Scene playback speed', { exact: true }).selectOption('2');
   await play.click();
   await expect(status).toContainText('completed', { timeout: 15000 });

@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../../src/engine/ScenePackage.js';
-import { test } from './fixtures.js';
+import { sceneTimelineGroup, test } from './fixtures.js';
 
 test.use({ actionTimeout: 15_000 });
 
@@ -30,6 +30,7 @@ test('dialogue authors multiline Unicode and instance speakers, rejects overlaps
     ),
   });
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await sceneTimelineGroup(page, 'Dialogue');
   await page.getByRole('button', { name: 'Add Dialogue Line', exact: true }).click();
   const track = page.getByLabel('Dialogue lines', { exact: true });
   await expect(track.getByRole('button')).toHaveCount(1);

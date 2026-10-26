@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { animationFileSchema } from '../../src/engine/schemas.js';
+import { sceneTimelineGroup } from './fixtures.js';
 
 test('two-Actor root-motion authoring, playback, conflict rejection, scrubbing and export/reload', async ({ page }) => {
   const errors: string[] = [];
@@ -112,6 +113,7 @@ test('two-Actor root-motion authoring, playback, conflict rejection, scrubbing a
   await expect(position).toHaveText('300.000, 100.000');
   await tracks.getByRole('button', { name: 'a', exact: true }).click();
   await time.fill('0.5');
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('combobox', { name: 'Action type', exact: true }).selectOption('move');
   await page.getByRole('button', { name: 'Add action', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Conflicting');

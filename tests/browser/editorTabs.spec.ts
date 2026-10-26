@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { inspectorControl, sceneInspectorGroup, test, timelineControl } from './fixtures.js';
+import { sceneTimelineGroup, inspectorControl, sceneInspectorGroup, test, timelineControl } from './fixtures.js';
 
 test('scene inspector groups wrap, preserve drafts and reveal selections after collapse', async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -48,6 +48,7 @@ test('scene inspector groups wrap, preserve drafts and reveal selections after c
   await sceneInspectorGroup(page, 'Scene');
   await inspector.getByRole('button', { name: 'Collapse inspector groups', exact: true }).click();
   await expect(inspector.getByRole('tabpanel')).toHaveCount(0);
+  await sceneTimelineGroup(page, 'Actions');
   await page.getByRole('button', { name: 'Add action', exact: true }).click();
   await expect(actors).toHaveAttribute('aria-selected', 'true');
   await expect(inspector.getByRole('tabpanel', { name: 'Actors', exact: true })).toBeVisible();
@@ -430,4 +431,76 @@ test('Feature Guide reveals the Character package tab without changing editor da
   await guide.getByRole('button', { name: 'Finish', exact: true }).click();
   await page.getByRole('tab', { name: 'Edit', exact: true }).click();
   await expect(page.locator('#dirty-status')).toHaveText('No changes');
+});
+
+test('scene timeline tabs reclaim track space and retain controls across collapse and keyboard navigation', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('scene-editor/');
+  await page.getByRole('button', { name: 'New Scene', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'New Scene' })
+    .getByRole('button', { name: 'Create scene', exact: true })
+    .click();
+  const timeline = page.getByRole('region', { name: 'Scene timeline', exact: true });
+  const tabs = timeline.getByRole('tablist', { name: 'Scene timeline tools' });
+  const actions = tabs.getByRole('tab', { name: 'Actions', exact: true });
+  const view = tabs.getByRole('tab', { name: 'View', exact: true });
+  const tracks = page.getByLabel('Action tracks', { exact: true });
+  await page.getByRole('separator', { name: 'Scene timeline height', exact: true }).press('Home');
+  await expect(actions).toHaveAttribute('aria-selected', 'true');
+  await expect(timeline.getByRole('tabpanel')).toHaveCount(0);
+  await expect(timeline.getByRole('tabpanel', { includeHidden: true })).toHaveCount(6);
+  expect((await timeline.locator('.editor-tabs-heading').boundingBox())!.height).toBeLessThanOrEqual(44);
+  const collapsedHeight = (await tracks.boundingBox())!.height;
+  expect(collapsedHeight).toBeGreaterThan(160);
+  await actions.click();
+  const kind = page.getByRole('combobox', { name: 'Action type', exact: true });
+  const original = await kind.elementHandle();
+  await kind.selectOption('wait');
+  await actions.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Camera', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Set Camera Key', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('combobox', { name: 'Effect type', exact: true }).selectOption('fade-out');
+  await sceneTimelineGroup(page, 'Audio');
+  await page.getByRole('combobox', { name: 'Track category', exact: true }).selectOption('voice');
+  await page.getByLabel('Mute preview audio', { exact: true }).check();
+  await sceneTimelineGroup(page, 'View');
+  await page.getByLabel('Timeline zoom', { exact: true }).fill('4');
+  await page.getByLabel('Snap', { exact: true }).uncheck();
+  await page.getByLabel('Scene playback speed', { exact: true }).selectOption('0.5');
+  await expect(timeline.locator('.scene-timeline-help')).not.toHaveAttribute('open');
+  expect((await tracks.boundingBox())!.height).toBeLessThan(collapsedHeight - 20);
+  await timeline.getByRole('button', { name: 'Collapse scene timeline controls', exact: true }).click();
+  await expect(timeline.getByRole('tabpanel')).toHaveCount(0);
+  expect((await tracks.boundingBox())!.height).toBeCloseTo(collapsedHeight, 0);
+  for (const name of ['Play', 'Restart', 'Stop'])
+    await expect(timeline.getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(page.getByLabel('Playhead (s)', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Scene playback status', { exact: true })).toBeVisible();
+  await view.press('ArrowRight');
+  await expect(actions).toBeFocused();
+  await expect(kind).toHaveValue('wait');
+  expect(await kind.evaluate((element, initial) => element === initial, original)).toBe(true);
+  await actions.press('End');
+  await expect(view).toBeFocused();
+  await expect(page.getByLabel('Timeline zoom', { exact: true })).toHaveValue('4');
+  await expect(page.getByLabel('Snap', { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel('Scene playback speed', { exact: true })).toHaveValue('0.5');
+  await view.press('Home');
+  await expect(actions).toBeFocused();
+  await sceneTimelineGroup(page, 'Transitions');
+  await expect(page.getByRole('combobox', { name: 'Effect type', exact: true })).toHaveValue('fade-out');
+  await sceneTimelineGroup(page, 'Audio');
+  await expect(page.getByRole('combobox', { name: 'Track category', exact: true })).toHaveValue('voice');
+  await expect(page.getByLabel('Mute preview audio', { exact: true })).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(page.locator('.scene-inspector details[open]')).toHaveCount(0);
+  await timeline.getByRole('button', { name: 'Collapse scene timeline controls', exact: true }).click();
+  await page.screenshot({ path: info.outputPath('scene-timeline-tabs.png') });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
+  expect((await tracks.boundingBox())!.height).toBeGreaterThanOrEqual(120);
 });

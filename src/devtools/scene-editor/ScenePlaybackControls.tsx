@@ -1,3 +1,4 @@
+import { Pause, Play, RotateCcw, Square } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { timeToTimelineX } from '../animation-editor/timeline.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -11,45 +12,66 @@ export function ScenePlaybackControls({ playback }: { playback: SceneEditorPlayb
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.scenePlayback}
+        aria-label={playback.status === 'playing' ? 'Pause' : 'Play'}
+        title={playback.status === 'playing' ? 'Pause' : 'Play'}
         disabled={!playback.ready}
         onClick={() => (playback.status === 'playing' ? playback.pause() : playback.play())}
       >
-        {playback.status === 'playing' ? 'Pause' : 'Play'}
+        {playback.status === 'playing' ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
       </button>
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.sceneRestart}
+        aria-label="Restart"
+        title="Restart"
         disabled={!playback.ready}
         onClick={() => playback.restart()}
       >
-        Restart
+        <RotateCcw size={16} aria-hidden="true" />
       </button>
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.sceneStop}
+        aria-label="Stop"
+        title="Stop"
         disabled={!playback.ready}
         onClick={() => playback.stop()}
       >
-        Stop
+        <Square size={16} aria-hidden="true" />
       </button>
-      <label>
-        Speed
-        <select
-          data-guide-id={GUIDE_TARGETS.scenePlaybackSpeed}
-          aria-label="Scene playback speed"
-          value={playback.speed}
-          onChange={(event) => playback.setSpeed(Number(event.target.value))}
-        >
-          {[0.25, 0.5, 1, 1.5, 2].map((speed) => (
-            <option key={speed} value={speed}>
-              {speed}×
-            </option>
-          ))}
-        </select>
-      </label>
       <span className="scene-playback-status" aria-label="Scene playback status">
         {playback.status} · {(playback.time / 1000).toFixed(2)} s
       </span>
+    </>
+  );
+}
+
+/** Secondary controls remain mounted inside the timeline's View and Audio tabs. */
+export function ScenePlaybackSpeed({ playback }: { playback: SceneEditorPlayback }) {
+  useSyncExternalStore(playback.subscribe, playback.getSnapshot, playback.getSnapshot);
+  return (
+    <label>
+      Speed
+      <select
+        data-guide-id={GUIDE_TARGETS.scenePlaybackSpeed}
+        aria-label="Scene playback speed"
+        value={playback.speed}
+        onChange={(event) => playback.setSpeed(Number(event.target.value))}
+      >
+        {[0.25, 0.5, 1, 1.5, 2].map((speed) => (
+          <option key={speed} value={speed}>
+            {speed}×
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function SceneAudioPlaybackControls({ playback }: { playback: SceneEditorPlayback }) {
+  useSyncExternalStore(playback.subscribe, playback.getSnapshot, playback.getSnapshot);
+  return (
+    <>
       <label data-guide-id={GUIDE_TARGETS.sceneAudioMute}>
         <input
           type="checkbox"
