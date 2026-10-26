@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
+import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { AttachmentController } from './AttachmentController.js';
 import './attachments.css';
@@ -7,10 +8,12 @@ export function AttachmentPanel({
   controller,
   authoring = true,
   defaultOpen = false,
+  embedded = false,
 }: {
   controller: AttachmentController;
   authoring?: boolean;
   defaultOpen?: boolean;
+  embedded?: boolean;
 }) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const [attachmentId, setAttachmentId] = useState('');
@@ -30,8 +33,13 @@ export function AttachmentPanel({
   const errors = state?.validationIssues().filter((issue) => issue.severity === 'error') ?? [];
   const mapping = slot && skin && Object.hasOwn(skin.slots, slot) ? skin.slots[slot] : undefined;
   return (
-    <details className="attachment-panel" id="attachment-panel" open={defaultOpen || undefined}>
-      <summary>Attachments &amp; skins</summary>
+    <InspectorSection
+      embedded={embedded}
+      defaultOpen={defaultOpen}
+      className="attachment-panel"
+      id="attachment-panel"
+      summary="Attachments & skins"
+    >
       {!state ? (
         <p>Load a character to manage attachments.</p>
       ) : (
@@ -247,6 +255,6 @@ export function AttachmentPanel({
           <p role="status">{snapshot.message}</p>
         </section>
       )}
-    </details>
+    </InspectorSection>
   );
 }

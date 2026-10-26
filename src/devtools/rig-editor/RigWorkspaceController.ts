@@ -33,10 +33,15 @@ export function createRigWorkspaceController(
       const next = marker ? `contact:${marker}` : editor.state.selection?.id;
       if (next && next !== selected) app.dispatchEvent(new Event('workspace:reveal-inspector'));
       if (rendered && !app.hidden && next && next !== selected) {
-        const details = app.querySelector<HTMLDetailsElement>(
-          marker ? '.foot-contact-panel' : '.rig-selection-details',
-        );
-        if (details) details.open = true;
+        // Keep hierarchy navigation and skeleton commands in their current tab.
+        // Canvas selections still reveal the fields for the selected object.
+        const hierarchyFocused = app.querySelector('.workspace-hierarchy:focus-within');
+        if (!hierarchyFocused) {
+          const id = marker ? 'rig-inspector-contact-markers' : 'rig-inspector-selection';
+          app
+            .querySelector(`[data-editor-tab-panel="${id}"]`)
+            ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
+        }
       }
       selected = next;
       rendered = true;

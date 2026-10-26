@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import type { ArtworkAlignmentPolicy, ArtworkReference } from '../../../engine/artworkReplacement.js';
+import { InspectorSection } from '../../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../guides/anchors.js';
 import type { ArtworkController } from './ArtworkController.js';
 import './artwork.css';
 
-export function ArtworkPanel({ controller }: { controller: ArtworkController }) {
+export function ArtworkPanel({ controller, embedded = false }: { controller: ArtworkController; embedded?: boolean }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const target = state.targets.find((entry) => entry.key === state.selectedKey);
   const replacement = state.proposed ?? state.applied;
@@ -12,8 +13,12 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
     ? target?.individuals.find((entry) => entry.reference === state.selectedReference)?.reason
     : target?.reason;
   return (
-    <details className="artwork-panel" id="artwork-panel">
-      <summary>Artwork import &amp; replacement</summary>
+    <InspectorSection
+      embedded={embedded}
+      className="artwork-panel"
+      id="artwork-panel"
+      summary="Artwork import & replacement"
+    >
       <section aria-label="Sprite replacement">
         <label>
           Import new artwork
@@ -199,6 +204,6 @@ export function ArtworkPanel({ controller }: { controller: ArtworkController }) 
           character ZIP to include images. Artwork Undo/Redo is independent of animation and rig edits.
         </small>
       </section>
-    </details>
+    </InspectorSection>
   );
 }

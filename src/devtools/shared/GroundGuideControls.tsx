@@ -1,20 +1,23 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { InspectorSection } from '../../ui/InspectorSection.js';
 import type { GroundGuideWorkspace } from './GroundGuideWorkspace.js';
 import { GUIDE_TARGETS } from './guides/anchors.js';
 import './groundGuide.css';
 
-/** Shared collapsed inspector disclosure; commands keep guide history outside authored documents. */
+/** Shared inspector controls; commands keep guide history outside authored documents. */
 export function GroundGuideControls({
   workspace,
   showSnapping = false,
   guideAnchors = true,
   children,
+  embedded = false,
 }: {
   workspace: GroundGuideWorkspace;
   showSnapping?: boolean;
   /** The character workspace mounts a second copy with independent rig tour anchors. */
   guideAnchors?: boolean | 'rig';
   children?: ReactNode;
+  embedded?: boolean;
 }) {
   const { workspaceId, guide, persistenceMessage, canUndo, canRedo, dragging } = useSyncExternalStore(
     workspace.subscribe,
@@ -30,10 +33,15 @@ export function GroundGuideControls({
     else setText(String(guide.y));
   };
   return (
-    <details className="ground-guide-controls">
-      <summary title="Visual reference only; not a physics floor. Guide changes do not edit character or Actor transforms.">
-        {scene ? 'Scene ground' : 'Ground reference'}
-      </summary>
+    <InspectorSection
+      embedded={embedded}
+      className="ground-guide-controls"
+      summary={
+        <span title="Visual reference only; not a physics floor. Guide changes do not edit character or Actor transforms.">
+          {scene ? 'Scene ground' : 'Ground reference'}
+        </span>
+      }
+    >
       <fieldset disabled={workspaceId === null || dragging}>
         <label
           className="ground-guide-toggle"
@@ -134,6 +142,6 @@ export function GroundGuideControls({
             : ' Drag ↕ Ground in the preview to adjust the guide. Escape cancels. Snapping affects temporary IK target drags within 8 preview pixels; Set Target Key saves them.')}
       </p>
       {persistenceMessage && <p role="status">{persistenceMessage}</p>}
-    </details>
+    </InspectorSection>
   );
 }

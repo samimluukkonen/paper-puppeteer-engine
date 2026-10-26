@@ -11,9 +11,21 @@ export interface EditorTab {
 const icons = { edit: PencilLine, package: Package, draft: HardDrive, project: FolderOpen };
 
 /** View-only chrome. Keep every panel mounted so native controller bindings and drafts survive tab changes. */
-export function EditorTabs({ label, tabs }: { label: string; tabs: readonly EditorTab[] }) {
+export function EditorTabs({
+  label,
+  tabs,
+  defaultExpanded = true,
+  controlsLabel = 'editor controls',
+  wrap = false,
+}: {
+  label: string;
+  tabs: readonly EditorTab[];
+  defaultExpanded?: boolean;
+  controlsLabel?: string;
+  wrap?: boolean;
+}) {
   const [active, setActive] = useState(tabs[0]!.id);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = root.current!;
@@ -31,7 +43,7 @@ export function EditorTabs({ label, tabs }: { label: string; tabs: readonly Edit
     setExpanded(true);
   };
   return (
-    <div ref={root} className="editor-tabs">
+    <div ref={root} className={`editor-tabs${wrap ? ' editor-tabs-wrap' : ''}`}>
       <div className="editor-tabs-heading">
         <div role="tablist" aria-label={label} aria-orientation="horizontal">
           {tabs.map((tab, index) => {
@@ -74,10 +86,10 @@ export function EditorTabs({ label, tabs }: { label: string; tabs: readonly Edit
         <button
           type="button"
           className="editor-tabs-collapse"
-          aria-label={expanded ? 'Collapse editor controls' : 'Expand editor controls'}
+          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${controlsLabel}`}
           aria-expanded={expanded}
           aria-controls={`${active}-panel`}
-          title={expanded ? 'Collapse editor controls' : 'Expand editor controls'}
+          title={`${expanded ? 'Collapse' : 'Expand'} ${controlsLabel}`}
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}

@@ -191,56 +191,114 @@ export function RigEditorView({
               Close
             </button>
           </div>
-          <details className="workspace-hierarchy" data-guide-id={GUIDE_TARGETS.rigHierarchy}>
-            <summary>Hierarchy</summary>
-            <div id="hierarchy" role="tree" />
-            {attachments && <RigStructurePanel controller={attachments} />}
-          </details>
-          <details className="rig-selection-details" data-guide-id={GUIDE_TARGETS.rigSelection}>
-            <summary>Selection details</summary>
-            <section aria-label="Rig properties">
-              <div id="inspector">Loading character…</div>
-            </section>
-          </details>
-          {attachments && <RigIKPanel controller={attachments} />}
-          {attachments && <FootContactMarkersPanel controller={attachments} />}
-          {groundGuide && (
-            <GroundGuideControls workspace={groundGuide} guideAnchors="rig">
-              <p className="workspace-caption">
-                Drag ↕ Ground in the preview to move the line. Escape cancels. Ground history is separate from rig
-                edits.
-              </p>
-            </GroundGuideControls>
-          )}
-          {attachments && <AttachmentPanel controller={attachments} defaultOpen={false} />}
-          {artwork && <ArtworkPanel controller={artwork} />}
-          <details>
-            <summary>Visibility</summary>
-            <div id="visibility" />
-            <label className="opacity-label">
-              Artwork opacity{' '}
-              <select id="opacity">
-                <option value="1">100%</option>
-                <option value="0.5">50%</option>
-                <option value="0.25">25%</option>
-              </select>
-            </label>
-          </details>
-          <details>
-            <summary>Session</summary>
-            <div id="session-status" />
-          </details>
-          <details>
-            <summary>Reset</summary>
-            <div className="action-grid">
-              <button id="reset-selected" type="button">
-                Reset Selected
-              </button>
-              <button id="reset-rig" type="button">
-                Reset Rig
-              </button>
-            </div>
-          </details>
+          <EditorTabs
+            label="Rig inspector sections"
+            controlsLabel="inspector sections"
+            wrap
+            tabs={[
+              {
+                id: 'rig-inspector-hierarchy',
+                label: 'Hierarchy',
+                content: (
+                  <div className="workspace-hierarchy" data-guide-id={GUIDE_TARGETS.rigHierarchy}>
+                    <div id="hierarchy" role="tree" />
+                    {attachments && <RigStructurePanel controller={attachments} />}
+                  </div>
+                ),
+              },
+              {
+                id: 'rig-inspector-selection',
+                label: 'Selection details',
+                content: (
+                  <div className="rig-selection-details" data-guide-id={GUIDE_TARGETS.rigSelection}>
+                    <section aria-label="Rig properties">
+                      <div id="inspector">Loading character…</div>
+                    </section>
+                  </div>
+                ),
+              },
+              ...(attachments
+                ? [
+                    {
+                      id: 'rig-inspector-ik',
+                      label: 'IK constraints',
+                      content: <RigIKPanel controller={attachments} embedded />,
+                    },
+                    {
+                      id: 'rig-inspector-contact-markers',
+                      label: 'Foot contact markers',
+                      content: <FootContactMarkersPanel controller={attachments} embedded />,
+                    },
+                  ]
+                : []),
+              ...(groundGuide
+                ? [
+                    {
+                      id: 'rig-inspector-ground',
+                      label: 'Ground reference',
+                      content: (
+                        <GroundGuideControls workspace={groundGuide} guideAnchors="rig" embedded>
+                          <p className="workspace-caption">
+                            Drag ↕ Ground in the preview to move the line. Escape cancels. Ground history is separate
+                            from rig edits.
+                          </p>
+                        </GroundGuideControls>
+                      ),
+                    },
+                  ]
+                : []),
+              ...(attachments
+                ? [
+                    {
+                      id: 'rig-inspector-attachments',
+                      label: 'Attachments & skins',
+                      content: <AttachmentPanel controller={attachments} embedded />,
+                    },
+                  ]
+                : []),
+              ...(artwork
+                ? [
+                    {
+                      id: 'rig-inspector-artwork',
+                      label: 'Artwork import & replacement',
+                      content: <ArtworkPanel controller={artwork} embedded />,
+                    },
+                  ]
+                : []),
+              {
+                id: 'rig-inspector-visibility',
+                label: 'Visibility',
+                content: (
+                  <>
+                    <div id="visibility" />
+                    <label className="opacity-label">
+                      Artwork opacity{' '}
+                      <select id="opacity">
+                        <option value="1">100%</option>
+                        <option value="0.5">50%</option>
+                        <option value="0.25">25%</option>
+                      </select>
+                    </label>
+                  </>
+                ),
+              },
+              { id: 'rig-inspector-session', label: 'Session', content: <div id="session-status" /> },
+              {
+                id: 'rig-inspector-reset',
+                label: 'Reset',
+                content: (
+                  <div className="action-grid">
+                    <button id="reset-selected" type="button">
+                      Reset Selected
+                    </button>
+                    <button id="reset-rig" type="button">
+                      Reset Rig
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+          />
         </aside>
         <div
           id="rig-preview-divider"

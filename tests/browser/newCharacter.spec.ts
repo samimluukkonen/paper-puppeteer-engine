@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { characterManifestSchema } from '../../src/engine/schemas.js';
-import { test, selectRigEntry } from './fixtures.js';
+import { test, selectRigEntry, inspectorControl } from './fixtures.js';
 
 test.describe.configure({ timeout: 60_000 });
 
@@ -24,7 +24,7 @@ test('create from a failed load, author an independent draft and switch editor v
   await expect(page.locator('#hierarchy [role=treeitem]')).toHaveText(['root']);
   await expect(page.locator('#editor-stage canvas')).toBeVisible();
   const artwork = page.locator('#editor-app #artwork-panel');
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(page, '#editor-app #artwork-panel');
   await expect(artwork.getByLabel('Import new artwork', { exact: true })).toBeEnabled();
   await expect(artwork).toContainText('No artwork yet.');
   await selectRigEntry(page, 'root');
@@ -95,7 +95,7 @@ test('first artwork imports into an empty draft and exports as a real image with
   await dialog.getByRole('button', { name: 'Create Character', exact: true }).click();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   const artwork = page.locator('#editor-app #artwork-panel');
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(page, '#editor-app #artwork-panel');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 8;

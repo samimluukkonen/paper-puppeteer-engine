@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { rigFileSchema } from '../../src/engine/schemas.js';
-import { animationMenuControl, test, selectRigEntry } from './fixtures.js';
+import { animationMenuControl, test, selectRigEntry, inspectorControl } from './fixtures.js';
 import { capturePreviewFrame } from './previewFrame.js';
 
 for (const editor of ['rig', 'animation'] as const) {
@@ -11,7 +11,7 @@ for (const editor of ['rig', 'animation'] as const) {
     const validation = page.locator(editor === 'rig' ? '#validation' : '#animation-status');
     await expect(validation).toHaveText('Validation: OK');
     const panel = page.locator('#artwork-panel');
-    await panel.locator('summary').click();
+    await inspectorControl(page, '#artwork-panel input[type=file]');
     await panel.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
     await expect(panel).toContainText('Attachment: leftForearm');
     const canvas = page.locator(editor === 'rig' ? '#editor-stage canvas' : '#animation-stage canvas');
@@ -82,6 +82,7 @@ for (const editor of ['rig', 'animation'] as const) {
       await selectRigEntry(page, 'leftForearm');
       await expect(validation).toHaveText('Validation: OK');
     }
+    await inspectorControl(page, '#artwork-panel input[type=file]');
     await input.setInputFiles({
       name: 'forearm.webp',
       mimeType: 'image/webp',
@@ -117,7 +118,7 @@ test('shared versus individual replacement, dimension policies and artwork histo
   await page.goto('animation-editor/');
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   const panel = page.locator('#artwork-panel');
-  await panel.locator('summary').click();
+  await inspectorControl(page, '#artwork-panel input[type=file]');
   await panel.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   await expect(panel).toContainText('Attachment: rightForearmDefault');
   const canvas = page.locator('#animation-stage canvas');

@@ -124,28 +124,21 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   await dialog.getByRole('button', { name: 'Create Character', exact: true }).click();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   await expect.poll(() => page.locator('#rig-inspector details[open]').count()).toBe(0);
-  // Measure the visible collapsed cards; the guidance content is inside a closed disclosure.
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const guidance = document.querySelector('#rig-inspector .rig-selection-details')!.getBoundingClientRect();
-        const collapsedIK = document.querySelector('#rig-inspector .rig-ik-panel')!.getBoundingClientRect();
-        return collapsedIK.top - guidance.bottom;
-      }),
-    )
-    .toBeGreaterThanOrEqual(16);
-  await page.screenshot({ path: test.info().outputPath('collapsed-inspector.png') });
+  await expect(page.getByRole('tabpanel', { name: 'Hierarchy', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'IK constraints', exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('initial-hierarchy-inspector.png') });
   const panel = await inspectorControl(page, '#rig-inspector section[aria-label="IK constraints"]');
   await expect(panel).toContainText('No IK constraints');
   await panel.getByRole('button', { name: '+ Add IK Constraint', exact: true }).click();
   await expect(panel).toContainText('Add a chain of three connected bones before creating IK.');
   await panel.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await selectRigEntry(page, 'root');
+  await selectRigEntry(page, 'root', false);
   const skeleton = page.getByRole('region', { name: 'Build skeleton', exact: true });
   for (const id of ['segment', 'tip']) {
     await skeleton.getByLabel('New bone ID', { exact: true }).fill(id);
     await skeleton.getByRole('button', { name: '+ Add Bone', exact: true }).click();
   }
+  await inspectorControl(page, '#rig-inspector section[aria-label="IK constraints"]');
   await panel.getByRole('button', { name: '+ Add IK Constraint', exact: true }).click();
   await panel.getByLabel('Constraint name', { exact: true }).fill('tentacleIK');
   await panel.getByRole('button', { name: 'Create IK Constraint', exact: true }).click();

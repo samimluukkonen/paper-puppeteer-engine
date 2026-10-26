@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
 import { characterManifestSchema, rigFileSchema } from '../../src/engine/schemas.js';
-import { test, selectRigEntry } from './fixtures.js';
+import { test, selectRigEntry, inspectorControl } from './fixtures.js';
 
 test('package preview exposes controls only after its artwork and puppet are ready', async ({ page }) => {
   await page.goto('rig-editor/');
@@ -58,7 +58,7 @@ test('static WebP replacement exports and reloads with guarded runtime image loa
   await page.goto('rig-editor/');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   const artwork = page.locator('#artwork-panel');
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(page, '#artwork-panel');
   await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   const encoded = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -143,7 +143,7 @@ for (const editor of ['rig', 'animation'] as const) {
     if (editor === 'animation')
       await page.getByRole('combobox', { name: 'Editor Mode', exact: true }).selectOption('animation');
     const artwork = page.locator('#artwork-panel');
-    await artwork.locator(':scope > summary').click();
+    await inspectorControl(page, '#artwork-panel');
     await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
     const encoded = await page.evaluate(() => {
       const canvas = document.createElement('canvas');

@@ -25,7 +25,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   await joint.fill('76');
   await joint.press('Tab');
   const artwork = page.locator('#artwork-panel');
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(page, '#artwork-panel');
   await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   const sprite = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -123,7 +123,7 @@ test('production authoring: sprites, rig, skin, motion, IK bake, onion, mirror, 
   await toggleAnimationToolPanel(page, 'bake');
 
   // Replacing the same asset from the other editor retains its logical identity and prior alignment.
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(page, '#artwork-panel');
   await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   await importSprite();
   await page.locator('#editor-mode').selectOption('rig-tweak');

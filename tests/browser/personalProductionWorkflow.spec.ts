@@ -17,13 +17,7 @@ async function editor(page: Page, name: string): Promise<Frame> {
 }
 
 async function reveal(frame: Frame, selector: string) {
-  const control = frame.locator(selector).first();
-  await control.waitFor({ state: 'attached' });
-  for (const details of await control.locator('xpath=ancestor::details').all()) {
-    if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open)))
-      await details.locator(':scope > summary').click();
-  }
-  return control;
+  return (await inspectorControl(frame, selector)).first();
 }
 
 async function selectBone(frame: Frame, id: string) {
@@ -99,7 +93,7 @@ test('personal production: new project and artwork → rig/IK/keys → scene →
   await attachments.getByLabel('Attachment ID', { exact: true }).fill('arm-art');
   await attachments.getByRole('button', { name: 'Create attachment', exact: true }).click();
   await attachments.getByLabel('Assigned attachment', { exact: true }).selectOption('arm-art');
-  const origin = frame.locator('#inspector [data-scope=attachment][data-field=originY]').first();
+  const origin = await reveal(frame, '#inspector [data-scope=attachment][data-field=originY]');
   await origin.fill('0.1');
   await origin.blur();
   await recover(page); // Applied binary artwork and skin assignment must survive.

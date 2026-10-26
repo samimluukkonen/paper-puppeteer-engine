@@ -146,6 +146,17 @@
   margin-bottom: -1px;
   min-width: 0;
 }
+.editor-tabs-wrap > .editor-tabs-heading > [role="tablist"] {
+  flex-wrap: wrap;
+}
+.editor-tabs-wrap > .editor-tabs-heading > [role="tablist"] > [role="tab"] {
+  flex: 0 0 auto;
+}
+.editor-tabs-wrap > .editor-tabs-heading > .editor-tabs-collapse {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 4px;
+}
 .editor-tabs:not(:has(> [role="tabpanel"]:not([hidden]))) .editor-tabs-heading {
   border-bottom: 0;
   border-radius: 6px;

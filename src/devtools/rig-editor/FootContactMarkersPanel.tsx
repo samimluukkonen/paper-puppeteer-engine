@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { FootContactMarker } from '../../engine/types.js';
+import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField } from '../shared/InspectorNumberField.js';
 import type { AttachmentController } from './AttachmentController.js';
@@ -37,7 +38,13 @@ function MarkerName({ marker, controller }: { marker: FootContactMarker; control
 }
 
 /** React owns only input drafts; selection, coordinates and history belong to the rig document. */
-export function FootContactMarkersPanel({ controller }: { controller: AttachmentController }) {
+export function FootContactMarkersPanel({
+  controller,
+  embedded = false,
+}: {
+  controller: AttachmentController;
+  embedded?: boolean;
+}) {
   const { editor, message } = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -64,8 +71,11 @@ export function FootContactMarkersPanel({ controller }: { controller: Attachment
     </option>
   ));
   return (
-    <details className="attachment-panel rig-ik-panel foot-contact-panel">
-      <summary>Foot Contact Markers</summary>
+    <InspectorSection
+      embedded={embedded}
+      className="attachment-panel rig-ik-panel foot-contact-panel"
+      summary="Foot Contact Markers"
+    >
       <section className="rig-ik-content" aria-label="Foot contact markers">
         {!markers.length && <p>No contact markers. Choose any bone and add a contact point.</p>}
         <div className="action-grid">
@@ -141,6 +151,6 @@ export function FootContactMarkersPanel({ controller }: { controller: Attachment
         )}
         <p role="status">{message}</p>
       </section>
-    </details>
+    </InspectorSection>
   );
 }

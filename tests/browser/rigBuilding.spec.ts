@@ -17,7 +17,7 @@ test('build a new character, import and align artwork, animate, export and reloa
   await dialog.getByRole('button', { name: 'Create Character', exact: true }).click();
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
   const skeleton = page.getByRole('region', { name: 'Build skeleton', exact: true });
-  await selectRigEntry(page, 'root');
+  await selectRigEntry(page, 'root', false);
   await skeleton.getByLabel('Bone ID / name', { exact: true }).fill('base');
   await skeleton.getByRole('button', { name: 'Rename bone', exact: true }).click();
   for (const id of ['trunk', 'branch']) {
@@ -29,8 +29,10 @@ test('build a new character, import and align artwork, animate, export and reloa
     );
   }
   const x = page.locator('#inspector [data-scope=bone][data-field=x]');
+  await inspectorControl(page, '#inspector');
   await x.fill('35');
   await x.blur();
+  await rigHierarchy(page);
   page.once('dialog', (confirmation) => {
     void confirmation.dismiss();
   });
@@ -55,7 +57,7 @@ test('build a new character, import and align artwork, animate, export and reloa
   await page.reload();
   await expect(page.locator('#hierarchy [role=treeitem]')).toHaveText(['base', 'trunk', 'branch']);
   page.off('dialog', accept);
-  await selectRigEntry(page, 'branch');
+  await selectRigEntry(page, 'branch', false);
   await expect(x).toHaveValue('35');
   await skeleton.getByLabel('New slot ID', { exact: true }).fill('branch-visual');
   await skeleton.getByRole('button', { name: '+ Add Slot', exact: true }).click();
@@ -63,7 +65,7 @@ test('build a new character, import and align artwork, animate, export and reloa
     (await rigHierarchy(page)).getByRole('treeitem', { name: '◇ branch-visual', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
   const artwork = page.locator('#editor-app #artwork-panel');
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(page, '#editor-app #artwork-panel');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 32;
@@ -84,6 +86,7 @@ test('build a new character, import and align artwork, animate, export and reloa
   await attachments.getByLabel('Attachment ID', { exact: true }).fill('leaf-appearance');
   await attachments.getByRole('button', { name: 'Create attachment', exact: true }).click();
   await attachments.getByLabel('Assigned attachment', { exact: true }).selectOption('leaf-appearance');
+  await inspectorControl(page, '#inspector');
   await expect(page.locator('#inspector [data-scope=attachment][data-field=originX]').first()).toBeVisible();
   for (const [field, value] of [
     ['originX', '0.25'],
@@ -99,7 +102,7 @@ test('build a new character, import and align artwork, animate, export and reloa
   await page.locator('#inspector [data-scope=slot][data-field=depth]').blur();
   await page.locator('#rig-facing').selectOption('left');
   await expect(page.locator('#validation')).toHaveText('Validation: OK');
-  await selectRigEntry(page, 'branch');
+  await selectRigEntry(page, 'branch', false);
   await skeleton.getByRole('button', { name: 'Remove bone', exact: true }).click();
   await expect(skeleton).toContainText('slot "branch-visual"');
   await expect((await rigHierarchy(page)).getByRole('treeitem', { name: 'branch', exact: true })).toBeVisible();

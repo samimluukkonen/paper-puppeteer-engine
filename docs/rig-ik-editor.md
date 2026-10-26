@@ -2,7 +2,7 @@
 
 The Rig Editor's **IK constraints** panel creates and edits the existing two-bone IK definitions. Select three directly connected joints, give the constraint a unique name, initialize its default target at the current end effector or enter coordinates, and confirm creation. Bone choices come from the current skeleton and support new characters and non-humanoid chains.
 
-Inspector disclosures start collapsed in both editors. Expand **Hierarchy** to select bones and expand **IK constraints** to author defaults; Animation Editor's **IK target** section can also be expanded or collapsed. Closing a section retains its edits and drafts. Click a selected bone again in the rig hierarchy to clear the selection and return to the selection guidance.
+Rig Editor inspector tabs wrap onto multiple rows when needed and start with **Hierarchy** selected and its contents visible. Open **Hierarchy** to select bones and **IK constraints** to author defaults. Animation Editor inspector disclosures, including **IK target**, also start collapsed. Switching tabs or closing a section retains its edits and drafts. Click a selected bone again in the rig hierarchy to clear the selection and return to the selection guidance.
 
 Select a constraint to highlight its start, middle and end joints. Edit its rig-local target, influence, bend direction, enabled flag, priority and end-bone-local endpoint offset. Numeric changes commit on blur or Enter; Escape discards unfinished numeric text. Creation enables live solver preview; the panel and existing preview checkbox control the same preview state.
 

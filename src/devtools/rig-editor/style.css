@@ -98,6 +98,18 @@
   padding: 6px 4px;
   line-height: 1.6;
 }
+#rig-inspector > .editor-tabs > [role="tabpanel"] {
+  padding: 12px;
+}
+#rig-inspector .rig-ik-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+#rig-inspector .rig-ik-panel .rig-ik-content {
+  padding-top: 0;
+}
 #inspector .property input:invalid {
   border-color: var(--danger-fg);
 }

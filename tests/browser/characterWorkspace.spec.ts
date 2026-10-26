@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip } from '../../src/devtools/shared/package/packageZip.js';
-import { animationHierarchy, test, selectRigEntry } from './fixtures.js';
+import { animationHierarchy, test, selectRigEntry, inspectorControl } from './fixtures.js';
 
 test('artist workflow retains one canvas, documents, artwork and history between editor routes', async ({ page }) => {
   test.setTimeout(90_000);
@@ -24,7 +24,7 @@ test('artist workflow retains one canvas, documents, artwork and history between
   await offset.fill('9');
   await offset.press('Tab');
   const artwork = page.locator('#artwork-panel');
-  await artwork.locator('summary').click();
+  await inspectorControl(page, '#artwork-panel');
   await artwork.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   const encoded = await page.evaluate(() => {
     const surface = document.createElement('canvas');

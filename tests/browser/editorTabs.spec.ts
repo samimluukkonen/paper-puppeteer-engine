@@ -1,6 +1,67 @@
 import { expect } from '@playwright/test';
 import { test } from './fixtures.js';
 
+test('rig inspector tabs wrap, preserve drafts and support keyboard navigation', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  const inspector = page.locator('#rig-inspector');
+  const tabs = inspector.getByRole('tablist', { name: 'Rig inspector sections' });
+  const hierarchy = tabs.getByRole('tab', { name: 'Hierarchy', exact: true });
+  const selection = tabs.getByRole('tab', { name: 'Selection details', exact: true });
+  const reset = tabs.getByRole('tab', { name: 'Reset', exact: true });
+  await expect(hierarchy).toHaveAttribute('aria-selected', 'true');
+  await expect(inspector.getByRole('tabpanel', { name: 'Hierarchy', exact: true })).toBeVisible();
+  await expect(inspector.getByRole('tabpanel')).toHaveCount(1);
+  const tree = inspector.getByRole('tree');
+  const original = await tree.elementHandle();
+  const head = tree.getByRole('treeitem', { name: 'head', exact: true });
+  await head.click();
+  await expect(head).toBeFocused();
+  await expect(hierarchy).toHaveAttribute('aria-selected', 'true');
+  await selection.click();
+  const x = inspector.locator('input[data-scope="bone"][data-field="x"]');
+  await x.fill('12');
+  await x.blur();
+  await hierarchy.click();
+  const boneId = inspector.getByLabel('New bone ID', { exact: true });
+  await boneId.fill('draft-bone');
+  await hierarchy.press('End');
+  await expect(reset).toBeFocused();
+  await expect(reset).toHaveAttribute('aria-selected', 'true');
+  await reset.press('ArrowRight');
+  await expect(hierarchy).toBeFocused();
+  await expect(boneId).toHaveValue('draft-bone');
+  expect(await tree.evaluate((element, initial) => element === initial, original)).toBe(true);
+  await hierarchy.press('ArrowRight');
+  await expect(selection).toBeFocused();
+  await expect(x).toHaveValue('12');
+  await page.locator('#undo').click();
+  await expect(x).toHaveValue('0');
+  await page.locator('#redo').click();
+  await expect(x).toHaveValue('12');
+  await inspector.getByRole('button', { name: 'Collapse inspector sections', exact: true }).click();
+  await expect(inspector.getByRole('tabpanel')).toHaveCount(0);
+  // The desktop divider can leave only 320px for the left column.
+  await page.locator('#rig-preview-divider').focus();
+  await page.locator('#rig-preview-divider').press('End');
+  await expect
+    .poll(() =>
+      tabs.getByRole('tab').evaluateAll((buttons) => new Set(buttons.map((b) => b.getBoundingClientRect().top)).size),
+    )
+    .toBeGreaterThan(1);
+  const bounds = (await tabs.boundingBox())!;
+  for (const tab of await tabs.getByRole('tab').all()) {
+    const box = (await tab.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+  }
+  await hierarchy.click();
+  await expect(boneId).toHaveValue('draft-bone');
+  await page.screenshot({ path: info.outputPath('rig-inspector-wrapped-tabs.png') });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+});
+
 for (const editor of ['rig', 'animation', 'scene'] as const) {
   test(`${editor} tabs preserve controls, support keys and reclaim desktop height`, async ({ page }) => {
     const errors: string[] = [];
@@ -25,7 +86,7 @@ for (const editor of ['rig', 'animation', 'scene'] as const) {
     const original = await control.elementHandle();
     if (editor === 'rig') await control.selectOption('5');
     if (editor === 'animation') await control.selectOption('walk');
-    const chrome = page.locator('.editor-tabs:visible');
+    const chrome = tabs.locator('..').locator('..');
     const expandedHeight = (await chrome.boundingBox())!.height;
     await page.getByRole('button', { name: 'Collapse editor controls', exact: true }).click();
     await expect(panel).toBeHidden();

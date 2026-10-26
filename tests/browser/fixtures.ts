@@ -7,29 +7,37 @@ export async function waitForPreviewPaint(page: Page): Promise<void> {
   );
 }
 
-/** Follow inspector disclosures through their visible summaries before using a control. */
+/** Reveal inspector tabs and disclosures through their visible controls. */
 export async function inspectorControl(page: Page | Frame, selector: string): Promise<Locator> {
   const control = page.locator(selector);
   await control.first().waitFor({ state: 'attached' });
-  for (const panel of await control.first().locator('xpath=ancestor::details').all()) {
+  for (const panel of await control.first().locator('xpath=ancestor-or-self::*[@data-editor-tab-panel]').all()) {
+    const tab = await panel.getAttribute('data-editor-tab-panel');
+    await page.locator(`[id="${tab}-tab"]`).click();
+  }
+  for (const panel of await control.first().locator('xpath=ancestor-or-self::details').all()) {
     if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open)))
       await panel.locator(':scope > summary').click();
   }
   return control;
 }
 
-/** Rig hierarchy starts collapsed; Rig Tweak retains its existing visible tree. */
+/** Reveal the rig hierarchy tab; Rig Tweak retains its existing visible tree. */
 export async function rigHierarchy(page: Page): Promise<Locator> {
   await page.locator('#editor-app:visible, .rig-tweak-panel:visible').first().waitFor();
-  if (await page.locator('#editor-app').isVisible()) await inspectorControl(page, '#hierarchy');
+  if (await page.locator('#editor-app').isVisible()) {
+    await inspectorControl(page, '#hierarchy');
+    return page.locator('#hierarchy');
+  }
   return page.getByRole('tree');
 }
 
 /** Selecting an already selected bone would now toggle it off. */
-export async function selectRigEntry(page: Page, name: string): Promise<void> {
+export async function selectRigEntry(page: Page, name: string, showDetails = true): Promise<void> {
   const entry = (await rigHierarchy(page)).getByRole('treeitem', { name, exact: true });
   if ((await entry.getAttribute('aria-selected')) === 'true') await entry.focus();
   else await entry.click();
+  if (showDetails && (await page.locator('#editor-app').isVisible())) await inspectorControl(page, '#inspector');
 }
 
 export async function animationIKInspector(page: Page): Promise<Locator> {
@@ -106,6 +114,7 @@ export async function rigCanvasProjection(page: Page) {
   const canvasBounds = await canvas.boundingBox();
   if (!canvasBounds) throw new Error('Missing rig canvas.');
   const scaleX = (scaleY * canvasBounds.height) / canvasBounds.width;
+  await inspectorControl(page, '#visibility');
   for (const { key, checked } of visibility) await page.locator(`input[data-visibility="${key}"]`).setChecked(checked);
   await page.locator('#edit-mode').selectOption('joint');
   await canvas.click({ position: { x: 4, y: 4 } });

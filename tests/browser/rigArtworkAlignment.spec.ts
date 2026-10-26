@@ -15,7 +15,7 @@ test('replacement forearm alignment, pose inspection, facing and export reload p
   const boneRotation = page.locator('#inspector input[data-scope="bone"][data-field="rotation"]');
   const originalSlot = await slotX.inputValue();
   const panel = page.locator('#artwork-panel');
-  await panel.locator('summary').click();
+  await inspectorControl(page, '#artwork-panel');
   await panel.getByLabel('Artwork asset', { exact: true }).selectOption('paper-left-forearm');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -33,6 +33,7 @@ test('replacement forearm alignment, pose inspection, facing and export reload p
   await panel.getByRole('button', { name: 'Preview Replacement', exact: true }).click();
   await expect(inspector.locator('[data-alignment="dimensions"]')).toHaveText('137 × 251');
   await panel.getByRole('button', { name: 'Apply Replacement', exact: true }).click();
+  await inspectorControl(page, '#inspector');
   await page.locator('#edit-mode').selectOption('sprite');
   const joint = (await inspector.locator('[data-alignment="joint"]').textContent())!.split(',').map(Number);
   const bounds = await page.locator('#editor-stage canvas').boundingBox();

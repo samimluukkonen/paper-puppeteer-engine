@@ -106,8 +106,8 @@ export function RigStructurePanel({ controller }: { controller: AttachmentContro
         )}
       </fieldset>
       <p>
-        Use Bind pose and Joint Editing to position joints and test rotations. Import PNG/WebP artwork below, then
-        create and assign attachments in the default skin.
+        Use Bind pose and Joint Editing to position joints and test rotations. Import PNG/WebP images in Artwork import
+        &amp; replacement, then create and assign attachments in Attachments &amp; skins.
       </p>
       <p role="status">{message}</p>
     </section>

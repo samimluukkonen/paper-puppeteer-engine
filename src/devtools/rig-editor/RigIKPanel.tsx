@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { RigDefinition } from '../../engine/types.js';
+import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField as NumberField } from '../shared/InspectorNumberField.js';
 import type { AttachmentController } from './AttachmentController.js';
@@ -207,7 +208,7 @@ export function RigIKCreateForm({
   );
 }
 
-export function RigIKPanel({ controller }: { controller: AttachmentController }) {
+export function RigIKPanel({ controller, embedded = false }: { controller: AttachmentController; embedded?: boolean }) {
   const { editor, message } = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -225,8 +226,7 @@ export function RigIKPanel({ controller }: { controller: AttachmentController })
     if (selected) controller.updateIK(selected.name, values);
   };
   return (
-    <details className="attachment-panel rig-ik-panel">
-      <summary>IK constraints</summary>
+    <InspectorSection embedded={embedded} className="attachment-panel rig-ik-panel" summary="IK constraints">
       <section data-guide-id={GUIDE_TARGETS.rigIK} className="rig-ik-content" aria-label="IK constraints">
         {!constraints.length && (
           <>
@@ -298,6 +298,6 @@ export function RigIKPanel({ controller }: { controller: AttachmentController })
         )}
         <p role="status">{message}</p>
       </section>
-    </details>
+    </InspectorSection>
   );
 }

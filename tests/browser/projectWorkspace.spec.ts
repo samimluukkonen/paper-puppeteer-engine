@@ -15,13 +15,7 @@ async function activeEditor(page: Page): Promise<Frame> {
 }
 
 async function reveal(frame: Frame, selector: string) {
-  const control = frame.locator(selector).first();
-  await control.waitFor({ state: 'attached' });
-  for (const details of await control.locator('xpath=ancestor::details').all()) {
-    if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open)))
-      await details.locator(':scope > summary').click();
-  }
-  return control;
+  return (await inspectorControl(frame, selector)).first();
 }
 
 test('project validation reports broken dependencies, blocks export, opens the affected scene and refreshes after undo', async ({
