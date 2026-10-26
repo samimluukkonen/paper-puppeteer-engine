@@ -177,6 +177,8 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
 import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
 import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
 import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
+import { SceneLoader, SceneDialogueOverlay, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
+import type { SceneDialogueTarget, SceneDefinition, SceneRunner } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
 export { createScriptedScene } from './choreography-example.js';
@@ -184,6 +186,21 @@ export { createScriptedScene } from './choreography-example.js';
 if (RootPuppet !== RuntimePuppet) throw new Error('Root and /runtime must share the Puppet class.');
 if (RootActor !== Actor) throw new Error('Root and /runtime must share the Actor class.');
 export const load = loadSceneCharacter;
+
+export function dialogue(scene: import('phaser').Scene, definition: SceneDefinition, runner: SceneRunner): void {
+  const overlay: SceneDialogueTarget = new SceneDialogueOverlay(scene);
+  overlay.setDialogue(getDialogueAtTime(definition, runner.time));
+  const active = runner.dialogue;
+  if (active) {
+    // @ts-expect-error Render metadata is readonly, including the speaker's initial placement.
+    active.actor!.position.x = 1;
+    // @ts-expect-error Presentation cannot rewrite the authored line.
+    active.line.text = 'replacement';
+  }
+  void SceneLoader.fromDefinition(scene, definition, {
+    baseUrl: 'https://example.test/scene.json', dialoguePresentation: overlay,
+  }).then(loaded => loaded.dispose());
+}
 
 export async function coordinate(a: Actor, b: Actor): Promise<ChoreographyCoordinationResult> {
   const choreography = new Choreography([a, b]);

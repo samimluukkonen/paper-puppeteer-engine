@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "sword",
+  "slots": {
+    "pelvisVisual": "pelvisDefault",
+    "torsoVisual": "torsoDefault",
+    "headVisual": "headDefault",
+    "leftUpperArmVisual": "leftUpperArmDefault",
+    "leftForearmVisual": "leftForearmDefault",
+    "leftHandVisual": "leftHandDefault",
+    "rightUpperArmVisual": "rightUpperArmDefault",
+    "rightForearmVisual": "rightForearmDefault",
+    "rightHandVisual": "rightHandGrip",
+    "leftThighVisual": "leftThighDefault",
+    "leftLowerLegVisual": "leftLowerLegDefault",
+    "leftFootVisual": "leftFootDefault",
+    "rightThighVisual": "rightThighDefault",
+    "rightLowerLegVisual": "rightLowerLegDefault",
+    "rightFootVisual": "rightFootDefault",
+    "rightHandItem": "katana"
+  }
+}

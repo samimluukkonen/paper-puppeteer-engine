@@ -6,6 +6,8 @@ import { cinematicFrame, SCENE_OUTPUT_VIEWPORT } from '../../engine/cinematicCam
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
+import { getDialogueAtTime } from '../../engine/sceneDialogue.js';
+import { SceneDialogueOverlay } from '../../engine/SceneDialogueOverlay.js';
 import { SceneImageLayer } from '../../engine/SceneImageLayer.js';
 import { sceneLayer } from '../../engine/sceneLayers.js';
 import { createSceneTextureBudget } from '../../engine/sceneTextureBudget.js';
@@ -52,6 +54,7 @@ class SceneStage extends Phaser.Scene {
   private overlay!: Phaser.GameObjects.Graphics;
   private grid!: Phaser.GameObjects.Graphics;
   private transitions!: SceneTransitionOverlay;
+  private dialogue!: SceneDialogueOverlay;
   private groundOverlay!: GroundGuideOverlay;
   private groundHandle!: SceneGroundHandle;
   private gesture: Gesture | undefined;
@@ -118,6 +121,7 @@ class SceneStage extends Phaser.Scene {
     });
     this.grid = this.add.graphics().setDepth(-1000);
     this.transitions = new SceneTransitionOverlay(this);
+    this.dialogue = new SceneDialogueOverlay(this);
     this.overlay = this.add.graphics().setDepth(1_000_000);
     this.groundOverlay = new GroundGuideOverlay(this, { draggable: true });
     this.groundHandle = new SceneGroundHandle(this.document.groundGuide);
@@ -447,6 +451,7 @@ class SceneStage extends Phaser.Scene {
         () => this.preview.dispose(),
         () => this.artwork.dispose(),
         () => this.transitions.dispose(),
+        () => this.dialogue.dispose(),
       ]) {
         try {
           dispose();
@@ -574,6 +579,14 @@ class SceneStage extends Phaser.Scene {
     this.syncCamera();
     this.syncArtwork();
     const source = this.document.workingScene;
+    this.dialogue.setCamera(this.document.cinematicCamera);
+    this.dialogue.setDialogue(
+      source &&
+        this.playback.previewing &&
+        !['failed', 'cancelled', 'interrupted', 'disposed'].includes(this.playback.status)
+        ? getDialogueAtTime(source, this.playback.time)
+        : undefined,
+    );
     this.transitions.setCamera(this.document.cinematicCamera);
     this.transitions.setTransition(
       source && (this.playback.previewing || this.document.cameraPreviewing)

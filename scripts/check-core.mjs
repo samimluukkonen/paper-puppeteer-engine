@@ -12,6 +12,7 @@ const {
   evaluateClip,
   evaluateRootMotionAtElapsedTime,
   getRootMotionDelta,
+  getDialogueAtTime,
   Joint,
   Rig,
   solveTwoBoneIK,
@@ -21,6 +22,9 @@ const {
 
 // Exercise the built subpath in plain Node, with no browser globals or Phaser mock.
 assert.equal(typeof globalThis.window, 'undefined');
+const subtitle = { id: 'line', text: 'Hello\nWorld', time: 500, duration: 500 };
+assert.equal(getDialogueAtTime({ dialogue: [subtitle] }, 750).line.text, 'Hello\nWorld');
+assert.equal(getDialogueAtTime({ dialogue: [subtitle] }, 1000), undefined);
 const serializationSpecifier = 'paper-puppeteer-engine/serialization';
 const serialization = /** @type {typeof import('../src/engine/serialization.ts')} */ (
   await import(serializationSpecifier)

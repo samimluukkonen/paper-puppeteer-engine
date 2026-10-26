@@ -1,0 +1,197 @@
+{
+  "version": 2,
+  "id": "dialogue-encounter",
+  "name": "Dialogue, sword and camera preview",
+  "duration": 8000,
+  "actors": [
+    {
+      "id": "a",
+      "character": {
+        "manifest": "../scenes/dialogue/character.json"
+      },
+      "position": {
+        "x": -280,
+        "y": 100
+      },
+      "facing": "right",
+      "animation": "idle",
+      "skin": "sword"
+    },
+    {
+      "id": "b",
+      "character": {
+        "manifest": "../scenes/dialogue/character.json"
+      },
+      "position": {
+        "x": 160,
+        "y": 100
+      },
+      "facing": "left",
+      "animation": "idle",
+      "skin": "alternate"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-walk",
+      "actorId": "a",
+      "type": "animation",
+      "time": 0,
+      "duration": 2000,
+      "animation": "walk",
+      "loop": true,
+      "speed": 1
+    },
+    {
+      "id": "a-move",
+      "actorId": "a",
+      "type": "move",
+      "time": 0,
+      "duration": 2000,
+      "destination": {
+        "x": -100,
+        "y": 100
+      }
+    },
+    {
+      "id": "a-sword",
+      "actorId": "a",
+      "type": "animation",
+      "time": 3500,
+      "duration": 1000,
+      "animation": "sword",
+      "loop": false,
+      "speed": 1
+    },
+    {
+      "id": "impact",
+      "actorId": "a",
+      "type": "cue",
+      "time": 4000,
+      "name": "sword-impact",
+      "payload": {
+        "audioClipId": "sword-sfx"
+      }
+    },
+    {
+      "id": "b-response",
+      "actorId": "b",
+      "type": "animation",
+      "time": 4800,
+      "duration": 1400,
+      "animation": "respond",
+      "loop": false,
+      "speed": 1
+    }
+  ],
+  "camera": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  },
+  "cameraTracks": {
+    "x": [
+      {
+        "id": "pan-0",
+        "time": 0,
+        "value": 0
+      },
+      {
+        "id": "pan-1",
+        "time": 2000,
+        "value": 30
+      }
+    ],
+    "zoom": [
+      {
+        "id": "zoom-0",
+        "time": 0,
+        "value": 1
+      },
+      {
+        "id": "zoom-1",
+        "time": 2000,
+        "value": 1.4
+      }
+    ]
+  },
+  "dialogue": [
+    {
+      "id": "challenge",
+      "actorId": "a",
+      "speakerName": "Hero",
+      "text": "Prepare yourself.\nKeep your guard up.",
+      "time": 2000,
+      "duration": 2000
+    },
+    {
+      "id": "response",
+      "actorId": "b",
+      "speakerName": "Friend",
+      "text": "I am ready.",
+      "time": 4800,
+      "duration": 2700
+    }
+  ],
+  "audioAssets": [
+    {
+      "id": "music",
+      "name": "Preview chord",
+      "path": "../scenes/dialogue/music.wav",
+      "category": "music",
+      "durationSeconds": 2
+    },
+    {
+      "id": "sword",
+      "name": "Sword impact",
+      "path": "../scenes/dialogue/sword.wav",
+      "category": "sfx",
+      "durationSeconds": 0.5
+    }
+  ],
+  "audioTracks": [
+    {
+      "id": "music",
+      "name": "Music",
+      "category": "music"
+    },
+    {
+      "id": "effects",
+      "name": "Effects",
+      "category": "sfx"
+    }
+  ],
+  "audioClips": [
+    {
+      "id": "music-bed",
+      "assetId": "music",
+      "trackId": "music",
+      "time": 0,
+      "duration": 8000,
+      "sourceOffset": 0,
+      "volume": 0.25,
+      "loop": true,
+      "fadeIn": 400,
+      "fadeOut": 1000
+    },
+    {
+      "id": "sword-sfx",
+      "assetId": "sword",
+      "trackId": "effects",
+      "time": 4000,
+      "duration": 500,
+      "sourceOffset": 0,
+      "volume": 0.6,
+      "loop": false
+    }
+  ],
+  "transitions": [
+    {
+      "id": "fade-out",
+      "type": "fade-out",
+      "time": 6500,
+      "duration": 1500,
+      "color": "#000000"
+    }
+  ]
+}

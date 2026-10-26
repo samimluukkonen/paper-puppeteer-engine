@@ -77,6 +77,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.3.5
+
+Display deterministic dialogue in Scene Editor and standalone Phaser scene playback. Export a pure active-dialogue evaluator with speaker metadata, a React-free default subtitle overlay and a small host-owned custom presentation target. Keep multiline text wrapped inside the cinematic output safe area, stable through camera movement and letterboxing, and above cinematic fades. Clear subtitles on stop, scene switching and runtime teardown.
+
+Reuse the existing scene cue dispatcher and audio scheduler. Preserve silent forward/backward seeking, exact half-open dialogue boundaries, fresh cue passes on restart, large-delta cue crossings and one audio owner even when dialogue and cues reference authored clips. Add a complete two-Actor sword/dialogue/music/camera/fade sample, runtime/audio/lifecycle regressions, local desktop canvas and standalone consumer verification, and update the [dialogue playback guide](docs/scene-dialogue.md) and package version metadata.
+
 ## 1.3.4
 
 Add a nine-step **Dialogue & Subtitle Authoring** Feature Guide to the shared Scene catalog. Reveal real creation, timeline, text, speaker, timing, voice-reference, history and saving controls, with helpful empty states and no Actor or dialogue prerequisites beyond an open scene. Preserve authored data, selection, playback/preview and history; cover the tour with unit and local desktop browser regressions.

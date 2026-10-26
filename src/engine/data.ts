@@ -53,4 +53,4 @@ export type { SceneAudioClip, SceneAudioTrack } from './sceneAudio.js';
 
 export type { ActiveSceneAudioClip } from './sceneAudio.js';
 
-export type { SceneDialogueLine } from './sceneDialogue.js';
+export type { SceneDialogueLine, ActiveSceneDialogue, SceneDialogueTarget } from './sceneDialogue.js';

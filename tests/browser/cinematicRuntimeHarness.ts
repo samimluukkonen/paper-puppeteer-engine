@@ -32,6 +32,19 @@ export async function sampleCinematicPackage(bytes: number[], times: number[]) {
     const sample = () => ({
       camera: loaded!.runner.cinematicCamera,
       transition: loaded!.runner.transition,
+      dialogue: loaded!.runner.dialogue,
+      subtitle: (() => {
+        const root = scene.children.getByName('scene-dialogue');
+        if (!(root instanceof Phaser.GameObjects.Container)) return undefined;
+        const text = root.getByName('scene-dialogue-text');
+        return {
+          text: text instanceof Phaser.GameObjects.Text ? text.text : '',
+          visible: root.visible,
+          depth: root.depth,
+          wrappedLines: text instanceof Phaser.GameObjects.Text ? text.getWrappedText().length : 0,
+          width: text instanceof Phaser.GameObjects.Text ? text.width : 0,
+        };
+      })(),
       actors: [...loaded!.runner.actors.values()].map((actor) => ({
         id: actor.id,
         position: actor.position,

@@ -98,5 +98,5 @@ export {
 
 export type { ActiveSceneAudioClip } from './sceneAudio.js';
 
-export type { SceneDialogueLine } from './sceneDialogue.js';
-export { sceneDialogueLineSchema, getDialogueLineAtTime, dialogueSpeaker } from './sceneDialogue.js';
+export type { SceneDialogueLine, ActiveSceneDialogue, SceneDialogueTarget } from './sceneDialogue.js';
+export { sceneDialogueLineSchema, getDialogueLineAtTime, getDialogueAtTime, dialogueSpeaker } from './sceneDialogue.js';

@@ -11,6 +11,8 @@ import { decodePackageZip, PACKAGE_MAX_BYTES } from './packageZip.js';
 import { Puppet } from './Puppet.js';
 import { resolveSceneDefinition, type ResolvedScene, type SceneAssetOptions } from './SceneAssets.js';
 import { parseSceneJson } from './SceneDefinition.js';
+import type { SceneDialogueTarget } from './sceneDialogue.js';
+import { SceneDialogueOverlay } from './SceneDialogueOverlay.js';
 import { SceneImageLayer } from './SceneImageLayer.js';
 import { validateScenePackage, type ScenePackageFiles } from './ScenePackage.js';
 import { readSceneResource } from './sceneResource.js';
@@ -24,6 +26,10 @@ export interface SceneLoadOptions {
   readonly fetcher?: typeof fetch;
   readonly signal?: AbortSignal;
   readonly onCue?: SceneRunnerOptions['onCue'];
+  /** Omit for default Phaser subtitles; false disables them. Custom targets are
+   * host-owned, receive silent-seek render samples and are cleared on cleanup.
+   */
+  readonly dialoguePresentation?: SceneDialogueTarget | false;
 }
 export interface LoadedScene {
   /** The host supplies runner.update(delta) once per Phaser update. */
@@ -153,6 +159,7 @@ async function loadSession(
   let runner: SceneRunner | undefined;
   let artwork: SceneImageLayer | undefined;
   let transitions: SceneTransitionOverlay | undefined;
+  let dialogue: SceneDialogueOverlay | undefined;
   let release: (() => void) | undefined;
   let disposed = false;
   let audience: { camera: CinematicCameraTarget; viewport: CameraViewport } | undefined;
@@ -169,7 +176,11 @@ async function loadSession(
         try {
           artwork?.dispose();
         } finally {
-          transitions?.dispose();
+          try {
+            transitions?.dispose();
+          } finally {
+            dialogue?.dispose();
+          }
         }
       }
     } finally {
@@ -206,7 +217,11 @@ async function loadSession(
     await artwork.ready();
     controller.signal.throwIfAborted();
     if (prepared.resolved.definition.transitions?.length) transitions = new SceneTransitionOverlay(scene);
+    if (options.dialoguePresentation === undefined && prepared.resolved.definition.dialogue?.length)
+      dialogue = new SceneDialogueOverlay(scene);
+    const dialoguePresentation = options.dialoguePresentation ?? dialogue;
     runner = new SceneRunner(prepared.resolved.definition, {
+      ...(dialoguePresentation ? { dialoguePresentation } : {}),
       audio: {
         ...(options.audioBackend ? { backend: options.audioBackend } : {}),
         resolve: (id) => {
@@ -220,6 +235,7 @@ async function loadSession(
       ...(transitions ? { transitionOverlay: transitions } : {}),
       onCamera: (state) => {
         transitions?.setCamera(state);
+        dialogue?.setCamera(state);
         if (!audience || disposed) return;
         applyCinematicCamera(audience.camera, state, audience.viewport);
         const definition = prepared.resolved.definition;

@@ -1,6 +1,6 @@
 {
   "name": "paper-puppeteer-engine",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "A reusable Phaser engine for hierarchical 2D paper cutout puppets.",
   "type": "module",
   "files": [

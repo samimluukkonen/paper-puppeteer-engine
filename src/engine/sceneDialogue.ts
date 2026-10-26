@@ -1,5 +1,8 @@
 import { z } from 'zod';
+import type { DeepReadonly } from './readonlyData.js';
+import type { SceneActorDefinition } from './SceneDefinition.js';
 import { identifierSchema } from './schemas.js';
+import { assertFinite } from './types.js';
 
 const dialogueIdentifier = identifierSchema.regex(/\S/, 'Must contain a non-whitespace character.');
 
@@ -22,6 +25,39 @@ export function getDialogueLineAtTime(
   time: number,
 ): Readonly<SceneDialogueLine> | undefined {
   return scene.dialogue?.find((line) => time >= line.time && time < line.time + line.duration);
+}
+
+export interface ActiveSceneDialogue {
+  readonly line: Readonly<SceneDialogueLine>;
+  /** Explicit label, then scene-local Actor ID; undefined for unlabelled narration. */
+  readonly speaker: string | undefined;
+  /** Authored speaker metadata, never a temporary runtime Actor instance. */
+  readonly actor: DeepReadonly<SceneActorDefinition> | undefined;
+}
+
+/** Render state, including passive seeks. This is not a gameplay/event callback. */
+export interface SceneDialogueTarget {
+  setDialogue(dialogue: ActiveSceneDialogue | undefined): void;
+}
+
+/** Pure half-open interval evaluation. Missing Actors still display their authored ID;
+ * complete scene validation rejects dangling speaker references before playback.
+ */
+export function getDialogueAtTime(
+  scene: {
+    readonly dialogue?: readonly Readonly<SceneDialogueLine>[];
+    readonly actors?: readonly DeepReadonly<SceneActorDefinition>[];
+  },
+  time: number,
+): ActiveSceneDialogue | undefined {
+  assertFinite(time, 'Dialogue sample time');
+  const line = getDialogueLineAtTime(scene, time);
+  if (!line) return undefined;
+  return {
+    line,
+    speaker: line.speakerName || line.actorId,
+    actor: line.actorId ? scene.actors?.find((actor) => actor.id === line.actorId) : undefined,
+  };
 }
 
 /** An explicit label overrides the Actor ID. Unassociated lines are narration. */

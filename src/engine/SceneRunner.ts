@@ -16,6 +16,7 @@ import {
   type SceneActorDefinition,
   type SceneDefinition,
 } from './SceneDefinition.js';
+import { getDialogueAtTime, type SceneDialogueTarget } from './sceneDialogue.js';
 import { sceneActorDepth, sceneLayer } from './sceneLayers.js';
 import {
   CLEAR_SCENE_TRANSITION,
@@ -58,6 +59,10 @@ export interface SceneRunnerOptions {
   /** Host-owned overlay; cleared on disposal/failure/cancel. Never dispatches scene cues. */
   readonly transitionOverlay?: SceneTransitionTarget;
   readonly onTransition?: (state: SceneTransitionState) => void;
+  /** Host-owned render target. Receives deterministic samples on playback and seek;
+   * cleared on stop/cancel/failure/disposal. Never use it for gameplay side effects.
+   */
+  readonly dialoguePresentation?: SceneDialogueTarget;
 }
 
 /** Declarative scene adapter over the v0.8 Actor runtime. Owns one millisecond clock;
@@ -141,6 +146,11 @@ export class SceneRunner {
   get transition() {
     return evaluateTransitionAtTime(this.definition, this.cursor);
   }
+  get dialogue() {
+    return ['stopped', 'disposed', 'failed', 'cancelled', 'interrupted'].includes(this.state)
+      ? undefined
+      : getDialogueAtTime(this.definition, this.cursor);
+  }
   /** Hosts without an attached camera can apply the same clock sample explicitly. */
   applyCamera(camera: CinematicCameraTarget, viewport?: CameraViewport): CameraViewport {
     return applyCinematicCamera(camera, this.cinematicCamera, viewport);
@@ -155,6 +165,7 @@ export class SceneRunner {
       : this.transition;
     this.options.transitionOverlay?.setTransition(transition);
     this.options.onTransition?.(transition);
+    this.options.dialoguePresentation?.setDialogue(this.dialogue);
   }
   get status(): SceneRunnerStatus {
     return this.state;
@@ -256,8 +267,12 @@ export class SceneRunner {
       try {
         this.audio?.dispose();
       } finally {
-        this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
-        this.options.onTransition?.(CLEAR_SCENE_TRANSITION);
+        try {
+          this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
+          this.options.onTransition?.(CLEAR_SCENE_TRANSITION);
+        } finally {
+          this.options.dialoguePresentation?.setDialogue(undefined);
+        }
       }
     }
   }
@@ -392,6 +407,11 @@ export class SceneRunner {
       this.ownCommand = false;
     }
     if (status !== 'completed') {
+      try {
+        this.options.dialoguePresentation?.setDialogue(undefined);
+      } catch (error) {
+        errors.push(error);
+      }
       try {
         this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
         this.options.onTransition?.(CLEAR_SCENE_TRANSITION);

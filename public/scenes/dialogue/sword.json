@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "name": "sword",
+  "duration": 1000,
+  "loop": false,
+  "tracks": {
+    "rightUpperArm": [
+      {
+        "time": 0,
+        "rotation": 0
+      },
+      {
+        "time": 350,
+        "rotation": -1.8
+      },
+      {
+        "time": 500,
+        "rotation": 0.9
+      },
+      {
+        "time": 1000,
+        "rotation": 0
+      }
+    ],
+    "rightForearm": [
+      {
+        "time": 0,
+        "rotation": 0
+      },
+      {
+        "time": 350,
+        "rotation": -0.6
+      },
+      {
+        "time": 500,
+        "rotation": 0.2
+      },
+      {
+        "time": 1000,
+        "rotation": 0
+      }
+    ],
+    "torso": [
+      {
+        "time": 0,
+        "rotation": 0
+      },
+      {
+        "time": 500,
+        "rotation": 0.15
+      },
+      {
+        "time": 1000,
+        "rotation": 0
+      }
+    ]
+  }
+}

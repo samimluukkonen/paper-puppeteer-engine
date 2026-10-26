@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import type Phaser from 'phaser';
 import { afterEach, expect, test, vi } from 'vitest';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
+import { Actor } from '../src/engine/Actor.js';
 import type { AudioAssetDefinition } from '../src/engine/AudioAsset.js';
 import {
   WebAudioBackend,
   type TimelineAudioOptions,
   type DecodedAudioResource,
 } from '../src/engine/AudioAssetLoader.js';
+import { Puppet } from '../src/engine/Puppet.js';
 import { getActiveAudioClipsAtTime, type SceneAudioClip } from '../src/engine/sceneAudio.js';
 import { SceneAudioController } from '../src/engine/SceneAudioController.js';
 import { createEmptyScene, parseSceneDefinition } from '../src/engine/SceneDefinition.js';
@@ -112,6 +114,50 @@ function fixture(clips: SceneAudioClip[] = [clip]) {
 const noActor = () => {
   throw new Error('No Actors expected');
 };
+
+test('dialogue voice metadata and sound cue payloads coexist with exactly one audio timeline voice', async () => {
+  const f = fixture();
+  const onCue = vi.fn();
+  const runner = new SceneRunner(
+    {
+      ...f.scene,
+      actors: [{ id: 'hero', character: { manifest: 'hero.json' }, position: { x: 0, y: 0 } }],
+      actions: [
+        { id: 'impact', actorId: 'hero', type: 'cue', name: 'sword', time: 1000, payload: { audioClipId: clip.id } },
+      ],
+      dialogue: [{ id: 'spoken', actorId: 'hero', text: 'Ready!', time: 1000, duration: 1000, voiceClipId: clip.id }],
+    },
+    {
+      createActor: (data) =>
+        new Actor({
+          id: data.id,
+          puppetOwnership: 'owned',
+          puppet: new Puppet(puppetScene(), { rig: { root: 'root', bones: [{ id: 'root' }] }, autoUpdate: false }),
+        }),
+      audio: f.options,
+      onCue,
+    },
+  );
+  await runner.audio!.unlock();
+  runner.play();
+  f.advance(1000);
+  runner.update(1000);
+  expect(runner.dialogue?.line.id).toBe('spoken');
+  expect(f.playTimeline).toHaveBeenCalledOnce();
+  expect(onCue).toHaveBeenCalledOnce();
+  runner.update(0);
+  expect(f.playTimeline).toHaveBeenCalledOnce();
+  runner.pause();
+  for (const time of [1500, 0, 1000, 1700]) runner.seek(time);
+  expect(f.playTimeline).toHaveBeenCalledOnce();
+  expect(onCue).toHaveBeenCalledOnce();
+  runner.play();
+  expect(f.playTimeline).toHaveBeenCalledTimes(2);
+  expect(f.voices[1]!.options.offset).toBeCloseTo(0.9);
+  runner.dispose();
+  expect(f.voices.every((voice) => voice.stop.mock.calls.length === 1)).toBe(true);
+  expect(f.backend.dispose).toHaveBeenCalledOnce();
+});
 
 test('pure half-open clip intervals, offsets, finite loops and multiplicative fades', () => {
   const scene = definition([{ ...clip, loop: true, duration: 4000, fadeIn: 3000, fadeOut: 3000 }]);

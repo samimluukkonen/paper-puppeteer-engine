@@ -81,7 +81,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'time',
         'Understand deterministic subtitle timing',
         T.sceneTime,
-        'Dialogue uses **scene time** without pausing for player input. A line’s interval includes its start and excludes its end, so seeking to the same time identifies the same authored line. **Subtitle playback display is deferred**: Play and scrubbing preview scene visuals and audio, but do not draw dialogue text yet. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
+        'Dialogue uses **scene time** without pausing for player input. A line’s interval includes its start and excludes its end, so seeking to the same time identifies the same authored line. **Play** displays the active subtitle; Pause holds it, Restart begins again and Stop clears it. **Scrubbing** immediately displays the line at the target time without playing audio or dispatching scene cues. Subtitles stay within the cinematic camera frame and remain readable above scene fades. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
       ),
       step(
         'save',
