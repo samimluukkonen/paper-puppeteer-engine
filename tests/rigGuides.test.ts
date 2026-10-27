@@ -4,6 +4,7 @@ import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { getGuidesForEditor } from '../src/devtools/shared/guides/registry.js';
 import { workspaceGuideHost } from '../src/devtools/shared/guides/workspaceGuideHost.js';
 import { createCharacterDocuments, createNewCharacter } from '../src/devtools/shared/newCharacter.js';
+import { createRectangleMeshAttachment } from '../src/engine/meshAttachments.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
 
 const guides = getGuidesForEditor('rig');
@@ -13,6 +14,7 @@ const counts = {
   'rig-joint-editing': 6,
   'rig-importing-artwork': 5,
   'rig-aligning-sprites': 5,
+  'rig-mesh-geometry': 8,
   'rig-slots-attachments': 5,
   'rig-skins': 5,
   'rig-ik-constraints': 8,
@@ -20,7 +22,7 @@ const counts = {
   'rig-foot-contact-markers': 5,
 };
 
-test('Rig Editor catalog covers the ten implemented tasks with bounded steps and declared targets', () => {
+test('Rig Editor catalog covers the eleven implemented tasks with bounded steps and declared targets', () => {
   assert.deepEqual(Object.fromEntries(guides.map((guide) => [guide.id, guide.steps.length])), counts);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
@@ -53,7 +55,7 @@ test('root-only rigs offer creation tasks and explain artwork and IK prerequisit
   const { rig, launcher } = workspace(false);
   for (const guide of guides) {
     const availability = launcher.getAvailability(guide.id);
-    if (['rig-aligning-sprites', 'rig-ik-constraints'].includes(guide.id)) {
+    if (['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry'].includes(guide.id)) {
       assert.isFalse(availability.available);
       assert.isFalse(launcher.launch(guide.id).ok);
     } else assert.isTrue(availability.available, guide.id);
@@ -67,12 +69,17 @@ test('root-only rigs offer creation tasks and explain artwork and IK prerequisit
   rig.createIKConstraint({ name: 'reach', rootBone: 'root', middleBone: 'middle', endBone: 'end' });
   rig.createAttachment({ id: 'image', texture: 'new-art' });
   launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-mesh-geometry').available);
+  rig.createSlot('art', 'root');
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability('rig-mesh-geometry').available);
   assert.isTrue(launcher.getAvailability('rig-aligning-sprites').available);
   assert.isTrue(launcher.getAvailability('rig-ik-constraints').available);
   rig.removeIKConstraint('reach');
   rig.removeAttachment('image');
   launcher.refresh();
   assert.isFalse(launcher.getAvailability('rig-aligning-sprites').available);
+  assert.isFalse(launcher.getAvailability('rig-mesh-geometry').available);
   assert.isFalse(launcher.getAvailability('rig-ik-constraints').available);
 });
 
@@ -111,6 +118,9 @@ test.each([false, true])(
       skin: rig.activeSkin,
       selection: rig.selection,
       ik: rig.selectedIKConstraintId,
+      editMode: rig.editMode,
+      meshVertex: rig.selectedMeshVertexId,
+      meshEdge: rig.selectedMeshEdge,
       animation: animation.workingAnimation,
       animationHistory: animation.historyLength,
       animationDirty: animation.dirty,
@@ -145,6 +155,9 @@ test.each([false, true])(
     assert.equal(rig.activeSkin, before.skin);
     assert.strictEqual(rig.selection, before.selection);
     assert.equal(rig.selectedIKConstraintId, before.ik);
+    assert.equal(rig.editMode, before.editMode);
+    assert.equal(rig.selectedMeshVertexId, before.meshVertex);
+    assert.strictEqual(rig.selectedMeshEdge, before.meshEdge);
     assert.strictEqual(animation.workingAnimation, before.animation);
     assert.equal(animation.historyLength, before.animationHistory);
     assert.equal(animation.dirty, before.animationDirty);
@@ -153,3 +166,53 @@ test.each([false, true])(
     assert.lengthOf(authored.mock.calls, 0);
   },
 );
+
+test('mesh guide rejects atlas-only artwork and accepts an existing mesh without a rigid source', () => {
+  const { rig, launcher } = workspace(false);
+  rig.createSlot('art', 'root');
+  rig.createAttachment({ id: 'atlas', texture: 'art', frame: 'sleeve' });
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-mesh-geometry').available);
+  assert.equal(launcher.getPrerequisiteGuide('rig-mesh-geometry')?.id, 'rig-slots-attachments');
+  rig.removeAttachment('atlas');
+  rig.createAttachment(
+    createRectangleMeshAttachment({ id: 'mesh', texture: 'art' }, { width: 40, height: 80 }, rig.workingCopy),
+  );
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability('rig-mesh-geometry').available);
+  rig.beginOperation();
+  rig.editSlot('art', 'depth', 1);
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-mesh-geometry').available);
+  rig.cancelOperation();
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability('rig-mesh-geometry').available);
+});
+
+test('mesh guide preserves an authored mesh, vertex and edge selection, mode, skin and history', () => {
+  const { rig, launcher } = workspace(true);
+  const slot = rig.workingCopy.slots!.find((entry) => rig.resolvedAttachment(entry.id))!;
+  rig.selectSlot(slot.id);
+  rig.convertSelectedSpriteToMesh({ width: 40, height: 80 });
+  rig.selectedMeshEdge = [0, 2];
+  rig.subdivideSelectedMeshEdge();
+  rig.selectedMeshEdge = [0, 4];
+  const copy = rig.workingCopy,
+    history = rig.historyLength,
+    skin = rig.activeSkin;
+  const selected = rig.selection,
+    vertex = rig.selectedMeshVertexId,
+    edge = rig.selectedMeshEdge;
+  const before = JSON.stringify(copy);
+  assert.isTrue(launcher.launch('rig-mesh-geometry').ok);
+  for (let i = 0; i < 7; ++i) assert.isTrue(launcher.controller.next().ok);
+  assert.isTrue(launcher.controller.finish().ok);
+  assert.strictEqual(rig.workingCopy, copy);
+  assert.equal(JSON.stringify(rig.workingCopy), before);
+  assert.equal(rig.historyLength, history);
+  assert.equal(rig.activeSkin, skin);
+  assert.strictEqual(rig.selection, selected);
+  assert.equal(rig.selectedMeshVertexId, vertex);
+  assert.strictEqual(rig.selectedMeshEdge, edge);
+  assert.equal(rig.editMode, 'mesh');
+});

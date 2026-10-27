@@ -48,6 +48,13 @@ export function workspaceGuideHost(options: {
         if (animation.selectedIKConstraintId) capabilities.push('tool:selected-ik');
         if (rig.workingCopy.bones.some((bone) => bone.sprite) || rig.workingCopy.attachments?.length)
           capabilities.push('rig-artwork');
+        if (
+          rig.workingCopy.slots?.length &&
+          rig.workingCopy.attachments?.some(
+            (attachment) => attachment.type === 'mesh' || attachment.frame === undefined,
+          )
+        )
+          capabilities.push('rig-mesh-artwork');
         if (rig.workingCopy.ik?.length) capabilities.push('ik-constraints');
         capabilities.push('tool:rig-hierarchy', 'tool:animation-timeline');
         // Mode switching is a UI tool, unavailable while switching would discard a preview.

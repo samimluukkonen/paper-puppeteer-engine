@@ -22,13 +22,20 @@ export function RigHelp() {
               <td>Choose Joint Editing / Slot Transform Editing and drag its marker</td>
             </tr>
             <tr>
+              <td>Edit mesh geometry</td>
+              <td>
+                Select an artwork slot, convert in Mesh geometry, then drag cyan diamonds or edit Vertex X/Y. Select an
+                edge to subdivide; Delete vertex safely triangulates its fan.
+              </td>
+            </tr>
+            <tr>
               <td>Edit artwork offset</td>
               <td>Choose Artwork Offset Editing, then drag artwork or its pivot</td>
             </tr>
             <tr>
               <td>Nudge the current operation</td>
               <td>
-                Arrow keys move joints, artwork offsets, or slot transforms in their explicit modes; hold{' '}
+                Arrow keys move mesh vertices, joints, artwork offsets, or slot transforms in their explicit modes; hold{' '}
                 <kbd>Shift</kbd> for larger steps
               </td>
             </tr>

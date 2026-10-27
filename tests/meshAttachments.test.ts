@@ -388,15 +388,17 @@ test('mixed rigs retain legacy omitted types, ordering, skins, visibility and im
   assert.notProperty(new Rig(legacy).getAttachment('sprite'), 'type');
 });
 
-test('Puppet keeps rigid artwork rendering and mesh selection separate with safe skin switching', () => {
+test('Puppet renders native textured meshes alongside rigid artwork with safe skin switching', () => {
   const puppet = new Puppet(puppetScene(), { rig: rigFile(), skin: 'default', autoUpdate: false });
   assert.equal(puppet.getAttachment('art'), 'cloth');
   assert.isUndefined(puppet.getSlotImage('art'));
+  assert.exists(puppet.getSlotMesh('art'));
   assert.equal(puppet.getSlotImage('other')!.texture.key, 'paper');
   puppet.setAttachment('art', 'rigid');
   assert.exists(puppet.getSlotImage('art'));
   puppet.setAttachment('art', 'cloth');
   assert.isUndefined(puppet.getSlotImage('art'));
+  assert.exists(puppet.getSlotMesh('art'));
   puppet.setSkin('hidden');
   assert.isUndefined(puppet.getAttachment('art'));
   puppet.setSkin('default');

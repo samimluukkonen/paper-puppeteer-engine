@@ -1,27 +1,28 @@
 # Rig Editor guided tutorials
 
-The v0.7.6.4 catalog is available from **Feature Guide → Rig Editor**. It uses the shared [selection modal and spotlight](feature-guide-architecture.md). Steps explain the actual controls; exit the tour to perform the task. No step creates or deletes bones, moves joints, changes artwork or skins, or saves/exports data.
+The catalog is available from **Feature Guide → Rig Editor**. It uses the shared [selection modal and spotlight](feature-guide-architecture.md). Steps explain the actual controls; exit the tour to perform the task. No step creates or deletes bones, moves joints, changes artwork or skins, or saves/exports data.
 
 ## Implemented catalog
 
-| Guide                          | Steps | Main controls                                                                                |
-| ------------------------------ | ----: | -------------------------------------------------------------------------------------------- |
-| Creating Foot Contact Markers  |     5 | New contact bone, Add Contact Marker, local coordinates, Ground reference, Download rig.json |
-| Creating a New Character       |     3 | + New Character, Character, Character package                                                |
-| Creating Bones                 |     5 | Hierarchy, Build skeleton, + Add Bone, Edit, canvas                                          |
-| Editing Joint Positions        |     6 | Hierarchy, Joint Editing, Bind pose, canvas, Selection details, Undo/Redo                    |
-| Importing Artwork              |     5 | Import new artwork, Artwork asset, Import sprite, Create sprite attachment, package          |
-| Aligning Sprites               |     5 | Hierarchy, Edit modes, canvas, Selection details, Undo/Redo                                  |
-| Slots and Attachments          |     5 | Hierarchy, + Add Slot, Create sprite attachment, Attachment slot, Edit                       |
-| Creating and Changing Skins    |     5 | Active skin, Skin authoring, Attachment slot                                                 |
-| IK Constraints                 |     8 | + Add IK Constraint, chain labels, bend arrow, targets, solver feedback, Enabled, Undo/Redo  |
-| Exporting the Rig or Character |     4 | Validation, File tools, Download rig.json, Character package                                 |
+| Guide                          | Steps | Main controls                                                                                             |
+| ------------------------------ | ----: | --------------------------------------------------------------------------------------------------------- |
+| Creating Foot Contact Markers  |     5 | New contact bone, Add Contact Marker, local coordinates, Ground reference, Download rig.json              |
+| Creating a New Character       |     3 | + New Character, Character, Character package                                                             |
+| Creating Bones                 |     5 | Hierarchy, Build skeleton, + Add Bone, Edit, canvas                                                       |
+| Editing Joint Positions        |     6 | Hierarchy, Joint Editing, Bind pose, canvas, Selection details, Undo/Redo                                 |
+| Importing Artwork              |     5 | Import new artwork, Artwork asset, Import sprite, Create sprite attachment, package                       |
+| Aligning Sprites               |     5 | Hierarchy, Edit modes, canvas, Selection details, Undo/Redo                                               |
+| Editing Mesh Geometry          |     8 | Mesh slot/skin, conversion, cyan vertices, numeric coordinates, subdivision, topology, history and saving |
+| Slots and Attachments          |     5 | Hierarchy, + Add Slot, Create sprite attachment, Attachment slot, Edit                                    |
+| Creating and Changing Skins    |     5 | Active skin, Skin authoring, Attachment slot                                                              |
+| IK Constraints                 |     8 | + Add IK Constraint, chain labels, bend arrow, targets, solver feedback, Enabled, Undo/Redo               |
+| Exporting the Rig or Character |     4 | Validation, File tools, Download rig.json, Character package                                              |
 
-There are 51 steps in total. Copy distinguishes skeleton joints, sprite origins (artwork pivots), sprite offsets (position relative to a bone/slot), slots (attachment locations), skins (appearance mappings), and default rig IK targets. It also distinguishes rig downloads from complete character ZIPs and the separate artwork replacement history.
+There are 59 steps in total. Copy distinguishes skeleton joints, sprite origins (artwork pivots), sprite offsets (position relative to a bone/slot), slots (attachment locations), skins (appearance mappings), and default rig IK targets. It also distinguishes rig downloads from complete character ZIPs and the separate artwork replacement history.
 
 ## Availability and preparation
 
-Creating a New Character works without a loaded character, including after a failed load. Other tasks require a loaded or newly created character. Joint editing also requires successful rig validation. Alignment requires an authored bone sprite or sprite attachment; its unavailable reason directs the artist to importing and attachment creation. IK requires an existing authored constraint; its reason directs the artist to create three connected bones and use **+ Add IK Constraint**. No character or bone names are hardcoded in the definitions.
+Creating a New Character works without a loaded character, including after a failed load. Other tasks require a loaded or newly created character. Joint editing also requires successful rig validation. Alignment requires an authored bone sprite or sprite attachment; its unavailable reason directs the artist to importing and attachment creation. Mesh editing requires a slot plus a whole-image sprite attachment or existing mesh; atlas-only artwork is insufficient. Its unavailable reason links to Slots and Attachments. IK requires an existing authored constraint; its reason directs the artist to create three connected bones and use **+ Add IK Constraint**. No character or bone names are hardcoded in the definitions.
 
 The other eight tasks are available on a valid root-only character. Import and attachment tutorials explain how to populate empty libraries and slots. Selecting a bone, slot, skin or constraint remains the artist's action after exiting the tour. The eight-step IK guide explains creation and validation, chain-role labels, enabled/preview/influence controls, signed bend direction and facing, default-target dragging, coordinate commitment/cancellation, reachability/transform diagnostics, runtime ownership restrictions and undo/export. Its dedicated bend and feedback steps cover the v1.4.1 workflow without changing solver state or authored data during the tour.
 
@@ -35,17 +36,20 @@ Preparation expands ancestor disclosures, reveals the inspector and scrolls the 
 - Skeleton: `rig-build-skeleton`, `rig-add-bone`, `rig-add-slot`.
 - Editing/preview: `rig-edit-mode`, `rig-preview-pose`, `rig-history`, `rig-ik-preview`.
 - Images: `rig-import-artwork`, `rig-artwork-asset`, `rig-replace-artwork`.
+- Mesh geometry: `rig-mesh-tools`, `rig-mesh-slot`, `rig-mesh-workflow` and `rig-mesh-skin`. The workflow target resolves to Convert to Mesh Attachment or Edit Mesh Geometry according to the current selection.
 - Attachments/skins: `rig-attachment-slot`, `rig-create-attachment`, `rig-active-skin`, `rig-skin-authoring`.
 - IK: `rig-ik-constraints`, `rig-add-ik`.
 - Export: `rig-validation`, `rig-file-tools`, `rig-download`, `rig-character-package`.
 
 The guides reuse `rig-bone-hierarchy`, `rig-selection-details`, and `rig-canvas`. Phaser joint, artwork-pivot and IK-crosshair instructions highlight the existing canvas panel and the relevant React tools. The Rig Editor does not register guide geometry for individual Phaser handles; no DOM selectors are used to find rendered handles. The existing optional geometry-provider contract remains covered by unit tests.
 
-All ten feature families are implemented. There are no fictional or omitted feature entries. Alignment and IK are conditionally unavailable when their resource prerequisites are absent; interactive practice remains deferred.
+All eleven feature families are implemented. There are no fictional or omitted feature entries. Alignment, mesh editing and IK are conditionally unavailable when their resource prerequisites are absent; interactive practice remains deferred.
 
-The v1.4.2.1 [mesh foundation](mesh-attachments.md#using-this-milestone) adds a documented data workflow, with a developer quick start and troubleshooting. It adds no mesh tour because visual creation, editing and rendering are deferred. Existing attachment/skin tours continue to teach the available rigid artwork controls; imported mesh selections remain unrendered.
+The v1.4.2.2 [visual mesh workflow](mesh-attachments.md#using-this-milestone) documents conversion, cyan vertex handles, safe subdivision/deletion, UV behavior, history and textured rendering. Open the **Mesh geometry** inspector in Rig Editor for these controls. Existing attachment/skin tours continue to explain slot selection and skin assignments; the eight-step **Editing Mesh Geometry** Feature Guide covers the new workflow without converting artwork or changing mesh/skin selection, edit mode, dirty state or history. It works before conversion and with an authored mesh selected.
 
 ## Verification
+
+The v1.4.2.2 mesh addition extends catalog, live availability and preservation coverage in `tests/rigGuides.test.ts`. A dedicated local browser case walks all eight steps before conversion and after subdivision, checks visible targets and screenshots, preserves mesh skin/slot/edge/mode and verifies Undo/Redo still reaches the original authoring actions. The earlier results below describe the original catalog verification.
 
 `tests/rigGuides.test.ts` checks registration and counts, declared targets, unloaded/root-only/existing rigs, live capability changes, all guide navigation, finish, exit at every step, and preservation of authored data, selections, skins, dirty flags and history. Existing controller/registry tests now follow the six-step joint tour. Resolver/observer tests cover React panels, scroll clipping, UI-only reveal, Phaser geometry providers and cleanup.
 

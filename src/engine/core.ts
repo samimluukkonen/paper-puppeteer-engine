@@ -300,3 +300,5 @@ export {
   bindPoseToMeshAttachment,
   meshBindPoseToBoneLocal,
 } from './meshAttachments.js';
+
+export { meshEdges, subdivideMeshEdge, deleteMeshVertex } from './meshEditing.js';

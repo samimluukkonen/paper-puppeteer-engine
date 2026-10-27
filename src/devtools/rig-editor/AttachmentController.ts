@@ -4,6 +4,7 @@ import { downloadJson } from '../../shared/downloadJson.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import type { RigEditor } from './RigEditor.js';
+import type { RigSelectionInspectorTab } from './RigEditorState.js';
 
 /** React adapter. Slot/attachment selection belongs exclusively to RigEditorState. */
 export class AttachmentController {
@@ -157,9 +158,9 @@ export class AttachmentController {
       editor.refresh();
     }, 'Empty slot removed.');
   }
-  selectSlot(id: string): void {
+  selectSlot(id: string, inspectorTab?: RigSelectionInspectorTab): void {
     this.run((editor) => {
-      editor.state.selectSlot(id);
+      editor.state.selectSlot(id, inspectorTab);
       editor.refresh();
     }, 'Slot selected. Artwork alignment uses the same selection.');
   }
@@ -180,6 +181,51 @@ export class AttachmentController {
           ? 'Slot cleared.'
           : 'Attachment assigned.',
     );
+  }
+  convertToMesh(): void {
+    this.run((editor) => {
+      const image = editor.getSelectedImage();
+      if (!image) throw new Error('Select a rigid sprite attachment slot first.');
+      const scale = editor.getArtworkOriginScale();
+      if (scale.x !== 1 || scale.y !== 1)
+        throw new Error('Apply or revert the artwork size replacement before converting to mesh.');
+      editor.state.convertSelectedSpriteToMesh({ width: image.width, height: image.height });
+      editor.refresh();
+    }, 'Mesh created. Open Mesh geometry to select vertices and edges. Default-skin conversion creates a new variant skin.');
+  }
+  meshAction(action: 'edit' | 'subdivide' | 'delete'): void {
+    this.run((editor) => {
+      if (action === 'edit') editor.state.editMode = 'mesh';
+      if (action === 'subdivide') editor.state.subdivideSelectedMeshEdge();
+      if (action === 'delete') editor.state.deleteSelectedMeshVertex();
+      editor.refresh();
+    }, 'Mesh geometry updated.');
+  }
+  selectMeshVertex(id: string): void {
+    this.run((editor) => {
+      editor.state.selectedMeshVertexId = id || null;
+      editor.state.selectedMeshEdge = null;
+      editor.refresh();
+    }, 'Mesh vertex selected. Drag the cyan diamond or edit local X/Y.');
+  }
+  selectMeshEdge(value: string): void {
+    this.run((editor) => {
+      const edge = value ? value.split(':').map(Number) : null;
+      editor.state.selectedMeshEdge = edge ? [edge[0]!, edge[1]!] : null;
+      editor.state.selectedMeshVertexId = null;
+      editor.refresh();
+    }, 'Mesh edge selected.');
+  }
+  editMeshVertex(axis: 'x' | 'y', value: number): boolean {
+    let committed = false;
+    this.run((editor) => {
+      const vertex = editor.state.selectedMesh?.vertices.find((v) => v.id === editor.state.selectedMeshVertexId);
+      if (!vertex) throw new Error('Select a mesh vertex.');
+      editor.state.moveMeshVertex(vertex.id, axis === 'x' ? value : vertex.x, axis === 'y' ? value : vertex.y);
+      editor.refresh();
+      committed = true;
+    }, 'Mesh vertex updated. UV coordinates retained.');
+    return committed;
   }
   createAttachment(id: string, texture: string, frame: string, numericFrame: boolean): void {
     this.run((editor) => {

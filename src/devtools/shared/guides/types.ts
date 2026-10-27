@@ -11,6 +11,7 @@ export type GuideCapability =
   | 'ik-keyframes'
   | 'ik-constraints'
   | 'rig-artwork'
+  | 'rig-mesh-artwork'
   | 'selected-bone'
   | 'onion-enabled'
   | 'selected-x-key'

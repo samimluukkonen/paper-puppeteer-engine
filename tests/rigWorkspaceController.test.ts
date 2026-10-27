@@ -1,6 +1,7 @@
 import { EventEmitter } from 'eventemitter3';
 import { afterEach, assert, test, vi } from 'vitest';
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
+import { AttachmentController } from '../src/devtools/rig-editor/AttachmentController.js';
 import { createRigWorkspaceController } from '../src/devtools/rig-editor/RigWorkspaceController.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import type { RigJsonDefinition } from '../src/engine/externalData.js';
@@ -48,7 +49,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function panelFixture() {
+async function panelFixture(withSlots = false) {
   const element = stubRigEditorDom();
   vi.stubGlobal('window', {
     location: { href: 'https://example.test/rig-editor/' },
@@ -67,6 +68,14 @@ async function panelFixture() {
         { id: chain.endBone, parent: chain.middleBone, y: 20 },
       ]),
     ],
+    ...(withSlots
+      ? {
+          slots: [
+            { id: 'root', bone: 'root' },
+            { id: 'other', bone: 'root' },
+          ],
+        }
+      : {}),
     skins: [{ version: 1, name: 'default', slots: {} }],
   };
   const definition = CharacterDefinition.fromData({
@@ -117,7 +126,7 @@ async function panelFixture() {
   const puppet = Reflect.get(scene, 'puppet') as Puppet;
   const disable = vi.spyOn(editor, 'disable');
   const destroy = vi.spyOn(puppet, 'destroy');
-  return { scene, editor, puppet, file, element, disable, destroy };
+  return { scene, editor, puppet, file, element, disable, destroy, controller };
 }
 
 async function editNumber(element: ReturnType<typeof stubRigEditorDom>, bone: string, field: string, values: number[]) {
@@ -307,5 +316,73 @@ test.each(['original', 'exported', 'replacement'] as const)(
     assert.strictEqual(scene.rigEditor, replacement);
     assert.equal(scene.rigFilename, filename);
     assert.equal(element('#action-feedback').textContent, feedback);
+  },
+);
+
+test.each(['hierarchy', 'mesh', 'attachments', 'canvas'] as const)(
+  'selection from %s keeps inspector navigation appropriate to its origin',
+  async (origin) => {
+    const { editor, controller, element } = await panelFixture();
+    const app = element('#editor-app');
+    vi.spyOn(app, 'querySelector').mockImplementation((selector) => {
+      if (selector === '#rig-inspector:focus-within') return origin === 'canvas' ? null : element(`#${origin}`);
+      if (selector === '.workspace-hierarchy:focus-within')
+        return origin === 'hierarchy' ? element('#hierarchy') : null;
+      return element(selector);
+    });
+    editor.state.selectBone('root');
+    controller.render(editor);
+    const panel = element('[data-editor-tab-panel="rig-inspector-selection"]');
+    panel.dispatchEvent.mockClear();
+    const before = editor.state.workingCopy;
+    const history = editor.state.historyLength;
+    editor.state.selectBone(paperDollIK[0]!.rootBone);
+    controller.render(editor);
+    assert.strictEqual(editor.state.workingCopy, before);
+    assert.equal(editor.state.historyLength, history);
+    if (origin === 'canvas') {
+      assert.equal(panel.dispatchEvent.mock.calls.length, 1);
+      const event = panel.dispatchEvent.mock.calls[0]![0] as CustomEvent<string>;
+      assert.equal(event.type, 'workspace:reveal-tab');
+      assert.equal(event.detail, 'rig-inspector-selection');
+    } else assert.equal(panel.dispatchEvent.mock.calls.length, 0);
+  },
+);
+
+test.each(['mesh', 'attachments'] as const)(
+  '%s slot selector reveals its own tab without focus and releases that intent for later canvas selections',
+  async (tab) => {
+    const { editor, controller, element } = await panelFixture(true);
+    vi.spyOn(element('#editor-app'), 'querySelector').mockImplementation((selector) =>
+      selector.endsWith(':focus-within') ? null : element(selector),
+    );
+    editor.state.selectBone('root');
+    controller.render(editor);
+    const target = element(`[data-editor-tab-panel="rig-inspector-${tab}"]`);
+    const details = element('[data-editor-tab-panel="rig-inspector-selection"]');
+    details.dispatchEvent.mockClear();
+    const before = editor.state.workingCopy,
+      history = editor.state.historyLength;
+    const attachments = new AttachmentController();
+    attachments.bind(editor);
+    attachments.selectSlot('root', tab);
+    assert.equal(editor.state.selectionInspectorTab, tab);
+    assert.equal(target.dispatchEvent.mock.calls.length, 1);
+    assert.equal((target.dispatchEvent.mock.calls[0]![0] as CustomEvent<string>).detail, `rig-inspector-${tab}`);
+    assert.equal(details.dispatchEvent.mock.calls.length, 0);
+    assert.strictEqual(editor.state.workingCopy, before);
+    assert.equal(editor.state.historyLength, history);
+    target.dispatchEvent.mockClear();
+    // Canvas code assigns fresh selection objects directly. The old inspector request must not follow the ID.
+    for (const id of ['other', 'root']) {
+      editor.state.selection = { type: 'slot', id };
+      editor.refresh();
+      assert.isUndefined(editor.state.selectionInspectorTab);
+    }
+    assert.equal(details.dispatchEvent.mock.calls.length, 2);
+    assert.equal(target.dispatchEvent.mock.calls.length, 0);
+    editor.state.selectSlot('root');
+    assert.isUndefined(editor.state.selectionInspectorTab);
+    attachments.dispose();
   },
 );

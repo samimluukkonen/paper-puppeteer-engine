@@ -411,6 +411,7 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     clearSlotDepth: Puppet.prototype.clearSlotDepth,
     getSlotImage: vi.fn(),
+    getSlotMesh: vi.fn(),
     getAttachment: vi.fn(),
   } as unknown as Puppet;
   const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
@@ -581,6 +582,7 @@ test.each([undefined, 0, -5, 40])(
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       clearSlotDepth: Puppet.prototype.clearSlotDepth,
       getSlotImage: vi.fn(),
+      getSlotMesh: vi.fn(),
       getAttachment: vi.fn(),
     } as unknown as Puppet;
     const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());

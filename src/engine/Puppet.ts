@@ -561,6 +561,12 @@ export class Puppet {
     return this.slotState.getAttachment(slot);
   }
 
+  /** Native textured geometry, independent of the compatibility rigid-image accessor. */
+  getSlotMesh(slot: string): Phaser.GameObjects.Mesh2D | undefined {
+    this.rig.getSlot(slot);
+    return this.renderer.getSlotMesh(slot);
+  }
+
   getSlotImage(slot: string): Phaser.GameObjects.Image | undefined {
     this.slotState.getAttachment(slot);
     return this.renderer.getSlotImage(slot);

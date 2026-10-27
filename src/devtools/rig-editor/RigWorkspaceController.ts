@@ -30,14 +30,21 @@ export function createRigWorkspaceController(
   return {
     render(editor: RigEditor): void {
       const marker = editor.state.selectedFootContactMarkerId;
-      const next = marker ? `contact:${marker}` : editor.state.selection?.id;
+      const selection = editor.state.selection;
+      const next = marker ? `contact:${marker}` : selection ? `${selection.type}:${selection.id}` : undefined;
       if (next && next !== selected) app.dispatchEvent(new Event('workspace:reveal-inspector'));
       if (rendered && !app.hidden && next && next !== selected) {
-        // Keep hierarchy navigation and skeleton commands in their current tab.
-        // Canvas selections still reveal the fields for the selected object.
-        const hierarchyFocused = app.querySelector('.workspace-hierarchy:focus-within');
-        if (!hierarchyFocused) {
-          const id = marker ? 'rig-inspector-contact-markers' : 'rig-inspector-selection';
+        // Explicit control destinations survive native dropdown blur and delayed rendering.
+        // Other inspector selections keep their tab; canvas selections reveal object fields.
+        const preferred = editor.state.selectionInspectorTab;
+        const id = preferred
+          ? `rig-inspector-${preferred}`
+          : app.querySelector('#rig-inspector:focus-within')
+            ? undefined
+            : marker
+              ? 'rig-inspector-contact-markers'
+              : 'rig-inspector-selection';
+        if (id) {
           app
             .querySelector(`[data-editor-tab-panel="${id}"]`)
             ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));

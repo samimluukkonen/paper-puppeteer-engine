@@ -77,6 +77,18 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.2-2
+
+Carry the originating inspector tab with mesh and attachment slot selections so native dropdown blur cannot redirect to Selection details. Keep the request bound to the exact selection object, distinguish same-ID bones/slots and preserve later canvas auto-reveal. Cover focused/blurred selection, repeated slot switching and rigid/mesh controls.
+
+Add an eight-step Editing Mesh Geometry Feature Guide with live whole-image/mesh prerequisites, stable inspector anchors and UI-only reveal. Explain conversion/skin ownership, vertex editing, subdivision and UV interpolation, safe deletion, history and export/reload. Cover empty, rigid and authored-mesh availability plus guide navigation and preservation in unit and local browser regressions.
+
+Add visual mesh geometry authoring to Rig Editor: explicit sprite attachment conversion, an Edit Mesh Geometry mode, cyan diamond vertex handles, edge selection, numeric local X/Y fields, triangle inspection and actionable validation feedback. Preserve rigid source definitions and other skin assignments; default-skin conversion creates and selects a separate mesh skin variant.
+
+Provide atomic shared-edge subdivision with averaged UVs and stable vertex IDs, and connected-fan deletion with local ear-clipping triangulation. Retain authored UVs on vertex movement. Reuse viewport affine conversion, camera zoom/pan and snapshot history: one drag is one Undo, Escape/blur cancels, and invalid proposals leave the last valid geometry intact. Fix simultaneous attachment/skin installation so snapshots include the full conversion.
+
+Render authored meshes through Phaser 4.2.1 Mesh2D in existing slot mounts, preserving transforms, depth, opacity, visibility, pixel-art texture policy and render-only preview geometry. Keep the rigid image API and add `Puppet.getSlotMesh`; release geometry while retaining host-owned textures. Preserve character/project/scene packaging and add geometry, history, viewport, rendering, cleanup and local desktop browser regressions. Document artist workflow and WebGL/whole-image/bind limits; synchronize package and lockfile metadata at `1.4.2-2`.
+
 ## 1.4.2-1
 
 Add a mesh developer quick start and artist troubleshooting for imported meshes, blank previews, protected rest transforms and artwork replacement limits. Link the guidance from the guide index and character/artist documentation; retain existing Feature Guide tours until mesh editor controls exist.

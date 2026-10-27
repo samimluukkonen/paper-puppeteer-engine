@@ -200,7 +200,7 @@ Pose validation uses the same severity/path/message diagnostics through `validat
 
 Bones define the hierarchy and joint geometry. A named slot follows one bone and selects one attachment at a time. Rigid sprite attachments define texture, optional atlas frame, local offset, rotation, scale, and normalized origin. A skin maps slot IDs to attachment IDs. All three are serializable parts of a rig definition; skin format version is `1`.
 
-Optional `type: 'mesh'` attachments use the same slots and skins, with vertices, UVs, triangles and explicit bind data. Legacy attachments with no `type` remain rigid sprites. Meshes are validated and preserved in packages but remain unrendered in this milestone. Follow the [mesh developer quick start](mesh-attachments.md#developer-quick-start) for explicit creation and the [usage guidance](mesh-attachments.md#using-this-milestone) for current editor limits. Atlas frames apply to rigid sprites; mesh attachments require whole images.
+Optional `type: 'mesh'` attachments use the same slots and skins, with vertices, UVs, triangles and explicit bind data. Legacy attachments with no `type` remain rigid sprites. Meshes are validated, rendered as textured geometry and preserved in packages. Follow the [mesh developer quick start](mesh-attachments.md#developer-quick-start) for explicit creation and the [usage guidance](mesh-attachments.md#using-this-milestone) for current editor limits. Atlas frames apply to rigid sprites; mesh attachments require whole images.
 
 ```ts
 const rig: RigDefinition = {

@@ -18,10 +18,13 @@ import {
 } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { mergeSkins } from '../../engine/mergeSkins.js';
+import { createRectangleMeshAttachment, replaceMeshGeometry } from '../../engine/meshAttachments.js';
+import { deleteMeshVertex, subdivideMeshEdge } from '../../engine/meshEditing.js';
 import { Rig } from '../../engine/Rig.js';
 import { footContactMarkerSchema } from '../../engine/schemas.js';
 import type {
   BoneDefinition,
+  MeshAttachmentDefinition,
   FootContactMarker,
   JointTransform,
   RigDefinition,
@@ -40,6 +43,7 @@ import { inspectRigDraft, type AuthoredRigData, type RigEditorRecoverySnapshot }
 import { serializeRigData, serializeRigJson } from './rigSerialization.js';
 import { RigStructureCommands } from './RigStructureCommands.js';
 
+export type RigSelectionInspectorTab = 'mesh' | 'attachments';
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
 export type VisibilityKey =
   | 'artwork'
@@ -50,7 +54,7 @@ export type VisibilityKey =
   | 'spriteOrigins'
   | 'ik'
   | 'footContacts';
-export type EditMode = 'joint' | 'sprite' | 'origin' | 'slot';
+export type EditMode = 'joint' | 'sprite' | 'origin' | 'slot' | 'mesh';
 export type BoneField = TransformProperty | 'length' | 'depth';
 export type SlotField = TransformProperty | 'depth';
 export type SpriteField = 'x' | 'y' | 'originX' | 'originY';
@@ -111,6 +115,11 @@ export class RigEditorState {
     return this.topologyRig;
   }
   selection: RigEditorSelection = null;
+  private inspectorSelection: { selection: NonNullable<RigEditorSelection>; tab: RigSelectionInspectorTab } | undefined;
+  /** A control can request its own inspector for this exact selection, independently of browser focus. */
+  get selectionInspectorTab(): RigSelectionInspectorTab | undefined {
+    return this.inspectorSelection?.selection === this.selection ? this.inspectorSelection.tab : undefined;
+  }
   selectedIKConstraintId: string | null = null;
   selectedFootContactMarkerId: string | null = null;
   private targetDragId: string | undefined;
@@ -118,6 +127,10 @@ export class RigEditorState {
     return this.targetDragId;
   }
   editMode: EditMode = 'joint';
+  selectedMeshVertexId: string | null = null;
+  selectedMeshEdge: [number, number] | null = null;
+  meshFeedback = '';
+
   dimUnselected = false;
   ikPreview = false;
   facing: 'left' | 'right' = 'right';
@@ -673,6 +686,98 @@ export class RigEditorState {
     const value = overrides && Object.hasOwn(overrides, slot) ? overrides[slot] : fallback?.[slot];
     return value ?? undefined;
   }
+  get selectedMesh(): MeshAttachmentDefinition | undefined {
+    const slot = this.selection?.type === 'slot' ? this.selection.id : undefined;
+    const id = slot ? this.resolvedAttachment(slot) : undefined;
+    const attachment = id ? this.getAttachment(id) : undefined;
+    return attachment?.type === 'mesh' ? attachment : undefined;
+  }
+
+  convertSelectedSpriteToMesh(imageSize: { width: number; height: number }): string {
+    if (this.selection?.type !== 'slot') throw new Error('Select a rigid sprite attachment slot.');
+    const slot = this.selection.id;
+    const source = this.resolvedAttachment(slot);
+    if (!source) throw new Error('Select a slot with rigid artwork.');
+    const sprite = this.getAttachment(source);
+    if (sprite.type === 'mesh') throw new Error('This attachment is already a mesh.');
+    let id = `${source}-mesh`,
+      suffix = 2;
+    while (this.workingCopy.attachments?.some((entry) => entry.id === id)) id = `${source}-mesh-${suffix++}`;
+    const mesh = createRectangleMeshAttachment({ ...sprite, id }, imageSize, this.workingCopy);
+    // Fork the default skin so inherited assignments and the original artwork remain untouched.
+    let skinName = this.activeSkin;
+    const original = this.getSkin(skinName);
+    if (skinName === this.defaultSkin) {
+      skinName = `${original.name}-mesh`;
+      suffix = 2;
+      while (this.skins.some((skin) => skin.name === skinName)) skinName = `${original.name}-mesh-${suffix++}`;
+    }
+    const next = freezeData({ ...original, name: skinName, slots: { ...original.slots, [slot]: id } });
+    const external = this.isStandaloneSkin(skinName);
+    this.installArtwork({
+      attachments: [...(this.workingCopy.attachments ?? []), mesh],
+      ...(external
+        ? { standaloneSkins: this.standaloneSkins.map((skin) => (skin.name === skinName ? next : skin)) }
+        : {
+            skins:
+              skinName === original.name
+                ? this.workingCopy.skins!.map((skin) => (skin.name === skinName ? next : skin))
+                : [...(this.workingCopy.skins ?? []), next],
+          }),
+    });
+    this.selectedSkin = skinName;
+    this.editMode = 'mesh';
+    this.selectedMeshVertexId = mesh.vertices[0]!.id;
+    this.selectedMeshEdge = null;
+    this.meshFeedback = `Created ${id} in skin ${skinName}. Original rigid artwork remains available in Attachments & skins.`;
+    return id;
+  }
+
+  private installMesh(mesh: MeshAttachmentDefinition): void {
+    this.change(() => {
+      this.data.attachments![this.attachmentIndices.get(mesh.id)!] = freezeData(mesh);
+    });
+  }
+
+  moveMeshVertex(id: string, x: number, y: number): void {
+    const mesh = this.selectedMesh;
+    if (!mesh || !mesh.vertices.some((vertex) => vertex.id === id)) throw new Error('Select a mesh vertex.');
+    this.installMesh(
+      replaceMeshGeometry(
+        mesh,
+        {
+          vertices: mesh.vertices.map((vertex) => (vertex.id === id ? { ...vertex, x, y } : vertex)),
+          triangles: mesh.triangles,
+        },
+        this.workingCopy,
+      ),
+    );
+    this.meshFeedback = '';
+  }
+
+  subdivideSelectedMeshEdge(): void {
+    const mesh = this.selectedMesh,
+      edge = this.selectedMeshEdge;
+    if (!mesh || !edge) throw new Error('Select an edge to subdivide.');
+    this.endOperation();
+    const next = subdivideMeshEdge(mesh, edge[0], edge[1], this.workingCopy);
+    this.installMesh(next);
+    this.selectedMeshVertexId = next.vertices[next.vertices.length - 1]!.id;
+    this.selectedMeshEdge = null;
+    this.meshFeedback = 'Edge subdivided. Adjacent triangles and the new UV were interpolated.';
+  }
+
+  deleteSelectedMeshVertex(): void {
+    const mesh = this.selectedMesh,
+      id = this.selectedMeshVertexId;
+    if (!mesh || !id) throw new Error('Select a vertex to delete.');
+    this.endOperation();
+    this.installMesh(deleteMeshVertex(mesh, id, this.workingCopy));
+    this.selectedMeshVertexId = null;
+    this.selectedMeshEdge = null;
+    this.meshFeedback = 'Vertex deleted and its triangle fan triangulated.';
+  }
+
   createAttachment(input: unknown): void {
     this.artworkCommands.createAttachment(input);
   }
@@ -708,10 +813,10 @@ export class RigEditorState {
     this.change(() => {
       if (update.attachments !== undefined) {
         this.data.attachments = [...update.attachments];
-        this.rebuildIndexes();
       }
       if (update.skins !== undefined) this.data.skins = [...update.skins];
       if (update.standaloneSkins !== undefined) this.externalSkins = freezeData(update.standaloneSkins);
+      if (update.attachments !== undefined) this.rebuildIndexes();
     });
   }
   private assertArtwork(attachment: AttachmentDefinition): void {
@@ -983,11 +1088,12 @@ export class RigEditorState {
     this.selection = { type: 'bone', id };
   }
 
-  selectSlot(id: string): void {
+  selectSlot(id: string, inspectorTab?: RigSelectionInspectorTab): void {
     this.getSlot(id);
     this.selectedFootContactMarkerId = null;
     this.selectedIKConstraintId = null;
     this.selection = { type: 'slot', id };
+    this.inspectorSelection = inspectorTab ? { selection: this.selection, tab: inspectorTab } : undefined;
   }
 
   clearSelection(): void {

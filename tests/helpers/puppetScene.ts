@@ -35,6 +35,9 @@ class Container {
   parentContainer: Container | null = null;
   readonly list: Container[] = [];
 
+  setScrollFactor() {
+    return this;
+  }
   setPosition(x: number, y: number) {
     this.x = x;
     this.y = y;
@@ -193,6 +196,8 @@ export function puppetScene(): Phaser.Scene {
       container: makeContainer,
       image: (x: number, y: number, texture: string, frame?: string | number) =>
         makeContainer(x, y).setTexture(texture, frame),
+      mesh2d: (x: number, y: number, texture: string, vertices: number[], indices: number[]) =>
+        Object.assign(makeContainer(x, y).setTexture(texture), { vertices, indices, renderAsTriangles: false }),
       graphics: makeContainer,
       text: (x = 0, y = 0) => new Container().setPosition(x, y),
     },

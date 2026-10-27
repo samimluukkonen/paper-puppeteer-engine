@@ -20,6 +20,7 @@ function fixture(definition: RigDefinition) {
     setRenderOrder: vi.fn<Puppet['setRenderOrder']>(),
     setSlotTransform: vi.fn(),
     getSlotImage: vi.fn(),
+    getSlotMesh: vi.fn(),
     getAttachment: vi.fn(),
   };
   const editor = new RigEditor({} as Phaser.Scene, puppet as unknown as Puppet, vi.fn());

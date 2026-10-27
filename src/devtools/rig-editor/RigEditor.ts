@@ -388,7 +388,10 @@ export class RigEditor {
       return state.visibility.artwork ? state.artworkOpacity * (state.dimUnselected && !selected ? 0.18 : 1) : 0;
     };
     for (const bone of state.rig.bones) this.puppet.getBone(bone.id).sprite?.setAlpha(alpha('bone', bone.id));
-    for (const slot of state.rig.slots) this.puppet.getSlotImage(slot.id)?.setAlpha(alpha('slot', slot.id));
+    for (const slot of state.rig.slots) {
+      this.puppet.getSlotImage(slot.id)?.setAlpha(alpha('slot', slot.id));
+      this.puppet.getSlotMesh(slot.id)?.setAlpha(alpha('slot', slot.id));
+    }
   }
 
   getAttachment(id: string): string | undefined {

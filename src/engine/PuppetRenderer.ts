@@ -4,6 +4,7 @@ import { composeAffine, transformToAffine } from './affineMath.js';
 import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
+import { createTexturedMesh } from './meshRendering.js';
 import type { Rig } from './Rig.js';
 import type { SkinDefinition, AttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
@@ -33,6 +34,7 @@ export class PuppetRenderer {
   private readonly container: Phaser.GameObjects.Container;
   private readonly branches = new Map<string, RenderBranch>();
   private readonly slotBranches = new Map<string, RenderBranch>();
+  private readonly slotMeshes = new Map<string, Phaser.GameObjects.Mesh2D>();
   private readonly slotImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly slotDepthOverrides = new Map<string, number>();
   private readonly nodes = new Map<string, ProjectionNode>();
@@ -118,7 +120,9 @@ export class PuppetRenderer {
       if (this.appearanceValues[index] !== value) changed = true;
       this.appearanceValues[index++] = value;
     };
-    const transform = (object: Phaser.GameObjects.Container | Phaser.GameObjects.Image): void => {
+    const transform = (
+      object: Phaser.GameObjects.Container | Phaser.GameObjects.Image | Phaser.GameObjects.Mesh2D,
+    ): void => {
       remember(object.x);
       remember(object.y);
       remember(object.rotation);
@@ -147,6 +151,14 @@ export class PuppetRenderer {
       remember(branch.root.depth);
       transform(branch.mount);
       image(this.slotImages.get(id));
+      const mesh = this.slotMeshes.get(id);
+      remember(mesh);
+      if (mesh) {
+        transform(mesh);
+        remember(mesh.texture);
+        remember(mesh.vertices);
+        remember(mesh.indices);
+      }
     }
     if (this.appearanceValues.length !== index) changed = true;
     this.appearanceValues.length = index;
@@ -242,6 +254,10 @@ export class PuppetRenderer {
     this.container.sort('depth');
   }
 
+  getSlotMesh(id: string): Phaser.GameObjects.Mesh2D | undefined {
+    return this.slotMeshes.get(id);
+  }
+
   getSlotImage(id: string): Phaser.GameObjects.Image | undefined {
     return this.slotImages.get(id);
   }
@@ -304,6 +320,15 @@ export class PuppetRenderer {
     );
     if (reference && !usages.length && replacement)
       throw new Error(`Artwork reference "${reference}" no longer uses "${assetKey}".`);
+    if (
+      replacement &&
+      this.artworkDefinitions.some(
+        (entry) =>
+          entry.type === 'mesh' && entry.texture === assetKey && (!reference || reference === `attachment:${entry.id}`),
+      ) &&
+      (replacement.originScaleX !== 1 || replacement.originScaleY !== 1)
+    )
+      throw new Error('Mesh artwork replacement must preserve image dimensions and pivot.');
     const key = replacement?.textureKey ?? assetKey;
     if (!this.scene.textures.exists(key)) throw new Error(`Missing artwork texture "${key}".`);
     if (replacement) {
@@ -327,7 +352,7 @@ export class PuppetRenderer {
     const identity = reference ? JSON.stringify([assetKey, reference]) : assetKey;
     const previous = map.get(identity);
     const images: {
-      image: Phaser.GameObjects.Image;
+      image: Phaser.GameObjects.Image | Phaser.GameObjects.Mesh2D;
       texture: string;
       frame: string | number;
       x: number;
@@ -335,7 +360,10 @@ export class PuppetRenderer {
       reference: ArtworkReference;
       old: ArtworkReplacement | undefined;
     }[] = [];
-    const remember = (image: Phaser.GameObjects.Image | undefined, ref: ArtworkReference): void => {
+    const remember = (
+      image: Phaser.GameObjects.Image | Phaser.GameObjects.Mesh2D | undefined,
+      ref: ArtworkReference,
+    ): void => {
       if (image)
         images.push({
           image,
@@ -352,7 +380,7 @@ export class PuppetRenderer {
         remember(this.bones.get(bone.id)!.sprite, `bone:${bone.id}`);
     for (const [id, definition] of this.slotArtwork)
       if (definition.texture === assetKey && (!reference || reference === `attachment:${definition.id}`))
-        remember(this.slotImages.get(id), `attachment:${definition.id}`);
+        remember(this.slotImages.get(id) ?? this.slotMeshes.get(id), `attachment:${definition.id}`);
     const install = (value: ArtworkReplacement | undefined): void => {
       if (value) map.set(identity, Object.freeze({ ...value }));
       else map.delete(identity);
@@ -405,18 +433,34 @@ export class PuppetRenderer {
 
   setSlotAttachment(id: string, definition: AttachmentDefinition | undefined): void {
     const mount = this.getSlotMount(id);
-    const previous = this.slotImages.get(id);
+    const previous = this.slotImages.get(id) ?? this.slotMeshes.get(id);
     const presentation = previous
       ? { alpha: previous.alpha, visible: previous.visible, depth: previous.depth }
       : undefined;
-    // Meshes retain slot selection/ordering but have no renderer in this data foundation milestone.
-    if (!definition || definition.type === 'mesh') {
+    if (!definition) {
       previous?.destroy();
       this.slotImages.delete(id);
+      this.slotMeshes.delete(id);
       this.slotArtwork.delete(id);
       return;
     }
     const replacement = this.getArtworkReplacement(definition.texture, `attachment:${definition.id}`);
+    if (definition.type === 'mesh') {
+      const mesh = createTexturedMesh(this.scene, definition, replacement?.textureKey ?? definition.texture);
+      try {
+        if (presentation)
+          mesh.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
+        mount.add(mesh).sort('depth');
+      } catch (error) {
+        mesh.destroy();
+        throw error;
+      }
+      previous?.destroy();
+      this.slotImages.delete(id);
+      this.slotMeshes.set(id, mesh);
+      this.slotArtwork.set(id, definition);
+      return;
+    }
     const image = mount.scene.add.image(
       definition.x ?? 0,
       definition.y ?? 0,
@@ -441,6 +485,7 @@ export class PuppetRenderer {
     previous?.destroy();
     this.slotArtwork.set(id, definition);
     this.slotImages.set(id, image);
+    this.slotMeshes.delete(id);
   }
 
   /** Copy current sprite artwork and runtime slot layout without reading or applying a pose.
@@ -449,8 +494,8 @@ export class PuppetRenderer {
    */
   copyAppearanceFrom(source: PuppetRenderer, tint: number): void {
     const copyTransform = (
-      target: Phaser.GameObjects.Container | Phaser.GameObjects.Image,
-      original: Phaser.GameObjects.Container | Phaser.GameObjects.Image,
+      target: Phaser.GameObjects.Container | Phaser.GameObjects.Image | Phaser.GameObjects.Mesh2D,
+      original: Phaser.GameObjects.Container | Phaser.GameObjects.Image | Phaser.GameObjects.Mesh2D,
     ): void => {
       target
         .setPosition(original.x, original.y)
@@ -480,6 +525,28 @@ export class PuppetRenderer {
         branch.root.setDepth(originalBranch.root.depth);
         depthsChanged = true;
       }
+      const sourceMesh = source.slotMeshes.get(slot.id);
+      if (sourceMesh) {
+        this.slotImages.get(slot.id)?.destroy();
+        this.slotImages.delete(slot.id);
+        let mesh = this.slotMeshes.get(slot.id);
+        if (!mesh) {
+          mesh = this.scene.add.mesh2d(0, 0, sourceMesh.texture.key, [...sourceMesh.vertices], [...sourceMesh.indices]);
+          mesh.setOrigin(0, 0);
+          mesh.renderAsTriangles = true;
+          branch.mount.add(mesh);
+          this.slotMeshes.set(slot.id, mesh);
+        }
+        mesh.vertices = [...sourceMesh.vertices];
+        mesh.indices = [...sourceMesh.indices];
+        mesh.setTexture(sourceMesh.texture.key).setDepth(sourceMesh.depth);
+        // Phaser 4.2.1 ships setTint but omits it from Mesh2D declarations.
+        (mesh as Phaser.GameObjects.Mesh2D & { setTint(color: number): unknown }).setTint(tint);
+        copyTransform(mesh, sourceMesh);
+        continue;
+      }
+      this.slotMeshes.get(slot.id)?.destroy();
+      this.slotMeshes.delete(slot.id);
       const original = source.slotImages.get(slot.id);
       let image = this.slotImages.get(slot.id);
       if (!original) {
@@ -546,6 +613,7 @@ export class PuppetRenderer {
     this.branches.clear();
     this.slotBranches.clear();
     this.slotImages.clear();
+    this.slotMeshes.clear();
     this.slotArtwork.clear();
     this.artworkTextures.clear();
     this.individualArtwork.clear();

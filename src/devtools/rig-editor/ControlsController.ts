@@ -66,6 +66,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     time.max = String(current.previewClips?.find((clip) => clip.name === current.previewName)?.duration ?? 0);
     app.querySelector<HTMLElement>('#rig-mode-hint')!.textContent =
       {
+        mesh: 'Edit Mesh Geometry: drag cyan diamond vertices; select edges in the Mesh inspector',
         joint: 'Joint Editing: move bones · Arrow keys nudge joints',
         sprite: 'Artwork Offset Editing: drag artwork or its pivot · Arrow keys nudge offsets',
         origin: 'Sprite Origin Editing: drag to choose a texture-local pivot; offset stays fixed',

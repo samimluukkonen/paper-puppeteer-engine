@@ -12,6 +12,7 @@ import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
 import { AttachmentPanel } from './AttachmentPanel.js';
 import { FootContactMarkersPanel } from './FootContactMarkersPanel.js';
+import { MeshGeometryPanel } from './MeshGeometryPanel.js';
 import { RigHelp } from './RigHelp.js';
 import { RigIKPanel } from './RigIKPanel.js';
 import { RigStructurePanel } from './RigStructurePanel.js';
@@ -50,6 +51,7 @@ export function RigEditorView({
                       Edit{' '}
                       <select id="edit-mode" data-guide-id={GUIDE_TARGETS.rigEditMode}>
                         <option value="joint">Joint Editing</option>
+                        <option value="mesh">Edit Mesh Geometry</option>
                         <option value="sprite">Artwork Offset Editing</option>
                         <option value="origin">Sprite Origin Editing</option>
                         <option value="slot">Slot Transform Editing</option>
@@ -250,9 +252,14 @@ export function RigEditorView({
               ...(attachments
                 ? [
                     {
+                      id: 'rig-inspector-mesh',
+                      label: 'Mesh geometry',
+                      content: <MeshGeometryPanel controller={attachments} embedded />,
+                    },
+                    {
                       id: 'rig-inspector-attachments',
                       label: 'Attachments & skins',
-                      content: <AttachmentPanel controller={attachments} embedded />,
+                      content: <AttachmentPanel controller={attachments} meshAuthoring embedded />,
                     },
                   ]
                 : []),

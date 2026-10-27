@@ -1,16 +1,28 @@
-# Mesh attachment foundation — v1.4.2.1
+# Visual mesh geometry — v1.4.2.2
 
 [All guides](../README.md#guides)
 
-This milestone adds optional authored mesh data, validation, immutable catalogs and pure geometry utilities alongside rigid sprites. Rendering, skeletal deformation, bone weights, painting and animated vertices remain future work. Selecting a mesh retains its slot assignment but creates no Phaser image; other rigid attachments continue rendering normally.
+Mesh attachments store validated geometry, UVs and bind references alongside rigid sprites. Rig Editor can convert a rigid sprite attachment, edit vertices and safely subdivide/retriangulate its triangles. Phaser renders the authored mesh as textured geometry. Bone weights, automatic skeletal deformation, vertex animation and cloth remain outside this milestone.
 
 ## Using this milestone
 
-For artwork you need to see and animate today, keep using rigid sprite attachments and the existing **Slots and Attachments**, **Aligning Sprites** and **Creating and Changing Skins** Feature Guides. There is no mesh conversion button, visual mesh editor or mesh Feature Guide tour in this milestone.
+Open **Feature Guide → Rig Editor → Editing Mesh Geometry** for an eight-step tour of conversion, vertex editing, safe subdivision/deletion, UVs, history and saving. It reveals the Mesh geometry inspector without editing the character. The guide becomes available when a valid character has a slot and a whole-image sprite attachment or existing mesh; use **Slots and Attachments** first when needed.
 
-If you import a character containing mesh data, its geometry and skin mappings survive package export/import. A selected mesh produces no visible artwork in either the editor preview or runtime. Select a rigid attachment in that slot to display artwork; selecting a skin or attachment does not convert or deform the mesh.
+1. Open a character in **Rig Editor**, select a sleeve's artwork **slot** in the hierarchy, then open **Mesh geometry** in the inspector (or use the conversion action in **Attachments & skins**).
+2. Choose **Convert to Mesh Attachment**. This creates four corners and two triangles, retaining the texture, pivot-relative positions, attachment transforms and binary artwork. The rigid definition remains available. If the default skin is active, conversion creates and selects a named `-mesh` skin variant; all existing skins remain untouched. For a nondefault skin, only that skin's selected slot mapping changes. Other slots retain their assignments.
+3. Choose **Edit Mesh Geometry**. Cyan diamonds distinguish mesh vertices from round bone joints, square slot markers, green contact markers and IK crosshairs. Click a diamond or select its ID in **Mesh vertex**. Drag it or commit **Vertex X/Y** with Enter/blur. Arrow keys nudge a selected vertex; Shift increases the step. X/Y are attachment-local coordinates, independent of camera zoom and facing.
+4. Click a triangle edge or choose **Mesh edge**, then **Subdivide edge**. The midpoint gets a stable ID, averaged endpoint UVs and consistently split adjacent triangles. Existing UVs remain unchanged when vertices move. **Triangle inspection** lists the current triangle vertex IDs.
+5. **Delete vertex** retriangulates only a connected triangle fan. Edge midpoints and ordinary interior vertices are supported. A corner without a valid replacement triangle, disconnected fan or invalid cavity is rejected atomically. The editor explains the failed operation; the last valid geometry remains intact.
+6. One completed drag is one **Undo** action. **Escape**, window blur or editor teardown cancels the active drag. Numeric edits, subdivision, deletion and conversion each have their own Undo/Redo entry. Escape inside a numeric field cancels its draft.
+7. Export a character package or rig JSON through the existing commands. Reload it and select the authored mesh skin using **Mesh skin** or **Active skin**. The original default skin deliberately retains rigid artwork. Geometry, stable IDs and UVs survive reload; image binaries are unchanged.
 
-Finish skeleton, slot placement and sprite alignment before creating experimental mesh data. Once a mesh is bound, edits that change its saved rest configuration are rejected and rolled back. Restore that configuration or recreate the mesh explicitly from the revised authored rig. Changing animation poses, playback, facing or camera zoom does not change the saved bind pose.
+Wheel zoom and middle-button pan work while editing. Vertex picking follows the live slot/attachment affine, including rotated, reflected and nonuniformly scaled ancestors. Animated pose inspection changes only the preview; mesh geometry belongs to the rig attachment working copy and creates no animation keys, Actor motion or scene choreography.
+
+Finish skeleton, slot placement and sprite alignment before converting. The saved bind snapshot conservatively protects every bone and slot rest transform. A rest-transform change is rejected until the mesh is explicitly recreated; animation poses, facing and camera changes do not alter the bind snapshot. Meshes use whole images; atlas frames and image-size/pivot-changing replacements are unsupported.
+
+### Rendering
+
+`PuppetRenderer` uses a small adapter to Phaser 4.2.1's native **Mesh2D** object (WebGL). Indexed triangles carry attachment-local X/Y and normalized top-left UVs. Existing slot mounts retain full affine projection, depth ordering, opacity and visibility. Texture filtering follows the existing host texture/pixel-art policy; conversion never smooths artwork or changes sampling globally. `Puppet.getSlotMesh(slot)` returns native geometry; `getSlotImage(slot)` continues to return rigid images only. Render-only onion previews copy geometry and borrowed textures as well as presentation. Switching or destroying attachments destroys geometry objects and leaves host-owned textures intact. Canvas-only Phaser hosts cannot render Mesh2D.
 
 ### Developer quick start
 
@@ -62,13 +74,13 @@ const json = serializeRigDefinition(file); // Save authored data, not the Rig in
 const cornerInBindSpace = meshAttachmentToBindPose(mesh, 'cloth-slot', mesh.vertices[0]!);
 ```
 
-The default skin still selects visible rigid artwork. The optional `mesh-data` skin selects the mesh ID and will leave that slot unrendered. `json` is the version-1 rig document for the character package, not a complete character ZIP. The first vertex is `(-20, -30)` in attachment-local space; its Puppet bind position is `(-16, -30)` after the attachment's X offset.
+The default skin still selects rigid artwork. The optional `mesh-data` skin selects the textured mesh. `json` is the version-1 rig document for the character package, not a complete character ZIP. The first vertex is `(-20, -30)` in attachment-local space; its Puppet bind position is `(-16, -30)` after the attachment's X offset.
 
 ### Troubleshooting
 
 | Symptom                                                       | Action                                                                                                                                           |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Mesh is assigned but the slot is blank                        | Mesh rendering is deferred. Select the retained rigid attachment to display artwork.                                                             |
+| Mesh is assigned but the slot is blank                        | Select the intended mesh skin, enable artwork visibility and use a WebGL Phaser host.                                                            |
 | A rest or slot edit reports a bind-pose mismatch              | Keep the saved rest configuration or explicitly recreate the mesh from the revised authored rig; animation scrubbing cannot fix a bind mismatch. |
 | A pivot edit is rejected                                      | Mesh pivots are baked into positions. Recreate geometry with the intended origin.                                                                |
 | A replacement/export reports image dimensions or pivot errors | Preserve the mesh image dimensions and use origin multipliers of 1, or recreate the mesh for the replacement image.                              |
@@ -129,7 +141,7 @@ Shape/scalar schemas and semantic rig checks reject:
 - Overlapping triangle interiors above the same doubled-area tolerance, including duplicate, crossing and contained triangles. Shared edges/vertices with zero intersection area are allowed. An AABB sweep skips disjoint pairs.
 - Invalid image references at character assembly, unsupported mesh/bind versions, stale bind data and singular/unsupported composed rest transforms. Character/scene package imports also compare `imageSize` with binary image headers.
 
-Invalid data fails before installation or export. Validation never repairs winding, drops triangles or renumbers vertices. This bounded triangle surface format does not prove manifold topology: UV seams, disconnected components and unused vertices are allowed, with no automatic triangulation or hole inference.
+Invalid data fails before installation or export. Validation never repairs winding, drops triangles or renumbers vertices. This bounded triangle surface format does not prove manifold topology: UV seams, disconnected components and unused vertices are allowed, with no global triangulation or hole inference. Editor operations require a connected supported fan and validate their complete result.
 
 Pure helpers are exported through `/core` and the root/runtime entry points:
 
@@ -137,7 +149,8 @@ Pure helpers are exported through `/core` and the root/runtime entry points:
 - `imagePixelToUV`, `uvToImagePixel`, `imagePixelToAttachmentLocal`, `attachmentLocalToImagePixel`.
 - `createMeshBindPose`, `validateMeshBindPose`, `createRectangleMeshAttachment`.
 - `meshAttachmentToBindPose`, `bindPoseToMeshAttachment`, `meshBindPoseToBoneLocal`.
-- `replaceMeshGeometry(mesh, { vertices, triangles }, rig)` validates a detached topology proposal while retaining bind data and supplied IDs. Future subdivision tools can retain existing IDs, add stable IDs/UVs and replace triangle indices atomically. This helper does not implement subdivision.
+- `meshEdges`, `subdivideMeshEdge(mesh, a, b, rig)` and `deleteMeshVertex(mesh, id, rig)` provide the bounded editor operations.
+- `replaceMeshGeometry(mesh, { vertices, triangles }, rig)` validates a detached topology proposal while retaining bind data and supplied IDs. The editor topology operations use this atomic validation boundary.
 
 Coordinate helpers require finite positive dimensions. Bounds return `undefined` for an empty array; lookup returns `undefined` for an unknown ID. Inverse point conversion can return `undefined` for unsupported points/transforms; missing bind references or an unsupported attachment bind matrix throw. Evaluate authored geometry only after shape and semantic validation.
 
@@ -151,6 +164,6 @@ Character, scene and project packages reuse retained authored rig files and text
 
 ## Implementation and verification
 
-The main implementation files are `types.ts`, `schemas.ts`, `meshGeometry.ts`, `meshBindPose.ts`, `meshAttachments.ts`, `validation.ts`, `Rig.ts`, `SlotState.ts` and the pure public barrels. `boneMath.ts` shares effective rest-position calculation with `Rig`. Puppet/renderer catalogs accept the attachment union; `PuppetRenderer` leaves mesh slots unrendered. Rig Editor history/catalog paths preserve and validate meshes. Character/scene packaging checks binary dimensions and prevents rigid pivot conversion from changing meshes. `schemas/rig.schema.json` is regenerated from the authoritative schema. Package and changelog metadata use SemVer `1.4.2-1`.
+The data foundation remains in `types.ts`, `schemas.ts`, `meshGeometry.ts`, `meshBindPose.ts`, `meshAttachments.ts`, `validation.ts`, `Rig.ts` and `SlotState.ts`. `meshEditing.ts` adds pure edge subdivision and connected-fan deletion; `meshRendering.ts` adapts authored data to Phaser Mesh2D. `PuppetRenderer` owns geometry objects, while the host retains textures. `RigEditorState`, `RigEditorInputController`, `RigEditorOverlay`, `MeshGeometryPanel` and `AttachmentController` share the existing history, selection and viewport paths. Package metadata uses SemVer `1.4.2-2`; outer data formats remain version 1.
 
-`tests/meshAttachments.test.ts` covers rectangle alignment, UV/pixel conversions, negative coordinates, topology/limits/overlaps, safe topology replacement, bind conversion and rest edits, immutable catalog updates, unchanged legacy types, mixed Puppet skins and deterministic character/project ZIP round trips. Existing artwork tests narrow rigid attachments before adding frame fields. Required checks are `npm run typecheck`, `npm run test` and `npm run build`, with sequential test files under the repository's one-worker configuration.
+`tests/meshEditing.test.ts` covers conversion, skin isolation, vertex edits, invalid proposals, UV interpolation, subdivision/deletion, grouped history, cancellation, reflected viewport coordinates, export/import and texture cleanup. `tests/meshAttachments.test.ts` retains validation, bind, rigid compatibility and deterministic character/project/scene package round trips. `tests/browser/meshEditor.spec.ts` exercises the actual desktop canvas, numeric edits, zoom/pan, Escape, Undo/Redo and export/reload. Browser checks remain local-only. Required checks are `npm run typecheck`, `npm run test` and `npm run build`, with sequential test files under the repository's one-worker configuration.

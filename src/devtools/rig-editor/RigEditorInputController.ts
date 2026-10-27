@@ -21,6 +21,7 @@ export class RigEditorInputController {
   private downY = 0;
   private characterDrag: { start: Point; value: Point } | undefined;
   private drag: { type: 'bone' | 'slot' | 'sprite' | 'attachment'; id: string; start: Point; value: Point } | undefined;
+  private meshDrag: { id: string; start: Point; value: Point } | undefined;
   private originDrag: { id: string; attachment: boolean; matrix: Affine; origin: Point; size: Point } | undefined;
   private artworkFrame: Phaser.GameObjects.Container | undefined;
   private enabled = false;
@@ -89,7 +90,8 @@ export class RigEditorInputController {
     this.ikDrag = undefined;
     this.ikHit = false;
     this.state.endIKTargetDrag(commit);
-    const hadDrag = !!this.drag || !!this.originDrag || !!this.markerDrag;
+    const hadDrag = !!this.drag || !!this.originDrag || !!this.markerDrag || !!this.meshDrag;
+    this.meshDrag = undefined;
     this.editor.finishArtworkGesture(commit);
     if (!commit && hadDrag) this.state.cancelOperation();
     this.markerDrag = undefined;
@@ -195,6 +197,25 @@ export class RigEditorInputController {
       return;
     }
     if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
+    if (this.state.editMode === 'mesh') {
+      if (event.key === 'Escape') {
+        this.state.selectedMeshVertexId = null;
+        this.state.selectedMeshEdge = null;
+      } else {
+        const vertex = this.state.selectedMesh?.vertices.find((v) => v.id === this.state.selectedMeshVertexId);
+        const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+        if (!vertex || !delta) return;
+        const amount = (this.state.gridSnap || 1) * (event.shiftKey ? 10 : 1);
+        try {
+          this.state.moveMeshVertex(vertex.id, vertex.x + delta[0]! * amount, vertex.y + delta[1]! * amount);
+        } catch (error) {
+          this.state.meshFeedback = error instanceof Error ? error.message : String(error);
+        }
+      }
+      this.editor.refresh();
+      event.preventDefault();
+      return;
+    }
     if (event.key === 'Escape') {
       this.state.selection = null;
       this.state.selectedIKConstraintId = null;
@@ -291,6 +312,22 @@ export class RigEditorInputController {
     this.drag = undefined;
     this.characterDrag = undefined;
     if (this.panning || !pointer.leftButtonDown()) return;
+    if (this.state.editMode === 'mesh') {
+      const vertex = this.overlay.pickMeshVertex(pointer.x, pointer.y);
+      this.state.selectedMeshVertexId = vertex?.id ?? null;
+      this.state.selectedMeshEdge = vertex ? null : (this.overlay.pickMeshEdge(pointer.x, pointer.y) ?? null);
+      this.state.meshFeedback = '';
+      const slot = this.state.selection;
+      const object = slot?.type === 'slot' ? this.puppet.getSlotMesh(slot.id) : undefined;
+      const start = object ? worldToLocal(this.world(pointer), object.getWorldTransformMatrix()) : undefined;
+      if (vertex && start) {
+        this.state.endOperation();
+        this.state.beginOperation();
+        this.meshDrag = { id: vertex.id, start, value: vertex };
+      }
+      this.editor.refresh();
+      return;
+    }
     const marker = this.overlay.pickFootContactMarker?.(pointer.x, pointer.y);
     this.markerHit = !!marker;
     if (marker) {
@@ -375,6 +412,28 @@ export class RigEditorInputController {
   private pointerMove(pointer: Phaser.Input.Pointer): void {
     if (pointer.id !== this.activePointerId || !pointer.isDown) return;
     if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
+    if (this.meshDrag) {
+      if (!this.moved) return;
+      const slot = this.state.selection;
+      const object = slot?.type === 'slot' ? this.puppet.getSlotMesh(slot.id) : undefined;
+      const point = object ? worldToLocal(this.world(pointer), object.getWorldTransformMatrix()) : undefined;
+      if (!point) {
+        this.endGesture(false);
+        return;
+      }
+      const { id, start, value } = this.meshDrag;
+      try {
+        this.state.moveMeshVertex(
+          id,
+          this.state.snapTranslation(value.x + point.x - start.x),
+          this.state.snapTranslation(value.y + point.y - start.y),
+        );
+      } catch (error) {
+        this.state.meshFeedback = error instanceof Error ? error.message : String(error);
+      }
+      this.editor.refresh();
+      return;
+    }
     if (this.markerDrag) {
       if (!this.moved) return;
       const { id, start, value } = this.markerDrag;
@@ -458,7 +517,15 @@ export class RigEditorInputController {
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
     if (pointer.id !== this.activePointerId) return;
-    if (!this.panning && !this.moved && !this.drag && !this.originDrag && !this.ikHit && !this.markerHit) {
+    if (
+      this.state.editMode !== 'mesh' &&
+      !this.panning &&
+      !this.moved &&
+      !this.drag &&
+      !this.originDrag &&
+      !this.ikHit &&
+      !this.markerHit
+    ) {
       this.state.selectedIKConstraintId = null;
       this.state.selectedFootContactMarkerId = null;
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;

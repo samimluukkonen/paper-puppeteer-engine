@@ -206,6 +206,7 @@ test.each(dragCases)(
       rig,
       getBone: () => bone,
       getSlotImage: () => image,
+      getSlotMesh: () => undefined,
       getAttachment: () => 'part',
       resetToBindPose: vi.fn().mockReturnThis(),
       setFacing: vi.fn().mockReturnThis(),

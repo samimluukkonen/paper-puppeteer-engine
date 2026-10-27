@@ -483,3 +483,26 @@ test.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGE
   'invalid history limit %s is rejected',
   (historyLimit) => assert.throws(() => new RigEditorState(source, undefined, { historyLimit }), /History limit/),
 );
+
+test('slot inspector requests are view state tied to the selected object rather than its ID', () => {
+  const state = new RigEditorState(
+    new Rig({
+      root: 'root',
+      bones: [{ id: 'root' }],
+      slots: [{ id: 'art', bone: 'root' }],
+    }),
+  );
+  const before = state.workingCopy;
+  state.selectSlot('art', 'mesh');
+  assert.equal(state.selectionInspectorTab, 'mesh');
+  assert.strictEqual(state.workingCopy, before);
+  assert.equal(state.historyLength, 0);
+  state.selectBone('root');
+  assert.isUndefined(state.selectionInspectorTab);
+  state.selection = { type: 'slot', id: 'art' };
+  assert.isUndefined(state.selectionInspectorTab);
+  state.selectSlot('art', 'attachments');
+  assert.equal(state.selectionInspectorTab, 'attachments');
+  state.clearSelection();
+  assert.isUndefined(state.selectionInspectorTab);
+});

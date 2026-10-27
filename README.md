@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [mesh attachment foundation](docs/mesh-attachments.md) adds validated authored geometry and bind references; mesh rendering and deformation are future milestones.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [visual mesh editor](docs/mesh-attachments.md) adds textured geometry, vertex editing and safe subdivision in Rig Editor; automatic deformation and bone weights remain future work.
 
 **Authoring tools:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
@@ -172,7 +172,7 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 
 ## Current limitations
 
-- Rigid pieces only: no mesh deformation, weighted skinning, physics, ragdolls, or cloth.
+- Rigid pieces and authored textured meshes; no automatic mesh deformation, weighted skinning, physics, ragdolls, or cloth.
 - One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot contacts require explicit IK targets; the sample walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.

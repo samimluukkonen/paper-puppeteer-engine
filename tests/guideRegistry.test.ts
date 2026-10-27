@@ -24,6 +24,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
       'rig-joint-editing',
       'rig-importing-artwork',
       'rig-aligning-sprites',
+      'rig-mesh-geometry',
       'rig-slots-attachments',
       'rig-skins',
       'rig-ik-constraints',

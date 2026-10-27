@@ -7,11 +7,13 @@ import './attachments.css';
 export function AttachmentPanel({
   controller,
   authoring = true,
+  meshAuthoring = false,
   defaultOpen = false,
   embedded = false,
 }: {
   controller: AttachmentController;
   authoring?: boolean;
+  meshAuthoring?: boolean;
   defaultOpen?: boolean;
   embedded?: boolean;
 }) {
@@ -73,7 +75,7 @@ export function AttachmentPanel({
               data-guide-id={GUIDE_TARGETS.rigAttachmentSlot}
               aria-label="Attachment slot"
               value={slot}
-              onChange={(event) => controller.selectSlot(event.target.value)}
+              onChange={(event) => controller.selectSlot(event.target.value, 'attachments')}
             >
               <option value="" disabled>
                 Select a slot
@@ -126,6 +128,11 @@ export function AttachmentPanel({
                   ))}
                 </select>
               </label>
+              {authoring && meshAuthoring && attachment && state.getAttachment(attachment).type !== 'mesh' && (
+                <button type="button" className="workspace-primary" onClick={() => controller.convertToMesh()}>
+                  Convert to Mesh Attachment
+                </button>
+              )}
               <div className="action-grid">
                 <button type="button" disabled={!authoring || !skin} onClick={() => controller.assign(null)}>
                   Clear assignment

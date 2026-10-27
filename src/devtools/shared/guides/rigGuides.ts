@@ -227,6 +227,73 @@ export const rigGuides: readonly GuideDefinition[] = [
     ],
   },
   {
+    id: 'rig-mesh-geometry',
+    title: 'Editing Mesh Geometry',
+    description: 'Convert sprite attachments and edit textured vertices with safe topology tools.',
+    editor: 'rig',
+    category: 'artwork',
+    prerequisites: [
+      ...character,
+      { capability: 'valid-rig', reason: 'Resolve rig validation errors before editing mesh geometry.' },
+      {
+        capability: 'rig-mesh-artwork',
+        guideId: 'rig-slots-attachments',
+        reason:
+          'Create an artwork slot and a whole-image sprite attachment first. Use Importing Artwork and Slots and Attachments. Existing mesh attachments also support this guide.',
+      },
+    ],
+    steps: [
+      step(
+        'slot',
+        'Choose the artwork slot',
+        'After exiting this tour, choose **Mesh attachment slot** or select the artwork slot in **Hierarchy**. It must have an assigned whole-image sprite or mesh. Use **Attachments & skins** to assign artwork to an empty slot. Bone sprites and atlas frames cannot be converted here.',
+        targets.rigMeshSlot,
+      ),
+      step(
+        'convert',
+        'Convert while keeping the original',
+        '**Convert to Mesh Attachment** creates a rectangle with four vertices and two triangles, preserving the image, placement and rigid source definition. Converting the **default skin** creates and selects a separate mesh skin variant; other skin assignments stay intact. A nondefault skin changes only its selected slot mapping. If the slot already selects a mesh, this control reads **Edit Mesh Geometry** instead.',
+        targets.rigMeshWorkflow,
+      ),
+      step(
+        'mode',
+        'Recognize mesh handles',
+        'Choose **Edit Mesh Geometry** in Edit or in the Mesh geometry inspector. **Cyan diamonds** mark vertices and lines show triangle edges. They differ from round bone joints, square slot markers, sprite origins, green contact markers and IK targets. Drag a diamond to edit the textured surface. Wheel zooms; middle drag pans.',
+        targets.rigCanvas,
+      ),
+      step(
+        'vertices',
+        'Place vertices precisely',
+        'With a mesh selected, choose **Mesh vertex** and edit **Vertex X/Y** in the Mesh geometry inspector. Values are attachment-local coordinates; moving a vertex retains its **UV** texture coordinates. Enter or blur commits; Escape in the field cancels its draft. Arrow keys nudge the selected diamond and Shift increases the step. Geometry belongs to the rig attachment and creates no animation keys.',
+        targets.rigMeshTools,
+      ),
+      step(
+        'subdivide',
+        'Add a vertex by subdividing an edge',
+        'Click an edge on the canvas or choose **Mesh edge**, then **Subdivide edge**. The new midpoint receives a stable vertex ID and averaged endpoint **UVs**. Every adjacent triangle splits consistently, including both sides of a shared edge. Existing UVs stay unchanged, so the texture is not remapped across the mesh.',
+        targets.rigMeshTools,
+      ),
+      step(
+        'topology',
+        'Inspect and safely remove geometry',
+        '**Triangle inspection** lists the vertex IDs for each triangle. **Delete vertex** retriangulates a supported connected triangle fan; a corner without a valid replacement is rejected. Invalid moves or topology edits leave the last valid geometry intact and show feedback here. Meshes require **whole images** and WebGL; finish rest transforms before conversion because the saved bind configuration is protected.',
+        targets.rigMeshTools,
+      ),
+      step(
+        'history',
+        'Review, undo or cancel an edit',
+        'One completed **vertex drag** is one rig **Undo** action. **Escape** during a drag, window blur or leaving the editor cancels it. Numeric commits, conversion, subdivision and deletion each use rig history. **Redo** restores the edit; the tour itself changes no artwork, skin selection or history.',
+        targets.rigHistory,
+      ),
+      step(
+        'save',
+        'Keep and reload the mesh skin',
+        '**Mesh skin** chooses the appearance being edited. Keep the new variant name: after exporting and reloading, select that skin again to see the mesh; the original default skin retains rigid artwork. **Download rig.json** keeps geometry, triangles and UVs. **Download character ZIP** also keeps images, skins and animations. Image binaries remain unchanged by geometry editing.',
+        targets.rigMeshSkin,
+      ),
+    ],
+  },
+  {
     id: 'rig-slots-attachments',
     title: 'Slots and Attachments',
     description: 'Connect an image attachment to a bone through a slot and skin assignment.',

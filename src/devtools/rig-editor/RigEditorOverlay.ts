@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { localToWorld, worldToLocal } from '../../engine/affineMath.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import { meshEdges } from '../../engine/meshEditing.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { gridLines } from './grid.js';
 import type { RigEditorSelection, RigEditorState } from './RigEditorState.js';
@@ -115,12 +116,50 @@ export class RigEditorOverlay {
       )[0];
   }
 
-  private gridFrame(): Phaser.GameObjects.Container {
+  getMeshVertices() {
+    const mesh = this.state.selectedMesh;
+    const slot = this.state.selection;
+    if (this.disposed || this.state.editMode !== 'mesh' || !mesh || slot?.type !== 'slot') return [];
+    const object = this.puppet.getSlotMesh(slot.id);
+    if (!object) return [];
+    const matrix = object.getWorldTransformMatrix();
+    return mesh.vertices.map((vertex, index) => ({
+      ...vertex,
+      index,
+      screen: this.screen(localToWorld(vertex, matrix)),
+    }));
+  }
+
+  pickMeshVertex(x: number, y: number) {
+    return this.getMeshVertices()
+      .map((vertex) => ({ ...vertex, distance: Math.hypot(x - vertex.screen.x, y - vertex.screen.y) }))
+      .filter((vertex) => vertex.distance <= 11)
+      .sort((a, b) => a.distance - b.distance)[0];
+  }
+
+  pickMeshEdge(x: number, y: number): [number, number] | undefined {
+    const mesh = this.state.selectedMesh;
+    const points = this.getMeshVertices();
+    if (!mesh || !points.length) return undefined;
+    return meshEdges(mesh)
+      .map((edge) => ({
+        edge,
+        distance: distanceToSegment({ x, y }, points[edge[0]]!.screen, points[edge[1]]!.screen),
+      }))
+      .filter((edge) => edge.distance <= 8)
+      .sort((a, b) => a.distance - b.distance)[0]?.edge;
+  }
+
+  private gridFrame(): Phaser.GameObjects.Container | Phaser.GameObjects.Mesh2D {
     const marker = this.state.selectedFootContactMarkerId;
     if (marker) return this.puppet.getBone(this.state.getFootContactMarker(marker).boneId).container;
     const selected = this.state.selection;
     if (!selected) return this.puppet.container;
     if (selected.type === 'slot') {
+      if (this.state.editMode === 'mesh') {
+        const mesh = this.puppet.getSlotMesh(selected.id);
+        if (mesh) return mesh;
+      }
       if (this.state.editMode === 'sprite' || this.state.editMode === 'origin') {
         const mount = this.puppet.getSlotImage(selected.id)?.parentContainer;
         if (mount) return mount;
@@ -258,6 +297,9 @@ export class RigEditorOverlay {
       this.state.workingCopy,
       this.state.selection?.type,
       this.state.selection?.id,
+      this.state.selectedMeshVertexId,
+      this.state.selectedMeshEdge,
+      ...this.getMeshVertices().flatMap((vertex) => [vertex.screen.x, vertex.screen.y]),
       this.state.selectedIKConstraintId,
       ...visibleChains.flatMap((chain) =>
         [chain.rootBone, chain.middleBone, chain.endBone].flatMap((id) => {
@@ -510,6 +552,30 @@ export class RigEditorOverlay {
           .lineBetween(point.x, point.y - 10, point.x, point.y + 10);
       }
       if (selected) label(`${marker.name} · contact`, point.x + 14, point.y + 12, '#a53d21');
+    }
+    const meshPoints = this.getMeshVertices();
+    const mesh = this.state.selectedMesh;
+    if (mesh && meshPoints.length) {
+      for (const [a, b] of meshEdges(mesh)) {
+        const p = meshPoints[a]!.screen,
+          q = meshPoints[b]!.screen;
+        const selected = this.state.selectedMeshEdge?.[0] === a && this.state.selectedMeshEdge[1] === b;
+        g.lineStyle(selected ? 3 : 1, selected ? 0xffdc72 : 0x40d9ed, 0.95).lineBetween(p.x, p.y, q.x, q.y);
+      }
+      for (const vertex of meshPoints) {
+        const { x, y } = vertex.screen;
+        const selected = vertex.id === this.state.selectedMeshVertexId;
+        const r = selected ? 8 : 6;
+        g.fillStyle(selected ? 0xffdc72 : 0x40d9ed, 1);
+        g.fillTriangle(x, y - r, x + r, y, x, y + r);
+        g.fillTriangle(x, y - r, x, y + r, x - r, y);
+        g.lineStyle(1, 0x010409, 1)
+          .lineBetween(x, y - r, x + r, y)
+          .lineBetween(x + r, y, x, y + r)
+          .lineBetween(x, y + r, x - r, y)
+          .lineBetween(x - r, y, x, y - r);
+        if (selected) label(`Mesh: ${vertex.id}`, x + 12, y - 18, '#40d9ed');
+      }
     }
     for (let i = labelIndex; i < this.labels.length; i += 1) this.labels[i]?.setVisible(false);
     // Cache only a completed draw so a failing renderer can be retried.

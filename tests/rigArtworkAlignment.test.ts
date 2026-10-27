@@ -132,6 +132,7 @@ function fixture(mode: EditMode = 'sprite', attachment = false, facing = 1) {
     getBone: (id: string) => bones[id as keyof typeof bones],
     getAttachment: () => (attachment ? 'art' : undefined),
     getSlotImage: () => (attachment ? image : undefined),
+    getSlotMesh: () => undefined,
     preparePose: vi.fn(),
     syncPose: vi.fn(),
     setSlotTransform: vi.fn(),

@@ -42,7 +42,7 @@ for (const existing of [true, false]) {
       const open = page.getByRole('button', { name: 'Feature Guide', exact: true });
       await open.click();
       const start = page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
-      if (!existing && ['rig-aligning-sprites', 'rig-ik-constraints'].includes(guide.id)) {
+      if (!existing && ['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry'].includes(guide.id)) {
         await expect(start).toBeDisabled();
         await page.keyboard.press('Escape');
         continue;
@@ -117,4 +117,56 @@ test('New Character tour remains available when character loading fails', async 
     await tour.getByRole('button', { name: index === 2 ? 'Finish' : 'Next', exact: true }).click();
   }
   await expect(tour).toHaveCount(0);
+});
+
+test('mesh guide resolves before and after conversion while preserving mesh selection and history', async ({
+  page,
+}) => {
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  await inspectorControl(page, '#mesh-geometry-panel');
+  const panel = page.locator('#mesh-geometry-panel');
+  await panel.getByLabel('Mesh attachment slot', { exact: true }).selectOption('leftForearmVisual');
+  const guide = guideRegistry.getGuideById('rig-mesh-geometry')!;
+  const downloads: string[] = [];
+  page.on('download', (download) => downloads.push(download.suggestedFilename()));
+  const walkthrough = async () => {
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    await page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+    const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+    for (const [index, step] of guide.steps.entries()) {
+      await expect(tour.getByRole('heading', { name: step.title, exact: true })).toBeVisible();
+      const target = page.locator(`[data-guide-id="${step.targetId}"]`);
+      await expect(target).toHaveCount(1);
+      await expect(target).toBeVisible();
+      await expect(tour.locator('.guide-spotlight-hole')).toBeVisible();
+      await expect(tour.getByRole('status')).toHaveCount(0);
+      if (index === 3)
+        await page.screenshot({
+          path: test.info().outputPath(`mesh-guide-${await page.locator('#edit-mode').inputValue()}.png`),
+        });
+      await tour
+        .getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true })
+        .click();
+    }
+    await expect(tour).toHaveCount(0);
+    expect(downloads).toEqual([]);
+  };
+  await walkthrough();
+  await expect(page.locator('#edit-mode')).toHaveValue('joint');
+  await expect(panel.getByLabel('Mesh attachment slot', { exact: true })).toHaveValue('leftForearmVisual');
+  await panel.getByRole('button', { name: 'Convert to Mesh Attachment', exact: true }).click();
+  await panel.getByLabel('Mesh edge', { exact: true }).selectOption('0:2');
+  await panel.getByRole('button', { name: 'Subdivide edge', exact: true }).click();
+  await panel.getByLabel('Mesh edge', { exact: true }).selectOption('0:4');
+  const skin = await panel.getByLabel('Mesh skin', { exact: true }).inputValue();
+  await walkthrough();
+  await expect(panel).toContainText('5 vertices · 4 triangles');
+  await expect(panel.getByLabel('Mesh edge', { exact: true })).toHaveValue('0:4');
+  await expect(panel.getByLabel('Mesh skin', { exact: true })).toHaveValue(skin);
+  await expect(page.locator('#edit-mode')).toHaveValue('mesh');
+  await page.locator('#undo').click();
+  await expect(panel).toContainText('4 vertices · 2 triangles');
+  await page.locator('#redo').click();
+  await expect(panel).toContainText('5 vertices · 4 triangles');
 });
