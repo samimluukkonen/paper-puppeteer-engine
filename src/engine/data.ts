@@ -1,6 +1,11 @@
 /** Shared authored data contracts. Type-only imports require neither Phaser nor React. */
 export type { AudioAssetDefinition, AudioCategory, AudioFormat } from './AudioAsset.js';
 export type {
+  AttachmentDefinition,
+  AttachmentDefinitionBase,
+  MeshVertex,
+  MeshBindPose,
+  MeshAttachmentDefinition,
   AttachmentOptions,
   BoneDefinition,
   Facing,

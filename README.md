@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [mesh attachment foundation](docs/mesh-attachments.md) adds validated authored geometry and bind references; mesh rendering and deformation are future milestones.
 
 **Authoring tools:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
@@ -96,6 +96,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 
 - [Character runtime integration](docs/runtime-integration.md)
 - [Rig constraint workflow, transform audit and optional deformation design](docs/rig-constraints-and-deformation.md)
+- [Mesh attachment quick start, coordinates and current limits](docs/mesh-attachments.md#using-this-milestone)
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Advanced Pose Library](docs/pose-library.md)

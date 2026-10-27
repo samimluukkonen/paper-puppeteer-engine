@@ -160,72 +160,326 @@
     "attachments": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^(?!__proto__$)[\\s\\S]+$"
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "sprite"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              "texture": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              "frame": {
+                "type": ["string", "number"]
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "scaleX": {
+                "type": "number"
+              },
+              "scaleY": {
+                "type": "number"
+              },
+              "originX": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "originY": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "groundContacts": {
+                "readOnly": true,
+                "minItems": 1,
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["x", "y"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["id", "texture"],
+            "additionalProperties": false
           },
-          "texture": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^(?!__proto__$)[\\s\\S]+$"
-          },
-          "frame": {
-            "type": ["string", "number"]
-          },
-          "x": {
-            "type": "number"
-          },
-          "y": {
-            "type": "number"
-          },
-          "rotation": {
-            "type": "number"
-          },
-          "scaleX": {
-            "type": "number"
-          },
-          "scaleY": {
-            "type": "number"
-          },
-          "originX": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "originY": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "groundContacts": {
-            "readOnly": true,
-            "minItems": 1,
-            "maxItems": 32,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "x": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                "y": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              "texture": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "rotation": {
+                "type": "number"
+              },
+              "scaleX": {
+                "type": "number"
+              },
+              "scaleY": {
+                "type": "number"
+              },
+              "originX": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "originY": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "groundContacts": {
+                "readOnly": true,
+                "minItems": 1,
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["x", "y"],
+                  "additionalProperties": false
                 }
               },
-              "required": ["x", "y"],
-              "additionalProperties": false
-            }
+              "type": {
+                "type": "string",
+                "const": "mesh"
+              },
+              "meshVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "imageSize": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000
+                  }
+                },
+                "required": ["width", "height"],
+                "additionalProperties": false
+              },
+              "vertices": {
+                "minItems": 3,
+                "maxItems": 1024,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                    },
+                    "x": {
+                      "type": "number",
+                      "minimum": -1000000,
+                      "maximum": 1000000
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": -1000000,
+                      "maximum": 1000000
+                    },
+                    "u": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "v": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["id", "x", "y", "u", "v"],
+                  "additionalProperties": false
+                }
+              },
+              "triangles": {
+                "minItems": 3,
+                "maxItems": 6144,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "bindPose": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "root": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  "bones": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                        },
+                        "parent": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                        },
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "rotation": {
+                          "type": "number"
+                        },
+                        "scaleX": {
+                          "type": "number"
+                        },
+                        "scaleY": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["id", "x", "y", "rotation", "scaleX", "scaleY"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "slots": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                        },
+                        "bone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                        },
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "rotation": {
+                          "type": "number"
+                        },
+                        "scaleX": {
+                          "type": "number"
+                        },
+                        "scaleY": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["id", "bone", "x", "y", "rotation", "scaleX", "scaleY"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "attachment": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      },
+                      "rotation": {
+                        "type": "number"
+                      },
+                      "scaleX": {
+                        "type": "number"
+                      },
+                      "scaleY": {
+                        "type": "number"
+                      }
+                    },
+                    "required": ["x", "y", "rotation", "scaleX", "scaleY"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["version", "root", "bones", "slots", "attachment"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["id", "texture", "type", "meshVersion", "imageSize", "vertices", "triangles", "bindPose"],
+            "additionalProperties": false
           }
-        },
-        "required": ["id", "texture"],
-        "additionalProperties": false
+        ]
       }
     },
     "skins": {

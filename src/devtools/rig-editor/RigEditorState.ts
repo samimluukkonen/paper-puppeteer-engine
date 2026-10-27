@@ -27,7 +27,7 @@ import type {
   RigDefinition,
   SkinDefinition,
   SlotDefinition,
-  SpriteAttachmentDefinition,
+  AttachmentDefinition,
   TransformProperty,
 } from '../../engine/types.js';
 import { checkSkinReferences, throwValidationIssue } from '../../engine/validation.js';
@@ -82,7 +82,7 @@ type WorkingRig = {
   root: string;
   bones: BoneDefinition[];
   slots?: SlotDefinition[];
-  attachments?: SpriteAttachmentDefinition[];
+  attachments?: AttachmentDefinition[];
   skins?: SkinDefinition[];
 };
 
@@ -331,6 +331,8 @@ export class RigEditorState {
     this.history.change(() => {
       this.invalidate();
       edit();
+      // Bound geometry must never survive a silent rest/hierarchy edit. History rolls failed proposals back.
+      if (this.data.attachments?.some((attachment) => attachment.type === 'mesh')) new Rig(this.data);
     });
     if (!this.history.inOperation) this.updateWarnings();
   }
@@ -632,7 +634,7 @@ export class RigEditorState {
     return slot;
   }
 
-  getAttachment(id: string): ReadonlyRigData<SpriteAttachmentDefinition> {
+  getAttachment(id: string): ReadonlyRigData<AttachmentDefinition> {
     const index = this.attachmentIndices.get(id);
     const attachment = index === undefined ? undefined : this.data.attachments?.[index];
     if (!attachment) throw new Error(`Unknown attachment "${id}".`);
@@ -712,7 +714,7 @@ export class RigEditorState {
       if (update.standaloneSkins !== undefined) this.externalSkins = freezeData(update.standaloneSkins);
     });
   }
-  private assertArtwork(attachment: SpriteAttachmentDefinition): void {
+  private assertArtwork(attachment: AttachmentDefinition): void {
     const issue = this.artworkIssue?.(attachment.texture, attachment.frame);
     if (issue) throw new Error(issue);
   }
@@ -943,12 +945,14 @@ export class RigEditorState {
   editSpriteFields(id: string, values: Partial<Record<SpriteField, number | undefined>>, attachment = false): void {
     for (const [field, value] of Object.entries(values)) if (value !== undefined) this.assertValue(field, value);
     const original = attachment ? this.getAttachment(id) : this.getBone(id).sprite;
+    if (original && 'type' in original && original.type === 'mesh' && ('originX' in values || 'originY' in values))
+      throw new Error('Mesh pivots are baked into vertex positions. Recreate the mesh to change its pivot.');
     const sprite = original ? { ...original } : undefined;
     if (!sprite) throw new Error(`No sprite for "${id}".`);
     this.change(() => {
       patchFields(sprite, values);
       if (attachment)
-        this.data.attachments![this.attachmentIndices.get(id)!] = freezeData(sprite as SpriteAttachmentDefinition);
+        this.data.attachments![this.attachmentIndices.get(id)!] = freezeData(sprite as AttachmentDefinition);
       else this.replaceBone({ ...this.getBone(id), sprite });
     });
   }

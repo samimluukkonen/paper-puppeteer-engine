@@ -1,5 +1,7 @@
 import type { AnimationClip } from './AnimationClip.js';
 import type { PropertyCurves } from './animationCurves.js';
+import { validateMeshBindPose } from './meshBindPose.js';
+import { validateMeshTopology } from './meshGeometry.js';
 import type { RigDefinition, SkinDefinition } from './types.js';
 
 export interface ValidationIssue {
@@ -116,6 +118,10 @@ export function checkRigReferences(definition: RigDefinition, report: ReportVali
         message: `Duplicate attachment id "${attachment.id}".`,
       });
     attachmentIds.add(attachment.id);
+    if (attachment.type === 'mesh') {
+      for (const issue of [...validateMeshTopology(attachment), ...validateMeshBindPose(attachment, definition)])
+        report({ ...issue, path: `attachments[${index}].${issue.path}` });
+    }
   }
   checkSkinReferences(definition.skins ?? [], definition, report);
   const constraintNames = new Set<string>();

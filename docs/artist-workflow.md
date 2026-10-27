@@ -36,6 +36,12 @@ In [slots, attachments and skins](visual-attachment-skins.md), create attachment
 
 **Download rig.json** exports a JSON checkpoint. Editor tabs already share the same live rig, so no file transfer is needed between them. Save that download and place it at the manifest's rig path yourself. Standalone skin downloads require the same manual placement. A rig download does not include replacement images.
 
+### Imported mesh attachments
+
+The optional [mesh attachment foundation](mesh-attachments.md#using-this-milestone) preserves experimental mesh geometry in imported and exported characters. Continue authoring visible artwork with rigid sprites: this milestone has no mesh editor or deformation controls, and a slot selecting a mesh remains blank in previews and runtime. Use the existing **Slots and Attachments** Feature Guide to select a rigid attachment for visible artwork.
+
+Bound meshes also protect their saved rest configuration. If a joint, slot or attachment transform edit reports a bind-pose mismatch, the editor rolls it back. Restore the saved configuration or ask the character's developer to recreate the mesh from the revised authored rig. Mesh pivots require geometry recreation; mesh image replacements must retain dimensions and origin multipliers of 1. See the [mesh troubleshooting guide](mesh-attachments.md#troubleshooting).
+
 ## Creating IK on a new character
 
 1. Choose **+ New Character**. In **Build skeleton**, select the root and add a child, then add that child's child. Place the joints so both chain segments have a nonzero length. Bone IDs can describe any shape, such as `base → segment → tip`.

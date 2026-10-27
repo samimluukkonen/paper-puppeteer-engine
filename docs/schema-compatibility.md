@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Engine release **0.9.4** supports the following authored JSON formats. Engine SemVer and JSON `version` fields are separate: upgrading the engine does not upgrade character files.
+Engine release **1.4.2-1** supports the following authored JSON formats. Engine SemVer and JSON `version` fields are separate: upgrading the engine does not upgrade character files.
 
 | Document                     | Supported version                | Required fields                                                          | Optional fields                                                                          |
 | ---------------------------- | -------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
@@ -116,3 +116,5 @@ Changed verification files: `tests/schemaCompatibility.test.ts`, `tests/characte
 Changed release/documentation files: `package.json`, `package-lock.json`, `README.md`, `CHANGELOG.md`, `docs/characters.md`, `docs/development.md`, and this guide. Generated JSON Schemas are unchanged because their version-1 shapes are unchanged.
 
 The [v1.1.1 Pose Library](pose-library.md) adds optional `library` metadata to version-1 poses: stable ID, character ID, canonical rig signature and `fk-local` provenance. Legacy pose files remain valid. Character validation rejects duplicate library IDs; editor Preview/Apply additionally require exact compatible character/rig identity. Runtime sparse pose application remains unchanged.
+
+The [v1.4.2.1 mesh attachment foundation](mesh-attachments.md) adds strict optional `type: "mesh"` attachments with `meshVersion: 1` and explicit bind-pose metadata to version-1 rigs. Omitted attachment types retain the original rigid sprite interpretation. No automatic conversion or outer-format migration occurs.

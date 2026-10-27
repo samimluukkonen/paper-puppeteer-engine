@@ -5,7 +5,7 @@ import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
 import type { Rig } from './Rig.js';
-import type { SkinDefinition, SpriteAttachmentDefinition } from './types.js';
+import type { SkinDefinition, AttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
 interface RenderBranch {
@@ -43,9 +43,9 @@ export class PuppetRenderer {
   private appearanceRevision = 0;
   private readonly artworkTextures = new Map<string, ArtworkReplacement>();
   private readonly individualArtwork = new Map<string, ArtworkReplacement>();
-  private artworkDefinitions: readonly SpriteAttachmentDefinition[];
+  private artworkDefinitions: readonly AttachmentDefinition[];
   private artworkSkins: readonly SkinDefinition[];
-  private readonly slotArtwork = new Map<string, SpriteAttachmentDefinition>();
+  private readonly slotArtwork = new Map<string, AttachmentDefinition>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -285,7 +285,7 @@ export class PuppetRenderer {
     ];
   }
 
-  updateArtworkDefinitions(definitions: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): void {
+  updateArtworkDefinitions(definitions: readonly AttachmentDefinition[], skins: readonly SkinDefinition[]): void {
     this.artworkDefinitions = definitions;
     this.artworkSkins = skins;
   }
@@ -403,13 +403,14 @@ export class PuppetRenderer {
     image.setOrigin(x * (replacement?.originScaleX ?? 1), y * (replacement?.originScaleY ?? 1));
   }
 
-  setSlotAttachment(id: string, definition: SpriteAttachmentDefinition | undefined): void {
+  setSlotAttachment(id: string, definition: AttachmentDefinition | undefined): void {
     const mount = this.getSlotMount(id);
     const previous = this.slotImages.get(id);
     const presentation = previous
       ? { alpha: previous.alpha, visible: previous.visible, depth: previous.depth }
       : undefined;
-    if (!definition) {
+    // Meshes retain slot selection/ordering but have no renderer in this data foundation milestone.
+    if (!definition || definition.type === 'mesh') {
       previous?.destroy();
       this.slotImages.delete(id);
       this.slotArtwork.delete(id);

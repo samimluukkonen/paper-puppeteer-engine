@@ -387,7 +387,7 @@ test.each([
   const puppet = new Puppet(scene, { rig: definition, skin: 'default', autoUpdate: false });
   const original = puppet.getSlotImage('hand-art')!;
   const next = definition.attachments!.map((entry) =>
-    entry.id === invalid.id
+    entry.id === invalid.id && entry.type !== 'mesh'
       ? { ...entry, texture: invalid.texture, ...(invalid.frame === undefined ? {} : { frame: invalid.frame }) }
       : { ...entry, x: 17 },
   );

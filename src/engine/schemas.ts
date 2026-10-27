@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MESH_LIMITS } from './meshGeometry.js';
 import { type TransformProperty, transformProperties } from './types.js';
 
 export const RIG_FORMAT_VERSION = 1;
@@ -60,6 +61,7 @@ export const slotDefinitionSchema = z.object({
 });
 
 export const spriteAttachmentSchema = z.object({
+  type: z.literal('sprite').exactOptional(),
   id: identifierSchema,
   texture: identifierSchema,
   frame: z.union([z.string(), finiteNumber]).exactOptional(),
@@ -73,6 +75,58 @@ export const spriteAttachmentSchema = z.object({
     .readonly()
     .exactOptional(),
 });
+
+const meshRestTransformFields = {
+  x: finiteNumber,
+  y: finiteNumber,
+  rotation: finiteNumber,
+  scaleX: finiteNumber.refine((value) => value !== 0, 'Mesh bind scale must be nonzero.'),
+  scaleY: finiteNumber.refine((value) => value !== 0, 'Mesh bind scale must be nonzero.'),
+};
+
+export const meshVertexSchema = z.strictObject({
+  id: identifierSchema,
+  x: finiteNumber.min(-MESH_LIMITS.coordinate).max(MESH_LIMITS.coordinate),
+  y: finiteNumber.min(-MESH_LIMITS.coordinate).max(MESH_LIMITS.coordinate),
+  u: finiteNumber.min(0).max(1),
+  v: finiteNumber.min(0).max(1),
+});
+
+export const meshBindPoseSchema = z.strictObject({
+  version: z.literal(1),
+  root: identifierSchema,
+  bones: z
+    .array(
+      z.strictObject({ id: identifierSchema, parent: identifierSchema.exactOptional(), ...meshRestTransformFields }),
+    )
+    .min(1),
+  slots: z.array(z.strictObject({ id: identifierSchema, bone: identifierSchema, ...meshRestTransformFields })),
+  attachment: z.strictObject(meshRestTransformFields),
+});
+
+export const meshAttachmentSchema = spriteAttachmentSchema
+  .omit({ type: true, frame: true })
+  .extend({
+    type: z.literal('mesh'),
+    meshVersion: z.literal(1),
+    imageSize: z.strictObject({
+      width: finiteNumber.int().positive().max(MESH_LIMITS.coordinate),
+      height: finiteNumber.int().positive().max(MESH_LIMITS.coordinate),
+    }),
+    vertices: z.array(meshVertexSchema).min(3).max(MESH_LIMITS.vertices),
+    triangles: z
+      .array(finiteNumber.int().nonnegative())
+      .min(3)
+      .max(MESH_LIMITS.triangles * 3),
+    bindPose: meshBindPoseSchema,
+  })
+  .strict();
+
+/** Strict variants prevent an unsupported discriminator from being stripped into a legacy sprite. */
+export const attachmentSchema = z.discriminatedUnion('type', [spriteAttachmentSchema.strict(), meshAttachmentSchema]);
+
+// Preserve the runtime sprite parser's established extra-field behavior; file/slot catalogs stay strict.
+const runtimeAttachmentSchema = z.discriminatedUnion('type', [spriteAttachmentSchema, meshAttachmentSchema]);
 
 export const skinDefinitionSchema = z.object({
   version: z.literal(1),
@@ -122,7 +176,7 @@ export const rigDefinitionSchema = z.object({
   root: identifierSchema,
   bones: z.array(boneDefinitionSchema),
   slots: z.array(slotDefinitionSchema).exactOptional(),
-  attachments: z.array(spriteAttachmentSchema).exactOptional(),
+  attachments: z.array(runtimeAttachmentSchema).exactOptional(),
   skins: z.array(skinDefinitionSchema).exactOptional(),
   ik: z.array(twoBoneIKDefinitionSchema).exactOptional(),
 });
@@ -202,7 +256,7 @@ export const rigFileSchema = rigDefinitionSchema
     name: z.string().min(1, 'Rig name must be a nonempty string.').exactOptional(),
     bones: z.array(boneDefinitionSchema.extend({ sprite: spriteSchema.strict().exactOptional() }).strict()),
     slots: z.array(slotDefinitionSchema.strict()).exactOptional(),
-    attachments: z.array(spriteAttachmentSchema.strict()).exactOptional(),
+    attachments: z.array(attachmentSchema).exactOptional(),
     skins: z.array(skinFileSchema).exactOptional(),
     ik: z
       .array(

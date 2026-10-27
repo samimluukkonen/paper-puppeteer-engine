@@ -34,7 +34,7 @@ import { Rig } from './Rig.js';
 import type { RootMotionOffset } from './rootMotion.js';
 import { SlotDebug } from './SlotDebug.js';
 import { SlotState } from './SlotState.js';
-import type { AttachmentOptions, Facing, RigDefinition, SkinDefinition, SpriteAttachmentDefinition } from './types.js';
+import type { AttachmentOptions, Facing, RigDefinition, SkinDefinition, AttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
 export type { SyncPoseOptions } from './PuppetPoseController.js';
@@ -73,7 +73,7 @@ export class Puppet {
   private slotState: SlotState;
   private slotDebugView: SlotDebug | undefined;
   private readonly renderedSlotAttachments = new Map<string, string>();
-  private readonly renderedSlotDefinitions = new Map<string, Readonly<SpriteAttachmentDefinition>>();
+  private readonly renderedSlotDefinitions = new Map<string, Readonly<AttachmentDefinition>>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
   private ikAnimationSource: Pick<AnimationPlayer, 'ikAnimation'> | undefined;
@@ -597,7 +597,7 @@ export class Puppet {
   }
 
   /** Update the artwork catalog and skins in place; skeleton, player, IK and slot mounts retain identity. */
-  updateSlotDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): this {
+  updateSlotDefinitions(attachments: readonly AttachmentDefinition[], skins: readonly SkinDefinition[]): this {
     const previous = this.slotState;
     const next = new SlotState(previous);
     next.updateDefinitions(attachments, skins);

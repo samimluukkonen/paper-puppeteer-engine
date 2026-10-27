@@ -510,7 +510,9 @@ test('catalog updates validate frames against the effective artwork replacement 
   const original = f.puppet.getSlotImage('arm')!;
   const replacement = f.textures.get(original.texture.key)!;
   replacement.has = () => false;
-  const next = f.rig.attachments.map((entry) => (entry.id === 'armA' ? { ...entry, frame: 'new-frame' } : entry));
+  const next = f.rig.attachments.map((entry) =>
+    entry.id === 'armA' && entry.type !== 'mesh' ? { ...entry, frame: 'new-frame' } : entry,
+  );
   assert.throws(() => f.puppet.updateSlotDefinitions(next, f.rig.skins), /Missing frame "new-frame"/);
   assert.strictEqual(f.puppet.getSlotImage('arm'), original);
   assert.isFalse(original.isDestroyed);

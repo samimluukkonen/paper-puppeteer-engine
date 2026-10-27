@@ -43,6 +43,8 @@ The guides reuse `rig-bone-hierarchy`, `rig-selection-details`, and `rig-canvas`
 
 All ten feature families are implemented. There are no fictional or omitted feature entries. Alignment and IK are conditionally unavailable when their resource prerequisites are absent; interactive practice remains deferred.
 
+The v1.4.2.1 [mesh foundation](mesh-attachments.md#using-this-milestone) adds a documented data workflow, with a developer quick start and troubleshooting. It adds no mesh tour because visual creation, editing and rendering are deferred. Existing attachment/skin tours continue to teach the available rigid artwork controls; imported mesh selections remain unrendered.
+
 ## Verification
 
 `tests/rigGuides.test.ts` checks registration and counts, declared targets, unloaded/root-only/existing rigs, live capability changes, all guide navigation, finish, exit at every step, and preservation of authored data, selections, skins, dirty flags and history. Existing controller/registry tests now follow the six-step joint tour. Resolver/observer tests cover React panels, scroll clipping, UI-only reveal, Phaser geometry providers and cleanup.

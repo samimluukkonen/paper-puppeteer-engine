@@ -43,7 +43,7 @@ export interface SlotDefinition extends Partial<JointTransform> {
   depth?: number;
 }
 
-export interface SpriteAttachmentDefinition {
+export interface AttachmentDefinitionBase {
   id: string;
   texture: string;
   frame?: string | number;
@@ -57,6 +57,45 @@ export interface SpriteAttachmentDefinition {
   /** Sole contact points in normalized image coordinates (0–1, measured from the top left). */
   groundContacts?: readonly { readonly x: number; readonly y: number }[];
 }
+
+/** Omitted type is the original rigid sprite format. */
+export interface SpriteAttachmentDefinition extends AttachmentDefinitionBase {
+  type?: 'sprite';
+}
+
+export interface MeshVertex {
+  id: string;
+  /** Unscaled attachment-local bind position, with the image pivot already subtracted. */
+  x: number;
+  y: number;
+  /** Normalized image coordinates, top left (0, 0), bottom right (1, 1). */
+  u: number;
+  v: number;
+}
+
+/** Effective authored rest transforms, independent of live joints, animation and camera state. */
+export interface MeshBindPose {
+  version: 1;
+  root: string;
+  bones: readonly (JointTransform & { id: string; parent?: string })[];
+  slots: readonly (JointTransform & { id: string; bone: string })[];
+  attachment: JointTransform;
+}
+
+export interface MeshAttachmentDefinition extends AttachmentDefinitionBase {
+  type: 'mesh';
+  /** Mesh format version is independent of the enclosing version-1 rig. */
+  meshVersion: 1;
+  /** Whole images only in the foundation format; atlas/trimmed frames need explicit future support. */
+  frame?: never;
+  imageSize: { readonly width: number; readonly height: number };
+  vertices: readonly MeshVertex[];
+  /** Triples index the authored vertex array. Positive signed area is clockwise in Y-down coordinates. */
+  triangles: readonly number[];
+  bindPose: MeshBindPose;
+}
+
+export type AttachmentDefinition = SpriteAttachmentDefinition | MeshAttachmentDefinition;
 
 export interface SkinDefinition {
   version: 1;
@@ -81,7 +120,7 @@ export interface RigDefinition {
   root: string;
   bones: readonly BoneDefinition[];
   slots?: readonly SlotDefinition[];
-  attachments?: readonly SpriteAttachmentDefinition[];
+  attachments?: readonly AttachmentDefinition[];
   skins?: readonly SkinDefinition[];
 }
 

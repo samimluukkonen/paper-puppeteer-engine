@@ -1,4 +1,5 @@
-import { normalizeBoneDirection } from './boneMath.js';
+import { computeBonePosition } from './boneMath.js';
+export { computeBonePosition } from './boneMath.js';
 import type { TwoBoneIKDefinition } from './ik/types.js';
 import { freezeData } from './readonlyData.js';
 import type { DeepReadonly } from './readonlyData.js';
@@ -9,7 +10,7 @@ import type {
   RigDefinition,
   SkinDefinition,
   SlotDefinition,
-  SpriteAttachmentDefinition,
+  AttachmentDefinition,
 } from './types.js';
 import { checkRigReferences, checkSkinReferences, throwValidationIssue } from './validation.js';
 
@@ -21,19 +22,6 @@ function skinOverrides(skins: readonly SkinDefinition[], rig: RigDefinition): De
   const parsed = skinDefinitionSchema.array().parse(skins);
   checkSkinReferences(parsed, rig, throwValidationIssue);
   return ownSkins(parsed);
-}
-
-/** Resolve the logical joint offset using the parent's explicit length, when present. */
-export function computeBonePosition(bone: BoneDefinition, parent?: BoneDefinition): { x: number; y: number } {
-  const x = bone.x ?? 0;
-  const y = bone.y ?? 0;
-  const length = parent?.length;
-  if (length === undefined) return { x, y };
-  const direction = normalizeBoneDirection(x, y) ?? { x: 0, y: 1 };
-  return {
-    x: direction.x * length,
-    y: direction.y * length,
-  };
 }
 
 /** Calculate draw order for an already validated, parent-ordered skeleton. */
@@ -74,11 +62,11 @@ export class Rig {
   readonly bones: DeepReadonly<readonly BoneDefinition[]>;
   readonly renderOrder: readonly string[];
   readonly slots: DeepReadonly<readonly SlotDefinition[]>;
-  readonly attachments: DeepReadonly<readonly SpriteAttachmentDefinition[]>;
+  readonly attachments: DeepReadonly<readonly AttachmentDefinition[]>;
   readonly skins: DeepReadonly<readonly SkinDefinition[]>;
   private readonly definitions: Map<string, DeepReadonly<BoneDefinition>>;
   private readonly slotDefinitions: Map<string, DeepReadonly<SlotDefinition>>;
-  private readonly attachmentDefinitions: Map<string, DeepReadonly<SpriteAttachmentDefinition>>;
+  private readonly attachmentDefinitions: Map<string, DeepReadonly<AttachmentDefinition>>;
 
   /** Existing rigs share validated immutable skeleton data; optional skins are validated independently. */
   constructor(definition: RigDefinition, skins?: readonly SkinDefinition[]) {
@@ -169,7 +157,7 @@ export class Rig {
     return slot;
   }
 
-  getAttachment(id: string): DeepReadonly<SpriteAttachmentDefinition> {
+  getAttachment(id: string): DeepReadonly<AttachmentDefinition> {
     const attachment = this.attachmentDefinitions.get(id);
     if (!attachment) throw new Error(`Unknown attachment "${id}".`);
     return attachment;

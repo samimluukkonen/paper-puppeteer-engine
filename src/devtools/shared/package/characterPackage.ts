@@ -6,11 +6,12 @@ import { CharacterTextureBudget, DEFAULT_CHARACTER_TEXTURE_LIMITS } from '../../
 import type { RigJsonDefinition } from '../../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
+import { assertMeshImageSize } from '../../../engine/meshGeometry.js';
 import type { PoseDefinition } from '../../../engine/Pose.js';
 import type { DeepReadonly } from '../../../engine/readonlyData.js';
 import { readResponseBytes, withResourceResponse } from '../../../engine/resourceInput.js';
 import { identifierSchema } from '../../../engine/schemas.js';
-import type { SkinDefinition, SpriteDefinition, SpriteAttachmentDefinition } from '../../../engine/types.js';
+import type { SkinDefinition, SpriteDefinition, AttachmentDefinition } from '../../../engine/types.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
 import { safeFilename } from '../assetFilename.js';
@@ -110,6 +111,10 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
     ...definition.rig.bones.flatMap((bone) => (bone.sprite ? [bone.sprite] : [])),
     ...definition.rig.attachments,
   ]) {
+    if ('type' in reference && reference.type === 'mesh') {
+      const bytes = files.get(manifest.textures[reference.texture]!)!;
+      assertMeshImageSize(reference, inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES)));
+    }
     if (reference.frame !== undefined && reference.frame !== '__BASE')
       throw new Error(
         `Texture "${reference.texture}" references frame "${reference.frame}". Package images are static; resolve atlas frames before export.`,
@@ -161,7 +166,7 @@ async function readImage(url: string, fetcher: typeof fetch, signal: AbortSignal
 
 /** Convert session origin multipliers to the existing normalized-origin/offset format, even outside 0..1. */
 function migrateOrigin(
-  sprite: SpriteDefinition | SpriteAttachmentDefinition,
+  sprite: SpriteDefinition | AttachmentDefinition,
   replacement: PackageSnapshot['replacements'][number],
   width: number,
   height: number,
@@ -247,7 +252,7 @@ export async function buildCharacterPackage(
     if (assigned.has(scope)) throw new Error(`Duplicate artwork replacement scope "${scope}".`);
     assigned.set(scope, { ...replacement, sourceKey: replacement.assetKey, assetKey: key });
   }
-  const migrate = (sprite: SpriteDefinition | SpriteAttachmentDefinition, reference: string): void => {
+  const migrate = (sprite: SpriteDefinition | AttachmentDefinition, reference: string): void => {
     const replacement = assigned.get(reference) ?? assigned.get(`texture:${sprite.texture}`);
     if (!replacement) return;
     if (replacement.sourceKey !== sprite.texture)
@@ -255,7 +260,17 @@ export async function buildCharacterPackage(
     if (sprite.frame !== undefined && sprite.frame !== '__BASE')
       throw new Error(`Cannot replace frame "${sprite.frame}" in ${reference}. Resolve it before export.`);
     const header = inspectSpriteHeader(textures.get(replacement.assetKey)!.subarray(0, IMAGE_HEADER_BYTES));
-    migrateOrigin(sprite, replacement, header.width, header.height);
+    if ('type' in sprite && sprite.type === 'mesh') {
+      if (
+        header.width !== sprite.imageSize.width ||
+        header.height !== sprite.imageSize.height ||
+        replacement.originScaleX !== 1 ||
+        replacement.originScaleY !== 1
+      )
+        throw new Error(
+          `Mesh artwork "${reference}" requires the original dimensions and pivot. Recreate the mesh before resizing artwork.`,
+        );
+    } else migrateOrigin(sprite, replacement, header.width, header.height);
     sprite.texture = replacement.assetKey;
     delete sprite.frame;
     assigned.delete(reference);

@@ -1,25 +1,31 @@
 import { equalJsonData } from './equalJsonData.js';
+import { validateMeshBindPose } from './meshBindPose.js';
+import { validateMeshTopology } from './meshGeometry.js';
+import { freezeData } from './readonlyData.js';
 import type { Rig } from './Rig.js';
-import { spriteAttachmentSchema, skinFileSchema } from './schemas.js';
-import type { SkinDefinition, SpriteAttachmentDefinition } from './types.js';
+import { attachmentSchema, skinFileSchema } from './schemas.js';
+import type { SkinDefinition, AttachmentDefinition } from './types.js';
 import { checkSkinReferences, throwValidationIssue } from './validation.js';
 
 /** Attachment selection only; changing it never touches bones or IK state. */
 export class SlotState {
   private readonly assigned = new Map<string, string>();
   private readonly slots: Set<string>;
-  private attachments = new Map<string, Readonly<SpriteAttachmentDefinition>>();
+  private readonly rig: Rig;
+  private attachments = new Map<string, Readonly<AttachmentDefinition>>();
   private skins = new Map<string, Readonly<Record<string, string | null>>>();
 
   /** Copy runtime assignments and immutable catalogs when staging a transactional update. */
   constructor(rig: Rig | SlotState) {
     if (rig instanceof SlotState) {
+      this.rig = rig.rig;
       this.slots = rig.slots;
       for (const [slot, attachment] of rig.assigned) this.assigned.set(slot, attachment);
       this.attachments = rig.attachments;
       this.skins = rig.skins;
       return;
     }
+    this.rig = rig;
     this.slots = new Set(rig.slots.map((slot) => slot.id));
     this.updateDefinitions(rig.attachments, rig.skins);
   }
@@ -27,9 +33,14 @@ export class SlotState {
   /** Install owned artwork/skin data without changing joints or current slot assignments.
    * Clear assignments to removed IDs first. Invalid updates leave all runtime state untouched.
    */
-  updateDefinitions(attachments: readonly SpriteAttachmentDefinition[], skins: readonly SkinDefinition[]): void {
-    const parsed = spriteAttachmentSchema.strict().array().parse(attachments);
-    const next = new Map(parsed.map((entry) => [entry.id, Object.freeze(entry)]));
+  updateDefinitions(attachments: readonly AttachmentDefinition[], skins: readonly SkinDefinition[]): void {
+    const parsed = attachmentSchema.array().parse(attachments);
+    for (const entry of parsed) {
+      if (entry.type !== 'mesh') continue;
+      for (const issue of [...validateMeshTopology(entry), ...validateMeshBindPose(entry, this.rig)])
+        throwValidationIssue(issue);
+    }
+    const next = new Map<string, Readonly<AttachmentDefinition>>(parsed.map((entry) => [entry.id, freezeData(entry)]));
     if (next.size !== parsed.length) throw new Error('Duplicate attachment IDs.');
     const parsedSkins = skinFileSchema.array().parse(skins);
     checkSkinReferences(
@@ -51,14 +62,14 @@ export class SlotState {
     this.skins = new Map(parsedSkins.map((skin) => [skin.name, Object.freeze(skin.slots)]));
   }
 
-  getDefinition(id: string): Readonly<SpriteAttachmentDefinition> {
+  getDefinition(id: string): Readonly<AttachmentDefinition> {
     const entry = this.attachments.get(id);
     if (!entry) throw new Error(`Unknown attachment "${id}".`);
     return entry;
   }
 
   /** Owned, validated catalog snapshots for render-only artwork inspection. */
-  getDefinitions(): readonly Readonly<SpriteAttachmentDefinition>[] {
+  getDefinitions(): readonly Readonly<AttachmentDefinition>[] {
     return [...this.attachments.values()];
   }
 

@@ -77,6 +77,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.2-1
+
+Add a mesh developer quick start and artist troubleshooting for imported meshes, blank previews, protected rest transforms and artwork replacement limits. Link the guidance from the guide index and character/artist documentation; retain existing Feature Guide tours until mesh editor controls exist.
+
+Add an optional versioned mesh attachment format alongside legacy rigid sprites, retaining texture keys, slot/skin IDs, ordering and character/project packaging. Include stable vertex IDs, attachment-local bind positions, normalized UVs, indexed triangles, image dimensions and explicit authored rest snapshots. Reject invalid topology, overlapping interiors, unsupported versions and stale/singular binds; roll back editor rest edits that invalidate bound meshes.
+
+Provide pure rectangle creation, topology replacement for future subdivision, vertex lookup, bounds and image/UV/attachment/bind/bone coordinate utilities through the renderer-independent API. Document coordinate conventions, limits, migration and future weight references in the [mesh attachment foundation](docs/mesh-attachments.md). Mesh slots retain selection but remain unrendered in this data-only milestone. Verify geometry, mixed rigs, immutability, legacy compatibility and deterministic character/project ZIP round trips. Synchronize package and lockfile version metadata at `1.4.2-1`.
+
 ## 1.4.1
 
 Expand the existing IK Constraints Feature Guide to eight steps with dedicated bend-direction and solver-diagnostics guidance, plus explicit enabled/preview/influence, validation and numeric commit/cancel instructions. Keep reveal-only navigation and update the artist/catalog documentation and guide step-count regression.

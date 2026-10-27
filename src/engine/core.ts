@@ -131,9 +131,18 @@ export {
   skinDefinitionSchema,
   slotDefinitionSchema,
   spriteAttachmentSchema,
+  attachmentSchema,
+  meshAttachmentSchema,
+  meshVertexSchema,
+  meshBindPoseSchema,
   twoBoneIKDefinitionSchema,
 } from './schemas.js';
 export type {
+  AttachmentDefinition,
+  AttachmentDefinitionBase,
+  MeshVertex,
+  MeshBindPose,
+  MeshAttachmentDefinition,
   AttachmentOptions,
   BoneDefinition,
   Facing,
@@ -269,3 +278,25 @@ export type { ActiveSceneAudioClip } from './sceneAudio.js';
 
 export type { SceneDialogueLine, ActiveSceneDialogue, SceneDialogueTarget } from './sceneDialogue.js';
 export { sceneDialogueLineSchema, getDialogueLineAtTime, getDialogueAtTime, dialogueSpeaker } from './sceneDialogue.js';
+
+export {
+  MESH_LIMITS,
+  MESH_AREA_EPSILON,
+  triangleSignedArea2,
+  validateMeshTopology,
+  meshBounds,
+  getMeshVertex,
+  imagePixelToUV,
+  uvToImagePixel,
+  imagePixelToAttachmentLocal,
+  attachmentLocalToImagePixel,
+} from './meshGeometry.js';
+export {
+  createMeshBindPose,
+  validateMeshBindPose,
+  createRectangleMeshAttachment,
+  replaceMeshGeometry,
+  meshAttachmentToBindPose,
+  bindPoseToMeshAttachment,
+  meshBindPoseToBoneLocal,
+} from './meshAttachments.js';

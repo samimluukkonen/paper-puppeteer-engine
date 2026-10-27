@@ -1,6 +1,6 @@
 import { serializeSkinDefinition } from '../../engine/authoredSerialization.js';
-import { identifierSchema, spriteAttachmentSchema } from '../../engine/schemas.js';
-import type { SkinDefinition, SpriteAttachmentDefinition } from '../../engine/types.js';
+import { identifierSchema, attachmentSchema } from '../../engine/schemas.js';
+import type { SkinDefinition, AttachmentDefinition } from '../../engine/types.js';
 import { checkSkinReferences, throwValidationIssue } from '../../engine/validation.js';
 import { freezeData } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
@@ -20,7 +20,7 @@ type ArtworkState = Pick<
 >;
 
 export interface RigArtworkUpdate {
-  attachments?: readonly SpriteAttachmentDefinition[];
+  attachments?: readonly AttachmentDefinition[];
   skins?: readonly SkinDefinition[];
   standaloneSkins?: readonly SkinDefinition[];
 }
@@ -28,7 +28,7 @@ export interface RigArtworkUpdate {
 export interface RigArtworkActions {
   install(update: RigArtworkUpdate): void;
   hasAttachment(id: string): boolean;
-  assertArtwork(attachment: SpriteAttachmentDefinition): void;
+  assertArtwork(attachment: AttachmentDefinition): void;
 }
 
 /** Author attachment and skin proposals without owning history, saved baselines or preview selection. */
@@ -39,7 +39,7 @@ export class RigArtworkCommands {
   ) {}
 
   createAttachment(input: unknown): void {
-    const attachment = spriteAttachmentSchema.strict().parse(input);
+    const attachment = attachmentSchema.parse(input);
     if (/^(blob:|__paper_artwork_)/.test(attachment.texture))
       throw new Error('Choose a stable character texture key, not a temporary preview texture.');
     if (this.actions.hasAttachment(attachment.id)) throw new Error(`Duplicate attachment ID "${attachment.id}".`);

@@ -3,7 +3,9 @@ import { characterManifestSchema } from './CharacterDefinition.js';
 import { CharacterLoader } from './CharacterLoader.js';
 import { CharacterTextureBudget } from './characterTextureLimits.js';
 import { decodeImage } from './decodeImage.js';
+import { inspectImageHeader } from './imageHeader.js';
 import { DEFAULT_MAX_JSON_BYTES } from './jsonInput.js';
+import { assertMeshImageSize } from './meshGeometry.js';
 import { packagePath, PACKAGE_MAX_FILE_BYTES, validatePackageFiles } from './packageZip.js';
 import { resolveSceneDefinition, type ResolvedScene, type SceneAssetOptions } from './SceneAssets.js';
 import { parseSceneDefinition, parseSceneJson, serializeSceneDefinition } from './SceneDefinition.js';
@@ -77,9 +79,12 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
     for (const sprite of [
       ...definition.rig.bones.flatMap((bone) => (bone.sprite ? [bone.sprite] : [])),
       ...definition.rig.attachments,
-    ])
+    ]) {
+      if ('type' in sprite && sprite.type === 'mesh')
+        assertMeshImageSize(sprite, inspectImageHeader(files.get(`${folder}${definition.textures[sprite.texture]}`)!)!);
       if (sprite.frame !== undefined && sprite.frame !== '__BASE')
         throw new Error(`Scene package images are static; unsupported frame "${sprite.frame}".`);
+    }
   }
   signal?.throwIfAborted();
   return resolved;
