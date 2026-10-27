@@ -12,7 +12,13 @@ declare global {
   }
 }
 
-for (const guideId of ['scene-audio-timeline', 'scene-audio-synchronization'] as const) {
+for (const guideId of [
+  'scene-audio-timeline',
+  'scene-audio-synchronization',
+  'scene-importing-audio',
+  'scene-audio-timeline-basics',
+  'scene-audio-scene-timing',
+] as const) {
   for (const populated of [false, true]) {
     test(`${guideId} reveals all controls and preserves ${populated ? 'selected clips, history, clock and preview' : 'an empty scene'}`, async ({
       page,
@@ -118,7 +124,7 @@ for (const guideId of ['scene-audio-timeline', 'scene-audio-synchronization'] as
         await expect(target).toBeVisible();
         await expect(page.locator('.guide-spotlight-hole')).toBeVisible();
         await expect(tour).not.toContainText('Target unavailable');
-        if (step.id === 'add' && !populated) await expect(target).toBeDisabled();
+        if ((step.id === 'add' || step.id === 'return') && !populated) await expect(target).toBeDisabled();
         if (step.id === 'trim' && !populated) await expect(target).toContainText('No clips yet?');
         if (step.id === 'unlock') await expect(target).toContainText(populated ? 'locked' : 'disabled');
         if (step.id === 'mute') {
@@ -133,7 +139,13 @@ for (const guideId of ['scene-audio-timeline', 'scene-audio-synchronization'] as
       }
       await tour.getByRole('button', { name: 'Finish', exact: true }).click();
       await expect(tour).not.toBeVisible();
-      await expect(page.getByRole('tab', { name: 'Edit', exact: true })).toHaveAttribute('aria-selected', 'true');
+      const edit = page.getByRole('tab', { name: 'Edit', exact: true });
+      // Only tours that visit document commands reveal Edit; other tours retain Local draft.
+      await expect(edit).toHaveAttribute(
+        'aria-selected',
+        String(guide.steps.some((step) => step.targetId === 'scene-package')),
+      );
+      await edit.click();
       await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
       await expect(page.getByLabel('Playhead (s)', { exact: true })).toHaveValue(populated ? '1' : '0');
       await expect(page.getByLabel('Scene playback status')).toContainText(populated ? 'paused' : 'stopped');

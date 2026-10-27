@@ -18,6 +18,7 @@ import type { SceneDefinition } from '../../src/engine/SceneDefinition.js';
 import { SceneImageLayer } from '../../src/engine/SceneImageLayer.js';
 import { buildScenePackage } from '../../src/engine/ScenePackage.js';
 import type { SceneRunnerOptions } from '../../src/engine/SceneRunner.js';
+import { silentWav, trackedAudioBackend } from './trackedAudioBackend.js';
 import '../../src/devtools/scene-editor/style.css';
 
 /** Development-only local diagnostic. Real Phaser objects/artwork; host clocks are advanced explicitly. */
@@ -58,6 +59,8 @@ export async function profileScene() {
   const source = JSON.stringify(definition);
   const shutdownListeners = stage.events.listenerCount('shutdown');
   const results = [];
+  const musicBytes = silentWav(180);
+  const effectBytes = silentWav(2);
   try {
     for (const [actors, markers] of [
       [2, 0],
@@ -100,6 +103,48 @@ export async function profileScene() {
             destination: { x: i * 100 + 100, y: 40 },
           },
         ]).flat(),
+        audioAssets: [
+          { id: 'music', name: 'Three minute music', path: 'audio/music.wav', category: 'music', durationSeconds: 180 },
+          { id: 'effect', name: 'Effect', path: 'audio/effect.wav', category: 'sfx', durationSeconds: 2 },
+        ],
+        audioTracks: [{ id: 'mix', name: 'Mix', category: 'music' }],
+        audioClips: [
+          {
+            id: 'bed',
+            assetId: 'music',
+            trackId: 'mix',
+            time: 0,
+            duration: 10000,
+            sourceOffset: 10000,
+            volume: 0,
+            loop: false,
+            fadeIn: 500,
+            fadeOut: 1000,
+          },
+          {
+            id: 'ambient',
+            assetId: 'effect',
+            trackId: 'mix',
+            time: 0,
+            duration: 10000,
+            sourceOffset: 200,
+            volume: 0,
+            loop: true,
+          },
+          ...Array.from({ length: 4 }, (_, i) => ({
+            id: `effect-${i}`,
+            assetId: 'effect',
+            trackId: 'mix',
+            time: 500 + i * 150,
+            duration: 1000,
+            sourceOffset: 50,
+            volume: 0,
+            loop: false,
+          })),
+        ],
+        dialogue: [
+          { id: 'line', actorId: 'actor-0', text: 'A cinematic scene.\n森は静かだった。', time: 500, duration: 2000 },
+        ],
       };
       for (let i = 0; i < markers; i++)
         data.actions.push({
@@ -170,8 +215,16 @@ export async function profileScene() {
         actor.disposalSignal.addEventListener('abort', () => disposed++, { once: true });
         return actor;
       };
-      playback.sync(doc.workingScene, true, createActor);
-      const releaseDocument = doc.subscribe(() => playback.sync(doc.workingScene, true, createActor));
+      const tracking = trackedAudioBackend();
+      const audioOptions = {
+        backend: tracking.backend,
+        resolve: (id: string) => {
+          const definition = data.audioAssets?.find((asset) => asset.id === id);
+          return definition ? { definition, bytes: id === 'music' ? musicBytes : effectBytes } : undefined;
+        },
+      };
+      playback.sync(doc.workingScene, true, createActor, audioOptions);
+      const releaseDocument = doc.subscribe(() => playback.sync(doc.workingScene, true, createActor, audioOptions));
       let commits = 0;
       let renderMs = 0;
       const uiSource = (
@@ -187,6 +240,11 @@ export async function profileScene() {
       );
       try {
         flushSync(() => root.render(uiSource));
+        const decodeStart = performance.now();
+        playback.enableAudio();
+        while (playback.audioStatus === 'loading') await new Promise((resolve) => setTimeout(resolve, 0));
+        if (playback.audioStatus !== 'ready') throw new Error(playback.audioError || playback.audioStatus);
+        const audioDecodeMs = performance.now() - decodeStart;
         flushSync(() => playback.play());
         commits = 0;
         renderMs = 0;
@@ -211,6 +269,18 @@ export async function profileScene() {
           syncCamera();
           seeks.push(performance.now() - start);
         }
+        const rapidScrubStart = performance.now();
+        const startsBeforeScrub = tracking.stats.starts;
+        for (let i = 0; i < 40; i++) flushSync(() => playback.seek((i * 977) % 10000));
+        const rapidScrubMs = performance.now() - rapidScrubStart;
+        if (tracking.stats.starts !== startsBeforeScrub) throw new Error('Passive scrubbing started audio.');
+        const restartStart = performance.now();
+        for (let i = 0; i < 20; i++) {
+          flushSync(() => playback.restart());
+          flushSync(() => playback.update(1000));
+          flushSync(() => playback.stop());
+        }
+        const restartMs = performance.now() - restartStart;
         const editsStart = performance.now();
         for (let i = 0; i < 60; i++) {
           flushSync(() => {
@@ -227,6 +297,7 @@ export async function profileScene() {
           await buildScenePackage(doc.workingScene!, {
             baseUrl: location.href,
             loadImage: () => Promise.resolve(png),
+            loadAudio: (reference) => Promise.resolve(reference.endsWith('music.wav') ? musicBytes : effectBytes),
           }),
         );
         const exportMs = performance.now() - exportStart;
@@ -248,6 +319,12 @@ export async function profileScene() {
           commits,
           renderMs,
           seeksMs: seeks,
+          audioDecodeMs,
+          rapidScrubs: 40,
+          rapidScrubMs,
+          restarts: 20,
+          restartMs,
+          audio: tracking.stats,
           created,
           disposedBeforeCleanup: disposed,
         });
@@ -262,6 +339,13 @@ export async function profileScene() {
       if (Object.keys(stage.textures.list).length !== textureBaseline)
         throw new Error('Profile leaked artwork textures.');
       if (created !== disposed) throw new Error(`Leaked Actors: created ${created}, disposed ${disposed}`);
+      if (
+        tracking.remainingVoices ||
+        tracking.stats.starts !== tracking.stats.stops ||
+        tracking.stats.decodedBytes !== tracking.stats.disposedBytes ||
+        tracking.stats.contextsClosed !== 1
+      )
+        throw new Error('Profile leaked audio voices, decoded buffers or contexts.');
       if (stage.children.list.length || stage.events.listenerCount('shutdown') !== shutdownListeners)
         throw new Error('Profile leaked GameObjects or shutdown listeners.');
       if (JSON.stringify(definition) !== source) throw new Error('Profile changed source character data.');

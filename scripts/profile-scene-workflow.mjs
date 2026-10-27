@@ -14,6 +14,8 @@ export async function profileSceneWorkflow(baseUrl, channel) {
       if (message.text().startsWith('scene-profile:')) process.stderr.write(`${message.text()}\n`);
     });
     await page.goto(`${baseUrl}/scene-editor/`);
+    // Authorize Web Audio through an actual browser interaction before the diagnostic loads media.
+    await page.mouse.click(8, 8);
     const measurements = await page.evaluate(async () => {
       const path = '/tests/browser/sceneProfileHarness.tsx';
       const harness = /** @type {typeof import('../tests/browser/sceneProfileHarness.js')} */ (await import(path));

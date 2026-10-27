@@ -1,5 +1,6 @@
 import { abortable } from './abortable.js';
 import { inspectAudioData, validateAudioAssetData, type AudioAssetDefinition } from './AudioAsset.js';
+import { throwNotificationErrors } from './notifications.js';
 
 export interface AudioPlayback {
   stop(): void;
@@ -167,8 +168,11 @@ export class WebAudioBackend implements AudioBackend {
         return {
           stop: () => {
             if (!stopped) {
-              source.stop();
-              release();
+              try {
+                source.stop();
+              } finally {
+                release();
+              }
             }
           },
           setVolume: (value) => {
@@ -263,7 +267,7 @@ export class AudioAssetLoader {
         ) {
           resource.dispose();
           throw new Error(
-            'Decoded audio exceeds the 128 MiB audition budget or has invalid duration. Use shorter audio, or close and reopen the Audio section.',
+            'Decoded audio exceeds the 128 MiB audio budget or has invalid duration. Use shorter audio or a lower sample rate, then reopen the Audio section or scene.',
           );
         }
         this.resources.add(resource);
@@ -320,19 +324,42 @@ export class AudioAssetLoader {
   }
   /** Release decoded memory while retaining the backend for a later audition. */
   clear(): void {
-    this.stop();
+    const errors: unknown[] = [];
+    try {
+      this.stop();
+    } catch (error) {
+      errors.push(error);
+    }
     this.cacheLifetime.abort(new DOMException('Audio loading was cancelled.', 'AbortError'));
     this.cacheLifetime = new AbortController();
     this.cacheGeneration++;
-    for (const resource of this.resources) resource.dispose();
+    const resources = [...this.resources];
     this.resources.clear();
     this.cache.clear();
     this.decodedBytes = 0;
+    for (const resource of resources) {
+      try {
+        resource.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    throwNotificationErrors(errors, 'Audio resource cleanup failed.');
   }
   dispose(): void {
     if (this.lifetime.signal.aborted) return;
     this.lifetime.abort();
-    this.clear();
-    this.backend.dispose();
+    const errors: unknown[] = [];
+    try {
+      this.clear();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      this.backend.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
+    throwNotificationErrors(errors, 'Audio backend cleanup failed.');
   }
 }

@@ -215,6 +215,38 @@ test('Stop and disposal during asynchronous decoding never start a late voice an
   await vi.waitFor(() => expect(f.disposeResource).toHaveBeenCalledTimes(2));
 });
 
+test.each(['clear', 'dispose'] as const)(
+  '%s releases all decoded resources even when adapter cleanup fails',
+  async (command) => {
+    const project = new ProjectWorkspace('Cleanup');
+    project.addAudio(definition(), audio());
+    const f = backend();
+    const second = { ...f.resource, dispose: vi.fn() };
+    f.value.decode.mockResolvedValueOnce(f.resource).mockResolvedValueOnce(second);
+    const loader = loaderFor(project, f.value);
+    await loader.prepare(audio('mp3'));
+    await loader.play('tone');
+    f.stop.mockImplementationOnce(() => {
+      throw new Error('Stop failed');
+    });
+    f.disposeResource.mockImplementationOnce(() => {
+      throw new Error('Buffer release failed');
+    });
+    expect(() => loader[command]()).toThrow('Audio resource cleanup failed');
+    expect(f.stop).toHaveBeenCalledOnce();
+    expect(f.disposeResource).toHaveBeenCalledOnce();
+    expect(second.dispose).toHaveBeenCalledOnce();
+    expect(f.value.dispose).toHaveBeenCalledTimes(command === 'dispose' ? 1 : 0);
+    if (command === 'clear') {
+      await loader.load('tone');
+      expect(f.value.decode).toHaveBeenCalledTimes(3);
+    }
+    loader.dispose();
+    loader.dispose();
+    expect(f.value.dispose).toHaveBeenCalledOnce();
+  },
+);
+
 test('backend permission/decode failures and decoded budgets are actionable and retryable', async () => {
   const project = new ProjectWorkspace('Audio');
   project.addAudio(definition(), audio());

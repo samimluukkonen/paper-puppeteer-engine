@@ -104,6 +104,8 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [Creating Your First Character](docs/creating-your-first-character.md)
 - [Making Your First Scene](docs/making-your-first-scene.md)
 - [Creating Your First Cinematic Scene](docs/creating-your-first-cinematic-scene.md)
+- [Creating an Audiovisual Scene](docs/creating-an-audiovisual-scene.md)
+- [v1.3 audiovisual integration report](docs/audiovisual-scene-readiness.md)
 - [v1.2 cinematic integration report](docs/cinematic-scene-readiness.md)
 - [v0.9 Scene Editor readiness and verification](docs/scene-editor-readiness.md)
 - [Using Feature Guide](docs/feature-guide.md)

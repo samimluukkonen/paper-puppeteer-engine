@@ -77,6 +77,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.3.6
+
+Harden the integrated audio/dialogue cinematic workflow with a local desktop regression that authors layered artwork, two Actors, walking and root-motion attack clips, music, ambience, overlapping effects, Unicode subtitles, camera keys/cuts, fades and cues. Verify Undo/Redo, binary autosave/recovery, project export/reimport and standalone Phaser playback with a user-action audio unlock and complete voice/buffer/context cleanup.
+
+Finish all audio resource cleanup even when an adapter's stop or buffer disposal throws; retain cleanup errors while releasing other buffers and closing the backend. Correct stale subtitle inspector guidance. Add four focused Scene Feature Guides using the existing registry and anchors: Importing Audio, Audio Timeline, Creating Dialogue, and Audio and Scene Timing. Extend empty/populated guide preservation tests and publish [Creating an Audiovisual Scene](docs/creating-an-audiovisual-scene.md).
+
+Extend the local scene profiler with a three-minute music source, six concurrent audio clips, dialogue, rapid scrubbing, repeated play/stop and audio resource counters alongside Actors, camera animation and large artwork. Extend the project diagnostic with audiovisual scenes and original/imported audio byte comparisons; measure export/import and IndexedDB autosave/recovery. Update older production-workflow browser checks to reveal inspector tabs explicitly. See the [v1.3 integration report](docs/audiovisual-scene-readiness.md) for measured results, verification and remaining limits. Keep browser checks local-only and preserve scene-format-2 compatibility.
+
 ## 1.3.5
 
 Display deterministic dialogue in Scene Editor and standalone Phaser scene playback. Export a pure active-dialogue evaluator with speaker metadata, a React-free default subtitle overlay and a small host-owned custom presentation target. Keep multiline text wrapped inside the cinematic output safe area, stable through camera movement and letterboxing, and above cinematic fades. Clear subtitles on stop, scene switching and runtime teardown.

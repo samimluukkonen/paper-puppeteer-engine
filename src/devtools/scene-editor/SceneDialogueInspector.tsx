@@ -118,8 +118,8 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
       </div>
       <p className="workspace-caption">
         Lines use scene time without pausing for input. Overlapping intervals are rejected; adjacent lines are allowed.
-        Duplicate places the copy in the next available interval after this line. Subtitle playback display is not
-        available yet.
+        Duplicate places the copy in the next available interval after this line. Play or scrub to preview subtitles;
+        Pause holds the current line and Stop clears it. Scrubbing stays silent.
       </p>
     </details>
   );

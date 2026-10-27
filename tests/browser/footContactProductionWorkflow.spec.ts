@@ -66,6 +66,8 @@ test('artist contact workflow from rig authoring through IK keys and portable tw
   await expect(ground.getByRole('status')).toContainText('Within tolerance');
   expect(await exportClip()).toBe(original);
   await ground.getByRole('button', { name: 'Apply IK target keys', exact: true }).click();
+  // Applying keys selects the IK target and reveals its inspector tab.
+  await inspectorControl(page, '#animation-inspector .ground-guide-controls fieldset');
   await expect(distanceRow).toContainText('on ground');
   const committed = await exportClip();
   await page.locator('#animation-undo').click();

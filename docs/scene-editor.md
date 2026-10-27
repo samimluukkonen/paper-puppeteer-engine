@@ -254,7 +254,7 @@ See the [runtime integration guide](runtime-integration.md#project-and-scene-han
 
 ## v0.9 production hardening
 
-Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers twenty-six Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
+Start with [Making Your First Scene](making-your-first-scene.md) for the complete visual workflow and the standalone ZIP handoff. The [v0.9 readiness report](scene-editor-readiness.md) records architecture, current verification, measured performance and deliberate limits. Scene Editor now offers thirty Explain tours through the existing Feature Guide registry and spotlight. They never modify authored data or history.
 
 Playback subscriptions are confined to clock controls, the playhead and an expanded runtime inspector. Authored clip rows no longer rebuild on every Phaser frame. Initial-placement animation sampling suppresses gameplay events and uses explicit hard cuts. Teardown clears ownership and attempts all Actor cleanup even when a callback fails. Runtime scene windows remain hard cuts, and scene/character format versions remain 2/1.
 

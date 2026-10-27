@@ -343,6 +343,29 @@ test('mute stops voices and unmute resumes at the current position', async () =>
   f.audio.dispose();
 });
 
+test('missing scene audio stays silent through seeks and can be retried after restoring the binary', async () => {
+  const f = fixture();
+  let available = false;
+  const runner = new SceneRunner(f.scene, {
+    createActor: noActor,
+    audio: { backend: f.backend, resolve: (id) => (available ? f.options.resolve(id) : undefined) },
+  });
+  await expect(runner.audio!.unlock()).rejects.toThrow('binary is missing');
+  expect(runner.audio!.status).toBe('error');
+  runner.seek(1500);
+  runner.play();
+  runner.update(100);
+  expect(runner.time).toBe(1600);
+  expect(f.playTimeline).not.toHaveBeenCalled();
+  available = true;
+  await runner.audio!.unlock();
+  runner.update(0);
+  expect(f.voices[0]!.options.offset).toBeCloseTo(0.8);
+  runner.dispose();
+  expect(f.voices[0]!.stop).toHaveBeenCalledOnce();
+  expect(f.disposeResource).toHaveBeenCalledOnce();
+});
+
 test('zero volume and simultaneous playback failures remain bounded and retryable', async () => {
   const f = fixture([
     { ...clip, volume: 0 },
@@ -626,6 +649,17 @@ test('Web Audio schedules finite stops, speed, offsets, loop bounds and independ
   });
   expect(() => secondVoice.stop()).toThrow('Backend stop failed');
   expect(secondVoice.ended).toBe(true);
+  expect(nodes.every((node) => node.disconnect.mock.calls.length === 1)).toBe(true);
+  const ended = vi.fn();
+  const audition = resource.play(0.5, ended);
+  source.stop.mockImplementationOnce(() => {
+    throw new Error('Audition stop failed');
+  });
+  expect(() => audition.stop()).toThrow('Audition stop failed');
+  audition.stop();
+  expect(ended).toHaveBeenCalledOnce();
+  expect(source.onended).toBeNull();
+  expect(source.buffer).toBeNull();
   expect(nodes.every((node) => node.disconnect.mock.calls.length === 1)).toBe(true);
   resource.dispose();
   backend.dispose();

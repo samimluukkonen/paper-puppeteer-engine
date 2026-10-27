@@ -58,6 +58,7 @@ test('personal production: new project and artwork → rig/IK/keys → scene →
   await selectBone(frame, 'root');
   const skeleton = frame.getByRole('region', { name: 'Build skeleton', exact: true });
   for (const id of ['segment', 'tip']) {
+    await reveal(frame, '.rig-structure-panel input[aria-label="New bone ID"]');
     await skeleton.getByLabel('New bone ID', { exact: true }).fill(id);
     await skeleton.getByRole('button', { name: '+ Add Bone', exact: true }).click();
     const y = await reveal(frame, '#inspector [data-scope=bone][data-field=y]');
@@ -69,6 +70,7 @@ test('personal production: new project and artwork → rig/IK/keys → scene →
   await selectBone(frame, 'segment');
   await expect(await reveal(frame, '#inspector [data-scope=bone][data-field=y]')).toHaveValue('40');
   const build = frame.getByRole('region', { name: 'Build skeleton', exact: true });
+  await reveal(frame, '.rig-structure-panel input[aria-label="New slot ID"]');
   await build.getByLabel('New slot ID', { exact: true }).fill('arm-visual');
   await build.getByRole('button', { name: '+ Add Slot', exact: true }).click();
   const png = await page.evaluate(() => {

@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { SceneLoader } from '../../src/engine/SceneLoader.js';
+import { trackedAudioBackend } from './trackedAudioBackend.js';
 
 /** Browser-only consumer: no editor modules or access to the authoring stage. */
-export async function sampleCinematicPackage(bytes: number[], times: number[]) {
+export async function sampleCinematicPackage(bytes: number[], times: number[], enableAudio = false) {
   const host = document.createElement('div');
   host.style.cssText = 'width:1000px;height:700px;background:#0d1117';
   document.body.replaceChildren(host);
@@ -26,7 +27,30 @@ export async function sampleCinematicPackage(bytes: number[], times: number[]) {
     }
     const baseline = Object.keys(scene.textures.list).length;
     const cues: string[] = [];
-    loaded = await SceneLoader.loadPackage(scene, new Uint8Array(bytes), { onCue: (cue) => cues.push(cue.name) });
+    const tracking = trackedAudioBackend();
+    const audio = tracking.stats;
+    loaded = await SceneLoader.loadPackage(scene, new Uint8Array(bytes), {
+      onCue: (cue) => cues.push(cue.name),
+      ...(enableAudio ? { audioBackend: tracking.backend } : {}),
+    });
+    if (enableAudio) {
+      const button = document.createElement('button');
+      button.textContent = 'Enable runtime audio';
+      host.prepend(button);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          button.addEventListener(
+            'click',
+            () => {
+              void loaded!.runner.audio!.unlock().then(resolve, reject);
+            },
+            { once: true },
+          );
+        });
+      } finally {
+        button.remove();
+      }
+    }
     loaded.applyCamera(scene.cameras.main);
     const textures = Object.keys(scene.textures.list).length;
     const sample = () => ({
@@ -65,9 +89,16 @@ export async function sampleCinematicPackage(bytes: number[], times: number[]) {
     }
     if (textures !== Object.keys(scene.textures.list).length) throw new Error('Seeking allocated new textures.');
     const passiveCues = [...cues];
+    const passiveAudioStarts = audio.starts;
     loaded.runner.restart();
     loaded.runner.update(1000);
     const played = sample();
+    if (enableAudio) {
+      loaded.runner.update(2450);
+      loaded.runner.pause();
+      loaded.runner.play();
+      loaded.runner.update(550);
+    }
     const playbackCues = [...cues];
     loaded.dispose();
     loaded.dispose();
@@ -80,6 +111,8 @@ export async function sampleCinematicPackage(bytes: number[], times: number[]) {
       texturesAfterDispose: Object.keys(scene.textures.list).length,
       baseline,
       remainingObjects: scene.children.list.length,
+      passiveAudioStarts,
+      audio: { ...audio, remainingVoices: tracking.remainingVoices },
     };
   } finally {
     loaded?.dispose();

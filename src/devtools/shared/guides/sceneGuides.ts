@@ -747,6 +747,90 @@ function focusedGuide(id: string, title: string, description: string, sourceId: 
 
 export const sceneGuides: readonly GuideDefinition[] = [
   ...workflowGuides,
+  guide(
+    'scene-importing-audio',
+    'Importing Audio',
+    'Find the project audio library, import and audition audio, then return to this scene.',
+    scene,
+    [
+      step(
+        'library',
+        'Open the project audio library',
+        T.sceneAudioAsset,
+        '**Audio asset** reads the open project’s audio library. After exiting this tour inside a project, choose **← Project**, then open **Audio** in Project Workspace. In a standalone scene, download its scene package before leaving, then use **Project** in **Views** to create or import a project. The tour stays in this editor and never navigates or opens files.',
+      ),
+      step(
+        'import',
+        'Import music, ambience or effects',
+        T.sceneAudioAsset,
+        'In Project Workspace’s **Audio** section, choose **Import category**, then **Import Audio** for a WAV, MP3 or OGG file up to 10 MiB. Import checks file content and browser decoding, and records media duration. The file becomes available in this scene’s **Audio asset** list when you return. The category organizes the library; it does not limit which tracks can use the file.',
+      ),
+      step(
+        'preview',
+        'Audition the imported file',
+        T.sceneAudioAsset,
+        'In the project **Audio** library, expand the file’s category and use its row-level **Play / Stop** control and **Preview volume**. This auditions the file independently of scene timing. Stop preview before returning. For a spotlight on those controls, use the **Importing and Managing Audio** guide in the **Project Workspace** category. This scene tour never starts sound.',
+      ),
+      step(
+        'return',
+        'Return and place the audio',
+        T.sceneAudioAddClip,
+        'Return with **Scene Editor** and open the timeline’s **Audio** tab. Choose **Track category** and **Add audio track**, then choose **Audio asset**, **Audio track** and **Add Audio Clip** at the playhead. Use **Audio Timeline** next for trimming and volume. Importing alone never schedules playback; project export and recovery retain the imported binary.',
+      ),
+    ],
+  ),
+  focusedGuide(
+    'scene-audio-timeline-basics',
+    'Audio Timeline',
+    'Add music, move a clip, adjust its trim and volume, and preview the result.',
+    'scene-audio-timeline',
+    ['tracks', 'add', 'arrange', 'trim', 'playback', 'fades'],
+  ),
+  focusedGuide(
+    'scene-creating-dialogue',
+    'Creating Dialogue',
+    'Create a line, choose a speaker, edit text and timing, and preview subtitles.',
+    'scene-dialogue-authoring',
+    ['add', 'speaker', 'text', 'timing', 'time'],
+  ),
+  guide(
+    'scene-audio-scene-timing',
+    'Audio and Scene Timing',
+    'Align an effect to animation, preview it, scrub silently and restart a fresh playback pass.',
+    scene,
+    [
+      step(
+        'align',
+        'Align a sound to animation',
+        T.sceneTimeline,
+        'After exiting this tour, select the Actor’s animation and inspect **Start (seconds)** in **Action properties**. Find the sword swing or impact pose by scrubbing. Use that scene time for a sound-effect clip on an audio track. A root-motion attack uses the same scene clock as movement, camera keys, cuts, fades, subtitles and audio.',
+      ),
+      step(
+        'adjust',
+        'Adjust effect timing and source trim',
+        T.sceneAudioTiming,
+        'Select the effect, then open **Audio clip**. Set **Start** to the action’s impact time; **Source offset** skips leading silence in the file. Set **Duration**, volume and fades, then **Apply audio clip properties**. Dragging the body moves scene time; dragging the left edge changes both start and source offset. Shared snapping aligns clip edges; **Alt** bypasses it.',
+      ),
+      step(
+        'preview',
+        'Preview the combined scene',
+        T.scenePlayback,
+        'After exiting, choose **Play** at 1× speed to assess the effect with animation, camera and dialogue. **Pause** holds scene time and stops audio. Play resumes only clips active at that time, including their trim and fade progress. If sound is blocked or missing, inspect **Audio** status and retry **Enable audio** after correcting the file or browser permission.',
+      ),
+      step(
+        'scrub',
+        'Scrub without triggering effects',
+        T.sceneTime,
+        '**Playhead (s)** and ruler scrubbing pause playback and remain silent, including repeated backward and forward crossings of the effect. Subtitles, root motion, Actors, camera and fades are sampled at the selected time. Scene cues and animation gameplay events are suppressed. A **cue** is an optional host notification; it does not automatically start an audio clip. Schedule sound on the audio timeline.',
+      ),
+      step(
+        'restart',
+        'Restart a fresh playback pass',
+        T.sceneRestart,
+        'After exiting, **Restart** replaces old voices and plays from zero. Effects wait for their authored times, and scene cues can dispatch again once crossed in the new pass. Use Restart to judge the full lead-in after timing edits. This tour never plays, seeks, enables audio, edits data or changes Undo/Redo.',
+      ),
+    ],
+  ),
   focusedGuide(
     'scene-background-artwork',
     'Adding Background Artwork',

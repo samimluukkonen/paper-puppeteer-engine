@@ -20,7 +20,7 @@ import { artworkFixture } from './helpers/scenePackageFixtures.js';
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {
   const document = new SceneEditorDocument();
   const launcher = new GuideLauncher(sceneGuideHost(document));
-  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 26);
+  assert.lengthOf(guideRegistry.getGuidesForEditor('scene'), 30);
   assert.deepEqual(launcher.getAvailability('scene-creating'), { available: true });
   assert.isFalse(launcher.getAvailability('scene-adding-actor').available);
   assert.isFalse(launcher.getAvailability('scene-backgrounds-layers').available);
@@ -345,18 +345,19 @@ test('cuts and fades guide exposes real targets in empty and selected-effect sta
   }
 });
 
-test.each(['scene-audio-timeline', 'scene-audio-synchronization'] as const)(
+test.each([
+  'scene-audio-timeline',
+  'scene-audio-synchronization',
+  'scene-importing-audio',
+  'scene-audio-timeline-basics',
+  'scene-audio-scene-timing',
+] as const)(
   '%s resolves unique real controls with empty and selected clips while preserving history and view state',
   (guideId) => {
     const document = new SceneEditorDocument();
     document.createScene({ id: 'audio-tour', duration: 4000 });
     const launcher = new GuideLauncher(sceneGuideHost(document));
     const guide = guideRegistry.getGuideById(guideId)!;
-    assert.equal(
-      guide.title,
-      guideId === 'scene-audio-timeline' ? 'Visual Audio Timeline' : 'Audio Playback & Synchronization',
-    );
-    assert.lengthOf(guide.steps, 9);
     assert.deepEqual(
       guide.prerequisites?.map(({ capability }) => capability),
       ['tool:scene'],
@@ -471,100 +472,101 @@ test.each(['scene-audio-timeline', 'scene-audio-synchronization'] as const)(
   },
 );
 
-test('dialogue guide reveals unique empty and populated controls without changing authored or preview state', () => {
-  const document = new SceneEditorDocument();
-  document.createScene({ id: 'dialogue-tour', duration: 6000 });
-  const launcher = new GuideLauncher(sceneGuideHost(document));
-  const guide = guideRegistry.getGuideById('scene-dialogue-authoring')!;
-  assert.equal(guide.title, 'Dialogue & Subtitle Authoring');
-  assert.lengthOf(guide.steps, 9);
-  assert.deepEqual(
-    guide.prerequisites?.map(({ capability }) => capability),
-    ['tool:scene'],
-  );
-  const registry = new SceneCharacterRegistry();
-  const playback = new SceneEditorPlayback();
-  const inspect = (selected: boolean) => {
-    playback.sync(document.workingScene, true, () => {
-      throw new Error('Dialogue guide fixture has no Actors.');
-    });
-    playback.seek(1500);
-    playback.setSpeed(0.5);
-    playback.setAudioMuted(true);
-    const html =
-      renderToStaticMarkup(createElement(SceneDialogueInspector, { document })) +
-      renderToStaticMarkup(
-        createElement(SceneTimeline, { scene: document.workingScene!, document, registry, playback }),
-      );
-    for (const id of [
-      GUIDE_TARGETS.sceneDialogueAdd,
-      GUIDE_TARGETS.sceneDialogueTrack,
-      GUIDE_TARGETS.sceneDialogueProperties,
-      GUIDE_TARGETS.sceneDialogueText,
-      GUIDE_TARGETS.sceneDialogueSpeaker,
-      GUIDE_TARGETS.sceneDialogueTiming,
-      GUIDE_TARGETS.sceneDialogueVoice,
-      GUIDE_TARGETS.sceneDialogueActions,
-    ])
-      assert.lengthOf([...html.matchAll(new RegExp(`data-guide-id="${id}"`, 'g'))], 1);
-    assert.notInclude(html, '<details open');
-    assert.include(html, selected ? 'Dialogue text' : 'No lines yet?');
-    const before = document.workingScene;
-    const json = document.exportJson();
-    const view = () => [
-      document.selectedDialogueLine,
-      document.selectedActorId,
-      document.selectedAudioClip,
-      document.selectedCameraKey,
-      document.cameraSelected,
-      document.cameraKeyEditing,
-      document.cameraPreviewing,
-      document.cameraOverlays,
-      document.canUndo,
-      document.canRedo,
-      playback.time,
-      playback.status,
-      playback.speed,
-      playback.audioMuted,
-      playback.audioStatus,
-    ];
-    const original = view();
-    assert.isTrue(launcher.launch(guide.id).ok);
-    assert.isTrue(launcher.controller.next().ok);
-    assert.isTrue(launcher.controller.previous().ok);
-    assert.isTrue(launcher.controller.restart().ok);
-    for (const [index, step] of guide.steps.entries()) {
-      assert.equal(step.preparation, 'reveal-target');
-      assert.notEqual(step.mode, 'try-it');
-      if (index) assert.isTrue(launcher.controller.next().ok);
+test.each(['scene-dialogue-authoring', 'scene-creating-dialogue'])(
+  '%s preserves authored and preview state with empty and selected lines',
+  (guideId) => {
+    const document = new SceneEditorDocument();
+    document.createScene({ id: 'dialogue-tour', duration: 6000 });
+    const launcher = new GuideLauncher(sceneGuideHost(document));
+    const guide = guideRegistry.getGuideById(guideId)!;
+    assert.deepEqual(
+      guide.prerequisites?.map(({ capability }) => capability),
+      ['tool:scene'],
+    );
+    const registry = new SceneCharacterRegistry();
+    const playback = new SceneEditorPlayback();
+    const inspect = (selected: boolean) => {
+      playback.sync(document.workingScene, true, () => {
+        throw new Error('Dialogue guide fixture has no Actors.');
+      });
+      playback.seek(1500);
+      playback.setSpeed(0.5);
+      playback.setAudioMuted(true);
+      const html =
+        renderToStaticMarkup(createElement(SceneDialogueInspector, { document })) +
+        renderToStaticMarkup(
+          createElement(SceneTimeline, { scene: document.workingScene!, document, registry, playback }),
+        );
+      for (const id of [
+        GUIDE_TARGETS.sceneDialogueAdd,
+        GUIDE_TARGETS.sceneDialogueTrack,
+        GUIDE_TARGETS.sceneDialogueProperties,
+        GUIDE_TARGETS.sceneDialogueText,
+        GUIDE_TARGETS.sceneDialogueSpeaker,
+        GUIDE_TARGETS.sceneDialogueTiming,
+        GUIDE_TARGETS.sceneDialogueVoice,
+        GUIDE_TARGETS.sceneDialogueActions,
+      ])
+        assert.lengthOf([...html.matchAll(new RegExp(`data-guide-id="${id}"`, 'g'))], 1);
+      assert.notInclude(html, '<details open');
+      assert.include(html, selected ? 'Dialogue text' : 'No lines yet?');
+      const before = document.workingScene;
+      const json = document.exportJson();
+      const view = () => [
+        document.selectedDialogueLine,
+        document.selectedActorId,
+        document.selectedAudioClip,
+        document.selectedCameraKey,
+        document.cameraSelected,
+        document.cameraKeyEditing,
+        document.cameraPreviewing,
+        document.cameraOverlays,
+        document.canUndo,
+        document.canRedo,
+        playback.time,
+        playback.status,
+        playback.speed,
+        playback.audioMuted,
+        playback.audioStatus,
+      ];
+      const original = view();
+      assert.isTrue(launcher.launch(guide.id).ok);
+      assert.isTrue(launcher.controller.next().ok);
+      assert.isTrue(launcher.controller.previous().ok);
+      assert.isTrue(launcher.controller.restart().ok);
+      for (const [index, step] of guide.steps.entries()) {
+        assert.equal(step.preparation, 'reveal-target');
+        assert.notEqual(step.mode, 'try-it');
+        if (index) assert.isTrue(launcher.controller.next().ok);
+      }
+      assert.isTrue(launcher.controller.finish().ok);
+      assert.isTrue(launcher.launch(guide.id).ok);
+      launcher.controller.exit();
+      assert.strictEqual(document.workingScene, before);
+      assert.equal(document.exportJson(), json);
+      assert.deepEqual(view(), original);
+    };
+    try {
+      inspect(false);
+      document.addDialogueLine({
+        time: 500,
+        duration: 1000,
+        text: '森は静かだった。\n  Hello 👋',
+        speakerName: 'Narrator',
+      });
+      const id = document.selectedDialogueLine!.id;
+      document.setCameraPreview(true);
+      document.setCameraOverlays(true);
+      document.selectDialogueLine(id);
+      document.updateDialogueLine(id, { text: 'Temporary edit' });
+      document.undo();
+      inspect(true);
+      assert.isTrue(document.canRedo);
+      document.selectDialogueLine(null);
+      inspect(false);
+    } finally {
+      playback.dispose();
+      registry.dispose();
     }
-    assert.isTrue(launcher.controller.finish().ok);
-    assert.isTrue(launcher.launch(guide.id).ok);
-    launcher.controller.exit();
-    assert.strictEqual(document.workingScene, before);
-    assert.equal(document.exportJson(), json);
-    assert.deepEqual(view(), original);
-  };
-  try {
-    inspect(false);
-    document.addDialogueLine({
-      time: 500,
-      duration: 1000,
-      text: '森は静かだった。\n  Hello 👋',
-      speakerName: 'Narrator',
-    });
-    const id = document.selectedDialogueLine!.id;
-    document.setCameraPreview(true);
-    document.setCameraOverlays(true);
-    document.selectDialogueLine(id);
-    document.updateDialogueLine(id, { text: 'Temporary edit' });
-    document.undo();
-    inspect(true);
-    assert.isTrue(document.canRedo);
-    document.selectDialogueLine(null);
-    inspect(false);
-  } finally {
-    playback.dispose();
-    registry.dispose();
-  }
-});
+  },
+);
