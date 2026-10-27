@@ -77,6 +77,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.1
+
+Expand the existing IK Constraints Feature Guide to eight steps with dedicated bend-direction and solver-diagnostics guidance, plus explicit enabled/preview/influence, validation and numeric commit/cancel instructions. Keep reveal-only navigation and update the artist/catalog documentation and guide step-count regression.
+
+Improve the existing Rig Editor and shared Rig Tweak constraint workflow with labelled start/middle/end joints, a facing-aware signed bend arrow, and visible solver reachability, disabled/inactive and transform diagnostics. Show the actual clockwise default for legacy omitted bend settings, preserve one authored bend field, and retain validated atomic edits, history and existing solver behavior. Keep live overlay feedback synchronized with runtime target/transform changes. Use shared primary/destructive button styling for constraint commands.
+
+Document the actual post-v1.2.6 baseline, bone identities, effective bind/rest transforms, coordinate systems, deterministic FK/animation/IK/render ordering, authoring/persistence ownership and proposed optional mesh data/compiler/evaluator/Phaser boundaries in the [constraint and deformation audit](docs/rig-constraints-and-deformation.md). Add authoring, bend/history, invalid-chain feedback, bind stability, serialization and local browser regressions; update the artist guide and existing Feature Guide. Keep all current formats and rigid rendering, with no mesh implementation or automatic conversion. Update package and lockfile version metadata to `1.4.1`.
+
 ## 1.3.6
 
 Harden the integrated audio/dialogue cinematic workflow with a local desktop regression that authors layered artwork, two Actors, walking and root-motion attack clips, music, ambience, overlapping effects, Unicode subtitles, camera keys/cuts, fades and cues. Verify Undo/Redo, binary autosave/recovery, project export/reimport and standalone Phaser playback with a user-action audio unlock and complete voice/buffer/context cleanup.

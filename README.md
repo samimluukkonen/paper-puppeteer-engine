@@ -95,6 +95,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 ## Guides
 
 - [Character runtime integration](docs/runtime-integration.md)
+- [Rig constraint workflow, transform audit and optional deformation design](docs/rig-constraints-and-deformation.md)
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Advanced Pose Library](docs/pose-library.md)

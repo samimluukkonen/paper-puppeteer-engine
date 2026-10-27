@@ -309,7 +309,7 @@ export const rigGuides: readonly GuideDefinition[] = [
   {
     id: 'rig-ik-constraints',
     title: 'IK Constraints',
-    description: 'Create and select connected chains, then edit their default rig targets.',
+    description: 'Create connected chains, edit targets and bend direction, and understand solver feedback.',
     editor: 'rig',
     category: 'ik',
     prerequisites: [
@@ -323,20 +323,26 @@ export const rigGuides: readonly GuideDefinition[] = [
       step(
         'create',
         'Create a connected IK chain',
-        'To add another constraint, choose **+ Add IK Constraint**. The form uses three connected bones: **Start bone**, **Middle bone** and **End bone**. Enter a unique Constraint name, review the settings, then choose Create IK Constraint.',
+        'To add another constraint, choose **+ Add IK Constraint**. Choose three directly connected bones: **Start bone**, **Middle bone** and **End bone**. Enter a unique Constraint name, review the settings, then choose Create IK Constraint. Invalid settings show an error and leave the rig unchanged.',
         targets.rigAddIK,
       ),
       step(
         'select',
         'Select an existing constraint',
-        'Choose a named constraint in **IK constraints** to inspect its chain, default target, influence and bend direction. Constraint names are stable IDs shared with animations; dependencies can protect chain edits and deletion.',
+        'Choose a named constraint in **IK constraints** to see **Start**, **Middle** and **End** bone labels on the canvas. Constraint names are stable IDs shared with animations; dependency messages explain when chain edits and deletion are protected.',
         targets.rigIK,
       ),
       step(
         'preview',
         'Preview the solver',
-        '**IK Preview**, also called **Live solver preview** in the constraint panel, lets the solver pose the chain. Turning preview on or off does not remove the authored default target.',
+        '**IK Preview**, also called **Live solver preview**, lets the solver pose the chain without adding history. **Enabled** is a saved constraint setting with Undo/Redo. **Influence** blends FK with IK from zero to one. Disabled constraints keep editable default targets.',
         targets.rigIKPreview,
+      ),
+      step(
+        'bend',
+        'Choose the bend direction',
+        'After exiting the tour, select a constraint and set **Bend direction** to **Clockwise (+1)** or **Counterclockwise (−1)**. Follow the signed-turn arrow at the middle joint; **Facing** reflects it on the canvas. Creation can infer the sign once from the pose. Older constraints without a saved sign default to clockwise. Undo/Redo restores bend edits.',
+        targets.rigIK,
       ),
       step(
         'target',
@@ -347,7 +353,13 @@ export const rigGuides: readonly GuideDefinition[] = [
       step(
         'coordinates',
         'Refine target coordinates',
-        'Select the constraint to enter **Target X** and **Target Y** in rig local coordinates. A constraint without a static target can get one by dragging its end effector crosshair. The requested target stays authored even when the chain cannot reach it.',
+        'Select the constraint to enter **Target X** and **Target Y** in rig local coordinates. Commit a number with **Enter** or by leaving the field; **Escape** discards unfinished text. Dragging the end effector crosshair can create a missing default target.',
+        targets.rigIK,
+      ),
+      step(
+        'diagnostics',
+        'Read the solver feedback',
+        '**Unreachable target** means the pose clamps at its reach limit while your coordinates stay saved; move the target into reach. **Unsupported scale** needs equal absolute X/Y scales on the start bone. **Cannot solve** calls for nonzero, invertible transforms. **Inactive** means no active target or influence; **Disabled** and **Solver off** distinguish Enabled from preview. Status describes the evaluated target; a separate ownership message explains blocked dragging.',
         targets.rigIK,
       ),
       step(

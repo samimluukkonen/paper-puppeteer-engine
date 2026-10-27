@@ -15,7 +15,7 @@ const counts = {
   'rig-aligning-sprites': 5,
   'rig-slots-attachments': 5,
   'rig-skins': 5,
-  'rig-ik-constraints': 6,
+  'rig-ik-constraints': 8,
   'rig-exporting': 4,
   'rig-foot-contact-markers': 5,
 };

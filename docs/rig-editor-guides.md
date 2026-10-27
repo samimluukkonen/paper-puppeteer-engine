@@ -14,16 +14,16 @@ The v0.7.6.4 catalog is available from **Feature Guide → Rig Editor**. It uses
 | Aligning Sprites               |     5 | Hierarchy, Edit modes, canvas, Selection details, Undo/Redo                                  |
 | Slots and Attachments          |     5 | Hierarchy, + Add Slot, Create sprite attachment, Attachment slot, Edit                       |
 | Creating and Changing Skins    |     5 | Active skin, Skin authoring, Attachment slot                                                 |
-| IK Constraints                 |     6 | + Add IK Constraint, constraint panel, IK Preview, canvas, Undo/Redo                         |
+| IK Constraints                 |     8 | + Add IK Constraint, chain labels, bend arrow, targets, solver feedback, Enabled, Undo/Redo  |
 | Exporting the Rig or Character |     4 | Validation, File tools, Download rig.json, Character package                                 |
 
-There are 49 steps in total. Copy distinguishes skeleton joints, sprite origins (artwork pivots), sprite offsets (position relative to a bone/slot), slots (attachment locations), skins (appearance mappings), and default rig IK targets. It also distinguishes rig downloads from complete character ZIPs and the separate artwork replacement history.
+There are 51 steps in total. Copy distinguishes skeleton joints, sprite origins (artwork pivots), sprite offsets (position relative to a bone/slot), slots (attachment locations), skins (appearance mappings), and default rig IK targets. It also distinguishes rig downloads from complete character ZIPs and the separate artwork replacement history.
 
 ## Availability and preparation
 
 Creating a New Character works without a loaded character, including after a failed load. Other tasks require a loaded or newly created character. Joint editing also requires successful rig validation. Alignment requires an authored bone sprite or sprite attachment; its unavailable reason directs the artist to importing and attachment creation. IK requires an existing authored constraint; its reason directs the artist to create three connected bones and use **+ Add IK Constraint**. No character or bone names are hardcoded in the definitions.
 
-The other eight tasks are available on a valid root-only character. Import and attachment tutorials explain how to populate empty libraries and slots. Selecting a bone, slot, skin or constraint remains the artist's action after exiting the tour. The IK guide explains creation of another constraint, selecting an existing constraint, default-target dragging, coordinate entry, runtime ownership restrictions and undo/export.
+The other eight tasks are available on a valid root-only character. Import and attachment tutorials explain how to populate empty libraries and slots. Selecting a bone, slot, skin or constraint remains the artist's action after exiting the tour. The eight-step IK guide explains creation and validation, chain-role labels, enabled/preview/influence controls, signed bend direction and facing, default-target dragging, coordinate commitment/cancellation, reachability/transform diagnostics, runtime ownership restrictions and undo/export. Its dedicated bend and feedback steps cover the v1.4.1 workflow without changing solver state or authored data during the tour.
 
 Preparation expands ancestor disclosures, reveals the inspector and scrolls the target into view using the existing UI-only resolver. It does not change selection, edit modes, preview poses or solver state. Inspector disclosures still start collapsed. File tools and New Character steps point to their opening buttons and describe the dialog workflow without opening another modal over the tour.
 

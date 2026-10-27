@@ -73,12 +73,14 @@ function fixture(options: { empty?: boolean; noTarget?: boolean; dependencies?: 
     });
   };
   const text = scene.add.text.bind(scene.add);
+  const labels: string[] = [];
   scene.add.text = (...args) =>
     Object.assign(text(...args), {
       setScrollFactor() {
         return this;
       },
-      setText() {
+      setText(value: string) {
+        labels.push(value);
         return this;
       },
       setColor() {
@@ -137,6 +139,7 @@ function fixture(options: { empty?: boolean; noTarget?: boolean; dependencies?: 
   };
   return {
     destroyed,
+    labels,
     state,
     editor,
     controller,
@@ -333,17 +336,123 @@ test.each(['escape', 'blur', 'disable'] as const)(
 test('unreachable and disabled defaults remain editable without clamping authored coordinates', () => {
   const current = fixture();
   try {
+    current.controller.selectIK(chain.name);
+    assert.include(render(current.controller), 'Reachable.');
     current.drag({ x: 700, y: 600 });
     assert.equal(current.puppet.getIK(chain.name).status, 'clamped');
+    assert.include(render(current.controller), 'Unreachable target.');
+    assert.include(current.labels, 'tentacle · Unreachable target');
     const handle = current.getOverlay().getIKTargets()[0]!;
     assert.isAbove(Math.hypot(handle.world.x - handle.endpoint.x, handle.world.y - handle.endpoint.y), 100);
     current.release({ x: 700, y: 600 });
     assert.closeTo(current.state.getIKConstraint(chain.name).target!.x, 700, 1e-7);
     current.controller.updateIK(chain.name, { enabled: false });
     assert.isFalse(current.getOverlay().getIKTargets()[0]!.enabled);
+    assert.include(render(current.controller), 'Disabled.');
     current.drag({ x: 50, y: 50 });
     current.release({ x: 50, y: 50 });
     assert.closeTo(current.state.getIKConstraint(chain.name).target!.x, 50, 1e-7);
+  } finally {
+    current.dispose();
+  }
+});
+
+test('legacy bend defaults, visual roles, bend edits and history retain bind transforms and stable FK/IK', () => {
+  const current = fixture();
+  try {
+    const source = current.state.source;
+    const bind = new Map(
+      current.puppet.rig.bones.map((bone) => [bone.id, { ...current.puppet.getBone(bone.id).bindPose }]),
+    );
+    current.controller.selectIK(chain.name);
+    assert.include(render(current.controller), 'Omitted bend direction defaults to clockwise (+1).');
+    assert.include(render(current.controller), 'value="1" selected=""');
+    assert.include(current.labels, 'Start: base');
+    assert.include(current.labels, 'Middle: segment');
+    assert.include(current.labels, 'tentacle · End: tip');
+    assert.include(current.labels, 'Bend +1 · clockwise');
+    const before = current.puppet.getBone('segment').getWorldPosition();
+    current.controller.updateIK(chain.name, { bendDirection: -1 });
+    assert.equal(current.state.historyLength, 1);
+    assert.include(current.labels, 'Bend −1 · counterclockwise');
+    assert.include(render(current.controller), 'value="-1" selected=""');
+    const after = current.puppet.getBone('segment').getWorldPosition();
+    assert.isAbove(Math.hypot(after.x - before.x, after.y - before.y), 50);
+    const solved = current.puppet.rig.bones.map((bone) => ({ ...current.puppet.getBone(bone.id).pose }));
+    for (let frame = 0; frame < 50; ++frame) current.puppet.syncPose();
+    assert.deepEqual(
+      current.puppet.rig.bones.map((bone) => current.puppet.getBone(bone.id).pose),
+      solved,
+    );
+    for (const [id, transform] of bind) {
+      assert.deepEqual(current.puppet.getBone(id).bindPose, transform);
+      assert.isTrue(Object.isFrozen(current.puppet.getBone(id).bindPose));
+    }
+    const handle = current.getOverlay().getIKTargets()[0]!;
+    assert.closeTo(handle.endpoint.x, handle.world.x, 1e-7);
+    assert.closeTo(handle.endpoint.y, handle.world.y, 1e-7);
+    current.editor.undo();
+    assert.isUndefined(current.state.getIKConstraint(chain.name).bendDirection);
+    assert.include(render(current.controller), 'Omitted bend direction defaults to clockwise (+1).');
+    assert.closeTo(current.puppet.getBone('segment').getWorldPosition().x, before.x, 1e-7);
+    current.editor.redo();
+    assert.closeTo(current.puppet.getBone('segment').getWorldPosition().x, after.x, 1e-7);
+    const exported = parseRigDefinition(JSON.parse(current.editor.exportJson(false)));
+    assert.equal(exported.ik![0]!.bendDirection, -1);
+    assert.deepEqual(exported.bones, source.bones);
+    assert.notMatch(JSON.stringify(exported), /feedback|bindPose|resolvedTarget|status/);
+    current.controller.previewIK(false);
+    assert.include(render(current.controller), 'Solver off.');
+    for (const [id, transform] of bind) assert.deepEqual(current.puppet.getBone(id).pose, transform);
+    current.controller.previewIK(true);
+    assert.closeTo(current.puppet.getBone('segment').getWorldPosition().x, after.x, 1e-7);
+    assert.strictEqual(current.state.source, source);
+  } finally {
+    current.dispose();
+  }
+});
+
+test('invalid chain edits report a visible error and preserve the authored snapshot, runtime and history', () => {
+  const current = fixture();
+  try {
+    current.controller.selectIK(chain.name);
+    const before = current.state.workingCopy;
+    const puppet = current.puppet;
+    for (const patch of [{ middleBone: 'tip' }, { endBone: 'missing' }]) {
+      current.controller.updateIK(chain.name, patch);
+      assert.match(render(current.controller), /directly connected|Unknown IK bone/);
+      assert.strictEqual(current.state.workingCopy, before);
+      assert.strictEqual(current.puppet, puppet);
+      assert.equal(current.state.historyLength, 0);
+    }
+  } finally {
+    current.dispose();
+  }
+});
+
+test('solver diagnostics refresh for host target and transform changes without authored edits', () => {
+  const current = fixture();
+  try {
+    const snapshot = current.state.workingCopy;
+    current.controller.selectIK(chain.name);
+    const constraint = current.puppet.getIK(chain.name);
+    constraint.setTarget(10000, 10000);
+    current.puppet.syncPose();
+    current.getOverlay().draw();
+    assert.equal(current.editor.getIKFeedback(chain.name).label, 'Unreachable target');
+    assert.include(current.labels, 'tentacle · Unreachable target');
+    const bone = current.puppet.getBone('base');
+    bone.pose.scaleX = 2;
+    current.puppet.syncPose();
+    current.getOverlay().draw();
+    assert.include(render(current.controller), 'Unsupported scale.');
+    assert.include(current.labels, 'tentacle · Unsupported scale');
+    bone.pose.scaleX = 0;
+    current.puppet.syncPose();
+    current.getOverlay().draw();
+    assert.include(render(current.controller), 'Cannot solve.');
+    assert.strictEqual(current.state.workingCopy, snapshot);
+    assert.equal(current.state.historyLength, 0);
   } finally {
     current.dispose();
   }

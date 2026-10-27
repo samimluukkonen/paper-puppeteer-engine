@@ -15,6 +15,7 @@ import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { RigEditorInputController } from './RigEditorInputController.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { type BoneField, RigEditorState, type SlotField, type SpriteField } from './RigEditorState.js';
+import { rigIKFeedback } from './rigIKFeedback.js';
 
 export class RigEditor {
   readonly state: RigEditorState;
@@ -528,6 +529,10 @@ export class RigEditor {
 
   getIKTargetEditIssue(id: string): string | undefined {
     return this.overlay?.getIKTargets().find((handle) => handle.id === id)?.disabledReason ?? undefined;
+  }
+
+  getIKFeedback(id: string) {
+    return rigIKFeedback(this.puppet.getIK(id), this.state.getIKConstraint(id));
   }
 
   createIKConstraint(options: CreateIKConstraintOptions): void {

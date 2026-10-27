@@ -64,10 +64,12 @@ function ChainFields({
 function Settings({
   definition,
   protectedChain,
+  creating = false,
   onPatch,
 }: {
   definition: TwoBoneIKDefinition;
   protectedChain?: boolean;
+  creating?: boolean;
   onPatch: (patch: IKConstraintPatch) => void;
 }) {
   return (
@@ -77,16 +79,22 @@ function Settings({
         Bend direction
         <select
           aria-label="Bend direction"
-          value={definition.bendDirection ?? ''}
+          value={definition.bendDirection ?? (creating ? '' : 1)}
           onChange={(event) => onPatch({ bendDirection: event.target.value === '1' ? 1 : -1 })}
         >
-          <option value="" disabled>
-            Automatic from pose
-          </option>
-          <option value="1">Clockwise</option>
-          <option value="-1">Counterclockwise</option>
+          {creating && (
+            <option value="" disabled>
+              From current pose on creation
+            </option>
+          )}
+          <option value="1">Clockwise (+1)</option>
+          <option value="-1">Counterclockwise (−1)</option>
         </select>
       </label>
+      <p>
+        Bend is the signed turn between links in the start bone’s coordinates. Facing reflects the canvas indicator.
+      </p>
+      {!creating && definition.bendDirection === undefined && <p>Omitted bend direction defaults to clockwise (+1).</p>}
       <label>
         <input
           type="checkbox"
@@ -196,9 +204,9 @@ export function RigIKCreateForm({
       {!automaticTarget && (
         <TargetFields target={definition.target ?? { x: 0, y: 0 }} onCommit={(target) => patch({ target })} />
       )}
-      <Settings definition={definition} onPatch={patch} />
+      <Settings definition={definition} creating onPatch={patch} />
       {definition.name && error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={!!error}>
+      <button type="submit" className="workspace-primary" disabled={!!error}>
         Create IK Constraint
       </button>
       <button type="button" onClick={onClose}>
@@ -222,6 +230,7 @@ export function RigIKPanel({ controller, embedded = false }: { controller: Attac
   const constraints = state.workingCopy.ik ?? [];
   const selected = constraints.find((entry) => entry.name === state.selectedIKConstraintId);
   const dependencies = selected ? state.ikConstraintDependencies(selected.name) : [];
+  const feedback = selected ? editor.getIKFeedback(selected.name) : undefined;
   const patch = (values: IKConstraintPatch) => {
     if (selected) controller.updateIK(selected.name, values);
   };
@@ -246,7 +255,12 @@ export function RigIKPanel({ controller, embedded = false }: { controller: Attac
             </button>
           ))}
         </div>
-        <button type="button" data-guide-id={GUIDE_TARGETS.rigAddIK} onClick={() => setCreating(true)}>
+        <button
+          type="button"
+          className="workspace-primary"
+          data-guide-id={GUIDE_TARGETS.rigAddIK}
+          onClick={() => setCreating(true)}
+        >
           + Add IK Constraint
         </button>
         <label>
@@ -270,6 +284,14 @@ export function RigIKPanel({ controller, embedded = false }: { controller: Attac
         {selected && (
           <fieldset key={selected.name}>
             <legend>Selected: {selected.name}</legend>
+            <p>
+              Chain: start {selected.rootBone} → middle {selected.middleBone} → end {selected.endBone}.
+            </p>
+            {feedback && (
+              <p role="status" aria-label="IK solver status">
+                {feedback.label}. {feedback.detail}
+              </p>
+            )}
             <ChainFields
               rig={state.workingCopy}
               definition={selected}
@@ -291,7 +313,12 @@ export function RigIKPanel({ controller, embedded = false }: { controller: Attac
                 end offset.
               </p>
             )}
-            <button type="button" disabled={!!dependencies.length} onClick={() => controller.removeIK(selected.name)}>
+            <button
+              type="button"
+              className="workspace-danger"
+              disabled={!!dependencies.length}
+              onClick={() => controller.removeIK(selected.name)}
+            >
               Delete Constraint
             </button>
           </fieldset>

@@ -4,6 +4,8 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { gridLines } from './grid.js';
 import type { RigEditorSelection, RigEditorState } from './RigEditorState.js';
+import { rigIKBendArrow } from './rigIKBendArrow.js';
+import { rigIKFeedback } from './rigIKFeedback.js';
 
 type Point = { x: number; y: number };
 const distanceToSegment = (p: Point, a: Point, b: Point): number => {
@@ -64,6 +66,7 @@ export class RigEditorOverlay {
           world: localToWorld(target, matrix),
           endpoint,
           enabled: definition.enabled !== false,
+          feedback: rigIKFeedback(constraint, definition),
           disabledReason,
         },
       ];
@@ -247,11 +250,29 @@ export class RigEditorOverlay {
     const camera = this.scene.cameras.main;
     const world = this.puppet.container.getWorldTransformMatrix();
     const view = camera.matrixCombined;
+    const handles = this.getIKTargets();
+    const visibleChains = this.chains.filter(
+      (chain) => this.state.visibility.ik || chain.name === this.state.selectedIKConstraintId,
+    );
     const snapshot = [
       this.state.workingCopy,
       this.state.selection?.type,
       this.state.selection?.id,
       this.state.selectedIKConstraintId,
+      ...visibleChains.flatMap((chain) =>
+        [chain.rootBone, chain.middleBone, chain.endBone].flatMap((id) => {
+          const matrix = this.puppet.getBone(id).container.getWorldTransformMatrix();
+          return [matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty];
+        }),
+      ),
+      ...handles.flatMap((handle) => [
+        handle.world.x,
+        handle.world.y,
+        handle.endpoint.x,
+        handle.endpoint.y,
+        handle.disabledReason,
+        handle.feedback.label,
+      ]),
       this.state.selectedFootContactMarkerId,
       // Markers follow evaluated bone poses even when only the host preview advances.
       ...this.getFootContactMarkers().flatMap((marker) => [marker.world.x, marker.world.y]),
@@ -423,9 +444,27 @@ export class RigEditorOverlay {
           .lineBetween(root.x, root.y, middle.x, middle.y)
           .lineBetween(middle.x, middle.y, end.x, end.y);
         for (const point of [root, middle, end]) g.strokeCircle(point.x, point.y, selected ? 10 : 9);
-        label(chain.name, end.x + 12, end.y - 10, '#76562b');
+        if (selected) {
+          label(`Start: ${chain.rootBone}`, root.x + 12, root.y - 22, '#a53d21');
+          label(`Middle: ${chain.middleBone}`, middle.x + 26, middle.y - 22, '#a53d21');
+          label(`${chain.name} · End: ${chain.endBone}`, end.x + 12, end.y - 10, '#a53d21');
+          const bend = chain.bendDirection ?? 1;
+          const basis = this.puppet.getBone(chain.rootBone).container.getWorldTransformMatrix();
+          const arrow = rigIKBendArrow(middle, this.puppet.getBone(chain.middleBone).pose, bend, basis);
+          g.lineStyle(2, color, 0.95);
+          for (const points of [arrow.arc, arrow.head]) {
+            for (let i = 1; i < points.length; i += 1)
+              g.lineBetween(points[i - 1]!.x, points[i - 1]!.y, points[i]!.x, points[i]!.y);
+          }
+          label(
+            `Bend ${bend === 1 ? '+1 · clockwise' : '−1 · counterclockwise'}`,
+            middle.x + 26,
+            middle.y + 8,
+            '#a53d21',
+          );
+        } else label(chain.name, end.x + 12, end.y - 10, '#76562b');
       }
-      for (const handle of this.getIKTargets().sort(
+      for (const handle of handles.sort(
         (a, b) =>
           Number(a.id === this.state.selectedIKConstraintId) - Number(b.id === this.state.selectedIKConstraintId),
       )) {
@@ -444,12 +483,7 @@ export class RigEditorOverlay {
             .lineBetween(point.x - 16, point.y, point.x + 16, point.y)
             .lineBetween(point.x, point.y - 16, point.x, point.y + 16);
         }
-        label(
-          `${handle.id} · ${handle.enabled ? 'default target' : 'disabled'}`,
-          point.x + 18,
-          point.y + 10,
-          '#76562b',
-        );
+        label(`${handle.id} · ${handle.feedback.label}`, point.x + 18, point.y + 10, '#76562b');
       }
       label(
         this.state.ikPreview ? 'IK preview · fixed targets' : 'IK chains · solver off',

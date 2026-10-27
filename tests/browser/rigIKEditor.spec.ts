@@ -83,6 +83,15 @@ test('create, drag, cancel, configure and reload a visual rig IK constraint thro
   await x.fill('999');
   await x.press('Escape');
   await expect(x).toHaveValue(committedX);
+  const status = panel.getByRole('status', { name: 'IK solver status', exact: true });
+  const previousStatus = await status.textContent();
+  await x.fill('9999');
+  await x.blur();
+  await expect(status).toContainText('Unreachable target.');
+  await expect(x).toHaveValue('9999');
+  await page.locator('#undo').click();
+  await expect(x).toHaveValue(committedX);
+  await expect(status).toHaveText(previousStatus!);
   const canvas = page.locator('#editor-stage canvas');
   const solved = await canvas.screenshot();
   await panel.getByLabel('Influence', { exact: true }).fill('0');
@@ -90,7 +99,15 @@ test('create, drag, cancel, configure and reload a visual rig IK constraint thro
   expect((await canvas.screenshot()).equals(solved)).toBe(false);
   await panel.getByLabel('Influence', { exact: true }).fill('1');
   await panel.getByLabel('Influence', { exact: true }).blur();
-  await panel.getByLabel('Bend direction', { exact: true }).selectOption('-1');
+  const bend = panel.getByLabel('Bend direction', { exact: true });
+  await bend.selectOption('1');
+  await bend.selectOption('-1');
+  await page.locator('#undo').click();
+  await expect(bend).toHaveValue('1');
+  await page.locator('#redo').click();
+  await expect(bend).toHaveValue('-1');
+  await expect(panel).toContainText('Chain: start rightUpperArm → middle rightForearm → end rightHand.');
+  await page.screenshot({ path: test.info().outputPath('constraint-feedback-and-bend.png') });
   const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
   await rigFileAction(page, '#log-json', (control) => control.click());
   const exported = parseRigDefinition(JSON.parse((await logged).text()));
@@ -161,14 +178,16 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   const animationDialog = page.getByRole('dialog', { name: 'Create new animation', exact: true });
   await animationDialog.getByLabel('Animation name / ID', { exact: true }).fill('reach');
   await animationDialog.getByRole('button', { name: 'Create Animation', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: 'Bones', exact: true })).toBeVisible();
+  await expect(page.getByRole('tabpanel', { name: 'IK target', exact: true })).toBeHidden();
   await page.getByRole('button', { name: 'Select IK target tentacleIK', exact: true }).click();
-  await expect(page.locator('#animation-ik-inspector > details')).not.toHaveAttribute('open');
+  await expect(page.getByRole('tab', { name: 'IK target', exact: true })).toHaveAttribute('aria-selected', 'true');
   await animationIKInspector(page);
   const inspector = page.locator('#animation-ik-inspector');
   await inspector.locator('[data-ik-property="x"]').fill('17');
-  await inspector.locator('summary').first().click();
+  await page.getByRole('button', { name: 'Collapse inspector sections', exact: true }).click();
   await expect(inspector.locator('[data-ik-property="x"]')).toBeHidden();
-  await inspector.locator('summary').first().click();
+  await page.getByRole('button', { name: 'Expand inspector sections', exact: true }).click();
   await expect(inspector.locator('[data-ik-property="x"]')).toHaveValue('17');
   for (const [time, value] of [
     ['0', '20'],
@@ -202,6 +221,7 @@ test('a new non-humanoid skeleton has an empty IK state and can create a chain w
   await expect(targetX).toHaveValue('15');
   await inspectorControl(page, '#animation-inspector section[aria-label="IK constraints"]');
   await tweakIK.getByLabel('Enabled', { exact: true }).uncheck();
+  await expect(tweakIK.getByRole('status', { name: 'IK solver status', exact: true })).toContainText('Disabled.');
   await tweakIK.getByLabel('Enabled', { exact: true }).check();
   await page.locator('#editor-mode').selectOption('animation');
   const downloadingAgain = page.waitForEvent('download');
