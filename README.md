@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [visual mesh editor](docs/mesh-attachments.md) adds textured geometry, vertex editing and safe subdivision in Rig Editor; automatic deformation and bone weights remain future work.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [visual mesh editor](docs/mesh-attachments.md) adds textured geometry, vertex editing and safe subdivision in Rig Editor; the [mesh runtime](docs/mesh-attachments.md#runtime-skeletal-skinning) adds validated bone weights and skeletal deformation from final FK/IK poses.
 
 **Authoring tools:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 

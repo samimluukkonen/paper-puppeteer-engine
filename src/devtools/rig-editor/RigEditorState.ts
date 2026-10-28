@@ -703,7 +703,7 @@ export class RigEditorState {
     let id = `${source}-mesh`,
       suffix = 2;
     while (this.workingCopy.attachments?.some((entry) => entry.id === id)) id = `${source}-mesh-${suffix++}`;
-    const mesh = createRectangleMeshAttachment({ ...sprite, id }, imageSize, this.workingCopy);
+    const mesh = createRectangleMeshAttachment({ ...sprite, id }, imageSize, this.workingCopy, this.getSlot(slot).bone);
     // Fork the default skin so inherited assignments and the original artwork remain untouched.
     let skinName = this.activeSkin;
     const original = this.getSkin(skinName);

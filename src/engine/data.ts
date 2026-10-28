@@ -4,6 +4,7 @@ export type {
   AttachmentDefinition,
   AttachmentDefinitionBase,
   MeshVertex,
+  BoneInfluence,
   MeshBindPose,
   MeshAttachmentDefinition,
   AttachmentOptions,

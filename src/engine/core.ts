@@ -1,4 +1,6 @@
 /** Public renderer-independent APIs. Existing pure authoring and bake exports remain supported. */
+export { MAX_BONE_INFLUENCES, normalizeBoneInfluences, createMeshSkinBinding, deformMesh } from './meshSkinning.js';
+export type { MeshSkinBinding } from './meshSkinning.js';
 export {
   AUDIO_CATEGORIES,
   AUDIO_MAX_FILE_BYTES,
@@ -141,6 +143,7 @@ export type {
   AttachmentDefinition,
   AttachmentDefinitionBase,
   MeshVertex,
+  BoneInfluence,
   MeshBindPose,
   MeshAttachmentDefinition,
   AttachmentOptions,

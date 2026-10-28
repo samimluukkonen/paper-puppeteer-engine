@@ -17,6 +17,7 @@ export function createRectangleMeshAttachment(
   sprite: SpriteAttachmentDefinition,
   imageSize: { width: number; height: number },
   rig: RigDefinition,
+  boneId = rig.root,
 ): MeshAttachmentDefinition {
   checkRigReferences(rigDefinitionSchema.parse(rig), throwValidationIssue);
   spriteAttachmentSchema.strict().parse(sprite);
@@ -38,6 +39,7 @@ export function createRectangleMeshAttachment(
       id,
       ...imagePixelToAttachmentLocal({ x, y }, width, height, sprite.originX, sprite.originY),
       ...imagePixelToUV({ x, y }, width, height),
+      influences: [{ boneId, weight: 1 }],
     })),
     triangles: [0, 1, 2, 0, 2, 3],
     bindPose: createMeshBindPose(rig, sprite),

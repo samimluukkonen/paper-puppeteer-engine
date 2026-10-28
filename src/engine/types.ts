@@ -63,6 +63,11 @@ export interface SpriteAttachmentDefinition extends AttachmentDefinitionBase {
   type?: 'sprite';
 }
 
+export interface BoneInfluence {
+  boneId: string;
+  weight: number;
+}
+
 export interface MeshVertex {
   id: string;
   /** Unscaled attachment-local bind position, with the image pivot already subtracted. */
@@ -71,6 +76,8 @@ export interface MeshVertex {
   /** Normalized image coordinates, top left (0, 0), bottom right (1, 1). */
   u: number;
   v: number;
+  /** Up to four unique bones, summing to one. Omitted legacy weights follow the assigned slot bone. */
+  influences?: readonly BoneInfluence[];
 }
 
 /** Effective authored rest transforms, independent of live joints, animation and camera state. */

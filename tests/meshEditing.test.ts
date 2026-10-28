@@ -58,7 +58,14 @@ test('conversion retains rigid source, image, placement, unrelated skin assignme
   assert.equal(mesh.texture, 'paper');
   assert.equal(mesh.x, 7);
   assert.equal(mesh.rotation, 0.4);
-  assert.deepEqual(mesh.vertices[0], { id: 'top-left', x: -20, y: -20, u: 0, v: 0 });
+  assert.deepEqual(mesh.vertices[0], {
+    id: 'top-left',
+    x: -20,
+    y: -20,
+    u: 0,
+    v: 0,
+    influences: [{ boneId: 'root', weight: 1 }],
+  });
   assert.equal(state.resolvedAttachment('other'), 'cloth');
   const converted = state.workingCopy;
   state.undo();
@@ -92,7 +99,14 @@ test('shared-edge subdivision splits both triangles with consistent winding and 
   const next = subdivideMeshEdge(mesh, 0, 2, file);
   assert.equal(next.vertices.length, 5);
   assert.equal(next.triangles.length, 12);
-  assert.deepEqual(next.vertices[4], { id: 'vertex-1', x: 20, y: 0, u: 0.5, v: 0.5 });
+  assert.deepEqual(next.vertices[4], {
+    id: 'vertex-1',
+    x: 20,
+    y: 0,
+    u: 0.5,
+    v: 0.5,
+    influences: [{ boneId: 'root', weight: 1 }],
+  });
   assert.deepEqual(validateMeshTopology(next), []);
   assert.isFalse(meshEdges(next).some(([a, b]) => a === 0 && b === 2));
   assert.deepEqual(mesh.vertices.length, 4);
@@ -106,7 +120,14 @@ test('boundary subdivision preserves endpoint UVs; delete retriangulates without
   const mesh = rectangle();
   const next = subdivideMeshEdge(mesh, 1, 0, file);
   assert.equal(next.triangles.length, 9);
-  assert.deepEqual(next.vertices[4], { id: 'vertex-1', x: 20, y: -20, u: 0.5, v: 0 });
+  assert.deepEqual(next.vertices[4], {
+    id: 'vertex-1',
+    x: 20,
+    y: -20,
+    u: 0.5,
+    v: 0,
+    influences: [{ boneId: 'root', weight: 1 }],
+  });
   const removed = deleteMeshVertex(next, 'vertex-1', file);
   assert.deepEqual(removed.vertices, mesh.vertices);
   assert.deepEqual(validateMeshTopology(removed), []);
@@ -158,6 +179,7 @@ test('renderer uses native local XYUV geometry, slot affine, opacity/order, repl
   assert.deepEqual(mesh.vertices.slice(0, 4), [-20, -20, 0, 0]);
   assert.deepEqual(mesh.indices, [0, 1, 2, 0, 0, 2, 3, 0]);
   assert.isTrue(mesh.renderAsTriangles);
+  assert.isTrue(mesh.flipV);
   assert.equal(mesh.originX, 0);
   const expected = meshAttachmentToBindPose(state.selectedMesh!, 'sleeve', state.selectedMesh!.vertices[0]!);
   const rendered = localToWorld(state.selectedMesh!.vertices[0]!, mesh.getWorldTransformMatrix());

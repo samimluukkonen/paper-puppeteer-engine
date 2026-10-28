@@ -38,7 +38,7 @@ In [slots, attachments and skins](visual-attachment-skins.md), create attachment
 
 ### Imported mesh attachments
 
-Choose **Feature Guide → Rig Editor → Editing Mesh Geometry** for a guided introduction. Use the [visual mesh workflow](mesh-attachments.md#using-this-milestone) to convert a selected rigid attachment slot, subdivide edges and adjust textured vertices in Rig Editor. Conversion retains the rigid source and protects other skin assignments; converting the default skin selects a new mesh variant. Choose that variant again after export/reload. Automatic deformation and bone weights remain outside this milestone.
+Choose **Feature Guide → Rig Editor → Editing Mesh Geometry** for a guided introduction. Use the [visual mesh workflow](mesh-attachments.md#using-this-milestone) to convert a selected rigid attachment slot, subdivide edges and adjust textured vertices in Rig Editor. Conversion retains the rigid source and protects other skin assignments; converting the default skin selects a new mesh variant. Choose that variant again after export/reload. New meshes follow the selected slot bone by default. Developers can author [bone weights for skeletal deformation](mesh-attachments.md#runtime-skeletal-skinning); weight painting UI remains outside this milestone.
 
 Bound meshes also protect their saved rest configuration. If a joint, slot or attachment transform edit reports a bind-pose mismatch, the editor rolls it back. Restore the saved configuration or ask the character's developer to recreate the mesh from the revised authored rig. Mesh pivots require geometry recreation; mesh image replacements must retain dimensions and origin multipliers of 1. See the [mesh troubleshooting guide](mesh-attachments.md#troubleshooting).
 

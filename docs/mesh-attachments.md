@@ -1,8 +1,8 @@
-# Visual mesh geometry — v1.4.2.2
+# Mesh geometry and skeletal deformation — v1.4.3.1
 
 [All guides](../README.md#guides)
 
-Mesh attachments store validated geometry, UVs and bind references alongside rigid sprites. Rig Editor can convert a rigid sprite attachment, edit vertices and safely subdivide/retriangulate its triangles. Phaser renders the authored mesh as textured geometry. Bone weights, automatic skeletal deformation, vertex animation and cloth remain outside this milestone.
+Mesh attachments store validated geometry, UVs and bind references alongside rigid sprites. Rig Editor can convert a rigid sprite attachment, edit vertices and safely subdivide/retriangulate its triangles. Phaser renders textured meshes and deforms their vertices from the final evaluated bone poses. Weight painting, animated mesh vertices and cloth remain outside this milestone.
 
 ## Using this milestone
 
@@ -22,7 +22,7 @@ Finish skeleton, slot placement and sprite alignment before converting. The save
 
 ### Rendering
 
-`PuppetRenderer` uses a small adapter to Phaser 4.2.1's native **Mesh2D** object (WebGL). Indexed triangles carry attachment-local X/Y and normalized top-left UVs. Existing slot mounts retain full affine projection, depth ordering, opacity and visibility. Texture filtering follows the existing host texture/pixel-art policy; conversion never smooths artwork or changes sampling globally. `Puppet.getSlotMesh(slot)` returns native geometry; `getSlotImage(slot)` continues to return rigid images only. Render-only onion previews copy geometry and borrowed textures as well as presentation. Switching or destroying attachments destroys geometry objects and leaves host-owned textures intact. Canvas-only Phaser hosts cannot render Mesh2D.
+`PuppetRenderer` uses a small adapter to Phaser 4.2.1's native **Mesh2D** object (WebGL). Indexed triangles carry attachment-local X/Y and normalized top-left UVs. Existing slot mounts retain full affine projection, depth ordering, opacity and visibility. Texture filtering follows the existing host texture/pixel-art policy; conversion never smooths artwork or changes sampling globally. `Puppet.getSlotMesh(slot)` returns native geometry; `getSlotImage(slot)` continues to return rigid images only. Render-only onion previews copy geometry and borrowed textures as well as presentation. Switching or destroying attachments destroys geometry objects and leaves host-owned textures intact. Canvas-only Phaser hosts receive an explicit WebGL-required diagnostic before Puppet objects are allocated, including when meshes are in inactive skins.
 
 ### Developer quick start
 
@@ -92,14 +92,14 @@ The default skin still selects rigid artwork. The optional `mesh-data` skin sele
 
 Meshes retain existing `id`, `texture`, transform, normalized origin and optional `groundContacts` fields. `texture` references the stable key in `CharacterManifest.textures`, rather than introducing a second image identity. Additional required fields are:
 
-| Field                            | Meaning                                                              |
-| -------------------------------- | -------------------------------------------------------------------- |
-| `type: 'mesh'`                   | Explicit attachment variant                                          |
-| `meshVersion: 1`                 | Mesh version, independent of the enclosing rig version               |
-| `imageSize: { width, height }`   | Positive integer source-image dimensions in pixels                   |
-| `vertices: [{ id, x, y, u, v }]` | Stable IDs, attachment-local rest positions and normalized image UVs |
-| `triangles: number[]`            | Triples indexing the authored vertex array                           |
-| `bindPose`                       | Required version-1 authored rest snapshot                            |
+| Field                                         | Meaning                                                              |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| `type: 'mesh'`                                | Explicit attachment variant                                          |
+| `meshVersion: 1`                              | Mesh version, independent of the enclosing rig version               |
+| `imageSize: { width, height }`                | Positive integer source-image dimensions in pixels                   |
+| `vertices: [{ id, x, y, u, v, influences? }]` | Stable IDs, attachment-local rest positions and normalized image UVs |
+| `triangles: number[]`                         | Triples indexing the authored vertex array                           |
+| `bindPose`                                    | Required version-1 authored rest snapshot                            |
 
 Whole images are supported. Mesh `frame` fields, including base-frame aliases, are rejected; atlas trimming, rotated frames and UV tiling need future explicit support. A mesh pivot is baked into its vertex positions. Stored normalized origins record geometry-creation provenance; evaluation does not subtract the pivot again.
 
@@ -109,20 +109,20 @@ Slot ownership remains `slot.bone`. Slots select attachment IDs; skins map slot 
 
 All coordinates use X right and Y down; rotations are radians and scales are unitless. Transforms compose as `T(x, y) * R(rotation) * diag(scaleX, scaleY)` through complete affine ancestor matrices. Reflections and nonuniform scales require full affine multiplication.
 
-| Space                                       | Definition                                                                                                                                         |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Image pixels                                | Source-image top left `(0, 0)` to bottom right `(width, height)`                                                                                   |
-| Image UV                                    | `u = pixelX / width`, `v = pixelY / height`, each in `[0, 1]`                                                                                      |
-| Attachment-local / mesh-local bind geometry | `x = pixelX - originX * width`, `y = pixelY - originY * height`, before attachment scale/rotation/offset                                           |
-| Bone local                                  | Relative to the owning joint; attachment placement first passes through the attachment and slot transforms                                         |
-| Puppet bind space                           | Mesh-local point transformed by authored attachment, slot, owning bone and ancestor rest transforms; excludes Puppet/Actor placement               |
-| Evaluated Puppet space                      | Current FK/animation/IK bone transforms composed through the Puppet hierarchy; future deformation compares these with the saved bind configuration |
-| Actor / world                               | Puppet placement, scale/facing and Actor/container ancestry map evaluated Puppet points into world coordinates                                     |
-| Viewport                                    | Camera pan/zoom and canvas projection are presentation only; never store these in bind data or future bone influences                              |
+| Space                                       | Definition                                                                                                                               |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Image pixels                                | Source-image top left `(0, 0)` to bottom right `(width, height)`                                                                         |
+| Image UV                                    | `u = pixelX / width`, `v = pixelY / height`, each in `[0, 1]`                                                                            |
+| Attachment-local / mesh-local bind geometry | `x = pixelX - originX * width`, `y = pixelY - originY * height`, before attachment scale/rotation/offset                                 |
+| Bone local                                  | Relative to the owning joint; attachment placement first passes through the attachment and slot transforms                               |
+| Puppet bind space                           | Mesh-local point transformed by authored attachment, slot, owning bone and ancestor rest transforms; excludes Puppet/Actor placement     |
+| Evaluated Puppet space                      | Current FK/animation/IK bone transforms composed through the Puppet hierarchy; skinning compares these with the saved bind configuration |
+| Actor / world                               | Puppet placement, scale/facing and Actor/container ancestry map evaluated Puppet points into world coordinates                           |
+| Viewport                                    | Camera pan/zoom and canvas projection are presentation only; never store these in bind data or bone influences                           |
 
 `bindPose` stores `version: 1`, the root bone ID, every bone's stable ID/parent and **effective** rest transform, every slot's ID/bone and rest transform, and the attachment rest transform. Bone positions resolve parent `length` through the same helper as `Rig`. Omitted numeric defaults become explicit; bone/slot snapshots sort by stable ID. Bind vertices remain attachment local; `meshAttachmentToBindPose()` converts them to Puppet bind coordinates.
 
-Capture from authored `RigDefinition` or immutable `Rig`, never playing joints or sampled animation. Runtime FK/IK, facing, Actor motion and camera changes leave the snapshot untouched. Future weights can reference stable vertex IDs and bone IDs, using saved inverse bone rest transforms through `meshBindPoseToBoneLocal()`. Weight fields are intentionally unsupported in this milestone.
+Capture from authored `RigDefinition` or immutable `Rig`, never playing joints or sampled animation. Runtime FK/IK, facing, Actor motion and camera changes leave the snapshot untouched. Weights reference stable bone IDs on each stable vertex, using saved inverse bone rest transforms through `meshBindPoseToBoneLocal()` and the runtime binding cache.
 
 Rig validation compares saved bind data with the current authored configuration. Effective length normalization permits only floating-point roundoff: `16 * Number.EPSILON * max(1, |a|, |b|)` per numeric field. Changed hierarchy, missing/duplicate snapshot identities, changed effective bone/slot rest transforms or changed attachment transforms fail validation. Composed bind matrices must be finite and invertible within the shared affine inverse tolerance.
 
@@ -164,6 +164,40 @@ Character, scene and project packages reuse retained authored rig files and text
 
 ## Implementation and verification
 
-The data foundation remains in `types.ts`, `schemas.ts`, `meshGeometry.ts`, `meshBindPose.ts`, `meshAttachments.ts`, `validation.ts`, `Rig.ts` and `SlotState.ts`. `meshEditing.ts` adds pure edge subdivision and connected-fan deletion; `meshRendering.ts` adapts authored data to Phaser Mesh2D. `PuppetRenderer` owns geometry objects, while the host retains textures. `RigEditorState`, `RigEditorInputController`, `RigEditorOverlay`, `MeshGeometryPanel` and `AttachmentController` share the existing history, selection and viewport paths. Package metadata uses SemVer `1.4.2-2`; outer data formats remain version 1.
+The data foundation remains in `types.ts`, `schemas.ts`, `meshGeometry.ts`, `meshBindPose.ts`, `meshAttachments.ts`, `validation.ts`, `Rig.ts` and `SlotState.ts`. `meshEditing.ts` adds pure edge subdivision and connected-fan deletion; `meshRendering.ts` adapts authored data to Phaser Mesh2D. `PuppetRenderer` owns geometry objects, while the host retains textures. `RigEditorState`, `RigEditorInputController`, `RigEditorOverlay`, `MeshGeometryPanel` and `AttachmentController` share the existing history, selection and viewport paths. Package metadata uses SemVer `1.4.3-1`; outer data formats remain version 1.
 
 `tests/meshEditing.test.ts` covers conversion, skin isolation, vertex edits, invalid proposals, UV interpolation, subdivision/deletion, grouped history, cancellation, reflected viewport coordinates, export/import and texture cleanup. `tests/meshAttachments.test.ts` retains validation, bind, rigid compatibility and deterministic character/project/scene package round trips. `tests/browser/meshEditor.spec.ts` exercises the actual desktop canvas, numeric edits, zoom/pan, Escape, Undo/Redo and export/reload. Browser checks remain local-only. Required checks are `npm run typecheck`, `npm run test` and `npm run build`, with sequential test files under the repository's one-worker configuration.
+
+## Runtime skeletal skinning
+
+Each vertex can include `influences: [{ boneId, weight }]`. One to four unique bone IDs are allowed; weights must be finite, nonnegative and sum to one (validation tolerance `1e-8`). Missing bones, duplicate IDs, all-zero totals and unnormalized imports are errors. `normalizeBoneInfluences()` is an explicit authoring helper, including for large finite input weights; import does not silently change data. The compiled binding normalizes accepted floating-point roundoff without changing the authored weights.
+
+`createRectangleMeshAttachment(sprite, imageSize, rig, boneId = rig.root)` gives every new vertex one influence of weight 1. Rig Editor passes the selected slot's bone. Legacy vertices without `influences` continue to follow their assigned slot bone, including when the same mesh is assigned to different slots. A weight of zero still requires a valid bone ID. Mesh and rig format versions remain 1 because the optional influence field is backward compatible.
+
+Subdividing an edge averages the two endpoints' weights, combines shared IDs, keeps the four strongest influences (bone ID breaks ties), and normalizes the result. Both unweighted endpoints retain legacy behavior. Partly weighted edges require explicit influences at both endpoints before subdivision. Moving/deleting vertices retains the surviving authored weights. There is no weight painting UI; author weights in rig data or through the pure helpers, then validate the proposal with `Rig`.
+
+### Math and coordinates
+
+For attachment-local bind vertex `v`, let `B_i` be influence bone `i`'s authored bind matrix in Puppet-local space, `P_i` its final posed matrix, and `C = B_slot * S * A` the bind placement through the owning bone, slot and attachment transforms. CPU linear blend skinning evaluates:
+
+```text
+q = sum_i weight_i * P_i * inverse(B_i) * C * v
+```
+
+`q` is in Puppet-local space. Bind matrices always use the saved authored effective rest hierarchy, including rest rotations, translations and signed/nonuniform scales. They never come from a sampled animation. The binding caches `inverse(B_i) * C * v` for each influence. At bind pose `P_i = B_i`, so normalized weights yield the authored placement `C * v`, within floating-point precision. Existing rest-snapshot checks reject rig, slot or attachment edits that invalidate binding; recreation is the current explicit rebind workflow.
+
+`PuppetRenderer` already composes the authoritative FK matrices for draw slots and updates changed descendants after each IK constraint. Pose synchronization now deforms meshes once after the final IK pass. Animation channels, pose presets and IK retain their established evaluation order. Root motion changes the outer Puppet container; it is never folded into the bind or bone matrices. Foot contact markers retain their existing bone-based evaluation.
+
+The native mesh remains in the existing slot hierarchy. Before rendering, `q` is converted to local mesh coordinates using `inverse(P_slot * S * A)`. Phaser then applies that hierarchy once, followed by Puppet/Actor translation, rotation, facing and scale, enclosing host containers and the camera. Slot/attachment transforms are included once in bind placement and canceled once in the output conversion; rest transforms are not applied twice. Runtime slot or native mesh transform edits rebuild the cached bind points from immutable authored vertices, retaining the authored bone binds. Single-slot-bone meshes use the exact authored local geometry as a rigid fast path.
+
+Bone scale may be negative or nonuniform. Weighted mesh output requires a nonsingular posed owning-bone/slot/attachment affine; zero scale or an unsupported nearly singular shear there produces an explicit diagnostic. Zero scale on the outer Puppet/Actor container does not enter this inversion. Rigid sprites retain their established transform support.
+
+### Renderer and lifecycle
+
+The backend is Phaser 4.2.1's WebGL `Mesh2D` with `renderAsTriangles = true`, using the existing indexed triangle adapter (one padding index per triangle), top-left normalized UVs and borrowed host textures. Its Canvas renderer is a no-op in Phaser, so Canvas is explicitly rejected for mesh characters rather than displaying an empty mesh. Authored UVs retain their top-left convention by matching Mesh2D's `flipV` to the texture source's upload `flipY`, including image/canvas replacements and preview copies. There is no GPU compute pass or texture recreation.
+
+Each mesh binding caches inverse-bind points and reads final matrices from the existing renderer projection. Frame evaluation overwrites the same XYUV array; triangle indices, UVs, texture objects and authored data remain stable. Ordinary rigid sprites never enter the mesh loop. Different meshes and skin assignments have independent bindings, including a shared mesh assigned to more than one slot. Slot depth and inherited visibility/alpha continue through existing draw branches. Render-only previews share immutable bindings but skin from their own sampled joint matrices rather than reusing previously deformed output.
+
+Replacing, clearing or switching attachments releases the old native geometry and binding. Puppet and preview disposal release all bindings and geometry while leaving host textures intact. `createMeshSkinBinding()` and `deformMesh()` are renderer-independent exports from `/core`; the latter accepts final Puppet-local bone matrices and an optional reusable XYUV output array. `Puppet.getSlotMesh()` exposes the native rendered geometry; save/export continues to use authored vertices and weights, never the deformed buffer.
+
+Regression coverage lives in `tests/meshSkinning.test.ts`, the existing mesh/renderer/Puppet suites and local desktop browser checks. These cover analytical one/two-bone skinning, identity, normalization and invalid references, parent/child affines, IK, backward seeking, facing/scales, root motion, mixed/multiple attachments, runtime slot changes, skin switching, previews, backend diagnostics and disposal.

@@ -350,6 +350,28 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
+                    },
+                    "influences": {
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "boneId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                          },
+                          "weight": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": ["boneId", "weight"],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": ["id", "x", "y", "u", "v"],

@@ -197,7 +197,12 @@ export function puppetScene(): Phaser.Scene {
       image: (x: number, y: number, texture: string, frame?: string | number) =>
         makeContainer(x, y).setTexture(texture, frame),
       mesh2d: (x: number, y: number, texture: string, vertices: number[], indices: number[]) =>
-        Object.assign(makeContainer(x, y).setTexture(texture), { vertices, indices, renderAsTriangles: false }),
+        Object.assign(makeContainer(x, y).setTexture(texture), {
+          vertices,
+          indices,
+          renderAsTriangles: false,
+          flipV: false,
+        }),
       graphics: makeContainer,
       text: (x = 0, y = 0) => new Container().setPosition(x, y),
     },

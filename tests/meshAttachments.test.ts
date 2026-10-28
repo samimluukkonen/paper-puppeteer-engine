@@ -91,12 +91,15 @@ test('rectangle retains image alignment, pivot, transforms, IDs and clockwise UV
   const before = structuredClone(sprite);
   const value = mesh();
   assert.deepEqual(sprite, before);
-  assert.deepEqual(value.vertices, [
-    { id: 'top-left', x: -20, y: -30, u: 0, v: 0 },
-    { id: 'top-right', x: 60, y: -30, u: 1, v: 0 },
-    { id: 'bottom-right', x: 60, y: 10, u: 1, v: 1 },
-    { id: 'bottom-left', x: -20, y: 10, u: 0, v: 1 },
-  ]);
+  assert.deepEqual(
+    value.vertices,
+    [
+      { id: 'top-left', x: -20, y: -30, u: 0, v: 0 },
+      { id: 'top-right', x: 60, y: -30, u: 1, v: 0 },
+      { id: 'bottom-right', x: 60, y: 10, u: 1, v: 1 },
+      { id: 'bottom-left', x: -20, y: 10, u: 0, v: 1 },
+    ].map((vertex) => ({ ...vertex, influences: [{ boneId: 'root', weight: 1 }] })),
+  );
   assert.deepEqual(value.triangles, [0, 1, 2, 0, 2, 3]);
   for (const key of ['x', 'y', 'rotation', 'scaleX', 'scaleY', 'originX', 'originY', 'groundContacts'] as const)
     assert.deepEqual(value[key], sprite[key]);
@@ -106,7 +109,14 @@ test('rectangle retains image alignment, pivot, transforms, IDs and clockwise UV
   assert.deepEqual(meshBounds(value), { minX: -20, minY: -30, maxX: 60, maxY: 10, width: 80, height: 40 });
   assert.isUndefined(meshBounds({ vertices: [] }));
   const defaults = createRectangleMeshAttachment({ id: 'plain', texture: 'paper' }, { width: 2, height: 4 }, rest);
-  assert.deepEqual(defaults.vertices[0], { id: 'top-left', x: -1, y: -2, u: 0, v: 0 });
+  assert.deepEqual(defaults.vertices[0], {
+    id: 'top-left',
+    x: -1,
+    y: -2,
+    u: 0,
+    v: 0,
+    influences: [{ boneId: 'root', weight: 1 }],
+  });
 });
 
 test('pixel, UV and pivot conversions round trip negative local coordinates without viewport state', () => {

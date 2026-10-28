@@ -1,5 +1,6 @@
 import { replaceMeshGeometry } from './meshAttachments.js';
 import { MESH_AREA_EPSILON, triangleSignedArea2 } from './meshGeometry.js';
+import { normalizeBoneInfluences, MAX_BONE_INFLUENCES } from './meshSkinning.js';
 import type { MeshAttachmentDefinition, MeshVertex, RigDefinition } from './types.js';
 
 /** Unique indexed edges, in stable triangle order, shared by inspector and viewport. */
@@ -27,11 +28,34 @@ export function subdivideMeshEdge(
     throw new Error('Select an existing mesh edge.');
   const p = mesh.vertices[a]!,
     q = mesh.vertices[b]!;
+  if (!!p.influences !== !!q.influences)
+    throw new Error('Assign explicit bone influences to both edge vertices before subdividing a partly weighted edge.');
+  const combined = new Map<string, number>();
+  for (const influence of [...(p.influences ?? []), ...(q.influences ?? [])])
+    combined.set(influence.boneId, (combined.get(influence.boneId) ?? 0) + influence.weight / 2);
+  const influences = combined.size
+    ? normalizeBoneInfluences(
+        [...combined]
+          .map(([boneId, weight]) => ({ boneId, weight }))
+          .sort(
+            (left, right) =>
+              right.weight - left.weight || (left.boneId < right.boneId ? -1 : left.boneId > right.boneId ? 1 : 0),
+          )
+          .slice(0, MAX_BONE_INFLUENCES),
+      )
+    : undefined;
   let suffix = 1;
   while (mesh.vertices.some((v) => v.id === `vertex-${suffix}`)) suffix++;
   const vertices = [
     ...mesh.vertices,
-    { id: `vertex-${suffix}`, x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, u: (p.u + q.u) / 2, v: (p.v + q.v) / 2 },
+    {
+      id: `vertex-${suffix}`,
+      x: (p.x + q.x) / 2,
+      y: (p.y + q.y) / 2,
+      u: (p.u + q.u) / 2,
+      v: (p.v + q.v) / 2,
+      ...(influences ? { influences } : {}),
+    },
   ];
   const n = vertices.length - 1;
   const triangles: number[] = [];

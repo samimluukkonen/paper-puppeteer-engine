@@ -90,6 +90,19 @@ export const meshVertexSchema = z.strictObject({
   y: finiteNumber.min(-MESH_LIMITS.coordinate).max(MESH_LIMITS.coordinate),
   u: finiteNumber.min(0).max(1),
   v: finiteNumber.min(0).max(1),
+  influences: z
+    .array(z.strictObject({ boneId: identifierSchema, weight: finiteNumber.min(0).max(1) }))
+    .min(1)
+    .max(4)
+    .refine(
+      (values) => new Set(values.map((value) => value.boneId)).size === values.length,
+      'Duplicate influence bones.',
+    )
+    .refine(
+      (values) => Math.abs(values.reduce((sum, value) => sum + value.weight, 0) - 1) <= 1e-8,
+      'Bone influence weights must be normalized to 1.',
+    )
+    .exactOptional(),
 });
 
 export const meshBindPoseSchema = z.strictObject({

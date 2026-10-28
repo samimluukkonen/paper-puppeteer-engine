@@ -54,7 +54,7 @@ Direct dependency versions are pinned in [package.json](../package.json), and `p
 
 ## Architecture
 
-The [v1.4.1 rig constraints and deformation audit](rig-constraints-and-deformation.md) records current bone identities, effective rest transforms, affine coordinates, FK/IK evaluation order, authoring/history ownership and non-invasive extension points for optional mesh attachments. The [v1.4.2.2 visual mesh editor](mesh-attachments.md) extends validated mesh data with Rig Editor vertex/topology authoring and native Phaser Mesh2D rendering. Automatic deformation and bone weights remain deferred.
+The [v1.4.1 rig constraints and deformation audit](rig-constraints-and-deformation.md) records current bone identities, effective rest transforms, affine coordinates, FK/IK evaluation order, authoring/history ownership and non-invasive extension points for optional mesh attachments. The [v1.4.3.1 mesh runtime](mesh-attachments.md) extends Rig Editor vertex/topology authoring and native Phaser Mesh2D rendering with validated bone influences and CPU skinning from final FK/IK matrices.
 
 The optional rig [foot contact marker foundation](foot-contact-markers.md) stores bone-local reference points and evaluates them through final local joint transforms and the full Puppet/Actor world affine. Creation and evaluation are renderer independent, and markers remain separate from IK and attachment ground contacts.
 

@@ -12,8 +12,9 @@ export interface SyncPoseOptions {
 }
 
 interface PoseProjection {
-  sync(): void;
+  sync(deformMeshes?: boolean): void;
   syncBone(id: string): void;
+  syncMeshes?(): void;
 }
 
 /** @internal Owns pose overrides and IK passes; Puppet supplies bones, rendering, and overlays. */
@@ -100,7 +101,7 @@ export class PuppetPoseController {
     this.preparePose();
     if (this.activePose) applyPoseToJoints(this.activePose.pose, this.bones, this.activePose.mix, this.poseUnderlying);
     for (const bone of this.bones.values()) bone.syncTransform();
-    this.renderer.sync();
+    this.renderer.sync(false);
     this.solveIK(options);
   }
 
@@ -140,6 +141,7 @@ export class PuppetPoseController {
       // Even a failing target provider must leave earlier IK passes restorable.
       this.ikPose.commit();
     }
+    this.renderer.syncMeshes?.();
     if (options.updateDebug !== false) this.updateDebugViews(constraints);
   }
 

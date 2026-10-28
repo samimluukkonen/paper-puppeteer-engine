@@ -18,6 +18,7 @@ import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
+import { assertMeshRenderer } from './meshRendering.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import type {
   PlaybackLifecycleEvent,
@@ -105,6 +106,7 @@ export class Puppet {
     const rig = options.rig ?? options.definition?.rig;
     if (!rig) throw new Error('Puppet requires a rig or character definition.');
     this.rig = rig instanceof Rig ? rig : new Rig(rig);
+    if (this.rig.attachments.some((attachment) => attachment.type === 'mesh')) assertMeshRenderer(scene);
     for (const bone of this.rig.bones) {
       if (bone.sprite) this.validateSpriteAsset(bone.sprite, `bone "${bone.id}"`);
     }

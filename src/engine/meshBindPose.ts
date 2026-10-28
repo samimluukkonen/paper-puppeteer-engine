@@ -57,6 +57,18 @@ export function createMeshBindPose(rig: RigDefinition, attachment: AttachmentDef
 
 /** A changed rest hierarchy/slot/attachment transform requires an explicit future rebind operation. */
 export function validateMeshBindPose(mesh: MeshAttachmentDefinition, rig: RigDefinition): ValidationIssue[] {
+  const boneIds = new Set(rig.bones.map((bone) => bone.id));
+  const influenceIssues: ValidationIssue[] = [];
+  mesh.vertices.forEach((vertex, index) => {
+    for (const influence of vertex.influences ?? [])
+      if (!boneIds.has(influence.boneId))
+        influenceIssues.push({
+          severity: 'error',
+          path: `vertices[${index}].influences`,
+          message: `Missing influence bone "${influence.boneId}".`,
+        });
+  });
+  if (influenceIssues.length) return influenceIssues;
   const actual = {
     ...mesh.bindPose,
     bones: [...mesh.bindPose.bones].sort(byId),
@@ -89,7 +101,7 @@ export function validateMeshBindPose(mesh: MeshAttachmentDefinition, rig: RigDef
   return [];
 }
 
-function boneBindMatrix(bind: MeshBindPose, boneId: string): Affine {
+export function boneBindMatrix(bind: MeshBindPose, boneId: string): Affine {
   const bones = new Map(bind.bones.map((bone) => [bone.id, bone]));
   const chain = [];
   const seen = new Set<string>();
@@ -132,7 +144,7 @@ export function bindPoseToMeshAttachment(
   return worldToLocal(point, attachmentBindMatrix(mesh, slotId));
 }
 
-/** Future bone weights can reference stable bone/vertex IDs and this inverse authored rest transform. */
+/** Bone weights reference stable bone/vertex IDs and this inverse authored rest transform. */
 export function meshBindPoseToBoneLocal(
   mesh: MeshAttachmentDefinition,
   boneId: string,

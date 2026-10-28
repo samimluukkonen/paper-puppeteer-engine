@@ -77,6 +77,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.3-1
+
+Add CPU linear blend skinning for textured mesh attachments using the runtime renderer's authoritative final FK/IK matrices. Cache inverse authored bind points, evaluate from immutable geometry and update existing Mesh2D buffers in place. Preserve slot affines, draw order, opacity, skins, rigid sprites, root motion, Actor placement, facing and reflected/nonuniform scale; render-only previews evaluate their own poses.
+
+Support up to four finite, nonnegative, normalized bone influences per vertex, validate bone references and expose explicit normalization and renderer-independent binding/deformation helpers. New meshes receive one valid influence (the selected slot bone in Rig Editor); older unweighted meshes follow their assigned slot bone. Subdivision interpolates and normalizes the strongest four weights deterministically.
+
+Reject Canvas mesh characters with an explicit WebGL-required diagnostic before allocating runtime objects. Map top-left mesh UVs through texture-source upload orientation, including texture swaps and previews. Diagnose singular weighted mesh mounts; keep borrowed textures and release mesh bindings with attachment/preview/Puppet disposal. Document skinning math, coordinates and supported backends, add analytical and runtime regressions, and synchronize package/lockfile metadata at `1.4.3-1`.
+
 ## 1.4.2-2
 
 Carry the originating inspector tab with mesh and attachment slot selections so native dropdown blur cannot redirect to Selection details. Keep the request bound to the exact selection object, distinguish same-ID bones/slots and preserve later canvas auto-reveal. Cover focused/blurred selection, repeated slot switching and rigid/mesh controls.

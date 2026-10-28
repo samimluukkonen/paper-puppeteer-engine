@@ -1,12 +1,13 @@
 import type Phaser from 'phaser';
 import type { Affine } from './affineMath.js';
-import { composeAffine, transformToAffine } from './affineMath.js';
+import { composeAffine, transformToAffine, worldToLocal } from './affineMath.js';
 import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
-import { createTexturedMesh } from './meshRendering.js';
+import { createTexturedMesh, syncMeshTextureOrientation } from './meshRendering.js';
+import { createMeshSkinBinding, deformMesh, type MeshSkinBinding } from './meshSkinning.js';
 import type { Rig } from './Rig.js';
-import type { SkinDefinition, AttachmentDefinition } from './types.js';
+import type { SkinDefinition, AttachmentDefinition, MeshAttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
 interface RenderBranch {
@@ -35,6 +36,18 @@ export class PuppetRenderer {
   private readonly branches = new Map<string, RenderBranch>();
   private readonly slotBranches = new Map<string, RenderBranch>();
   private readonly slotMeshes = new Map<string, Phaser.GameObjects.Mesh2D>();
+  private readonly meshBindings = new Map<
+    string,
+    {
+      definition: MeshAttachmentDefinition;
+      binding: MeshSkinBinding;
+      transforms: number[];
+    }
+  >();
+  private readonly posedMesh = identity();
+  private readonly slotMatrix = identity();
+  private readonly meshMatrix = identity();
+  private readonly readMeshBone = (id: string): Affine | undefined => this.nodes.get(id)?.world;
   private readonly slotImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly slotDepthOverrides = new Map<string, number>();
   private readonly nodes = new Map<string, ProjectionNode>();
@@ -396,10 +409,14 @@ export class PuppetRenderer {
             (entry.x / (entry.old?.originScaleX ?? 1)) * (next?.originScaleX ?? 1),
             (entry.y / (entry.old?.originScaleY ?? 1)) * (next?.originScaleY ?? 1),
           );
+        syncMeshTextureOrientation(entry.image);
       }
     } catch (error) {
       install(previous);
-      for (const entry of images) entry.image.setTexture(entry.texture, entry.frame).setOrigin(entry.x, entry.y);
+      for (const entry of images) {
+        entry.image.setTexture(entry.texture, entry.frame).setOrigin(entry.x, entry.y);
+        syncMeshTextureOrientation(entry.image);
+      }
       throw error;
     }
   }
@@ -441,13 +458,17 @@ export class PuppetRenderer {
       previous?.destroy();
       this.slotImages.delete(id);
       this.slotMeshes.delete(id);
+      this.meshBindings.delete(id);
       this.slotArtwork.delete(id);
       return;
     }
     const replacement = this.getArtworkReplacement(definition.texture, `attachment:${definition.id}`);
     if (definition.type === 'mesh') {
       const mesh = createTexturedMesh(this.scene, definition, replacement?.textureKey ?? definition.texture);
+      let binding: MeshSkinBinding;
       try {
+        binding = createMeshSkinBinding(definition, id, mount, mesh);
+        this.skinMesh(id, mesh, binding);
         if (presentation)
           mesh.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
         mount.add(mesh).sort('depth');
@@ -458,6 +479,7 @@ export class PuppetRenderer {
       previous?.destroy();
       this.slotImages.delete(id);
       this.slotMeshes.set(id, mesh);
+      this.meshBindings.set(id, { definition, binding, transforms: this.meshTransforms(mount, mesh) });
       this.slotArtwork.set(id, definition);
       return;
     }
@@ -486,6 +508,7 @@ export class PuppetRenderer {
     this.slotArtwork.set(id, definition);
     this.slotImages.set(id, image);
     this.slotMeshes.delete(id);
+    this.meshBindings.delete(id);
   }
 
   /** Copy current sprite artwork and runtime slot layout without reading or applying a pose.
@@ -543,10 +566,20 @@ export class PuppetRenderer {
         // Phaser 4.2.1 ships setTint but omits it from Mesh2D declarations.
         (mesh as Phaser.GameObjects.Mesh2D & { setTint(color: number): unknown }).setTint(tint);
         copyTransform(mesh, sourceMesh);
+        mesh.flipV = sourceMesh.flipV;
+        const sourceBinding = source.meshBindings.get(slot.id);
+        if (sourceBinding)
+          this.meshBindings.set(slot.id, {
+            definition: sourceBinding.definition,
+            binding: sourceBinding.binding,
+            transforms: [...sourceBinding.transforms],
+          });
+        else this.meshBindings.delete(slot.id);
         continue;
       }
       this.slotMeshes.get(slot.id)?.destroy();
       this.slotMeshes.delete(slot.id);
+      this.meshBindings.delete(slot.id);
       const original = source.slotImages.get(slot.id);
       let image = this.slotImages.get(slot.id);
       if (!original) {
@@ -564,10 +597,62 @@ export class PuppetRenderer {
     if (depthsChanged) this.container.sort('depth');
   }
 
-  sync(): void {
+  sync(deformMeshes = true): void {
     for (const node of this.nodes.values()) {
       this.readNode(node);
       this.updateNode(node);
+    }
+    if (deformMeshes) this.syncMeshes();
+  }
+
+  private meshTransforms(mount: Phaser.GameObjects.Container, mesh: Phaser.GameObjects.Mesh2D): number[] {
+    return [
+      mount.x,
+      mount.y,
+      mount.rotation,
+      mount.scaleX,
+      mount.scaleY,
+      mesh.x,
+      mesh.y,
+      mesh.rotation,
+      mesh.scaleX,
+      mesh.scaleY,
+    ];
+  }
+
+  /** Called once after the final IK pass. Rigid artwork never enters this loop. */
+  syncMeshes(): void {
+    for (const [id, entry] of this.meshBindings) {
+      const mesh = this.slotMeshes.get(id)!;
+      const mount = this.getSlotMount(id);
+      const transforms = this.meshTransforms(mount, mesh);
+      if (transforms.some((value, index) => value !== entry.transforms[index])) {
+        entry.binding = createMeshSkinBinding(entry.definition, id, mount, mesh);
+        entry.transforms = transforms;
+      }
+      this.skinMesh(id, mesh, entry.binding);
+    }
+  }
+
+  private skinMesh(id: string, mesh: Phaser.GameObjects.Mesh2D, binding: MeshSkinBinding): void {
+    if (binding.rigid) {
+      for (let index = 0; index < binding.localVertices.length; index++)
+        mesh.vertices[index] = binding.localVertices[index]!;
+      return;
+    }
+    const slot = this.rig.getSlot(id);
+    const mount = this.getSlotMount(id);
+    composeAffine(transformToAffine(mount, this.slotMatrix), this.nodes.get(slot.bone)!.world, this.meshMatrix);
+    composeAffine(transformToAffine(mesh, this.slotMatrix), this.meshMatrix, this.posedMesh);
+    if (!worldToLocal({ x: 0, y: 0 }, this.posedMesh))
+      throw new Error(`Mesh slot "${id}" requires nonsingular posed bone, slot and attachment transforms.`);
+    // Render through existing affine slot mounts: cancel their posed transform once,
+    // leaving Puppet/Actor placement, facing, alpha, depth and borrowed textures untouched.
+    deformMesh(binding, this.readMeshBone, mesh.vertices);
+    for (let index = 0; index < mesh.vertices.length; index += 4) {
+      const local = worldToLocal({ x: mesh.vertices[index]!, y: mesh.vertices[index + 1]! }, this.posedMesh)!;
+      mesh.vertices[index] = local.x;
+      mesh.vertices[index + 1] = local.y;
     }
   }
 
@@ -614,6 +699,7 @@ export class PuppetRenderer {
     this.slotBranches.clear();
     this.slotImages.clear();
     this.slotMeshes.clear();
+    this.meshBindings.clear();
     this.slotArtwork.clear();
     this.artworkTextures.clear();
     this.individualArtwork.clear();
