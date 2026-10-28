@@ -56,6 +56,7 @@ export function workspaceGuideHost(options: {
         )
           capabilities.push('rig-mesh-artwork');
         if (rig.workingCopy.ik?.length) capabilities.push('ik-constraints');
+        if (rig.editMode === 'weights' && rig.selectedMesh) capabilities.push('tool:rig-weight-paint');
         capabilities.push('tool:rig-hierarchy', 'tool:animation-timeline');
         // Mode switching is a UI tool, unavailable while switching would discard a preview.
         if (!animation.hasPendingAnimationEdits) capabilities.push('tool:editor-navigation');

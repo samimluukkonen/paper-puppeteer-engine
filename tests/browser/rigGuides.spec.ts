@@ -42,7 +42,10 @@ for (const existing of [true, false]) {
       const open = page.getByRole('button', { name: 'Feature Guide', exact: true });
       await open.click();
       const start = page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
-      if (!existing && ['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry'].includes(guide.id)) {
+      if (
+        guide.id === 'rig-weight-painting' ||
+        (!existing && ['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry'].includes(guide.id))
+      ) {
         await expect(start).toBeDisabled();
         await page.keyboard.press('Escape');
         continue;
@@ -117,6 +120,85 @@ test('New Character tour remains available when character loading fails', async 
     await tour.getByRole('button', { name: index === 2 ? 'Finish' : 'Next', exact: true }).click();
   }
   await expect(tour).toHaveCount(0);
+});
+
+test('weight painting guide reveals controls and preview without changing weights, settings, pose or history', async ({
+  page,
+}) => {
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  const guide = guideRegistry.getGuideById('rig-weight-painting')!;
+  const open = page.getByRole('button', { name: 'Feature Guide', exact: true });
+  const start = page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
+  await open.click();
+  await expect(start).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await inspectorControl(page, '#mesh-geometry-panel');
+  const panel = page.locator('#mesh-geometry-panel');
+  await panel.getByLabel('Mesh attachment slot', { exact: true }).selectOption('leftForearmVisual');
+  await panel.getByRole('button', { name: 'Convert to Mesh Attachment', exact: true }).click();
+  await panel.getByRole('button', { name: 'Paint Bone Weights', exact: true }).click();
+  await panel.getByLabel('Influence bone', { exact: true }).selectOption('leftUpperArm');
+  const numeric = panel.getByLabel('Selected bone weight', { exact: true });
+  await numeric.fill('0.65');
+  await numeric.press('Enter');
+  const radius = panel.getByLabel('Brush radius (screen pixels)', { exact: true });
+  await radius.fill('47');
+  await radius.press('Enter');
+  await panel.getByLabel('Brush action', { exact: true }).selectOption('erase');
+  const skin = await panel.getByLabel('Mesh skin', { exact: true }).inputValue();
+  const vertex = await panel.getByLabel('Weight vertex', { exact: true }).inputValue();
+  const logRig = async () => {
+    const logged = page.waitForEvent('console', { predicate: (message) => message.text().startsWith('{') });
+    await rigFileAction(page, '#log-json', (button) => button.click());
+    return rigFileSchema.parse(JSON.parse((await logged).text()));
+  };
+  const before = await logRig();
+  const downloads: string[] = [];
+  page.on('download', (download) => downloads.push(download.suggestedFilename()));
+  await inspectorControl(page, '#hierarchy');
+  await open.click();
+  await expect(start).toBeEnabled();
+  await start.click();
+  const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+  for (const [index, step] of guide.steps.entries()) {
+    await expect(tour.getByRole('heading', { name: step.title, exact: true })).toBeVisible();
+    const target = page.locator(`[data-guide-id="${step.targetId}"]`);
+    await expect(target).toHaveCount(1);
+    await expect(target).toBeVisible();
+    await expect(tour.locator('.guide-spotlight-hole')).toBeVisible();
+    await expect(tour.getByRole('status')).toHaveCount(0);
+    if (step.id === 'preview') {
+      await expect(panel.getByLabel('Preview test bend', { exact: true })).toBeVisible();
+      await expect(panel.getByLabel('Test bone', { exact: true })).toBeInViewport();
+      await expect(panel.getByLabel('Test bend (degrees)', { exact: true })).toBeInViewport();
+      await page.screenshot({ path: test.info().outputPath('weight-painting-guide-preview.png') });
+      await tour.getByRole('button', { name: 'Back', exact: true }).click();
+      await tour.getByRole('button', { name: 'Next', exact: true }).click();
+    }
+    await tour.getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true }).click();
+  }
+  await expect(tour).toHaveCount(0);
+  await expect(open).toBeFocused();
+  expect(await logRig()).toEqual(before);
+  expect(downloads).toEqual([]);
+  await inspectorControl(page, '#mesh-geometry-panel');
+  await expect(numeric).toHaveValue('0.65');
+  await expect(radius).toHaveValue('47');
+  await expect(panel.getByLabel('Brush action', { exact: true })).toHaveValue('erase');
+  await expect(panel.getByLabel('Influence bone', { exact: true })).toHaveValue('leftUpperArm');
+  await expect(panel.getByLabel('Mesh skin', { exact: true })).toHaveValue(skin);
+  await expect(panel.getByLabel('Weight vertex', { exact: true })).toHaveValue(vertex);
+  await expect(panel.getByLabel('Preview test bend', { exact: true })).not.toBeChecked();
+  await expect(page.locator('#edit-mode')).toHaveValue('weights');
+  await open.click();
+  await start.click();
+  await page.keyboard.press('Escape');
+  await expect(tour).toHaveCount(0);
+  await page.locator('#undo').click();
+  await expect(numeric).toHaveValue('0');
+  await page.locator('#redo').click();
+  await expect(numeric).toHaveValue('0.65');
 });
 
 test('mesh guide resolves before and after conversion while preserving mesh selection and history', async ({

@@ -1,3 +1,4 @@
+import type { Point } from '../../engine/affineMath.js';
 import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import {
   RIG_FORMAT_VERSION,
@@ -20,6 +21,8 @@ import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { mergeSkins } from '../../engine/mergeSkins.js';
 import { createRectangleMeshAttachment, replaceMeshGeometry } from '../../engine/meshAttachments.js';
 import { deleteMeshVertex, subdivideMeshEdge } from '../../engine/meshEditing.js';
+import { normalizeBoneInfluences } from '../../engine/meshSkinning.js';
+import { MeshWeightStroke, setBoneWeight, assertInfluenceLimit } from '../../engine/meshWeightPainting.js';
 import { Rig } from '../../engine/Rig.js';
 import { footContactMarkerSchema } from '../../engine/schemas.js';
 import type {
@@ -54,7 +57,7 @@ export type VisibilityKey =
   | 'spriteOrigins'
   | 'ik'
   | 'footContacts';
-export type EditMode = 'joint' | 'sprite' | 'origin' | 'slot' | 'mesh';
+export type EditMode = 'joint' | 'sprite' | 'origin' | 'slot' | 'mesh' | 'weights';
 export type BoneField = TransformProperty | 'length' | 'depth';
 export type SlotField = TransformProperty | 'depth';
 export type SpriteField = 'x' | 'y' | 'originX' | 'originY';
@@ -130,6 +133,123 @@ export class RigEditorState {
   selectedMeshVertexId: string | null = null;
   selectedMeshEdge: [number, number] | null = null;
   meshFeedback = '';
+  influenceBoneId = '';
+  brushRadius = 60;
+  brushStrength = 0.25;
+  brushErase = false;
+  weightInfluenceLimit = 4;
+  weightBrushPoint: Point | undefined;
+  private weightStroke: MeshWeightStroke | undefined;
+
+  get paintingWeights(): boolean {
+    return !!this.weightStroke;
+  }
+
+  get meshSlotBoneId(): string {
+    if (!this.selectedMesh || this.selection?.type !== 'slot') throw new Error('Select a mesh attachment slot.');
+    return this.getSlot(this.selection.id).bone;
+  }
+
+  get weightBoneId(): string {
+    return this.boneIndices.has(this.influenceBoneId) ? this.influenceBoneId : this.meshSlotBoneId;
+  }
+
+  /** Prefer the slot bone; erasing that bone falls back to its parent, root, then another bone. */
+  get weightFallbackBoneId(): string {
+    const selected = this.weightBoneId,
+      slot = this.meshSlotBoneId;
+    return (
+      [slot, this.getBone(selected).parent, this.data.root, ...this.data.bones.map((bone) => bone.id)].find(
+        (id): id is string => !!id && id !== selected,
+      ) ?? selected
+    );
+  }
+
+  selectWeightBone(id: string): void {
+    this.getBone(id);
+    this.influenceBoneId = id;
+  }
+
+  beginWeightStroke(points: readonly Point[], point: Point): void {
+    this.finishWeightStroke(false);
+    const mesh = this.selectedMesh;
+    if (!mesh) throw new Error('Select a mesh attachment first.');
+    const stroke = new MeshWeightStroke(mesh, points, point, {
+      boneId: this.weightBoneId,
+      rigidBoneId: this.meshSlotBoneId,
+      fallbackBoneId: this.weightFallbackBoneId,
+      radius: this.brushRadius,
+      strength: this.brushStrength,
+      erase: this.brushErase,
+      limit: this.weightInfluenceLimit,
+    });
+    this.endOperation();
+    this.beginOperation();
+    this.weightStroke = stroke;
+    this.continueWeightStroke(point);
+  }
+
+  continueWeightStroke(point: Point): void {
+    if (!this.weightStroke) return;
+    const result = this.weightStroke.sample(point);
+    this.installMesh(result.mesh);
+    this.meshFeedback = `${result.changed} vertices brushed; ${result.dropped} other influences dropped. Fallback: ${this.weightStroke.options.fallbackBoneId}.`;
+  }
+
+  finishWeightStroke(commit = true): void {
+    if (!this.weightStroke) return;
+    this.weightStroke = undefined;
+    if (commit) this.endOperation();
+    else {
+      this.cancelOperation();
+      this.meshFeedback = 'Weight stroke cancelled.';
+    }
+  }
+
+  editSelectedVertexWeight(weight: number): void {
+    const mesh = this.selectedMesh,
+      id = this.selectedMeshVertexId;
+    if (!mesh || !mesh.vertices.some((vertex) => vertex.id === id)) throw new Error('Select a mesh vertex.');
+    const boneId = this.weightBoneId,
+      fallback = this.weightFallbackBoneId;
+    let dropped = 0;
+    const vertices = mesh.vertices.map((vertex) => {
+      if (vertex.id !== id) return vertex;
+      const original = vertex.influences ?? [{ boneId: this.meshSlotBoneId, weight: 1 }];
+      const influences = setBoneWeight(original, boneId, weight, fallback, this.weightInfluenceLimit);
+      dropped = original.filter(
+        (entry) =>
+          entry.boneId !== boneId && entry.weight > 0 && !influences.some((next) => next.boneId === entry.boneId),
+      ).length;
+      return { ...vertex, influences };
+    });
+    this.installMesh({ ...mesh, vertices });
+    this.meshFeedback = `Vertex weight updated; ${dropped} other influences dropped. Fallback: ${fallback}.`;
+  }
+
+  normalizeSelectedMeshWeights(reset = false): void {
+    const mesh = this.selectedMesh;
+    if (!mesh) throw new Error('Select a mesh attachment first.');
+    const boneId = this.meshSlotBoneId;
+    this.installMesh({
+      ...mesh,
+      vertices: mesh.vertices.map((vertex) => ({
+        ...vertex,
+        influences: reset
+          ? [{ boneId, weight: 1 }]
+          : normalizeBoneInfluences(vertex.influences ?? [{ boneId, weight: 1 }]),
+      })),
+    });
+    this.meshFeedback = reset
+      ? `Reset this mesh to slot bone ${boneId}.`
+      : 'Normalized this mesh. No influences dropped.';
+  }
+
+  setWeightInfluenceLimit(limit: number): void {
+    assertInfluenceLimit(limit);
+    this.weightInfluenceLimit = limit;
+    this.meshFeedback = 'Limit applies only to brushed or numerically edited vertices. Existing weights are retained.';
+  }
 
   dimUnselected = false;
   ikPreview = false;
@@ -693,6 +813,11 @@ export class RigEditorState {
     return attachment?.type === 'mesh' ? attachment : undefined;
   }
 
+  removeBoneAndReassignMeshes(id: string, replacement: string): void {
+    this.structureCommands.removeBoneAndReassignMeshes(id, replacement);
+    this.meshFeedback = `Removed ${id}; reassigned its mesh weights to ${replacement} and explicitly rebound all meshes. Other vertex weights retained.`;
+  }
+
   convertSelectedSpriteToMesh(imageSize: { width: number; height: number }): string {
     if (this.selection?.type !== 'slot') throw new Error('Select a rigid sprite attachment slot.');
     const slot = this.selection.id;
@@ -760,11 +885,18 @@ export class RigEditorState {
       edge = this.selectedMeshEdge;
     if (!mesh || !edge) throw new Error('Select an edge to subdivide.');
     this.endOperation();
-    const next = subdivideMeshEdge(mesh, edge[0], edge[1], this.workingCopy);
+    const next = subdivideMeshEdge(mesh, edge[0], edge[1], this.workingCopy, this.meshSlotBoneId);
     this.installMesh(next);
     this.selectedMeshVertexId = next.vertices[next.vertices.length - 1]!.id;
     this.selectedMeshEdge = null;
-    this.meshFeedback = 'Edge subdivided. Adjacent triangles and the new UV were interpolated.';
+    const endpointBones = new Set(
+      [...(mesh.vertices[edge[0]]!.influences ?? []), ...(mesh.vertices[edge[1]]!.influences ?? [])]
+        .filter((entry) => entry.weight > 0)
+        .map((entry) => entry.boneId),
+    );
+    const kept = new Set(next.vertices.at(-1)!.influences?.map((entry) => entry.boneId));
+    const dropped = [...endpointBones].filter((id) => !kept.has(id)).length;
+    this.meshFeedback = `Edge subdivided. New UV and weights interpolated; ${dropped} weaker influences dropped at the four-bone limit. Existing vertices retained.`;
   }
 
   deleteSelectedMeshVertex(): void {

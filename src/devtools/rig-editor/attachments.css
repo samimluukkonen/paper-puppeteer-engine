@@ -7,6 +7,12 @@
   display: grid;
   gap: 4px;
 }
+.mesh-geometry-controls:not([hidden]),
+.weight-paint-controls:not([hidden]),
+.weight-brush-controls {
+  display: grid;
+  gap: 8px;
+}
 .attachment-panel label:has(input[type="checkbox"]) {
   display: flex;
   align-items: center;

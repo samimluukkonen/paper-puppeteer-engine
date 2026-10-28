@@ -34,6 +34,9 @@ export class RigEditor {
   private appliedCatalog: RigDefinition | undefined;
   private appliedSkins: readonly import('../../engine/types.js').SkinDefinition[] | undefined;
   previewTime = 0;
+  weightPreviewEnabled = false;
+  weightPreviewBoneId = '';
+  weightPreviewRotation = 0;
   actionError = '';
   private resumeAfterRebuild = false;
   private dragTargetOverride:
@@ -345,6 +348,9 @@ export class RigEditor {
         if (definitions.has(id)) Object.assign(this.puppet.getBone(id).pose, transform);
       }
     }
+    if (this.weightPreviewEnabled && definitions.has(this.weightPreviewBoneId)) {
+      this.puppet.getBone(this.weightPreviewBoneId).pose.rotation += this.weightPreviewRotation;
+    }
     for (const slot of rig.slots ?? []) {
       this.puppet.setSlotTransform(slot.id, createTransform(slot), false);
       const image = this.puppet.getSlotImage(slot.id);
@@ -502,6 +508,18 @@ export class RigEditor {
     this.cancelGesture();
     this.previewClip = clip;
     this.previewTime = this.previewClip ? Math.max(0, Math.min(this.previewClip.duration, time)) : 0;
+    this.appliedRig = undefined;
+    this.refresh();
+  }
+
+  /** Render-only bend layered over the existing clip/bind preview; never edits rig data or animation keys. */
+  setWeightPreview(enabled: boolean, boneId: string, rotation: number): void {
+    this.state.getBone(boneId);
+    if (!Number.isFinite(rotation)) throw new Error('Test bend must be finite.');
+    this.cancelGesture();
+    this.weightPreviewEnabled = enabled;
+    this.weightPreviewBoneId = boneId;
+    this.weightPreviewRotation = rotation;
     this.appliedRig = undefined;
     this.refresh();
   }

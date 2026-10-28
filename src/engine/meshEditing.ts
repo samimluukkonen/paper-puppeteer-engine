@@ -23,15 +23,18 @@ export function subdivideMeshEdge(
   a: number,
   b: number,
   rig: RigDefinition,
+  rigidBoneId?: string,
 ): MeshAttachmentDefinition {
   if (!meshEdges(mesh).some(([x, y]) => (x === a && y === b) || (x === b && y === a)))
     throw new Error('Select an existing mesh edge.');
   const p = mesh.vertices[a]!,
     q = mesh.vertices[b]!;
-  if (!!p.influences !== !!q.influences)
+  if (!!p.influences !== !!q.influences && !rigidBoneId)
     throw new Error('Assign explicit bone influences to both edge vertices before subdividing a partly weighted edge.');
   const combined = new Map<string, number>();
-  for (const influence of [...(p.influences ?? []), ...(q.influences ?? [])])
+  const weights = (vertex: MeshVertex) =>
+    vertex.influences ?? (rigidBoneId ? [{ boneId: rigidBoneId, weight: 1 }] : []);
+  for (const influence of [...weights(p), ...weights(q)])
     combined.set(influence.boneId, (combined.get(influence.boneId) ?? 0) + influence.weight / 2);
   const influences = combined.size
     ? normalizeBoneInfluences(

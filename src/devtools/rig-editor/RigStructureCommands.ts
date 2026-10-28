@@ -1,3 +1,5 @@
+import { createMeshBindPose } from '../../engine/meshBindPose.js';
+import { normalizeBoneInfluences } from '../../engine/meshSkinning.js';
 import { identifierSchema } from '../../engine/schemas.js';
 import type { BoneDefinition, RigDefinition } from '../../engine/types.js';
 import type { RigEditorState } from './RigEditorState.js';
@@ -47,8 +49,40 @@ export class RigStructureCommands {
         .filter((marker) => marker.boneId === id)
         .map((marker) => `foot contact marker "${marker.id}"`),
       ...(bone.sprite ? ['bone artwork'] : []),
+      ...(rig.attachments ?? [])
+        .filter((entry) => entry.type === 'mesh' && entry.bindPose.bones.some((bone) => bone.id === id))
+        .map((entry) => `mesh "${entry.id}" weights or bind hierarchy (use Reassign mesh weights and remove bone)`),
       ...this.actions.boneReferences(id),
     ];
+  }
+
+  /** Explicit atomic removal: redirect only references to this bone and recapture all mesh rest snapshots. */
+  removeBoneAndReassignMeshes(id: string, replacement: string): void {
+    this.state.getBone(replacement);
+    if (id === replacement) throw new Error('Choose a different replacement bone.');
+    const rig = this.state.workingCopy;
+    if (id === rig.root) throw new Error('The root bone cannot be removed.');
+    const references = this.boneDependencies(id).filter((reference) => !reference.startsWith('mesh "'));
+    if (references.length) throw new Error(`Resolve these dependencies first: ${references.join(', ')}.`);
+    const candidate: RigDefinition = { ...rig, bones: rig.bones.filter((bone) => bone.id !== id) };
+    candidate.attachments = (rig.attachments ?? []).map((attachment) => {
+      if (attachment.type !== 'mesh') return attachment;
+      const vertices = attachment.vertices.map((vertex) => {
+        if (!vertex.influences?.some((influence) => influence.boneId === id)) return vertex;
+        const weights = new Map<string, number>();
+        for (const influence of vertex.influences) {
+          const boneId = influence.boneId === id ? replacement : influence.boneId;
+          weights.set(boneId, (weights.get(boneId) ?? 0) + influence.weight);
+        }
+        return {
+          ...vertex,
+          influences: normalizeBoneInfluences([...weights].map(([boneId, weight]) => ({ boneId, weight }))),
+        };
+      });
+      return { ...attachment, vertices, bindPose: createMeshBindPose(candidate, attachment) };
+    });
+    this.actions.install(candidate);
+    this.state.selectBone(replacement);
   }
 
   removeBone(id: string): void {

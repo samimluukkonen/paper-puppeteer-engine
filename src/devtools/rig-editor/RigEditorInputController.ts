@@ -86,6 +86,8 @@ export class RigEditorInputController {
 
   /** Commit authored changes once and release pointer ownership after any gesture ending. */
   endGesture(commit = true): void {
+    const hadWeightStroke = this.state.paintingWeights;
+    this.state.finishWeightStroke(commit);
     const hadIKDrag = !!this.ikDrag;
     this.ikDrag = undefined;
     this.ikHit = false;
@@ -104,7 +106,7 @@ export class RigEditorInputController {
     this.characterDrag = undefined;
     this.moved = false;
     this.state.endOperation();
-    if (hadIKDrag || (!commit && hadDrag)) this.editor.refresh(false);
+    if (hadIKDrag || (!commit && (hadDrag || hadWeightStroke))) this.editor.refresh(false);
   }
 
   private interruptGesture = (): void => {
@@ -197,6 +199,14 @@ export class RigEditorInputController {
       return;
     }
     if (event.altKey || event.ctrlKey || event.metaKey || isTypingTarget(event.target)) return;
+    if (this.state.editMode === 'weights') {
+      if (event.key === 'Escape') {
+        this.state.selectedMeshVertexId = null;
+        this.editor.refresh();
+        event.preventDefault();
+      }
+      return;
+    }
     if (this.state.editMode === 'mesh') {
       if (event.key === 'Escape') {
         this.state.selectedMeshVertexId = null;
@@ -312,6 +322,23 @@ export class RigEditorInputController {
     this.drag = undefined;
     this.characterDrag = undefined;
     if (this.panning || !pointer.leftButtonDown()) return;
+    if (this.state.editMode === 'weights') {
+      const points = this.overlay.getMeshVertices();
+      if (!points.length) {
+        this.state.meshFeedback = 'Select a mesh slot in Mesh geometry before painting.';
+        this.editor.refresh();
+        return;
+      }
+      this.state.selectedMeshVertexId =
+        this.overlay.pickMeshVertex(pointer.x, pointer.y)?.id ?? this.state.selectedMeshVertexId;
+      this.state.weightBrushPoint = { x: pointer.x, y: pointer.y };
+      this.state.beginWeightStroke(
+        points.map((vertex) => vertex.screen),
+        this.state.weightBrushPoint,
+      );
+      this.editor.refresh();
+      return;
+    }
     if (this.state.editMode === 'mesh') {
       const vertex = this.overlay.pickMeshVertex(pointer.x, pointer.y);
       this.state.selectedMeshVertexId = vertex?.id ?? null;
@@ -410,6 +437,14 @@ export class RigEditorInputController {
   }
 
   private pointerMove(pointer: Phaser.Input.Pointer): void {
+    if (this.state.editMode === 'weights' && !this.panning) {
+      this.state.weightBrushPoint = { x: pointer.x, y: pointer.y };
+      if (pointer.id === this.activePointerId && pointer.isDown && this.state.paintingWeights) {
+        this.state.continueWeightStroke(this.state.weightBrushPoint);
+        this.editor.refresh();
+      } else this.redraw();
+      return;
+    }
     if (pointer.id !== this.activePointerId || !pointer.isDown) return;
     if (Math.hypot(pointer.x - this.downX, pointer.y - this.downY) > 4) this.moved = true;
     if (this.meshDrag) {
@@ -517,8 +552,10 @@ export class RigEditorInputController {
   private pointerUp(pointer: Phaser.Input.Pointer): void {
     // Phaser also reports window mouse releases from hierarchy and inspector clicks.
     if (pointer.id !== this.activePointerId) return;
+    if (this.state.paintingWeights) this.state.continueWeightStroke({ x: pointer.x, y: pointer.y });
     if (
       this.state.editMode !== 'mesh' &&
+      this.state.editMode !== 'weights' &&
       !this.panning &&
       !this.moved &&
       !this.drag &&

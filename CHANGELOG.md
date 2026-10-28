@@ -77,6 +77,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.3-2
+
+Add **Paint Bone Weights** to Rig Editor's mesh tools: hierarchy-based influence selection, screen-space radius and strength, paint/erase, per-vertex numeric weights, normalization/reset and a gray/blue/orange vertex heatmap with selected-vertex outlines. Sweep distance-based brushes across existing vertices with linear falloff, frozen pose projections and one strength application per stroke. Preserve other influence ratios; deterministically retain the strongest bones at the chosen one-to-four influence limit, report dropped influences and use a documented valid fallback instead of zero-total weights.
+
+Reuse snapshot history for one Undo per stroke, Escape/blur cancellation, numeric edits, reset and explicit mesh-dependent bone removal. Add a render-only test bend and existing clip sampling to deformation preview without authoring rig transforms or animation keys. Interpolate normalized weights on subdivision, including partially painted legacy meshes, and preserve weights on surviving vertices. Report mesh bone/bind dependencies and offer atomic reassignment, merged influences and explicit rebind during bone removal. Cover brush math, influence limits, selection, history, topology, bone dependencies, import/export and live runtime parity; add a local desktop browser painting workflow and artist documentation. Synchronize package/lockfile metadata at `1.4.3-2`.
+
+Add a nine-step **Painting Bone Weights** Feature Guide with live selected-mesh/Paint-mode prerequisites and a link to Editing Mesh Geometry. Spotlight brush, hierarchy influence, numeric, normalization/limit and deformation-preview controls; explain stroke history, safe topology and saving. Preserve painted weights, settings, selections, poses and history, and cover availability, navigation, UI-only reveal and real desktop spotlights.
+
 ## 1.4.3-1
 
 Add CPU linear blend skinning for textured mesh attachments using the runtime renderer's authoritative final FK/IK matrices. Cache inverse authored bind points, evaluate from immutable geometry and update existing Mesh2D buffers in place. Preserve slot affines, draw order, opacity, skins, rigid sprites, root motion, Actor placement, facing and reflected/nonuniform scale; render-only previews evaluate their own poses.

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
 import { inspectorControl, rigFileAction, selectRigEntry, test, waitForPreviewPaint } from './fixtures.js';
 
@@ -36,6 +37,82 @@ async function selectedDiamond(page: import('@playwright/test').Page) {
   const bounds = (await canvas.boundingBox())!;
   return { x: bounds.x + point.x * bounds.width, y: bounds.y + point.y * bounds.height };
 }
+
+test('weight brush, erase, numeric editing, test bend, stroke history and export/reload', async ({ page }) => {
+  await page.goto('rig-editor/');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+  await selectRigEntry(page, '◇ leftForearmVisual');
+  await inspectorControl(page, '#mesh-geometry-panel');
+  const panel = page.locator('#mesh-geometry-panel');
+  await panel.getByRole('button', { name: 'Convert to Mesh Attachment', exact: true }).click();
+  const skin = await panel.getByLabel('Mesh skin', { exact: true }).inputValue();
+  await panel.getByLabel('Mesh edge', { exact: true }).selectOption('0:2');
+  await panel.getByRole('button', { name: 'Subdivide edge', exact: true }).click();
+  await panel.getByLabel('Mesh vertex', { exact: true }).selectOption('vertex-1');
+  const point = await selectedDiamond(page);
+  await panel.getByRole('button', { name: 'Paint Bone Weights', exact: true }).click();
+  await expect(page.locator('#edit-mode')).toHaveValue('weights');
+  await panel.getByLabel('Influence bone', { exact: true }).selectOption('leftUpperArm');
+  const radius = panel.getByLabel('Brush radius (screen pixels)', { exact: true });
+  await radius.fill('12');
+  await radius.press('Enter');
+  const strength = panel.getByLabel('Brush strength', { exact: true });
+  await strength.fill('0.4');
+  await strength.press('Enter');
+  const numeric = panel.getByLabel('Selected bone weight', { exact: true });
+  await expect(numeric).toHaveValue('0');
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.move(point.x + 2, point.y, { steps: 4 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(numeric).toHaveValue('0');
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.move(point.x + 2, point.y, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await numeric.inputValue())).toBeCloseTo(0.4, 1);
+  const paintedValue = await numeric.inputValue();
+  await page.locator('#undo').click();
+  await expect(numeric).toHaveValue('0');
+  await page.locator('#redo').click();
+  await expect(numeric).toHaveValue(paintedValue);
+  await panel.getByLabel('Brush action', { exact: true }).selectOption('erase');
+  await strength.fill('0.1');
+  await strength.press('Enter');
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect.poll(async () => Number(await numeric.inputValue())).toBeCloseTo(Number(paintedValue) - 0.1, 1);
+  await numeric.fill('0.65');
+  await numeric.press('Enter');
+  await expect(numeric).toHaveValue('0.65');
+  const exportJson = async () => {
+    const download = page.waitForEvent('download');
+    await page.locator('#download-json').click();
+    return readFile(await (await download).path(), 'utf8');
+  };
+  const beforePose = await exportJson();
+  await panel.getByText('Preview deformation', { exact: true }).click();
+  await panel.getByLabel('Test bone', { exact: true }).selectOption('leftForearm');
+  const bend = panel.getByLabel('Test bend (degrees)', { exact: true });
+  await bend.fill('65');
+  await bend.press('Enter');
+  await expect(panel.getByLabel('Preview test bend', { exact: true })).toBeChecked();
+  await waitForPreviewPaint(page);
+  await page.locator('#editor-stage canvas').screenshot({ path: test.info().outputPath('painted-elbow-preview.png') });
+  expect(await exportJson()).toBe(beforePose);
+  await rigFileAction(page, '#reload-exported', (control) => control.click());
+  await inspectorControl(page, '#mesh-geometry-panel');
+  await panel.getByLabel('Mesh skin', { exact: true }).selectOption(skin);
+  await panel.getByLabel('Mesh attachment slot', { exact: true }).selectOption('leftForearmVisual');
+  await panel.getByRole('button', { name: 'Paint Bone Weights', exact: true }).click();
+  await panel.getByLabel('Influence bone', { exact: true }).selectOption('leftUpperArm');
+  await panel.getByLabel('Weight vertex', { exact: true }).selectOption('vertex-1');
+  await expect(numeric).toHaveValue('0.65');
+  await expect(panel).toContainText('5 vertices · 4 triangles');
+  await expect(page.locator('#validation')).toHaveText('Validation: OK');
+});
 
 test('textured mesh conversion, subdivision, canvas editing, camera, history and export/reload', async ({ page }) => {
   await page.goto('rig-editor/');

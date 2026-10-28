@@ -139,6 +139,14 @@ export class AttachmentController {
       editor.refresh();
     }, 'Bone removal finished.');
   }
+  removeBoneAndReassignMeshes(replacement: string): void {
+    this.run((editor) => {
+      const selected = editor.state.selection;
+      if (selected?.type !== 'bone') throw new Error('Select a bone first.');
+      editor.state.removeBoneAndReassignMeshes(selected.id, replacement);
+      editor.refresh();
+    }, 'Bone removed. Its weights were reassigned and all mesh bind snapshots updated. Undo restores the complete change.');
+  }
   createSlot(id: string): void {
     this.run((editor) => {
       const selection = editor.state.selection;
@@ -193,13 +201,61 @@ export class AttachmentController {
       editor.refresh();
     }, 'Mesh created. Open Mesh geometry to select vertices and edges. Default-skin conversion creates a new variant skin.');
   }
-  meshAction(action: 'edit' | 'subdivide' | 'delete'): void {
+  meshAction(action: 'edit' | 'paint' | 'subdivide' | 'delete' | 'normalize' | 'reset'): void {
     this.run((editor) => {
       if (action === 'edit') editor.state.editMode = 'mesh';
+      if (action === 'paint') {
+        if (!editor.state.selectedMesh) throw new Error('Select a mesh attachment first.');
+        editor.state.editMode = 'weights';
+      }
       if (action === 'subdivide') editor.state.subdivideSelectedMeshEdge();
       if (action === 'delete') editor.state.deleteSelectedMeshVertex();
+      if (action === 'normalize' || action === 'reset') editor.state.normalizeSelectedMeshWeights(action === 'reset');
       editor.refresh();
     }, 'Mesh geometry updated.');
+  }
+  weightSettings(patch: {
+    boneId?: string;
+    radius?: number;
+    strength?: number;
+    erase?: boolean;
+    limit?: number;
+  }): void {
+    this.run((editor) => {
+      const state = editor.state;
+      if (patch.boneId !== undefined) state.selectWeightBone(patch.boneId);
+      if (patch.limit !== undefined) state.setWeightInfluenceLimit(patch.limit);
+      if (patch.radius !== undefined) {
+        if (!Number.isFinite(patch.radius) || patch.radius < 1 || patch.radius > 500)
+          throw new Error('Brush radius must be 1–500 pixels.');
+        state.brushRadius = patch.radius;
+      }
+      if (patch.strength !== undefined) {
+        if (!Number.isFinite(patch.strength) || patch.strength < 0 || patch.strength > 1)
+          throw new Error('Strength must be between 0 and 1.');
+        state.brushStrength = patch.strength;
+      }
+      if (patch.erase !== undefined) state.brushErase = patch.erase;
+      editor.refresh(false);
+    }, 'Brush settings updated.');
+  }
+  editWeight(value: number): boolean {
+    let committed = false;
+    this.run((editor) => {
+      editor.state.editSelectedVertexWeight(value);
+      editor.refresh();
+      committed = true;
+    }, 'Vertex weight updated.');
+    return committed;
+  }
+  weightPreview(enabled: boolean, boneId: string, degrees: number): void {
+    this.run(
+      (editor) => editor.setWeightPreview(enabled, boneId, (degrees * Math.PI) / 180),
+      'Deformation preview updated. No animation keys authored.',
+    );
+  }
+  previewPose(name: string, time = 0): void {
+    this.run((editor) => editor.setPreviewPose(name, time), 'Pose preview updated. No animation keys authored.');
   }
   selectMeshVertex(id: string): void {
     this.run((editor) => {

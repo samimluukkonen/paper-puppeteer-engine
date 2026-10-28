@@ -294,6 +294,79 @@ export const rigGuides: readonly GuideDefinition[] = [
     ],
   },
   {
+    id: 'rig-weight-painting',
+    title: 'Painting Bone Weights',
+    description: 'Blend a mesh between bones with brushes, precise weights and a deformation preview.',
+    editor: 'rig',
+    category: 'artwork',
+    prerequisites: [
+      ...character,
+      { capability: 'valid-rig', reason: 'Resolve rig validation errors before painting bone weights.' },
+      {
+        capability: 'tool:rig-weight-paint',
+        guideId: 'rig-mesh-geometry',
+        reason:
+          'Select a mesh slot and choose Paint Bone Weights in Mesh geometry first. Use Editing Mesh Geometry to convert artwork and add subdivisions.',
+      },
+    ],
+    steps: [
+      step(
+        'mesh',
+        'Recognize the selected mesh',
+        '**Paint Bone Weights** edits the mesh named below this button. Choose **Mesh attachment slot** and **Mesh skin** to work on another mesh. Finish the skeleton and artwork alignment before conversion; use **Edit Mesh Geometry** to add subdivisions around an elbow before painting. This tour only reveals controls; it does not paint or change your selection.',
+        targets.rigWeightMode,
+      ),
+      step(
+        'bone',
+        'Choose an influence bone and read its weights',
+        '**Influence bone** follows the rig hierarchy and leaves the mesh selected. Choose upper arm to paint the shoulder, then forearm to blend toward the cuff. Painting adds the chosen bone automatically. In the canvas, **gray** diamonds have zero selected-bone weight, **blue** is weak and **orange** is strong. A **gold outline** and percentage identify the selected vertex. The overlay is never exported as artwork.',
+        targets.rigWeightBone,
+      ),
+      step(
+        'brush',
+        'Paint or erase with the brush',
+        'After exiting the tour, use **Paint** to add influence or **Erase** to reduce it. **Brush radius** is measured in screen pixels; **Brush strength** is the maximum 0–1 weight change in one stroke, fading linearly toward the edge. Drag over existing vertices; painting creates no vertices. Repeated stationary events do not add strength: release and paint again to build influence. Wheel zooms and middle drag pans.',
+        targets.rigWeightBrush,
+      ),
+      step(
+        'numeric',
+        'Enter precise vertex weights',
+        'Choose **Weight vertex** or click a diamond, then edit **Selected bone weight** from 0 to 1. The list shows every influence as a percentage. **Enter** or blur commits the value; Escape in the field cancels its draft. Other bones share the remaining weight in their existing proportions. The same rules apply to the brush.',
+        targets.rigWeightVertex,
+      ),
+      step(
+        'limits',
+        'Understand normalization and influence limits',
+        '**Maximum influences per edited vertex** chooses one to four bones for future brush or numeric edits. Changing this limit preserves existing vertices. At the limit, keep the edited bone and the strongest others; equal weights use bone ID order. Feedback reports dropped influences. With a limit of **1**, any positive paint assigns that bone fully. Erasing the last influence uses the named **fallback bone**, so weights never total zero.',
+        targets.rigWeightLimit,
+      ),
+      step(
+        'normalize',
+        'Normalize or reset deliberately',
+        '**Normalize mesh weights** makes each vertex total 100% while preserving its influences. **Reset mesh weights** assigns every vertex of this mesh to its slot bone; Undo restores painted values. These commands affect the named mesh, including every slot or skin that shares that mesh definition. They do not change other mesh attachments.',
+        targets.rigWeightActions,
+      ),
+      step(
+        'preview',
+        'Test the elbow bend without creating keys',
+        'In **Preview deformation**, choose a **Test bone** and commit **Test bend (degrees)** to see the painted blend. **Preview test bend** toggles it. **Weight preview pose** and time sample an existing animation; the test bend adds rotation over that pose. The preview uses runtime FK/IK and skinning and creates **no animation keys** or authored rest changes. You can paint while posed and compare against the original rigid skin.',
+        targets.rigWeightPreview,
+      ),
+      step(
+        'history',
+        'Undo a complete stroke or cancel it',
+        'One brush stroke is one rig **Undo** transaction. **Redo** restores the complete stroke. Escape during a stroke, window blur or leaving the editor cancels it. Numeric edits, normalization and reset each have their own history entry. Brush settings and test poses are view state. Finishing or exiting this tour preserves your weights, settings, selection and history.',
+        targets.rigHistory,
+      ),
+      step(
+        'save',
+        'Keep weights through topology edits and reload',
+        'Return to **Edit Mesh Geometry** to subdivide edges: new vertices average endpoint weights and retain the strongest four, while existing weights stay painted. Deleting a vertex removes only its record. Bone removal reports mesh dependencies; use **Reassign mesh dependencies** in Hierarchy for explicit reassignment and rebind after resolving other references. Export **rig.json** or **Download character ZIP**, then reload and select the same **Mesh skin** to retain painted weights.',
+        targets.rigMeshSkin,
+      ),
+    ],
+  },
+  {
     id: 'rig-slots-attachments',
     title: 'Slots and Attachments',
     description: 'Connect an image attachment to a bone through a slot and skin assignment.',

@@ -52,6 +52,7 @@ export function RigEditorView({
                       <select id="edit-mode" data-guide-id={GUIDE_TARGETS.rigEditMode}>
                         <option value="joint">Joint Editing</option>
                         <option value="mesh">Edit Mesh Geometry</option>
+                        <option value="weights">Paint Bone Weights</option>
                         <option value="sprite">Artwork Offset Editing</option>
                         <option value="origin">Sprite Origin Editing</option>
                         <option value="slot">Slot Transform Editing</option>

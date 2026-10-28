@@ -15,6 +15,9 @@ function BoneActions({
 }) {
   const [name, setName] = useState(id);
   const bone = state.getBone(id);
+  const [replacement, setReplacement] = useState(bone.parent ?? state.workingCopy.root);
+  const dependencies = state.boneDependencies(id);
+  const meshes = state.workingCopy.attachments?.filter((entry) => entry.type === 'mesh') ?? [];
   return (
     <fieldset>
       <legend>Selected bone: {id}</legend>
@@ -49,6 +52,39 @@ function BoneActions({
         Remove bone
       </button>
       <small>Dependent children, slots, artwork, IK and animation tracks must be resolved before removal.</small>
+      {!!dependencies.length && <p>Dependencies: {dependencies.join(', ')}.</p>}
+      {meshes.length > 0 && id !== state.workingCopy.root && (
+        <details>
+          <summary>Reassign mesh dependencies</summary>
+          <label>
+            Replacement influence bone
+            <select
+              aria-label="Replacement influence bone"
+              value={replacement}
+              onChange={(event) => setReplacement(event.target.value)}
+            >
+              {state.workingCopy.bones
+                .filter((entry) => entry.id !== id)
+                .map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.id}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <p>
+            Redirect this bone’s mesh weights, merge matching influences, and rebind {meshes.length} meshes to the
+            remaining rest hierarchy. Resolve child, slot, IK and animation references first. This is one Undo.
+          </p>
+          <button
+            type="button"
+            className="workspace-danger"
+            onClick={() => controller.removeBoneAndReassignMeshes(replacement)}
+          >
+            Reassign mesh weights and remove bone
+          </button>
+        </details>
+      )}
     </fieldset>
   );
 }

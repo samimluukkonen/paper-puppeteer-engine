@@ -1,6 +1,6 @@
 # Paper Puppeteer Engine
 
-A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [visual mesh editor](docs/mesh-attachments.md) adds textured geometry, vertex editing and safe subdivision in Rig Editor; the [mesh runtime](docs/mesh-attachments.md#runtime-skeletal-skinning) adds validated bone weights and skeletal deformation from final FK/IK poses.
+A reusable TypeScript + Phaser engine for 2D paper puppets: rigid transparent cutouts connected by hierarchical joints, animated through local keyframed transforms. The engine includes static pose presets, bind pose reset, pose JSON export, awaitable animation playback, named animation states, animation queues, crossfades, timeline events, stepped playback, masked animation layers, IK, facing, slots, and skins. The authoring tools display the version from `package.json`. The optional [visual mesh editor](docs/mesh-attachments.md) adds textured geometry, vertex editing and safe subdivision in Rig Editor; [visual bone weight painting](docs/mesh-attachments.md#painting-bone-weights) controls skeletal deformation from final FK/IK poses.
 
 **Authoring tools:** [GitHub Pages](https://samimluukkonen.github.io/paper-puppeteer-engine/)
 
@@ -172,7 +172,7 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 
 ## Current limitations
 
-- Rigid pieces and authored textured meshes; no automatic mesh deformation, weighted skinning, physics, ragdolls, or cloth.
+- Rigid pieces and authored textured meshes with up to four painted bone influences per vertex; no physics, ragdolls, cloth or vertex animation keys.
 - One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot contacts require explicit IK targets; the sample walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.

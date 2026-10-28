@@ -1,8 +1,8 @@
-# Mesh geometry and skeletal deformation — v1.4.3.1
+# Mesh geometry and bone weight painting — v1.4.3.2
 
 [All guides](../README.md#guides)
 
-Mesh attachments store validated geometry, UVs and bind references alongside rigid sprites. Rig Editor can convert a rigid sprite attachment, edit vertices and safely subdivide/retriangulate its triangles. Phaser renders textured meshes and deforms their vertices from the final evaluated bone poses. Weight painting, animated mesh vertices and cloth remain outside this milestone.
+Mesh attachments store validated geometry, UVs and bind references alongside rigid sprites. Rig Editor can convert a rigid sprite attachment, edit vertices, safely subdivide/retriangulate its triangles and paint bone weights. Phaser renders textured meshes and deforms their vertices from the final evaluated bone poses. Animated mesh vertices and cloth remain outside this milestone.
 
 ## Using this milestone
 
@@ -86,6 +86,34 @@ The default skin still selects rigid artwork. The optional `mesh-data` skin sele
 | A replacement/export reports image dimensions or pivot errors | Preserve the mesh image dimensions and use origin multipliers of 1, or recreate the mesh for the replacement image.                              |
 | Import reports topology or unsupported-version errors         | Fix the reported authored data using the limits below. Invalid triangles and unsupported versions are rejected rather than repaired.             |
 
+## Painting bone weights
+
+For an in-app walkthrough, first select a mesh and choose **Paint Bone Weights**, then open **Feature Guide → Rig Editor → Painting Bone Weights**. The nine-step Explain tour highlights the real controls without painting or changing settings, selection, test poses or history. If the guide is unavailable, its prerequisite link opens **Editing Mesh Geometry** for conversion and subdivision instructions.
+
+1. Finish the skeleton and artwork placement, select the sleeve slot and convert it to a mesh. In **Mesh geometry**, subdivide edges around the elbow to create enough existing vertices for a smooth transition.
+2. Choose **Paint Bone Weights** in Mesh geometry or the editor mode menu. Choose an **Influence bone** from the hierarchy, **Brush action**, **Brush radius (screen pixels)** and **Brush strength** (0–1).
+3. Select the upper-arm bone and paint the shoulder region, then select the forearm bone and paint toward the cuff. Every vertex starts bound to the slot bone; painting adds the selected bone without a separate binding command. Gray diamonds have zero selected-bone weight, blue is weak and orange is strong. The selected vertex retains a gold outline and a percentage label. This overlay is never exported as artwork.
+4. Drag over vertices. Radius stays constant on screen through zoom and pan. **Erase** reduces influence. Strength is the maximum additive change per vertex in one stroke, with linear distance falloff at the edge. Repeated stationary events do not accumulate weight; release and paint again to build stronger influence. Swept pointer segments cover vertices between events. Vertex projections are captured at stroke start so deformation cannot pull vertices into or out of that stroke's coverage.
+5. Select **Weight vertex** (or click its diamond), then commit **Selected bone weight** with Enter/blur for an exact 0–1 value. The list shows every current bone percentage. The same normalization rules apply to painting, erasing and numeric edits.
+6. Open the initially collapsed **Preview deformation** section. Choose a **Test bone** and **Test bend (degrees)**, or sample an existing **Weight preview pose** and time. A test bend adds rotation over that pose; **Preview test bend** disables it. These controls use runtime FK/IK and skinning and author no rig transforms or animation keys. Paint while posed to inspect the result immediately. Existing IK-preview controls remain available. Switch to the original skin to compare rigid artwork, then return to the mesh skin.
+7. Undo/Redo restores a complete stroke with one entry. Escape, window blur, hidden document or editor deactivation cancels the current stroke. Numeric edits, normalization and reset are separate undoable commands. Brush/bone/preview settings are view state. Export/reload through existing rig or character package commands to retain authored weights.
+
+### Normalization and influence limits
+
+The edited bone receives its requested clamped weight. Other positive influences share the remaining `1 - weight` proportionally. A full erase removes the selected bone and renormalizes the others. Weights always have a positive total of 1 within floating-point tolerance; imports continue rejecting malformed weights rather than silently repairing them.
+
+The runtime supports at most four influences. **Maximum influences per edited vertex** chooses 1–4 for future brush/numeric edits; changing this setting never rewrites existing vertices. Keep the edited bone and the strongest remaining influences, breaking equal-weight ties by ascending bone ID. Feedback reports other influences dropped. At limit 1, any positive selected weight becomes a full assignment; erasing to zero chooses the strongest remaining bone or the fallback. Unbrushed vertices keep their records, including legacy implicit weights.
+
+When no other positive influence remains, use the selected slot's bone. If that is the edited bone, choose its parent, then the rig root, then the first different bone in authored rig order. A one-bone rig retains its sole bone at weight 1 because no valid alternative exists. The inspector and feedback name this fallback. **Normalize mesh weights** preserves every existing influence and normalizes only this mesh. **Reset mesh weights** assigns every vertex of this mesh to its slot bone; Undo restores painted values. A mesh definition shared by several slots/skins shares its painted weights.
+
+### Topology and bone dependencies
+
+Subdivision averages endpoint influence sets, keeps the strongest four with stable bone-ID ties and normalizes the new vertex. Rig Editor supplies the selected slot bone for an implicit legacy endpoint. Existing endpoint weights and unrelated vertices remain authored. Subdivision feedback reports dropped midpoint influences. Vertex deletion removes its weight record with the vertex; surviving weights are preserved.
+
+Normal bone deletion/rename reports dependent mesh IDs before changing anything. Bind snapshots capture the complete hierarchy, so even an unweighted bone can have a mesh dependency. In **Hierarchy → selected bone → Reassign mesh dependencies**, choose a **Replacement influence bone**, then **Reassign mesh weights and remove bone**. First resolve children, slot ownership, artwork, IK, animation and host references through existing controls. This explicit action redirects only the removed bone's influences, merges duplicate replacement weights, normalizes them and recaptures every mesh bind snapshot for the remaining hierarchy. Vertex positions, UVs, triangles and other weights remain authored. The entire removal/reassignment/rebind is one Undo. Ordinary rest-transform edits still require restoring the original configuration or recreating the mesh; there is no implicit rebind or dangling bone reference.
+
+The authoring helpers `setBoneWeight`, `MeshWeightStroke`, `WeightBrushOptions` and `boneWeightColor` are available from `/core`. Their implementation lives in `meshWeightPainting.ts`; `WeightPaintControls` connects the shared inspector to existing editor selection, history and pointer handling. `tests/meshWeightPainting.test.ts` covers math, limits, brush coverage, selection, numeric edits, history, topology, dependencies, export/import, collapsed controls and runtime preview parity. The local desktop workflow in `tests/browser/meshEditor.spec.ts` covers painting, erasing, test bends and persistence on the real canvas.
+
 ## Schema and ownership
 
 `RigDefinition.attachments` now contains `AttachmentDefinition`, a union of `SpriteAttachmentDefinition` and `MeshAttachmentDefinition`. Legacy sprites omit `type`; explicit `type: 'sprite'` is supported too. No existing artwork is converted automatically.
@@ -164,7 +192,7 @@ Character, scene and project packages reuse retained authored rig files and text
 
 ## Implementation and verification
 
-The data foundation remains in `types.ts`, `schemas.ts`, `meshGeometry.ts`, `meshBindPose.ts`, `meshAttachments.ts`, `validation.ts`, `Rig.ts` and `SlotState.ts`. `meshEditing.ts` adds pure edge subdivision and connected-fan deletion; `meshRendering.ts` adapts authored data to Phaser Mesh2D. `PuppetRenderer` owns geometry objects, while the host retains textures. `RigEditorState`, `RigEditorInputController`, `RigEditorOverlay`, `MeshGeometryPanel` and `AttachmentController` share the existing history, selection and viewport paths. Package metadata uses SemVer `1.4.3-1`; outer data formats remain version 1.
+The data foundation remains in `types.ts`, `schemas.ts`, `meshGeometry.ts`, `meshBindPose.ts`, `meshAttachments.ts`, `validation.ts`, `Rig.ts` and `SlotState.ts`. `meshEditing.ts` adds pure edge subdivision and connected-fan deletion; `meshRendering.ts` adapts authored data to Phaser Mesh2D. `PuppetRenderer` owns geometry objects, while the host retains textures. `RigEditorState`, `RigEditorInputController`, `RigEditorOverlay`, `MeshGeometryPanel` and `AttachmentController` share the existing history, selection and viewport paths. Package metadata uses SemVer `1.4.3-2`; outer data formats remain version 1.
 
 `tests/meshEditing.test.ts` covers conversion, skin isolation, vertex edits, invalid proposals, UV interpolation, subdivision/deletion, grouped history, cancellation, reflected viewport coordinates, export/import and texture cleanup. `tests/meshAttachments.test.ts` retains validation, bind, rigid compatibility and deterministic character/project/scene package round trips. `tests/browser/meshEditor.spec.ts` exercises the actual desktop canvas, numeric edits, zoom/pan, Escape, Undo/Redo and export/reload. Browser checks remain local-only. Required checks are `npm run typecheck`, `npm run test` and `npm run build`, with sequential test files under the repository's one-worker configuration.
 

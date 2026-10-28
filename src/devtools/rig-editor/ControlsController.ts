@@ -67,6 +67,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     app.querySelector<HTMLElement>('#rig-mode-hint')!.textContent =
       {
         mesh: 'Edit Mesh Geometry: drag cyan diamond vertices; select edges in the Mesh inspector',
+        weights: 'Paint Bone Weights: brush mesh vertices; choose bone and brush in Mesh geometry',
         joint: 'Joint Editing: move bones · Arrow keys nudge joints',
         sprite: 'Artwork Offset Editing: drag artwork or its pivot · Arrow keys nudge offsets',
         origin: 'Sprite Origin Editing: drag to choose a texture-local pivot; offset stays fixed',
@@ -98,6 +99,8 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
       if (!editor) return;
       editor.cancelGesture();
       editor.state.editMode = (event.target as HTMLSelectElement).value as EditMode;
+      if (editor.state.editMode === 'weights' && editor.state.selectedMesh && editor.state.selection?.type === 'slot')
+        editor.state.selectSlot(editor.state.selection.id, 'mesh');
       editor.refresh();
     },
     { signal: lifetime.signal },

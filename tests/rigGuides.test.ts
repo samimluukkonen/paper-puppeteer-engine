@@ -15,6 +15,7 @@ const counts = {
   'rig-importing-artwork': 5,
   'rig-aligning-sprites': 5,
   'rig-mesh-geometry': 8,
+  'rig-weight-painting': 9,
   'rig-slots-attachments': 5,
   'rig-skins': 5,
   'rig-ik-constraints': 8,
@@ -22,7 +23,7 @@ const counts = {
   'rig-foot-contact-markers': 5,
 };
 
-test('Rig Editor catalog covers the eleven implemented tasks with bounded steps and declared targets', () => {
+test('Rig Editor catalog covers the twelve implemented tasks with declared targets', () => {
   assert.deepEqual(Object.fromEntries(guides.map((guide) => [guide.id, guide.steps.length])), counts);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
@@ -55,7 +56,7 @@ test('root-only rigs offer creation tasks and explain artwork and IK prerequisit
   const { rig, launcher } = workspace(false);
   for (const guide of guides) {
     const availability = launcher.getAvailability(guide.id);
-    if (['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry'].includes(guide.id)) {
+    if (['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry', 'rig-weight-painting'].includes(guide.id)) {
       assert.isFalse(availability.available);
       assert.isFalse(launcher.launch(guide.id).ok);
     } else assert.isTrue(availability.available, guide.id);
@@ -215,4 +216,97 @@ test('mesh guide preserves an authored mesh, vertex and edge selection, mode, sk
   assert.equal(rig.selectedMeshVertexId, vertex);
   assert.strictEqual(rig.selectedMeshEdge, edge);
   assert.equal(rig.editMode, 'mesh');
+});
+
+test('weight guide requires a valid selected mesh in Paint mode and directs artists to mesh setup', () => {
+  const { rig, launcher } = workspace(true);
+  assert.isFalse(launcher.getAvailability('rig-weight-painting').available);
+  assert.equal(launcher.getPrerequisiteGuide('rig-weight-painting')?.id, 'rig-mesh-geometry');
+  const slot = rig.workingCopy.slots!.find((entry) => rig.resolvedAttachment(entry.id))!;
+  rig.selectSlot(slot.id);
+  rig.convertSelectedSpriteToMesh({ width: 40, height: 80 });
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-weight-painting').available);
+  rig.editMode = 'weights';
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability('rig-weight-painting').available);
+  rig.selectBone(rig.workingCopy.root);
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-weight-painting').available);
+  rig.selectSlot(slot.id);
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability('rig-weight-painting').available);
+  rig.beginOperation();
+  rig.editSlot(slot.id, 'depth', 1);
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-weight-painting').available);
+  rig.cancelOperation();
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability('rig-weight-painting').available);
+  rig.selectSkin(rig.defaultSkin);
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability('rig-weight-painting').available);
+});
+
+test('weight guide reveals every step and exits without changing painted data, settings, selection or history', () => {
+  const { rig, animation, launcher } = workspace(true);
+  const slot = rig.workingCopy.slots!.find((entry) => rig.resolvedAttachment(entry.id))!;
+  rig.selectSlot(slot.id);
+  rig.convertSelectedSpriteToMesh({ width: 40, height: 80 });
+  rig.selectedMeshEdge = [0, 2];
+  rig.subdivideSelectedMeshEdge();
+  rig.editMode = 'weights';
+  rig.selectWeightBone(rig.workingCopy.bones.find((bone) => bone.id !== rig.meshSlotBoneId)!.id);
+  rig.editSelectedVertexWeight(0.65);
+  rig.brushRadius = 47;
+  rig.brushStrength = 0.35;
+  rig.brushErase = true;
+  rig.setWeightInfluenceLimit(3);
+  const before = {
+    copy: rig.workingCopy,
+    history: rig.historyLength,
+    skin: rig.activeSkin,
+    selection: rig.selection,
+    vertex: rig.selectedMeshVertexId,
+    bone: rig.weightBoneId,
+    animation: animation.workingAnimation,
+    animationHistory: animation.historyLength,
+  };
+  const targets = { resolve: () => ({ x: 1, y: 2, width: 100, height: 28 }), reveal: vi.fn(() => true) };
+  const guide = guides.find((entry) => entry.id === 'rig-weight-painting')!;
+  for (let exitAt = 0; exitAt < guide.steps.length; exitAt++) {
+    assert.isTrue(launcher.launch(guide.id).ok);
+    for (let index = 0; index <= exitAt; index++) {
+      assert.isTrue(launcher.controller.prepareCurrentStep(targets).ok);
+      assert.deepEqual(targets.reveal.mock.lastCall, [guide.steps[index]!.targetId]);
+      if (index < exitAt) assert.isTrue(launcher.controller.next().ok);
+    }
+    assert.isTrue(launcher.controller.exit().ok);
+  }
+  assert.isTrue(launcher.launch(guide.id).ok);
+  for (let i = 1; i < guide.steps.length; i++) assert.isTrue(launcher.controller.next().ok);
+  assert.isTrue(launcher.controller.previous().ok);
+  assert.isTrue(launcher.controller.next().ok);
+  assert.isTrue(launcher.controller.finish().ok);
+  assert.strictEqual(rig.workingCopy, before.copy);
+  assert.equal(rig.historyLength, before.history);
+  assert.equal(rig.activeSkin, before.skin);
+  assert.strictEqual(rig.selection, before.selection);
+  assert.equal(rig.selectedMeshVertexId, before.vertex);
+  assert.equal(rig.weightBoneId, before.bone);
+  assert.equal(rig.editMode, 'weights');
+  assert.equal(rig.brushRadius, 47);
+  assert.equal(rig.brushStrength, 0.35);
+  assert.isTrue(rig.brushErase);
+  assert.equal(rig.weightInfluenceLimit, 3);
+  assert.strictEqual(animation.workingAnimation, before.animation);
+  assert.equal(animation.historyLength, before.animationHistory);
+  rig.undo();
+  assert.isFalse(
+    rig.selectedMesh!.vertices.some((vertex) =>
+      vertex.influences?.some((entry) => entry.boneId === before.bone && entry.weight === 0.65),
+    ),
+  );
+  rig.redo();
+  assert.deepEqual(rig.workingCopy, before.copy);
 });

@@ -4,6 +4,7 @@ import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField } from '../shared/InspectorNumberField.js';
 import type { AttachmentController } from './AttachmentController.js';
+import { WeightPaintControls } from './WeightPaintControls.js';
 
 export function MeshGeometryPanel({
   controller,
@@ -84,6 +85,7 @@ export function MeshGeometryPanel({
               <p>
                 {mesh.id}: {mesh.vertices.length} vertices · {mesh.triangles.length / 3} triangles
               </p>
+              {editor && <WeightPaintControls controller={controller} editor={editor} />}
               <button
                 type="button"
                 data-guide-id={GUIDE_TARGETS.rigMeshWorkflow}
@@ -92,94 +94,96 @@ export function MeshGeometryPanel({
               >
                 Edit Mesh Geometry
               </button>
-              <p>
-                Cyan diamonds are mesh vertices. Select a diamond or edge in the canvas. Drag vertices; Escape cancels.
-                Use the wheel to zoom and middle drag to pan.
-              </p>
-              <label>
-                Mesh vertex
-                <select
-                  aria-label="Mesh vertex"
-                  value={vertex?.id ?? ''}
-                  onChange={(event) => controller.selectMeshVertex(event.target.value)}
-                >
-                  <option value="">Select a vertex</option>
-                  {mesh.vertices.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {vertex && (
-                <fieldset key={`${mesh.id}:${vertex.id}:${fieldReset}`}>
-                  <legend>Attachment-local position</legend>
-                  <InspectorNumberField
-                    label="Vertex X"
-                    value={vertex.x}
-                    onCommit={(value) => commitVertex('x', value)}
-                  />
-                  <InspectorNumberField
-                    label="Vertex Y"
-                    value={vertex.y}
-                    onCommit={(value) => commitVertex('y', value)}
-                  />
-                  <small>
-                    UV: {vertex.u.toFixed(4)}, {vertex.v.toFixed(4)} (retained when moving)
-                  </small>
-                </fieldset>
-              )}
-              <label>
-                Mesh edge
-                <select
-                  aria-label="Mesh edge"
-                  value={state.selectedMeshEdge?.join(':') ?? ''}
-                  onChange={(event) => controller.selectMeshEdge(event.target.value)}
-                >
-                  <option value="">Select an edge</option>
-                  {meshEdges(mesh).map(([a, b]) => (
-                    <option key={`${a}:${b}`} value={`${a}:${b}`}>
-                      {mesh.vertices[a]!.id} — {mesh.vertices[b]!.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="action-grid">
-                <button
-                  type="button"
-                  className="workspace-primary"
-                  disabled={!state.selectedMeshEdge}
-                  onClick={() => controller.meshAction('subdivide')}
-                >
-                  Subdivide edge
-                </button>
-                <button
-                  type="button"
-                  className="workspace-danger"
-                  disabled={!vertex}
-                  onClick={() => controller.meshAction('delete')}
-                >
-                  Delete vertex
-                </button>
+              <div className="mesh-geometry-controls" hidden={state.editMode === 'weights'}>
+                <p>
+                  Cyan diamonds are mesh vertices. Select a diamond or edge in the canvas. Drag vertices; Escape
+                  cancels. Use the wheel to zoom and middle drag to pan.
+                </p>
+                <label>
+                  Mesh vertex
+                  <select
+                    aria-label="Mesh vertex"
+                    value={vertex?.id ?? ''}
+                    onChange={(event) => controller.selectMeshVertex(event.target.value)}
+                  >
+                    <option value="">Select a vertex</option>
+                    {mesh.vertices.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {vertex && (
+                  <fieldset key={`${mesh.id}:${vertex.id}:${fieldReset}`}>
+                    <legend>Attachment-local position</legend>
+                    <InspectorNumberField
+                      label="Vertex X"
+                      value={vertex.x}
+                      onCommit={(value) => commitVertex('x', value)}
+                    />
+                    <InspectorNumberField
+                      label="Vertex Y"
+                      value={vertex.y}
+                      onCommit={(value) => commitVertex('y', value)}
+                    />
+                    <small>
+                      UV: {vertex.u.toFixed(4)}, {vertex.v.toFixed(4)} (retained when moving)
+                    </small>
+                  </fieldset>
+                )}
+                <label>
+                  Mesh edge
+                  <select
+                    aria-label="Mesh edge"
+                    value={state.selectedMeshEdge?.join(':') ?? ''}
+                    onChange={(event) => controller.selectMeshEdge(event.target.value)}
+                  >
+                    <option value="">Select an edge</option>
+                    {meshEdges(mesh).map(([a, b]) => (
+                      <option key={`${a}:${b}`} value={`${a}:${b}`}>
+                        {mesh.vertices[a]!.id} — {mesh.vertices[b]!.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="action-grid">
+                  <button
+                    type="button"
+                    className="workspace-primary"
+                    disabled={!state.selectedMeshEdge}
+                    onClick={() => controller.meshAction('subdivide')}
+                  >
+                    Subdivide edge
+                  </button>
+                  <button
+                    type="button"
+                    className="workspace-danger"
+                    disabled={!vertex}
+                    onClick={() => controller.meshAction('delete')}
+                  >
+                    Delete vertex
+                  </button>
+                </div>
+                <small>
+                  Deletion triangulates a connected fan. Keep corners when no valid replacement triangle exists. Invalid
+                  edits leave the mesh unchanged.
+                </small>
+                <details>
+                  <summary>Triangle inspection ({mesh.triangles.length / 3})</summary>
+                  <ol>
+                    {Array.from({ length: mesh.triangles.length / 3 }, (_, i) => (
+                      <li key={i}>
+                        {mesh.triangles
+                          .slice(i * 3, i * 3 + 3)
+                          .map((index) => mesh.vertices[index]!.id)
+                          .join(' → ')}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+                <p>Topology valid. UVs remain attached to vertices; subdivision averages endpoint UVs.</p>
               </div>
-              <small>
-                Deletion triangulates a connected fan. Keep corners when no valid replacement triangle exists. Invalid
-                edits leave the mesh unchanged.
-              </small>
-              <details>
-                <summary>Triangle inspection ({mesh.triangles.length / 3})</summary>
-                <ol>
-                  {Array.from({ length: mesh.triangles.length / 3 }, (_, i) => (
-                    <li key={i}>
-                      {mesh.triangles
-                        .slice(i * 3, i * 3 + 3)
-                        .map((index) => mesh.vertices[index]!.id)
-                        .join(' → ')}
-                    </li>
-                  ))}
-                </ol>
-              </details>
-              <p>Topology valid. UVs remain attached to vertices; subdivision averages endpoint UVs.</p>
             </>
           )}
           <p role="status">{state.meshFeedback}</p>

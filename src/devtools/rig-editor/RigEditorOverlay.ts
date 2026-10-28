@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { localToWorld, worldToLocal } from '../../engine/affineMath.js';
 import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
 import { meshEdges } from '../../engine/meshEditing.js';
+import { boneWeightColor } from '../../engine/meshWeightPainting.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { gridLines } from './grid.js';
 import type { RigEditorSelection, RigEditorState } from './RigEditorState.js';
@@ -119,14 +120,22 @@ export class RigEditorOverlay {
   getMeshVertices() {
     const mesh = this.state.selectedMesh;
     const slot = this.state.selection;
-    if (this.disposed || this.state.editMode !== 'mesh' || !mesh || slot?.type !== 'slot') return [];
+    if (this.disposed || !['mesh', 'weights'].includes(this.state.editMode) || !mesh || slot?.type !== 'slot')
+      return [];
     const object = this.puppet.getSlotMesh(slot.id);
     if (!object) return [];
     const matrix = object.getWorldTransformMatrix();
     return mesh.vertices.map((vertex, index) => ({
       ...vertex,
       index,
-      screen: this.screen(localToWorld(vertex, matrix)),
+      screen: this.screen(
+        localToWorld(
+          this.state.editMode === 'weights'
+            ? { x: object.vertices[index * 4]!, y: object.vertices[index * 4 + 1]! }
+            : vertex,
+          matrix,
+        ),
+      ),
     }));
   }
 
@@ -299,6 +308,11 @@ export class RigEditorOverlay {
       this.state.selection?.id,
       this.state.selectedMeshVertexId,
       this.state.selectedMeshEdge,
+      this.state.influenceBoneId,
+      this.state.brushRadius,
+      this.state.brushErase,
+      this.state.weightBrushPoint?.x,
+      this.state.weightBrushPoint?.y,
       ...this.getMeshVertices().flatMap((vertex) => [vertex.screen.x, vertex.screen.y]),
       this.state.selectedIKConstraintId,
       ...visibleChains.flatMap((chain) =>
@@ -566,15 +580,39 @@ export class RigEditorOverlay {
         const { x, y } = vertex.screen;
         const selected = vertex.id === this.state.selectedMeshVertexId;
         const r = selected ? 8 : 6;
-        g.fillStyle(selected ? 0xffdc72 : 0x40d9ed, 1);
+        const painting = this.state.editMode === 'weights';
+        const influences = vertex.influences ?? [{ boneId: this.state.meshSlotBoneId, weight: 1 }];
+        const weight = influences.find((entry) => entry.boneId === this.state.weightBoneId)?.weight ?? 0;
+        g.fillStyle(painting ? boneWeightColor(weight) : selected ? 0xffdc72 : 0x40d9ed, 1);
         g.fillTriangle(x, y - r, x + r, y, x, y + r);
         g.fillTriangle(x, y - r, x, y + r, x - r, y);
-        g.lineStyle(1, 0x010409, 1)
+        g.lineStyle(painting && selected ? 3 : 1, painting && selected ? 0xffdc72 : 0x010409, 1)
           .lineBetween(x, y - r, x + r, y)
           .lineBetween(x + r, y, x, y + r)
           .lineBetween(x, y + r, x - r, y)
           .lineBetween(x - r, y, x, y - r);
-        if (selected) label(`Mesh: ${vertex.id}`, x + 12, y - 18, '#40d9ed');
+        if (selected)
+          label(
+            painting ? `${vertex.id}: ${(weight * 100).toFixed(1)}%` : `Mesh: ${vertex.id}`,
+            x + 12,
+            y - 18,
+            painting ? '#155c65' : '#40d9ed',
+          );
+      }
+      if (this.state.editMode === 'weights') {
+        label(
+          `Weights: ${this.state.weightBoneId} · gray 0% · blue weak → orange 100%`,
+          16,
+          camera.height - 28,
+          '#155c65',
+        );
+        const point = this.state.weightBrushPoint;
+        if (point)
+          g.lineStyle(2, this.state.brushErase ? 0xf85149 : 0xffdc72, 0.9).strokeCircle(
+            point.x,
+            point.y,
+            this.state.brushRadius,
+          );
       }
     }
     for (let i = labelIndex; i < this.labels.length; i += 1) this.labels[i]?.setVisible(false);
