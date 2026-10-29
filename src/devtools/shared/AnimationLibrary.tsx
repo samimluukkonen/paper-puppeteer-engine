@@ -5,6 +5,7 @@ import {
   filterAnimationLibrary,
   type AnimationLibraryEntry,
 } from './animationLibraryData.js';
+import { CharacterRigSelect } from './CharacterRigSelect.js';
 import './animationLibrary.css';
 
 export interface AnimationLibraryProps {
@@ -56,17 +57,13 @@ export function AnimationLibrary({
             />
           </label>
           {targets && (
-            <label>
-              Compatible character / rig
-              <select value={target} onChange={(event) => setTarget(event.target.value)}>
-                <option value="">All source characters</option>
-                {targets.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <CharacterRigSelect
+              label="Compatible character / rig"
+              value={target}
+              onChange={setTarget}
+              choices={targets}
+              emptyLabel="All source characters"
+            />
           )}
           <label>
             <input

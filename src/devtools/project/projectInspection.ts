@@ -6,6 +6,7 @@ import { shapeIssues } from '../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../engine/imageHeader.js';
 import { assertMeshImageSize } from '../../engine/meshGeometry.js';
 import { packagePath, validatePackageFiles } from '../../engine/packageZip.js';
+import { validateRigBoneMapping } from '../../engine/rigBoneMapping.js';
 import {
   sceneDefinitionSchema,
   validateSceneDefinition,
@@ -20,6 +21,7 @@ import { parseProjectDefinition } from './ProjectDefinition.js';
 export type ValidationContext = 'draft' | 'export';
 export type AssetKind =
   | 'project'
+  | 'rig-mapping'
   | 'audio'
   | 'character'
   | 'rig'
@@ -441,6 +443,46 @@ export class ProjectInspector {
       }
       for (const marker of rig.footContactMarkers ?? [])
         edge(rigAsset, bone(marker.boneId), `Foot contact marker "${marker.name}"`);
+    }
+    for (const mapping of project.rigMappings ?? []) {
+      const target = asset('rig-mapping', project.id, mapping.id);
+      for (const id of new Set([mapping.sourceRigId, mapping.targetRigId]))
+        edge(target, asset('character', id), `Rig mapping "${mapping.name}"`);
+      const source = input.characters.get(mapping.sourceRigId)?.snapshot;
+      const destination = input.characters.get(mapping.targetRigId)?.snapshot;
+      if (!source || !destination) {
+        add(
+          target,
+          `Mapping "${mapping.name}" references an unavailable rig.`,
+          'rigMappings',
+          'warning',
+          'project',
+          'Open Rig compatibility & bone mapping and repair or remove the saved mapping.',
+        );
+        continue;
+      }
+      try {
+        for (const issue of validateRigBoneMapping(
+          { id: mapping.sourceRigId, rig: source.rig },
+          { id: mapping.targetRigId, rig: destination.rig },
+          mapping,
+        ))
+          add(
+            target,
+            `Mapping "${mapping.name}": ${issue.message}`,
+            'rigMappings',
+            'warning',
+            'project',
+            'Review current rig revisions and save an approved mapping before reuse.',
+          );
+      } catch (error) {
+        add(
+          target,
+          `Mapping "${mapping.name}": ${error instanceof Error ? error.message : String(error)}`,
+          'rigMappings',
+          'warning',
+        );
+      }
     }
     for (const entry of project.scenes) {
       const target = asset('scene', entry.id);

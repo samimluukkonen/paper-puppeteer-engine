@@ -136,6 +136,20 @@ export {
   validatePoseDefinition,
 } from './Pose.js';
 export { Rig } from './Rig.js';
+export { analyzeRigCompatibility, suggestRigBoneMapping } from './rigCompatibility.js';
+export type {
+  RigCompatibilityLevel,
+  RigCompatibilityReport,
+  RigMappingSuggestions,
+  BoneMappingSuggestion,
+} from './rigCompatibility.js';
+export {
+  createRigBoneMapping,
+  validateRigBoneMapping,
+  rigCompatibilityRevision,
+  rigBoneMappingSchema,
+} from './rigBoneMapping.js';
+export type { IdentifiedRig, BoneMappingEntry, RigBoneMapping, RigMappingIssue } from './rigBoneMapping.js';
 export type { DeepReadonly } from './readonlyData.js';
 export { SlotState } from './SlotState.js';
 export {

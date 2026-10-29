@@ -13,6 +13,13 @@ import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { equalJsonData } from '../../engine/equalJsonData.js';
 import { validatePackageFiles } from '../../engine/packageZip.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
+import {
+  rigBoneMappingSchema,
+  validateRigBoneMapping,
+  type RigBoneMapping,
+  type IdentifiedRig,
+} from '../../engine/rigBoneMapping.js';
+import { analyzeRigCompatibility } from '../../engine/rigCompatibility.js';
 import { createEmptyScene, parseSceneDefinition, type SceneDefinition } from '../../engine/SceneDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
@@ -382,6 +389,35 @@ export class ProjectWorkspace {
     if (entry.loading) throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
     return capturePackage(this.workingCharacter(entry));
   }
+  /** Borrow the current authored rig, never the preview's animated joints. */
+  rigSource(id: string): IdentifiedRig {
+    const entry = this.character(id);
+    if (entry.loading || entry.pending?.())
+      throw new Error(`Character "${id}" is opening or has pending edits. Finish them first.`);
+    return { id, rig: this.workingCharacter(entry).rig };
+  }
+  saveRigMapping(input: RigBoneMapping): void {
+    const mapping = rigBoneMappingSchema.parse(input);
+    const source = this.rigSource(mapping.sourceRigId),
+      target = this.rigSource(mapping.targetRigId);
+    const issues = validateRigBoneMapping(source, target, mapping);
+    if (issues.some(({ severity }) => severity === 'error'))
+      throw new Error(issues.map(({ message }) => message).join('\n'));
+    this.change({
+      ...this.metadata,
+      rigMappings: [...(this.metadata.rigMappings ?? []).filter(({ id }) => id !== mapping.id), mapping],
+    });
+  }
+  removeRigMapping(id: string): void {
+    this.change({
+      ...this.metadata,
+      rigMappings: (this.metadata.rigMappings ?? []).filter((mapping) => mapping.id !== id),
+    });
+  }
+  /** Always compare against the current working revisions, including after Undo, reload and import. */
+  rigMappingReport(mapping: RigBoneMapping) {
+    return analyzeRigCompatibility(this.rigSource(mapping.sourceRigId), this.rigSource(mapping.targetRigId), mapping);
+  }
   private workingCharacter(entry: ProjectCharacter): PackageSnapshot {
     const snapshot = entry.capture?.() ?? {
       definition: entry.definition,
@@ -457,6 +493,7 @@ export class ProjectWorkspace {
     const metadata = references
       ? {
           ...this.definition,
+          rigMappings: [],
           characters: this.metadata.characters.filter((entry) => references.has(entry.manifest)),
           audio: this.metadata.audio ?? [],
           scenes: [{ id: scene.id, path: 'scene.json' }],
@@ -493,10 +530,16 @@ export class ProjectWorkspace {
       const dependents = this.dependents({ kind: 'character', owner: id, id }).filter(
         ({ from }) => from.kind !== 'project',
       );
-      if (dependents.length)
+      if (dependents.length) {
+        const usage = dependents.every(({ from }) => from.kind === 'rig-mapping')
+          ? 'rig mappings'
+          : dependents.some(({ from }) => from.kind === 'rig-mapping')
+            ? 'scenes and rig mappings'
+            : 'scenes';
         throw new Error(
-          `Character is used by scenes: ${dependents.map((entry) => `${entry.label} (scene ID: ${entry.from.owner})`).join('; ')}. Remove or replace these references first.`,
+          `Character is used by ${usage}: ${dependents.map((entry) => `${entry.label} (${entry.from.kind === 'rig-mapping' ? 'mapping' : 'scene'} ID: ${entry.from.kind === 'rig-mapping' ? entry.from.id : entry.from.owner})`).join('; ')}. Remove or replace these references first.`,
         );
+      }
     }
     this.change({ ...this.metadata, [kind]: this.metadata[kind].filter((entry) => entry.id !== id) });
   }

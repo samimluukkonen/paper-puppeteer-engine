@@ -25,6 +25,7 @@ import { ProjectEditorHosts, type ProjectEditorHost, type ProjectSession } from 
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
 import { ProjectValidationError, type ProjectInspection, type ValidationContext } from './projectInspection.js';
 import { buildProjectPackage, importProjectPackage, packageHostedCharacter } from './projectPackage.js';
+import { ProjectRigMapping } from './ProjectRigMapping.js';
 import { ProjectValidationPanel } from './ProjectValidationPanel.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
 import '../../ui/theme.css';
@@ -563,6 +564,7 @@ export function ProjectView() {
                 )
               }
             />
+            <ProjectRigMapping key={`mappings:${selected.key}`} workspace={workspace} busy={busy} />
             <ProjectAudioLibrary
               key={selected.key}
               workspace={workspace}

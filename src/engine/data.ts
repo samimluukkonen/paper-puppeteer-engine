@@ -6,6 +6,13 @@ export type {
   MeshDeformationPose,
 } from './meshDeformation.js';
 /** Shared authored data contracts. Type-only imports require neither Phaser nor React. */
+export type { IdentifiedRig, BoneMappingEntry, RigBoneMapping, RigMappingIssue } from './rigBoneMapping.js';
+export type {
+  RigCompatibilityLevel,
+  RigCompatibilityReport,
+  RigMappingSuggestions,
+  BoneMappingSuggestion,
+} from './rigCompatibility.js';
 export type { AudioAssetDefinition, AudioCategory, AudioFormat } from './AudioAsset.js';
 export type {
   AttachmentDefinition,

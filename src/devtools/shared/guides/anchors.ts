@@ -4,6 +4,7 @@ export const GUIDE_TARGETS = {
   projectScenes: 'project-scenes',
   projectAssets: 'project-assets',
   projectAnimationLibrary: 'project-animation-library',
+  projectRigMapping: 'project-rig-mapping',
   projectValidate: 'project-validate',
   projectAudio: 'project-audio',
   projectAudioImport: 'project-audio-import',

@@ -85,6 +85,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.2
+
+- Add pure rig compatibility analysis with exact/shared, explicitly mappable, partial and incompatible levels, effective rest/hierarchy/orientation/proportion diagnostics and separate IK, foot-marker, skin and mesh checks. Bone correspondence does not enable retargeting or cross-rig deformation transfer.
+- Add versioned data-only rig bone mappings with stable character-owned rig identities, SHA-256 revision fingerprints, strict ID/uniqueness/parent validation and explicit stale-map review.
+- Add a compact, initially collapsed Project Workspace comparison editor with shared rig selectors, ambiguity-preserving suggestions, manual correspondence editing, validation, approval, saved-map review/removal and project Undo/Redo, autosave and ZIP persistence.
+- Add a read-only Project Feature Guide, a rig compatibility guide and regression coverage for structure, renamed IDs, ambiguity, IK/mesh differences, stale maps and backward-compatible project persistence. Publish the renderer-independent APIs through core and synchronize package metadata at 1.5.2.
+
 ## 1.5.1
 
 - Add read-only Animation Library Feature Guides in Project Workspace and Animation Editor, covering search, optional labels, rig compatibility, preview, shared references, independent copies, scene reuse and saving; update the variation guide for display-name metadata.

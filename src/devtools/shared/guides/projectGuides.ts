@@ -11,6 +11,58 @@ const step = (id: string, title: string, targetId: string, description: string):
 
 export const projectGuides: readonly GuideDefinition[] = [
   {
+    id: 'project-rig-mapping',
+    title: 'Comparing Rigs and Mapping Bones',
+    description:
+      'Compare rig structure, review proposed correspondences and save reusable mappings for future retargeting.',
+    editor: 'project',
+    category: 'animation',
+    prerequisites: [
+      {
+        capability: 'tool:project',
+        reason: 'Create or import a project first. You can read this guide before adding characters.',
+      },
+    ],
+    steps: [
+      step(
+        'compare',
+        'Choose the source and target rigs',
+        T.projectRigMapping,
+        'After exiting this tour, open **Rig compatibility & bone mapping** and choose **Source rig** and **Target rig** from the project characters. These use stable character IDs and current authored rig revisions. The comparison is independent of playback, actor facing and camera placement. The tour reveals controls only; it never chooses rigs, edits correspondence or approves a map.',
+      ),
+      step(
+        'suggest',
+        'Review automatic proposals',
+        T.projectRigMapping,
+        '**Auto Suggest** proposes correspondences using bone ID tokens and corresponding parent positions. Review each row. **Ambiguous** candidates stay unassigned: choose a target explicitly, or leave **Unmapped / skip** for partial coverage. Use **Remove** to clear a correspondence. Names alone never establish compatibility, and suggestions are never saved automatically.',
+      ),
+      step(
+        'validate',
+        'Understand the compatibility report',
+        T.projectRigMapping,
+        '**Validate** checks existing IDs, unique targets, root correspondence, parent-child consistency and current revisions. Expand **Compatibility diagnostics** to review rest transforms, orientation, proportions, missing or extra bones, IK constraints, foot markers and mesh bindings. **Exact / shared rig** requires identity and structure; **Mappable rig** needs an explicit valid map; **Partially compatible** requires skipping tracks or separate handling. Invalid or stale maps cannot be saved.',
+      ),
+      step(
+        'limits',
+        'Keep IK and mesh transfer separate',
+        T.projectRigMapping,
+        'A bone map does not rename IK tracks, convert puppet-local targets or remap disabled constraints. Different mesh topology cannot share vertex corrections; matching topology still does not approve cross-rig deformation transfer. **Save Mapping** does not copy or transform animation keys. Animation Library direct reuse keeps its existing identity checks. Automatic retargeting is a later milestone.',
+      ),
+      step(
+        'save',
+        'Approve and maintain a reusable mapping',
+        T.projectRigMapping,
+        'Give the map a name and choose **Save Mapping** to approve it. **Saved mappings → Review mapping** loads it for editing. If rig data changes, **Review current revisions** acknowledges the new snapshot; review rows and diagnostics before saving again. **Undo Project** and **Redo Project** restore map changes. Remove saved maps before removing their characters.',
+      ),
+      step(
+        'persist',
+        'Keep mapping metadata with the project',
+        T.projectExport,
+        '**Export Project** preserves approved mappings and their rig fingerprints in the ZIP; committed saves also use local autosave and recovery. Import revalidates saved maps against current rigs. Stale maps are retained for repair and reported by **Validate Project**; they are never silently used. Character and animation downloads do not include project-owned mappings. This tour never exports or changes checkpoints.',
+      ),
+    ],
+  },
+  {
     id: 'project-animation-library',
     title: 'Finding and Reusing Animations',
     description: 'Find existing animation assets, preview motion, check rig compatibility and reuse or copy a clip.',
