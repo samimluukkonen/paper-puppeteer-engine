@@ -84,6 +84,7 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
   const data: AnimationJsonDefinition = {
     version: ANIMATION_FORMAT_VERSION,
     name: animation.name,
+    ...(animation.library === undefined ? {} : { library: structuredClone(animation.library) }),
     duration: timeValue(animation.duration),
     loop: animation.loop,
     ...(animation.interpolation === undefined ? {} : { interpolation: animation.interpolation }),

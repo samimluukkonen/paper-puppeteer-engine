@@ -26,7 +26,15 @@ export interface Keyframe extends Partial<JointTransform> {
   curves?: PropertyCurves<TransformProperty>;
 }
 
+export interface AnimationLibraryMetadata {
+  displayName?: string;
+  description?: string;
+  tags?: readonly string[];
+}
+
 export interface AnimationClip {
+  /** Optional artist labels; name remains the stable runtime asset ID. */
+  library?: AnimationLibraryMetadata;
   name: string;
   duration: number;
   loop: boolean;

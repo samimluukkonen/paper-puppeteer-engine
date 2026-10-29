@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { evaluateRootMotionAtElapsedTime } from '../../engine/rootMotion.js';
 import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 
@@ -117,6 +118,13 @@ function ActionProperties({
                 ))}
               </select>
             </label>
+            {actor && registry.get(actor.character.manifest) && (
+              <SceneAnimationLibrary
+                definition={registry.get(actor.character.manifest)!}
+                manifest={actor.character.manifest}
+                onUse={(name) => setDraft({ ...draft, animation: name })}
+              />
+            )}
             <label>
               Movement source
               <select

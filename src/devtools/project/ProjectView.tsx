@@ -18,6 +18,7 @@ import { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage } from '../shared/package/characterPackage.js';
 import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
+import { ProjectAnimationLibrary } from './ProjectAnimationLibrary.js';
 import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
 import { ProjectAudioLibrary } from './ProjectAudioLibrary.js';
 import { ProjectEditorHosts, type ProjectEditorHost, type ProjectSession } from './ProjectEditorHosts.js';
@@ -549,6 +550,19 @@ export function ProjectView() {
                 {!workspace.definition.scenes.length && <p>No scenes. New scenes start empty.</p>}
               </section>
             </div>
+            <ProjectAnimationLibrary
+              key={`animations:${selected.key}`}
+              workspace={workspace}
+              busy={busy}
+              open={(character, animation, copy) =>
+                run(() =>
+                  editors.open(selected, 'character', character, 'animation', false, undefined, {
+                    name: animation,
+                    copy,
+                  }),
+                )
+              }
+            />
             <ProjectAudioLibrary
               key={selected.key}
               workspace={workspace}

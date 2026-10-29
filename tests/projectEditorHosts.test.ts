@@ -161,3 +161,33 @@ test('an opening that completes after teardown releases its lease without publis
   assert.equal(dispose.mock.calls.length, 1);
   assert.equal(f.hosts().length, 0);
 });
+
+test('library asset requests reach the original editor once, before or after its animation owner binds', async () => {
+  const owner = await session();
+  const dispose = vi.fn();
+  vi.spyOn(packages, 'openPackageRuntime').mockResolvedValue({
+    definition: owner.workspace.character('hero').definition,
+    dispose,
+  });
+  const f = fixture();
+  try {
+    await f.controller.open(owner, 'character', 'hero', 'animation', false, undefined, { name: 'cut', copy: false });
+    const host = f.hosts()[0]!;
+    const select = vi.fn();
+    const release = host.context.bindAnimationSelection!(select);
+    assert.deepEqual(select.mock.calls, [['cut', false]]);
+    await f.controller.open(owner, 'character', 'hero', 'animation', false, undefined, { name: 'cut', copy: true });
+    assert.deepEqual(select.mock.calls, [
+      ['cut', false],
+      ['cut', true],
+    ]);
+    assert.equal(f.hosts().length, 1);
+    release();
+    const next = vi.fn();
+    host.context.bindAnimationSelection!(next);
+    assert.equal(next.mock.calls.length, 0);
+  } finally {
+    f.controller.dispose();
+  }
+  assert.equal(dispose.mock.calls.length, 1);
+});

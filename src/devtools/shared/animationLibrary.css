@@ -1,0 +1,76 @@
+.animation-library {
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  min-width: 0;
+}
+.animation-library > summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--bg-subtle);
+}
+.animation-library-content {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.animation-library-content label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.animation-library-content input[type="search"] {
+  flex: 1;
+  min-width: 120px;
+}
+.animation-library-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 400px;
+  overflow: auto;
+}
+.animation-library-list li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-default);
+  overflow-wrap: anywhere;
+}
+.animation-library-list small {
+  color: var(--fg-muted);
+}
+.animation-library-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.animation-library-actions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.animation-library input[type="checkbox"],
+.animation-library-preview input[type="checkbox"] {
+  min-height: 0;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.animation-library-metadata {
+  display: grid;
+  gap: 8px;
+}
+.animation-library-metadata label {
+  display: grid;
+  gap: 8px;
+}
+.animation-library-stage {
+  width: 760px;
+  height: 500px;
+  max-width: 100%;
+}
+.animation-library-preview {
+  width: 820px;
+}

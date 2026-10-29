@@ -15,6 +15,7 @@ import { validatePackageFiles } from '../../engine/packageZip.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import { createEmptyScene, parseSceneDefinition, type SceneDefinition } from '../../engine/SceneDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
+import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import {
   animationPreviewPreferencesSchema,
   type AnimationPreviewPreferences,
@@ -362,6 +363,19 @@ export class ProjectWorkspace {
     this.checkpoints.set(definition.id, this.characterDigest(definition.id, entry));
     this.change(proposal);
     return definition.id;
+  }
+  /** Derived inventory borrows immutable document snapshots; no keyframes are indexed or copied. */
+  animationLibrary(): readonly AnimationLibraryEntry[] {
+    return this.metadata.characters.flatMap(({ id, name }) => {
+      const entry = this.character(id);
+      if (entry.loading) return [];
+      return this.workingCharacter(entry).animations.map((clip) => ({
+        character: id,
+        characterName: name,
+        rigIdentity: id,
+        clip,
+      }));
+    });
   }
   captureCharacter(id: string): PackageSnapshot {
     const entry = this.character(id);

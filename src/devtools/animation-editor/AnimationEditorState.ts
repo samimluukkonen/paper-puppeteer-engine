@@ -1,6 +1,7 @@
 import type { Point } from '../../engine/affineMath.js';
 import type {
   AnimationClip,
+  AnimationLibraryMetadata,
   AnimationEvent,
   AnimationPlaybackMode,
   Interpolation,
@@ -1720,6 +1721,19 @@ export class AnimationEditorState {
       if (reverted) this.resetAnimationSession(true);
       this.notify();
       return reverted;
+    });
+  }
+
+  /** Lightweight artist labels use the ordinary authored history and persistence boundary. */
+  setLibraryMetadata(library: AnimationLibraryMetadata): boolean {
+    if (!this.animationAuthoringEnabled || this.hasPendingAnimationEdits || !this.working) return false;
+    return this.batchNotifications(() => {
+      const next = this.document.inspect({ ...this.working, library });
+      if (!next) {
+        this.notify();
+        return false;
+      }
+      return this.installWorkingAnimation(next);
     });
   }
 

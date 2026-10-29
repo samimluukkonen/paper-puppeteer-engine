@@ -29,6 +29,58 @@ const step = (id: string, title: string, description: string, targetId: string):
 /** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
+    id: 'animation-library',
+    title: 'Using Animation Library',
+    description: 'Search reusable clips, organize artist labels and choose shared assets or independent variations.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: animation,
+    steps: [
+      step(
+        'open',
+        'Browse this character’s animations',
+        'After exiting this tour, choose **Animation Library** and expand its counted browser. It uses this character’s existing animation documents. Commit or cancel temporary edits and use **Animation mode** first. Reading this guide only reveals controls; it never opens the library dialog, selects a clip, starts playback or changes keys.',
+        targets.animationLibrary,
+      ),
+      step(
+        'search',
+        'Search names and optional tags',
+        'Inside the library, **Search animations** matches stable IDs, display names and tags. Rows show source character, duration, looping and compatibility. Direct reuse requires the same character’s **rig identity**; cross-character retargeting is deferred. The project-wide browser also offers **Compatible character / rig** and **Compatible rig only**.',
+        targets.animationLibrary,
+      ),
+      step(
+        'metadata',
+        'Give the selected clip readable labels',
+        'Expand **Library metadata** for the selected animation. Enter an optional **Display name**, **Description** and comma-separated **Tags**, then choose **Save library metadata**. Labels do not change the stable Animation ID or motion. They use ordinary animation **Undo/Redo**, autosave and JSON/package export. Select a different source before editing its labels; manual tagging is never required.',
+        targets.animationLibrary,
+      ),
+      step(
+        'preview',
+        'Preview on the existing canvas',
+        'Choose **Preview animation** after the tour. The library closes, selects the source while retaining other clips’ edits and plays it on this canvas, including **Environment Preview** when enabled. Use **Play/Pause**, **Restart** and **Loop preview** to review skeletal motion, IK, root travel and mesh deformation. Preview creates no authored keys or history entries.',
+        targets.animationPlayback,
+      ),
+      step(
+        'shared',
+        'Understand existing references',
+        '**Use Existing Animation** and **Locate Original Asset** select the source document with its stable ID. They make no copies. Editing a shared source can affect every Scene Actor or action that references it. The library keeps other clips’ committed edits and histories when switching selection.',
+        targets.animationLibrary,
+      ),
+      step(
+        'copy',
+        'Make a separate editable variation',
+        'In the library, **Create Independent Copy** creates a deep copy with an unused ID. Bone curves, IK and suppression, root motion, deformation, metadata and event payloads remain independent. Edit the variation and return to the source to compare. The separate **Create Variation** dialog offers a custom ID and time scale. Undo/Redo applies to edits; creating a clip is navigation.',
+        targets.animationVariation,
+      ),
+      step(
+        'save',
+        'Save and reuse in a scene',
+        '**Download JSON** keeps the selected clip and its labels. Character/project ZIPs include all registered animations and stable references. In **Scene Editor**, use the library for Actor properties, animation action properties or the timeline’s **Actions** tab. Apply action drafts explicitly; existing action timing and movement ownership remain intact. Reopen the scene after creating a variation. This guide never exports or marks data clean.',
+        targets.animationExport,
+      ),
+    ],
+  },
+  {
     id: 'animation-mesh-deformation',
     title: 'Animating Mesh Deformation',
     description: 'Correct a weighted sleeve or cape with sparse vertex offsets, neutral shapes and animation keys.',
@@ -389,7 +441,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'name',
         'Open Create Variation and choose an ID',
-        'Choose **Create Variation** to open its dialog. Check **Source**, then enter a unique **New name / ID**. The suggested ID is unused; duplicate IDs are rejected. Use letters, numbers, - or _, starting with a letter or number. The name is the stable animation ID, with no separate display name. To give a later version another ID, create another variation.',
+        'Choose **Create Variation** to open its dialog. Check **Source**, then enter a unique **New name / ID**. The suggested ID is unused; duplicate IDs are rejected. Use letters, numbers, - or _, starting with a letter or number. The name stays the stable animation ID; **Animation Library → Library metadata** provides an optional display name. To give a later version another ID, create another variation.',
         targets.animationVariation,
       ),
       step(

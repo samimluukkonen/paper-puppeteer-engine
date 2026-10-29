@@ -23,6 +23,7 @@ export type { AudioAssetDefinition, AudioCategory, AudioFormat } from './AudioAs
 export { DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 export type {
   AnimationClip,
+  AnimationLibraryMetadata,
   AnimationEvent,
   AnimationPlaybackMode,
   CompiledClip,

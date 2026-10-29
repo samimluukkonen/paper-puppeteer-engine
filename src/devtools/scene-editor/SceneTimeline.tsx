@@ -6,6 +6,7 @@ import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';
 import { SceneAudioControls, SceneAudioTracks } from './SceneAudioTimeline.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import { SceneDialogueControls, SceneDialogueTrack } from './SceneDialogueTimeline.js';
@@ -114,28 +115,42 @@ export function SceneTimeline({
       cancel();
     };
   }, [document]);
-  const add = (): void => {
+  const add = (animationName?: string): void => {
     if (!actor) return;
     const time = Math.min(playback.time, scene.duration);
     const duration = Math.min(1000, scene.duration - time);
     const common = { actorId: actor.id, time };
     let action: SceneActionInput;
-    switch (kind) {
+    const actionKind = animationName ? 'animation' : kind;
+    switch (actionKind) {
       case 'animation':
         if (!animations[0]) return;
-        action = { ...common, type: kind, animation: animations[0].name, duration, loop: false, speed: 1 };
+        if (animationName && !animations.some((clip) => clip.name === animationName)) return;
+        action = {
+          ...common,
+          type: 'animation',
+          animation: animationName ?? animations[0].name,
+          duration,
+          loop: false,
+          speed: 1,
+        };
         break;
       case 'move':
-        action = { ...common, type: kind, destination: { x: actor.position.x + 120, y: actor.position.y }, duration };
+        action = {
+          ...common,
+          type: actionKind,
+          destination: { x: actor.position.x + 120, y: actor.position.y },
+          duration,
+        };
         break;
       case 'wait':
-        action = { ...common, type: kind, duration };
+        action = { ...common, type: actionKind, duration };
         break;
       case 'face':
-        action = { ...common, type: kind, target: { type: 'direction', facing: 'right' } };
+        action = { ...common, type: actionKind, target: { type: 'direction', facing: 'right' } };
         break;
       case 'cue':
-        action = { ...common, type: kind, name: 'cue' };
+        action = { ...common, type: actionKind, name: 'cue' };
         break;
     }
     document.addAction(action);
@@ -179,11 +194,18 @@ export function SceneTimeline({
                     className="workspace-primary"
                     data-guide-id={GUIDE_TARGETS.sceneAddAction}
                     disabled={!actor || (kind === 'animation' && !animations.length)}
-                    onClick={add}
+                    onClick={() => add()}
                   >
                     Add action
                   </button>
                 </div>
+                {kind === 'animation' && actor && registry.get(actor.character.manifest) && (
+                  <SceneAnimationLibrary
+                    definition={registry.get(actor.character.manifest)!}
+                    manifest={actor.character.manifest}
+                    onUse={(name) => add(name)}
+                  />
+                )}
                 {scene.actors.length > 0 && !scene.actions.length && (
                   <p className="workspace-caption">
                     No timeline clips. Select an Actor, choose an Action type, then Add action.

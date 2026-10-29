@@ -13,6 +13,8 @@ import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN, PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorState.js';
 import { AnimationGroundPanel } from './AnimationGroundPanel.js';
+import type { AnimationLibraryController } from './AnimationLibraryController.js';
+import { AnimationLibraryPanel } from './AnimationLibraryPanel.js';
 import type { AnimationVariationController } from './AnimationVariationController.js';
 import { AnimationVariationDialog } from './AnimationVariationDialog.js';
 import { EditorIcon } from './EditorIcon.js';
@@ -49,6 +51,7 @@ export function AnimationEditorView({
   poseLibrary,
   newAnimation,
   variations,
+  animationLibrary,
   ikInspector,
   ikBake,
   retiming,
@@ -71,6 +74,7 @@ export function AnimationEditorView({
   poseLibrary?: PoseLibraryController;
   newAnimation?: NewAnimationController;
   variations?: AnimationVariationController;
+  animationLibrary?: AnimationLibraryController;
   ikInspector: IKInspectorController;
   ikBake: IKBakeController;
   retiming: KeyframeRetimingController;
@@ -143,6 +147,7 @@ export function AnimationEditorView({
                     )}
                     {newAnimation && <NewAnimationDialog controller={newAnimation} />}
                     {variations && <AnimationVariationDialog controller={variations} />}
+                    {animationLibrary && <AnimationLibraryPanel controller={animationLibrary} />}
                     <label inert={tweaking}>
                       Animation{' '}
                       <select id="animation-selection" data-guide-id={GUIDE_TARGETS.animationSelection}></select>

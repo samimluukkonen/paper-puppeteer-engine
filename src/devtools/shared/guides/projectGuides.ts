@@ -11,6 +11,69 @@ const step = (id: string, title: string, targetId: string, description: string):
 
 export const projectGuides: readonly GuideDefinition[] = [
   {
+    id: 'project-animation-library',
+    title: 'Finding and Reusing Animations',
+    description: 'Find existing animation assets, preview motion, check rig compatibility and reuse or copy a clip.',
+    editor: 'project',
+    category: 'animation',
+    prerequisites: [
+      {
+        capability: 'tool:project',
+        reason: 'Create or import a project first. No character or animation is required to read this guide.',
+      },
+    ],
+    steps: [
+      step(
+        'library',
+        'Open the Animation Library',
+        T.projectAnimationLibrary,
+        '**Animation Library** browses the existing animations owned by your project characters. It shows their source character, stable **Animation ID**, duration and looping. An empty library is valid: add a character and create an animation in its Animation Editor after this tour. Reading the guide only reveals controls; it never opens editors, selects assets, starts playback or changes authored data.',
+      ),
+      step(
+        'search',
+        'Find a clip by name or tags',
+        T.projectAnimationLibrary,
+        'After exiting, enter a name, display name or optional tag in **Search animations**. Multiple search words narrow the results together. Tags and categories are never required. Use **Locate Original Asset** to open the source animation, then **Animation Library → Library metadata** in Animation Editor to edit its display name, description or tags. Labels can change without renaming the stable Animation ID.',
+      ),
+      step(
+        'compatibility',
+        'Check the target character and rig',
+        T.projectAnimationLibrary,
+        'Choose **Compatible character / rig**, then optionally enable **Compatible rig only**. Each row explains its compatibility. Direct reuse currently requires the **same source character identity**; matching bone names on a different character does not establish a compatible rig. Incompatible or unavailable rigs cannot be reused or copied onto that target. Cross-rig retargeting is deferred; other source characters can still be previewed and located.',
+      ),
+      step(
+        'preview',
+        'Preview without authoring keys',
+        T.projectAnimationLibrary,
+        'After exiting, choose **Preview animation**. The detached runtime preview supports **Play/Pause**, **Stop / Restart** and **Loop preview**, including skeletal motion, IK, root travel and mesh deformation. These controls leave the source animation, keys and history unchanged and suppress authored events. **Close preview** releases its runtime resources. This guide never starts a preview or opens its dialog.',
+      ),
+      step(
+        'reuse',
+        'Keep the existing asset identity',
+        T.projectAnimationLibrary,
+        '**Use Existing Animation** opens that character’s existing animation in Animation Editor. It keeps the same source ID and creates no copy. Scene Actors and actions referring to that asset share it: editing the source can affect all those references. Use an independent copy when a new shot needs different motion.',
+      ),
+      step(
+        'copy',
+        'Create an independent variation',
+        T.projectAnimationLibrary,
+        '**Create Independent Copy** opens the source editor and registers an unused ID such as sword-cut-variation. Bone curves, IK and suppression, root motion, mesh deformation, events and metadata are copied independently. Edit the variation, then switch to the source to compare. **Undo/Redo** restores edits to the selected clip; creation itself is document navigation. **Create Variation** also lets you choose a custom ID and time scale.',
+      ),
+      step(
+        'scene',
+        'Use the variation in a scene',
+        T.projectScenes,
+        'After exiting, open a scene and select an Actor using the source character. **Animation Library** is available in Actor properties, animation action properties and the timeline’s **Actions** tab. Use Existing Animation sets the existing reference; action drafts require **Apply action properties**. Changing an action reference preserves start, duration, speed, looping and movement ownership. Reopen the scene after creating a variation to load its latest character definition.',
+      ),
+      step(
+        'save',
+        'Keep references and metadata together',
+        T.projectExport,
+        '**Export Project** keeps characters, clips, labels and scene references in one portable ZIP without duplicating shared clips. Committed edits also use local autosave and recovery. **Download character ZIP** includes that character’s animations; **Download JSON** includes the selected clip. Export and reload the project to compare the original and variation. This tour never downloads, marks assets saved or changes history.',
+      ),
+    ],
+  },
+  {
     id: 'project-mesh-handoff',
     title: 'Mesh Characters Across Editors',
     description: 'Take a weighted mesh from rigging and animation into scene Actors, validation and portable packages.',

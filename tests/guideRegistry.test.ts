@@ -37,6 +37,7 @@ test('central registry has unique feature IDs, editor categories, and stable ord
   assert.deepEqual(
     getGuidesForEditor('animation').map(({ id }) => id),
     [
+      'animation-library',
       'animation-mesh-deformation',
       'animation-root-motion',
       'animation-root-vs-pelvis',

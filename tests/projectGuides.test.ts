@@ -11,6 +11,7 @@ import { FeatureGuideCatalog } from '../src/ui/FeatureGuideCatalog.js';
 
 const guide = guideRegistry.getGuideById('project-audio-assets')!;
 const meshGuide = guideRegistry.getGuideById('project-mesh-handoff')!;
+const libraryGuide = guideRegistry.getGuideById('project-animation-library')!;
 
 test('mesh handoff overview is available before assets exist and uses only shared project targets', () => {
   assert.equal(meshGuide.title, 'Mesh Characters Across Editors');
@@ -46,7 +47,7 @@ test('project audio guide uses stable anchors and reveal-only steps without asse
   assert.equal(guide.editor, 'project');
   assert.equal(guide.category, 'audio');
   assert.lengthOf(guide.steps, 7);
-  assert.deepEqual(guideRegistry.getGuidesForEditor('project'), [meshGuide, guide]);
+  assert.deepEqual(guideRegistry.getGuidesForEditor('project'), [libraryGuide, meshGuide, guide]);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const step of guide.steps) {
     assert.isTrue(anchors.has(step.targetId));
@@ -60,7 +61,7 @@ test('project audio guide uses stable anchors and reveal-only steps without asse
   );
 });
 
-test.each([guide, meshGuide])(
+test.each([guide, meshGuide, libraryGuide])(
   '$id rechecks live availability and preserves metadata, binaries and history without navigating',
   (guide) => {
     let project: ProjectWorkspace | undefined;
@@ -118,4 +119,33 @@ test('project catalog shares search/category controls and does not request a cha
   assert.include(html, guide.title);
   assert.include(html, 'Open Project Workspace');
   assert.notInclude(html, 'No character is loaded');
+});
+
+test('animation library tour covers source ownership, compatibility and copy/reuse without requiring assets', () => {
+  assert.equal(libraryGuide.editor, 'project');
+  assert.equal(libraryGuide.category, 'animation');
+  assert.lengthOf(libraryGuide.steps, 8);
+  const targets = new Set<string>(Object.values(GUIDE_TARGETS));
+  for (const step of libraryGuide.steps) {
+    assert.isTrue(targets.has(step.targetId));
+    assert.equal(step.preparation, 'reveal-target');
+    assert.notEqual(step.mode, 'try-it');
+  }
+  assert.deepEqual(
+    libraryGuide.prerequisites?.map(({ capability }) => capability),
+    ['tool:project'],
+  );
+  const text = libraryGuide.steps.map(({ description }) => description).join(' ');
+  for (const concept of [
+    'Search animations',
+    'Compatible rig only',
+    'Play/Pause',
+    'Use Existing Animation',
+    'Create Independent Copy',
+    'Library metadata',
+    'root motion',
+    'Apply action properties',
+    'Export Project',
+  ])
+    assert.include(text, concept);
 });

@@ -255,7 +255,14 @@ export const meshDeformationKeySchema = z.strictObject({
 });
 export const meshDeformationTracksSchema = identifierRecord(z.array(meshDeformationKeySchema));
 
+export const animationLibraryMetadataSchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(200).exactOptional(),
+  description: z.string().max(2000).exactOptional(),
+  tags: z.array(z.string().trim().min(1).max(80)).max(32).exactOptional(),
+});
+
 export const animationClipSchema = z.object({
+  library: animationLibraryMetadataSchema.exactOptional(),
   name: identifierSchema,
   duration: finiteNumber.positive('Animation duration must be greater than zero.'),
   loop: z.boolean(),

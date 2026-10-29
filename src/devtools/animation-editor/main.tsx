@@ -11,8 +11,8 @@ import { projectEditorContext } from '../project/projectBridge.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
-import '../rig-editor/style.css';
 import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutController.js';
+import '../rig-editor/style.css';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { buildCharacterDraft } from '../shared/autosave/editorDrafts.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
@@ -32,6 +32,7 @@ import { bindWorkspaceNavigation, workspaceView } from '../shared/WorkspaceNavig
 import { AnimationDraftRecoveryController } from './AnimationDraftRecoveryController.js';
 import { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { AnimationLibraryController } from './AnimationLibraryController.js';
 import { AnimationPreviewPreferencesBinding } from './AnimationPreviewPreferences.js';
 import { AnimationVariationController } from './AnimationVariationController.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
@@ -94,6 +95,8 @@ const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
 const newAnimation = new NewAnimationController();
 const variations = new AnimationVariationController();
+const animationLibrary = new AnimationLibraryController();
+let releaseLibrarySelection: (() => void) | undefined;
 const retiming = new KeyframeRetimingController();
 const motionDiagnostics = new MotionDiagnosticsController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
@@ -185,6 +188,7 @@ function CharacterWorkspace() {
           poseLibrary={poseLibrary}
           newAnimation={newAnimation}
           variations={variations}
+          animationLibrary={animationLibrary}
           ikInspector={ikInspector}
           groundGuide={groundGuide}
           footContacts={footContacts}
@@ -340,6 +344,12 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       guides.refresh();
       newAnimation.bind(state);
       variations.bind(state);
+      animationLibrary.bind(state, id);
+      releaseLibrarySelection?.();
+      releaseLibrarySelection = projectContext?.bindAnimationSelection?.((name, copy) => {
+        if (copy) animationLibrary.copy(name);
+        else animationLibrary.select(name);
+      });
       rigTweak.bind(state, editorScene.rigEditor!);
       rigWorkspace.render(editorScene.rigEditor!);
       editorScene.fitPreview();
@@ -464,6 +474,9 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       guides.refresh();
       newAnimation.unbind();
       variations.unbind();
+      releaseLibrarySelection?.();
+      releaseLibrarySelection = undefined;
+      animationLibrary.unbind();
       rigWorkspace.showError(message);
       packages.unbind();
       releaseAnimationPackage?.();
@@ -613,6 +626,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     motionDiagnostics.dispose();
     newAnimation.dispose();
     variations.dispose();
+    releaseLibrarySelection?.();
+    animationLibrary.dispose();
     workspace.dispose();
     recoveryControls.dispose();
     releaseNavigationGuard();

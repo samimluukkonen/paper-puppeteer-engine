@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';
 import { sceneCharacterChoices, type SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 
@@ -80,6 +81,15 @@ function ActorProperties({
             ))}
           </select>
         </label>
+      )}
+      {definition && (
+        <SceneAnimationLibrary
+          definition={definition}
+          manifest={actor.character.manifest}
+          onUse={(name) => {
+            document.setActorAppearance(actor.id, 'animation', name);
+          }}
+        />
       )}
       {!!definition?.rig.skins.length && (
         <label>

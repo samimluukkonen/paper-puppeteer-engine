@@ -85,6 +85,15 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.1
+
+- Add read-only Animation Library Feature Guides in Project Workspace and Animation Editor, covering search, optional labels, rig compatibility, preview, shared references, independent copies, scene reuse and saving; update the variation guide for display-name metadata.
+
+- Add a shared searchable Animation Library in Project Workspace, Animation Editor and Scene Editor selection workflows, with optional display names, descriptions and tags on existing clip documents, source locations, duration and explicit rig compatibility.
+- Preview through the existing editor/Environment Preview canvas or an isolated CharacterLoader/Puppet runtime with Play/Pause, Stop/Restart and view-only looping, preserving skeletal animation, IK, root motion and mesh deformation without authoring keys.
+- Reference existing compatible character-owned clips by their stable IDs, or create independently editable deep copies through Animation Variations. Keep scene timing, movement ownership, animation events, dependency warnings, metadata Undo/Redo, local recovery and package references intact.
+- Retain version-1 character/animation packages and add library ownership documentation and regression coverage for search/filter, missing/incompatible rigs, preview isolation, copying, persistence and scene references.
+
 ## 1.4.6
 
 - Add optional final-pose mesh diagnostics in Rig and Animation Editors: triangle/vertex overlays, bone influence names and advisory counts for collapse, inversion, nonfinite output and excessive edge stretch. Keep diagnostics off initially, independent of authoring/history and hidden during ordinary preview unless explicitly enabled; never repair artistic deformation automatically.

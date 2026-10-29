@@ -28,6 +28,8 @@ export interface ProjectEditorHost {
   openGuide?: (guideId?: string) => void;
   guideId?: string | undefined;
   guidePending?: boolean;
+  animationRequest?: { name: string; copy: boolean } | undefined;
+  selectAnimation?: (name: string, copy: boolean) => void;
 }
 interface RuntimeLease {
   definition: CharacterDefinition;
@@ -102,6 +104,7 @@ export class ProjectEditorHosts {
     view: 'rig' | 'animation' = 'rig',
     guide = false,
     guideId?: string,
+    animationRequest?: { name: string; copy: boolean },
   ): Promise<void> {
     this.lifetime.signal.throwIfAborted();
     const workspace = session.workspace;
@@ -111,6 +114,10 @@ export class ProjectEditorHosts {
     if (existing) {
       existing.openView?.(view);
       this.options.activate(existing.token);
+      if (animationRequest) {
+        if (existing.selectAnimation) existing.selectAnimation(animationRequest.name, animationRequest.copy);
+        else existing.animationRequest = animationRequest;
+      }
       if (guide) {
         if (existing.openGuide) existing.openGuide(guideId);
         else {
@@ -201,6 +208,34 @@ export class ProjectEditorHosts {
         failed = true;
         entry.loading = false;
         workspace.refresh();
+      },
+      animationLibrary: () => workspace.animationLibrary(),
+      animationLibraryRevision: workspace.getSnapshot,
+      loadAnimationPreview: async (characterId, signal) =>
+        openPackageRuntime(
+          await buildCharacterPackage(
+            workspace.captureCharacter(characterId),
+            characterFileFetcher(workspace.character(characterId).files),
+            signal,
+          ),
+          signal,
+        ),
+      openAnimation: (characterId, name, copy = false) => {
+        // Reopen scenes after character editing so their runtime definitions include new variations.
+        if (kind === 'scene') context.navigate('project');
+        return this.open(session, 'character', characterId, 'animation', false, undefined, { name, copy });
+      },
+      bindAnimationSelection: (select) => {
+        const host = this.owners.get(token)!;
+        host.selectAnimation = select;
+        if (host.animationRequest) {
+          const request = host.animationRequest;
+          host.animationRequest = undefined;
+          select(request.name, request.copy);
+        }
+        return () => {
+          delete host.selectAnimation;
+        };
       },
       bindScene: (dispose) => {
         disposeScene = dispose;
@@ -328,6 +363,7 @@ export class ProjectEditorHosts {
       context,
       guidePending: guide,
       guideId,
+      animationRequest,
     };
     this.owners.set(token, host);
     this.closers.set(token, close);
