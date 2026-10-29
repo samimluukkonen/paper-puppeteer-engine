@@ -72,6 +72,8 @@ export interface RigEditorStateOptions {
   artworkIssue?: (texture: string, frame?: string | number) => string | undefined;
   /** Live references from every animation session and host-provided preview IK chain. */
   boneReferences?: (id: string) => readonly string[];
+  /** Live deformation dependencies; reject newly incompatible attachment/vertex proposals atomically. */
+  meshReferences?: (candidate: RigDefinition) => readonly string[];
   /** Live IK track, baked metadata and specialized host references. Also reserves host-owned IDs. */
   ikReferences?: (id: string) => readonly string[];
   /** Live persisted marker references, including host Scene Editor grounding selections. */
@@ -292,6 +294,7 @@ export class RigEditorState {
   readonly defaultSkin: string;
   private selectedSkin: string;
   private readonly artworkIssue: RigEditorStateOptions['artworkIssue'];
+  private readonly meshReferences: RigEditorStateOptions['meshReferences'];
   private readonly boneReferences: RigEditorStateOptions['boneReferences'];
   private readonly ikReferences: RigEditorStateOptions['ikReferences'];
   private readonly footContactReferences: RigEditorStateOptions['footContactReferences'];
@@ -307,6 +310,7 @@ export class RigEditorState {
     this.source = source;
     this.artworkIssue = options.artworkIssue;
     this.boneReferences = options.boneReferences;
+    this.meshReferences = options.meshReferences;
     this.ikReferences = options.ikReferences;
     this.footContactReferences = options.footContactReferences;
     this.externalSkins = freezeData(structuredClone(options.standaloneSkins ?? []));
@@ -461,11 +465,13 @@ export class RigEditorState {
   }
 
   private change(edit: () => void): void {
+    const previousMeshIssues = new Set(this.meshReferences?.(this.workingCopy));
     this.history.change(() => {
       this.invalidate();
       edit();
       // Bound geometry must never survive a silent rest/hierarchy edit. History rolls failed proposals back.
       if (this.data.attachments?.some((attachment) => attachment.type === 'mesh')) new Rig(this.data);
+      this.assertMeshReferences(this.data, previousMeshIssues);
     });
     if (!this.history.inOperation) this.updateWarnings();
   }
@@ -513,7 +519,19 @@ export class RigEditorState {
       this.selection = null;
   }
 
+  private assertMeshReferences(
+    candidate: RigDefinition,
+    previous = new Set(this.meshReferences?.(this.workingCopy)),
+  ): void {
+    const issues = this.meshReferences?.(candidate).filter((issue) => !previous.has(issue)) ?? [];
+    if (issues.length)
+      throw new Error(
+        `Mesh edit would invalidate ${issues.join('; ')} Restore the mesh IDs or explicitly remove the animation tracks first.`,
+      );
+  }
+
   private assertRetainedReferences(candidate: RigDefinition): void {
+    this.assertMeshReferences(candidate);
     const markerIds = new Set(candidate.footContactMarkers?.map((marker) => marker.id));
     for (const marker of this.data.footContactMarkers ?? []) {
       if (markerIds.has(marker.id)) continue;

@@ -50,6 +50,10 @@ Vertex array order is irrelevant: IDs are the only correction references. Subdiv
 
 A working editor document retains incompatible tracks and shows an actionable topology message. Its preview evaluates compatible tracks; it does not substitute vertex array indexes. Export stays blocked until the mesh/IDs are restored or **Remove incompatible tracks** explicitly removes the affected tracks. The removal uses animation history. Undo can restore an incompatible snapshot after its required mesh IDs have been restored. Onion skins are hidden while topology is incompatible.
 
+Shared Rig Editor documents reject new edits or history restores that would invalidate live deformation tracks, including deleting an animated vertex or attachment. Restore the required IDs or explicitly remove the animation tracks first. For the complete pipeline audit, skin/replacement combinations and ownership rules, see [cross-editor mesh integration](mesh-integration.md).
+
+Onion meshes evaluate each neighbor's correction shape and authored FK pose. Ghosts precede IK solving and remain at the current preview placement rather than sampling root travel. Bake IK to inspect solved silhouettes; the Onion settings panel also explains these limits.
+
 | Tool                 | Behavior                                                                                                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Animation Variations | Deep-copy tracks and scale all correction key times with the clip.                                                                                                       |

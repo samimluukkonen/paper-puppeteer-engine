@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import { meshDeformationIssues } from '../../engine/meshDeformation.js';
 import { Rig } from '../../engine/Rig.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { AnimationEditorState } from '../animation-editor/AnimationEditorState.js';
@@ -58,6 +59,16 @@ export function createCharacterDocuments(definition: CharacterDefinition, option
     animation,
     rig: new RigEditorState(new Rig(definition.rig, file?.skins ?? []), file, {
       ...options,
+      meshReferences: (candidate) => [
+        ...animation
+          .packageAnimations()
+          .flatMap((clip) =>
+            meshDeformationIssues(clip.deformationTracks, candidate).map(
+              (issue) => `animation "${clip.name}": ${issue.message}`,
+            ),
+          ),
+        ...(options.meshReferences?.(candidate) ?? []),
+      ],
       boneReferences: (id) => [
         ...animation
           .packageAnimations()

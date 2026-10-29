@@ -4,6 +4,7 @@ import { validateCharacterDefinition, type CharacterManifest } from '../../engin
 import { CharacterTextureBudget } from '../../engine/characterTextureLimits.js';
 import { shapeIssues } from '../../engine/externalData.js';
 import { IMAGE_HEADER_BYTES } from '../../engine/imageHeader.js';
+import { assertMeshImageSize } from '../../engine/meshGeometry.js';
 import { packagePath, validatePackageFiles } from '../../engine/packageZip.js';
 import {
   sceneDefinitionSchema,
@@ -355,7 +356,10 @@ export class ProjectInspector {
               attempt(
                 target,
                 () => {
-                  inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
+                  const header = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
+                  for (const attachment of rig.attachments ?? [])
+                    if (attachment.type === 'mesh' && attachment.texture === key)
+                      assertMeshImageSize(attachment, header);
                   budget.checkImage(key, bytes);
                 },
                 'rig',
@@ -400,7 +404,17 @@ export class ProjectInspector {
       }
       for (const item of rig.attachments ?? []) {
         edge(rigAsset, asset('attachment', entry.id, item.id), `Rig of "${entry.name}"`);
-        sprite(asset('attachment', entry.id, item.id), item, `Character "${entry.name}", attachment "${item.id}"`);
+        const from = asset('attachment', entry.id, item.id);
+        sprite(from, item, `Character "${entry.name}", attachment "${item.id}"`);
+        if (item.type === 'mesh') {
+          for (const bind of item.bindPose.bones) edge(from, bone(bind.id), `Mesh "${item.id}" bind pose`);
+          for (const slot of item.bindPose.slots)
+            edge(from, asset('slot', entry.id, slot.id), `Mesh "${item.id}" bind slot`);
+          for (const id of new Set(
+            item.vertices.flatMap((vertex) => vertex.influences?.map((influence) => influence.boneId) ?? []),
+          ))
+            edge(from, bone(id), `Mesh "${item.id}" bone weights`);
+        }
       }
       for (const skin of [...(rig.skins ?? []), ...skins]) {
         edge(target, asset('skin', entry.id, skin.name), `Character "${entry.name}"`);
@@ -415,6 +429,8 @@ export class ProjectInspector {
         const from = asset('animation', entry.id, clip.name);
         edge(target, from, `Character "${entry.name}"`);
         for (const id of Object.keys(clip.tracks)) edge(from, bone(id), `Animation "${clip.name}" bone track`);
+        for (const id of Object.keys(clip.deformationTracks ?? {}))
+          edge(from, asset('attachment', entry.id, id), `Animation "${clip.name}" mesh deformation track`);
         for (const id of new Set([...Object.keys(clip.ikTracks ?? {}), ...(clip.disabledIKConstraints ?? [])]))
           edge(from, ik(id), `Animation "${clip.name}" IK`);
       }

@@ -5,6 +5,7 @@ import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
 import type { MeshDeformationPose } from './meshDeformation.js';
+import { assertMeshImageSize } from './meshGeometry.js';
 import { createTexturedMesh, syncMeshTextureOrientation } from './meshRendering.js';
 import { createMeshSkinBinding, deformMesh, type MeshSkinBinding } from './meshSkinning.js';
 import type { Rig } from './Rig.js';
@@ -347,6 +348,14 @@ export class PuppetRenderer {
     const key = replacement?.textureKey ?? assetKey;
     if (!this.scene.textures.exists(key)) throw new Error(`Missing artwork texture "${key}".`);
     if (replacement) {
+      for (const attachment of this.artworkDefinitions) {
+        if (
+          attachment.type === 'mesh' &&
+          attachment.texture === assetKey &&
+          (!reference || reference === `attachment:${attachment.id}`)
+        )
+          assertMeshImageSize(attachment, this.scene.textures.get(key).get('__BASE'));
+      }
       for (const value of [replacement.originScaleX, replacement.originScaleY]) {
         assertFinite(value, 'Artwork origin multiplier');
         if (value <= 0) throw new Error('Artwork origin multipliers must be positive.');

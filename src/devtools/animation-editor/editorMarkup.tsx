@@ -957,6 +957,10 @@ export function AnimationEditorView({
                   aria-label="Onion Skinning settings"
                 >
                   <h2>Onion Skinning</h2>
+                  <p>
+                    Ghost meshes include sampled shape corrections and bone poses before IK. Bake IK to inspect solved
+                    silhouettes. Root travel stays at the current preview position.
+                  </p>
                   <label htmlFor="animation-onion-previous-count">Previous poses</label>
                   <input id="animation-onion-previous-count" type="number" min="0" max="3" step="1" />
                   <label htmlFor="animation-onion-next-count">Next poses</label>

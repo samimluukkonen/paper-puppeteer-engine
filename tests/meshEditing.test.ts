@@ -194,6 +194,7 @@ test('renderer uses native local XYUV geometry, slot affine, opacity/order, repl
   const next = puppet.getSlotMesh('sleeve')!;
   assert.equal(next.alpha, 0.3);
   assert.isFalse(next.visible);
+  Object.assign(scene.textures, { get: () => ({ get: () => state.selectedMesh!.imageSize }) });
   puppet.setArtworkReplacement('paper', { textureKey: 'replacement', originScaleX: 1, originScaleY: 1 });
   assert.equal(next.texture.key, 'replacement');
   assert.deepEqual(next.vertices, mesh.vertices);

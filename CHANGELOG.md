@@ -77,6 +77,16 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.5
+
+- Add a nine-step **Mesh Characters Across Editors** Feature Guide in Project Workspace, with real-control spotlights, live project prerequisites and read-only navigation. Cover mesh skins, artwork compatibility, animation/ghost limits, scene Actors, root travel, validation and portable saving; update existing mesh and onion-skin tours.
+
+- Audit mesh deformation across Rig, Animation, Environment Preview, Scene, Actor/choreography, standalone loading, Project Workspace and package/recovery paths; document shared rendering, replacement combinations, ownership and current onion-skin limits.
+- Reject rig edits, imports, recovery and Undo/Redo that newly invalidate live deformation attachment/vertex references, using existing snapshot rollback and animation owners. Preserve repairable drafts and stable-ID geometry edits.
+- Keep runtime catalog changes compatible with registered deformation tracks and refresh masked shape evaluation from current weights. Validate newly registered animations against the current catalog and reject introducing meshes on Canvas before installation.
+- Reject mesh artwork replacements with different image dimensions before applying them, including inactive skin attachments. Add mesh bind/slot/weight and deformation-track dependency edges plus image-dimension diagnostics to Project inspection.
+- Cover authored mesh handoff through character/project/scene packages, recovery, multiple Actors, mixed skins, root motion/facing/scale, direct seeks, ghost sampling, catalog edits and shared texture disposal. Extend built and packed standalone consumer checks with mesh serialization and weighted evaluation. Synchronize package/lockfile metadata at `1.4.5`.
+
 ## 1.4.4
 
 - Add a nine-step **Animating Mesh Deformation** Feature Guide with live mesh/animation prerequisites, setup links, real-control spotlights and read-only navigation. Explain neutral shapes, bind-space corrections, timeline timing, topology compatibility and portable saving.

@@ -11,6 +11,75 @@ const step = (id: string, title: string, targetId: string, description: string):
 
 export const projectGuides: readonly GuideDefinition[] = [
   {
+    id: 'project-mesh-handoff',
+    title: 'Mesh Characters Across Editors',
+    description: 'Take a weighted mesh from rigging and animation into scene Actors, validation and portable packages.',
+    editor: 'project',
+    category: 'animation',
+    prerequisites: [
+      {
+        capability: 'tool:project',
+        reason: 'Create or import a project first. You can explore this workflow before adding a character or scene.',
+      },
+    ],
+    steps: [
+      step(
+        'character',
+        'Keep one character through the workflow',
+        T.projectCharacters,
+        'After exiting this tour, use **New Character** or **Import Character ZIP** to register your character. Its **Rig Editor** and **Animation Editor** buttons open the same project character. Return to Project Workspace between editors to continue the handoff. This overview also works in an empty project; it never creates assets, opens editors or changes selection.',
+      ),
+      step(
+        'rig',
+        'Finish the rig and paint the mesh',
+        T.projectCharacters,
+        'Open the character’s **Rig Editor** after this tour. Finish the skeleton and artwork alignment, create an attachment slot, then follow **Editing Mesh Geometry** and **Painting Bone Weights** in Feature Guide. Finish rest transforms before conversion: the saved **bind pose** is protected. Subdivision preserves existing vertex IDs and interpolates weights; new correction vertices start neutral.',
+      ),
+      step(
+        'artwork',
+        'Preserve skins, artwork and layer order',
+        T.projectAssets,
+        '**Assets** lists each character’s attachments, skins and artwork. Keep the **mesh skin** name created during conversion: the original skin can still select rigid artwork. A skin can choose another sprite or mesh, but shape tracks stay with their attachment IDs. Replacing mesh artwork requires the same **image dimensions** and pivot; recreate the mesh deliberately for different proportions. Ordinary slot depth places a transparent sleeve behind or ahead of other parts.',
+      ),
+      step(
+        'animation',
+        'Animate the same attachment',
+        T.projectCharacters,
+        'Open this character’s **Animation Editor**, select a skin displaying the mesh, and follow **Animating Mesh Deformation**. Animate bones first; use optional sparse corrections with **neutral keys** to return to ordinary weighted skinning. **Stable vertex IDs** connect shape keys to geometry. Rig edits and Undo/Redo reject newly invalid animated references; restore required IDs or explicitly remove incompatible tracks in Animation Editor.',
+      ),
+      step(
+        'review',
+        'Compare the final silhouette and ghosts',
+        T.projectCharacters,
+        'In Animation Editor, scrub forward and backward through the bend. The main preview combines corrections with final **FK/IK** skinning. **Onion skins** sample their own correction shapes and FK poses before IK, and stay at the current preview placement instead of sampling root travel. Bake IK to inspect solved ghost silhouettes. Facing reflects the complete character; bone mirroring preserves correction tracks without retargeting mesh vertices. Graph Editor does not edit deformation channels.',
+      ),
+      step(
+        'scene',
+        'Place the mesh character in a scene',
+        T.projectScenes,
+        'After exiting, create or open a scene here. In **Scene Editor**, choose **Add Actor**, select this project character, and set its **Skin** to the mesh variant. Add an animation action using the authored clip. Adding the same character again creates an independent Actor. Use **Creating Animation Clips** and **Positioning an Actor** in the scene Feature Guide for the real controls. The scene uses the same mesh skinning as Animation Editor.',
+      ),
+      step(
+        'travel',
+        'Check travel, facing and repeated seeks',
+        T.projectScenes,
+        'In Scene Editor, use **Movement source → Animation root motion** for a clip with authored travel, or use scene movement actions. Do not overlap competing translation owners. Choose each Actor’s facing explicitly and seek repeatedly to the same scene time to compare the shape and placement. Camera pan/zoom, parallax and scene fades operate around the posed character. Use the existing root-motion and scene guides for detailed controls.',
+      ),
+      step(
+        'validate',
+        'Resolve dependencies before production export',
+        T.projectValidate,
+        'After exiting, choose **Validate Project**. Mesh dependencies include textures, bind bones and slots, weights, topology and deformation vertex IDs. Open an affected asset from the report to repair it. **Editing draft** allows missing artwork as warnings; **Production export** requires valid referenced data and image dimensions. Apply or cancel artwork proposals before exporting. Reading this step does not run validation or change the project.',
+      ),
+      step(
+        'save',
+        'Save the complete handoff',
+        T.projectExport,
+        '**Export Project** saves characters and scenes together. For separate handoff, use **Download character ZIP** in a character editor or **Download scene package** in Scene Editor. Packages preserve mesh geometry, UVs, weights, bind data, skins, textures and deformation tracks. Reload and select the same mesh skin to compare the bend. Standalone mesh playback requires **WebGL**; rigid characters still support Canvas. Browser recovery is a local draft, not a portable download. This tour never exports, marks data clean or changes history.',
+      ),
+    ],
+  },
+  {
     id: 'project-audio-assets',
     title: 'Importing and Managing Audio',
     description:

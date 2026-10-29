@@ -97,6 +97,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [Character runtime integration](docs/runtime-integration.md)
 - [Rig constraint workflow, transform audit and optional deformation design](docs/rig-constraints-and-deformation.md)
 - [Mesh attachment quick start, coordinates and current limits](docs/mesh-attachments.md#using-this-milestone)
+- [Mesh deformation integration across editors and runtime](docs/mesh-integration.md)
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Advanced Pose Library](docs/pose-library.md)
@@ -172,7 +173,7 @@ Browser smoke tests are local-only and excluded from CI. For local browser check
 
 ## Current limitations
 
-- Rigid pieces and authored textured meshes with up to four painted bone influences per vertex; no physics, ragdolls, cloth or vertex animation keys.
+- Rigid pieces and authored textured meshes with up to four painted bone influences per vertex and sparse deformation shape keys; no physics, ragdolls or cloth simulation.
 - One clip per layer with simple masked overlays; no animation graph, blend tree, or automatic state machine.
 - Only direct two-link chains and endpoint positions: no joint limits, end-effector rotation constraints, arbitrary-length chains, or terrain-aware locomotion. Foot contacts require explicit IK targets; the sample walk remains in place.
 - The rotating chain root must have uniform scale magnitudes (`abs(scaleX) === abs(scaleY)`); its signs may differ. Nonuniform scale inside that joint is skipped with `unsupported-scale`. Arbitrary nonsingular ancestor transforms and middle-joint scale are supported. Zero/singular transforms skip solving safely.

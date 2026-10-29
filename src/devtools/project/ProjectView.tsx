@@ -362,7 +362,7 @@ export function ProjectView() {
                         <Download size={16} aria-hidden="true" />
                         Export Project
                       </button>
-                      <button disabled={busy} onClick={() => validate()}>
+                      <button data-guide-id={GUIDE_TARGETS.projectValidate} disabled={busy} onClick={() => validate()}>
                         <ShieldCheck size={16} aria-hidden="true" />
                         Validate Project
                       </button>
@@ -422,7 +422,7 @@ export function ProjectView() {
               />
             )}
             <div className="project-columns">
-              <section className="project-panel">
+              <section className="project-panel" data-guide-id={GUIDE_TARGETS.projectCharacters}>
                 <h2>Characters</h2>
                 <div className="project-actions">
                   <button
@@ -506,7 +506,7 @@ export function ProjectView() {
                   <p>No characters. Create an empty character or register an existing package.</p>
                 )}
               </section>
-              <section className="project-panel">
+              <section className="project-panel" data-guide-id={GUIDE_TARGETS.projectScenes}>
                 <h2>Scenes</h2>
                 <div className="project-actions">
                   <button
@@ -557,7 +557,7 @@ export function ProjectView() {
               run={run}
               onStatus={setStatus}
             />
-            <section className="project-panel">
+            <section className="project-panel" data-guide-id={GUIDE_TARGETS.projectAssets}>
               <h2>Assets</h2>
               <p className="workspace-caption">
                 Artwork, rigs, animations, skins and attachments belong to their character. Open its editor to author

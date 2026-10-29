@@ -6,6 +6,7 @@ import type { RigJsonDefinition } from '../../engine/externalData.js';
 import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
 import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
 import type { IKTarget, TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import { meshDeformationIssues } from '../../engine/meshDeformation.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { computeBonePosition, computeRenderOrder, Rig } from '../../engine/Rig.js';
 import { createTransform, type RigDefinition } from '../../engine/types.js';
@@ -89,6 +90,12 @@ export class RigEditor {
     this.state =
       state ??
       new RigEditorState(puppet.rig, undefined, {
+        meshReferences: (candidate) =>
+          this.previewClips.flatMap((clip) =>
+            meshDeformationIssues(clip.deformationTracks, candidate).map(
+              (issue) => `animation "${clip.name}": ${issue.message}`,
+            ),
+          ),
         ikReferences: (id) => [
           ...this.previewClips.flatMap((clip) => [
             ...(clip.ikTracks?.some((track) => track.constraint === id) ? [`animation "${clip.name}" IK track`] : []),

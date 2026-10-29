@@ -83,7 +83,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'preview',
         'Scrub before, during and after the bend',
-        'Scrub and play across the **neutral keys** and correction. The main preview shows final bone-weighted geometry with corrections applied once; **Smooth/Stepped** playback uses the ordinary clip timing. Seeking to the same time produces the same shape without accumulating offsets. **Undo/Redo** changes authored corrections, while playback and scrubbing never create keys. Use a skin containing the chosen mesh when comparing the corrected silhouette.',
+        'Scrub and play across the **neutral keys** and correction. The main preview shows final bone-weighted geometry with corrections applied once; **Smooth/Stepped** playback uses the ordinary clip timing. Seeking to the same time produces the same shape without accumulating offsets. **Undo/Redo** changes authored corrections, while playback and scrubbing never create keys. Use a skin containing the chosen mesh when comparing the corrected silhouette. **Onion skins** sample each neighbor’s correction shape and FK pose before IK, at the current preview placement rather than sampled root travel. Bake IK to inspect solved ghost silhouettes.',
         targets.animationCanvas,
       ),
       step(
@@ -95,7 +95,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'save',
         'Save and reload the corrected animation',
-        '**Download JSON** preserves committed correction keys with bones, IK, events and settings. **File tools → Reload Current Export** checks the animation round trip; import/reload replaces the session history after any required confirmation. **Character package → Download character ZIP** keeps the clip together with its mesh rig, weights, skin assignments and artwork. Reload, select the same mesh skin and scrub the elbow again. Runtime playback uses the same correction sampling and skinning order as the editor. Reading or finishing this tour does not export, mark the clip clean or change any authored data.',
+        '**Download JSON** preserves committed correction keys with bones, IK, events and settings. **File tools → Reload Current Export** checks the animation round trip; import/reload replaces the session history after any required confirmation. **Character package → Download character ZIP** keeps the clip together with its mesh rig, weights, skin assignments and artwork. Reload, select the same mesh skin and scrub the elbow again. In **Scene Editor**, add this character as an Actor and choose that mesh skin. For the complete handoff, open **Mesh Characters Across Editors** under Project Workspace in Feature Guide. Runtime playback uses the same correction sampling and skinning order as the editor. Reading or finishing this tour does not export, mark the clip clean or change any authored data.',
         targets.animationExport,
       ),
     ],
@@ -861,7 +861,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'compare',
         'Scrub and compare',
-        '**Scrub** to compare the live pose with its neighbors. A clip with no changing bone keys may show overlapping ghosts. **Ghosts are read-only** and never appear in exported animation JSON.',
+        '**Scrub** to compare the live pose with its neighbors. A clip with no changing bone keys may show overlapping ghosts. **Ghosts are read-only** and never appear in exported animation JSON. Mesh ghosts include each neighbor’s sampled shape corrections before IK; root travel stays at the current preview position. Bake IK to compare solved silhouettes.',
         targets.animationCanvas,
       ),
     ],

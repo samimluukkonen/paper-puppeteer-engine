@@ -158,9 +158,10 @@ test('sleeve corrections: bind handles, interpolation, timeline, history, cancel
   await page.mouse.down();
   await page.mouse.move(marker.x + marker.width / 2 + lane.width * 0.1, marker.y + marker.height / 2, { steps: 4 });
   await page.mouse.up();
-  await expect(
-    page.getByRole('button', { name: 'Select leftForearmDefault deformation key at 0.6 s', exact: true }),
-  ).toBeVisible();
+  const draggedKey = page.locator('.timeline-deformation-track .timeline-keyframe[aria-pressed="true"]');
+  await expect(draggedKey).toBeVisible();
+  // Fractional CSS lane widths can produce subpixel differences in the authored time.
+  expect(Number(await draggedKey.getAttribute('data-time'))).toBeCloseTo(0.6, 6);
   await page.locator('#animation-undo').click();
   expect(await exported(page)).toEqual(authored);
   await key.click();

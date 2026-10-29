@@ -8,7 +8,7 @@ import type { PlaybackInstanceId, PlaybackOutcome } from './PlaybackLifecycle.js
 import { readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
 import type { RootMotionPolicy } from './rootMotion.js';
-import { type TransformProperty, transformProperties } from './types.js';
+import { type AttachmentDefinition, type TransformProperty, transformProperties } from './types.js';
 
 export interface AnimationState {
   playbackId: PlaybackInstanceId;
@@ -55,11 +55,13 @@ export class AnimationLayerEvaluator {
   readonly ikEvaluator: AnimationIKEvaluator;
   private ikPlayback: AnimationPlaybackMode = { mode: 'smooth' };
   private sampleBuffer: ClipPoseBuffer | undefined;
+  private meshAttachments: readonly AttachmentDefinition[];
 
   constructor(
     private readonly rig: Rig,
     private joints: ReadonlyMap<string, Joint>,
   ) {
+    this.meshAttachments = rig.attachments;
     this.ikEvaluator = new AnimationIKEvaluator(
       rig,
       (clip, time) => this.sampleTime(clip, time, this.ikPlayback),
@@ -126,6 +128,20 @@ export class AnimationLayerEvaluator {
     }
     for (const [id, values] of pose) Object.assign(this.joints.get(id)!.pose, values);
     this.ikEvaluator.apply(layers);
+    this.refreshMeshDeformation(layers, playback);
+  }
+
+  /** Refresh masks after catalog weight edits without reapplying bones, IK, clocks or events. */
+  updateMeshAttachments(
+    attachments: readonly AttachmentDefinition[],
+    layers: ReadonlyMap<string, AnimationLayer>,
+    playback: AnimationPlaybackMode,
+  ): void {
+    this.meshAttachments = attachments;
+    this.refreshMeshDeformation(layers, playback);
+  }
+
+  private refreshMeshDeformation(layers: ReadonlyMap<string, AnimationLayer>, playback: AnimationPlaybackMode): void {
     let deformation: MeshDeformationPose = new Map();
     for (const layer of layers.values()) deformation = this.applyDeformationLayer(deformation, layer, playback);
     this.deformation = readonlyMap(deformation);
@@ -142,7 +158,7 @@ export class AnimationLayerEvaluator {
     if (layer.mask)
       value = new Map(
         [...value].filter(([id]) => {
-          const mesh = this.rig.attachments.find((entry) => entry.id === id);
+          const mesh = this.meshAttachments.find((entry) => entry.id === id);
           return (
             mesh?.type === 'mesh' &&
             mesh.vertices.every((vertex) =>

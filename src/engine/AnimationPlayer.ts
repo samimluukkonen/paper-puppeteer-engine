@@ -22,14 +22,14 @@ import type {
   PlaybackStatus,
   PlaybackWaitResult,
 } from './PlaybackLifecycle.js';
-import type { Rig } from './Rig.js';
+import { Rig } from './Rig.js';
 import {
   evaluateRootMotionAtElapsedTime,
   type RootMotionApplication,
   type RootMotionOffset,
   type RootMotionPolicy,
 } from './rootMotion.js';
-import { assertFinite } from './types.js';
+import { assertFinite, type AttachmentDefinition } from './types.js';
 
 export interface PlayAnimationOptions extends QueueAnimationOptions {
   restart?: boolean;
@@ -116,6 +116,7 @@ export class AnimationPlayer {
   private disposed = false;
   private previewMode = false;
   private previewRootMotion = false;
+  private clipRig: Rig;
 
   /** Isolated preview reconstruction suppresses authored events and legacy completion
    * callbacks. Lifecycle outcomes still settle runtime waits and ownership policies.
@@ -135,6 +136,7 @@ export class AnimationPlayer {
     compiledClips: readonly CompiledClip[] = [],
     private rootMotionApplication?: RootMotionApplication,
   ) {
+    this.clipRig = rig;
     // Reuse compiled tracks, but check their references against this player's rig.
     for (const clip of compiledClips) {
       if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
@@ -161,6 +163,30 @@ export class AnimationPlayer {
   /** Immutable puppet-local target channels, including layer/fade ownership weights. */
   get meshDeformation() {
     return this.poseEvaluator.deformation;
+  }
+
+  /** @internal Keep catalog edits compatible with every registered shape track and current layer mask. */
+  updateMeshAttachments(attachments: readonly AttachmentDefinition[]): void {
+    this.assertActive();
+    if (
+      !attachments.some((entry) => entry.type === 'mesh') &&
+      !this.clipRig.attachments.some((entry) => entry.type === 'mesh')
+    )
+      return;
+    const candidate = new Rig({
+      root: this.rig.root,
+      bones: this.rig.bones,
+      slots: this.rig.slots,
+      attachments,
+      ...(this.rig.ik ? { ik: this.rig.ik } : {}),
+    });
+    for (const clip of this.clips.values()) {
+      const issues = meshDeformationIssues(clip.deformationTracks, candidate);
+      if (issues.length)
+        throw new Error(`Animation "${clip.name}": ${issues.map((issue) => issue.message).join('\n')}`);
+    }
+    this.poseEvaluator.updateMeshAttachments(candidate.attachments, this.layers, this.playback);
+    this.clipRig = candidate;
   }
 
   get ikAnimation(): IKAnimationPose {
@@ -266,7 +292,7 @@ export class AnimationPlayer {
   addAnimation(clip: AnimationClip): void {
     this.assertActive();
     if (this.clips.has(clip.name)) throw new Error(`Animation "${clip.name}" is already registered.`);
-    this.clips.set(clip.name, compileClip(clip, this.rig));
+    this.clips.set(clip.name, compileClip(clip, this.clipRig));
   }
 
   hasAnimation(name: string): boolean {

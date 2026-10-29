@@ -161,7 +161,7 @@ export const rigGuides: readonly GuideDefinition[] = [
       step(
         'replace',
         'Understand image replacement',
-        '**Import sprite** replaces the selected image. Choose **Replacement scope** first, then an Alignment policy if offered. **Preview Replacement** and **Apply Replacement** are explicit actions; Cancel discards the proposal.',
+        '**Import sprite** replaces the selected image. Choose **Replacement scope** first, then an Alignment policy if offered. **Preview Replacement** and **Apply Replacement** are explicit actions; Cancel discards the proposal. If any affected attachment is a mesh, keep its original **image dimensions** and pivot, including inactive skins. Different proportions require deliberate mesh recreation; rigid alignment policies cannot remap mesh UVs or contact markers.',
         targets.rigReplaceArtwork,
       ),
       step(
@@ -276,7 +276,7 @@ export const rigGuides: readonly GuideDefinition[] = [
       step(
         'topology',
         'Inspect and safely remove geometry',
-        '**Triangle inspection** lists the vertex IDs for each triangle. **Delete vertex** retriangulates a supported connected triangle fan; a corner without a valid replacement is rejected. Invalid moves or topology edits leave the last valid geometry intact and show feedback here. Meshes require **whole images** and WebGL; finish rest transforms before conversion because the saved bind configuration is protected.',
+        '**Triangle inspection** lists the vertex IDs for each triangle. **Delete vertex** retriangulates a supported connected triangle fan; a corner without a valid replacement is rejected. Invalid moves or topology edits leave the last valid geometry intact and show feedback here. Meshes require **whole images** and WebGL; finish rest transforms before conversion because the saved bind configuration is protected. Edits and Undo/Redo cannot newly invalidate live deformation tracks: keep animated vertex IDs or explicitly remove incompatible tracks in Animation Editor first.',
         targets.rigMeshTools,
       ),
       step(

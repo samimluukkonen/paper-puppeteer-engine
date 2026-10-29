@@ -18,6 +18,7 @@ import { RIG_FORMAT_VERSION, type RigJsonDefinition } from './externalData.js';
 import { IKDebug } from './ik/IKDebug.js';
 import { parseTwoBoneIKDefinition, TwoBoneIKConstraint } from './ik/TwoBoneIKConstraint.js';
 import type { IKTarget, IKTransformContext, TwoBoneIKDefinition } from './ik/types.js';
+import { assertMeshImageSize } from './meshGeometry.js';
 import { assertMeshRenderer } from './meshRendering.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import type {
@@ -612,6 +613,7 @@ export class Puppet {
 
   /** Update the artwork catalog and skins in place; skeleton, player, IK and slot mounts retain identity. */
   updateSlotDefinitions(attachments: readonly AttachmentDefinition[], skins: readonly SkinDefinition[]): this {
+    if (attachments.some((attachment) => attachment.type === 'mesh')) assertMeshRenderer(this.scene);
     const previous = this.slotState;
     const next = new SlotState(previous);
     next.updateDefinitions(attachments, skins);
@@ -621,7 +623,13 @@ export class Puppet {
       this.validateSpriteAsset(attachment, owner);
       const replacement = this.renderer.getArtworkReplacement(attachment.texture, `attachment:${attachment.id}`);
       if (replacement) this.validateSpriteAsset({ ...attachment, texture: replacement.textureKey }, owner);
+      if (attachment.type === 'mesh' && replacement) {
+        if (replacement.originScaleX !== 1 || replacement.originScaleY !== 1)
+          throw new Error('Mesh artwork replacement must preserve image dimensions and pivot.');
+        assertMeshImageSize(attachment, this.scene.textures.get(replacement.textureKey).get('__BASE'));
+      }
     }
+    this.animationPlayer.updateMeshAttachments(next.getDefinitions());
     this.slotState = next;
     try {
       this.renderer.updateArtworkDefinitions(next.getDefinitions(), next.getSkins());
@@ -629,6 +637,7 @@ export class Puppet {
     } catch (error) {
       this.slotState = previous;
       try {
+        this.animationPlayer.updateMeshAttachments(previous.getDefinitions());
         this.renderer.updateArtworkDefinitions(previous.getDefinitions(), previous.getSkins());
         this.renderSlots();
       } catch (rollbackError) {
