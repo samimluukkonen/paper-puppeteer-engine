@@ -227,6 +227,53 @@ export const rigGuides: readonly GuideDefinition[] = [
     ],
   },
   {
+    id: 'rig-creating-mesh',
+    title: 'Creating a Mesh Attachment',
+    description: 'Turn a sleeve sprite into editable geometry and save the complete character.',
+    editor: 'rig',
+    category: 'artwork',
+    prerequisites: [
+      ...validRig,
+      {
+        capability: 'rig-mesh-artwork',
+        reason: 'Create a slot and whole-image sprite attachment first.',
+        guideId: 'rig-slots-attachments',
+      },
+    ],
+    steps: [
+      step(
+        'select',
+        'Select the sleeve sprite',
+        'After exiting this tour, choose **Mesh attachment slot** for your sleeve. Assign whole-image artwork through **Attachments & skins** first. Finish joint and artwork alignment in **Bind pose** before conversion.',
+        targets.rigMeshSlot,
+      ),
+      step(
+        'convert',
+        'Convert to a mesh',
+        'Choose **Convert to Mesh Attachment** explicitly. It makes four vertices and two triangles and retains your rigid source. Converting the default skin creates a separate **mesh skin**; keep its name for animation and scenes.',
+        targets.rigMeshWorkflow,
+      ),
+      step(
+        'subdivide',
+        'Add elbow geometry',
+        'Choose the diagonal in **Mesh edge**, then **Subdivide edge**. Repeat around the elbow where bending needs more detail. Existing vertex IDs and UVs survive. This tour never subdivides for you.',
+        targets.rigMeshTools,
+      ),
+      step(
+        'edit',
+        'Shape the sleeve',
+        'Use **Edit Mesh Geometry**, drag cyan vertex diamonds, or select **Mesh vertex** and enter **Vertex X/Y**. Invalid topology is rejected. Use **Undo/Redo** to compare. Next, follow **Painting Bone Weights** to blend upper arm and forearm influences.',
+        targets.rigMeshTools,
+      ),
+      step(
+        'save',
+        'Keep the whole character',
+        'Choose **Download character ZIP** to save geometry, weights, artwork, skins and animations together. Reload and choose the same mesh skin. **Download rig.json** alone omits images and separate skins. Guide navigation never saves or marks data clean.',
+        targets.rigPackage,
+      ),
+    ],
+  },
+  {
     id: 'rig-mesh-geometry',
     title: 'Editing Mesh Geometry',
     description: 'Convert sprite attachments and edit textured vertices with safe topology tools.',
@@ -276,7 +323,7 @@ export const rigGuides: readonly GuideDefinition[] = [
       step(
         'topology',
         'Inspect and safely remove geometry',
-        '**Triangle inspection** lists the vertex IDs for each triangle. **Delete vertex** retriangulates a supported connected triangle fan; a corner without a valid replacement is rejected. Invalid moves or topology edits leave the last valid geometry intact and show feedback here. Meshes require **whole images** and WebGL; finish rest transforms before conversion because the saved bind configuration is protected. Edits and Undo/Redo cannot newly invalidate live deformation tracks: keep animated vertex IDs or explicitly remove incompatible tracks in Animation Editor first.',
+        '**Triangle inspection** lists the vertex IDs for each triangle. **Delete vertex** retriangulates a supported connected triangle fan; a corner without a valid replacement is rejected. Invalid moves or topology edits leave the last valid geometry intact and show feedback here. **Show mesh diagnostics** overlays final triangles and vertices: yellow marks >3× edge stretch, red marks collapse or inversion. Warnings never repair geometry. Disable diagnostics to review the artwork. Meshes require **whole images** and WebGL; finish rest transforms before conversion because the saved bind configuration is protected. Edits and Undo/Redo cannot newly invalidate live deformation tracks: keep animated vertex IDs or explicitly remove incompatible tracks in Animation Editor first.',
         targets.rigMeshTools,
       ),
       step(

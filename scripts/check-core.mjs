@@ -16,6 +16,7 @@ const {
   evaluateRootMotionAtElapsedTime,
   getRootMotionDelta,
   getDialogueAtTime,
+  inspectMeshDeformation,
   Joint,
   Rig,
   solveTwoBoneIK,
@@ -119,6 +120,10 @@ for (const time of [500, 1000, 0, 500]) {
   assert.equal(meshOutput[0], -10 + time * 0.008);
   assert.equal(meshOutput[1], -5 - time * 0.004);
 }
+meshPlayer.sample(0);
+deformMesh(binding, (id) => matrices.get(id), meshOutput, meshPlayer.meshDeformation.get('cloth'));
+assert.deepEqual(inspectMeshDeformation(mesh, meshOutput), []);
+assert.throws(() => inspectMeshDeformation(mesh, []), /buffer size/);
 meshPlayer.dispose();
 // Consumers and the library must share the installed Zod runtime and error class.
 assert.throws(() => new Rig({ root: 'root', bones: [{ id: 'root', x: NaN }] }), z.ZodError);

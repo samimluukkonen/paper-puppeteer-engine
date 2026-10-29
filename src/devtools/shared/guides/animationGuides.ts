@@ -83,7 +83,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'preview',
         'Scrub before, during and after the bend',
-        'Scrub and play across the **neutral keys** and correction. The main preview shows final bone-weighted geometry with corrections applied once; **Smooth/Stepped** playback uses the ordinary clip timing. Seeking to the same time produces the same shape without accumulating offsets. **Undo/Redo** changes authored corrections, while playback and scrubbing never create keys. Use a skin containing the chosen mesh when comparing the corrected silhouette. **Onion skins** sample each neighbor’s correction shape and FK pose before IK, at the current preview placement rather than sampled root travel. Bake IK to inspect solved ghost silhouettes.',
+        'Scrub and play across the **neutral keys** and correction. The main preview shows final bone-weighted geometry with corrections applied once; **Smooth/Stepped** playback uses the ordinary clip timing. Seeking to the same time produces the same shape without accumulating offsets. Enable **Show mesh diagnostics** to review final FK/IK triangles, collapse, inversion and >3× edge stretch, then hide it for ordinary preview. Warnings never modify keys. **Undo/Redo** changes authored corrections, while playback and scrubbing never create keys. Use a skin containing the chosen mesh when comparing the corrected silhouette. **Onion skins** sample each neighbor’s correction shape and FK pose before IK, at the current preview placement rather than sampled root travel. Bake IK to inspect solved ghost silhouettes.',
         targets.animationCanvas,
       ),
       step(

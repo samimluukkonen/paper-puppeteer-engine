@@ -13,6 +13,7 @@ import { createTransform, type RigDefinition } from '../../engine/types.js';
 import { sameRigTopology } from '../shared/boneHierarchy.js';
 import { equalEditorData } from '../shared/editorData.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
+import { MeshDiagnosticsOverlay } from '../shared/MeshDiagnosticsOverlay.js';
 import { RigEditorInputController } from './RigEditorInputController.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { type BoneField, RigEditorState, type SlotField, type SpriteField } from './RigEditorState.js';
@@ -38,6 +39,8 @@ export class RigEditor {
   weightPreviewEnabled = false;
   weightPreviewBoneId = '';
   weightPreviewRotation = 0;
+  meshDiagnosticsEnabled = false;
+  private meshDiagnostics: MeshDiagnosticsOverlay | undefined;
   actionError = '';
   private resumeAfterRebuild = false;
   private dragTargetOverride:
@@ -177,6 +180,8 @@ export class RigEditor {
     this.inputController = undefined;
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
+    this.meshDiagnostics?.destroy();
+    this.meshDiagnostics = undefined;
     this.overlay.destroy();
     this.overlay = undefined;
   }
@@ -648,5 +653,15 @@ export class RigEditor {
 
   private update(): void {
     this.overlay?.draw();
+    if (this.meshDiagnosticsEnabled && this.overlay) {
+      this.meshDiagnostics ??= new MeshDiagnosticsOverlay(this.scene);
+      const message = this.meshDiagnostics.render(
+        this.puppet,
+        this.state.selectedMesh,
+        this.state.selection?.type === 'slot' ? this.state.selection.id : undefined,
+      );
+      const status = document.getElementById('rig-mesh-diagnostics-status');
+      if (status && status.textContent !== message) status.textContent = message;
+    } else this.meshDiagnostics?.clear();
   }
 }

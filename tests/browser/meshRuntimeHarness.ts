@@ -1,7 +1,11 @@
 import Phaser from 'phaser';
+import { Actor } from '../../src/engine/Actor.js';
 import { createRectangleMeshAttachment } from '../../src/engine/meshAttachments.js';
 import { Puppet } from '../../src/engine/Puppet.js';
+import { createEmptyScene } from '../../src/engine/SceneDefinition.js';
+import { SceneRunner } from '../../src/engine/SceneRunner.js';
 import type { RigDefinition } from '../../src/engine/types.js';
+import { productionMesh } from '../helpers/productionMesh.js';
 
 /** Local-only native WebGL consumer: verify triangle UVs, alpha, deformation and teardown. */
 export async function sampleSkinnedMeshes() {
@@ -166,6 +170,165 @@ export async function sampleSkinnedMeshes() {
     };
   } finally {
     puppet?.destroy();
+    game.destroy(true);
+    await paint();
+    host.remove();
+  }
+}
+
+/** Optional local profile. Render timings cover Phaser CPU submission, not GPU completion. */
+export async function profileSkinnedMeshes() {
+  const host = document.createElement('div');
+  document.body.replaceChildren(host);
+  const scene = new Phaser.Scene('MeshProfile');
+  const game = new Phaser.Game({
+    type: Phaser.WEBGL,
+    parent: host,
+    width: 720,
+    height: 480,
+    audio: { noAudio: true },
+    scene: [scene],
+  });
+  const paint = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const rows = [];
+  let actors: Puppet[] = [];
+  try {
+    const start = performance.now();
+    while (!scene.sys.isActive()) {
+      if (performance.now() - start > 15000) throw new Error('Mesh profile did not boot.');
+      await paint();
+    }
+    scene.textures.createCanvas('paper', 80, 40)!.refresh();
+    const textureCount = Object.keys(scene.textures.list).length;
+    for (const side of [2, 12, 32])
+      for (const count of [1, 8]) {
+        const { rig, mesh } = productionMesh(side);
+        actors = Array.from({ length: count }, (_, index) =>
+          new Puppet(scene, {
+            rig,
+            skin: 'default',
+            autoUpdate: false,
+            x: 40 + (index % 4) * 150,
+            y: 40 + Math.floor(index / 4) * 160,
+            animations: [
+              {
+                name: 'attack',
+                duration: 1000,
+                loop: true,
+                tracks: {
+                  lower: [
+                    { time: 0, rotation: 0 },
+                    { time: 1000, rotation: 1 },
+                  ],
+                },
+              },
+            ],
+          }).play('attack'),
+        );
+        const buffers = actors.map((actor) => actor.getSlotMesh('cloth')!.vertices);
+        const samples: number[] = [];
+        let renderStart = 0;
+        const before = () => {
+          renderStart = performance.now();
+        };
+        const after = () => {
+          samples.push(performance.now() - renderStart);
+        };
+        game.events.on(Phaser.Core.Events.PRE_RENDER, before);
+        game.events.on(Phaser.Core.Events.POST_RENDER, after);
+        const seekSamples: number[] = [];
+        const playbackSamples: number[] = [];
+        try {
+          for (let frame = 0; frame < 40; frame++) {
+            const seekStart = performance.now();
+            for (const actor of actors) actor.sampleAnimation((frame * 37) % 1000);
+            seekSamples.push(performance.now() - seekStart);
+            const updateStart = performance.now();
+            for (const actor of actors) actor.update(16);
+            playbackSamples.push(performance.now() - updateStart);
+            await paint();
+          }
+        } finally {
+          game.events.off(Phaser.Core.Events.PRE_RENDER, before);
+          game.events.off(Phaser.Core.Events.POST_RENDER, after);
+        }
+        const median = (values: number[]) =>
+          values.slice(5).sort((a, b) => a - b)[Math.floor((values.length - 5) / 2)] ?? 0;
+        const stableBuffers = actors.every((actor, index) => actor.getSlotMesh('cloth')!.vertices === buffers[index]);
+        for (const actor of actors) actor.destroy();
+        actors = [];
+        const sceneTimings: number[] = [];
+        const runner = new SceneRunner(
+          {
+            ...createEmptyScene({ id: 'mesh-profile', duration: 10000 }),
+            actors: Array.from({ length: count }, (_, index) => ({
+              id: `actor-${index}`,
+              character: { manifest: 'character.json' },
+              position: { x: 0, y: 0 },
+            })),
+            actions: Array.from({ length: count }, (_, index) => ({
+              id: `attack-${index}`,
+              actorId: `actor-${index}`,
+              type: 'animation',
+              time: 0,
+              duration: 10000,
+              animation: 'attack',
+              speed: 1,
+              loop: true,
+            })),
+          },
+          {
+            createActor: (definition) =>
+              new Actor({
+                id: definition.id,
+                puppetOwnership: 'owned',
+                puppet: new Puppet(scene, {
+                  rig,
+                  skin: 'default',
+                  autoUpdate: false,
+                  animations: [
+                    {
+                      name: 'attack',
+                      duration: 1000,
+                      loop: true,
+                      tracks: {
+                        lower: [
+                          { time: 0, rotation: 0 },
+                          { time: 1000, rotation: 1 },
+                        ],
+                      },
+                    },
+                  ],
+                }),
+              }),
+          },
+        );
+        try {
+          runner.play();
+          for (let frame = 0; frame < 40; frame++) {
+            const start = performance.now();
+            runner.update(16);
+            sceneTimings.push(performance.now() - start);
+          }
+        } finally {
+          runner.dispose();
+        }
+        rows.push({
+          vertices: mesh.vertices.length,
+          triangles: mesh.triangles.length / 3,
+          actors: count,
+          scenePlaybackMs: median(sceneTimings),
+          renderSubmissionMs: median(samples),
+          seekIKSkinningMs: median(seekSamples),
+          playbackIKSkinningMs: median(playbackSamples),
+          xyuvBytes: mesh.vertices.length * 4 * 8 * count,
+          stableBuffers,
+          resourcesClean: scene.children.list.length === 0 && Object.keys(scene.textures.list).length === textureCount,
+        });
+      }
+    return rows;
+  } finally {
+    for (const actor of actors) actor.destroy();
     game.destroy(true);
     await paint();
     host.remove();

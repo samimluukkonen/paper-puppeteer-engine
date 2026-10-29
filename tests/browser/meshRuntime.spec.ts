@@ -64,3 +64,26 @@ test('native WebGL meshes preserve UVs, alpha and slot order through deformation
   expect(result.textureRetained).toBe(true);
   expect(result.remainingObjects).toBe(0);
 });
+
+test('local mesh CPU and native renderer profile', async ({ page }, testInfo) => {
+  test.skip(process.env.VITE_PROFILE !== '1', 'Optional local measurements, no timing thresholds.');
+  await page.route('**/mesh-profile-host', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mesh profile</title>' }),
+  );
+  await page.route('**/mesh-consumer.js', (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: consumerScript }),
+  );
+  await page.goto('mesh-profile-host');
+  const rows = await page.evaluate(async () => {
+    const path = new URL('mesh-consumer.js', location.href).href;
+    const api = (await import(/* @vite-ignore */ path)) as typeof import('./meshRuntimeHarness.js');
+    return api.profileSkinnedMeshes();
+  });
+  console.log(JSON.stringify(rows));
+  await testInfo.attach('mesh-profile.json', { body: JSON.stringify(rows, null, 2), contentType: 'application/json' });
+  expect(rows).toHaveLength(6);
+  for (const row of rows) {
+    expect(row.stableBuffers).toBe(true);
+    expect(row.resourcesClean).toBe(true);
+  }
+});

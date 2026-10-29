@@ -96,6 +96,8 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 
 - [Character runtime integration](docs/runtime-integration.md)
 - [Rig constraint workflow, transform audit and optional deformation design](docs/rig-constraints-and-deformation.md)
+- [Getting Started with Mesh Deformation](docs/getting-started-mesh-deformation.md)
+- [Mesh production readiness and regression matrix](docs/mesh-production-readiness.md)
 - [Mesh attachment quick start, coordinates and current limits](docs/mesh-attachments.md#using-this-milestone)
 - [Mesh deformation integration across editors and runtime](docs/mesh-integration.md)
 - [GitHub / Primer UI style guide](docs/style-guide.md)

@@ -14,6 +14,10 @@ export function MeshDeformationPanel() {
         Mesh
         <select id="deformation-mesh" aria-label="Deformable mesh" />
       </label>
+      <label>
+        <input id="deformation-diagnostics" type="checkbox" /> Show mesh diagnostics
+      </label>
+      <p id="animation-mesh-diagnostics-status" hidden />
       <p id="deformation-empty" />
       <svg id="deformation-bind-view" className="deformation-bind-view" aria-label="Bind-space mesh corrections" />
       <label data-guide-id={GUIDE_TARGETS.animationDeformationVertex}>

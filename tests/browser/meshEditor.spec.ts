@@ -93,6 +93,14 @@ test('weight brush, erase, numeric editing, test bend, stroke history and export
     return readFile(await (await download).path(), 'utf8');
   };
   const beforePose = await exportJson();
+  const diagnostics = panel.getByLabel('Show mesh diagnostics', { exact: true });
+  await expect(diagnostics).not.toBeChecked();
+  await diagnostics.check();
+  await expect(page.locator('#rig-mesh-diagnostics-status')).toContainText('Bones:');
+  expect(await exportJson()).toBe(beforePose);
+  await diagnostics.uncheck();
+  await expect(page.locator('#rig-mesh-diagnostics-status')).toBeHidden();
+
   await panel.getByText('Preview deformation', { exact: true }).click();
   await panel.getByLabel('Test bone', { exact: true }).selectOption('leftForearm');
   const bend = panel.getByLabel('Test bend (degrees)', { exact: true });

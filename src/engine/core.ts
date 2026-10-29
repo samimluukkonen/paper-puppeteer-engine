@@ -316,3 +316,6 @@ export {
 } from './meshAttachments.js';
 
 export { meshEdges, subdivideMeshEdge, deleteMeshVertex } from './meshEditing.js';
+
+export { inspectMeshDeformation } from './meshDiagnostics.js';
+export type { MeshTriangleDiagnostic } from './meshDiagnostics.js';

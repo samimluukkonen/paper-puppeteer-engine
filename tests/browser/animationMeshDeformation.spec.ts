@@ -295,3 +295,30 @@ test('deformation guide reveals real controls without enabling editing or changi
     expect(await snapshot()).toEqual(before);
   }
 });
+
+test('posed mesh diagnostics toggle without authoring corrections or changing playback data', async ({ page }) => {
+  await prepareSleeve(page);
+  await page.goto('animation-editor/');
+  await expect(page.locator('#animation-status')).toContainText('Validation: OK');
+  await inspectorControl(page, '#mesh-deformation-panel');
+  const panel = page.locator('#mesh-deformation-panel');
+  const diagnostics = panel.getByLabel('Show mesh diagnostics', { exact: true });
+  await expect(diagnostics).not.toBeChecked();
+  await panel.getByLabel('Deformable mesh', { exact: true }).selectOption('leftForearmDefault');
+  const before = await exported(page);
+  await seek(page, '0.5');
+  const clean = await stableCanvas(page);
+  await diagnostics.check();
+  await expect(page.locator('#animation-mesh-diagnostics-status')).toContainText('Bones: leftForearm, leftUpperArm');
+  await expect(page.locator('#deformation-edit-mode')).not.toBeChecked();
+  const overlay = await stableCanvas(page);
+  expect(overlay.equals(clean)).toBe(false);
+  expect(await exported(page)).toEqual(before);
+  await diagnostics.uncheck();
+  expect((await stableCanvas(page)).equals(clean)).toBe(true);
+  await diagnostics.check();
+  await seek(page, '0.8');
+  await expect(page.locator('#animation-mesh-diagnostics-status')).toContainText('Review hints only');
+  expect(await exported(page)).toEqual(before);
+  await diagnostics.uncheck();
+});

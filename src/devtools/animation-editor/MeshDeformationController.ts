@@ -38,6 +38,13 @@ export class MeshDeformationController {
 
   constructor(private readonly app: HTMLElement) {
     const options = { signal: this.abort.signal };
+    this.element<HTMLInputElement>('deformation-diagnostics')?.addEventListener(
+      'change',
+      (event) => {
+        this.state?.setMeshDiagnostics((event.target as HTMLInputElement).checked);
+      },
+      options,
+    );
     this.element<HTMLInputElement>('deformation-edit-mode')?.addEventListener(
       'change',
       (event) => {
@@ -392,6 +399,8 @@ export class MeshDeformationController {
       this.mesh = mesh;
     }
     select.value = mesh?.id ?? '';
+    this.element<HTMLInputElement>('deformation-diagnostics')!.checked = state.meshDiagnosticsEnabled;
+    this.element('animation-mesh-diagnostics-status')!.hidden = !state.meshDiagnosticsEnabled;
     this.element<HTMLInputElement>('deformation-edit-mode')!.checked = state.deformationEditing;
     this.element('deformation-empty')!.textContent = !meshes.length
       ? 'No mesh attachments. Create a mesh in the Rig Editor first.'
@@ -436,20 +445,21 @@ export class MeshDeformationController {
       )
       .forEach((input) => {
         input.disabled =
-          !state.workingAnimation ||
-          !state.animationAuthoringEnabled ||
-          (input.id !== 'deformation-edit-mode' &&
-            input.id !== 'deformation-mesh' &&
-            input.id !== 'deformation-remove-incompatible' &&
-            (!mesh || !state.deformationEditing)) ||
-          ([
-            'deformation-key-time',
-            'deformation-curve',
-            'deformation-apply-key',
-            'deformation-delete-key',
-            'deformation-duplicate-key',
-          ].includes(input.id) &&
-            !state.selectedDeformationKey);
+          input.id !== 'deformation-diagnostics' &&
+          (!state.workingAnimation ||
+            !state.animationAuthoringEnabled ||
+            (input.id !== 'deformation-edit-mode' &&
+              input.id !== 'deformation-mesh' &&
+              input.id !== 'deformation-remove-incompatible' &&
+              (!mesh || !state.deformationEditing)) ||
+            ([
+              'deformation-key-time',
+              'deformation-curve',
+              'deformation-apply-key',
+              'deformation-delete-key',
+              'deformation-duplicate-key',
+            ].includes(input.id) &&
+              !state.selectedDeformationKey));
       });
     this.draw(mesh, offsets);
   }

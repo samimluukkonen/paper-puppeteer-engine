@@ -12,6 +12,7 @@ The catalog is available from **Feature Guide → Rig Editor**. It uses the shar
 | Editing Joint Positions        |     6 | Hierarchy, Joint Editing, Bind pose, canvas, Selection details, Undo/Redo                                                 |
 | Importing Artwork              |     5 | Import new artwork, Artwork asset, Import sprite, Create sprite attachment, package                                       |
 | Aligning Sprites               |     5 | Hierarchy, Edit modes, canvas, Selection details, Undo/Redo                                                               |
+| Creating a Mesh Attachment     |     5 | Mesh slot, conversion, subdivision, vertex editing, Character package                                                     |
 | Editing Mesh Geometry          |     8 | Mesh slot/skin, conversion, cyan vertices, numeric coordinates, subdivision, topology, history and saving                 |
 | Painting Bone Weights          |     9 | Influence bone, heatmap, paint/erase, radius/strength, numeric weights, normalization/limits, preview, history and saving |
 | Slots and Attachments          |     5 | Hierarchy, + Add Slot, Create sprite attachment, Attachment slot, Edit                                                    |
@@ -19,7 +20,7 @@ The catalog is available from **Feature Guide → Rig Editor**. It uses the shar
 | IK Constraints                 |     8 | + Add IK Constraint, chain labels, bend arrow, targets, solver feedback, Enabled, Undo/Redo                               |
 | Exporting the Rig or Character |     4 | Validation, File tools, Download rig.json, Character package                                                              |
 
-There are 68 steps in total. Copy distinguishes skeleton joints, sprite origins (artwork pivots), sprite offsets (position relative to a bone/slot), slots (attachment locations), skins (appearance mappings), and default rig IK targets. It also distinguishes rig downloads from complete character ZIPs and the separate artwork replacement history.
+There are 73 steps in total. Copy distinguishes skeleton joints, sprite origins (artwork pivots), sprite offsets (position relative to a bone/slot), slots (attachment locations), skins (appearance mappings), and default rig IK targets. It also distinguishes rig downloads from complete character ZIPs and the separate artwork replacement history.
 
 ## Availability and preparation
 
@@ -45,7 +46,7 @@ Preparation expands ancestor disclosures, reveals the inspector and scrolls the 
 
 The guides reuse `rig-bone-hierarchy`, `rig-selection-details`, and `rig-canvas`. Phaser joint, artwork-pivot and IK-crosshair instructions highlight the existing canvas panel and the relevant React tools. The Rig Editor does not register guide geometry for individual Phaser handles; no DOM selectors are used to find rendered handles. The existing optional geometry-provider contract remains covered by unit tests.
 
-All twelve feature families are implemented. There are no fictional or omitted feature entries. Alignment, mesh editing, weight painting and IK are conditionally unavailable when their resource prerequisites are absent; interactive practice remains deferred.
+All thirteen feature families are implemented. There are no fictional or omitted feature entries. Alignment, mesh editing, weight painting and IK are conditionally unavailable when their resource prerequisites are absent; interactive practice remains deferred.
 
 The v1.4.2.2 [visual mesh workflow](mesh-attachments.md#using-this-milestone) documents conversion, cyan vertex handles, safe subdivision/deletion, UV behavior, history and textured rendering. Open the **Mesh geometry** inspector in Rig Editor for these controls. Existing attachment/skin tours continue to explain slot selection and skin assignments; the eight-step **Editing Mesh Geometry** Feature Guide covers the new workflow without converting artwork or changing mesh/skin selection, edit mode, dirty state or history. It works before conversion and with an authored mesh selected.
 

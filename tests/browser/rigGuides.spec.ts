@@ -44,7 +44,8 @@ for (const existing of [true, false]) {
       const start = page.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true });
       if (
         guide.id === 'rig-weight-painting' ||
-        (!existing && ['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry'].includes(guide.id))
+        (!existing &&
+          ['rig-aligning-sprites', 'rig-ik-constraints', 'rig-creating-mesh', 'rig-mesh-geometry'].includes(guide.id))
       ) {
         await expect(start).toBeDisabled();
         await page.keyboard.press('Escape');

@@ -14,6 +14,7 @@ const counts = {
   'rig-joint-editing': 6,
   'rig-importing-artwork': 5,
   'rig-aligning-sprites': 5,
+  'rig-creating-mesh': 5,
   'rig-mesh-geometry': 8,
   'rig-weight-painting': 9,
   'rig-slots-attachments': 5,
@@ -23,7 +24,7 @@ const counts = {
   'rig-foot-contact-markers': 5,
 };
 
-test('Rig Editor catalog covers the twelve implemented tasks with declared targets', () => {
+test('Rig Editor catalog covers the thirteen implemented tasks with declared targets', () => {
   assert.deepEqual(Object.fromEntries(guides.map((guide) => [guide.id, guide.steps.length])), counts);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
@@ -56,7 +57,15 @@ test('root-only rigs offer creation tasks and explain artwork and IK prerequisit
   const { rig, launcher } = workspace(false);
   for (const guide of guides) {
     const availability = launcher.getAvailability(guide.id);
-    if (['rig-aligning-sprites', 'rig-ik-constraints', 'rig-mesh-geometry', 'rig-weight-painting'].includes(guide.id)) {
+    if (
+      [
+        'rig-aligning-sprites',
+        'rig-ik-constraints',
+        'rig-creating-mesh',
+        'rig-mesh-geometry',
+        'rig-weight-painting',
+      ].includes(guide.id)
+    ) {
       assert.isFalse(availability.available);
       assert.isFalse(launcher.launch(guide.id).ok);
     } else assert.isTrue(availability.available, guide.id);

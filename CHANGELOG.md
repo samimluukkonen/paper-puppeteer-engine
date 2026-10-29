@@ -77,6 +77,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.6
+
+- Add optional final-pose mesh diagnostics in Rig and Animation Editors: triangle/vertex overlays, bone influence names and advisory counts for collapse, inversion, nonfinite output and excessive edge stretch. Keep diagnostics off initially, independent of authoring/history and hidden during ordinary preview unless explicitly enabled; never repair artistic deformation automatically.
+- Add a short **Creating a Mesh Attachment** Feature Guide using existing stable controls; retain the detailed geometry, weight painting and correction tours, and explain deformation diagnostics without enabling them or authoring data during navigation.
+- Add production regressions for small, medium and maximum-size meshes, independent mixed characters, hair/cape/clothing attachment isolation, deterministic correction seeking, malformed topology and cleanup. Add optional sequential CPU and native WebGL profiling with resource counts and no machine-dependent thresholds. Update the project recovery browser check to reveal artwork through the shared inspector tabs.
+- Publish **Getting Started with Mesh Deformation** and a v1.4 production readiness/regression report, including verification evidence, measured workload boundaries, compatibility, package/recovery ownership and deferred features. Synchronize package/lockfile metadata at `1.4.6`.
+
 ## 1.4.5
 
 - Add a nine-step **Mesh Characters Across Editors** Feature Guide in Project Workspace, with real-control spotlights, live project prerequisites and read-only navigation. Cover mesh skins, artwork compatibility, animation/ghost limits, scene Actors, root travel, validation and portable saving; update existing mesh and onion-skin tours.

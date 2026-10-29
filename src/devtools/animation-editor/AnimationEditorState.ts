@@ -187,6 +187,12 @@ export class AnimationEditorState {
     });
   }
 
+  meshDiagnosticsEnabled = false;
+  setMeshDiagnostics(enabled: boolean): void {
+    this.meshDiagnosticsEnabled = enabled;
+    this.notify();
+  }
+
   deformationEditing = false;
   deformationSelected = false;
   selectedMeshId: string | null = null;

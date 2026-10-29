@@ -85,6 +85,15 @@ export function MeshGeometryPanel({
               <p>
                 {mesh.id}: {mesh.vertices.length} vertices · {mesh.triangles.length / 3} triangles
               </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={editor?.meshDiagnosticsEnabled ?? false}
+                  onChange={(event) => controller.meshDiagnostics(event.target.checked)}
+                />
+                Show mesh diagnostics
+              </label>
+              <p id="rig-mesh-diagnostics-status" hidden={!editor?.meshDiagnosticsEnabled} />
               {editor && <WeightPaintControls controller={controller} editor={editor} />}
               <button
                 type="button"

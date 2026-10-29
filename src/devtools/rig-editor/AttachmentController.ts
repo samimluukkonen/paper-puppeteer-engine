@@ -248,6 +248,12 @@ export class AttachmentController {
     }, 'Vertex weight updated.');
     return committed;
   }
+  meshDiagnostics(enabled: boolean): void {
+    if (!this.editor) return;
+    this.editor.meshDiagnosticsEnabled = enabled;
+    this.editor.refresh(false);
+    this.refresh();
+  }
   weightPreview(enabled: boolean, boneId: string, degrees: number): void {
     this.run(
       (editor) => editor.setWeightPreview(enabled, boneId, (degrees * Math.PI) / 180),

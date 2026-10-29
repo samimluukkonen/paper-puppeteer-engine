@@ -18,6 +18,7 @@ import { contactGroundDistance } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
+import { MeshDiagnosticsOverlay } from '../shared/MeshDiagnosticsOverlay.js';
 import { createCharacterDocuments } from '../shared/newCharacter.js';
 import type { PackageSnapshot } from '../shared/package/characterPackage.js';
 import { CHARACTER_PREVIEW_ORIGIN } from '../shared/previewPlacement.js';
@@ -138,6 +139,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   private onionSkinSettings = DEFAULT_ONION_SKIN_SETTINGS;
   private state: AnimationEditorState | undefined;
   private loadSession = 0;
+  private meshDiagnostics: MeshDiagnosticsOverlay | undefined;
   private selectionOverlay: Phaser.GameObjects.Graphics | undefined;
   private rebuildingRig = false;
   private facing: Facing = 'right';
@@ -197,6 +199,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.state = undefined;
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
+      this.meshDiagnostics?.destroy();
+      this.meshDiagnostics = undefined;
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
       this.groundOverlay?.dispose();
@@ -223,6 +227,15 @@ export class AnimationEditorScene extends Phaser.Scene {
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
     this.motionLayer?.render();
+    if (!this.rigMode && this.puppet && this.state?.meshDiagnosticsEnabled) {
+      this.meshDiagnostics ??= new MeshDiagnosticsOverlay(this);
+      const mesh = this.state.rig?.attachments.find(
+        (entry) => entry.type === 'mesh' && entry.id === this.state?.selectedMeshId,
+      );
+      const message = this.meshDiagnostics.render(this.puppet, mesh?.type === 'mesh' ? mesh : undefined);
+      const status = document.getElementById('animation-mesh-diagnostics-status');
+      if (status && status.textContent !== message) status.textContent = message;
+    } else this.meshDiagnostics?.clear();
     this.syncMirrorPreview();
     this.syncBakePreview();
     this.rootHandle?.render();
@@ -741,6 +754,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.appliedWorkingRig = undefined;
       // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
       this.input?.off('pointerdown', this.selectPreviewBone, this);
+      this.meshDiagnostics?.destroy();
+      this.meshDiagnostics = undefined;
       this.selectionOverlay?.destroy();
       this.selectionOverlay = undefined;
       this.groundOverlay?.dispose();

@@ -172,3 +172,14 @@ The v1.2.6 scene diagnostic also loads three 2048 × 1024 artwork textures in fi
 The v1.3.6 workload adds a three-minute mono PCM source, a short effect source, music/ambience and four overlapping effects (six concurrent clips), fades, source trims and Unicode dialogue. It measures real browser decoding, forty rapid passive seeks and twenty Restart/update/Stop cycles. A wrapper around the real Web Audio backend counts voices, decoded/disposed bytes and context disposal, and verifies complete cleanup between workloads. PCM is silent so the diagnostic does not make noise. The synthetic scene deltas exclude normal frame pacing and are not a listening or sample-accuracy test; browser integration checks exercise user-action audio unlock and transport separately. Export includes the long music binary. See [audiovisual integration results](audiovisual-scene-readiness.md).
 
 The v1.3.6 project diagnostic (`PLAYWRIGHT_CHANNEL=chrome npm run profile:project`) also includes two audio assets, including the three-minute source, plus audio clips and Unicode dialogue in all three scenes. It measures project export/import and IndexedDB autosave/recovery, compares original/imported audio bytes and authored data, and retains the existing five-character/three-scene workload. Measurements are recorded in the same [audiovisual integration report](audiovisual-scene-readiness.md).
+
+## Mesh deformation
+
+The v1.4.6 profiles use 4-, 144- and 1,024-vertex meshes with one/eight mixed rigid-and-mesh instances. Run them sequentially, separately from ordinary browser suites:
+
+```bash
+VITE_PROFILE=1 npx vitest run tests/meshProduction.profile.test.ts --maxWorkers=1 --silent=false
+VITE_PROFILE=1 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/meshRuntime.spec.ts --grep 'local mesh CPU' --project=production --workers=1
+```
+
+The Node profile uses affine scene doubles and separates reusable-buffer vertex updates from IK/skinning during seeking and playback. The native WebGL profile measures Phaser CPU render submission across painted frames, seek/playback and SceneRunner updates with owned Actors. It checks retained geometry buffers and released GameObjects/textures between workloads. Numeric XYUV payload estimates exclude object overhead, bind caches and textures; GPU completion and total heap usage are not measured. Neither profile sets timing thresholds. See [mesh production readiness](mesh-production-readiness.md) for observations and workload boundaries.

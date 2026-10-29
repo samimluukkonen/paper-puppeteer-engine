@@ -42,7 +42,7 @@ test('refresh recovers artwork, committed rig, animation and scene edits then ex
   await page.getByRole('button', { name: 'Rig Editor', exact: true }).click();
   const frame = await activeEditor(page);
   const artwork = frame.locator('#editor-app #artwork-panel');
-  await artwork.locator(':scope > summary').click();
+  await inspectorControl(frame, '#editor-app #artwork-panel');
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 8;
