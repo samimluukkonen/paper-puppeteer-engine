@@ -8,6 +8,7 @@ import {
 import { interpolateNumber, shortestRotationDelta } from './animationMath.js';
 import { ikAnimationProperties, type IKAnimationProperty, type IKKeyframe } from './ik/animationKeyframes.js';
 import { copyJsonData } from './jsonData.js';
+import type { MeshDeformationTracks } from './meshDeformation.js';
 import { freezeData, isFullyFrozen, readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
 import type { RootMotionDefinition } from './rootMotion.js';
@@ -34,6 +35,7 @@ export interface AnimationClip {
   tracks: Readonly<Record<string, readonly Keyframe[]>>;
   /** Authored animation-local X/Y offsets. Pose evaluation never applies these to placement. */
   rootMotion?: RootMotionDefinition;
+  deformationTracks?: MeshDeformationTracks;
   /** Constraint-name keyed sparse rows. Positions are puppet-local, before placement/facing/scale. */
   ikTracks?: Readonly<Record<string, readonly IKKeyframe[]>>;
   /** Clip-local suppression, including runtime targets/providers; absent means ordinary rig IK. */
@@ -79,6 +81,7 @@ export interface CompiledClip {
   readonly loop: boolean;
   readonly tracks: readonly CompiledTrack[];
   readonly rootMotion?: RootMotionDefinition;
+  readonly deformationTracks?: MeshDeformationTracks;
   readonly ikTracks?: readonly CompiledIKTrack[];
   readonly disabledIKConstraints?: readonly string[];
   readonly events: readonly Readonly<AnimationEvent>[];
@@ -150,7 +153,13 @@ export function ownCompiledClip(clip: CompiledClip): CompiledClip {
       });
       // Reuse authored timeline rules for each independently compiled property.
       checkAnimationReferences(
-        { ...metadata, disabledIKConstraints: [], tracks: { [track.bone]: authoredKeys }, events: [] },
+        {
+          ...metadata,
+          deformationTracks: {},
+          disabledIKConstraints: [],
+          tracks: { [track.bone]: authoredKeys },
+          events: [],
+        },
         { bones: [{ id: track.bone }] },
         throwValidationIssue,
       );
@@ -208,6 +217,7 @@ function snapshotCompiledClip(clip: CompiledClip): CompiledClip {
           }),
         }
       : {}),
+    ...(clip.deformationTracks ? { deformationTracks: freezeData(structuredClone(clip.deformationTracks)) } : {}),
     ...(clip.ikTracks ? { ikTracks: Object.freeze(clip.ikTracks.map(ownCompiledIKTrack)) } : {}),
     ...(clip.disabledIKConstraints ? { disabledIKConstraints: Object.freeze([...clip.disabledIKConstraints]) } : {}),
     events: Object.freeze(
@@ -277,6 +287,7 @@ export function compileValidatedClip(clip: AnimationClip): CompiledClip {
     loop: clip.loop,
     tracks,
     ...(clip.rootMotion ? { rootMotion: clip.rootMotion } : {}),
+    ...(clip.deformationTracks ? { deformationTracks: clip.deformationTracks } : {}),
     ...(clip.ikTracks ? { ikTracks } : {}),
     ...(clip.disabledIKConstraints ? { disabledIKConstraints: clip.disabledIKConstraints } : {}),
     events,

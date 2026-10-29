@@ -118,3 +118,5 @@ Changed release/documentation files: `package.json`, `package-lock.json`, `READM
 The [v1.1.1 Pose Library](pose-library.md) adds optional `library` metadata to version-1 poses: stable ID, character ID, canonical rig signature and `fk-local` provenance. Legacy pose files remain valid. Character validation rejects duplicate library IDs; editor Preview/Apply additionally require exact compatible character/rig identity. Runtime sparse pose application remains unchanged.
 
 The [v1.4.2.1 mesh attachment foundation](mesh-attachments.md) adds strict optional `type: "mesh"` attachments with `meshVersion: 1` and explicit bind-pose metadata to version-1 rigs. Omitted attachment types retain the original rigid sprite interpretation. No automatic conversion or outer-format migration occurs.
+
+The [v1.4.4 mesh deformation animation guide](mesh-deformation-animation.md) documents sparse shape keys, bind-space authoring, evaluation order, topology diagnostics and animation-tool compatibility.

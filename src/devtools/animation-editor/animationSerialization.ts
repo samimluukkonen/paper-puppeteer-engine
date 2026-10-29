@@ -64,6 +64,7 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
       animation.duration,
       ...Object.values(animation.tracks).flatMap((keys) => keys.map((key) => key.time)),
       ...Object.values(animation.ikTracks ?? {}).flatMap((keys) => keys.map((key) => key.time)),
+      ...Object.values(animation.deformationTracks ?? {}).flatMap((keys) => keys.map((key) => key.time)),
       ...(animation.rootMotion?.translationKeys ?? []).map((key) => key.time),
       ...(animation.events ?? []).map((event) => event.time),
     ]),
@@ -112,6 +113,32 @@ export function serializeAnimation(input: unknown, rig: Rig): AnimationExportRes
               ),
             })),
           },
+        }),
+    ...(animation.deformationTracks === undefined
+      ? {}
+      : {
+          deformationTracks: Object.fromEntries(
+            Object.keys(animation.deformationTracks)
+              .sort()
+              .map((id) => [
+                id,
+                animation.deformationTracks![id]!.map((key) => ({
+                  time: timeValue(key.time),
+                  ...(key.curve ? { curve: copyPropertyCurve(key.curve) } : {}),
+                  offsets: Object.fromEntries(
+                    Object.keys(key.offsets)
+                      .sort()
+                      .map((vertex) => [
+                        vertex,
+                        {
+                          x: normalizeNumber(key.offsets[vertex]!.x),
+                          y: normalizeNumber(key.offsets[vertex]!.y),
+                        },
+                      ]),
+                  ),
+                })),
+              ]),
+          ),
         }),
     tracks: Object.fromEntries(
       Object.keys(animation.tracks)

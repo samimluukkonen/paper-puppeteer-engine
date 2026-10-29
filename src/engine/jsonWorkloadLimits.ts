@@ -124,7 +124,7 @@ export class JsonWorkloadBudget {
       if (this.events > this.limits.maxEvents)
         throw new JsonInputLimitError(`Animation data exceeds the ${this.limits.maxEvents}-event limit.`);
     }
-    for (const field of ['tracks', 'ikTracks']) {
+    for (const field of ['tracks', 'ikTracks', 'deformationTracks']) {
       const tracks = ownValue(input, field);
       if (tracks === null || typeof tracks !== 'object' || Array.isArray(tracks)) continue;
       for (const name of Object.keys(tracks)) {

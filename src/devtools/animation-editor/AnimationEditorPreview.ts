@@ -1,6 +1,7 @@
 import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
 import type { IKAnimationPose } from '../../engine/ik/AnimationIKPose.js';
 import { Joint } from '../../engine/Joint.js';
+import { meshDeformationIssues } from '../../engine/meshDeformation.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { JointTransform } from '../../engine/types.js';
@@ -32,7 +33,7 @@ export class AnimationEditorPreview {
   constructor(
     private readonly state: AnimationEditorState,
     private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'setIKAnimationSource'> &
-      Partial<Pick<Puppet, 'container'>>,
+      Partial<Pick<Puppet, 'container' | 'setMeshDeformationSource'>>,
     private readonly motion?: MotionPreviewController,
   ) {
     this.origin = motion
@@ -67,6 +68,7 @@ export class AnimationEditorPreview {
     }
     if (this.state.editorMode === 'rig') {
       this.puppet.setIKAnimationSource(undefined);
+      this.puppet.setMeshDeformationSource?.(undefined);
       if (force) this.puppet.syncPose();
       return;
     }
@@ -91,13 +93,24 @@ export class AnimationEditorPreview {
       // Detached joints carry the current working bind pose. Runtime/source bind data stays immutable.
       const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
       // Compile before replacing the held preview. No data or interpolation lives in the timeline UI.
+      // Incompatible topology remains authored and visibly flagged; preview only compatible tracks.
+      const compatible = animation?.deformationTracks
+        ? {
+            ...animation,
+            deformationTracks: Object.fromEntries(
+              Object.entries(animation.deformationTracks).filter(
+                ([id, keys]) => !meshDeformationIssues({ [id]: keys }, rig).length,
+              ),
+            ),
+          }
+        : animation;
       const next = animation
         ? new AnimationPlayer(
             rig,
             joints,
             // The editor clock owns wrapping; sampling must retain the exact stepped endpoint for scrubs.
             // Preview is pose-only, including initialization/recompilation at time-zero event markers.
-            [getCompiledPreviewClip(animation, rig)],
+            [getCompiledPreviewClip(compatible!, rig)],
           )
         : undefined;
       this.player?.dispose();
@@ -134,6 +147,7 @@ export class AnimationEditorPreview {
     }
     this.ikSource.ikAnimation = pose;
     this.puppet.setIKAnimationSource(this.ikSource);
+    this.puppet.setMeshDeformationSource?.(this.player);
     this.puppet.syncPose();
     this.sampledTime = sampledTime;
     this.draft = draft;
@@ -150,6 +164,7 @@ export class AnimationEditorPreview {
     this.releasePlacement?.();
     this.puppet.container?.setPosition(this.origin.x, this.origin.y);
     this.puppet.setIKAnimationSource(undefined);
+    this.puppet.setMeshDeformationSource?.(undefined);
     this.player?.dispose();
     this.player = undefined;
     this.rig = undefined;

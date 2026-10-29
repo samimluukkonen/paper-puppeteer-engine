@@ -12,6 +12,12 @@ import type { ValidationIssue } from '../../engine/externalData.js';
 import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
 import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
 import type { IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
+import {
+  getMeshDeformationTrack,
+  meshDeformationIssues,
+  type MeshDeformationKey,
+  type VertexOffset,
+} from '../../engine/meshDeformation.js';
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { PoseDefinition } from '../../engine/Pose.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
@@ -49,6 +55,7 @@ import {
 } from './animationValues.js';
 import { createAnimationVariation, type AnimationVariationOptions } from './animationVariation.js';
 import type { NewAnimationOptions } from './createEmptyAnimation.js';
+import { editDeformationKey, setDeformationOffsets } from './deformationEdits.js';
 import {
   type GhostPoseSample,
   type GhostSamplingSettings,
@@ -113,6 +120,217 @@ export class AnimationEditorState {
     if (![x, y].every(Number.isFinite) || (x === this.placementOffset.x && y === this.placementOffset.y)) return;
     this.placementOffset = Object.freeze({ x, y });
     this.notify();
+  }
+
+  private deformationGesture: {
+    base: ReadonlyAnimation;
+    preview: ReadonlyAnimation;
+    rig: Rig;
+    meshId: string;
+    time: number;
+  } | null = null;
+  get deformationEditActive(): boolean {
+    return this.deformationGesture !== null;
+  }
+  beginDeformationEdit(): boolean {
+    if (!this.animationAuthoringEnabled || !this.working || !this.rig || !this.selectedMeshId) return false;
+    this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.pause();
+      this.endScrub();
+      this.selection.selectBone(null);
+      this.rootMotionSelected = false;
+      this.selectedRootKey = null;
+      this.deformationSelected = true;
+      this.deformationGesture = {
+        base: this.working!,
+        preview: this.working!,
+        rig: this.rig!,
+        meshId: this.selectedMeshId!,
+        time: this.currentTimeMilliseconds,
+      };
+      this.notify();
+    });
+    return true;
+  }
+  previewMeshOffsets(changes: Readonly<Record<string, VertexOffset>>): boolean {
+    const gesture = this.deformationGesture;
+    if (!gesture || gesture.base !== this.working || gesture.rig !== this.rig) return false;
+    gesture.preview = setDeformationOffsets(gesture.base, gesture.rig, gesture.meshId, gesture.time, changes);
+    this.notify();
+    return true;
+  }
+  previewDeformationMove(key: MeshDeformationKey, time: number): boolean {
+    const gesture = this.deformationGesture;
+    if (!gesture || gesture.base !== this.working || gesture.rig !== this.rig) return false;
+    gesture.preview = editDeformationKey(gesture.base, gesture.rig, gesture.meshId, { ...key, time }, key.time);
+    this.notify();
+    return true;
+  }
+  cancelDeformationEdit(): boolean {
+    if (!this.deformationGesture) return false;
+    this.deformationGesture = null;
+    this.notify();
+    return true;
+  }
+  commitDeformationEdit(time = this.currentTime): boolean {
+    const gesture = this.deformationGesture;
+    if (!gesture) return false;
+    this.deformationGesture = null;
+    if (gesture.base !== this.working || gesture.rig !== this.rig || !this.animationAuthoringEnabled) {
+      this.notify();
+      return false;
+    }
+    return this.batchNotifications(() => {
+      this.selectedDeformationTime = time;
+      return this.installWorkingAnimation(gesture.preview);
+    });
+  }
+
+  deformationEditing = false;
+  deformationSelected = false;
+  selectedMeshId: string | null = null;
+  selectedDeformationTime: number | null = null;
+  get selectedDeformationKey(): MeshDeformationKey | null {
+    return this.deformationSelected && this.selectedMeshId !== null && this.selectedDeformationTime !== null
+      ? ((this.working ? getMeshDeformationTrack(this.working, this.selectedMeshId) : []).find(
+          (key) => key.time / 1000 === this.selectedDeformationTime,
+        ) ?? null)
+      : null;
+  }
+  private topologyCache:
+    | { animation: ReadonlyAnimation | null; rig: Rig | undefined; issues: readonly ValidationIssue[] }
+    | undefined;
+  get deformationTopologyIssues(): readonly ValidationIssue[] {
+    if (!this.topologyCache || this.topologyCache.animation !== this.working || this.topologyCache.rig !== this.rig)
+      this.topologyCache = {
+        animation: this.working,
+        rig: this.rig,
+        issues: this.rig ? meshDeformationIssues(this.working?.deformationTracks, this.rig) : [],
+      };
+    return this.topologyCache.issues;
+  }
+  setDeformationEditing(enabled: boolean): void {
+    this.batchNotifications(() => {
+      this.cancelDeformationEdit();
+      this.deformationEditing = enabled;
+      if (enabled) {
+        this.pause();
+        this.endScrub();
+      }
+      this.notify();
+    });
+  }
+  selectDeformation(meshId: string, time?: number): boolean {
+    if (!this.working || !this.rig?.attachments.some((entry) => entry.id === meshId && entry.type === 'mesh'))
+      return false;
+    if (time !== undefined && !getMeshDeformationTrack(this.working, meshId).some((key) => key.time / 1000 === time))
+      return false;
+    return this.batchNotifications(() => {
+      this.cancelTimelineDrag();
+      this.selection.selectBone(null);
+      this.rootMotionSelected = false;
+      this.selectedRootKey = null;
+      this.deformationSelected = true;
+      this.selectedMeshId = meshId;
+      this.selectedDeformationTime = time ?? null;
+      if (time !== undefined) {
+        this.pause();
+        this.endScrub();
+        this.updateTime(time);
+      }
+      this.notify();
+      return true;
+    });
+  }
+  setMeshOffsets(changes: Readonly<Record<string, VertexOffset>> | null, time = this.currentTime): boolean {
+    if (!this.animationAuthoringEnabled || !this.working || !this.rig || !this.selectedMeshId) return false;
+    const id = this.selectedMeshId;
+    return this.commitDeformationProposal(
+      () => setDeformationOffsets(this.working!, this.rig!, id, time * 1000, changes),
+      time,
+    );
+  }
+  changeDeformationKey(key: MeshDeformationKey | null, previousTime = this.selectedDeformationKey?.time): boolean {
+    if (
+      !this.animationAuthoringEnabled ||
+      !this.working ||
+      !this.rig ||
+      !this.selectedMeshId ||
+      previousTime === undefined
+    )
+      return false;
+    return this.commitDeformationProposal(
+      () => editDeformationKey(this.working!, this.rig!, this.selectedMeshId!, key, previousTime),
+      key ? key.time / 1000 : null,
+    );
+  }
+  duplicateDeformationKey(): boolean {
+    const key = this.selectedDeformationKey;
+    if (!key || !this.working || !this.rig || !this.selectedMeshId || !this.animationAuthoringEnabled) return false;
+    const destination =
+      this.currentTimeMilliseconds !== key.time ? this.currentTimeMilliseconds : key.time + 1000 / this.keyframeFPS;
+    return this.commitDeformationProposal(
+      () => editDeformationKey(this.working!, this.rig!, this.selectedMeshId!, { ...key, time: destination }),
+      destination / 1000,
+    );
+  }
+  private commitDeformationProposal(
+    create: () => ReadonlyAnimation,
+    time: number | null,
+    meshId = this.selectedMeshId,
+  ): boolean {
+    return this.batchNotifications(() => {
+      try {
+        const next = create();
+        if (!this.installWorkingAnimation(next)) return false;
+        this.selection.selectBone(null);
+        this.rootMotionSelected = false;
+        this.selectedRootKey = null;
+        this.selectedMeshId = meshId;
+        this.deformationSelected = true;
+        this.selectedDeformationTime = time;
+        this.notify();
+        return true;
+      } catch (error) {
+        this.document.reportError(error);
+        this.notify();
+        return false;
+      }
+    });
+  }
+  removeIncompatibleDeformationTracks(): boolean {
+    if (!this.working || !this.rig || !this.animationAuthoringEnabled || !this.deformationTopologyIssues.length)
+      return false;
+    const deformationTracks = Object.fromEntries(
+      Object.entries(this.working.deformationTracks ?? {}).filter(
+        ([id, keys]) => !meshDeformationIssues({ [id]: keys }, this.rig!).length,
+      ),
+    );
+    return this.commitDeformationProposal(
+      () => validateEditedAnimation({ ...this.working!, deformationTracks }, this.working!, this.rig!),
+      null,
+    );
+  }
+  private copyDeformationKey(): boolean {
+    const key = this.selectedDeformationKey;
+    if (!key || !this.selectedMeshId) return false;
+    this.clipboard.content = { kind: 'deformation', data: { meshId: this.selectedMeshId, key } };
+    this.notify();
+    return true;
+  }
+  private pasteDeformationKey(): boolean {
+    const content = this.clipboard.content;
+    if (content?.kind !== 'deformation' || !this.working || !this.rig || !this.animationAuthoringEnabled) return false;
+    return this.commitDeformationProposal(
+      () =>
+        editDeformationKey(this.working!, this.rig!, content.data.meshId, {
+          ...content.data.key,
+          time: this.currentTimeMilliseconds,
+        }),
+      this.currentTime,
+      content.data.meshId,
+    );
   }
 
   rootMotionSelected = false;
@@ -182,6 +400,8 @@ export class AnimationEditorState {
     return this.batchNotifications(() => {
       this.cancelTimelineDrag();
       this.selection.selectBone(null);
+      this.deformationSelected = false;
+      this.selectedDeformationTime = null;
       this.rootMotionSelected = true;
       this.rootMotionProperty = property;
       this.selectedRootKey = time === undefined ? null : Object.freeze({ property, time });
@@ -195,7 +415,9 @@ export class AnimationEditorState {
     });
   }
   private clearRootSelection(): void {
-    const changed = this.rootMotionSelected || this.selectedRootKey !== null;
+    const changed = this.rootMotionSelected || this.selectedRootKey !== null || this.deformationSelected;
+    this.deformationSelected = false;
+    this.selectedDeformationTime = null;
     this.rootMotionSelected = false;
     this.selectedRootKey = null;
     if (changed) this.notify();
@@ -404,6 +626,7 @@ export class AnimationEditorState {
     return (
       (this.trajectoryCopyActive ? this.trajectoryCopy!.animation : undefined) ??
       (this.cleanupPreviewActive ? this.cleanupPreview!.animation : undefined) ??
+      this.deformationGesture?.preview ??
       this.variationPreview?.animation ??
       this.rootGesture?.preview ??
       this.graphGesture?.preview ??
@@ -659,7 +882,8 @@ export class AnimationEditorState {
           this.eventDrag ||
           this.ikTargetDrag ||
           this.graphEditActive ||
-          this.rootMotionDragActive
+          this.rootMotionDragActive ||
+          this.deformationEditActive
         ),
     });
     this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, {
@@ -946,16 +1170,19 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.duplicateSelectedEvent());
   }
   copyTimelineSelection(): boolean {
+    if (this.deformationSelected) return this.copyDeformationKey();
     if (this.rootMotionSelected) return false;
     if (this.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
+    if (this.clipboard.content?.kind === 'deformation') return this.pasteDeformationKey();
     if (this.rootMotionSelected) return false;
     if (this.selectedIKConstraintId) return false;
     return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
+    if (this.deformationSelected) return this.duplicateDeformationKey();
     if (this.rootMotionSelected) return this.duplicateRootKey();
     if (this.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
@@ -991,13 +1218,14 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
   }
   private cancelTimelineDrag(): boolean {
+    const deformation = this.cancelDeformationEdit();
     const root = this.cancelRootMotionDrag();
     const cleanup = this.cancelCleanupPreview();
     const variation = this.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root;
+    return this.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root || deformation;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -1084,6 +1312,13 @@ export class AnimationEditorState {
     return this.batchNotifications(() => this.keyframes.moveSelectedKeyframe(time));
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
+    if (this.deformationSelected) {
+      const key = this.selectedDeformationKey;
+      return (
+        !!key &&
+        this.changeDeformationKey({ ...key, time: key.time + (direction * (large ? 10 : 1) * 1000) / this.keyframeFPS })
+      );
+    }
     if (this.rootMotionSelected && this.selectedRootKey) {
       const key = this.selectedRootKey;
       try {
@@ -1109,6 +1344,10 @@ export class AnimationEditorState {
   }
   clearKeyframeSelection(): void {
     return this.batchNotifications(() => {
+      if (this.selectedDeformationTime !== null) {
+        this.selectedDeformationTime = null;
+        this.notify();
+      }
       if (this.selectedRootKey) {
         this.selectedRootKey = null;
         this.notify();
@@ -1132,6 +1371,7 @@ export class AnimationEditorState {
   }
   /** The toolbar and keyboard share the same typed selection dispatch. */
   deleteTimelineSelection(): boolean {
+    if (this.deformationSelected) return this.changeDeformationKey(null);
     if (this.rootMotionSelected) return this.animationAuthoringEnabled && this.deleteRootKey();
     if (!this.animationAuthoringEnabled) return false;
     if (this.selectedEvent) return this.deleteSelectedEvent();
@@ -1153,7 +1393,18 @@ export class AnimationEditorState {
   getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
     return this.selectionCommands.getAdjacentKeyframe(direction);
   }
+  getAdjacentDeformationKey(direction: -1 | 1): MeshDeformationKey | undefined {
+    if (!this.deformationSelected || !this.working || !this.selectedMeshId) return undefined;
+    const keys = getMeshDeformationTrack(this.working, this.selectedMeshId);
+    return direction < 0
+      ? [...keys].reverse().find((key) => key.time / 1000 < this.currentTime)
+      : keys.find((key) => key.time / 1000 > this.currentTime);
+  }
   selectAdjacentKeyframe(direction: -1 | 1): boolean {
+    if (this.deformationSelected && this.selectedMeshId) {
+      const key = this.getAdjacentDeformationKey(direction);
+      return !!key && this.selectDeformation(this.selectedMeshId, key.time / 1000);
+    }
     return this.batchNotifications(() => this.selectionCommands.selectAdjacentKeyframe(direction));
   }
   /** Cached immutable editor rows: playback and selection never rebuild layout or authored-key queries. */
@@ -1308,7 +1559,8 @@ export class AnimationEditorState {
       !!this.eventDrag ||
       !!this.ikTargetDrag ||
       this.graphEditActive ||
-      this.rootMotionDragActive
+      this.rootMotionDragActive ||
+      this.deformationEditActive
     );
   }
 
@@ -1720,6 +1972,8 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
+    this.cancelDeformationEdit();
+    this.deformationEditing = false;
     this.cancelRootMotionDrag();
     this.clearRootSelection();
     this.rootMotionEditing = false;

@@ -77,6 +77,15 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.4.4
+
+- Add a nine-step **Animating Mesh Deformation** Feature Guide with live mesh/animation prerequisites, setup links, real-control spotlights and read-only navigation. Explain neutral shapes, bind-space corrections, timeline timing, topology compatibility and portable saving.
+
+- Add optional sparse mesh deformation shape keys keyed by attachment and stable vertex IDs, with linear, stepped and Bézier interpolation. Apply attachment-local corrections to immutable bind vertices before final FK/IK skinning and Puppet/Actor placement; reuse playback timing, layer weights and fades.
+- Add Edit Mesh Deformation with a labeled bind-space correction view, square multi-select vertex handles, numeric offsets, neutral keys and per-mesh timeline rows. Support temporary drag previews, atomic Undo/Redo, key movement, duplication, deletion and timeline copy/paste.
+- Preserve correction data through JSON/package exports, pose/bone tools and IK baking; scale correction times in Animation Variations. Flag incompatible topology, reject invalid references and explicitly describe unsupported mesh mirroring/Graph Editor operations.
+- Add runtime/editor parity, sparse interpolation, transform, topology, serialization, history and local browser workflow coverage. Document schema, evaluation order and compatibility in the mesh deformation guide.
+
 ## 1.4.3-2
 
 Add **Paint Bone Weights** to Rig Editor's mesh tools: hierarchy-based influence selection, screen-space radius and strength, paint/erase, per-vertex numeric weights, normalization/reset and a gray/blue/orange vertex heatmap with selected-vertex outlines. Sweep distance-based brushes across existing vertices with linear falloff, frozen pose projections and one strength application per stroke. Preserve other influence ratios; deterministically retain the strongest bones at the chosen one-to-four influence limit, report dropped influences and use a documented valid fallback instead of zero-total weights.

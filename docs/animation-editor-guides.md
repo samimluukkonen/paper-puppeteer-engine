@@ -2,10 +2,11 @@
 
 [Development guide](development.md#architecture) · [Feature Guide architecture](feature-guide-architecture.md)
 
-The catalog contains twenty-five selectable tasks. Open **Feature Guide → Animation Editor**. Steps start as explanations; optional **Try It** exists for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. The inspector starts on Bones; steps reveal the relevant tab, and nested settings start collapsed.
+The catalog contains twenty-six selectable tasks. Open **Feature Guide → Animation Editor**. Steps start as explanations; optional **Try It** exists for bone selection, the X key button and onion skinning. See [Using Feature Guide](feature-guide.md). Next, Back, Finish, restart and Exit never perform the described actions. The inspector starts on Bones; steps reveal the relevant tab, and nested settings start collapsed.
 
 | Guide                           | Steps | Prerequisites beyond a loaded, valid rig                                 |
 | ------------------------------- | ----: | ------------------------------------------------------------------------ |
+| Animating Mesh Deformation      |     9 | Selected clip and a mesh attachment; setup link to Editing Mesh Geometry |
 | Preview Displacement            |     7 | Selected clip; temporary additive world trajectory                       |
 | Environment Preview             |    10 | Selected clip; artwork is optional                                       |
 | Creating Root Motion            |     5 | Selected clip; works with empty/legacy clips and no root keys            |
@@ -32,7 +33,7 @@ The catalog contains twenty-five selectable tasks. Open **Feature Guide → Anim
 | Rig-Tweak Mode                  |     4 | None; explains entering the mode without entering it for the artist      |
 | Exporting Animations            |     4 | Selected clip                                                            |
 
-IK tasks use the `ik` registry category; the other twenty-three use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
+IK tasks use the `ik` registry category; the other twenty-four use `animation`. Availability reasons tell the artist how to meet missing prerequisites. The target tutorial requires selecting a constraint before launch because its inspector is conditional. No guide assumes a particular bone or constraint name, creates sample content, infers pairs automatically, or selects an authoring target. Clip/selection/rig changes refresh availability. Authored-key facts are cached by immutable clip identity so playback does not repeatedly scan keyframes.
 
 ## Target contract
 
@@ -89,3 +90,5 @@ Screenshots from the existing-clip walkthrough are saved under the Playwright te
 | `PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/animationGuides.spec.ts tests/browser/featureGuide.spec.ts` | Exit 0; 22 passed across development and production (9.3 minutes)                              |
 
 Visual review covered representative screenshots from all thirteen guides on `demo-puppet` at a 1440 × 1000 desktop viewport. Instructions matched the current UI, cards left highlighted controls clear, and long mirror panels scrolled to their action buttons. The browser walkthrough also checked Back, Finish, Escape, focus restoration and unchanged animation JSON/history. This was automated traversal plus screenshot review; a separate human artist practice session was not performed. Dialog forms and conditional selection fields are explained without the tour submitting forms or selecting authoring data.
+
+The **Animating Mesh Deformation** guide checks mesh availability in the live animation rig, links to **Editing Mesh Geometry** when setup is missing, and highlights the mode, mesh, vertex, offset, shape-key and timing controls. Its nine Explain steps cover neutral keys, bind-space editing, the posed preview, stable vertex IDs, topology warnings, tool compatibility and export/reload. Targets remain visible with editing disabled, so the guide never enables a mode or selects a mesh to explain it. Unit tests cover live prerequisites, all exit positions and preservation of authored shapes, selection, playback, dirty state and Undo/Redo. The local desktop deformation browser test walks every real spotlight with empty and authored corrections, checking Back/Finish/restart/Escape, focus and zero authored changes.

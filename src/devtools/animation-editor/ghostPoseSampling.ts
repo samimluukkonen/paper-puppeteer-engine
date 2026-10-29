@@ -1,7 +1,9 @@
 import type { AnimationPose } from '../../engine/AnimationPose.js';
+import { evaluateMeshDeformation, type MeshDeformationPose } from '../../engine/meshDeformation.js';
 import type { Rig } from '../../engine/Rig.js';
 import { getEvaluatedAnimationPose } from './animationValues.js';
 import type { AnimationData } from './keyframeTargets.js';
+import { motionPreviewSampleTime } from './motionPreview.js';
 import { DEFAULT_KEYFRAME_FPS } from './timeline.js';
 import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
@@ -22,6 +24,7 @@ export interface GhostSampleTime {
 }
 
 export interface GhostPoseSample extends GhostSampleTime {
+  readonly meshDeformation?: MeshDeformationPose;
   /** Complete detached local transforms in the existing pose type, before procedural IK. */
   readonly pose: AnimationPose;
 }
@@ -104,5 +107,16 @@ export function sampleGhostPoses(
   if (!animation || !rig) return [];
   const fps = settings.fps ?? (animation.playback?.mode === 'stepped' ? animation.playback.fps : DEFAULT_KEYFRAME_FPS);
   const times = getGhostSampleTimes(currentTime, toSeconds(animation.duration), { ...settings, fps });
-  return times.map((sample) => ({ ...sample, pose: sampleGhostPose(animation, rig, sample.time)! }));
+  return times.map((sample) => ({
+    ...sample,
+    pose: sampleGhostPose(animation, rig, sample.time)!,
+    ...(animation.deformationTracks
+      ? {
+          meshDeformation: evaluateMeshDeformation(
+            animation,
+            motionPreviewSampleTime({ ...animation, version: 1 }, sample.time * 1000),
+          ),
+        }
+      : {}),
+  }));
 }

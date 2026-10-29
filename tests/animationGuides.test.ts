@@ -6,6 +6,7 @@ import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { getGuidesForEditor } from '../src/devtools/shared/guides/registry.js';
 import { workspaceGuideHost } from '../src/devtools/shared/guides/workspaceGuideHost.js';
 import { createCharacterDocuments, createNewCharacter } from '../src/devtools/shared/newCharacter.js';
+import { Rig } from '../src/engine/Rig.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
 
 const guides = getGuidesForEditor('animation');
@@ -27,13 +28,16 @@ function workspace(existing = false) {
   return { ...documents, launcher };
 }
 
-test('Animation Editor catalog contains twenty-five bounded task guides, declared anchors and correct categories', () => {
-  assert.lengthOf(guides, 25);
+test('Animation Editor catalog contains twenty-six bounded task guides, declared anchors and correct categories', () => {
+  assert.lengthOf(guides, 26);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const guide of guides) {
     assert.equal(guide.category, guide.id.startsWith('animation-ik-') ? 'ik' : 'animation');
     assert.isAtLeast(guide.steps.length, 3);
-    assert.isAtMost(guide.steps.length, guide.id === 'animation-environment-preview' ? 10 : 7);
+    assert.isAtMost(
+      guide.steps.length,
+      guide.id === 'animation-environment-preview' ? 10 : guide.id === 'animation-mesh-deformation' ? 9 : 7,
+    );
     for (const step of guide.steps) {
       assert.isTrue(anchors.has(step.targetId), `${guide.id}/${step.id}`);
       assert.equal(step.preparation, 'reveal-target');
@@ -66,7 +70,12 @@ test('missing character, no clip, empty clip, bone keys and optional IK have liv
   for (const guide of guides)
     assert.equal(
       launcher.getAvailability(guide.id).available,
-      !['animation-keyframe-editing', 'animation-ik-targets', 'animation-ik-baking'].includes(guide.id),
+      ![
+        'animation-keyframe-editing',
+        'animation-ik-targets',
+        'animation-ik-baking',
+        'animation-mesh-deformation',
+      ].includes(guide.id),
       guide.id,
     );
   assert.include(
@@ -311,5 +320,106 @@ test.each([false, true])(
     assert.strictEqual(motion.getSnapshot(), before);
     assert.equal(animation.currentTime, 0.3);
     motion.dispose();
+  },
+);
+
+test('mesh deformation guide checks live mesh availability and links to setup without selecting or editing', () => {
+  const { animation, rig, launcher } = workspace(true);
+  const id = 'animation-mesh-deformation';
+  assert.include(JSON.stringify(launcher.getAvailability(id)), 'Create or select an animation first');
+  animation.selectAnimation(animation.animationIds[0]!);
+  launcher.refresh();
+  assert.include(JSON.stringify(launcher.getAvailability(id)), 'Create a mesh attachment');
+  assert.equal(launcher.getPrerequisiteGuide(id)?.id, 'rig-mesh-geometry');
+  const originalRig = animation.rig!;
+  const slot = rig.workingCopy.slots!.find((entry) => rig.resolvedAttachment(entry.id))!;
+  rig.selectSlot(slot.id);
+  rig.convertSelectedSpriteToMesh({ width: 40, height: 80 });
+  animation.updatePreviewRig(new Rig(rig.workingCopy, rig.skins));
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability(id).available);
+  assert.isNull(animation.selectedMeshId);
+  assert.isFalse(animation.deformationEditing);
+  animation.updatePreviewRig(originalRig);
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability(id).available);
+  animation.updatePreviewRig(new Rig(rig.workingCopy, rig.skins));
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability(id).available);
+  rig.beginOperation();
+  rig.editSlot(slot.id, 'depth', 1);
+  launcher.refresh();
+  assert.isFalse(launcher.getAvailability(id).available);
+  rig.cancelOperation();
+  launcher.refresh();
+  assert.isTrue(launcher.getAvailability(id).available);
+});
+
+test.each([false, true])(
+  'mesh deformation guide preserves shape keys, mode, selection, playback and history; configured=%s',
+  (configured) => {
+    const { animation, rig, launcher } = workspace(true);
+    animation.selectAnimation(animation.animationIds[0]!);
+    const slot = rig.workingCopy.slots!.find((entry) => rig.resolvedAttachment(entry.id))!;
+    rig.selectSlot(slot.id);
+    rig.convertSelectedSpriteToMesh({ width: 40, height: 80 });
+    animation.updatePreviewRig(new Rig(rig.workingCopy, rig.skins));
+    if (configured) {
+      const mesh = rig.selectedMesh!;
+      animation.setDeformationEditing(true);
+      animation.selectDeformation(mesh.id);
+      animation.setMeshOffsets({ [mesh.vertices[0]!.id]: { x: 4, y: -3 } });
+      animation.setMeshOffsets({ [mesh.vertices[0]!.id]: { x: 8, y: -6 } });
+      animation.undo();
+    }
+    animation.setCurrentTime(0.3);
+    animation.play();
+    launcher.refresh();
+    const snapshot = () => ({
+      clip: animation.workingAnimation,
+      preview: animation.previewAnimation,
+      json: animation.exportJson(),
+      history: animation.historyLength,
+      undo: animation.canUndo,
+      redo: animation.canRedo,
+      dirty: animation.dirty,
+      time: animation.currentTime,
+      playing: animation.isPlaying,
+      mode: animation.deformationEditing,
+      mesh: animation.selectedMeshId,
+      selected: animation.deformationSelected,
+      key: animation.selectedDeformationKey,
+      bone: animation.selectedBoneId,
+      rig: rig.workingCopy,
+      rigHistory: rig.historyLength,
+      skin: rig.activeSkin,
+      selection: rig.selection,
+    });
+    const before = snapshot();
+    const notify = vi.fn();
+    const release = animation.subscribe(notify);
+    const guide = guides.find((entry) => entry.id === 'animation-mesh-deformation')!;
+    assert.lengthOf(guide.steps, 9);
+    const targets = { resolve: () => ({ x: 1, y: 2, width: 200, height: 40 }), reveal: vi.fn(() => true) };
+    for (let exitAt = 0; exitAt < guide.steps.length; exitAt++) {
+      assert.isTrue(launcher.launch(guide.id).ok);
+      for (let index = 0; index <= exitAt; index++) {
+        assert.equal(guide.steps[index]!.mode, 'explain');
+        assert.isTrue(launcher.controller.prepareCurrentStep(targets).ok);
+        assert.deepEqual(targets.reveal.mock.lastCall, [guide.steps[index]!.targetId]);
+        if (index < exitAt) assert.isTrue(launcher.controller.next().ok);
+      }
+      assert.isTrue(launcher.controller.exit().ok);
+    }
+    launcher.launch(guide.id);
+    for (let index = 1; index < guide.steps.length; index++) launcher.controller.next();
+    assert.isTrue(launcher.controller.previous().ok);
+    assert.isTrue(launcher.controller.next().ok);
+    assert.isTrue(launcher.controller.finish().ok);
+    assert.deepEqual(snapshot(), before);
+    assert.strictEqual(animation.workingAnimation, before.clip);
+    assert.strictEqual(rig.workingCopy, before.rig);
+    assert.lengthOf(notify.mock.calls, 0);
+    release();
   },
 );

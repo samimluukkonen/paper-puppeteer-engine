@@ -74,7 +74,9 @@ export class TimelineInputController {
         event.preventDefault();
         if (
           event.target instanceof Element &&
-          event.target.closest('.timeline-track-lane:not(.timeline-event-track):not(.timeline-root-track)')
+          event.target.closest(
+            '.timeline-track-lane:not(.timeline-event-track):not(.timeline-root-track):not(.timeline-deformation-track)',
+          )
         ) {
           this.timeline.focus({ preventScroll: true });
           this.beginMarquee(event);
@@ -324,7 +326,7 @@ export class TimelineInputController {
     // Event lanes have their own height/identity and never participate in key marquee row indices.
     const rows = Array.from(
       this.timeline.querySelectorAll<HTMLElement>(
-        '.timeline-track-lane:not(.timeline-event-track):not(.timeline-root-track)',
+        '.timeline-track-lane:not(.timeline-event-track):not(.timeline-root-track):not(.timeline-deformation-track)',
       ),
     );
     const included = rows.flatMap((row, index) => {

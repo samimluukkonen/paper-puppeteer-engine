@@ -4,6 +4,7 @@ import { composeAffine, transformToAffine, worldToLocal } from './affineMath.js'
 import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
+import type { MeshDeformationPose } from './meshDeformation.js';
 import { createTexturedMesh, syncMeshTextureOrientation } from './meshRendering.js';
 import { createMeshSkinBinding, deformMesh, type MeshSkinBinding } from './meshSkinning.js';
 import type { Rig } from './Rig.js';
@@ -67,6 +68,7 @@ export class PuppetRenderer {
     parent: Phaser.GameObjects.Container,
     private readonly rig: Rig,
     private readonly bones: ReadonlyMap<string, Bone>,
+    private readonly getDeformation?: () => MeshDeformationPose,
   ) {
     this.artworkDefinitions = rig.attachments;
     this.artworkSkins = rig.skins;
@@ -468,7 +470,7 @@ export class PuppetRenderer {
       let binding: MeshSkinBinding;
       try {
         binding = createMeshSkinBinding(definition, id, mount, mesh);
-        this.skinMesh(id, mesh, binding);
+        this.skinMesh(id, mesh, binding, definition.id);
         if (presentation)
           mesh.setAlpha(presentation.alpha).setVisible(presentation.visible).setDepth(presentation.depth);
         mount.add(mesh).sort('depth');
@@ -630,14 +632,22 @@ export class PuppetRenderer {
         entry.binding = createMeshSkinBinding(entry.definition, id, mount, mesh);
         entry.transforms = transforms;
       }
-      this.skinMesh(id, mesh, entry.binding);
+      this.skinMesh(id, mesh, entry.binding, entry.definition.id);
     }
   }
 
-  private skinMesh(id: string, mesh: Phaser.GameObjects.Mesh2D, binding: MeshSkinBinding): void {
+  private skinMesh(id: string, mesh: Phaser.GameObjects.Mesh2D, binding: MeshSkinBinding, attachmentId: string): void {
+    const offsets = this.getDeformation?.().get(attachmentId);
     if (binding.rigid) {
       for (let index = 0; index < binding.localVertices.length; index++)
         mesh.vertices[index] = binding.localVertices[index]!;
+      binding.vertices.forEach((vertex, index) => {
+        const offset = offsets?.get(vertex.id);
+        if (offset) {
+          mesh.vertices[index * 4] = mesh.vertices[index * 4]! + offset.x;
+          mesh.vertices[index * 4 + 1] = mesh.vertices[index * 4 + 1]! + offset.y;
+        }
+      });
       return;
     }
     const slot = this.rig.getSlot(id);
@@ -648,7 +658,7 @@ export class PuppetRenderer {
       throw new Error(`Mesh slot "${id}" requires nonsingular posed bone, slot and attachment transforms.`);
     // Render through existing affine slot mounts: cancel their posed transform once,
     // leaving Puppet/Actor placement, facing, alpha, depth and borrowed textures untouched.
-    deformMesh(binding, this.readMeshBone, mesh.vertices);
+    deformMesh(binding, this.readMeshBone, mesh.vertices, offsets);
     for (let index = 0; index < mesh.vertices.length; index += 4) {
       const local = worldToLocal({ x: mesh.vertices[index]!, y: mesh.vertices[index + 1]! }, this.posedMesh)!;
       mesh.vertices[index] = local.x;

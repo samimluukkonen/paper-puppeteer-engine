@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { Bone } from '../../engine/Bone.js';
+import type { MeshDeformationPose } from '../../engine/meshDeformation.js';
 import type { Puppet } from '../../engine/Puppet.js';
 import { PuppetRenderer } from '../../engine/PuppetRenderer.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -13,7 +14,13 @@ export class AnimationPoseOverlay {
   readonly container: Phaser.GameObjects.Container;
   private readonly bones = new Map<string, Bone>();
   private readonly renderer: PuppetRenderer;
-  private sample: { readonly pose: ReadonlyMap<string, Readonly<Partial<JointTransform>>> } | undefined;
+  private deformation: MeshDeformationPose | undefined;
+  private sample:
+    | {
+        readonly meshDeformation?: MeshDeformationPose;
+        readonly pose: ReadonlyMap<string, Readonly<Partial<JointTransform>>>;
+      }
+    | undefined;
   private poseDirty = true;
   private appearanceRevision: number | undefined;
   private tint: number | undefined;
@@ -30,11 +37,22 @@ export class AnimationPoseOverlay {
       this.bones.set(bone.id, bone);
       (definition.parent ? this.bones.get(definition.parent)!.container : this.container).add(bone.container);
     }
-    this.renderer = new PuppetRenderer(scene, this.container, puppet.rig, this.bones);
+    this.renderer = new PuppetRenderer(
+      scene,
+      this.container,
+      puppet.rig,
+      this.bones,
+      () => this.deformation ?? puppet.meshDeformation,
+    );
   }
 
-  apply(sample: { readonly pose: ReadonlyMap<string, Readonly<Partial<JointTransform>>> }): void {
+  apply(sample: {
+    readonly meshDeformation?: MeshDeformationPose;
+    readonly pose: ReadonlyMap<string, Readonly<Partial<JointTransform>>>;
+  }): void {
     if (sample === this.sample) return;
+    if (this.deformation !== sample.meshDeformation) this.poseDirty = true;
+    this.deformation = sample.meshDeformation;
     this.sample = sample;
     for (const [id, bone] of this.bones) {
       const pose = sample.pose.get(id)!;
@@ -48,6 +66,7 @@ export class AnimationPoseOverlay {
   hide(): void {
     this.container.setVisible(false);
     this.sample = undefined;
+    this.deformation = undefined;
   }
 
   syncAppearance(puppet: Puppet, settings: OnionSkinSettings, revision: number): void {
@@ -88,6 +107,7 @@ export class AnimationPoseOverlay {
 
   destroy(): void {
     this.sample = undefined;
+    this.deformation = undefined;
     this.renderer.destroy();
     this.container.destroy();
     this.bones.clear();
@@ -150,7 +170,7 @@ export class AnimationEditorGhostLayer {
   /** Also called each scene frame to follow skin, frame, visibility, facing and preview layout changes. */
   sync(): void {
     if (this.disposed || !this.settings.enabled || this.frameDepth > 0) return;
-    if (this.state.editorMode !== 'animation') {
+    if (this.state.editorMode !== 'animation' || this.state.deformationTopologyIssues.length) {
       for (const ghost of this.instances.values()) ghost.hide();
       this.animation = undefined;
       return;

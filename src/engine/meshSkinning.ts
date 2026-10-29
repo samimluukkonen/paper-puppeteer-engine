@@ -1,5 +1,6 @@
 import { composeAffine, localToWorld, transformToAffine, worldToLocal, type Affine } from './affineMath.js';
 import { boneBindMatrix } from './meshBindPose.js';
+import type { MeshVertexOffsets } from './meshDeformation.js';
 import type { BoneInfluence, JointTransform, MeshAttachmentDefinition } from './types.js';
 import { createTransform } from './types.js';
 
@@ -26,11 +27,13 @@ export interface MeshSkinBinding {
   readonly localVertices: readonly number[];
   /** Cached inverse-bind points. No live pose or previously deformed geometry is retained. */
   readonly vertices: readonly {
+    readonly id: string;
     readonly u: number;
     readonly v: number;
     readonly influences: readonly {
       readonly boneId: string;
       readonly weight: number;
+      readonly correction: Readonly<Pick<Affine, 'a' | 'b' | 'c' | 'd'>>;
       readonly x: number;
       readonly y: number;
     }[];
@@ -74,12 +77,16 @@ export function createMeshSkinBinding(
       // Normalize the compiled cache too so accepted roundoff cannot shift the bind pose.
       const influences = normalizeBoneInfluences(vertex.influences ?? [{ boneId: slot.bone, weight: 1 }]);
       return {
+        id: vertex.id,
         u: vertex.u,
         v: vertex.v,
         influences: influences.map((influence) => {
           const local = worldToLocal(point, bindBone(influence.boneId));
           if (!local) throw new Error(`Singular mesh inverse bind for bone "${influence.boneId}".`);
-          return { ...influence, ...local };
+          const matrix = { ...bindBone(influence.boneId), tx: 0, ty: 0 };
+          const dx = worldToLocal({ x: attachment.a, y: attachment.b }, matrix)!;
+          const dy = worldToLocal({ x: attachment.c, y: attachment.d }, matrix)!;
+          return { ...influence, ...local, correction: { a: dx.x, b: dx.y, c: dy.x, d: dy.y } };
         }),
       };
     }),
@@ -93,16 +100,20 @@ export function deformMesh(
   binding: MeshSkinBinding,
   getBoneMatrix: (boneId: string) => Readonly<Affine> | undefined,
   output: number[] = [],
+  offsets?: MeshVertexOffsets,
 ): number[] {
   output.length = binding.vertices.length * 4;
   binding.vertices.forEach((vertex, index) => {
     let x = 0,
       y = 0;
+    const offset = offsets?.get(vertex.id);
     for (const influence of vertex.influences) {
       const matrix = getBoneMatrix(influence.boneId);
       if (!matrix) throw new Error(`Missing posed mesh bone "${influence.boneId}".`);
-      x += influence.weight * (matrix.a * influence.x + matrix.c * influence.y + matrix.tx);
-      y += influence.weight * (matrix.b * influence.x + matrix.d * influence.y + matrix.ty);
+      const px = influence.x + (offset ? influence.correction.a * offset.x + influence.correction.c * offset.y : 0);
+      const py = influence.y + (offset ? influence.correction.b * offset.x + influence.correction.d * offset.y : 0);
+      x += influence.weight * (matrix.a * px + matrix.c * py + matrix.tx);
+      y += influence.weight * (matrix.b * px + matrix.d * py + matrix.ty);
     }
     output[index * 4] = x;
     output[index * 4 + 1] = y;

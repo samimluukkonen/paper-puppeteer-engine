@@ -180,6 +180,7 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
             </label>
           ))}
         </fieldset>
+        <p>Mesh deformation corrections are preserved unchanged. Mesh/vertex mirroring is unavailable.</p>
         <p className="animation-mirror-destination">{direction.help}</p>
         <p>
           {state.scope} Only authored source bone properties are copied; temporary edits and IK are excluded. Root

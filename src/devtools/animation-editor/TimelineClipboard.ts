@@ -1,4 +1,5 @@
 import { copyAnimationEvent, type AnimationEvent } from '../../engine/AnimationClip.js';
+import type { MeshDeformationKey } from '../../engine/meshDeformation.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import { freezeData } from '../shared/editorData.js';
@@ -17,6 +18,7 @@ export interface EventClipboard {
 }
 
 export type TimelineClipboardContent =
+  | { readonly kind: 'deformation'; readonly data: { readonly meshId: string; readonly key: MeshDeformationKey } }
   | { readonly kind: 'keyframes'; readonly data: KeyframeClipboard }
   | { readonly kind: 'event'; readonly data: EventClipboard };
 

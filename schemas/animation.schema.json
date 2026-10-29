@@ -591,6 +591,120 @@
       "required": ["translationKeys"],
       "additionalProperties": false
     },
+    "deformationTracks": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?!__proto__$)[\\s\\S]+$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "number",
+              "minimum": 0
+            },
+            "offsets": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!__proto__$)[\\s\\S]+$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              }
+            },
+            "curve": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "const": "linear"
+                    }
+                  },
+                  "required": ["mode"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "const": "stepped"
+                    }
+                  },
+                  "required": ["mode"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "const": "bezier"
+                    },
+                    "control1": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": ["x", "y"],
+                      "additionalProperties": false
+                    },
+                    "control2": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        }
+                      },
+                      "required": ["x", "y"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["mode", "control1", "control2"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["time", "offsets"],
+          "additionalProperties": false
+        }
+      }
+    },
     "ikTracks": {
       "type": "object",
       "propertyNames": {

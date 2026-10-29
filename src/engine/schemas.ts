@@ -248,6 +248,13 @@ export const steppedPlaybackSchema = z.object({
 });
 
 /** Shape and scalar validation for authored clips; rig-specific rules run during compilation. */
+export const meshDeformationKeySchema = z.strictObject({
+  time: finiteNumber.nonnegative(),
+  offsets: identifierRecord(z.strictObject({ x: finiteNumber, y: finiteNumber })),
+  curve: propertyCurveSchema.exactOptional(),
+});
+export const meshDeformationTracksSchema = identifierRecord(z.array(meshDeformationKeySchema));
+
 export const animationClipSchema = z.object({
   name: identifierSchema,
   duration: finiteNumber.positive('Animation duration must be greater than zero.'),
@@ -255,6 +262,7 @@ export const animationClipSchema = z.object({
   interpolation: z.literal('linear').exactOptional(),
   tracks: identifierRecord(z.array(keyframeSchema)),
   rootMotion: rootMotionDefinitionSchema.exactOptional(),
+  deformationTracks: meshDeformationTracksSchema.exactOptional(),
   ikTracks: identifierRecord(z.array(ikKeyframeSchema)).exactOptional(),
   disabledIKConstraints: z.array(identifierSchema).exactOptional(),
   events: z.array(animationEventSchema).exactOptional(),

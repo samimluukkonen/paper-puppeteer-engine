@@ -1794,3 +1794,32 @@ a {
   gap: 8px;
   margin: 8px 0;
 }
+
+.deformation-bind-view {
+  width: 100%;
+  height: 240px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  touch-action: none;
+}
+.deformation-bind-view polygon {
+  fill: var(--bg-subtle);
+  stroke: var(--fg-muted);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.deformation-bind-view rect {
+  fill: var(--bg-panel);
+  stroke: var(--accent-fg);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+.deformation-bind-view rect[aria-pressed="true"] {
+  fill: var(--accent-fg);
+}
+.deformation-bind-view rect:focus-visible {
+  stroke: var(--fg-default);
+}

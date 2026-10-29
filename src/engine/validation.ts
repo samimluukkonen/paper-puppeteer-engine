@@ -1,6 +1,7 @@
 import type { AnimationClip } from './AnimationClip.js';
 import type { PropertyCurves } from './animationCurves.js';
 import { validateMeshBindPose } from './meshBindPose.js';
+import { meshDeformationIssues } from './meshDeformation.js';
 import { validateMeshTopology } from './meshGeometry.js';
 import type { RigDefinition, SkinDefinition } from './types.js';
 
@@ -178,7 +179,7 @@ export function checkSkinReferences(
 
 export function checkAnimationReferences(
   clip: AnimationClip,
-  rig: Pick<RigDefinition, 'bones' | 'ik'> | undefined,
+  rig: Pick<RigDefinition, 'bones' | 'ik' | 'attachments'> | undefined,
   report: ReportValidationIssue,
 ): void {
   // Timeline rules remain checkable even when character assembly has no valid skeleton.
@@ -192,6 +193,18 @@ export function checkAnimationReferences(
     checkKeyframeTimeline(keys, clip.duration, path, report);
     checkPropertyCurves(keys, path, report);
   }
+  for (const [id, keys] of Object.entries(clip.deformationTracks ?? {})) {
+    const path = `deformationTracks.${id}`;
+    checkKeyframeTimeline(keys, clip.duration, path, report);
+    for (const [index, key] of keys.entries())
+      if (key.curve?.mode === 'bezier' && key.curve.control1.x > key.curve.control2.x)
+        report({
+          severity: 'error',
+          path: `${path}[${index}].curve`,
+          message: 'Bezier time controls must be ordered.',
+        });
+  }
+  if (rig) for (const issue of meshDeformationIssues(clip.deformationTracks, rig)) report(issue);
   const boneIds = rig ? new Set(rig.bones.map((bone) => bone.id)) : undefined;
   for (const [bone, keys] of Object.entries(clip.tracks)) {
     if (boneIds && !boneIds.has(bone))

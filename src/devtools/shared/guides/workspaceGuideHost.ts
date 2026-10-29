@@ -40,6 +40,8 @@ export function workspaceGuideHost(options: {
           if (hasBoneKeys) capabilities.push('bone-keyframes');
           if (hasIKKeys) capabilities.push('ik-keyframes');
         }
+        if (animation.rig?.attachments.some((attachment) => attachment.type === 'mesh'))
+          capabilities.push('mesh-attachments');
         if (animation.selectedBoneId) {
           capabilities.push('selected-bone');
           if (animation.hasKeyframeAtTime(animation.selectedBoneId, 'x')) capabilities.push('selected-x-key');

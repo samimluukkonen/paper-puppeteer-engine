@@ -33,6 +33,13 @@ export function createAnimationVariation(
       duration: copy.duration * scale,
       tracks: Object.fromEntries(Object.entries(copy.tracks).map(([id, rows]) => [id, scaleRows(rows)])),
       ...(copy.rootMotion ? { rootMotion: { translationKeys: scaleRows(copy.rootMotion.translationKeys) } } : {}),
+      ...(copy.deformationTracks
+        ? {
+            deformationTracks: Object.fromEntries(
+              Object.entries(copy.deformationTracks).map(([id, rows]) => [id, scaleRows(rows)]),
+            ),
+          }
+        : {}),
       ...(copy.ikTracks
         ? { ikTracks: Object.fromEntries(Object.entries(copy.ikTracks).map(([id, rows]) => [id, scaleRows(rows)])) }
         : {}),

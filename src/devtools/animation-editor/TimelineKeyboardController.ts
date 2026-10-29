@@ -230,7 +230,11 @@ export class TimelineKeyboardController {
     const state = this.state;
     if (
       (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
-      (!state.selectedKeyframe && !state.selectedEvent && !state.selectedIKKeyframe && !state.selectedRootKey) ||
+      (!state.selectedKeyframe &&
+        !state.selectedEvent &&
+        !state.selectedIKKeyframe &&
+        !state.selectedRootKey &&
+        !state.selectedDeformationKey) ||
       event.altKey ||
       event.ctrlKey ||
       event.metaKey

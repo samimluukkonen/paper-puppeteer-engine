@@ -7,6 +7,7 @@ import { EventTrackController } from './EventTrackController.js';
 import { ikTrackKey, type IKKeyframeSelection } from './ikTimeline.js';
 import { interpolationLabel } from './interpolationPresentation.js';
 import { keyIdentity, keyframeSelectionIndex, sameKey } from './keyframeSelection.js';
+import type { MeshDeformationController } from './MeshDeformationController.js';
 import type { RootMotionController } from './RootMotionController.js';
 import { timeToTimelineX } from './timeline.js';
 import { summarizeKeyframeTimes } from './timelineSummaries.js';
@@ -59,6 +60,7 @@ export class TimelineTracksController {
   private readonly events: EventTrackController;
   private state: AnimationEditorState | undefined;
   private tracks: readonly TimelineTrack[] | undefined;
+  private deformationRevision = -1;
   private interpolation: AnimationEditorState['authoredInterpolation'];
   private readonly rows = new Map<string, TrackElements>();
   private selectedIK: AnimationEditorState['selectedTarget'] | undefined;
@@ -78,6 +80,7 @@ export class TimelineTracksController {
     private readonly onKeyPointerDown: (event: PointerEvent, key: TimelineKey, marker: HTMLButtonElement) => void,
     onEventPointerDown?: (event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement) => void,
     private readonly root?: RootMotionController,
+    private readonly deformation?: MeshDeformationController,
   ) {
     this.events = new EventTrackController(onEventPointerDown);
   }
@@ -150,7 +153,8 @@ export class TimelineTracksController {
     this.state = state;
     this.events.render(state, width);
     const tracks = state.timelineTracks;
-    const changed = tracks !== this.tracks;
+    const changed = tracks !== this.tracks || this.deformationRevision !== (this.deformation?.revision ?? -1);
+    this.deformationRevision = this.deformation?.revision ?? -1;
     const summariesChanged = changed || this.summaryAnimation !== state.workingAnimation;
     this.summaryAnimation = state.workingAnimation;
     const interpolationChanged = this.interpolation !== state.authoredInterpolation;
@@ -238,6 +242,8 @@ export class TimelineTracksController {
           );
         }
       }
+      labels.push(...(this.deformation?.labels ?? []));
+      lanes.push(...(this.deformation?.lanes ?? []));
       reconcileRows(this.labels, labels);
       reconcileRows(this.lanes, lanes);
       if (!tracks.length) {

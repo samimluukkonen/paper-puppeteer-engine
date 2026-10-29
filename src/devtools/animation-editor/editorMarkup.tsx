@@ -28,6 +28,7 @@ import { IKInspectorPanel } from './IKInspectorPanel.js';
 import { AUTHORED_INTERPOLATION_MODES, interpolationLabel } from './interpolationPresentation.js';
 import type { KeyframeRetimingController } from './KeyframeRetimingController.js';
 import { KeyframeRetimingPanel } from './KeyframeRetimingPanel.js';
+import { MeshDeformationPanel } from './MeshDeformationPanel.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 import { MirrorToolsPanel } from './MirrorToolsPanel.js';
 import type { MotionDiagnosticsController } from './MotionDiagnosticsController.js';
@@ -382,6 +383,12 @@ export function AnimationEditorView({
                     <div id="animation-bones" aria-label="Bone hierarchy" />
                   </div>
                 ),
+              },
+              {
+                id: 'animation-inspector-deformation',
+                label: 'Mesh Deformation',
+                hidden: tweaking,
+                content: <MeshDeformationPanel />,
               },
               {
                 id: 'animation-inspector-selection',

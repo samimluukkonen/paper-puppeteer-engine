@@ -163,7 +163,13 @@ export class Puppet {
       parent.add(bone.container);
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
-    this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones);
+    this.renderer = new PuppetRenderer(
+      scene,
+      this.container,
+      this.rig,
+      this.bones,
+      () => (this.meshDeformationSource ?? this.animationPlayer).meshDeformation,
+    );
     this.attachments = new PuppetAttachments(
       scene,
       (id) => this.getBone(id).container,
@@ -807,6 +813,7 @@ export class Puppet {
     this.movementTranslation = undefined;
     this.rootMotionOrigin = undefined;
     this.ikAnimationSource = undefined;
+    this.meshDeformationSource = undefined;
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onSceneUpdate, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
@@ -857,6 +864,14 @@ export class Puppet {
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
   preparePose(): void {
     this.poseController.preparePose();
+  }
+
+  private meshDeformationSource: Pick<AnimationPlayer, 'meshDeformation'> | undefined;
+  get meshDeformation() {
+    return (this.meshDeformationSource ?? this.animationPlayer).meshDeformation;
+  }
+  setMeshDeformationSource(source: Pick<AnimationPlayer, 'meshDeformation'> | undefined): void {
+    this.meshDeformationSource = source;
   }
 
   /** @internal Editor preview bridge; undefined restores the runtime player's IK channels. */

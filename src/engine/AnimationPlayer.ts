@@ -13,6 +13,7 @@ import {
 } from './animationTimeline.js';
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
+import { meshDeformationIssues } from './meshDeformation.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import type {
   PlaybackLifecycleEvent,
@@ -149,12 +150,19 @@ export class AnimationPlayer {
         if (!rig.ik?.some((constraint) => constraint.name === name))
           throw new Error(`Animation "${clip.name}" references unknown IK "${name}".`);
       }
-      this.clips.set(clip.name, ownCompiledClip(clip));
+      const owned = ownCompiledClip(clip);
+      const issues = meshDeformationIssues(owned.deformationTracks, rig);
+      if (issues.length) throw new Error(issues.map((issue) => issue.message).join('\n'));
+      this.clips.set(clip.name, owned);
     }
     this.poseEvaluator = new AnimationLayerEvaluator(rig, joints);
   }
 
   /** Immutable puppet-local target channels, including layer/fade ownership weights. */
+  get meshDeformation() {
+    return this.poseEvaluator.deformation;
+  }
+
   get ikAnimation(): IKAnimationPose {
     return this.poseEvaluator.ikEvaluator.current;
   }
@@ -451,6 +459,14 @@ export class AnimationPlayer {
     preparePose?.();
     const layer = this.getOrCreateLayer(layerName);
     let source: AnimationState | AnimationPose | undefined;
+    const deformationSource =
+      fade > 0 && layer.state && layer.transition
+        ? this.poseEvaluator.evaluateDeformationLayer(
+            layer,
+            this.playback,
+            this.poseEvaluator.underlyingDeformation(layerName, this.layers, this.playback),
+          )
+        : undefined;
     const ikSource =
       fade > 0 && layer.transition ? this.poseEvaluator.ikEvaluator.snapshotLayer(layerName, this.layers) : undefined;
     if (fade > 0) {
@@ -479,7 +495,15 @@ export class AnimationPlayer {
       playing: true,
     };
     lifecycle.push({ ...this.playbackStatus(layer.state, layerName), type: 'started' });
-    layer.transition = source ? { source, elapsed: 0, duration: fade, ...(ikSource ? { ikSource } : {}) } : undefined;
+    layer.transition = source
+      ? {
+          source,
+          elapsed: 0,
+          duration: fade,
+          ...(ikSource ? { ikSource } : {}),
+          ...(deformationSource ? { deformationSource } : {}),
+        }
+      : undefined;
     layer.stopped = false;
     select?.(layer.state, layerName);
     this.poseEvaluator.invalidate();
@@ -766,6 +790,7 @@ export class AnimationPlayer {
     this.layers.clear();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
     this.poseEvaluator.ikEvaluator.clear();
+    this.poseEvaluator.deformation = new Map();
     this.poseEvaluator.invalidate();
     this.dispatchNotifications([], [], lifecycle);
   }
@@ -786,6 +811,7 @@ export class AnimationPlayer {
     this.assertActive();
     for (const joint of this.joints.values()) joint.reset();
     this.poseEvaluator.ikEvaluator.clear();
+    this.poseEvaluator.deformation = new Map();
   }
 
   /** Advance playback and return whether this call evaluated the authored pose.

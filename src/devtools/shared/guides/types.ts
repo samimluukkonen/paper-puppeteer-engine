@@ -12,6 +12,7 @@ export type GuideCapability =
   | 'ik-constraints'
   | 'rig-artwork'
   | 'rig-mesh-artwork'
+  | 'mesh-attachments'
   | 'selected-bone'
   | 'onion-enabled'
   | 'selected-x-key'

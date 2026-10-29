@@ -1,3 +1,12 @@
+export { sampleMeshDeformation, evaluateMeshDeformation, meshDeformationIssues } from './meshDeformation.js';
+export { meshDeformationKeySchema, meshDeformationTracksSchema } from './schemas.js';
+export type {
+  VertexOffset,
+  MeshDeformationKey,
+  MeshDeformationTracks,
+  MeshVertexOffsets,
+  MeshDeformationPose,
+} from './meshDeformation.js';
 /** Public renderer-independent APIs. Existing pure authoring and bake exports remain supported. */
 export { MAX_BONE_INFLUENCES, normalizeBoneInfluences, createMeshSkinBinding, deformMesh } from './meshSkinning.js';
 export type { MeshSkinBinding } from './meshSkinning.js';

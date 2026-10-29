@@ -29,6 +29,78 @@ const step = (id: string, title: string, description: string, targetId: string):
 /** Navigation only reveals UI. Optional practice always uses the existing editor controls. */
 export const animationGuides: readonly GuideDefinition[] = [
   {
+    id: 'animation-mesh-deformation',
+    title: 'Animating Mesh Deformation',
+    description: 'Correct a weighted sleeve or cape with sparse vertex offsets, neutral shapes and animation keys.',
+    editor: 'animation',
+    category: 'animation',
+    prerequisites: [
+      ...animation,
+      {
+        capability: 'mesh-attachments',
+        guideId: 'rig-mesh-geometry',
+        reason:
+          'Create a mesh attachment in the Rig Editor first. Use Editing Mesh Geometry, then select a preview skin that displays the mesh.',
+      },
+    ],
+    steps: [
+      step(
+        'mode',
+        'Add corrections over skeletal animation',
+        'After exiting this tour, enable **Edit Mesh Deformation** in the **Mesh Deformation** inspector tab. Bone weights remain the main deformation source. Optional corrections add **attachment-local bind-space offsets** before FK/IK skinning and Puppet/Actor placement; they do not change base geometry, UVs, weights, root motion or pelvis keys. This tour only reveals controls: it never enables the mode, selects a mesh or creates keys.',
+        targets.animationDeformationMode,
+      ),
+      step(
+        'mesh',
+        'Choose the attachment and its visible skin',
+        'Choose **Mesh** after exiting. The main preview needs a **skin** that displays that attachment; creating a rectangle mesh from a default skin may have made a separate mesh skin variant. Mesh names come from your character. Finish geometry and weight painting in the Rig Editor first; use **Editing Mesh Geometry** and **Painting Bone Weights** for those workflows.',
+        targets.animationDeformationMesh,
+      ),
+      step(
+        'neutral',
+        'Bracket a correction with neutral shapes',
+        'For a sword cut, animate the arm with bones first. At a time before the sharp elbow bend, use **Set neutral key**; add another after the correction should end. A neutral shape has zero offsets. Missing vertices also mean **zero offset**. A single shape holds throughout the clip, and the first/last shapes hold outside their keyed range, so neutral keys control the return to ordinary weighted skinning. **Add shape key** captures the sampled correction shape at the playhead.',
+        targets.animationDeformationShapes,
+      ),
+      step(
+        'vertex',
+        'Select vertices in bind space',
+        'Move the **playhead** to the bent elbow, then choose **Vertex** or click a **square handle** in the bind-space triangle view. **Shift-click** adds vertices to a group; dragging a selected square translates the group. These handles are separate from bone and IK controls. This view edits attachment-local corrections rather than trying to invert the posed silhouette, which can be ambiguous where weighted bones overlap.',
+        targets.animationDeformationVertex,
+      ),
+      step(
+        'offsets',
+        'Refine the sleeve silhouette',
+        'Enter **Offset X/Y** and click **Set vertex correction key**, or drag a square while watching the main textured preview. Numeric values set the requested offsets for all selected vertices; unselected corrections are retained. Corrections are sparse and belong only to the chosen animation. A drag previews temporarily and commits one **Undo** operation on release. **Escape**, pointer cancellation or window blur cancels it. **Redo** restores a committed correction.',
+        targets.animationDeformationOffsets,
+      ),
+      step(
+        'timing',
+        'Select, retime and interpolate shape keys',
+        'Find the per-mesh row under **Mesh Deformation** in the timeline. Select a key to seek to it, drag horizontally to retime, or use **arrow keys** to nudge; Shift bypasses frame snapping during a drag. **Key time (s)** and **Apply key** retime the selected shape. **Outgoing interpolation** chooses Linear or Stepped. Imported Bezier controls can be preserved; choosing another mode replaces them. Timeline **Copy/Paste**, **Duplicate** and **Delete** edit whole shape keys. Moves and pastes reject occupied times rather than overwriting another shape.',
+        targets.animationDeformationTiming,
+      ),
+      step(
+        'preview',
+        'Scrub before, during and after the bend',
+        'Scrub and play across the **neutral keys** and correction. The main preview shows final bone-weighted geometry with corrections applied once; **Smooth/Stepped** playback uses the ordinary clip timing. Seeking to the same time produces the same shape without accumulating offsets. **Undo/Redo** changes authored corrections, while playback and scrubbing never create keys. Use a skin containing the chosen mesh when comparing the corrected silhouette.',
+        targets.animationCanvas,
+      ),
+      step(
+        'compatibility',
+        'Keep stable vertex references and tool limits in view',
+        '**Stable vertex IDs** keep corrections attached through reordering and subdivision; new vertices start neutral. Deleted/replaced IDs or a missing mesh produce a topology warning and block export. Restore the IDs, or explicitly use **Remove incompatible tracks**; the editor retains the authored data until that command. **Animation Variations** scale shape times, and Pose Library, IK baking and bone mirroring preserve corrections. Mesh mirroring and deformation channels in **Graph Editor** are unavailable; use this inspector for offsets and shape interpolation. Motion Diagnostics measures bones.',
+        targets.animationDeformationCompatibility,
+      ),
+      step(
+        'save',
+        'Save and reload the corrected animation',
+        '**Download JSON** preserves committed correction keys with bones, IK, events and settings. **File tools → Reload Current Export** checks the animation round trip; import/reload replaces the session history after any required confirmation. **Character package → Download character ZIP** keeps the clip together with its mesh rig, weights, skin assignments and artwork. Reload, select the same mesh skin and scrub the elbow again. Runtime playback uses the same correction sampling and skinning order as the editor. Reading or finishing this tour does not export, mark the clip clean or change any authored data.',
+        targets.animationExport,
+      ),
+    ],
+  },
+  {
     id: 'animation-root-motion',
     title: 'Creating Root Motion',
     description: 'Author whole-character travel with root position keys, a viewport handle and Graph Editor curves.',

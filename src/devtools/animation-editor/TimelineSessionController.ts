@@ -203,8 +203,12 @@ export class TimelineSessionController {
     if ((authoredChanged || fps !== this.authoredFPS || document.activeElement !== this.fps) && this.fps.value !== fps)
       this.fps.value = fps;
     this.authoredFPS = fps;
-    const previousDisabled = !state.getAdjacentKeyframe(-1);
-    const nextDisabled = !state.getAdjacentKeyframe(1);
+    const previousDisabled = !(state.deformationSelected
+      ? state.getAdjacentDeformationKey(-1)
+      : state.getAdjacentKeyframe(-1));
+    const nextDisabled = !(state.deformationSelected
+      ? state.getAdjacentDeformationKey(1)
+      : state.getAdjacentKeyframe(1));
     if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
     if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
     setText(
@@ -228,6 +232,8 @@ export class TimelineSessionController {
       state.selectedTarget,
       state.selectedIKKeyframe,
       state.selectedRootKey,
+      state.selectedDeformationKey,
+      state.deformationSelected,
       state.rootMotionSelected,
       state.selectedEvent,
       state.timelineClipboard,
@@ -256,7 +262,11 @@ export class TimelineSessionController {
     this.files.render();
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled =
-      state.selectedKeys.length === 0 && !state.selectedIKKeyframe && !state.selectedEvent && !state.selectedRootKey;
+      state.selectedKeys.length === 0 &&
+      !state.selectedIKKeyframe &&
+      !state.selectedEvent &&
+      !state.selectedRootKey &&
+      !state.selectedDeformationKey;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
     setCommandAvailability(
       this.deleteKey,
@@ -287,7 +297,11 @@ export class TimelineSessionController {
       bakeReason,
       'Select IK constraints and sampling FPS, then preview before baking',
     );
-    const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0) + (state.selectedRootKey ? 1 : 0);
+    const count =
+      state.selectedKeys.length +
+      (state.selectedIKKeyframe ? 1 : 0) +
+      (state.selectedRootKey ? 1 : 0) +
+      (state.selectedDeformationKey ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
     setText(
       this.deleteKey,
@@ -297,8 +311,9 @@ export class TimelineSessionController {
           ? `Delete ${count} Selected Key${count === 1 ? '' : 's'}${hidden ? ` (${hidden} hidden)` : ''}`
           : 'Delete Selected Keys',
     );
-    const copyDisabled =
-      state.rootMotionSelected || !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
+    const copyDisabled = state.deformationSelected
+      ? !state.selectedDeformationKey
+      : state.rootMotionSelected || !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
     if (this.duplicateKeys.disabled !== (state.rootMotionSelected ? !state.selectedRootKey : copyDisabled))
       this.duplicateKeys.disabled = state.rootMotionSelected ? !state.selectedRootKey : copyDisabled;
@@ -306,15 +321,25 @@ export class TimelineSessionController {
     setText(this.duplicateKeys, state.selectedEvent ? 'Duplicate Event' : 'Duplicate Keys');
     setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
     const pasteDisabled =
-      state.rootMotionSelected || !!state.selectedIKConstraintId || !animation || !state.timelineClipboard;
+      state.timelineClipboard?.kind === 'deformation'
+        ? !animation
+        : state.deformationSelected ||
+          state.rootMotionSelected ||
+          !!state.selectedIKConstraintId ||
+          !animation ||
+          !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
-    const clipboardReason = state.rootMotionSelected
-      ? 'Root clipboard is unavailable; use Duplicate key.'
-      : state.selectedIKConstraintId
-        ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
-        : copyDisabled
-          ? 'Select bone keys or an event first.'
-          : '';
+    const clipboardReason = state.deformationSelected
+      ? state.selectedDeformationKey
+        ? ''
+        : 'Select a deformation key first.'
+      : state.rootMotionSelected
+        ? 'Root clipboard is unavailable; use Duplicate key.'
+        : state.selectedIKConstraintId
+          ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
+          : copyDisabled
+            ? 'Select bone keys or an event first.'
+            : '';
     setCommandAvailability(this.copyKeys, clipboardReason, 'Copy selection (Ctrl/Cmd+C in timeline)');
     setCommandAvailability(
       this.duplicateKeys,
@@ -323,15 +348,21 @@ export class TimelineSessionController {
     );
     setCommandAvailability(
       this.pasteKeys,
-      state.rootMotionSelected
-        ? 'Select a bone or event track to paste.'
-        : state.selectedIKConstraintId
-          ? 'Select a bone track or event track to paste.'
-          : !animation
-            ? 'Load a valid animation first.'
-            : !state.timelineClipboard
-              ? 'Copy bone keys or an event first.'
-              : '',
+      state.timelineClipboard?.kind === 'deformation'
+        ? !animation
+          ? 'Load a valid animation first.'
+          : ''
+        : state.deformationSelected
+          ? 'Copy a deformation key first.'
+          : state.rootMotionSelected
+            ? 'Select a bone or event track to paste.'
+            : state.selectedIKConstraintId
+              ? 'Select a bone track or event track to paste.'
+              : !animation
+                ? 'Load a valid animation first.'
+                : !state.timelineClipboard
+                  ? 'Copy bone keys or an event first.'
+                  : '',
       'Paste at the playhead (Ctrl/Cmd+V in timeline)',
     );
     setText(

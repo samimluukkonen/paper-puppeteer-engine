@@ -5,6 +5,7 @@ import { EventInspectorController } from './EventInspectorController.js';
 import { GraphEditorController } from './GraphEditorController.js';
 import { registerGraphGuideTargets } from './graphGuideTargets.js';
 import { InterpolationController } from './InterpolationController.js';
+import { MeshDeformationController } from './MeshDeformationController.js';
 import { RootMotionController } from './RootMotionController.js';
 import { generateRulerTicks, timeToTimelineX } from './timeline.js';
 import { defaultTimelineFilters, normalizedTrackSearch, type TimelineFilters } from './timelineFiltering.js';
@@ -26,6 +27,7 @@ export class TimelineController {
   private readonly input: TimelineInputController;
   private readonly session: TimelineSessionController;
   private readonly root: RootMotionController;
+  private readonly deformation: MeshDeformationController;
   private readonly tracks: TimelineTracksController;
   private readonly interpolation: InterpolationController;
   private readonly graph: GraphEditorController;
@@ -59,12 +61,14 @@ export class TimelineController {
     this.showIK = this.element('#timeline-show-ik');
     this.showEvents = this.element('#timeline-show-events');
     this.root = new RootMotionController(app);
+    this.deformation = new MeshDeformationController(app);
     this.tracks = new TimelineTracksController(
       this.element('#timeline-track-labels'),
       this.element('#timeline-tracks'),
       (event, key, marker) => this.input.beginKeyDrag(event, key, marker),
       (event, ref, marker) => this.input.beginEventDrag(event, ref, marker),
       this.root,
+      this.deformation,
     );
     this.session = new TimelineSessionController(app, () => this.state, {
       endScrub: () => this.input.endScrub(),
@@ -191,6 +195,7 @@ export class TimelineController {
 
   private render(): void {
     this.root.render(this.state, this.navigation.view.contentWidth);
+    this.deformation.render(this.state, this.navigation.view.contentWidth);
     this.graph.render();
     this.input.synchronize();
     const state = this.state;
@@ -207,6 +212,7 @@ export class TimelineController {
       state,
       animation,
       state.timelineTracks,
+      this.deformation.revision,
       state.selectedTarget,
       state.selectedIKKeyframe,
       state.selectedBoneId,
@@ -316,6 +322,7 @@ export class TimelineController {
     this.viewAbort.abort();
     this.unsubscribe?.();
     this.root.dispose();
+    this.deformation.dispose();
     this.tracks.dispose();
   }
 }
