@@ -37,6 +37,8 @@ loaded.runner.play();
 
 Character, rig, skin, animation and project formats remain version **1**; scenes use **2**. ZIP support is the stored UTF-8 subset emitted by these exporters. The [v1.0.5 report](personal-production-readiness.md) records exact workflow/runtime verification and limits.
 
+Scene background resolution uses the same aggregate artwork budget as the editor: 100 MiB encoded image bytes and 128 megapixels, with the existing per-image limits. Referenced encoded audio has a separate 100 MiB scene total and a 10 MiB per-file limit. Hosted audio is counted while streaming, and an overflow cancels the response before retaining it or requesting further assets. Host-provided audio caches follow the same total. The decoded-audio budget remains separate from these transfer limits.
+
 ## Exported package layout and validation
 
 ```text

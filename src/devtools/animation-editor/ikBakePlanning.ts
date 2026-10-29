@@ -29,7 +29,7 @@ const rigSnapshots = new WeakMap<Rig, RigDefinition>();
 
 /** Transfer logical joint positions exactly. Rig already resolved explicit lengths;
  * omitting lengths avoids a second normalization and preserves floating-point identity.
- * Artwork does not participate in the detached solver.
+ * Mesh attachments and slots remain available for deformation-track validation.
  */
 export function bakeRigSnapshot(rig: Rig): RigDefinition {
   let snapshot = rigSnapshots.get(rig);
@@ -37,6 +37,8 @@ export function bakeRigSnapshot(rig: Rig): RigDefinition {
     snapshot = {
       root: rig.root,
       bones: rig.bones.map(({ length: _length, sprite: _sprite, ...bone }) => bone),
+      slots: rig.slots,
+      attachments: rig.attachments,
       ...(rig.ik === undefined ? {} : { ik: rig.ik }),
     };
     rigSnapshots.set(rig, snapshot);

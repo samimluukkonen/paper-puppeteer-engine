@@ -84,11 +84,12 @@ export function validateMeshBindPose(mesh: MeshAttachmentDefinition, rig: RigDef
       },
     ];
   try {
+    const resolveBone = createBoneBindResolver(actual);
     for (const bone of actual.bones) {
-      if (!worldToLocal({ x: 0, y: 0 }, boneBindMatrix(actual, bone.id)))
+      if (!worldToLocal({ x: 0, y: 0 }, resolveBone(bone.id)))
         throw new Error('Mesh bind bone transform is singular or unsupported.');
     }
-    for (const slot of actual.slots) attachmentBindMatrix(mesh, slot.id);
+    for (const slot of actual.slots) attachmentBindMatrix(mesh, slot.id, resolveBone);
   } catch (error) {
     return [
       {
@@ -101,29 +102,46 @@ export function validateMeshBindPose(mesh: MeshAttachmentDefinition, rig: RigDef
   return [];
 }
 
-export function boneBindMatrix(bind: MeshBindPose, boneId: string): Affine {
+/** @internal One scoped resolver shares the index and ancestor matrices across a validation or binding.
+ * Keep caches local to the operation: public callers may supply mutable bind data.
+ */
+export function createBoneBindResolver(bind: MeshBindPose): (boneId: string) => Affine {
   const bones = new Map(bind.bones.map((bone) => [bone.id, bone]));
-  const chain = [];
-  const seen = new Set<string>();
-  let id: string | undefined = boneId;
-  while (id !== undefined) {
-    if (seen.has(id)) throw new Error('Mesh bind hierarchy contains a cycle.');
-    seen.add(id);
-    const bone = bones.get(id);
-    if (!bone) throw new Error(`Missing mesh bind bone "${id}".`);
-    chain.push(bone);
-    id = bone.parent;
-  }
-  let matrix = emptyAffine();
-  for (const bone of chain.reverse())
-    matrix = composeAffine(transformToAffine(bone, emptyAffine()), matrix, emptyAffine());
-  return matrix;
+  const matrices = new Map<string, Affine>();
+  return (boneId) => {
+    const chain = [];
+    const seen = new Set<string>();
+    let id: string | undefined = boneId;
+    while (id !== undefined && !matrices.has(id)) {
+      if (seen.has(id)) throw new Error('Mesh bind hierarchy contains a cycle.');
+      seen.add(id);
+      const bone = bones.get(id);
+      if (!bone) throw new Error(`Missing mesh bind bone "${id}".`);
+      chain.push(bone);
+      id = bone.parent;
+    }
+    let matrix = id === undefined ? undefined : matrices.get(id);
+    for (let index = chain.length - 1; index >= 0; --index) {
+      const bone = chain[index]!;
+      matrix = composeAffine(transformToAffine(bone, emptyAffine()), matrix, emptyAffine());
+      matrices.set(bone.id, matrix);
+    }
+    return matrices.get(boneId)!;
+  };
 }
 
-function attachmentBindMatrix(mesh: MeshAttachmentDefinition, slotId: string): Affine {
+export function boneBindMatrix(bind: MeshBindPose, boneId: string): Affine {
+  return createBoneBindResolver(bind)(boneId);
+}
+
+function attachmentBindMatrix(
+  mesh: MeshAttachmentDefinition,
+  slotId: string,
+  resolveBone = createBoneBindResolver(mesh.bindPose),
+): Affine {
   const slot = mesh.bindPose.slots.find((entry) => entry.id === slotId);
   if (!slot) throw new Error(`Missing mesh bind slot "${slotId}".`);
-  const bone = boneBindMatrix(mesh.bindPose, slot.bone);
+  const bone = resolveBone(slot.bone);
   const mount = composeAffine(transformToAffine(slot, emptyAffine()), bone, emptyAffine());
   const matrix = composeAffine(transformToAffine(mesh.bindPose.attachment, emptyAffine()), mount, emptyAffine());
   if (!worldToLocal({ x: matrix.tx, y: matrix.ty }, matrix))

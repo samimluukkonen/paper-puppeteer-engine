@@ -10,6 +10,7 @@ export const DEFAULT_SCENE_WORKLOAD_LIMITS = Object.freeze({
   maxTotalSlots: 32_768,
   maxTotalImageBytes: 100 * 1024 * 1024,
   maxTotalImagePixels: 128 * 1024 * 1024,
+  maxTotalAudioBytes: 100 * 1024 * 1024,
 });
 
 /** Count every instance, including Actors sharing one immutable character definition.

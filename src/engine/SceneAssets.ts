@@ -1,13 +1,13 @@
 import { validateAudioAssetData } from './AudioAsset.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
 import { CharacterLoader } from './CharacterLoader.js';
-import { CharacterTextureBudget } from './characterTextureLimits.js';
 import { inspectImageHeader } from './imageHeader.js';
 import { packagePath, PACKAGE_MAX_FILE_BYTES } from './packageZip.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { parseSceneDefinition, type SceneDefinition, type SceneCharacterAssets } from './SceneDefinition.js';
 import { readSceneResource } from './sceneResource.js';
-import { assertSceneInstanceBudget } from './sceneWorkloadLimits.js';
+import { createSceneTextureBudget } from './sceneTextureBudget.js';
+import { assertSceneInstanceBudget, DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
 
 export interface SceneAssetOptions {
   /** URL of scene.json; relative character references resolve against this URL. */
@@ -96,7 +96,7 @@ export async function resolveSceneDefinition(input: unknown, options: SceneAsset
     }
   }
   const images = new Map<string, Uint8Array<ArrayBuffer>>();
-  const budget = new CharacterTextureBudget({ allowWebp: true });
+  const budget = createSceneTextureBudget();
   for (const reference of new Set(definition.images?.map((image) => image.image))) {
     options.signal?.throwIfAborted();
     const url = new URL(reference, options.baseUrl);
@@ -111,13 +111,23 @@ export async function resolveSceneDefinition(input: unknown, options: SceneAsset
   }
   const audio = new Map<string, Uint8Array<ArrayBuffer>>();
   const audioIds = new Set(definition.audioClips?.map((clip) => clip.assetId));
+  let audioBytes = 0;
+  const audioLimitError = (): Error =>
+    new Error(`Scene audio exceeds the ${DEFAULT_SCENE_WORKLOAD_LIMITS.maxTotalAudioBytes}-byte total limit.`);
+  const countAudioBytes = (bytes: number): void => {
+    audioBytes += bytes;
+    if (audioBytes > DEFAULT_SCENE_WORKLOAD_LIMITS.maxTotalAudioBytes) throw audioLimitError();
+  };
   for (const asset of definition.audioAssets ?? []) {
     if (!audioIds.has(asset.id)) continue;
     options.signal?.throwIfAborted();
+    if (audioBytes === DEFAULT_SCENE_WORKLOAD_LIMITS.maxTotalAudioBytes) throw audioLimitError();
     const url = new URL(asset.path, options.baseUrl);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Scene audio must use HTTP(S).');
     const bytes = await (options.loadAudio?.(asset.path) ??
-      readSceneResource(url.href, options.fetcher ?? fetch, PACKAGE_MAX_FILE_BYTES, options.signal));
+      readSceneResource(url.href, options.fetcher ?? fetch, PACKAGE_MAX_FILE_BYTES, options.signal, countAudioBytes));
+    // Host caches bypass the streaming reader, but retain the same scene-wide budget.
+    if (options.loadAudio) countAudioBytes(bytes.byteLength);
     // AudioAssetDefinition's package validation expects confined paths; scene references may lead with ../.
     validateAudioAssetData({ ...asset, path: asset.path.replace(/^(?:\.\.\/)+/, '') }, bytes);
     audio.set(asset.id, bytes);

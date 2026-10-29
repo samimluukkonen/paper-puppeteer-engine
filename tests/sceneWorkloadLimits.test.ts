@@ -1,4 +1,6 @@
-import { assert, expect, test } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
+import { SceneImageRegistry } from '../src/devtools/scene-editor/SceneImageRegistry.js';
+import { AUDIO_MAX_FILE_BYTES } from '../src/engine/AudioAsset.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { resolveSceneDefinition } from '../src/engine/SceneAssets.js';
 import { createEmptyScene, parseSceneDefinition, validateSceneDefinition } from '../src/engine/SceneDefinition.js';
@@ -53,6 +55,109 @@ test('rejects oversized raw scene collections before inspecting their malformed 
     assert.match(issues[0]!.message, /limit/);
   }
   assert.equal(parseSceneDefinition(scene()).actors.length, limits.maxActors);
+});
+
+test('scene resolution accepts the editor image budget and rejects its next allocation', async () => {
+  const header = new Uint8Array(24);
+  header.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
+  new DataView(header.buffer).setUint32(16, 4096);
+  new DataView(header.buffer).setUint32(20, 4096);
+  const images = Array.from({ length: 9 }, (_, index) => ({
+    id: `image-${index}`,
+    image: `../images/image-${index}.png`,
+    position: { x: 0, y: 0 },
+    scale: { x: 1, y: 1 },
+    visible: true,
+    order: index,
+  }));
+  const registry = new SceneImageRegistry();
+  for (const image of images.slice(0, 8)) registry.register(image.image, header);
+  const source = { ...createEmptyScene({ id: 'images' }), images: images.slice(0, 8) };
+  const options = { baseUrl: 'https://example.test/scene.json', loadImage: () => Promise.resolve(header) };
+  assert.equal((await resolveSceneDefinition(source, options)).images!.size, registry.entries.length);
+  assert.throws(() => registry.register(images[8]!.image, header), /pixel total limit/);
+  await expect(resolveSceneDefinition({ ...source, images }, options)).rejects.toThrow(/pixel total limit/);
+});
+
+function audioScene(count: number) {
+  return {
+    ...createEmptyScene({ id: 'audio' }),
+    audioAssets: Array.from({ length: count }, (_, index) => ({
+      id: `audio-${index}`,
+      name: `Audio ${index}`,
+      path: `audio/${index}.wav`,
+      category: 'sfx' as const,
+    })),
+    audioTracks: [{ id: 'track', name: 'SFX', category: 'sfx' as const }],
+    audioClips: Array.from({ length: count }, (_, index) => ({
+      id: `clip-${index}`,
+      assetId: `audio-${index}`,
+      trackId: 'track',
+      time: 0,
+      duration: 1,
+      sourceOffset: 0,
+      volume: 1,
+      loop: false,
+    })),
+  };
+}
+function wav(size: number) {
+  const bytes = new Uint8Array(size);
+  bytes.set(new TextEncoder().encode('RIFF'), 0);
+  bytes.set(new TextEncoder().encode('WAVE'), 8);
+  return bytes;
+}
+
+test('host audio shares the total limit and stops acquiring assets when the budget is full', async () => {
+  const bytes = wav(AUDIO_MAX_FILE_BYTES);
+  const count = limits.maxTotalAudioBytes / bytes.byteLength;
+  const loadAudio = vi.fn(() => Promise.resolve(bytes));
+  const options = { baseUrl: 'https://example.test/scene.json', loadAudio };
+  const resolved = await resolveSceneDefinition(audioScene(count), options);
+  assert.equal(resolved.audio!.size, count);
+  loadAudio.mockClear();
+  await expect(resolveSceneDefinition(audioScene(count + 2), options)).rejects.toThrow(/audio.*total limit/);
+  assert.equal(loadAudio.mock.calls.length, count);
+});
+
+test('host audio rejects a file larger than the remaining scene budget', async () => {
+  const bytes = wav(AUDIO_MAX_FILE_BYTES - 1);
+  const loadAudio = vi.fn(() => Promise.resolve(bytes));
+  await expect(
+    resolveSceneDefinition(audioScene(12), {
+      baseUrl: 'https://example.test/scene.json',
+      loadAudio,
+    }),
+  ).rejects.toThrow(/audio.*total limit/);
+  assert.equal(loadAudio.mock.calls.length, 11);
+});
+
+test.each([undefined, '1'])('audio budget cancels streamed overflow with content-length %s', async (length) => {
+  const bytes = wav(AUDIO_MAX_FILE_BYTES - 1);
+  const cancel = vi.fn();
+  const fetcher = vi.fn<typeof fetch>(() =>
+    Promise.resolve(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(bytes);
+            // Leave overflow open: rejection must cancel it without waiting for EOF.
+            if (fetcher.mock.calls.length <= 10) controller.close();
+          },
+          cancel,
+        }),
+        { headers: length ? { 'content-length': length } : {} },
+      ),
+    ),
+  );
+  await expect(
+    resolveSceneDefinition(audioScene(12), {
+      baseUrl: 'https://example.test/scene.json',
+      fetcher,
+    }),
+  ).rejects.toThrow(/audio.*total limit/);
+  assert.equal(fetcher.mock.calls.length, 11);
+  assert.equal(cancel.mock.calls.length, 1);
 });
 
 test('counts every Actor instance even when all Actors share one definition', async () => {

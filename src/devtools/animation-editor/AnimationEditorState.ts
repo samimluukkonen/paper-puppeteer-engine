@@ -12,12 +12,7 @@ import type { ValidationIssue } from '../../engine/externalData.js';
 import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
 import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
 import type { IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
-import {
-  getMeshDeformationTrack,
-  meshDeformationIssues,
-  type MeshDeformationKey,
-  type VertexOffset,
-} from '../../engine/meshDeformation.js';
+import { getMeshDeformationTrack, type MeshDeformationKey, type VertexOffset } from '../../engine/meshDeformation.js';
 import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { PoseDefinition } from '../../engine/Pose.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
@@ -32,6 +27,7 @@ import {
 } from '../shared/boneSymmetry.js';
 import { freezeData } from '../shared/editorData.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
+import { AnimationEditorDeformationCommands } from './AnimationEditorDeformationCommands.js';
 import {
   AnimationEditorDocument,
   type AnimationEditorStateOptions,
@@ -44,6 +40,7 @@ import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationE
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
 import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
+import { AnimationEditorPreviewCommands } from './AnimationEditorPreviewCommands.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
 import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
@@ -53,9 +50,8 @@ import {
   getEvaluatedBonePropertyValue,
   getEvaluatedBoneTransform,
 } from './animationValues.js';
-import { createAnimationVariation, type AnimationVariationOptions } from './animationVariation.js';
+import type { AnimationVariationOptions } from './animationVariation.js';
 import type { NewAnimationOptions } from './createEmptyAnimation.js';
-import { editDeformationKey, setDeformationOffsets } from './deformationEdits.js';
 import {
   type GhostPoseSample,
   type GhostSamplingSettings,
@@ -81,7 +77,7 @@ import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
-import { previewMotionCleanup, type MotionDiagnosticOptions } from './motionDiagnostics.js';
+import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
 import { motionPreviewSampleTime } from './motionPreview.js';
 import { PoseLibrary } from './PoseLibrary.js';
 import { rootKeys, setRootKey, duplicateRootPropertyKey, type RootKeySelection } from './rootMotionEdits.js';
@@ -91,7 +87,6 @@ import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js
 import { AnimationEditorTimelineSnapping, type TimelineSnapSettings } from './timelineSnapping.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
-import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';
 import type { RootLoopMode, WorldDisplacementMode } from './worldDisplacement.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
@@ -122,221 +117,61 @@ export class AnimationEditorState {
     this.notify();
   }
 
-  private deformationGesture: {
-    base: ReadonlyAnimation;
-    preview: ReadonlyAnimation;
-    rig: Rig;
-    meshId: string;
-    time: number;
-  } | null = null;
-  get deformationEditActive(): boolean {
-    return this.deformationGesture !== null;
-  }
-  beginDeformationEdit(): boolean {
-    if (!this.animationAuthoringEnabled || !this.working || !this.rig || !this.selectedMeshId) return false;
-    this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.pause();
-      this.endScrub();
-      this.selection.selectBone(null);
-      this.rootMotionSelected = false;
-      this.selectedRootKey = null;
-      this.deformationSelected = true;
-      this.deformationGesture = {
-        base: this.working!,
-        preview: this.working!,
-        rig: this.rig!,
-        meshId: this.selectedMeshId!,
-        time: this.currentTimeMilliseconds,
-      };
-      this.notify();
-    });
-    return true;
-  }
-  previewMeshOffsets(changes: Readonly<Record<string, VertexOffset>>): boolean {
-    const gesture = this.deformationGesture;
-    if (!gesture || gesture.base !== this.working || gesture.rig !== this.rig) return false;
-    gesture.preview = setDeformationOffsets(gesture.base, gesture.rig, gesture.meshId, gesture.time, changes);
-    this.notify();
-    return true;
-  }
-  previewDeformationMove(key: MeshDeformationKey, time: number): boolean {
-    const gesture = this.deformationGesture;
-    if (!gesture || gesture.base !== this.working || gesture.rig !== this.rig) return false;
-    gesture.preview = editDeformationKey(gesture.base, gesture.rig, gesture.meshId, { ...key, time }, key.time);
-    this.notify();
-    return true;
-  }
-  cancelDeformationEdit(): boolean {
-    if (!this.deformationGesture) return false;
-    this.deformationGesture = null;
-    this.notify();
-    return true;
-  }
-  commitDeformationEdit(time = this.currentTime): boolean {
-    const gesture = this.deformationGesture;
-    if (!gesture) return false;
-    this.deformationGesture = null;
-    if (gesture.base !== this.working || gesture.rig !== this.rig || !this.animationAuthoringEnabled) {
-      this.notify();
-      return false;
-    }
-    return this.batchNotifications(() => {
-      this.selectedDeformationTime = time;
-      return this.installWorkingAnimation(gesture.preview);
-    });
-  }
-
   meshDiagnosticsEnabled = false;
-  setMeshDiagnostics(enabled: boolean): void {
-    this.meshDiagnosticsEnabled = enabled;
-    this.notify();
-  }
-
   deformationEditing = false;
   deformationSelected = false;
   selectedMeshId: string | null = null;
   selectedDeformationTime: number | null = null;
-  get selectedDeformationKey(): MeshDeformationKey | null {
-    return this.deformationSelected && this.selectedMeshId !== null && this.selectedDeformationTime !== null
-      ? ((this.working ? getMeshDeformationTrack(this.working, this.selectedMeshId) : []).find(
-          (key) => key.time / 1000 === this.selectedDeformationTime,
-        ) ?? null)
-      : null;
+  get deformationEditActive(): boolean {
+    return this.deformation.deformationEditActive;
   }
-  private topologyCache:
-    | { animation: ReadonlyAnimation | null; rig: Rig | undefined; issues: readonly ValidationIssue[] }
-    | undefined;
+  get selectedDeformationKey(): MeshDeformationKey | null {
+    return this.deformation.selectedDeformationKey;
+  }
   get deformationTopologyIssues(): readonly ValidationIssue[] {
-    if (!this.topologyCache || this.topologyCache.animation !== this.working || this.topologyCache.rig !== this.rig)
-      this.topologyCache = {
-        animation: this.working,
-        rig: this.rig,
-        issues: this.rig ? meshDeformationIssues(this.working?.deformationTracks, this.rig) : [],
-      };
-    return this.topologyCache.issues;
+    return this.deformation.deformationTopologyIssues;
+  }
+  beginDeformationEdit(): boolean {
+    return this.deformation.beginDeformationEdit();
+  }
+  previewMeshOffsets(changes: Readonly<Record<string, VertexOffset>>): boolean {
+    return this.deformation.previewMeshOffsets(changes);
+  }
+  previewDeformationMove(key: MeshDeformationKey, time: number): boolean {
+    return this.deformation.previewDeformationMove(key, time);
+  }
+  cancelDeformationEdit(): boolean {
+    return this.deformation.cancelDeformationEdit();
+  }
+  commitDeformationEdit(time = this.currentTime): boolean {
+    return this.deformation.commitDeformationEdit(time);
+  }
+  setMeshDiagnostics(enabled: boolean): void {
+    this.deformation.setMeshDiagnostics(enabled);
   }
   setDeformationEditing(enabled: boolean): void {
-    this.batchNotifications(() => {
-      this.cancelDeformationEdit();
-      this.deformationEditing = enabled;
-      if (enabled) {
-        this.pause();
-        this.endScrub();
-      }
-      this.notify();
-    });
+    this.deformation.setDeformationEditing(enabled);
   }
   selectDeformation(meshId: string, time?: number): boolean {
-    if (!this.working || !this.rig?.attachments.some((entry) => entry.id === meshId && entry.type === 'mesh'))
-      return false;
-    if (time !== undefined && !getMeshDeformationTrack(this.working, meshId).some((key) => key.time / 1000 === time))
-      return false;
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.selection.selectBone(null);
-      this.rootMotionSelected = false;
-      this.selectedRootKey = null;
-      this.deformationSelected = true;
-      this.selectedMeshId = meshId;
-      this.selectedDeformationTime = time ?? null;
-      if (time !== undefined) {
-        this.pause();
-        this.endScrub();
-        this.updateTime(time);
-      }
-      this.notify();
-      return true;
-    });
+    return this.deformation.selectDeformation(meshId, time);
   }
   setMeshOffsets(changes: Readonly<Record<string, VertexOffset>> | null, time = this.currentTime): boolean {
-    if (!this.animationAuthoringEnabled || !this.working || !this.rig || !this.selectedMeshId) return false;
-    const id = this.selectedMeshId;
-    return this.commitDeformationProposal(
-      () => setDeformationOffsets(this.working!, this.rig!, id, time * 1000, changes),
-      time,
-    );
+    return this.deformation.setMeshOffsets(changes, time);
   }
   changeDeformationKey(key: MeshDeformationKey | null, previousTime = this.selectedDeformationKey?.time): boolean {
-    if (
-      !this.animationAuthoringEnabled ||
-      !this.working ||
-      !this.rig ||
-      !this.selectedMeshId ||
-      previousTime === undefined
-    )
-      return false;
-    return this.commitDeformationProposal(
-      () => editDeformationKey(this.working!, this.rig!, this.selectedMeshId!, key, previousTime),
-      key ? key.time / 1000 : null,
-    );
+    return this.deformation.changeDeformationKey(key, previousTime);
   }
   duplicateDeformationKey(): boolean {
-    const key = this.selectedDeformationKey;
-    if (!key || !this.working || !this.rig || !this.selectedMeshId || !this.animationAuthoringEnabled) return false;
-    const destination =
-      this.currentTimeMilliseconds !== key.time ? this.currentTimeMilliseconds : key.time + 1000 / this.keyframeFPS;
-    return this.commitDeformationProposal(
-      () => editDeformationKey(this.working!, this.rig!, this.selectedMeshId!, { ...key, time: destination }),
-      destination / 1000,
-    );
-  }
-  private commitDeformationProposal(
-    create: () => ReadonlyAnimation,
-    time: number | null,
-    meshId = this.selectedMeshId,
-  ): boolean {
-    return this.batchNotifications(() => {
-      try {
-        const next = create();
-        if (!this.installWorkingAnimation(next)) return false;
-        this.selection.selectBone(null);
-        this.rootMotionSelected = false;
-        this.selectedRootKey = null;
-        this.selectedMeshId = meshId;
-        this.deformationSelected = true;
-        this.selectedDeformationTime = time;
-        this.notify();
-        return true;
-      } catch (error) {
-        this.document.reportError(error);
-        this.notify();
-        return false;
-      }
-    });
+    return this.deformation.duplicateDeformationKey();
   }
   removeIncompatibleDeformationTracks(): boolean {
-    if (!this.working || !this.rig || !this.animationAuthoringEnabled || !this.deformationTopologyIssues.length)
-      return false;
-    const deformationTracks = Object.fromEntries(
-      Object.entries(this.working.deformationTracks ?? {}).filter(
-        ([id, keys]) => !meshDeformationIssues({ [id]: keys }, this.rig!).length,
-      ),
-    );
-    return this.commitDeformationProposal(
-      () => validateEditedAnimation({ ...this.working!, deformationTracks }, this.working!, this.rig!),
-      null,
-    );
+    return this.deformation.removeIncompatibleDeformationTracks();
   }
   private copyDeformationKey(): boolean {
-    const key = this.selectedDeformationKey;
-    if (!key || !this.selectedMeshId) return false;
-    this.clipboard.content = { kind: 'deformation', data: { meshId: this.selectedMeshId, key } };
-    this.notify();
-    return true;
+    return this.deformation.copyDeformationKey();
   }
   private pasteDeformationKey(): boolean {
-    const content = this.clipboard.content;
-    if (content?.kind !== 'deformation' || !this.working || !this.rig || !this.animationAuthoringEnabled) return false;
-    return this.commitDeformationProposal(
-      () =>
-        editDeformationKey(this.working!, this.rig!, content.data.meshId, {
-          ...content.data.key,
-          time: this.currentTimeMilliseconds,
-        }),
-      this.currentTime,
-      content.data.meshId,
-    );
+    return this.deformation.pasteDeformationKey();
   }
 
   rootMotionSelected = false;
@@ -502,122 +337,41 @@ export class AnimationEditorState {
     });
   }
 
-  private trajectoryCopy: { base: ReadonlyAnimation; rig: Rig; animation: ReadonlyAnimation } | null = null;
   get trajectoryCopyActive(): boolean {
-    return !!this.trajectoryCopy && this.trajectoryCopy.base === this.working && this.trajectoryCopy.rig === this.rig;
+    return this.previews.trajectoryCopyActive;
   }
   previewTrajectoryCopy(rootMotion: NonNullable<ReadonlyAnimation['rootMotion']>): boolean {
-    if (!this.working || !this.rig || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits) return false;
-    const animation = validateEditedAnimation({ ...this.working, rootMotion }, this.working, this.rig);
-    this.batchNotifications(() => {
-      this.pause();
-      this.cancelCleanupPreview();
-      this.cancelVariationPreview();
-      this.rootMotionEditing = false;
-      this.trajectoryCopy = { base: this.working!, rig: this.rig!, animation };
-      this.setWorldDisplacementView('authored');
-      this.notify();
-    });
-    return true;
+    return this.previews.previewTrajectoryCopy(rootMotion);
   }
   cancelTrajectoryCopy(): boolean {
-    if (!this.trajectoryCopy) return false;
-    this.trajectoryCopy = null;
-    this.notify();
-    return true;
+    return this.previews.cancelTrajectoryCopy();
   }
   commitTrajectoryCopy(): boolean {
-    if (!this.trajectoryCopyActive || this.hasPendingAnimationEdits || !this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
-      const animation = this.trajectoryCopy!.animation;
-      this.trajectoryCopy = null;
-      this.pause();
-      return this.installWorkingAnimation(animation);
-    });
+    return this.previews.commitTrajectoryCopy();
   }
-
-  private cleanupPreview: { base: ReadonlyAnimation; rig: Rig; animation: ReadonlyAnimation; timeMs: number } | null =
-    null;
-
   get cleanupPreviewActive(): boolean {
-    return !!this.cleanupPreview && this.cleanupPreview.base === this.working && this.cleanupPreview.rig === this.rig;
+    return this.previews.cleanupPreviewActive;
   }
-
-  /** Pose-only comparison through the existing runtime canvas; events and authored data stay untouched. */
   previewCleanup(animation: ReadonlyAnimation, timeMs: number): void {
-    if (!this.working || !this.rig || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits)
-      throw new Error('Commit or cancel temporary edits before cleanup preview.');
-    if (!Number.isFinite(timeMs) || timeMs < 0 || timeMs > animation.duration) throw new Error('Invalid preview time.');
-    getValidatedEditorAnimation(animation, this.rig);
-    this.batchNotifications(() => {
-      this.pause();
-      this.variationPreview = null;
-      this.posePreview = null;
-      this.cleanupPreview = { base: this.working!, rig: this.rig!, animation, timeMs };
-      this.notify();
-    });
+    this.previews.previewCleanup(animation, timeMs);
   }
   cancelCleanupPreview(): boolean {
-    if (!this.cleanupPreview) return false;
-    this.cleanupPreview = null;
-    this.notify();
-    return true;
+    return this.previews.cancelCleanupPreview();
   }
   applyMotionCleanup(
     targets: readonly PropertyKeyframeTarget[],
     options: Partial<MotionDiagnosticOptions> = {},
   ): boolean {
-    if (
-      !this.working ||
-      !this.rig ||
-      !this.animationAuthoringEnabled ||
-      this.hasPendingAnimationEdits ||
-      !targets.length
-    )
-      return false;
-    return this.batchNotifications(() => {
-      const result = previewMotionCleanup(this.working!, this.rig!, targets, options);
-      const next = this.document.inspect(result.animation);
-      return !!next && this.installWorkingAnimation(next);
-    });
+    return this.previews.applyMotionCleanup(targets, options);
   }
-
-  private variationPreview: {
-    base: ReadonlyAnimation;
-    rig: Rig;
-    animation: ReadonlyAnimation;
-    timeMs: number;
-  } | null = null;
-
   get previewTimeMilliseconds(): Milliseconds {
-    return (
-      (this.cleanupPreviewActive ? this.cleanupPreview!.timeMs : undefined) ??
-      this.variationPreview?.timeMs ??
-      this.currentTimeMilliseconds
-    );
+    return this.previews.previewTimeMilliseconds;
   }
-
-  /** Pose-only scrub in the existing preview; authored clocks, events and history stay untouched. */
   previewVariation(options: AnimationVariationOptions, progress: number): void {
-    if (!this.animationAuthoringEnabled || !this.working || !this.rig || this.hasPendingAnimationEdits)
-      throw new Error('Commit or cancel temporary edits before previewing a variation.');
-    if (!Number.isFinite(progress) || progress < 0 || progress > 1)
-      throw new Error('Preview progress must be from 0 to 1.');
-    const animation = createAnimationVariation(this.working, this.rig, options);
-    this.batchNotifications(() => {
-      this.pause();
-      this.posePreview = null;
-      this.cancelCleanupPreview();
-      this.variationPreview = { base: this.working!, rig: this.rig!, animation, timeMs: animation.duration * progress };
-      this.notify();
-    });
+    this.previews.previewVariation(options, progress);
   }
-
   cancelVariationPreview(): boolean {
-    if (!this.variationPreview) return false;
-    this.variationPreview = null;
-    this.notify();
-    return true;
+    return this.previews.cancelVariationPreview();
   }
 
   private graphGesture: {
@@ -630,10 +384,10 @@ export class AnimationEditorState {
   /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
   get previewAnimation(): ReadonlyAnimation | null {
     return (
-      (this.trajectoryCopyActive ? this.trajectoryCopy!.animation : undefined) ??
-      (this.cleanupPreviewActive ? this.cleanupPreview!.animation : undefined) ??
-      this.deformationGesture?.preview ??
-      this.variationPreview?.animation ??
+      this.previews.trajectoryAnimation ??
+      this.previews.cleanupAnimation ??
+      this.deformation.previewAnimation ??
+      this.previews.variationAnimation ??
       this.rootGesture?.preview ??
       this.graphGesture?.preview ??
       this.working
@@ -719,10 +473,8 @@ export class AnimationEditorState {
   }
 
   readonly poseLibrary: PoseLibrary;
-  private posePreview: { pose: DeepReadonly<PoseDefinition>; animation: ReadonlyAnimation; rig: Rig } | null = null;
-
   get previewedPose(): DeepReadonly<PoseDefinition> | null {
-    return this.posePreview?.pose ?? null;
+    return this.previews.previewedPose;
   }
 
   /** Capture the evaluated authored FK pose, never Puppet's post-IK/rendered transforms. */
@@ -744,28 +496,10 @@ export class AnimationEditorState {
   }
 
   previewLibraryPose(id: string): boolean {
-    if (
-      !this.animationAuthoringEnabled ||
-      !this.working ||
-      !this.rig ||
-      this.hasPendingAnimationEdits ||
-      this.poseLibrary.compatibility(id, this.rig)
-    )
-      return false;
-    return this.batchNotifications(() => {
-      this.pause();
-      this.cancelCleanupPreview();
-      this.cancelVariationPreview();
-      this.posePreview = { pose: this.poseLibrary.get(id).pose, animation: this.working!, rig: this.rig! };
-      this.notify();
-      return true;
-    });
+    return this.previews.previewLibraryPose(id);
   }
-
   cancelPosePreview(): void {
-    if (!this.posePreview) return;
-    this.posePreview = null;
-    this.notify();
+    this.previews.cancelPosePreview();
   }
 
   /** One validated keyframe batch and one document history entry, using editor milliseconds. */
@@ -790,7 +524,7 @@ export class AnimationEditorState {
       if (!edits.length) return false;
       const next = setBonePropertyKeyframes(this.working!, this.rig!, edits, { preserveTiming: true });
       this.pause();
-      this.posePreview = null;
+      this.previews.clearPose();
       return this.installWorkingAnimation(freezeData(next));
     });
   }
@@ -806,6 +540,8 @@ export class AnimationEditorState {
     () => this.working?.duration ?? 0,
     () => this.working?.events ?? [],
   );
+  private readonly previews: AnimationEditorPreviewCommands;
+  private readonly deformation: AnimationEditorDeformationCommands;
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly snapping: AnimationEditorTimelineSnapping;
@@ -830,14 +566,27 @@ export class AnimationEditorState {
       rig,
       options.poses ?? [],
       () => {
-        this.posePreview = null;
+        this.previews.clearPose();
         this.notify();
       },
       () => this.rig,
     );
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
+    this.previews = new AnimationEditorPreviewCommands(this, this.document, {
+      batch: (command) => this.batchNotifications(command),
+      install: (animation) => this.installWorkingAnimation(animation),
+      notify: () => this.notify(),
+    });
     this.selection = new AnimationEditorSelection(rig);
+    this.deformation = new AnimationEditorDeformationCommands(this, this.document, this.clipboard, {
+      batch: (command) => this.batchNotifications(command),
+      install: (animation) => this.installWorkingAnimation(animation),
+      clearBoneSelection: () => this.selection.selectBone(null),
+      cancelTimelineDrag: () => this.cancelTimelineDrag(),
+      updateTime: (time) => this.updateTime(time),
+      notify: () => this.notify(),
+    });
     this.snapping = new AnimationEditorTimelineSnapping(
       () => this.workingAnimation,
       () => this.notify(),
@@ -1001,7 +750,7 @@ export class AnimationEditorState {
   }
   get selectedIKTargetValues() {
     const id = this.selectedIKConstraintId;
-    if ((this.graphGesture || this.variationPreview || this.cleanupPreviewActive) && id && this.rig)
+    if ((this.graphGesture || this.previews.hasIKPreview) && id && this.rig)
       return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.previewTimeMilliseconds);
     return this.ik.selectedIKTargetValues;
   }
@@ -1617,38 +1366,7 @@ export class AnimationEditorState {
       this.notificationPending = true;
       return;
     }
-    if (
-      this.trajectoryCopy &&
-      (!this.trajectoryCopyActive ||
-        !this.animationAuthoringEnabled ||
-        this.hasPendingAnimationEdits ||
-        !this.rootMotionVisible ||
-        this.rootMotionEditing)
-    )
-      this.trajectoryCopy = null;
-    if (
-      this.cleanupPreview &&
-      (!this.cleanupPreviewActive || !this.animationAuthoringEnabled || this.hasPendingAnimationEdits || this.isPlaying)
-    )
-      this.cleanupPreview = null;
-    if (
-      this.variationPreview &&
-      (this.variationPreview.base !== this.working ||
-        this.variationPreview.rig !== this.rig ||
-        !this.animationAuthoringEnabled ||
-        this.hasPendingAnimationEdits ||
-        this.isPlaying)
-    )
-      this.variationPreview = null;
-    if (
-      this.posePreview &&
-      (this.posePreview.animation !== this.working ||
-        this.posePreview.rig !== this.rig ||
-        !this.animationAuthoringEnabled ||
-        this.hasPendingAnimationEdits ||
-        this.isPlaying)
-    )
-      this.posePreview = null;
+    this.previews.reconcile();
     throwNotificationErrors(
       dispatchListeners(this.listeners, (listener) => listener()),
       'Animation editor listeners failed.',
@@ -1983,11 +1701,8 @@ export class AnimationEditorState {
     this.cancelRootMotionDrag();
     this.clearRootSelection();
     this.rootMotionEditing = false;
-    this.cleanupPreview = null;
-    this.trajectoryCopy = null;
-    this.variationPreview = null;
+    this.previews.reset();
     this.cancelGraphEdit();
-    this.posePreview = null;
     this.cancelIKTargetDrag();
     ++this.animationSessions;
     this.keyframes.resetSession();
@@ -2099,8 +1814,8 @@ export class AnimationEditorState {
   private restoreHistory(restore: () => boolean): boolean {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.
     const cancelledDrag = this.cancelTimelineDrag();
-    const cancelled = this.clearTransformDraft() || cancelledDrag || !!this.posePreview;
-    this.posePreview = null;
+    const cancelled = this.clearTransformDraft() || cancelledDrag || !!this.previews.previewedPose;
+    this.previews.clearPose();
     const changed = restore();
     if (changed) {
       this.updateTime(this.currentTime);

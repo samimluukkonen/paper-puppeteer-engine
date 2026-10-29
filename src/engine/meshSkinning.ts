@@ -1,5 +1,5 @@
 import { composeAffine, localToWorld, transformToAffine, worldToLocal, type Affine } from './affineMath.js';
-import { boneBindMatrix } from './meshBindPose.js';
+import { createBoneBindResolver } from './meshBindPose.js';
 import type { MeshVertexOffsets } from './meshDeformation.js';
 import type { BoneInfluence, JointTransform, MeshAttachmentDefinition } from './types.js';
 import { createTransform } from './types.js';
@@ -51,15 +51,7 @@ export function createMeshSkinBinding(
 ): MeshSkinBinding {
   const slot = mesh.bindPose.slots.find((entry) => entry.id === slotId);
   if (!slot) throw new Error(`Missing mesh bind slot "${slotId}".`);
-  const matrices = new Map<string, Affine>();
-  const bindBone = (id: string): Affine => {
-    let matrix = matrices.get(id);
-    if (!matrix) {
-      matrix = boneBindMatrix(mesh.bindPose, id);
-      matrices.set(id, matrix);
-    }
-    return matrix;
-  };
+  const bindBone = createBoneBindResolver(mesh.bindPose);
   const mount = composeAffine(transformToAffine(slotTransform ?? slot, identity()), bindBone(slot.bone), identity());
   const attachment = composeAffine(
     transformToAffine(attachmentTransform ?? createTransform(mesh), identity()),

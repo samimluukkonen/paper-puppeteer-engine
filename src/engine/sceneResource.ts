@@ -6,6 +6,7 @@ export async function readSceneResource(
   fetcher: typeof fetch,
   maxBytes: number,
   signal?: AbortSignal,
+  countBytes?: (bytes: number) => void,
 ): Promise<Uint8Array<ArrayBuffer>> {
   if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error('Scene resources must use HTTP(S).');
   return withResourceResponse(
@@ -21,6 +22,7 @@ export async function readSceneResource(
       readResponseBytes(response, {
         maxBytes,
         signal: requestSignal,
+        ...(countBytes ? { countBytes } : {}),
         limitError: () => new Error(`Scene resource exceeds ${maxBytes} bytes: ${url}`),
         emptyError: () => new Error(`Empty scene resource "${url}".`),
         validateResponse: (value) => {

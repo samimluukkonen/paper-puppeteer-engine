@@ -4,6 +4,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Preserve mesh deformation tracks during worker IK baking by retaining attachment and slot validation data alongside exact logical joints.
+
+- Use the shared scene artwork limits during dependency resolution and bound encoded scene audio to 100 MiB across streamed and host-provided assets, cancelling overflowing reads before retaining their bytes.
+
+- Reuse bone indexes and ancestor bind matrices within mesh validation and skin binding, avoiding repeated full-rig traversal while keeping mutable coordinate queries fresh.
+
+- Extract mesh deformation commands and detached trajectory, cleanup, variation and pose previews from AnimationEditorState, preserving the existing selection, notification, clock and document-history boundaries.
+
 - Reclaim Scene Editor timeline space with shared collapsible Actions, Camera, Transitions, Dialogue, Audio and View tabs. Start tool panels collapsed, keep compact playback and playhead controls visible, retain mounted settings and reveal controls for Feature Guides.
 
 - Organize the Scene Editor inspector into shared wrapping tabs for Scene, Actors, Camera, Artwork, Dialogue, Audio and Transitions. Keep sections collapsed initially, retain drafts across tabs and reveal the relevant group for selections and Feature Guides.
