@@ -7,6 +7,7 @@ export type {
 } from './meshDeformation.js';
 /** Shared authored data contracts. Type-only imports require neither Phaser nor React. */
 export type { IdentifiedRig, BoneMappingEntry, RigBoneMapping, RigMappingIssue } from './rigBoneMapping.js';
+export type { RetargetInput, RetargetOptions, RetargetResult, RetargetSkippedTrack } from './animationRetargeting.js';
 export type {
   RigCompatibilityLevel,
   RigCompatibilityReport,

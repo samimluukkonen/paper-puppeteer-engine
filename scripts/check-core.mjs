@@ -9,6 +9,7 @@ const {
   AnimationStateController,
   CharacterLoader,
   compileClip,
+  createRigBoneMapping,
   createRectangleMeshAttachment,
   createMeshSkinBinding,
   deformMesh,
@@ -19,6 +20,7 @@ const {
   inspectMeshDeformation,
   Joint,
   Rig,
+  retargetAnimation,
   solveTwoBoneIK,
   validatePoseDefinition,
   validateRigDefinition,
@@ -43,6 +45,39 @@ const meshRest = {
   bones: [{ id: 'root' }, { id: 'tip', parent: 'root', x: 10 }],
   slots: [{ id: 'cloth', bone: 'root' }],
 };
+// Retarget through the built renderer-independent entry and validate the resulting authored JSON.
+const retargetSource = { id: 'source', rig: meshRest };
+const retargetTarget = {
+  id: 'target',
+  rig: { ...meshRest, bones: [{ id: 'root' }, { id: 'tip', parent: 'root', x: 20, rotation: 0.5 }] },
+};
+const retargeted = retargetAnimation({
+  sourceAnimation: {
+    name: 'source-clip',
+    duration: 100,
+    loop: false,
+    tracks: { tip: [{ time: 0, x: 12, rotation: 0.2 }] },
+  },
+  sourceRig: retargetSource,
+  targetRig: retargetTarget,
+  boneMapping: createRigBoneMapping(
+    retargetSource,
+    retargetTarget,
+    [
+      { sourceBoneId: 'root', targetBoneId: 'root' },
+      { sourceBoneId: 'tip', targetBoneId: 'tip' },
+    ],
+    'map',
+    'Built core smoke',
+  ),
+  options: { name: 'retargeted', rootMotion: 'preserve' },
+});
+assert.ok(retargeted.animation);
+assert.equal(retargeted.animation.tracks.tip[0].x, 24);
+assert.equal(retargeted.animation.tracks.tip[0].rotation, 0.7);
+assert.doesNotThrow(() =>
+  serialization.serializeAnimationDefinition({ version: 1, ...retargeted.animation }, retargetTarget.rig),
+);
 const mesh = createRectangleMeshAttachment({ id: 'cloth', texture: 'paper' }, { width: 20, height: 10 }, meshRest);
 mesh.vertices = mesh.vertices.map((vertex) => ({
   ...vertex,
@@ -232,5 +267,5 @@ assert.ok(Number.isFinite(solved.middleRotation));
 player.dispose();
 assert.equal(player.isDisposed, true);
 console.log(
-  'Built /core, /serialization and /data work in Node: loading, validation, mesh round trips/skinning/seeking, async animation, IK, and disposal.',
+  'Built /core, /serialization and /data work in Node: loading, validation, FK retargeting, mesh round trips/skinning/seeking, async animation, IK, and disposal.',
 );

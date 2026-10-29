@@ -85,6 +85,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.3-1
+
+- Add a pure, renderer-independent `retargetAnimation` API with current explicit bone-map validation, rest-relative local FK rotation/translation/scale conversion, preserved sparse keys and interpolation curves, deterministic output and independently editable results.
+- Separate local, caller-identified pelvis and Actor root-motion translation policies; derive proportional scaling from effective rig geometry, handle degenerate lengths without division and report unusually different proportions. Reject singular or changed rest reflections explicitly.
+- Use conservative FK-only transfer: report omitted source IK data, suppress target constraints and require source IK baking when evaluated IK motion is needed. Preserve corrective mesh tracks only with verified identical effective rig revisions and complete identity correspondence; report other omissions and leave target skinning available.
+- Preserve animation metadata, playback, duration and detached JSON events, flag application-specific payload references, export the service/types through the public engine entry points, and add the retargeting guide and regression tests.
+
 ## 1.5.2
 
 - Add pure rig compatibility analysis with exact/shared, explicitly mappable, partial and incompatible levels, effective rest/hierarchy/orientation/proportion diagnostics and separate IK, foot-marker, skin and mesh checks. Bone correspondence does not enable retargeting or cross-rig deformation transfer.

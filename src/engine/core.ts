@@ -137,6 +137,8 @@ export {
 } from './Pose.js';
 export { Rig } from './Rig.js';
 export { analyzeRigCompatibility, suggestRigBoneMapping } from './rigCompatibility.js';
+export { retargetAnimation } from './animationRetargeting.js';
+export type { RetargetInput, RetargetOptions, RetargetResult, RetargetSkippedTrack } from './animationRetargeting.js';
 export type {
   RigCompatibilityLevel,
   RigCompatibilityReport,

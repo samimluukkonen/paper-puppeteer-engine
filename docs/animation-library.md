@@ -20,7 +20,7 @@ Multiple Actors and actions referencing the same source ID share that asset. Edi
 
 ## Compatibility
 
-Version-1 characters own their rigs and have no separately registered cross-character rig identity. Direct reuse therefore requires the same source character identity. Identical bone names or topology on another character do not establish compatibility. The library explains mismatched or unavailable rigs and disables reuse/copy for incompatible targets. Other characters can still be previewed and located. Advanced cross-rig retargeting is deferred.
+Version-1 characters own their rigs and have no separately registered cross-character rig identity. Direct reuse therefore requires the same source character identity. Identical bone names or topology on another character do not establish compatibility. The library explains mismatched or unavailable rigs and disables reuse/copy for incompatible targets. Other characters can still be previewed and located. The separate [animation retargeting API](animation-retargeting.md) can create target-compatible FK clips using a reviewed explicit map; its visual library workflow is a later milestone.
 
 After opening a character from a scene library to create a variation, reopen the scene from Project Workspace to load its new runtime definition. The scene document and history remain retained while its old preview is released. If a retained runtime is missing a newly created clip, selection explains how to refresh it.
 
