@@ -1,8 +1,19 @@
 .ground-guide-controls fieldset {
+  display: grid;
+  gap: 8px;
   border: 0;
   padding: 0;
   margin: 0;
   min-width: 0;
+}
+
+.ground-guide-controls fieldset > label {
+  display: grid;
+  gap: 8px;
+}
+
+.ground-guide-controls fieldset > button {
+  justify-self: start;
 }
 
 .ground-guide-controls label.ground-guide-toggle {
