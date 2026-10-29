@@ -17,6 +17,17 @@
   display: flex;
   align-items: center;
 }
+.weight-preview-controls {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+}
+.weight-preview-controls label {
+  gap: 8px;
+}
+.weight-preview-controls small {
+  line-height: 1.6;
+}
 .attachment-panel fieldset {
   display: grid;
   gap: 8px;

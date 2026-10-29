@@ -144,59 +144,61 @@ export function WeightPaintControls({ controller, editor }: { controller: Attach
         </small>
         <details data-guide-id={GUIDE_TARGETS.rigWeightPreview}>
           <summary>Preview deformation</summary>
-          <label>
-            <input
-              type="checkbox"
-              checked={editor.weightPreviewEnabled}
-              onChange={(event) => controller.weightPreview(event.target.checked, previewBone, degrees)}
-            />
-            Preview test bend
-          </label>
-          <label>
-            Test bone
-            <select
-              aria-label="Test bone"
-              value={previewBone}
-              onChange={(event) => controller.weightPreview(editor.weightPreviewEnabled, event.target.value, degrees)}
-            >
-              {bones}
-            </select>
-          </label>
-          <InspectorNumberField
-            label="Test bend (degrees)"
-            value={degrees}
-            min={-180}
-            max={180}
-            onCommit={(value) => controller.weightPreview(true, previewBone, value)}
-          />
-          <label>
-            Weight preview pose
-            <select
-              aria-label="Weight preview pose"
-              value={editor.previewName}
-              onChange={(event) => controller.previewPose(event.target.value)}
-            >
-              <option value="">Bind pose</option>
-              {editor.previewClips.map((clip) => (
-                <option key={clip.name} value={clip.name}>
-                  {clip.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {editor.previewName && (
+          <div className="weight-preview-controls">
+            <label>
+              <input
+                type="checkbox"
+                checked={editor.weightPreviewEnabled}
+                onChange={(event) => controller.weightPreview(event.target.checked, previewBone, degrees)}
+              />
+              Preview test bend
+            </label>
+            <label>
+              Test bone
+              <select
+                aria-label="Test bone"
+                value={previewBone}
+                onChange={(event) => controller.weightPreview(editor.weightPreviewEnabled, event.target.value, degrees)}
+              >
+                {bones}
+              </select>
+            </label>
             <InspectorNumberField
-              label="Weight preview time (ms)"
-              value={editor.previewTime}
-              min={0}
-              max={editor.previewClips.find((clip) => clip.name === editor.previewName)?.duration ?? 0}
-              onCommit={(value) => controller.previewPose(editor.previewName, value)}
+              label="Test bend (degrees)"
+              value={degrees}
+              min={-180}
+              max={180}
+              onCommit={(value) => controller.weightPreview(true, previewBone, value)}
             />
-          )}
-          <small>
-            Uses the runtime FK/IK and skinning evaluator. Test bends and clip sampling create no animation keys and are
-            never exported.
-          </small>
+            <label>
+              Weight preview pose
+              <select
+                aria-label="Weight preview pose"
+                value={editor.previewName}
+                onChange={(event) => controller.previewPose(event.target.value)}
+              >
+                <option value="">Bind pose</option>
+                {editor.previewClips.map((clip) => (
+                  <option key={clip.name} value={clip.name}>
+                    {clip.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {editor.previewName && (
+              <InspectorNumberField
+                label="Weight preview time (ms)"
+                value={editor.previewTime}
+                min={0}
+                max={editor.previewClips.find((clip) => clip.name === editor.previewName)?.duration ?? 0}
+                onCommit={(value) => controller.previewPose(editor.previewName, value)}
+              />
+            )}
+            <small>
+              Uses the runtime FK/IK and skinning evaluator. Test bends and clip sampling create no animation keys and
+              are never exported.
+            </small>
+          </div>
         </details>
       </div>
     </section>
