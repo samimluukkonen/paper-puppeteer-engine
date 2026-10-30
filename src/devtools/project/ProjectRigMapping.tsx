@@ -61,7 +61,7 @@ export function ProjectRigMapping({ workspace, busy }: { workspace: ProjectWorks
       {open && (
         <div className="project-rig-mapping-content">
           <p className="workspace-caption">
-            Compare authored rigs and approve bone correspondence for future retargeting. Saving a mapping does not
+            Compare authored rigs and approve bone correspondence for animation retargeting. Saving a mapping does not
             transfer animations.
           </p>
           <div className="project-mapping-pickers">
@@ -134,18 +134,20 @@ export function ProjectRigMapping({ workspace, busy }: { workspace: ProjectWorks
   );
 }
 
-function MappingEditor({
+export function MappingEditor({
   workspace,
   source,
   target,
   initial,
   busy,
+  onSaved,
 }: {
   workspace: ProjectWorkspace;
   source: IdentifiedRig;
   target: IdentifiedRig;
   initial: RigBoneMapping | undefined;
   busy: boolean;
+  onSaved?: (mapping: RigBoneMapping) => void;
 }) {
   const [draft, setDraft] = useState(
     () =>
@@ -231,8 +233,10 @@ function MappingEditor({
           disabled={busy || !report.mappingValid || !draft.name.trim()}
           onClick={() => {
             try {
-              workspace.saveRigMapping({ ...draft, name: draft.name.trim() });
+              const approved = { ...draft, name: draft.name.trim() };
+              workspace.saveRigMapping(approved);
               setStatus('Mapping saved in project metadata. Local autosave and Export Project include it.');
+              onSaved?.(approved);
             } catch (error) {
               setStatus(error instanceof Error ? error.message : String(error));
             }
@@ -335,8 +339,8 @@ function MappingEditor({
         </ul>
       </details>
       <p className="workspace-caption">
-        Bone keys use absolute local transforms; proportions and rest orientation may need future retargeting. IK
-        targets, constraint suppression, foot markers and mesh correction tracks need separate handling.
+        Bone keys use absolute local transforms; retargeting accounts for proportions and rest orientation. IK targets,
+        constraint suppression, foot markers and mesh correction tracks need separate handling.
       </p>
     </div>
   );

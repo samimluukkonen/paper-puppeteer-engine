@@ -97,6 +97,7 @@ const newAnimation = new NewAnimationController();
 const variations = new AnimationVariationController();
 const animationLibrary = new AnimationLibraryController();
 let releaseLibrarySelection: (() => void) | undefined;
+let releaseAnimationCreation: (() => void) | undefined;
 const retiming = new KeyframeRetimingController();
 const motionDiagnostics = new MotionDiagnosticsController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
@@ -350,6 +351,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
         if (copy) animationLibrary.copy(name);
         else animationLibrary.select(name);
       });
+      releaseAnimationCreation?.();
+      releaseAnimationCreation = projectContext?.bindAnimationCreation?.((clip) => state.createDerivedAnimation(clip));
       rigTweak.bind(state, editorScene.rigEditor!);
       rigWorkspace.render(editorScene.rigEditor!);
       editorScene.fitPreview();
@@ -476,6 +479,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       variations.unbind();
       releaseLibrarySelection?.();
       releaseLibrarySelection = undefined;
+      releaseAnimationCreation?.();
+      releaseAnimationCreation = undefined;
       animationLibrary.unbind();
       rigWorkspace.showError(message);
       packages.unbind();
@@ -627,6 +632,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     newAnimation.dispose();
     variations.dispose();
     releaseLibrarySelection?.();
+    releaseAnimationCreation?.();
     animationLibrary.dispose();
     workspace.dispose();
     recoveryControls.dispose();

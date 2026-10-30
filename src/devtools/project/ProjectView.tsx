@@ -555,6 +555,7 @@ export function ProjectView() {
               key={`animations:${selected.key}`}
               workspace={workspace}
               busy={busy}
+              create={(target, clip, targetRevision) => editors.createAnimation(selected, target, clip, targetRevision)}
               open={(character, animation, copy) =>
                 run(() =>
                   editors.open(selected, 'character', character, 'animation', false, undefined, {

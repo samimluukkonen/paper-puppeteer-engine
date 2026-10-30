@@ -1,7 +1,9 @@
+import type { AnimationClip } from '../../engine/AnimationClip.js';
 import { characterManifestSchema } from '../../engine/CharacterDefinition.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { inspectImageHeader } from '../../engine/imageHeader.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
+import { rigCompatibilityRevision } from '../../engine/rigBoneMapping.js';
 import { parseSceneJson } from '../../engine/SceneDefinition.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { buildCharacterPackage, openPackageRuntime, packageJson } from '../shared/package/characterPackage.js';
@@ -30,6 +32,8 @@ export interface ProjectEditorHost {
   guidePending?: boolean;
   animationRequest?: { name: string; copy: boolean } | undefined;
   selectAnimation?: (name: string, copy: boolean) => void;
+  createAnimation?: (clip: AnimationClip) => boolean;
+  pendingCreation?: { run(): void; reject(error: Error): void };
 }
 interface RuntimeLease {
   definition: CharacterDefinition;
@@ -97,6 +101,56 @@ export class ProjectEditorHosts {
     this.leases.add(lease);
     return lease;
   }
+
+  /** Wait for the existing editor owner; never maintain a second writable animation registry. */
+  async createAnimation(
+    session: ProjectSession,
+    id: string,
+    clip: AnimationClip,
+    targetRevision: string,
+  ): Promise<void> {
+    await this.open(session, 'character', id, 'animation');
+    const host = [...this.owners.values()].find(
+      (entry) => entry.session === session && entry.kind === 'character' && entry.asset === id,
+    );
+    if (!host) throw new Error('Target editor is unavailable. Return to Project and retry.');
+    if (host.pendingCreation) throw new Error('An animation is already being created.');
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const finish = (error?: Error): void => {
+          clearTimeout(timer);
+          delete host.pendingCreation;
+          if (error) reject(error);
+          else resolve();
+        };
+        const timer = setTimeout(
+          () => finish(new Error('Target editor did not become ready. Return to Project and retry.')),
+          30_000,
+        );
+        host.pendingCreation = {
+          reject: finish,
+          run: () => {
+            try {
+              if (host.pending?.()) throw new Error('Commit or cancel temporary target edits first.');
+              if (rigCompatibilityRevision(session.workspace.rigSource(id).rig) !== targetRevision)
+                throw new Error('Target rig changed. Review the mapping and preview again.');
+              if (!host.createAnimation?.(structuredClone(clip)))
+                throw new Error('Could not create animation. Check target editor validation, then preview again.');
+              session.workspace.refresh();
+              finish();
+            } catch (error) {
+              finish(error instanceof Error ? error : new Error(String(error)));
+            }
+          },
+        };
+        if (host.createAnimation) host.pendingCreation.run();
+      });
+    } catch (error) {
+      if (session.workspace.character(id).loading) host.context.characterLoadFailed();
+      host.context.navigate('project');
+      throw error;
+    }
+  }
   async open(
     session: ProjectSession,
     kind: 'character' | 'scene',
@@ -135,6 +189,7 @@ export class ProjectEditorHosts {
     const character = kind === 'character' ? workspace.character(id) : undefined;
     const close = (): void => {
       closed = true;
+      this.owners.get(token)?.pendingCreation?.reject(new Error('Target editor closed before animation creation.'));
       if (character) character.loading = false;
       const dispose = disposeScene;
       disposeScene = undefined;
@@ -207,6 +262,9 @@ export class ProjectEditorHosts {
         if (!entry.loading) return;
         failed = true;
         entry.loading = false;
+        this.owners
+          .get(token)
+          ?.pendingCreation?.reject(new Error('Target character failed to load. Repair it and retry.'));
         workspace.refresh();
       },
       animationLibrary: () => workspace.animationLibrary(),
@@ -235,6 +293,14 @@ export class ProjectEditorHosts {
         }
         return () => {
           delete host.selectAnimation;
+        };
+      },
+      bindAnimationCreation: (create) => {
+        const host = this.owners.get(token)!;
+        host.createAnimation = create;
+        host.pendingCreation?.run();
+        return () => {
+          delete host.createAnimation;
         };
       },
       bindScene: (dispose) => {

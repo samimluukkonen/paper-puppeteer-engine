@@ -1,3 +1,4 @@
+import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { SceneEditorDocument, ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
@@ -33,6 +34,7 @@ export interface ProjectEditorContext {
   loadCharacter(reference: string): Promise<CharacterDefinition>;
   bindScene(dispose: () => void): void;
   bindAnimationSelection?(select: (name: string, copy: boolean) => void): () => void;
+  bindAnimationCreation?(create: (clip: AnimationClip) => boolean): () => void;
   openAnimation?(characterId: string, name: string, copy?: boolean): Promise<void>;
   animationLibrary?(): readonly AnimationLibraryEntry[];
   animationLibraryRevision?(this: void): number;

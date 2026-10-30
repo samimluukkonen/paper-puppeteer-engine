@@ -85,6 +85,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.3-2
+
+- Add Retarget to Another Character to the Project Animation Library, with source/target selection, validated saved mappings and the existing Bone Mapping Editor, supported root/local/pelvis translation policies and actionable IK, missing-track, orientation, proportion and mesh diagnostics.
+- Compare isolated source and target Puppets with one playback clock, scrubbing, speed, equal world scale, root travel, ground reference and authored foot contact markers. Regenerate from the unchanged source, invalidate obsolete previews and dispose cancelled/replaced runtime resources.
+- Create an independent UUID-named target animation through the existing editor document owner, preserving source assets, scene Actors and clip histories. Validate before registration and include new documents in normal autosave/recovery and project export/import.
+- Add a visual retargeting Feature Guide and workflow documentation, plus regression and local browser coverage. Synchronize package and lockfile metadata at 1.5.3-2.
+
 ## 1.5.3-1
 
 - Add a pure, renderer-independent `retargetAnimation` API with current explicit bone-map validation, rest-relative local FK rotation/translation/scale conversion, preserved sparse keys and interpolation curves, deterministic output and independently editable results.

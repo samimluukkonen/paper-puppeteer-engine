@@ -11,6 +11,58 @@ const step = (id: string, title: string, targetId: string, description: string):
 
 export const projectGuides: readonly GuideDefinition[] = [
   {
+    id: 'project-animation-retargeting',
+    title: 'Retargeting an Animation Visually',
+    description:
+      'Map bones, compare synchronized source and target previews, and create an independent target animation.',
+    editor: 'project',
+    category: 'animation',
+    prerequisites: [
+      {
+        capability: 'tool:project',
+        reason: 'Create or import a project first. You can read this guide before adding characters.',
+      },
+    ],
+    steps: [
+      step(
+        'source',
+        'Choose an animation and another character',
+        T.projectAnimationLibrary,
+        'After exiting this tour, expand **Animation Library** and choose **Retarget to Another Character** on a source clip. Choose the **Target character** in the dialog. Both characters must belong to this project. The tour only reveals existing controls; it never opens a dialog, chooses assets or creates data.',
+      ),
+      step(
+        'mapping',
+        'Review and approve bone correspondence',
+        T.projectRigMapping,
+        'In the retargeting dialog, choose a saved **Bone mapping** or **Open Bone Mapping Editor**. Review **Auto Suggest** proposals, choose ambiguous matches manually, **Validate** and **Save Mapping**. Invalid or stale maps cannot preview. Partial maps skip tracks with warnings. Saving a map is explicit project metadata and uses Project Undo/Redo.',
+      ),
+      step(
+        'options',
+        'Choose supported transfer policies',
+        T.projectAnimationLibrary,
+        '**Root motion** preserves, scales or omits whole-character displacement. **Local translation** preserves deltas or scales by bone length. Optional **Pelvis / body translation override** requires explicit source bones. **FK-only transfer** omits source IK and suppresses target constraints on the result. Bake source IK first to transfer its solved motion. Review all skipped-track and mesh correction warnings.',
+      ),
+      step(
+        'comparison',
+        'Inspect synchronized motion and contacts',
+        T.projectAnimationLibrary,
+        '**Preview Result** uses two ordinary Puppets with one clock, **Play/Pause**, **Comparison time** and **Playback speed**. Both sides use the same world scale. Enable **Show ground reference** and **Show foot contact markers** to inspect travel, sliding, floating and pelvis height. These are diagnostics, with no automatic foot locking. Adjusting a mapping regenerates from the unchanged source; option changes require Preview Result again.',
+      ),
+      step(
+        'create',
+        'Create and correct an independent animation',
+        T.projectCharacters,
+        'After reviewing the loaded comparison and diagnostics, **Create Animation** registers a unique target document and opens it in **Animation Editor**. Correct its keys with ordinary Undo/Redo. Creation follows New Animation navigation semantics and preserves existing clip histories. **Cancel** discards temporary preview data; explicitly saved mappings remain. The source, rigs and existing Scene Actors are unchanged.',
+      ),
+      step(
+        'persist',
+        'Preserve the result and source together',
+        T.projectExport,
+        '**Export Project** keeps the new target animation, original source and saved mappings together. Local autosave/recovery includes the new unsaved clip. Export/import or recover, then reopen both animations to verify the handoff. This tour never previews, exports, creates assets or changes authored history.',
+      ),
+    ],
+  },
+  {
     id: 'project-rig-mapping',
     title: 'Comparing Rigs and Mapping Bones',
     description:
@@ -46,7 +98,7 @@ export const projectGuides: readonly GuideDefinition[] = [
         'limits',
         'Keep IK and mesh transfer separate',
         T.projectRigMapping,
-        'A bone map does not rename IK tracks, convert puppet-local targets or remap disabled constraints. Different mesh topology cannot share vertex corrections; matching topology still does not approve cross-rig deformation transfer. **Save Mapping** does not copy or transform animation keys. Animation Library direct reuse keeps its existing identity checks. Automatic retargeting is a later milestone.',
+        'A bone map does not rename IK tracks, convert puppet-local targets or remap disabled constraints. Different mesh topology cannot share vertex corrections; matching topology still does not approve cross-rig deformation transfer. **Save Mapping** does not copy or transform animation keys. Animation Library direct reuse keeps its existing identity checks. Use **Retarget to Another Character** in Animation Library for the separate visual transfer workflow.',
       ),
       step(
         'save',
@@ -91,7 +143,7 @@ export const projectGuides: readonly GuideDefinition[] = [
         'compatibility',
         'Check the target character and rig',
         T.projectAnimationLibrary,
-        'Choose **Compatible character / rig**, then optionally enable **Compatible rig only**. Each row explains its compatibility. Direct reuse currently requires the **same source character identity**; matching bone names on a different character does not establish a compatible rig. Incompatible or unavailable rigs cannot be reused or copied onto that target. Cross-rig retargeting is deferred; other source characters can still be previewed and located.',
+        'Choose **Compatible character / rig**, then optionally enable **Compatible rig only**. Each row explains its compatibility. Direct reuse currently requires the **same source character identity**; matching bone names on a different character does not establish a compatible rig. Incompatible or unavailable rigs cannot be reused or copied onto that target. Use **Retarget to Another Character** for the separate mapped transfer workflow; other source characters can also be previewed and located.',
       ),
       step(
         'preview',

@@ -13,6 +13,7 @@ const guide = guideRegistry.getGuideById('project-audio-assets')!;
 const meshGuide = guideRegistry.getGuideById('project-mesh-handoff')!;
 const libraryGuide = guideRegistry.getGuideById('project-animation-library')!;
 const mappingGuide = guideRegistry.getGuideById('project-rig-mapping')!;
+const retargetGuide = guideRegistry.getGuideById('project-animation-retargeting')!;
 
 test('mesh handoff overview is available before assets exist and uses only shared project targets', () => {
   assert.equal(meshGuide.title, 'Mesh Characters Across Editors');
@@ -48,7 +49,13 @@ test('project audio guide uses stable anchors and reveal-only steps without asse
   assert.equal(guide.editor, 'project');
   assert.equal(guide.category, 'audio');
   assert.lengthOf(guide.steps, 7);
-  assert.deepEqual(guideRegistry.getGuidesForEditor('project'), [mappingGuide, libraryGuide, meshGuide, guide]);
+  assert.deepEqual(guideRegistry.getGuidesForEditor('project'), [
+    retargetGuide,
+    mappingGuide,
+    libraryGuide,
+    meshGuide,
+    guide,
+  ]);
   const anchors = new Set<string>(Object.values(GUIDE_TARGETS));
   for (const step of guide.steps) {
     assert.isTrue(anchors.has(step.targetId));
@@ -62,7 +69,7 @@ test('project audio guide uses stable anchors and reveal-only steps without asse
   );
 });
 
-test.each([guide, meshGuide, libraryGuide, mappingGuide])(
+test.each([guide, meshGuide, libraryGuide, mappingGuide, retargetGuide])(
   '$id rechecks live availability and preserves metadata, binaries and history without navigating',
   (guide) => {
     let project: ProjectWorkspace | undefined;

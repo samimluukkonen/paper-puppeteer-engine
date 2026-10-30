@@ -1742,6 +1742,11 @@ export class AnimationEditorState {
     return this.createAnimationSession(() => this.document.createAnimation(options));
   }
 
+  createDerivedAnimation(input: AnimationClip): boolean {
+    if (this.hasPendingAnimationEdits) return false;
+    return this.createAnimationSession(() => this.document.createDerivedAnimation(input));
+  }
+
   createVariation(options: AnimationVariationOptions): boolean {
     if (this.hasPendingAnimationEdits) {
       this.document.reportError(new Error('Commit or cancel temporary edits before creating a variation.'));

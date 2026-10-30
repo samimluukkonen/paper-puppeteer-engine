@@ -17,7 +17,9 @@ export function animationAssetReference(entry: AnimationLibraryEntry): string {
 export function animationCompatibility(entry: AnimationLibraryEntry, targetRig: string | undefined): string {
   if (!entry.rigIdentity) return 'Source rig is unavailable.';
   if (!targetRig) return 'Choose a target character with an available rig.';
-  return entry.rigIdentity === targetRig ? '' : 'Incompatible rig identity. Cross-rig retargeting is not available.';
+  return entry.rigIdentity === targetRig
+    ? ''
+    : 'Incompatible rig identity for direct reuse. Use Retarget to Another Character in Project Workspace.';
 }
 
 export function existingAnimationReference(entry: AnimationLibraryEntry, targetRig: string | undefined): string {

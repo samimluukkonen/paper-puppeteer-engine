@@ -1,8 +1,24 @@
-# Animation retargeting — v1.5.3-1
+# Animation retargeting — v1.5.3-2
 
 [All guides](../README.md#guides) · [Rig compatibility and bone mapping](rig-compatibility.md)
 
-`retargetAnimation` creates a detached target-compatible animation from an explicit current bone map. It is a synchronous, pure engine service exported by `paper-puppeteer-engine/core` and the runtime/root entries; its contracts are also available from `/data`. It does not register clips, edit rigs, update mappings, save assets or add editor controls. The visual workflow belongs to v1.5.3.2.
+The Project Workspace Animation Library offers a visual comparison workflow backed by `retargetAnimation`. The synchronous, pure engine service is exported by `paper-puppeteer-engine/core` and the runtime/root entries; its contracts are also available from `/data`.
+
+## Visual workflow
+
+1. Add both characters to the project. Finish temporary rig/artwork/animation edits first. For a sword cut, use two characters with corresponding hierarchies and different limb proportions.
+2. Expand **Animation Library** and choose **Retarget to Another Character** on the source clip. The dialog also lets you choose another source animation. Select **Target character**.
+3. Choose a saved **Bone mapping**, or **Open Bone Mapping Editor**. The existing editor supports **Auto Suggest**, manual target choices, validation and explicit **Save Mapping**. Ambiguous suggestions stay unassigned. Stale revisions require review; invalid maps cannot preview. Partial valid maps can skip source tracks with warnings.
+4. Choose **Root motion** (preserve, scale to character or omit) and **Local translation** (scale by bone length or preserve deltas). Optional **Pelvis / body translation override** lets you explicitly select mapped source bones. IK has one supported policy: **FK-only transfer**. Bake source IK in Animation Editor first if its solved motion is needed. Missing tracks always skip with diagnostics; extra target branches keep their rest pose.
+5. Choose **Preview Result**. Source and target render side by side through ordinary Phaser Puppets, with one time, play/pause, restart, scrubbing and playback speed. Both use the same world scale and camera framing so differences in proportions remain visible. **Fit comparison** frames the start, middle and endpoint; use it again if needed. The source evaluates its FK/IK and mesh corrections; the result follows the service's FK-only and mesh policies. Authored root displacement is shown on each side. Preview events are suppressed.
+6. Enable **Show ground reference**, set **Ground Y** in character units (positive down), and enable **Show foot contact markers** to inspect authored markers after IK. Ground uses the source character’s saved ground reference when available, converted from the editor preview origin; otherwise it starts at the character origin. Adjustments are view state. Look for floating/sliding feet, pelvis height and step-length differences. These are observations, with no automatic foot locking or correction. **Show bones** helps inspect rigs with sparse artwork.
+7. Review all **Diagnostics**, especially skipped bone/IK/mesh tracks, changed rest orientations and large proportions. **Review / adjust bone mapping** returns to the existing editor. Saving regenerates from the unchanged source snapshot. Option changes discard the previous comparison and require **Preview Result** again.
+8. After the comparison loads, **Create Animation** generates an independent target document with an unused UUID-based animation ID and opens it in the target Animation Editor. Make ordinary keyframe corrections and use Undo/Redo for those edits. Creation itself follows New Animation's document-navigation semantics, rather than adding an edit to the source history.
+9. **Export Project** preserves the source, target clip, mappings and existing scene references. Local autosave/recovery also captures the new unsaved document. Export/import or reload recovery, open the target clip and compare it with the unchanged source.
+
+Preview never registers an animation, changes rigs or Scene Editor Actors, creates ordinary keyframes or marks source assets dirty. **Cancel** discards the comparison, including while artwork is loading. Bone maps saved explicitly inside the workflow remain project metadata and use Project Undo/Redo. Preview loads own cancellable package/runtime leases and release their Puppets, graphics, textures and object URLs on replacement or closure.
+
+Creation validates before registration through the existing target document owner. Load failures, stale target rigs, temporary target edits and ID collisions leave no partial animation. Resolve the reported problem and regenerate the comparison. The standalone Animation Library handles direct reuse/copies of its current character; this cross-character workflow lives in Project Workspace, where both character documents and mappings are available. **Feature Guide → Project Workspace → Retargeting an Animation Visually** provides a read-only overview.
 
 ## Calling the service
 
@@ -102,4 +118,4 @@ Bone tracks and omitted-track processing use stable ID order; target IK suppress
 
 `tests/animationRetargeting.test.ts` covers identical/renamed rigs, rest orientations and proportions, hierarchy composition, Actor facing, rest reflections, angular wraps and turn representatives, sparse Bézier/stepped sampling, local/pelvis/root policies, effective lengths, degenerate geometry, IK omission/suppression, mesh preservation/omission, events, partial/invalid/stale maps, detached edits, deterministic output and authored JSON round trips.
 
-Run `npm run typecheck`, `npm run test` and `npm run build`. Vitest uses the repository's single-worker, sequential configuration. No browser or UI workflow is needed for this engine-only milestone.
+`tests/animationRetargetWorkflow.test.ts` covers detached sessions, option/mapping regeneration, invalid maps, existing evaluator synchronization, source isolation, creation, history and project persistence. Local browser coverage exercises the actual dialog, mapping editor, comparison, cancellation and target editor handoff. Run `npm run typecheck`, `npm run test` and `npm run build`. Vitest uses the repository's single-worker, sequential configuration; browser checks remain local-only (see the [development guide](development.md#checks-and-profiling)).

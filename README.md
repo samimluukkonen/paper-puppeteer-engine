@@ -104,7 +104,7 @@ v0.7.5 completes [runtime controller production hardening](docs/runtime-controll
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Reusable Animation Library](docs/animation-library.md)
 - [Rig compatibility and bone mapping](docs/rig-compatibility.md)
-- [Animation retargeting API, math and transfer policies](docs/animation-retargeting.md)
+- [Visual animation retargeting, comparison preview, API and transfer policies](docs/animation-retargeting.md)
 - [Advanced Pose Library](docs/pose-library.md)
 - [Advanced animation artist workflow](docs/advanced-animation-workflow.md)
 - [v1.1 internal readiness assessment](docs/advanced-animation-readiness.md)

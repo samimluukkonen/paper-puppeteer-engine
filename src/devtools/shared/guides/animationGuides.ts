@@ -45,7 +45,7 @@ export const animationGuides: readonly GuideDefinition[] = [
       step(
         'search',
         'Search names and optional tags',
-        'Inside the library, **Search animations** matches stable IDs, display names and tags. Rows show source character, duration, looping and compatibility. Direct reuse requires the same character’s **rig identity**; cross-character retargeting is deferred. The project-wide browser also offers **Compatible character / rig** and **Compatible rig only**.',
+        'Inside the library, **Search animations** matches stable IDs, display names and tags. Rows show source character, duration, looping and compatibility. Direct reuse requires the same character’s **rig identity**. For cross-character transfer, use **Retarget to Another Character** in **Project Workspace**. Its browser also offers **Compatible character / rig** and **Compatible rig only**.',
         targets.animationLibrary,
       ),
       step(

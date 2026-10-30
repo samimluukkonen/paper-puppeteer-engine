@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides)
 
-Version 1.5.2 adds rig comparisons and reusable bone correspondence. Comparison itself does not transfer animations, transform keys, change rest poses or regenerate constraints. Version 1.5.3-1 adds the separate [animation retargeting API](animation-retargeting.md), which consumes a current explicit map. Animation Library keeps its existing direct-reuse checks; the visual retargeting workflow is a later milestone.
+Version 1.5.2 adds rig comparisons and reusable bone correspondence. Comparison itself does not transfer animations, transform keys, change rest poses or regenerate constraints. Version 1.5.3-1 adds the separate [animation retargeting API](animation-retargeting.md), which consumes a current explicit map. Animation Library keeps its existing direct-reuse checks; the [visual retargeting workflow](animation-retargeting.md#visual-workflow) creates independent target clips with synchronized comparison.
 
 In Project Workspace, expand **Rig compatibility & bone mapping**, then choose **Source rig** and **Target rig**. These are the current authored rigs of registered project characters, including committed edits in retained Rig Editors. Playback, camera transforms and Actor facing do not affect comparison. Finish pending imports or edits if a rig is unavailable.
 

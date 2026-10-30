@@ -205,6 +205,17 @@ export class AnimationEditorDocument {
     return this.registerNewAnimation(animation);
   }
 
+  /** Register detached generated data with the same unsaved-document semantics as New Animation. */
+  createDerivedAnimation(input: AnimationClip): boolean {
+    const animation = this.inspect({ ...input, version: ANIMATION_FORMAT_VERSION });
+    if (!animation) return false;
+    if (this.animations.has(animation.name)) {
+      this.reportError(new Error(`Animation "${animation.name}" is already registered.`));
+      return false;
+    }
+    return this.registerNewAnimation(animation);
+  }
+
   /** Copy the current committed working snapshot, including unsaved authored edits. */
   createVariation(options: AnimationVariationOptions): boolean {
     try {

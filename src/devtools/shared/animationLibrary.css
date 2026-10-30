@@ -74,3 +74,69 @@
 .animation-library-preview {
   width: 820px;
 }
+
+.retarget-dialog {
+  width: min(1120px, calc(100vw - 48px));
+}
+.retarget-settings {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+}
+.retarget-settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.retarget-settings select {
+  min-width: 220px;
+  max-width: 100%;
+}
+.retarget-settings p {
+  margin: 0;
+}
+.retarget-settings details > summary {
+  cursor: pointer;
+}
+.retarget-settings details[open] > summary {
+  margin-bottom: 16px;
+}
+.retarget-settings details label {
+  margin: 8px 0;
+}
+.retarget-diagnostics {
+  max-height: 180px;
+  overflow: auto;
+  padding-left: 24px;
+}
+.retarget-comparison-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.retarget-comparison-stage {
+  width: 1040px;
+  max-width: 100%;
+  height: 360px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-inset);
+}
+.retarget-dialog input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+}
+.retarget-dialog input[type="number"] {
+  width: 90px;
+}
+.retarget-dialog .animation-library-actions label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}

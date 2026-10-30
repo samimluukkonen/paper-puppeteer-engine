@@ -1,8 +1,12 @@
 import { useState } from 'react';
+import type { AnimationClip } from '../../engine/AnimationClip.js';
 import { AnimationLibrary } from '../shared/AnimationLibrary.js';
+import { animationAssetReference, type AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import { AnimationLibraryPreview, type AnimationPreviewLease } from '../shared/AnimationLibraryPreviewDialog.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { buildCharacterPackage, openPackageRuntime } from '../shared/package/characterPackage.js';
+import { AnimationRetargetDialog } from './AnimationRetargetDialog.js';
+import { AnimationRetargetSession } from './AnimationRetargetSession.js';
 import { characterFileFetcher } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 
@@ -10,11 +14,23 @@ export function ProjectAnimationLibrary({
   workspace,
   busy,
   open,
+  create,
 }: {
   workspace: ProjectWorkspace;
   busy: boolean;
   open(this: void, character: string, animation: string, copy: boolean): void;
+  create(this: void, target: string, clip: AnimationClip, targetRevision: string): Promise<void>;
 }) {
+  const [retarget, setRetarget] = useState<{ entry: AnimationLibraryEntry; session: AnimationRetargetSession }>();
+  const [message, setMessage] = useState('');
+  const chooseSource = (entry: AnimationLibraryEntry) => {
+    try {
+      setRetarget({ entry, session: new AnimationRetargetSession(workspace, entry) });
+      setMessage('');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
   const [preview, setPreview] = useState<{
     animation: string;
     load(this: void, signal: AbortSignal): Promise<AnimationPreviewLease>;
@@ -41,7 +57,20 @@ export function ProjectAnimationLibrary({
         onUse={(entry) => open(entry.character, entry.clip.name, false)}
         onLocate={(entry) => open(entry.character, entry.clip.name, false)}
         onCopy={(entry) => open(entry.character, entry.clip.name, true)}
+        onRetarget={chooseSource}
       />
+      {message && <p role="status">{message}</p>}
+      {retarget && (
+        <AnimationRetargetDialog
+          key={animationAssetReference(retarget.entry)}
+          workspace={workspace}
+          entry={retarget.entry}
+          session={retarget.session}
+          changeSource={chooseSource}
+          create={create}
+          close={() => setRetarget(undefined)}
+        />
+      )}
       {!!unavailable.length && (
         <ul>
           {unavailable.map(({ id, name }) => (

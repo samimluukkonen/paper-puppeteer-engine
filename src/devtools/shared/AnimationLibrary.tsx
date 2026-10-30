@@ -18,6 +18,7 @@ export interface AnimationLibraryProps {
   onUse(this: void, entry: AnimationLibraryEntry): void;
   onLocate?: ((entry: AnimationLibraryEntry) => void) | undefined;
   onCopy?: ((entry: AnimationLibraryEntry) => void) | undefined;
+  onRetarget?: ((entry: AnimationLibraryEntry) => void) | undefined;
 }
 
 /** Shared browser for project inventory and existing editor selection workflows. */
@@ -31,6 +32,7 @@ export function AnimationLibrary({
   onUse,
   onLocate,
   onCopy,
+  onRetarget,
 }: AnimationLibraryProps) {
   const [query, setQuery] = useState('');
   const [target, setTarget] = useState('');
@@ -121,6 +123,11 @@ export function AnimationLibrary({
                     {onLocate && (
                       <button type="button" disabled={disabled} onClick={() => onLocate(entry)}>
                         Locate Original Asset
+                      </button>
+                    )}
+                    {onRetarget && (
+                      <button type="button" disabled={disabled || !entry.rigIdentity} onClick={() => onRetarget(entry)}>
+                        Retarget to Another Character
                       </button>
                     )}
                   </div>

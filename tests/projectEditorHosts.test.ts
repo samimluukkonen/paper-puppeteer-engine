@@ -1,4 +1,5 @@
 import { afterEach, assert, expect, test, vi } from 'vitest';
+import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import {
   ProjectEditorHosts,
   type ProjectEditorHost,
@@ -8,6 +9,7 @@ import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { LocalAutosave } from '../src/devtools/shared/autosave/LocalAutosave.js';
 import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import * as packages from '../src/devtools/shared/package/characterPackage.js';
+import { rigCompatibilityRevision } from '../src/engine/rigBoneMapping.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -190,4 +192,74 @@ test('library asset requests reach the original editor once, before or after its
     f.controller.dispose();
   }
   assert.equal(dispose.mock.calls.length, 1);
+});
+
+test('generated animation waits for the sole target owner and commits one recoverable document', async () => {
+  const owner = await session();
+  const snapshot = owner.workspace.captureCharacter('hero');
+  vi.spyOn(packages, 'openPackageRuntime').mockResolvedValue({ definition: snapshot.definition, dispose: vi.fn() });
+  const f = fixture();
+  const state = new AnimationEditorState(snapshot.definition.rig);
+  const clip = { name: 'retarget-new', duration: 1000, loop: false, tracks: {} };
+  const creation = f.controller.createAnimation(owner, 'hero', clip, rigCompatibilityRevision(snapshot.rig));
+  try {
+    await vi.waitFor(() => expect(f.hosts()[0]?.pendingCreation).toBeDefined());
+    expect(owner.workspace.animationLibrary()).toEqual([]);
+    const host = f.hosts()[0]!;
+    host.context.bindCharacter(
+      () => ({ ...snapshot, animations: state.packageAnimations() }),
+      () => false,
+      () => {},
+    );
+    host.context.bindAnimationCreation!((clip) => state.createDerivedAnimation(clip));
+    await creation;
+    expect(state.selectedAnimationId).toBe(clip.name);
+    expect(state.hasUnsavedChanges).toBe(true);
+    expect(owner.workspace.animationLibrary()[0]!.clip).toEqual({ ...clip, version: 1 });
+    expect(host.pendingCreation).toBeUndefined();
+    await expect(
+      f.controller.createAnimation(owner, 'hero', clip, rigCompatibilityRevision(snapshot.rig)),
+    ).rejects.toThrow(/Could not create/);
+    expect(state.animationIds).toEqual([clip.name]);
+    expect(f.activate).toHaveBeenLastCalledWith(undefined);
+  } finally {
+    f.controller.dispose();
+    owner.autosave.dispose();
+  }
+});
+
+test('failed target loading, stale revisions and disposal reject creation before registration', async () => {
+  const owner = await session();
+  const snapshot = owner.workspace.captureCharacter('hero');
+  vi.spyOn(packages, 'openPackageRuntime').mockResolvedValue({ definition: snapshot.definition, dispose: vi.fn() });
+  const f = fixture();
+  const clip = { name: 'retarget-new', duration: 1000, loop: false, tracks: {} };
+  const creation = f.controller.createAnimation(owner, 'hero', clip, rigCompatibilityRevision(snapshot.rig));
+  const failed = expect(creation).rejects.toThrow(/failed to load/);
+  await vi.waitFor(() => expect(f.hosts()[0]?.pendingCreation).toBeDefined());
+  f.hosts()[0]!.context.characterLoadFailed();
+  await failed;
+  expect(f.hosts()).toHaveLength(0);
+  await f.controller.open(owner, 'character', 'hero', 'animation');
+  const host = f.hosts()[0]!;
+  const create = vi.fn(() => true);
+  host.context.bindCharacter(
+    () => snapshot,
+    () => false,
+    () => {},
+  );
+  host.context.bindAnimationCreation!(create);
+  await expect(f.controller.createAnimation(owner, 'hero', clip, `rig-v1:${'0'.repeat(64)}`)).rejects.toThrow(
+    /Target rig changed/,
+  );
+  expect(create).not.toHaveBeenCalled();
+  const unbind = host.context.bindAnimationCreation!(create);
+  unbind();
+  const pending = f.controller.createAnimation(owner, 'hero', clip, rigCompatibilityRevision(snapshot.rig));
+  const disposed = expect(pending).rejects.toThrow(/closed/);
+  await vi.waitFor(() => expect(host.pendingCreation).toBeDefined());
+  f.controller.dispose();
+  await disposed;
+  expect(owner.workspace.animationLibrary()).toEqual([]);
+  owner.autosave.dispose();
 });
