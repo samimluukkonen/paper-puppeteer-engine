@@ -201,6 +201,31 @@ test('one scene clock starts and ends overlapping clips without per-frame restar
   f.audio.dispose();
 });
 
+test('audio reconciliation uses compiled signatures, retaining equal clips and restarting edited clips', async () => {
+  const f = fixture();
+  await f.audio.unlock();
+  const stringify = vi.spyOn(JSON, 'stringify');
+  for (let time = 1000; time <= 1200; time += 10) {
+    f.audio.sync(time, true, 1);
+    f.advance(10);
+  }
+  expect(stringify).not.toHaveBeenCalled();
+  expect(f.playTimeline).toHaveBeenCalledOnce();
+  f.audio.setScene(definition([{ ...clip }]));
+  stringify.mockClear();
+  f.audio.sync(1210, true, 1);
+  expect(stringify).not.toHaveBeenCalled();
+  expect(f.playTimeline).toHaveBeenCalledOnce();
+  f.audio.setScene(definition([{ ...clip, volume: 0.2 }]));
+  stringify.mockClear();
+  f.audio.sync(1210, true, 1);
+  expect(stringify).not.toHaveBeenCalled();
+  expect(f.voices[0]!.stop).toHaveBeenCalledOnce();
+  expect(f.playTimeline).toHaveBeenCalledTimes(2);
+  expect(f.voices[1]!.options.volume).toBe(0.2);
+  f.audio.dispose();
+});
+
 test('pause/resume, stop, restart, completion, cancellation and disposal release every voice', async () => {
   const f = fixture([{ ...clip, time: 0, loop: true, duration: 6000 }]);
   const runner = new SceneRunner(f.scene, { createActor: noActor, audio: f.options });

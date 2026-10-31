@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import type { DeepReadonly } from './readonlyData.js';
+import { isFullyFrozen, type DeepReadonly } from './readonlyData.js';
 import type { SceneActorDefinition } from './SceneDefinition.js';
+import { latestSceneInterval } from './sceneIntervals.js';
 import { identifierSchema } from './schemas.js';
 import { assertFinite } from './types.js';
 
@@ -19,12 +20,36 @@ export const sceneDialogueLineSchema = z.strictObject({
 });
 export type SceneDialogueLine = z.infer<typeof sceneDialogueLineSchema>;
 
+const lineIndices = new WeakMap<readonly Readonly<SceneDialogueLine>[], readonly Readonly<SceneDialogueLine>[]>();
+type DialogueActors = readonly DeepReadonly<SceneActorDefinition>[];
+const actorIndices = new WeakMap<DialogueActors, ReadonlyMap<string, DeepReadonly<SceneActorDefinition>>>();
+
+function getDialogueActor(actors: DialogueActors | undefined, id: string) {
+  if (!actors) return undefined;
+  let index = actorIndices.get(actors);
+  if (!index) {
+    if (!isFullyFrozen(actors)) return actors.find((actor) => actor.id === id);
+    index = new Map(actors.map((actor) => [actor.id, actor]));
+    actorIndices.set(actors, index);
+  }
+  return index.get(id);
+}
+
 /** Single-subtitle policy: validated lines never overlap; intervals are [time, time + duration). */
 export function getDialogueLineAtTime(
   scene: { readonly dialogue?: readonly Readonly<SceneDialogueLine>[] },
   time: number,
 ): Readonly<SceneDialogueLine> | undefined {
-  return scene.dialogue?.find((line) => time >= line.time && time < line.time + line.duration);
+  const lines = scene.dialogue;
+  if (!lines || !Number.isFinite(time)) return undefined;
+  let sorted = lineIndices.get(lines);
+  if (!sorted) {
+    if (!isFullyFrozen(lines)) return lines.find((line) => time >= line.time && time < line.time + line.duration);
+    sorted = [...lines].sort((a, b) => a.time - b.time);
+    lineIndices.set(lines, sorted);
+  }
+  const line = latestSceneInterval(sorted, time);
+  return line && time < line.time + line.duration ? line : undefined;
 }
 
 export interface ActiveSceneDialogue {
@@ -56,7 +81,7 @@ export function getDialogueAtTime(
   return {
     line,
     speaker: line.speakerName || line.actorId,
-    actor: line.actorId ? scene.actors?.find((actor) => actor.id === line.actorId) : undefined,
+    actor: line.actorId ? getDialogueActor(scene.actors, line.actorId) : undefined,
   };
 }
 

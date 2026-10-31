@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Compile scene audio asset lookups, clip signatures and interval indices, plus dialogue speaker and transition indices, reusing immutable branches across edits so frame sampling visits active content without rescanning authored collections.
+
 - Compile sparse mesh deformation vertex indices and layer mask eligibility, reuse private sampling/blending buffers, and share immutable empty results. Render directly from live buffers while preserving detached public snapshots and interrupted fades.
 
 - Compute and validate the owning inverse transform once per weighted mesh update, applying it directly to the reusable vertex buffer without per-vertex inverse calculations or point allocations.

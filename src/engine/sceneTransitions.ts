@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import type { DeepReadonly } from './readonlyData.js';
+import { isFullyFrozen, type DeepReadonly } from './readonlyData.js';
 import type { SceneDefinition } from './SceneDefinition.js';
+import { latestSceneInterval } from './sceneIntervals.js';
 import { identifierSchema } from './schemas.js';
 import { assertFinite } from './types.js';
 
@@ -22,6 +23,25 @@ export interface SceneTransitionTarget {
 }
 export const CLEAR_SCENE_TRANSITION: SceneTransitionState = Object.freeze({ color: '#000000', opacity: 0 });
 
+type Transitions = readonly DeepReadonly<SceneTransition>[];
+const transitionIndices = new WeakMap<Transitions, Transitions>();
+
+function latestTransition(transitions: Transitions | undefined, time: number) {
+  if (!transitions) return undefined;
+  let sorted = transitionIndices.get(transitions);
+  if (!sorted) {
+    if (!isFullyFrozen(transitions)) {
+      let latest: DeepReadonly<SceneTransition> | undefined;
+      for (const transition of transitions)
+        if (transition.time <= time && (!latest || transition.time > latest.time)) latest = transition;
+      return latest;
+    }
+    sorted = [...transitions].sort((a, b) => a.time - b.time);
+    transitionIndices.set(transitions, sorted);
+  }
+  return latestSceneInterval(sorted, time);
+}
+
 /** Pure, order-independent sampling of validated, non-overlapping intervals. Before the
  * first fade the overlay is clear. At an adjacent boundary the new fade owns the sample.
  * Fade-out holds its color; a later fade-in permits an authored hold between them.
@@ -29,9 +49,7 @@ export const CLEAR_SCENE_TRANSITION: SceneTransitionState = Object.freeze({ colo
 export function evaluateTransitionAtTime(scene: DeepReadonly<SceneDefinition>, time: number): SceneTransitionState {
   assertFinite(time, 'Transition sample time');
   const bounded = Math.max(0, Math.min(scene.duration, time));
-  let latest: DeepReadonly<SceneTransition> | undefined;
-  for (const transition of scene.transitions ?? [])
-    if (transition.time <= bounded && (!latest || transition.time > latest.time)) latest = transition;
+  const latest = latestTransition(scene.transitions, bounded);
   if (!latest) return CLEAR_SCENE_TRANSITION;
   const progress = Math.min(1, (bounded - latest.time) / latest.duration);
   return { color: latest.color, opacity: latest.type === 'fade-in' ? 1 - progress : progress };

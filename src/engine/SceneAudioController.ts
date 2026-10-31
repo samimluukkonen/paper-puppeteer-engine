@@ -6,7 +6,7 @@ import {
   type TimelineAudioPlayback,
 } from './AudioAssetLoader.js';
 import type { DeepReadonly } from './readonlyData.js';
-import { getActiveAudioClipsAtTime } from './sceneAudio.js';
+import { compileSceneAudio } from './sceneAudio.js';
 import type { SceneDefinition } from './SceneDefinition.js';
 
 /** Scene milliseconds; correction is limited to one restart per voice per 250 backend milliseconds. */
@@ -24,6 +24,7 @@ export interface SceneAudioOptions {
 export class SceneAudioController {
   private readonly loader: AudioAssetLoader;
   private scene: DeepReadonly<SceneDefinition>;
+  private compiled: ReturnType<typeof compileSceneAudio>;
   private readonly resources = new Map<string, DecodedAudioResource>();
   private readonly durations = new Map<string, number>();
   private readonly voices = new Map<
@@ -36,6 +37,7 @@ export class SceneAudioController {
   private silenced = false;
   constructor(scene: DeepReadonly<SceneDefinition>, options: SceneAudioOptions) {
     this.scene = scene;
+    this.compiled = compileSceneAudio(scene);
     this.loader = new AudioAssetLoader(options.resolve, options.backend);
     this.state = scene.audioClips?.length ? 'locked' : 'disabled';
   }
@@ -71,6 +73,7 @@ export class SceneAudioController {
       this.state = 'locked';
     }
     this.scene = scene;
+    this.compiled = compileSceneAudio(scene);
     if (!scene.audioClips?.length) {
       this.stop();
       this.state = 'disabled';
@@ -140,7 +143,7 @@ export class SceneAudioController {
     }
     try {
       if (!Number.isFinite(speed) || speed <= 0) throw new Error('Audio playback speed must be positive and finite.');
-      const active = getActiveAudioClipsAtTime(this.scene, time, this.durations);
+      const active = this.compiled.sample(time, this.durations);
       const ids = new Set(active.map(({ clip }) => clip.id));
       for (const [id, voice] of this.voices)
         if (!ids.has(id)) {
@@ -149,7 +152,7 @@ export class SceneAudioController {
         }
       for (const sample of active) {
         const { clip } = sample;
-        const signature = JSON.stringify(clip);
+        const signature = this.compiled.signature(clip.id);
         let voice = this.voices.get(clip.id);
         if (voice) {
           const consumed = voice.playback.elapsed * 1000;

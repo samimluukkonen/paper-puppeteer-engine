@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { AUDIO_CATEGORIES } from './AudioAsset.js';
-import type { DeepReadonly } from './readonlyData.js';
+import { isFullyFrozen, type DeepReadonly } from './readonlyData.js';
 import type { SceneDefinition } from './SceneDefinition.js';
+import { compileSceneIntervals } from './sceneIntervals.js';
 import { identifierSchema } from './schemas.js';
 
 /** All scene/source timing uses milliseconds. Media metadata uses durationSeconds. */
@@ -33,6 +34,68 @@ export interface ActiveSceneAudioClip {
   readonly sourcePosition: number;
   readonly volume: number;
 }
+type AudioAssets = NonNullable<DeepReadonly<SceneDefinition>['audioAssets']>;
+type AudioClips = NonNullable<DeepReadonly<SceneDefinition>['audioClips']>;
+const assetIndices = new WeakMap<AudioAssets, ReadonlyMap<string, number>>();
+const clipIndices = new WeakMap<AudioClips, ReturnType<typeof compileAudioClips>>();
+const emptyAssets: AudioAssets = Object.freeze([]);
+const emptyClips: AudioClips = Object.freeze([]);
+
+function compileAudioClips(clips: AudioClips) {
+  return {
+    at: compileSceneIntervals(
+      clips,
+      (clip) => clip.time,
+      (clip) => clip.time + clip.duration,
+    ),
+    signatures: new Map(clips.map((clip) => [clip.id, JSON.stringify(clip)])),
+  };
+}
+
+/** Compile once per authored snapshot; frozen branches share indices across unrelated edits.
+ * Decoded durations remain live runtime inputs and never enter the authored cache.
+ */
+export function compileSceneAudio(scene: DeepReadonly<SceneDefinition>) {
+  const assets = scene.audioAssets ?? emptyAssets;
+  let assetDurations = assetIndices.get(assets);
+  if (!assetDurations) {
+    assetDurations = new Map(assets.map((asset) => [asset.id, (asset.durationSeconds ?? Infinity) * 1000]));
+    if (isFullyFrozen(assets)) assetIndices.set(assets, assetDurations);
+  }
+  const clips = scene.audioClips ?? emptyClips;
+  let index = clipIndices.get(clips);
+  if (!index) {
+    index = compileAudioClips(clips);
+    if (isFullyFrozen(clips)) clipIndices.set(clips, index);
+  }
+  const durationsByAsset = assetDurations;
+  const clipIndex = index;
+  return {
+    signature: (id: string): string => clipIndex.signatures.get(id)!,
+    sample(time: number, durations?: ReadonlyMap<string, number>): readonly ActiveSceneAudioClip[] {
+      if (!Number.isFinite(time) || time < 0 || time >= scene.duration) return [];
+      const active: ActiveSceneAudioClip[] = [];
+      for (const clip of clipIndex.at(time)) {
+        const elapsed = time - clip.time;
+        const duration = durations?.get(clip.assetId) ?? durationsByAsset.get(clip.assetId) ?? Infinity;
+        const window = duration - clip.sourceOffset;
+        if (window <= 0 || (!clip.loop && elapsed >= window)) continue;
+        const remaining = Math.min(clip.duration - elapsed, clip.loop ? Infinity : window - elapsed);
+        const fadeIn = clip.fadeIn ? Math.min(1, elapsed / clip.fadeIn) : 1;
+        const fadeOut = clip.fadeOut ? Math.min(1, (clip.duration - elapsed) / clip.fadeOut) : 1;
+        active.push({
+          clip,
+          elapsed,
+          remaining,
+          sourcePosition: clip.sourceOffset + (clip.loop ? elapsed % window : elapsed),
+          volume: clip.volume * fadeIn * fadeOut,
+        });
+      }
+      return active;
+    },
+  };
+}
+
 /** Pure half-open intervals; no loading, cues, audio nodes or browser interaction.
  * Optional decoded durations override authored metadata at runtime. All times are milliseconds.
  */
@@ -42,26 +105,7 @@ export function getActiveAudioClipsAtTime(
   durations?: ReadonlyMap<string, number>,
 ): readonly ActiveSceneAudioClip[] {
   if (!Number.isFinite(time) || time < 0 || time >= scene.duration) return [];
-  const assets = new Map(scene.audioAssets?.map((asset) => [asset.id, asset]));
-  return (scene.audioClips ?? []).flatMap((clip) => {
-    const elapsed = time - clip.time;
-    if (elapsed < 0 || elapsed >= clip.duration) return [];
-    const duration = durations?.get(clip.assetId) ?? (assets.get(clip.assetId)?.durationSeconds ?? Infinity) * 1000;
-    const window = duration - clip.sourceOffset;
-    if (window <= 0 || (!clip.loop && elapsed >= window)) return [];
-    const remaining = Math.min(clip.duration - elapsed, clip.loop ? Infinity : window - elapsed);
-    const fadeIn = clip.fadeIn ? Math.min(1, elapsed / clip.fadeIn) : 1;
-    const fadeOut = clip.fadeOut ? Math.min(1, (clip.duration - elapsed) / clip.fadeOut) : 1;
-    return [
-      {
-        clip,
-        elapsed,
-        remaining,
-        sourcePosition: clip.sourceOffset + (clip.loop ? elapsed % window : elapsed),
-        volume: clip.volume * fadeIn * fadeOut,
-      },
-    ];
-  });
+  return compileSceneAudio(scene).sample(time, durations);
 }
 
 /** Non-destructive trim. Left trimming advances the source offset and keeps the scene end fixed.
