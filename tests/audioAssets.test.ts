@@ -366,9 +366,13 @@ test('stalled decodes time out, permit retries and dispose a late backend result
   await vi.waitFor(() => expect(f.value.decode).toHaveBeenCalledOnce());
   deadline.abort(new DOMException('Audio loading timed out.', 'TimeoutError'));
   await rejected;
-  await loader.load('tone');
-  expect(f.value.decode).toHaveBeenCalledTimes(2);
+  const retry = loader.load('tone');
+  // Timing out stops waiting, but cannot cancel the backend's allocation.
+  await new Promise((done) => setTimeout(done, 20));
+  expect(f.value.decode).toHaveBeenCalledOnce();
   resolve({ ...f.resource, dispose: f.disposeResource });
+  await retry;
+  expect(f.value.decode).toHaveBeenCalledTimes(2);
   await vi.waitFor(() => expect(f.disposeResource).toHaveBeenCalledOnce());
 });
 

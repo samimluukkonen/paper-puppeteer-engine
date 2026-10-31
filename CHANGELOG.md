@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Preflight decoded audio memory from WAV sample counts, MP3 frames and Ogg Vorbis/Opus granules, including Web Audio resampling and the remaining cache budget. Serialize decodes, retain occupied slots after timeouts, skip cancelled queue entries and keep post-decode budget checks.
+
 - Validate scenes against current immutable character catalogs once per manifest, avoiding full rig, skin, animation and pose clones for every Actor.
 
 - Compile scene audio asset lookups, clip signatures and interval indices, plus dialogue speaker and transition indices, reusing immutable branches across edits so frame sampling visits active content without rescanning authored collections.

@@ -16,6 +16,8 @@ Imports accept WAV, MP3 and OGG containers with a codec that the current browser
 
 Limits reuse the existing package constraints: 1 byte–10 MiB per encoded file, 100 MiB per ZIP/expanded project and 256 total archive files. The manifest allows up to 128 audio entries. Decoded audition resources have a separate aggregate 128 MiB PCM budget. If that cache fills, close and reopen Audio to release it, or import shorter audio. Loading/decoding and permission waits have a 60-second deadline. A codec may be supported in one browser and unavailable in another; package import checks compatibility in the receiving browser.
 
+Before allocating decoded samples, the loader estimates duration, channel count and sample rate from PCM/float WAV data or compressed WAV `fact` counts, MPEG Layer III frames, and Ogg Vorbis/Opus headers and granules. Web Audio also includes resampling to the context's sample rate. Each request checks the remaining cache budget when its decode slot becomes available. Unsupported metadata falls back to the actual decoded-buffer check, which remains enforced for every result. Loaders serialize backend requests, and native Web Audio decoding shares one slot across backend instances. A timeout stops waiting but holds that slot until the underlying decoder settles; cancelled queued requests never start decoding.
+
 ## Model and portable storage
 
 The version-1 project manifest gains an optional `audio` array. Older projects remain valid without it:

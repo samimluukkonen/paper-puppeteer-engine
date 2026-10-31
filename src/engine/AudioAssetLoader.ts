@@ -1,6 +1,14 @@
 import { abortable } from './abortable.js';
 import { inspectAudioData, validateAudioAssetData, type AudioAssetDefinition } from './AudioAsset.js';
+import {
+  AUDIO_DECODE_BUDGET_ERROR,
+  AUDIO_MAX_DECODED_BYTES,
+  AudioDecodeQueue,
+  preflightAudioDecode,
+} from './audioDecodeBudget.js';
 import { throwNotificationErrors } from './notifications.js';
+
+export { AUDIO_MAX_DECODED_BYTES } from './audioDecodeBudget.js';
 
 export interface AudioPlayback {
   stop(): void;
@@ -36,7 +44,8 @@ export interface DecodedAudioResource {
 /** Injectable browser/backend boundary; no React or Phaser scene ownership. */
 export interface AudioBackend {
   readonly running?: boolean;
-  decode(bytes: Uint8Array<ArrayBuffer>): Promise<DecodedAudioResource>;
+  /** Remaining cache budget; adapters may use it to reject before allocating decoded samples. */
+  decode(bytes: Uint8Array<ArrayBuffer>, maxDecodedBytes?: number, signal?: AbortSignal): Promise<DecodedAudioResource>;
   resume(): Promise<void>;
   dispose(): void;
 }
@@ -44,8 +53,10 @@ export interface AudioAssetSource {
   readonly definition: AudioAssetDefinition;
   readonly bytes: Uint8Array<ArrayBuffer>;
 }
-export const AUDIO_MAX_DECODED_BYTES = 128 * 1024 * 1024;
 export const AUDIO_LOAD_TIMEOUT_MS = 60_000;
+
+// Browser decoding cannot be aborted. Share one slot across hosts and backend instances.
+const webAudioDecodes = new AudioDecodeQueue();
 
 /** Minimal Web Audio adapter. Context creation and resume are lazy; importing never starts sound. */
 export class WebAudioBackend implements AudioBackend {
@@ -60,9 +71,32 @@ export class WebAudioBackend implements AudioBackend {
       throw new Error('Web Audio is unavailable. Use a browser with Web Audio support.');
     return (this.context ??= new AudioContext());
   }
-  async decode(bytes: Uint8Array<ArrayBuffer>): Promise<DecodedAudioResource> {
+  async decode(
+    bytes: Uint8Array<ArrayBuffer>,
+    maxDecodedBytes = AUDIO_MAX_DECODED_BYTES,
+    signal?: AbortSignal,
+  ): Promise<DecodedAudioResource> {
     const context = this.getContext();
-    let buffer: AudioBuffer | undefined = await context.decodeAudioData(new Uint8Array(bytes).buffer);
+    const budget = Math.min(maxDecodedBytes, AUDIO_MAX_DECODED_BYTES);
+    let buffer: AudioBuffer | undefined = await webAudioDecodes.run(async () => {
+      signal?.throwIfAborted();
+      if (this.closed) throw new Error('Audio backend is disposed.');
+      preflightAudioDecode(bytes, budget, context.sampleRate);
+      const decoded = await context.decodeAudioData(new Uint8Array(bytes).buffer);
+      signal?.throwIfAborted();
+      if (this.closed) throw new Error('Audio backend is disposed.');
+      if (
+        !Number.isFinite(decoded.duration) ||
+        decoded.duration <= 0 ||
+        !Number.isFinite(decoded.length) ||
+        decoded.length <= 0 ||
+        !Number.isFinite(decoded.numberOfChannels) ||
+        decoded.numberOfChannels <= 0 ||
+        decoded.length * decoded.numberOfChannels * 4 > budget
+      )
+        throw new Error(AUDIO_DECODE_BUDGET_ERROR);
+      return decoded;
+    });
     return {
       durationSeconds: buffer.duration,
       byteLength: buffer.length * buffer.numberOfChannels * 4,
@@ -207,6 +241,7 @@ export class AudioAssetLoader {
   private cacheLifetime = new AbortController();
   private readonly cache = new Map<string, Promise<DecodedAudioResource>>();
   private readonly resources = new Set<DecodedAudioResource>();
+  private readonly decodes = new AudioDecodeQueue();
   private decodedBytes = 0;
   private playback: AudioPlayback | undefined;
   private generation = 0;
@@ -249,7 +284,11 @@ export class AudioAssetLoader {
         this.cacheLifetime.signal,
         AbortSignal.timeout(AUDIO_LOAD_TIMEOUT_MS),
       ]);
-      const decoding = this.backend.decode(owned).then((resource) => {
+      const decoding = this.decodes.run(async () => {
+        deadline.throwIfAborted();
+        const budget = AUDIO_MAX_DECODED_BYTES - this.decodedBytes;
+        preflightAudioDecode(owned, budget);
+        const resource = await this.backend.decode(owned, budget, deadline);
         if (deadline.aborted) {
           resource.dispose();
           deadline.throwIfAborted();
@@ -266,9 +305,7 @@ export class AudioAssetLoader {
           this.decodedBytes + resource.byteLength > AUDIO_MAX_DECODED_BYTES
         ) {
           resource.dispose();
-          throw new Error(
-            'Decoded audio exceeds the 128 MiB audio budget or has invalid duration. Use shorter audio or a lower sample rate, then reopen the Audio section or scene.',
-          );
+          throw new Error(AUDIO_DECODE_BUDGET_ERROR);
         }
         this.resources.add(resource);
         this.decodedBytes += resource.byteLength;
