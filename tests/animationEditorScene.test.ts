@@ -383,6 +383,36 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
   assert.equal(state.currentTime, 0.375);
 });
 
+test('scene skips inactive contact synchronization and constraint collection until markers are shown', () => {
+  const scene = new AnimationEditorScene(vi.fn(), vi.fn());
+  const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const state = new AnimationEditorState(rig, [{ name: 'move', duration: 2000, loop: true, tracks: {} }]);
+  state.selectAnimation('move');
+  const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
+  Object.assign(scene, { state, puppet });
+  scene.footContacts.bind(state, scene.groundGuide);
+  scene.footContacts.sync(puppet);
+  const sync = vi.spyOn(scene.footContacts, 'sync');
+  const constraints = vi.spyOn(scene, 'getBakeRuntimeConstraints');
+  try {
+    state.play();
+    for (let frame = 0; frame < 60; frame++) scene.update(frame * 16, 16);
+    assert.equal(sync.mock.calls.length, 0);
+    assert.equal(constraints.mock.calls.length, 0);
+    scene.footContacts.setVisible(true);
+    scene.update(1000, 16);
+    assert.equal(sync.mock.calls.length, 1);
+    assert.equal(constraints.mock.calls.length, 1);
+    scene.footContacts.setVisible(false);
+    scene.update(1016, 16);
+    assert.equal(sync.mock.calls.length, 1);
+    assert.equal(constraints.mock.calls.length, 1);
+  } finally {
+    scene.footContacts.unbind();
+    puppet.destroy();
+  }
+});
+
 test('scene owns options before loading and retains its IK chains after caller mutations', async () => {
   vi.stubGlobal('window', { location: { href: 'https://example.test/animation-editor/' } });
   vi.mocked(loadSceneCharacter).mockResolvedValue(demoCharacter);

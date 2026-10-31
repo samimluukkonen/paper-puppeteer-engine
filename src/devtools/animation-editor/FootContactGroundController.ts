@@ -35,6 +35,11 @@ export class FootContactGroundController {
   feedback = '';
   contacts: ReturnType<typeof evaluatedFootContacts> = [];
 
+  /** Hidden proposals still need invalidation when their live context changes. */
+  get needsSync(): boolean {
+    return this.visible || !!this.plan;
+  }
+
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -70,13 +75,15 @@ export class FootContactGroundController {
     this.notify();
   }
   /** Called after the authoritative preview updates, also tracks facing/outer affine changes. */
-  sync(
-    puppet: Puppet,
-    runtime: readonly TwoBoneIKConstraint[] = (puppet.rig.ik ?? []).map((entry) => puppet.getIK(entry.name)),
-    now = performance.now(),
-  ): void {
+  sync(puppet: Puppet, runtime?: readonly TwoBoneIKConstraint[], now = performance.now()): void {
+    const changedPuppet = this.puppet !== puppet;
+    if (runtime) this.runtime = runtime;
+    else if (changedPuppet) this.runtime = (puppet.rig.ik ?? []).map((entry) => puppet.getIK(entry.name));
     this.puppet = puppet;
-    this.runtime = runtime;
+    if (!this.needsSync) {
+      if (changedPuppet) this.refresh();
+      return;
+    }
     this.refresh();
     const contacts = this.visible ? evaluatedFootContacts(puppet, this.state?.rig) : [];
     if (JSON.stringify(contacts) !== JSON.stringify(this.contacts)) {
@@ -95,14 +102,15 @@ export class FootContactGroundController {
     const matrix = this.puppet?.container.getWorldTransformMatrix();
     return matrix && { a: matrix.a, b: matrix.b, c: matrix.c, d: matrix.d, tx: matrix.tx, ty: matrix.ty };
   }
-  private refresh(): void {
+  private refresh(force = false): void {
     const state = this.state;
     const guide = this.guide?.getSnapshot();
-    const matrix = this.matrix();
+    const active = force || this.needsSync;
+    const matrix = active ? this.matrix() : undefined;
     const context = [
       state?.rig,
       state?.workingAnimation,
-      state?.currentTimeMilliseconds,
+      active || this.feedback ? state?.currentTimeMilliseconds : undefined,
       state?.sessionRevision,
       state?.editorMode,
       state?.isPlaying,
@@ -119,13 +127,9 @@ export class FootContactGroundController {
       matrix?.tx,
       matrix?.ty,
       state?.hasPendingAnimationEdits,
-      state?.getIKManipulationDisabledReason(this.constraintId),
-      state?.rig
-        ? getIKBakeRuntimeIssues(state.rig, this.runtime)
-            .map((issue) => issue.message)
-            .join('\n')
-        : '',
+      active ? state?.getIKManipulationDisabledReason(this.constraintId) : undefined,
     ];
+    if (active) for (const runtime of this.runtime) context.push(runtime, runtime.configurationRevision);
     if (context.length === this.context.length && context.every((value, index) => value === this.context[index]))
       return;
     this.context = context;
@@ -138,9 +142,10 @@ export class FootContactGroundController {
     const presentation = [
       state?.rig,
       state?.workingAnimation,
+      this.puppet,
       state?.editorMode,
       state?.isPlaying,
-      this.disabledReason,
+      active ? this.disabledReason : undefined,
       this.markerId,
       this.constraintId,
     ];
@@ -173,6 +178,7 @@ export class FootContactGroundController {
   }
   setVisible(visible: boolean): void {
     this.visible = visible;
+    this.refresh();
     if (!visible) this.contacts = [];
     this.lastContactNotification = -Infinity;
     this.pendingContactNotification = false;
@@ -205,7 +211,7 @@ export class FootContactGroundController {
     return '';
   }
   preview(): boolean {
-    this.refresh();
+    this.refresh(true);
     const reason = this.disabledReason;
     if (reason) {
       this.feedback = reason;
@@ -215,6 +221,7 @@ export class FootContactGroundController {
     const state = this.state!;
     state.pause();
     state.endScrub();
+    this.refresh(true);
     try {
       // Pose presets and external edits are not clip data. Refuse a mismatched preview context.
       if (!this.authoredPoseMatches())

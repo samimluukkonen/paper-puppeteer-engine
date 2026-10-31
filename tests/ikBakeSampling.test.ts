@@ -6,6 +6,7 @@ import { type Affine, composeAffine, localToWorld, transformToAffine } from '../
 import type { AnimationClip, AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
 import type { FiredAnimationEvent } from '../src/engine/AnimationPlayer.js';
 import { getIKBakeSampleTimes, sampleIKBake, type IKBakeSampleResult } from '../src/engine/core.js';
+import { getIKBakeRuntimeIssues } from '../src/engine/ik/IKBakeSampling.js';
 import { blendIKRotation } from '../src/engine/ik/solveTwoBoneIK.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -507,6 +508,101 @@ test('optional runtime guards reject providers and all overrides without invokin
   assert.isFalse(unsupported.success);
   assert.equal(unsupported.issues[0]!.code, 'external-state');
   puppet.destroy();
+});
+
+test('runtime guards reuse unchanged configurations and invalidate every ownership/settings change', () => {
+  const skeleton = rig();
+  const puppet = new Puppet(puppetScene(), { rig: skeleton, autoUpdate: false });
+  const chain = puppet.getIK('arm');
+  const ownership = vi.spyOn(chain, 'targetOwnership', 'get');
+  const provider = vi.fn(() => undefined);
+  try {
+    const constraints = [chain, puppet.getIK('leg')];
+    assert.isEmpty(getIKBakeRuntimeIssues(skeleton, constraints));
+    ownership.mockClear();
+    const revision = chain.configurationRevision;
+    for (let frame = 0; frame < 60; frame++) {
+      puppet.syncPose();
+      chain.enabled = true;
+      chain.priority = 1;
+      chain.bendDirection = 1;
+      chain.setEndOffset({ x: 0, y: 0 }).clearMixOverride().setTargetProvider(undefined);
+      chain.target = undefined;
+      assert.isEmpty(getIKBakeRuntimeIssues(skeleton, [...constraints]));
+    }
+    assert.equal(chain.configurationRevision, revision);
+    assert.equal(ownership.mock.calls.length, 0, 'playback and new collection identities reuse cached checks');
+    for (const [change, restore] of [
+      [() => chain.setTargetProvider(provider), () => chain.setTargetProvider(undefined)],
+      [
+        () => chain.setTarget(10, 20),
+        () => {
+          chain.target = undefined;
+        },
+      ],
+      [
+        () => {
+          chain.mix = 1;
+        },
+        () => chain.clearMixOverride(),
+      ],
+      [
+        () => {
+          chain.mix = 0.5;
+        },
+        () => {
+          chain.mix = 1;
+          chain.clearMixOverride();
+        },
+      ],
+      [
+        () => {
+          chain.priority = 2;
+        },
+        () => {
+          chain.priority = 1;
+        },
+      ],
+      [
+        () => {
+          chain.enabled = false;
+        },
+        () => {
+          chain.enabled = true;
+        },
+      ],
+      [
+        () => {
+          chain.bendDirection = -1;
+        },
+        () => {
+          chain.bendDirection = 1;
+        },
+      ],
+      [() => chain.setEndOffset({ x: 1, y: 0 }), () => chain.setEndOffset({ x: 0, y: 0 })],
+      [() => chain.setEndOffset({ x: 0, y: 1 }), () => chain.setEndOffset({ x: 0, y: 0 })],
+    ]) {
+      change!();
+      assert.equal(getIKBakeRuntimeIssues(skeleton, constraints).length, 1);
+      restore!();
+      assert.isEmpty(getIKBakeRuntimeIssues(skeleton, constraints));
+    }
+    assert.equal(provider.mock.calls.length, 0);
+    const other = new Rig({
+      root: skeleton.root,
+      bones: skeleton.bones,
+      ik: skeleton.ik!.map((entry) => ({ ...entry, priority: 10 })),
+    });
+    assert.equal(getIKBakeRuntimeIssues(other, constraints).length, 2, 'rig replacement uses fresh definitions');
+    assert.isEmpty(getIKBakeRuntimeIssues(skeleton, constraints));
+    const extra = puppet.addIK({ name: 'extra', rootBone: 'thigh', middleBone: 'shin', endBone: 'foot' });
+    assert.equal(getIKBakeRuntimeIssues(skeleton, [...constraints, extra]).length, 1);
+    assert.isEmpty(getIKBakeRuntimeIssues(skeleton, constraints), 'removing an extra chain removes its issue');
+    chain.dispose();
+    assert.equal(getIKBakeRuntimeIssues(skeleton, constraints).length, 1);
+  } finally {
+    puppet.destroy();
+  }
 });
 
 test('isolated samples are immutable, deterministic and refreshed for mutable input changes', () => {

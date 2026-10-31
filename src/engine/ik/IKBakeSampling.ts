@@ -9,7 +9,7 @@ import { getValidatedAnimation } from '../validatedAnimation.js';
 import { getIKBakeSampleCount, preflightIKBake } from './IKBakeBudget.js';
 import { IsolatedIKSampler } from './IsolatedIKSampler.js';
 import type { TwoBoneIKConstraint } from './TwoBoneIKConstraint.js';
-import type { IKStatus, IKTarget } from './types.js';
+import type { IKStatus, IKTarget, TwoBoneIKDefinition } from './types.js';
 
 export interface IKBakeSamplingOptions {
   /** Sampling density only; authored stepped playback still controls evaluation. */
@@ -89,25 +89,48 @@ function messageFor(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** @internal Read runtime ownership without evaluating providers or sampling the animation. */
+const runtimeIssueCaches = new WeakMap<
+  Rig,
+  {
+    definitions: ReadonlyMap<string, DeepReadonly<TwoBoneIKDefinition>>;
+    constraints: WeakMap<TwoBoneIKConstraint, { revision: number; external: boolean }>;
+  }
+>();
+
+/** @internal Read runtime ownership without evaluating providers or sampling the animation.
+ * Rig definitions are immutable; only changed runtime configurations need to be checked again.
+ */
 export function getIKBakeRuntimeIssues(rig: Rig, runtimeConstraints: readonly TwoBoneIKConstraint[]): IKBakeIssue[] {
+  let cache = runtimeIssueCaches.get(rig);
+  if (!cache) {
+    cache = {
+      definitions: new Map((rig.ik ?? []).map((definition) => [definition.name, definition])),
+      constraints: new WeakMap(),
+    };
+    runtimeIssueCaches.set(rig, cache);
+  }
   const issues: IKBakeIssue[] = [];
   for (const runtime of runtimeConstraints) {
-    const definition = rig.ik?.find((entry) => entry.name === runtime.name);
-    if (
-      !definition ||
-      runtime.targetOwnership !== 'animation' ||
-      runtime.rootBone !== definition.rootBone ||
-      runtime.middleBone !== definition.middleBone ||
-      runtime.endBone !== definition.endBone ||
-      runtime.enabled !== (definition.enabled ?? true) ||
-      runtime.priority !== (definition.priority ?? 0) ||
-      runtime.mix !== (definition.mix ?? 1) ||
-      runtime.hasMixOverride ||
-      runtime.bendDirection !== (definition.bendDirection ?? 1) ||
-      runtime.endOffset.x !== (definition.endOffset?.x ?? 0) ||
-      runtime.endOffset.y !== (definition.endOffset?.y ?? 0)
-    )
+    let cached = cache.constraints.get(runtime);
+    if (cached?.revision !== runtime.configurationRevision) {
+      const definition = cache.definitions.get(runtime.name);
+      const external =
+        !definition ||
+        runtime.targetOwnership !== 'animation' ||
+        runtime.rootBone !== definition.rootBone ||
+        runtime.middleBone !== definition.middleBone ||
+        runtime.endBone !== definition.endBone ||
+        runtime.enabled !== (definition.enabled ?? true) ||
+        runtime.priority !== (definition.priority ?? 0) ||
+        runtime.mix !== (definition.mix ?? 1) ||
+        runtime.hasMixOverride ||
+        runtime.bendDirection !== (definition.bendDirection ?? 1) ||
+        runtime.endOffset.x !== (definition.endOffset?.x ?? 0) ||
+        runtime.endOffset.y !== (definition.endOffset?.y ?? 0);
+      cached = { revision: runtime.configurationRevision, external };
+      cache.constraints.set(runtime, cached);
+    }
+    if (cached.external)
       issues.push({
         code: 'external-state',
         severity: 'error',

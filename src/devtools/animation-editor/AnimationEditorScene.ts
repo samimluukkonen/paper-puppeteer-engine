@@ -263,7 +263,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       overlay.lineStyle(3, 0xb7543a).strokeCircle(point.x, point.y, 10);
     }
     if (!this.rigMode && this.puppet) {
-      this.footContacts.sync(this.puppet, this.getBakeRuntimeConstraints());
+      if (this.footContacts.needsSync) this.footContacts.sync(this.puppet, this.getBakeRuntimeConstraints());
       const { plan, visible, contacts, tolerance, markerId } = this.footContacts;
       if (plan) {
         this.contactOverlay ??= new AnimationPoseOverlay(this, this.puppet, 'contact', 0);

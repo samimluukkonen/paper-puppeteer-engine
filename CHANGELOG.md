@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Skip inactive foot-contact diagnostics during animation playback and cache IK constraint lookups and runtime configuration checks, preserving immediate alignment proposal invalidation when ownership changes.
+
 - Add opt-in dirty idle synchronization for runtime puppets, skipping unchanged bone, render, IK, mesh and debug work while preserving live providers, animation evaluation and update callbacks. Keep automatic synchronization as the default and expose explicit pose invalidation for direct edits.
 
 - Separate local draft revision metadata from shared content-addressed binaries, reuse unchanged resource hashes, query projects through indexes and reclaim binaries after their final revision reference. Upgrade existing recovery drafts without copying their assets, preserving atomic retention and recovery.

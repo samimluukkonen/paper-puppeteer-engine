@@ -592,6 +592,52 @@ test('contact diagnostics throttle playback renders, flush the final sample and 
   }
 });
 
+test('hidden contacts skip world-context and ownership checks until shown, while hidden proposals still invalidate', () => {
+  const f = animationFixture();
+  const matrix = vi.spyOn(f.puppet.container, 'getWorldTransformMatrix');
+  const ownership = vi.spyOn(f.puppet.getIK('leg'), 'targetOwnership', 'get');
+  const getIK = vi.spyOn(f.puppet, 'getIK');
+  try {
+    f.contacts.setVisible(false);
+    matrix.mockClear();
+    ownership.mockClear();
+    getIK.mockClear();
+    for (let frame = 1; frame <= 60; frame++) {
+      f.state.setCurrentTime(frame / 100);
+      // Preview evaluation has its own world-coordinate work; only measure contact synchronization.
+      matrix.mockClear();
+      f.contacts.sync(f.puppet, undefined, frame * 16);
+      assert.equal(matrix.mock.calls.length, 0);
+    }
+    assert.equal(ownership.mock.calls.length, 0);
+    assert.equal(getIK.mock.calls.length, 0);
+    const provider = vi.fn(() => undefined);
+    f.puppet.getIK('leg').setTargetProvider(provider);
+    f.contacts.setVisible(true);
+    assert.include(f.contacts.disabledReason, 'runtime');
+    assert.equal(provider.mock.calls.length, 0);
+    f.puppet.getIK('leg').setTargetProvider(undefined);
+    f.contacts.sync(f.puppet);
+    assert.deepEqual(f.contacts.contacts, evaluatedFootContacts(f.puppet));
+    f.contacts.setVisible(false);
+    assert.isFalse(f.contacts.needsSync);
+    assert.isTrue(f.contacts.preview(), 'explicit alignment works with markers hidden');
+    const plan = f.contacts.plan;
+    assert.isTrue(f.contacts.needsSync);
+    f.contacts.sync(f.puppet);
+    assert.strictEqual(f.contacts.plan, plan, 'unchanged hidden proposals survive synchronization');
+    f.puppet.getIK('leg').mix = 1;
+    f.contacts.sync(f.puppet);
+    assert.isNull(f.contacts.plan, 'same-value runtime ownership overrides invalidate proposals');
+    assert.isFalse(f.contacts.apply());
+  } finally {
+    matrix.mockRestore();
+    ownership.mockRestore();
+    getIK.mockRestore();
+    f.dispose();
+  }
+});
+
 test('scene contact selections reset on import and cannot silently use another marker', () => {
   const f = sceneFixture();
   try {

@@ -34,7 +34,8 @@ export class TwoBoneIKConstraint {
   readonly endBone: string;
   private endpointOffset: Readonly<IKTarget> = Object.freeze({ x: 0, y: 0 });
   private order: number;
-  enabled: boolean;
+  private active = true;
+  private revision = 0;
   status: IKStatus = 'inactive';
   resolvedTarget: Readonly<IKTarget> | undefined;
   lengthA = 0;
@@ -77,6 +78,17 @@ export class TwoBoneIKConstraint {
   get mix(): number {
     return this.influence;
   }
+  /** @internal Changes to runtime ownership/settings, independent of solved pose and playback time. */
+  get configurationRevision(): number {
+    return this.revision;
+  }
+  get enabled(): boolean {
+    return this.active;
+  }
+  set enabled(value: boolean) {
+    if (this.active !== value) this.revision++;
+    this.active = value;
+  }
   get isDisposed(): boolean {
     return this.disposed;
   }
@@ -86,12 +98,14 @@ export class TwoBoneIKConstraint {
   set priority(value: number) {
     this.assertActive();
     assertFinite(value, `IK ${this.name}.priority`);
+    if (this.order !== value) this.revision++;
     this.order = value;
   }
   set mix(value: number) {
     this.assertActive();
     assertFinite(value, 'IK mix');
     if (value < 0 || value > 1) throw new Error('IK mix must be between 0 and 1.');
+    if (this.influence !== value || !this.mixOverride) this.revision++;
     this.influence = value;
     this.mixOverride = true;
   }
@@ -99,6 +113,7 @@ export class TwoBoneIKConstraint {
   /** Return influence ownership to animation while retaining the current static fallback mix. */
   clearMixOverride(): this {
     this.assertActive();
+    if (this.mixOverride) this.revision++;
     this.mixOverride = false;
     return this;
   }
@@ -114,6 +129,7 @@ export class TwoBoneIKConstraint {
   set bendDirection(value: BendDirection) {
     this.assertActive();
     assertBendDirection(value);
+    if (this.bend !== value) this.revision++;
     this.bend = value;
   }
 
@@ -124,6 +140,7 @@ export class TwoBoneIKConstraint {
     this.assertActive();
     assertFinite(offset.x, `IK ${this.name}.endOffset.x`);
     assertFinite(offset.y, `IK ${this.name}.endOffset.y`);
+    if (this.endpointOffset.x !== offset.x || this.endpointOffset.y !== offset.y) this.revision++;
     this.endpointOffset = Object.freeze({ ...offset });
     return this;
   }
@@ -146,6 +163,7 @@ export class TwoBoneIKConstraint {
       assertFinite(value.x, 'IK target.x');
       assertFinite(value.y, 'IK target.y');
     }
+    if (this.provider || this.point?.x !== value?.x || this.point?.y !== value?.y) this.revision++;
     this.point = value ? Object.freeze({ ...value }) : undefined;
     this.provider = undefined;
   }
@@ -161,6 +179,7 @@ export class TwoBoneIKConstraint {
   /** Evaluated immediately before this constraint, after all earlier constraints. */
   setTargetProvider(provider: IKTargetProvider | undefined): this {
     this.assertActive();
+    if (this.provider !== provider) this.revision++;
     this.provider = provider;
     return this;
   }
@@ -252,6 +271,7 @@ export class TwoBoneIKConstraint {
   /** Release the host's target callback. Puppet calls this for every owned constraint on destruction. */
   dispose(): void {
     if (this.disposed) return;
+    this.revision++;
     this.disposed = true;
     this.provider = undefined;
     this.point = undefined;
