@@ -1,9 +1,11 @@
-.animation-library {
+.animation-library,
+.animation-library-metadata-section {
   border: 1px solid var(--border-default);
   border-radius: 6px;
   min-width: 0;
 }
-.animation-library > summary {
+.animation-library > summary,
+.animation-library-metadata-section > summary {
   padding: 8px 12px;
   cursor: pointer;
   background: var(--bg-subtle);
@@ -61,10 +63,31 @@
 .animation-library-metadata {
   display: grid;
   gap: 8px;
+  padding: 16px 12px 12px;
 }
 .animation-library-metadata label {
   display: grid;
   gap: 8px;
+}
+.animation-library-metadata :is(input, textarea) {
+  min-width: 0;
+  width: 100%;
+}
+.animation-library-metadata textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.animation-library-metadata button {
+  justify-self: start;
+}
+.animation-library-dialog {
+  padding: 0;
+}
+.animation-library-description {
+  color: var(--fg-muted);
+}
+.animation-library-feedback:empty {
+  display: none;
 }
 .animation-library-stage {
   width: 760px;

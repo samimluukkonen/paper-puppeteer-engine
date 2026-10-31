@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Align Animation Library dialog padding, inset metadata fields and actions, and add a Library icon beside its title.
+
 - Align Mesh Deformation inspector checkboxes, stack mesh and vertex selectors, and use consistent field spacing, muted help text and wrapping actions.
 
 - Add matching Lucide icons to Animation Editor Edit-row buttons, menu triggers and every inspector tab, preserving text labels and keyboard controls.

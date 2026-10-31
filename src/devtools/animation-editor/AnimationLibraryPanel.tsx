@@ -35,67 +35,86 @@ export function AnimationLibraryPanel({ controller }: { controller: AnimationLib
         <Library size={16} aria-hidden="true" />
         Animation Library
       </button>
-      <dialog ref={dialog} className="workspace-dialog animation-library-preview" aria-label="Animation Library">
-        <h2>Animation Library</h2>
-        <p>
-          Preview uses the editor canvas, including Environment Preview. Use its Play/Pause, Restart and Loop controls.
-          Library browsing preserves authored edits.
-        </p>
-        <AnimationLibrary
-          entries={snapshot.entries}
-          targetRig={snapshot.entries[0]?.rigIdentity}
-          disabled={!!snapshot.reason}
-          onPreview={(entry) => select(entry.clip.name, true)}
-          onUse={(entry) => select(entry.clip.name)}
-          onCopy={(entry) => select(entry.clip.name, false, true)}
-          onLocate={(entry) => select(entry.clip.name)}
-        />
-        <details>
-          <summary>Library metadata · {snapshot.source?.name ?? 'No animation'}</summary>
-          <form
-            className="animation-library-metadata"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const success = controller.metadata({
-                ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
-                ...(description ? { description } : {}),
-                tags: [
-                  ...new Set(
-                    tags
-                      .split(',')
-                      .map((tag) => tag.trim())
-                      .filter(Boolean),
-                  ),
-                ],
-              });
-              setMessage(
-                success
-                  ? 'Library metadata updated. Undo restores the previous labels.'
-                  : 'Could not update metadata. Check the editor validation feedback.',
-              );
-            }}
-          >
-            <label>
-              Display name
-              <input maxLength={200} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-            </label>
-            <label>
-              Description
-              <textarea maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} />
-            </label>
-            <label>
-              Tags (comma separated, optional)
-              <input value={tags} onChange={(event) => setTags(event.target.value)} />
-            </label>
-            <button type="submit" disabled={!!snapshot.reason || !snapshot.source}>
-              Save library metadata
-            </button>
-          </form>
-        </details>
-        <p role="status">{message || snapshot.reason}</p>
-        <button type="button" onClick={() => dialog.current?.close()}>
-          Close library
-        </button>
+      <dialog
+        ref={dialog}
+        className="workspace-dialog animation-library-preview animation-library-dialog"
+        aria-labelledby="animation-library-title"
+      >
+        <div className="workspace-dialog-header">
+          <h2 id="animation-library-title" className="workspace-heading-with-icon">
+            <Library size={16} aria-hidden="true" />
+            Animation Library
+          </h2>
+        </div>
+        <div className="workspace-dialog-body">
+          <p className="animation-library-description">
+            Preview uses the editor canvas, including Environment Preview. Use its Play/Pause, Restart and Loop
+            controls. Library browsing preserves authored edits.
+          </p>
+          <AnimationLibrary
+            entries={snapshot.entries}
+            targetRig={snapshot.entries[0]?.rigIdentity}
+            disabled={!!snapshot.reason}
+            onPreview={(entry) => select(entry.clip.name, true)}
+            onUse={(entry) => select(entry.clip.name)}
+            onCopy={(entry) => select(entry.clip.name, false, true)}
+            onLocate={(entry) => select(entry.clip.name)}
+          />
+          <details className="animation-library-metadata-section">
+            <summary>Library metadata · {snapshot.source?.name ?? 'No animation'}</summary>
+            <form
+              className="animation-library-metadata"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const success = controller.metadata({
+                  ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
+                  ...(description ? { description } : {}),
+                  tags: [
+                    ...new Set(
+                      tags
+                        .split(',')
+                        .map((tag) => tag.trim())
+                        .filter(Boolean),
+                    ),
+                  ],
+                });
+                setMessage(
+                  success
+                    ? 'Library metadata updated. Undo restores the previous labels.'
+                    : 'Could not update metadata. Check the editor validation feedback.',
+                );
+              }}
+            >
+              <label>
+                Display name
+                <input maxLength={200} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+              </label>
+              <label>
+                Description
+                <textarea
+                  maxLength={2000}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </label>
+              <label>
+                Tags (comma separated, optional)
+                <input value={tags} onChange={(event) => setTags(event.target.value)} />
+              </label>
+              <button type="submit" disabled={!!snapshot.reason || !snapshot.source}>
+                Save library metadata
+              </button>
+            </form>
+          </details>
+          <p className="animation-library-feedback" role="status">
+            {message || snapshot.reason}
+          </p>
+        </div>
+        <div className="workspace-dialog-footer">
+          <button type="button" onClick={() => dialog.current?.close()}>
+            Close library
+          </button>
+        </div>
       </dialog>
     </>
   );
