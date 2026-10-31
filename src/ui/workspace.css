@@ -247,7 +247,7 @@
   align-items: center;
   gap: 6px;
 }
-.workspace-command-bar button:has(> svg),
+.workspace-command-bar :where(button:has(> svg)),
 .workspace-button-with-icon {
   display: inline-flex;
   align-items: center;
