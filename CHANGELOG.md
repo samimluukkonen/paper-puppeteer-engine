@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Use Phaser's GPU-clamped texture limit in editor previews so separate puppet images can batch together. Add a local rendering diagnostic comparing draw calls, submission timings and pixel hashes against the original one-texture configuration.
+
 - Reuse owned Actors for same-position and forward scene seeks, skipping consumed action boundaries and gameplay events. Coalesce ruler scrubbing per display frame, flush on release, cancel obsolete samples on transport/scene changes, and document the remaining backward-seek checkpoint tradeoffs.
 
 - Deduplicate in-flight editor openings by project session, asset and host kind, sharing preparation failures while retaining requested views, guides and animation selections. Clear failed openings so later requests can retry.

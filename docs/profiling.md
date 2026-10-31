@@ -69,6 +69,23 @@ The rig editor caches unchanged overlay geometry and labels, redrawing after edi
 
 ## Renderer scaling
 
+### Editor texture batching
+
+Run `PLAYWRIGHT_CHANNEL=chrome npm run profile:timeline -- --textures` locally (or omit the channel for installed Playwright Chromium). The diagnostic compares the original `maxTextures: 1` configuration with `createEditorGame` using Phaser's default. Phaser 4.2.1 clamps that default to the smaller of 16 and the GPU's `MAX_TEXTURE_IMAGE_UNITS`; no editor-specific compatibility requirement for the old restriction was found.
+
+Fresh desktop pages load the shipped demo puppet's separate images and render one or five stationary Puppets, including both facings. Each workload warms 60 frames and reports the median of five 120-frame batches. The diagnostic counts actual renderer draw submissions, rejects browser/WebGL errors or blank output, and requires identical SHA-256 pixel hashes between configurations. It remains local-only, outside CI, with no timing thresholds.
+
+One local headless Chrome 150.0.7871.125 run on 2026-10-31 selected 16 textures:
+
+| Puppets | Draw calls/frame: limit 1 | Draw calls/frame: default | Render submission ms/frame: limit 1 | Render submission ms/frame: default |
+| ------- | ------------------------: | ------------------------: | ----------------------------------: | ----------------------------------: |
+| 1       |                        15 |                         1 |                                0.35 |                                0.15 |
+| 5       |                        75 |                         1 |                                1.02 |                                1.22 |
+
+Both workloads rendered byte-identical pixels. Sharing the 15 artwork textures lets all five Puppets fit in one batch. Timings cover synchronous render traversal and driver submission, exclude animation/UI work and explicit GPU completion waits, and can include driver backpressure. The five-Puppet timing did not improve in this run; fewer draw calls alone do not establish an FPS or GPU-time improvement.
+
+### Puppet hierarchy scaling
+
 Profile renderer scaling separately from animation and IK:
 
 ```bash

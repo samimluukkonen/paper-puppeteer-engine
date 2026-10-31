@@ -7,7 +7,8 @@ export function createEditorGame(parent: string, scene: Phaser.Scene, size = { w
     parent,
     ...size,
     transparent: true,
-    render: { antialias: true, maxTextures: 1 },
+    // Let Phaser batch separate artwork textures up to its GPU-clamped default limit.
+    render: { antialias: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
   });

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { z } from 'zod';
 import { profileAdvancedAuthoring } from './profile-advanced-authoring.mjs';
+import { profileEditorTextures } from './profile-editor-textures.mjs';
 import { profileEditorWorkflow } from './profile-editor-workflow.mjs';
 import { profileProjectWorkflow } from './profile-project-workflow.mjs';
 import { profileSceneWorkflow } from './profile-scene-workflow.mjs';
@@ -51,7 +52,9 @@ try {
     });
     vite.stderr.on('data', (chunk) => process.stderr.write(String(chunk)));
   });
-  if (process.argv.includes('--advanced')) {
+  if (process.argv.includes('--textures')) {
+    console.log(JSON.stringify(await profileEditorTextures(baseUrl, process.env.PLAYWRIGHT_CHANNEL)));
+  } else if (process.argv.includes('--advanced')) {
     console.log(JSON.stringify(await profileAdvancedAuthoring(baseUrl, rig, process.env.PLAYWRIGHT_CHANNEL)));
   } else if (process.argv.includes('--project')) {
     console.log(JSON.stringify(await profileProjectWorkflow(baseUrl, process.env.PLAYWRIGHT_CHANNEL)));
