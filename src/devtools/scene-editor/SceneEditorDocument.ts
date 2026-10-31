@@ -153,6 +153,33 @@ export class SceneEditorDocument {
   scene(id: string): ReadonlyScene | undefined {
     return this.entries.get(id)?.working;
   }
+  /** Every restorable revision keeps its project-owned dependencies alive. */
+  get retainedSnapshots(): readonly ReadonlyScene[] {
+    return [...this.entries.values()].flatMap((entry) => [
+      entry.source,
+      entry.saved,
+      entry.working,
+      ...entry.history.retainedSnapshots,
+    ]);
+  }
+  /** Project membership, its checkpoint and history determine which scene owners still exist. */
+  retainScenes(retained: ReadonlySet<string>): void {
+    const removed = this.sceneIds.filter((id) => !retained.has(id));
+    if (!removed.length) return;
+    if (this.selected !== null && removed.includes(this.selected)) {
+      this.finishLayerGestures();
+      this.selected = null;
+      this.groundOffsets = new Map();
+      this.groundContacts = new Map();
+      this.selectedContacts.clear();
+    }
+    for (const id of removed) {
+      this.entries.delete(id);
+      this.lockedLayers.delete(id);
+      this.groundGuide.forget(id);
+    }
+    this.success();
+  }
   get sourceScene(): ReadonlyScene | null {
     return this.entry?.source ?? null;
   }
@@ -580,9 +607,7 @@ export class SceneEditorDocument {
   /** Sources, checkpoints, undo, redo and active gestures all keep their binary dependencies. */
   cleanupImages(): number {
     const retained = new Set<string>(this.retainedImageReferences?.());
-    for (const entry of this.entries.values())
-      for (const scene of [entry.source, entry.saved, entry.working, ...entry.history.retainedSnapshots])
-        for (const image of scene.images ?? []) retained.add(image.image);
+    for (const scene of this.retainedSnapshots) for (const image of scene.images ?? []) retained.add(image.image);
     return this.images.removeUnused(retained);
   }
 

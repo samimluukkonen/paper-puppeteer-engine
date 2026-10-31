@@ -59,13 +59,14 @@ export interface ProjectCharacter {
   loading: boolean;
 }
 
-/** Membership history retains resources, so undo never recreates or overwrites a document. */
+/** Current documents, checkpoints and membership history retain resources needed for restoration. */
 export class ProjectWorkspace {
   private metadata: DeepReadonly<ProjectDefinition>;
   private previewPreferences: DeepReadonly<NonNullable<ProjectDefinition['editorPreferences']>['animationPreview']> =
     {};
   private saved: DeepReadonly<ProjectDefinition> | undefined;
   private readonly characters = new Map<string, ProjectCharacter>();
+  private readonly characterManifests = new Map<string, string>();
   private readonly fingerprints = new Map<string, PackageFingerprints>();
   private readonly artwork = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
@@ -106,7 +107,11 @@ export class ProjectWorkspace {
       parseProjectDefinition({ version: 1, id, name: name.trim(), characters: [], scenes: [] }),
     );
     this.history = this.createHistory();
-    this.scenes.subscribe(this.refresh);
+    this.scenes.subscribe(() => {
+      // Registration notifies before membership is recorded. Only membership edits collect scene owners.
+      this.collectAssets(false);
+      this.refresh();
+    });
     this.scenes.images.subscribe(this.refresh);
   }
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -148,6 +153,7 @@ export class ProjectWorkspace {
   markRecovered(key: string): void {
     this.recoveryKey = key;
     this.saved = undefined;
+    this.collectAssets();
     this.refresh();
   }
   get autosaveRevision(): string | undefined {
@@ -252,6 +258,7 @@ export class ProjectWorkspace {
     this.history.change(() => {
       this.metadata = value;
     });
+    this.collectAssets();
     this.refresh();
   }
   rename(name: string): void {
@@ -259,11 +266,49 @@ export class ProjectWorkspace {
   }
   undo(): void {
     this.history.undo();
+    this.collectAssets();
     this.refresh();
   }
   redo(): void {
     this.history.redo();
+    this.collectAssets();
     this.refresh();
+  }
+  /** Scene sources, checkpoints and local histories can outlive their project membership references. */
+  private collectAssets(collectScenes = true): void {
+    // Most editor notifications have no removed owners. Avoid scanning document histories in that case.
+    if (
+      this.characters.size === this.metadata.characters.length &&
+      this.audioFiles.size === (this.metadata.audio?.length ?? 0) &&
+      this.scenes.sceneIds.length === this.metadata.scenes.length
+    )
+      return;
+    const projects = [this.metadata, ...this.history.retainedSnapshots, ...(this.saved ? [this.saved] : [])];
+    const characters = new Set(projects.flatMap((project) => project.characters.map(({ id }) => id)));
+    const scenes = new Set(projects.flatMap((project) => project.scenes.map(({ id }) => id)));
+    const audio = new Set(projects.flatMap((project) => project.audio?.map(({ id }) => id) ?? []));
+    if (collectScenes) this.scenes.retainScenes(scenes);
+    const referencedManifests = new Set<string>();
+    for (const scene of this.scenes.retainedSnapshots) {
+      for (const actor of scene.actors) referencedManifests.add(actor.character.manifest);
+      for (const clip of scene.audioClips ?? []) audio.add(clip.assetId);
+    }
+    for (const [id, manifest] of this.characterManifests) if (referencedManifests.has(manifest)) characters.add(id);
+    for (const [id, entry] of this.characters) {
+      if (characters.has(id)) continue;
+      this.characters.delete(id);
+      this.characterManifests.delete(id);
+      this.fingerprints.delete(id);
+      this.checkpoints.delete(id);
+      const { [id]: _preferences, ...preferences } = this.previewPreferences;
+      this.previewPreferences = preferences;
+      entry.documents?.artwork.dispose();
+    }
+    const artwork = new Set([...this.characters.values()].flatMap((entry) => [...entry.files.values()]));
+    for (const [digest, bytes] of this.artwork) if (!artwork.has(bytes)) this.artwork.delete(digest);
+    for (const id of this.audioFiles.keys()) if (!audio.has(id)) this.audioFiles.delete(id);
+    for (const id of this.sceneCheckpoints.keys()) if (!scenes.has(id)) this.sceneCheckpoints.delete(id);
+    this.inspector.retainAssets(characters, scenes);
   }
   audioSource(id: string) {
     const definition = this.metadata.audio?.find((entry) => entry.id === id);
@@ -365,7 +410,8 @@ export class ProjectWorkspace {
   private path(kind: 'characters' | 'scenes'): string {
     let index = 1;
     const used = new Set([
-      ...this.metadata.characters.map((entry) => entry.manifest),
+      // A retained scene revision resolves characters by manifest, including after membership removal.
+      ...this.characterManifests.values(),
       ...this.metadata.scenes.map((entry) => entry.path),
     ]);
     let path: string;
@@ -410,6 +456,7 @@ export class ProjectWorkspace {
       owned.set(path, bytes);
     }
     this.characters.set(definition.id, entry);
+    this.characterManifests.set(definition.id, proposal.characters.at(-1)!.manifest);
     this.fingerprints.set(definition.id, new PackageFingerprints());
     this.checkpoints.set(definition.id, this.characterDigest(definition.id, entry));
     this.change(proposal);
@@ -602,8 +649,12 @@ export class ProjectWorkspace {
   ): void {
     this.saved = freezeData(parseProjectDefinition(metadata));
     for (const [id, snapshot] of characters)
-      this.checkpoints.set(id, canonicalJson(this.fingerprints.get(id)!.compute(snapshot)));
+      this.checkpoints.set(
+        id,
+        canonicalJson((this.fingerprints.get(id) ?? new PackageFingerprints()).compute(snapshot)),
+      );
     this.sceneCheckpoints = new Map(scenes.map((scene) => [scene.id, sceneFingerprint(scene)]));
+    this.collectAssets();
     this.refresh();
   }
   /** Archive import keeps stable paths; initialized documents remain separate owners. */
@@ -618,6 +669,7 @@ export class ProjectWorkspace {
     const { editorPreferences, ...documents } = value;
     this.previewPreferences = freezeData(editorPreferences?.animationPreview ?? {});
     this.metadata = freezeData(documents);
+    for (const { id, manifest } of value.characters) this.characterManifests.set(id, manifest);
     this.markExported(
       value,
       new Map(value.characters.map(({ id }) => [id, this.captureCharacter(id)])),
@@ -625,5 +677,6 @@ export class ProjectWorkspace {
     );
     // Imported membership is the source baseline, not a set of user registration operations.
     this.history = this.createHistory();
+    this.collectAssets();
   }
 }

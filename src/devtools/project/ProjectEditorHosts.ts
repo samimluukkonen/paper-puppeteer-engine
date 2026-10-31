@@ -217,9 +217,13 @@ export class ProjectEditorHosts {
   ): Promise<void> {
     this.lifetime.signal.throwIfAborted();
     const workspace = session.workspace;
-    const existing = [...this.owners.values()].find(
+    let existing = [...this.owners.values()].find(
       (host) => host.session === session && host.kind === kind && host.asset === id,
     );
+    if (existing && kind === 'character' && existing.context.characterDocuments !== workspace.character(id).documents) {
+      this.evict(existing.token);
+      existing = undefined;
+    }
     if (existing) {
       existing.openView?.(view);
       this.activateHost(existing.token);

@@ -107,6 +107,13 @@ export class GroundGuideWorkspace {
     this.install({ workspaceId, guide, persistenceMessage });
   }
 
+  /** Release session state when its document can no longer be restored. */
+  forget(workspaceId: string): void {
+    if (this.snapshot.workspaceId === workspaceId) this.bind(null);
+    this.entries.delete(workspaceId);
+    this.histories.delete(workspaceId);
+  }
+
   /** Install portable project preferences without recording a user edit or writing browser-specific metadata. */
   restore(guide: GroundGuide): void {
     this.cancelDrag();

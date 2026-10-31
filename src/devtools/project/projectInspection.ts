@@ -180,6 +180,10 @@ export class ProjectInspector {
     { key: string; issues: readonly ValidationIssue[]; fingerprints: PackageFingerprints }
   >();
   private readonly scenes = new Map<string, { key: string; issues: readonly ValidationIssue[] }>();
+  retainAssets(characters: ReadonlySet<string>, scenes: ReadonlySet<string>): void {
+    for (const id of this.characters.keys()) if (!characters.has(id)) this.characters.delete(id);
+    for (const id of this.scenes.keys()) if (!scenes.has(id)) this.scenes.delete(id);
+  }
   inspect(input: ProjectInspectionInput, context: ValidationContext = 'draft', fresh = false): ProjectInspection {
     if (fresh) {
       this.characters.clear();

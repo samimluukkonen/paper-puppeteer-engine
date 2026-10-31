@@ -154,6 +154,46 @@ test('temporary edits pin suspended hosts without letting the renderer cache gro
   }
 });
 
+test('reusing a collected character ID replaces its cached renderer and document context', async () => {
+  const owner = await session();
+  const files = owner.workspace.character('hero').files;
+  const release = vi.fn();
+  vi.spyOn(packages, 'openPackageRuntime').mockImplementation(async () => ({
+    definition: owner.workspace.character('hero').definition,
+    dispose: release,
+  }));
+  const f = fixture();
+  try {
+    await f.controller.open(owner, 'character', 'hero');
+    const previous = f.hosts()[0]!;
+    const documents = previous.context.characterDocuments!;
+    documents.rig.editBone('root', 'x', 42);
+    const unbind = previous.context.bindCharacter(
+      () => false,
+      () => {},
+    );
+    const dispose = vi.fn(unbind);
+    previous.context.bindRenderer({ activate: () => {}, suspend: () => {}, dispose });
+    previous.context.navigate('project');
+    owner.workspace.remove('characters', 'hero');
+    for (let index = 0; index < 105; index++) owner.workspace.rename(`Film ${index}`);
+    await owner.workspace.addCharacter(files);
+    await f.controller.open(owner, 'character', 'hero');
+    const current = f.hosts()[0]!;
+    expect(current.token).not.toBe(previous.token);
+    expect(current.context.characterDocuments).toBe(owner.workspace.characterDocuments('hero'));
+    expect(current.context.characterDocuments).not.toBe(documents);
+    expect(current.context.characterDocuments!.rig.recoveryDraft.bones[0]!.x ?? 0).toBe(0);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(f.controller.resolve(previous.token)).toBeUndefined();
+  } finally {
+    f.controller.dispose();
+    owner.workspace.disposeCharacterDocuments();
+    owner.autosave.dispose();
+  }
+});
+
 test('concurrent opens share one renderer and reactivate the retained host', async () => {
   const owner = await session();
   const runtime = vi.spyOn(packages, 'openPackageRuntime').mockResolvedValue({
