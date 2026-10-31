@@ -1,3 +1,4 @@
+import GitCompareArrows from 'lucide-react/icons/git-compare-arrows';
 import { useMemo, useState, type ReactNode } from 'react';
 import { createRigBoneMapping, type IdentifiedRig, type RigBoneMapping } from '../../engine/rigBoneMapping.js';
 import {
@@ -57,7 +58,12 @@ export function ProjectRigMapping({ workspace, busy }: { workspace: ProjectWorks
       data-guide-id={GUIDE_TARGETS.projectRigMapping}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>Rig compatibility &amp; bone mapping ({saved.length})</summary>
+      <summary>
+        <span className="workspace-heading-with-icon">
+          <GitCompareArrows size={16} aria-hidden="true" />
+          Rig compatibility &amp; bone mapping ({saved.length})
+        </span>
+      </summary>
       {open && (
         <div className="project-rig-mapping-content">
           <p className="workspace-caption">

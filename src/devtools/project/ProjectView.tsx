@@ -1,11 +1,17 @@
+import Clapperboard from 'lucide-react/icons/clapperboard';
 import Download from 'lucide-react/icons/download';
 import FolderInput from 'lucide-react/icons/folder-input';
 import FolderOpen from 'lucide-react/icons/folder-open';
 import FolderPlus from 'lucide-react/icons/folder-plus';
+import Images from 'lucide-react/icons/images';
+import LayoutTemplate from 'lucide-react/icons/layout-template';
+import Network from 'lucide-react/icons/network';
 import Redo2 from 'lucide-react/icons/redo-2';
+import Settings from 'lucide-react/icons/settings';
 import ShieldCheck from 'lucide-react/icons/shield-check';
 import Trash2 from 'lucide-react/icons/trash-2';
 import Undo2 from 'lucide-react/icons/undo-2';
+import UsersRound from 'lucide-react/icons/users-round';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { abortable } from '../../engine/abortable.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';
@@ -437,7 +443,10 @@ export function ProjectView() {
             )}
             <div className="project-columns">
               <section className="project-panel" data-guide-id={GUIDE_TARGETS.projectCharacters}>
-                <h2>Characters</h2>
+                <h2 className="workspace-heading-with-icon">
+                  <UsersRound size={16} aria-hidden="true" />
+                  Characters
+                </h2>
                 <div className="project-actions">
                   <button
                     className="workspace-primary"
@@ -495,13 +504,20 @@ export function ProjectView() {
                         {entry.manifest}
                       </span>
                       <div className="project-actions">
-                        <button disabled={busy} onClick={() => run(() => openAsset('character', entry.id, 'rig'))}>
+                        <button
+                          className="workspace-button-with-icon"
+                          disabled={busy}
+                          onClick={() => run(() => openAsset('character', entry.id, 'rig'))}
+                        >
+                          <Network size={16} aria-hidden="true" />
                           Rig Editor
                         </button>
                         <button
+                          className="workspace-button-with-icon"
                           disabled={busy}
                           onClick={() => run(() => openAsset('character', entry.id, 'animation'))}
                         >
+                          <Clapperboard size={16} aria-hidden="true" />
                           Animation Editor
                         </button>
                         <button
@@ -521,7 +537,10 @@ export function ProjectView() {
                 )}
               </section>
               <section className="project-panel" data-guide-id={GUIDE_TARGETS.projectScenes}>
-                <h2>Scenes</h2>
+                <h2 className="workspace-heading-with-icon">
+                  <LayoutTemplate size={16} aria-hidden="true" />
+                  Scenes
+                </h2>
                 <div className="project-actions">
                   <button
                     className="workspace-primary"
@@ -587,7 +606,10 @@ export function ProjectView() {
               onStatus={setStatus}
             />
             <section className="project-panel" data-guide-id={GUIDE_TARGETS.projectAssets}>
-              <h2>Assets</h2>
+              <h2 className="workspace-heading-with-icon">
+                <Images size={16} aria-hidden="true" />
+                Assets
+              </h2>
               <p className="workspace-caption">
                 Artwork, rigs, animations, skins and attachments belong to their character. Open its editor to author
                 them.
@@ -605,7 +627,12 @@ export function ProjectView() {
               })}
             </section>
             <details className="project-panel project-settings">
-              <summary>Project Settings</summary>
+              <summary>
+                <span className="workspace-heading-with-icon">
+                  <Settings size={16} aria-hidden="true" />
+                  Project Settings
+                </span>
+              </summary>
               <form
                 onSubmit={(event) => {
                   event.preventDefault();

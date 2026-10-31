@@ -322,7 +322,7 @@ export function RecoveryPanel({
             </div>
             <div className="workspace-dialog-footer">
               <button
-                className="workspace-danger"
+                className="workspace-danger workspace-button-with-icon"
                 disabled={busy || !draft}
                 onClick={() => {
                   if (!draft) return;
@@ -338,6 +338,7 @@ export function RecoveryPanel({
                     .finally(() => setBusy(false));
                 }}
               >
+                <Trash2 size={16} aria-hidden="true" />
                 Discard Draft
               </button>
               <div className="workspace-dialog-actions">

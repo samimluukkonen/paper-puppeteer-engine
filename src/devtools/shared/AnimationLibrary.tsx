@@ -1,3 +1,4 @@
+import LibraryBig from 'lucide-react/icons/library-big';
 import { useState } from 'react';
 import {
   animationAssetReference,
@@ -46,7 +47,12 @@ export function AnimationLibrary({
       data-guide-id={guideTarget}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>Animation Library ({entries.length})</summary>
+      <summary>
+        <span className="workspace-heading-with-icon">
+          <LibraryBig size={16} aria-hidden="true" />
+          Animation Library ({entries.length})
+        </span>
+      </summary>
       {open && (
         <div className="animation-library-content">
           <label>

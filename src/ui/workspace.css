@@ -255,9 +255,16 @@
   gap: 6px;
 }
 .workspace-command-bar :is(button, label) > svg,
-.workspace-button-with-icon > svg {
+.workspace-button-with-icon > svg,
+.workspace-heading-with-icon > svg {
   display: block;
   flex: none;
+}
+.workspace-heading-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
 }
 .local-draft-bar,
 .local-save-status {
