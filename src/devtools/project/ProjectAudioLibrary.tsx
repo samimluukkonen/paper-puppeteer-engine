@@ -1,4 +1,8 @@
-import { Music, Play, Square, Trash2, Upload } from 'lucide-react';
+import Music from 'lucide-react/icons/music';
+import Play from 'lucide-react/icons/play';
+import Square from 'lucide-react/icons/square';
+import Trash2 from 'lucide-react/icons/trash-2';
+import Upload from 'lucide-react/icons/upload';
 import { useEffect, useRef, useState } from 'react';
 import { AUDIO_CATEGORIES, type AudioAssetDefinition, type AudioCategory } from '../../engine/AudioAsset.js';
 import { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';

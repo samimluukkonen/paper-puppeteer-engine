@@ -1,4 +1,7 @@
-import { Clapperboard, FolderOpen, LayoutTemplate, Network } from 'lucide-react';
+import Clapperboard from 'lucide-react/icons/clapperboard';
+import FolderOpen from 'lucide-react/icons/folder-open';
+import LayoutTemplate from 'lucide-react/icons/layout-template';
+import Network from 'lucide-react/icons/network';
 import { useSyncExternalStore, type ReactNode, type Ref } from 'react';
 import packageInfo from '../../package.json';
 import { projectEditorContext } from '../devtools/project/projectBridge.js';

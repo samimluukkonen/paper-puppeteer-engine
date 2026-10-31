@@ -1,4 +1,13 @@
-import { ChevronFirst, ChevronLast, Minus, Pause, Play, Plus, Redo2, Repeat, SkipBack, Undo2 } from 'lucide-react';
+import ChevronFirst from 'lucide-react/icons/chevron-first';
+import ChevronLast from 'lucide-react/icons/chevron-last';
+import Minus from 'lucide-react/icons/minus';
+import Pause from 'lucide-react/icons/pause';
+import Play from 'lucide-react/icons/play';
+import Plus from 'lucide-react/icons/plus';
+import Redo2 from 'lucide-react/icons/redo-2';
+import Repeat from 'lucide-react/icons/repeat';
+import SkipBack from 'lucide-react/icons/skip-back';
+import Undo2 from 'lucide-react/icons/undo-2';
 
 const icons = {
   undo: Undo2,

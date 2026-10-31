@@ -1,4 +1,7 @@
-import { Pause, Play, RotateCcw, Square } from 'lucide-react';
+import Pause from 'lucide-react/icons/pause';
+import Play from 'lucide-react/icons/play';
+import RotateCcw from 'lucide-react/icons/rotate-ccw';
+import Square from 'lucide-react/icons/square';
 import { useSyncExternalStore } from 'react';
 import { timeToTimelineX } from '../animation-editor/timeline.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';

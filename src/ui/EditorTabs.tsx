@@ -1,4 +1,9 @@
-import { ChevronDown, ChevronUp, FolderOpen, HardDrive, Package, PencilLine } from 'lucide-react';
+import ChevronDown from 'lucide-react/icons/chevron-down';
+import ChevronUp from 'lucide-react/icons/chevron-up';
+import FolderOpen from 'lucide-react/icons/folder-open';
+import HardDrive from 'lucide-react/icons/hard-drive';
+import Package from 'lucide-react/icons/package';
+import PencilLine from 'lucide-react/icons/pencil-line';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface EditorTab {

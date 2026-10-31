@@ -52,6 +52,8 @@ Install the recommended `oxc.oxc-vscode` extension for format-on-save and explic
 
 Direct dependency versions are pinned in [package.json](../package.json), and `package-lock.json` locks the resolved dependency graph. React is a development dependency used by the bundled editor applications; it does not become a dependency of the engine package.
 
+The [dependency review](dependency-review.md) records the latest package update, upstream release sources and project-specific compatibility and feature decisions. Import Lucide components from the public `lucide-react/icons/<kebab-case-name>` exports to avoid processing the entire icon catalog.
+
 ## Architecture
 
 The [v1.4.1 rig constraints and deformation audit](rig-constraints-and-deformation.md) records current bone identities, effective rest transforms, affine coordinates, FK/IK evaluation order, authoring/history ownership and non-invasive extension points for optional mesh attachments. The [v1.4.3.1 mesh runtime](mesh-attachments.md) extends Rig Editor vertex/topology authoring and native Phaser Mesh2D rendering with validated bone influences and CPU skinning from final FK/IK matrices.

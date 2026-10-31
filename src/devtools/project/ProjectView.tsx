@@ -1,4 +1,11 @@
-import { Download, FolderInput, FolderOpen, FolderPlus, Redo2, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
+import Download from 'lucide-react/icons/download';
+import FolderInput from 'lucide-react/icons/folder-input';
+import FolderOpen from 'lucide-react/icons/folder-open';
+import FolderPlus from 'lucide-react/icons/folder-plus';
+import Redo2 from 'lucide-react/icons/redo-2';
+import ShieldCheck from 'lucide-react/icons/shield-check';
+import Trash2 from 'lucide-react/icons/trash-2';
+import Undo2 from 'lucide-react/icons/undo-2';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { abortable } from '../../engine/abortable.js';
 import { CharacterLoader } from '../../engine/CharacterLoader.js';

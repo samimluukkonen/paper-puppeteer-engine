@@ -1,4 +1,4 @@
-import { GraduationCap } from 'lucide-react';
+import GraduationCap from 'lucide-react/icons/graduation-cap';
 import {
   createContext,
   useCallback,

@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import Trash2 from 'lucide-react/icons/trash-2';
 import { useState } from 'react';
 import { AUDIO_CATEGORIES, type AudioCategory } from '../../engine/AudioAsset.js';
 import type { SceneAudioClip } from '../../engine/sceneAudio.js';

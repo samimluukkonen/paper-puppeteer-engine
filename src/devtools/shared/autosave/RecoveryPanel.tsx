@@ -1,14 +1,12 @@
-import {
-  ChevronDown,
-  CircleAlert,
-  CircleCheck,
-  CircleDot,
-  History,
-  LoaderCircle,
-  RotateCcw,
-  Trash2,
-  X,
-} from 'lucide-react';
+import ChevronDown from 'lucide-react/icons/chevron-down';
+import CircleAlert from 'lucide-react/icons/circle-alert';
+import CircleCheck from 'lucide-react/icons/circle-check';
+import CircleDot from 'lucide-react/icons/circle-dot';
+import History from 'lucide-react/icons/history';
+import LoaderCircle from 'lucide-react/icons/loader-circle';
+import RotateCcw from 'lucide-react/icons/rotate-ccw';
+import Trash2 from 'lucide-react/icons/trash-2';
+import X from 'lucide-react/icons/x';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { z } from 'zod';
