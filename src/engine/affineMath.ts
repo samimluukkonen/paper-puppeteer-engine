@@ -45,6 +45,51 @@ export function localToWorld(point: Point, matrix: Affine): Point {
   };
 }
 
+/** Write a finite inverse into a reusable matrix. Leave result unchanged on failure. */
+export function invertAffine(matrix: Affine, result: Affine, relativeDeterminantTolerance = 1e-12): boolean {
+  if (
+    !Number.isFinite(matrix.a) ||
+    !Number.isFinite(matrix.b) ||
+    !Number.isFinite(matrix.c) ||
+    !Number.isFinite(matrix.d) ||
+    !Number.isFinite(matrix.tx) ||
+    !Number.isFinite(matrix.ty)
+  )
+    return false;
+  // Match worldToLocal's axis-relative tolerance without overflowing the determinant.
+  const scaleX = Math.max(Math.abs(matrix.a), Math.abs(matrix.b));
+  const scaleY = Math.max(Math.abs(matrix.c), Math.abs(matrix.d));
+  if (scaleX === 0 || scaleY === 0) return false;
+  const a = matrix.a / scaleX;
+  const b = matrix.b / scaleX;
+  const c = matrix.c / scaleY;
+  const d = matrix.d / scaleY;
+  const det = a * d - b * c;
+  if (!Number.isFinite(det) || det === 0 || Math.abs(det) < relativeDeterminantTolerance) return false;
+  const inverseA = d / det / scaleX;
+  const inverseB = -b / det / scaleY;
+  const inverseC = -c / det / scaleX;
+  const inverseD = a / det / scaleY;
+  const tx = -(inverseA * matrix.tx + inverseC * matrix.ty);
+  const ty = -(inverseB * matrix.tx + inverseD * matrix.ty);
+  if (
+    !Number.isFinite(inverseA) ||
+    !Number.isFinite(inverseB) ||
+    !Number.isFinite(inverseC) ||
+    !Number.isFinite(inverseD) ||
+    !Number.isFinite(tx) ||
+    !Number.isFinite(ty)
+  )
+    return false;
+  result.a = inverseA;
+  result.b = inverseB;
+  result.c = inverseC;
+  result.d = inverseD;
+  result.tx = tx;
+  result.ty = ty;
+  return true;
+}
+
 /** Invert an affine transform using an axis-relative determinant tolerance.
  * Zero accepts any nonsingular transform whose local result remains finite.
  */

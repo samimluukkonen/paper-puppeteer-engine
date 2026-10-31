@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import type { Affine } from './affineMath.js';
-import { composeAffine, transformToAffine, worldToLocal } from './affineMath.js';
+import { composeAffine, invertAffine, transformToAffine } from './affineMath.js';
 import { type AffineFactors, factorAffine } from './affineProjection.js';
 import type { ArtworkReference, ArtworkReplacement, ArtworkUsage } from './artworkReplacement.js';
 import type { Bone } from './Bone.js';
@@ -47,6 +47,7 @@ export class PuppetRenderer {
     }
   >();
   private readonly posedMesh = identity();
+  private readonly inversePosedMesh = identity();
   private readonly slotMatrix = identity();
   private readonly meshMatrix = identity();
   private readonly readMeshBone = (id: string): Affine | undefined => this.nodes.get(id)?.world;
@@ -663,15 +664,21 @@ export class PuppetRenderer {
     const mount = this.getSlotMount(id);
     composeAffine(transformToAffine(mount, this.slotMatrix), this.nodes.get(slot.bone)!.world, this.meshMatrix);
     composeAffine(transformToAffine(mesh, this.slotMatrix), this.meshMatrix, this.posedMesh);
-    if (!worldToLocal({ x: 0, y: 0 }, this.posedMesh))
+    const inverse = this.inversePosedMesh;
+    if (!invertAffine(this.posedMesh, inverse))
       throw new Error(`Mesh slot "${id}" requires nonsingular posed bone, slot and attachment transforms.`);
     // Render through existing affine slot mounts: cancel their posed transform once,
     // leaving Puppet/Actor placement, facing, alpha, depth and borrowed textures untouched.
     deformMesh(binding, this.readMeshBone, mesh.vertices, offsets);
     for (let index = 0; index < mesh.vertices.length; index += 4) {
-      const local = worldToLocal({ x: mesh.vertices[index]!, y: mesh.vertices[index + 1]! }, this.posedMesh)!;
-      mesh.vertices[index] = local.x;
-      mesh.vertices[index + 1] = local.y;
+      const x = mesh.vertices[index]!;
+      const y = mesh.vertices[index + 1]!;
+      const localX = inverse.a * x + inverse.c * y + inverse.tx;
+      const localY = inverse.b * x + inverse.d * y + inverse.ty;
+      if (!Number.isFinite(localX) || !Number.isFinite(localY))
+        throw new Error(`Mesh slot "${id}" requires finite local vertex positions.`);
+      mesh.vertices[index] = localX;
+      mesh.vertices[index + 1] = localY;
     }
   }
 

@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Compute and validate the owning inverse transform once per weighted mesh update, applying it directly to the reusable vertex buffer without per-vertex inverse calculations or point allocations.
+
 - Virtualize Animation Editor timeline rows and property-key time ranges before creating elements, releasing offscreen markers and listeners. Keep selection, marquee bounds and navigation in the data model, and scroll to selections before revealing their virtualized controls.
 
 - Use Phaser's GPU-clamped texture limit in editor previews so separate puppet images can batch together. Add a local rendering diagnostic comparing draw calls, submission timings and pixel hashes against the original one-texture configuration.

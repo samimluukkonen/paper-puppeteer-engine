@@ -1,5 +1,6 @@
 import { assert, test, vi } from 'vitest';
 import { Actor } from '../src/engine/Actor.js';
+import * as affineMath from '../src/engine/affineMath.js';
 import { localToWorld, worldToLocal } from '../src/engine/affineMath.js';
 import { serializeRigDefinition } from '../src/engine/authoredSerialization.js';
 import { Bone } from '../src/engine/Bone.js';
@@ -290,6 +291,32 @@ test.each([
   const branch = puppet.getSlotMesh('second')!.parentContainer.parentContainer.parentContainer;
   assert.equal(branch.depth, -2);
   actor.dispose();
+  puppet.destroy();
+});
+
+test('weighted updates invert each owning transform once and retain each vertex buffer', () => {
+  const { puppet, weighted } = runtime();
+  const slots = ['cloth', 'second'];
+  const buffers = slots.map((slot) => puppet.getSlotMesh(slot)!.vertices);
+  const invert = vi.spyOn(affineMath, 'invertAffine');
+  const convertPoint = vi.spyOn(affineMath, 'worldToLocal');
+  try {
+    for (const rotation of [0.6, -0.4]) {
+      invert.mockClear();
+      Object.assign(puppet.getBone('root').pose, { rotation, scaleX: -1.4, scaleY: 0.7 });
+      puppet.getBone('lower').pose.rotation = -rotation;
+      puppet.syncPose();
+      assert.equal(invert.mock.calls.length, slots.length);
+      assert.equal(convertPoint.mock.calls.length, 0);
+    }
+  } finally {
+    invert.mockRestore();
+    convertPoint.mockRestore();
+  }
+  slots.forEach((slot, index) => {
+    assert.strictEqual(puppet.getSlotMesh(slot)!.vertices, buffers[index]);
+    assertRendered(puppet, weighted, slot);
+  });
   puppet.destroy();
 });
 
