@@ -1,10 +1,12 @@
 import { rejects } from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type Phaser from 'phaser';
-import { afterEach, assert, test, vi } from 'vitest';
+import { afterEach, assert, expect, test, vi } from 'vitest';
+import { SceneActorPreview } from '../src/devtools/scene-editor/SceneActorPreview.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
 import { Actor } from '../src/engine/Actor.js';
+import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { encodePackageZip } from '../src/engine/packageZip.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { resolveSceneDefinition } from '../src/engine/SceneAssets.js';
@@ -12,6 +14,7 @@ import { parseSceneJson, serializeSceneDefinition } from '../src/engine/SceneDef
 import { SceneLoader, type LoadedScene } from '../src/engine/SceneLoader.js';
 import { buildScenePackage } from '../src/engine/ScenePackage.js';
 import type { SceneCue, SceneRunner } from '../src/engine/SceneRunner.js';
+import { DEFAULT_SCENE_WORKLOAD_LIMITS as limits } from '../src/engine/sceneWorkloadLimits.js';
 import { puppetScene } from './helpers/puppetScene.js';
 import { requestUrl } from './helpers/requestUrl.js';
 import { artworkFixture, assetFixture, sceneFixture } from './helpers/scenePackageFixtures.js';
@@ -77,6 +80,44 @@ function snapshot(runner: SceneRunner) {
     depth: actor.puppet.container.depth,
   }));
 }
+
+test('excessive solver work rejects runtime and editor previews before allocating actors', async () => {
+  const assets = assetFixture();
+  const definition = CharacterDefinition.fromData({
+    manifest: assets.documents['character.json'],
+    rig: {
+      version: 1,
+      root: 'root',
+      bones: [{ id: 'root' }, { id: 'middle', parent: 'root', x: 1 }, { id: 'end', parent: 'middle', x: 1 }],
+      ik: Array.from({ length: limits.maxTotalIKConstraints / limits.maxActors + 1 }, (_, index) => ({
+        name: `ik-${index}`,
+        rootBone: 'root',
+        middleBone: 'middle',
+        endBone: 'end',
+      })),
+    },
+    skins: { 'skins/default.json': assets.documents['skins/default.json'] },
+    animations: { 'animations/wave.json': assets.documents['animations/wave.json'] },
+  });
+  const source = sceneFixture();
+  source.actions = [];
+  source.actors = Array.from({ length: limits.maxActors }, (_, index) => ({
+    ...source.actors[0]!,
+    id: `actor-${index}`,
+  }));
+  const { scene } = stage();
+  const allocate = vi.spyOn(scene.add, 'container');
+  const preview = new SceneActorPreview(scene);
+  assert.throws(
+    () => preview.sync(source, new Map([[source.actors[0]!.character.manifest, definition]])),
+    /IK constraint instance limit/,
+  );
+  await expect(
+    SceneLoader.fromDefinition(scene, source, { ...assets, loadCharacter: async () => definition }),
+  ).rejects.toThrow(/IK constraint instance limit/);
+  assert.equal(allocate.mock.calls.length, 0);
+  assert.equal(preview.instances.size, 0);
+});
 
 test('exported/imported JSON and ZIP runtime playback match the editor runner at every sampled time', async () => {
   const source = sceneFixture();

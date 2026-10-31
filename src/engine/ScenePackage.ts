@@ -46,8 +46,9 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
     baseUrl: packageBase,
     fetcher,
     ...(signal ? { signal } : {}),
-    loadCharacter: (url) =>
+    loadCharacter: (url, _reference, loadOptions) =>
       CharacterLoader.load(url, fetcher, {
+        ...loadOptions,
         ...(signal ? { signal } : {}),
         pathPolicy: (path) => {
           packagePath(path);

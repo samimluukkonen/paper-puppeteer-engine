@@ -40,6 +40,14 @@ export class JsonWorkloadBudget {
   private keyframes = 0;
   private events = 0;
 
+  /** @internal Counts can be cached alongside an immutable character definition. */
+  get keyframeCount(): number {
+    return this.keyframes;
+  }
+  get eventCount(): number {
+    return this.events;
+  }
+
   constructor(options: JsonWorkloadLimitOptions = {}) {
     this.limits = {
       maxBones: validateInputLimit(options.maxBones ?? DEFAULT_JSON_WORKLOAD_LIMITS.maxBones, 'maxBones'),

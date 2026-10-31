@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Bound aggregate scene character JSON, animation keyframes and events, plus instance-weighted mesh geometry, skinning influences and IK work before runtime allocation. Apply the same guards to cached definitions and streamed/ZIP metadata, canceling overflow before character assembly.
+
 - Skip unchanged scene-wide ownership scans during Actor playback using runtime ownership revisions, preserving immediate callback-driven interruption detection and linear checking work through natural completions.
 
 - Align Animation Library dialog padding, inset metadata fields and actions, and add a Library icon beside its title.

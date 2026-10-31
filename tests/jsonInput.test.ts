@@ -1,5 +1,32 @@
 import { assert, expect, test, vi } from 'vitest';
-import { assertJsonInputSize, JsonInputLimitError, readJsonFile, readJsonResponse } from '../src/engine/jsonInput.js';
+import {
+  assertJsonInputSize,
+  countJsonBytes,
+  JsonInputLimitError,
+  readJsonFile,
+  readJsonResponse,
+} from '../src/engine/jsonInput.js';
+
+test.each([
+  null,
+  [true, false, 0, -0, -2.5, 1e30],
+  { 'é\u0000': ['\\\"\b\t\n\f\r', '雪🙂', '\ud800', '\udc00', '\ud800x\udc00'] },
+  { empty: {}, array: [], nested: { text: 'hello' } },
+])('counts compact JSON bytes without serializing entire documents: %j', (value) => {
+  const bytes = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  assert.equal(countJsonBytes(value, bytes), bytes);
+  assert.throws(() => countJsonBytes(value, bytes - 1), JsonInputLimitError);
+});
+
+test('bounded JSON counting stops before traversing the remainder of an oversized document', () => {
+  const value = {
+    first: 'large',
+    get later(): never {
+      throw new Error('Do not traverse after overflow');
+    },
+  };
+  assert.throws(() => countJsonBytes(value, 4), JsonInputLimitError);
+});
 
 test('text limits measure UTF-8 bytes, with exact boundaries accepted', () => {
   assert.doesNotThrow(() => assertJsonInputSize('"é"', 4));

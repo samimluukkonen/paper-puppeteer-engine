@@ -11,7 +11,15 @@ export const DEFAULT_CHARACTER_LOAD_LIMITS = Object.freeze({
   timeoutMs: 30_000,
 });
 
+/** Optional enclosing scene budget, shared across serial character loads. */
+export interface CharacterMetadataBudget {
+  countBytes(bytes: number): void;
+  checkAnimation(input: unknown): void;
+}
+
 export interface CharacterLoadOptions extends JsonWorkloadLimitOptions {
+  /** Charge streamed JSON and raw animation rows before parsing/assembling the character. */
+  metadataBudget?: CharacterMetadataBudget;
   /** Cancel all metadata requests belonging to this load. Custom fetchers must honor RequestInit.signal. */
   signal?: AbortSignal;
   /** Maximum decoded bytes per JSON response. Defaults to 10 MiB. */
@@ -90,6 +98,7 @@ export const CharacterLoader = {
       };
       let totalBytes = 0;
       const countBytes = (bytes: number): void => {
+        options.metadataBudget?.countBytes(bytes);
         totalBytes += bytes;
         if (totalBytes > limits.maxTotalJsonBytes)
           throw new JsonInputLimitError(
@@ -167,7 +176,10 @@ export const CharacterLoader = {
             const path = paths[index]!;
             const { data } = await read(new URL(path, manifestUrl).href, (input) => {
               if (path === manifest.rig) workload.checkRig(input);
-              if (animationPaths.has(path)) workload.checkAnimation(input);
+              if (animationPaths.has(path)) {
+                options.metadataBudget?.checkAnimation(input);
+                workload.checkAnimation(input);
+              }
             });
             entries[index] = [path, data];
           }

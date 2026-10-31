@@ -1,13 +1,17 @@
 import { validateAudioAssetData } from './AudioAsset.js';
 import type { CharacterDefinition } from './CharacterDefinition.js';
-import { CharacterLoader } from './CharacterLoader.js';
+import { CharacterLoader, type CharacterLoadOptions } from './CharacterLoader.js';
 import { inspectImageHeader } from './imageHeader.js';
 import { packagePath, PACKAGE_MAX_FILE_BYTES } from './packageZip.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { parseSceneDefinition, type SceneDefinition, type SceneCharacterAssets } from './SceneDefinition.js';
 import { readSceneResource } from './sceneResource.js';
 import { createSceneTextureBudget } from './sceneTextureBudget.js';
-import { assertSceneInstanceBudget, DEFAULT_SCENE_WORKLOAD_LIMITS } from './sceneWorkloadLimits.js';
+import {
+  assertSceneInstanceBudget,
+  DEFAULT_SCENE_WORKLOAD_LIMITS,
+  SceneMetadataBudget,
+} from './sceneWorkloadLimits.js';
 
 export interface SceneAssetOptions {
   /** URL of scene.json; relative character references resolve against this URL. */
@@ -16,8 +20,15 @@ export interface SceneAssetOptions {
   readonly loadAudio?: (reference: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly loadImage?: (reference: string) => Promise<Uint8Array<ArrayBuffer>>;
   readonly signal?: AbortSignal;
-  /** Optional host cache. Must return a complete immutable CharacterDefinition. */
-  readonly loadCharacter?: (manifestUrl: string, reference: string) => Promise<CharacterDefinition>;
+  /** Optional host cache. Must return a complete immutable CharacterDefinition.
+   * Forward loadOptions to CharacterLoader when fetching to retain streaming scene guards.
+   * Cached definitions are checked against retained metadata and instance budgets before use.
+   */
+  readonly loadCharacter?: (
+    manifestUrl: string,
+    reference: string,
+    loadOptions: CharacterLoadOptions,
+  ) => Promise<CharacterDefinition>;
 }
 
 export interface ResolvedScene {
@@ -71,21 +82,25 @@ export async function resolveSceneDefinition(input: unknown, options: SceneAsset
   const references = [...new Set(definition.actors.map((actor) => actor.character.manifest))];
   if (references.length > 64) throw new Error('Scene exceeds the 64-character package limit.');
   const characters = new Map<string, CharacterDefinition>();
+  const metadataBudget = new SceneMetadataBudget();
   for (const reference of references) {
     options.signal?.throwIfAborted();
     const url = new URL(reference, options.baseUrl);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Scene character URLs must use HTTP(S).');
     try {
-      const character = await (options.loadCharacter?.(url.href, reference) ??
-        CharacterLoader.load(url.href, options.fetcher ?? fetch, {
-          ...(options.signal ? { signal: options.signal } : {}),
-          pathPolicy: (path) => {
-            sceneCharacterAssetPath(path);
-          },
-          urlPolicy: (resource) => resource.origin === url.origin && !resource.search && !resource.hash,
-        }));
+      const loadOptions: CharacterLoadOptions = {
+        ...(options.signal ? { signal: options.signal } : {}),
+        metadataBudget,
+        pathPolicy: (path) => {
+          sceneCharacterAssetPath(path);
+        },
+        urlPolicy: (resource) => resource.origin === url.origin && !resource.search && !resource.hash,
+      };
+      const character = await (options.loadCharacter?.(url.href, reference, loadOptions) ??
+        CharacterLoader.load(url.href, options.fetcher ?? fetch, loadOptions));
       options.signal?.throwIfAborted();
       validateSceneCharacterPaths(character);
+      metadataBudget.completeCharacter(character);
       characters.set(reference, character);
       assertSceneInstanceBudget(definition, characters);
     } catch (error) {

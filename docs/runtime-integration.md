@@ -39,6 +39,8 @@ Character, rig, skin, animation and project formats remain version **1**; scenes
 
 Scene background resolution uses the same aggregate artwork budget as the editor: 100 MiB encoded image bytes and 128 megapixels, with the existing per-image limits. Referenced encoded audio has a separate 100 MiB scene total and a 10 MiB per-file limit. Hosted audio is counted while streaming, and an overflow cancels the response before retaining it or requesting further assets. Host-provided audio caches follow the same total. The decoded-audio budget remains separate from these transfer limits.
 
+Scene loading also enforces the [metadata and instance workload limits](scene-editor.md#visual-stage) before allocating Actors. JSON bytes and animation rows accumulate across character packages; mesh geometry, skinning influences and IK work count every instance. A custom `SceneAssetOptions.loadCharacter(url, reference, loadOptions)` that fetches metadata should forward `loadOptions` to `CharacterLoader.load` to preserve streaming guards and cancellation. Already cached immutable definitions receive retained metadata and instance checks, and their workload reserves scene capacity before later streamed loads.
+
 ## Exported package layout and validation
 
 ```text
