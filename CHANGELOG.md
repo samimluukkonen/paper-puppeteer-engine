@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Block project Undo/Redo when restoring membership would orphan scene audio clips, preserving assets and history until the scene references are undone.
+
 - Preserve mesh deformation tracks during worker IK baking by retaining attachment and slot validation data alongside exact logical joints.
 
 - Use the shared scene artwork limits during dependency resolution and bound encoded scene audio to 100 MiB across streamed and host-provided assets, cancelling overflowing reads before retaining their bytes.

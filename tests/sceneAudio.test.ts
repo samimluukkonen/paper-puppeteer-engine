@@ -69,6 +69,69 @@ function project() {
   return workspace;
 }
 
+test.each(AUDIO_CATEGORIES.flatMap((category) => ['undo', 'redo'].map((direction) => ({ category, direction }))))(
+  'project $direction protects $category audio used by an unselected scene without consuming history',
+  async ({ category, direction }) => {
+    const workspace = new ProjectWorkspace('Audio film', 'film');
+    workspace.createScene({ id: 'audio' });
+    workspace.createScene({ id: 'other' });
+    workspace.addAudio({ ...asset, category }, bytes());
+    if (direction === 'redo') {
+      workspace.removeAudio(asset.id);
+      workspace.undo();
+    }
+    workspace.scenes.selectScene('audio');
+    expect(workspace.scenes.addAudioTrack(category)).toBe(true);
+    const { id: _id, ...input } = clip;
+    expect(workspace.scenes.addAudioClip({ ...input, trackId: `${category}-1` })).toBe(true);
+    workspace.scenes.selectScene('other');
+    const metadata = workspace.definition;
+    const scene = workspace.scenes.scene('audio');
+    const history = {
+      length: workspace.history.length,
+      canUndo: workspace.history.canUndo,
+      canRedo: workspace.history.canRedo,
+    };
+    const restore = () => (direction === 'undo' ? workspace.undo() : workspace.redo());
+
+    expect(restore).toThrow(/audio used by scene "audio".*Undo the scene edit first/);
+    expect(workspace.definition).toEqual(metadata);
+    expect(workspace.scenes.scene('audio')).toBe(scene);
+    expect(workspace.audioSource(asset.id)!.bytes).toEqual(bytes());
+    expect(workspace.history).toMatchObject(history);
+    expect(workspace.inspect('export').counts.error).toBe(0);
+    await expect(buildProjectPackage(workspace)).resolves.toBeDefined();
+
+    workspace.scenes.selectScene('audio');
+    expect(workspace.scenes.undo()).toBe(true);
+    restore();
+    expect(workspace.audioSource(asset.id)).toBeUndefined();
+    if (direction === 'undo') workspace.redo();
+    else workspace.undo();
+    expect(workspace.audioSource(asset.id)!.bytes).toEqual(bytes());
+    expect(workspace.scenes.redo()).toBe(true);
+    expect(workspace.inspect('export').counts.error).toBe(0);
+  },
+);
+
+test('project history ignores removed scenes but checks their audio when restoring membership', () => {
+  const workspace = new ProjectWorkspace('Audio film', 'film');
+  workspace.createScene({ id: 'audio' });
+  workspace.remove('scenes', 'audio');
+  workspace.addAudio(asset, bytes());
+  workspace.scenes.addAudioTrack('sfx');
+  const { id: _id, ...input } = clip;
+  expect(workspace.scenes.addAudioClip(input)).toBe(true);
+
+  workspace.undo();
+  expect(workspace.audioSource(asset.id)).toBeUndefined();
+  expect(() => workspace.undo()).toThrow(/audio used by scene "audio"/);
+  expect(workspace.definition.scenes).toEqual([]);
+  expect(workspace.scenes.undo()).toBe(true);
+  workspace.undo();
+  expect(workspace.definition.scenes).toHaveLength(1);
+});
+
 test('old scene data stays unchanged and optional audio data round-trips without changing scene format', () => {
   const old = createEmptyScene({ id: 'old' });
   expect(parseSceneJson(serializeSceneDefinition(old))).toEqual(old);

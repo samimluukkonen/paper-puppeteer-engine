@@ -166,12 +166,18 @@ export class ProjectWorkspace {
     return new SnapshotHistory(
       () => this.metadata,
       (value) => {
-        const references = new Set(value.characters.map((entry) => entry.manifest));
+        const characters = new Set(value.characters.map((entry) => entry.manifest));
+        const audio = new Set(value.audio?.map((entry) => entry.id));
+        // Images live in the scene registry, so membership restoration cannot remove them.
+        // Check every scene in the target membership, including documents being restored.
         for (const { id } of value.scenes) {
-          if (this.scenes.scene(id)?.actors.some((actor) => !references.has(actor.character.manifest)))
+          const scene = this.scenes.scene(id);
+          if (scene?.actors.some((actor) => !characters.has(actor.character.manifest)))
             throw new Error(
               `Project history would remove a character used by scene "${id}". Undo the scene edit first.`,
             );
+          if (scene?.audioClips?.some((clip) => !audio.has(clip.assetId)))
+            throw new Error(`Project history would remove audio used by scene "${id}". Undo the scene edit first.`);
         }
         this.metadata = value;
       },
