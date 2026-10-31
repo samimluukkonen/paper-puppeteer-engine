@@ -18,6 +18,7 @@ import {
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { checkJson } from '../src/engine/jsonData.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
+import { freezeData } from '../src/engine/readonlyData.js';
 import { createEmptyScene, parseSceneDefinition } from '../src/engine/SceneDefinition.js';
 import { validateScenePackage } from '../src/engine/ScenePackage.js';
 import type { ValidationIssue } from '../src/engine/validation.js';
@@ -184,6 +185,68 @@ test('scene registration validates dependencies without mutating source and prot
       }),
     /not registered/,
   );
+});
+
+test('scene validation reads each referenced working catalog once without cloning character packages', async () => {
+  const project = new ProjectWorkspace('Film');
+  for (const id of ['hero', 'friend', 'unused']) await project.addCharacter(await emptyCharacter(id));
+  project.character('unused').loading = true;
+  const captures = ['hero', 'friend'].map((id) => {
+    const source = project.captureCharacter(id);
+    const snapshot = freezeData({
+      ...source,
+      rig: { ...source.rig, skins: [{ version: 1 as const, name: 'inline', slots: {} }] },
+      skins: [{ version: 1 as const, name: 'standalone', slots: {} }],
+      animations: [{ name: 'wave', duration: 1000, loop: false, tracks: {} }],
+    });
+    const capture = vi.fn(() => snapshot);
+    project.character(id).capture = capture;
+    return { capture, snapshot };
+  });
+  const scene = {
+    ...createEmptyScene({ id: 'crowd' }),
+    actors: Array.from({ length: 40 }, (_, index) => ({
+      id: `actor-${index}`,
+      character: { manifest: project.characterReference(index % 2 ? 'friend' : 'hero') },
+      position: { x: index, y: 0 },
+      animation: 'wave',
+      skin: index % 2 ? 'inline' : 'standalone',
+    })),
+  };
+  const original = structuredClone(scene);
+  const clone = vi.spyOn(globalThis, 'structuredClone');
+  try {
+    assert.deepEqual(project.validateScene(scene), original);
+    for (const { capture, snapshot } of captures) {
+      expect(capture).toHaveBeenCalledTimes(1);
+      for (const branch of [snapshot.rig, snapshot.skins, snapshot.animations, snapshot.poses])
+        expect(clone).not.toHaveBeenCalledWith(branch);
+    }
+    assert.deepEqual(scene, original);
+  } finally {
+    clone.mockRestore();
+  }
+  const source = captures[0]!.snapshot;
+  project.character('hero').capture = () => ({ ...source, animations: [] });
+  assert.throws(() => project.validateScene(scene), /Unknown animation "wave"/);
+  project.character('hero').capture = () => ({ ...source, skins: [] });
+  assert.throws(() => project.validateScene(scene), /Unknown skin "standalone"/);
+});
+
+test('scene validation preserves loading and pending artwork guards', async () => {
+  const project = new ProjectWorkspace('Film');
+  await project.addCharacter(await emptyCharacter());
+  const source = project.captureCharacter('hero');
+  const scene = {
+    ...createEmptyScene({ id: 'opening' }),
+    actors: [{ id: 'actor', character: { manifest: project.characterReference('hero') }, position: { x: 0, y: 0 } }],
+  };
+  const entry = project.character('hero');
+  entry.loading = true;
+  assert.throws(() => project.validateScene(scene), /still opening/);
+  entry.loading = false;
+  entry.capture = () => ({ ...source, pendingArtwork: true });
+  assert.throws(() => project.validateScene(scene), /Apply or cancel/);
 });
 
 test('new scene documents start unsaved independently of project metadata', async () => {

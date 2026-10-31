@@ -20,7 +20,12 @@ import {
   type IdentifiedRig,
 } from '../../engine/rigBoneMapping.js';
 import { analyzeRigCompatibility } from '../../engine/rigCompatibility.js';
-import { createEmptyScene, parseSceneDefinition, type SceneDefinition } from '../../engine/SceneDefinition.js';
+import {
+  createEmptyScene,
+  parseSceneDefinition,
+  type SceneCharacterAssets,
+  type SceneDefinition,
+} from '../../engine/SceneDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import {
@@ -563,22 +568,23 @@ export class ProjectWorkspace {
   }
   validateScene(input: unknown): SceneDefinition {
     const scene = parseSceneDefinition(input);
-    const characters = new Map(
-      scene.actors.map((actor) => {
-        const id = this.resolveCharacter(actor.character.manifest);
-        const snapshot = this.captureCharacter(id);
-        return [
-          actor.character.manifest,
-          {
-            animations: snapshot.animations.map((clip) => clip.name),
-            rootMotionAnimations: snapshot.animations
-              .filter((clip) => clip.rootMotion?.translationKeys.length)
-              .map((clip) => clip.name),
-            skins: [...snapshot.skins, ...(snapshot.rig.skins ?? [])].map((skin) => skin.name),
-          },
-        ];
-      }),
-    );
+    const characters = new Map<string, SceneCharacterAssets>();
+    // Borrow current immutable documents once per manifest; validation needs no detached package copies.
+    for (const { character } of scene.actors) {
+      if (characters.has(character.manifest)) continue;
+      const id = this.resolveCharacter(character.manifest);
+      const entry = this.character(id);
+      if (entry.loading) throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
+      const snapshot = this.workingCharacter(entry);
+      if (snapshot.pendingArtwork) throw new Error('Apply or cancel the artwork proposal before exporting a package.');
+      characters.set(character.manifest, {
+        animations: snapshot.animations.map((clip) => clip.name),
+        rootMotionAnimations: snapshot.animations
+          .filter((clip) => clip.rootMotion?.translationKeys.length)
+          .map((clip) => clip.name),
+        skins: [...snapshot.skins, ...(snapshot.rig.skins ?? [])].map((skin) => skin.name),
+      });
+    }
     return parseSceneDefinition(scene, {
       characters,
       images: new Set(this.scenes.images.entries.map((image) => image.reference)),
