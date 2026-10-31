@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Align Mesh Deformation inspector checkboxes, stack mesh and vertex selectors, and use consistent field spacing, muted help text and wrapping actions.
+
 - Add matching Lucide icons to Animation Editor Edit-row buttons, menu triggers and every inspector tab, preserving text labels and keyboard controls.
 
 - Hide the Rig Editor Inspector button when the inspector is already visible in wide desktop windows, preserving the narrower-window toggle.

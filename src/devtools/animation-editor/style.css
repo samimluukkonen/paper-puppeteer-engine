@@ -1796,6 +1796,56 @@ a {
   margin: 8px 0;
 }
 
+#mesh-deformation-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#mesh-deformation-panel > *,
+#mesh-deformation-panel label {
+  min-width: 0;
+}
+#mesh-deformation-panel label {
+  display: grid;
+  gap: 8px;
+}
+#mesh-deformation-panel .deformation-toggle {
+  display: flex;
+  align-items: center;
+}
+#mesh-deformation-panel input[type="checkbox"] {
+  flex: 0 0 auto;
+  min-height: 0;
+  margin: 0;
+}
+#mesh-deformation-panel :is(select, input[type="number"]) {
+  width: 100%;
+  min-width: 0;
+}
+#mesh-deformation-panel p {
+  margin: 0;
+  line-height: 1.5;
+}
+#mesh-deformation-panel p:empty {
+  display: none;
+}
+#mesh-deformation-panel .animation-field-help {
+  color: var(--fg-muted);
+}
+#mesh-deformation-panel .root-motion-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+#mesh-deformation-panel .root-motion-fields button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  max-width: 100%;
+}
+#mesh-deformation-panel .root-motion-actions {
+  flex-wrap: wrap;
+  margin: 0;
+}
 .deformation-bind-view {
   width: 100%;
   height: 240px;

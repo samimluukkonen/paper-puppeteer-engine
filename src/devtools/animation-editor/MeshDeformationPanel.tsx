@@ -3,10 +3,11 @@ import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 export function MeshDeformationPanel() {
   return (
     <div id="mesh-deformation-panel">
-      <label data-guide-id={GUIDE_TARGETS.animationDeformationMode}>
-        <input id="deformation-edit-mode" type="checkbox" /> Edit Mesh Deformation
+      <label className="deformation-toggle" data-guide-id={GUIDE_TARGETS.animationDeformationMode}>
+        <input id="deformation-edit-mode" type="checkbox" />
+        <span>Edit Mesh Deformation</span>
       </label>
-      <p>
+      <p className="animation-field-help">
         Bind-space correction mode. Square handles edit attachment-local offsets before bone skinning. The main preview
         shows the final posed silhouette.
       </p>
@@ -14,8 +15,9 @@ export function MeshDeformationPanel() {
         Mesh
         <select id="deformation-mesh" aria-label="Deformable mesh" />
       </label>
-      <label>
-        <input id="deformation-diagnostics" type="checkbox" /> Show mesh diagnostics
+      <label className="deformation-toggle">
+        <input id="deformation-diagnostics" type="checkbox" />
+        <span>Show mesh diagnostics</span>
       </label>
       <p id="animation-mesh-diagnostics-status" hidden />
       <p id="deformation-empty" />
@@ -47,7 +49,7 @@ export function MeshDeformationPanel() {
           Set neutral key
         </button>
       </div>
-      <p>
+      <p className="animation-field-help">
         Missing vertices mean zero offset. Add neutral keys before and after a correction to return smoothly to ordinary
         skinning. Drag a square to edit a vertex; Shift-click selects more vertices. Escape cancels a drag.
       </p>
@@ -79,7 +81,7 @@ export function MeshDeformationPanel() {
           Delete key
         </button>
       </div>
-      <p data-guide-id={GUIDE_TARGETS.animationDeformationCompatibility}>
+      <p className="animation-field-help" data-guide-id={GUIDE_TARGETS.animationDeformationCompatibility}>
         Timeline keys support drag, arrow nudges, Delete, Copy/Paste and Duplicate. Bézier curves imported through JSON
         are preserved; editing interpolation here replaces them. Graph Editor displays bone, IK and root channels only.
         Mirroring and Pose Library change bones and preserve mesh corrections unchanged. Variations scale correction

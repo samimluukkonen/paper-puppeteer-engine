@@ -127,6 +127,7 @@ test('sleeve corrections: bind handles, interpolation, timeline, history, cancel
   expect(await exported(page)).toEqual(authored);
 
   const handle = page.getByRole('button', { name: 'Select bind-space vertex top-left', exact: true });
+  await handle.scrollIntoViewIfNeeded();
   const bounds = (await handle.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await page.mouse.down();
@@ -139,6 +140,7 @@ test('sleeve corrections: bind handles, interpolation, timeline, history, cancel
   await page
     .getByRole('button', { name: 'Select bind-space vertex bottom-left', exact: true })
     .click({ modifiers: ['Shift'] });
+  await handle.scrollIntoViewIfNeeded();
   const moved = (await handle.boundingBox())!;
   await page.mouse.move(moved.x + moved.width / 2, moved.y + moved.height / 2);
   await page.mouse.down();
