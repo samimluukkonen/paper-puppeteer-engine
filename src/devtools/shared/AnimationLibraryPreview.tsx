@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
-import { createEditorGame } from './editorGame.js';
+import { createEditorGame, destroyEditorGame } from './editorGame.js';
 
 export interface AnimationPreviewLease {
   readonly definition: CharacterDefinition;
@@ -135,7 +135,7 @@ export function AnimationLibraryPreview({
     return () => {
       request.abort();
       scene.current = undefined;
-      if (game) game.destroy(true);
+      if (game) destroyEditorGame(game);
       else lease?.dispose();
     };
   }, [animation, load, parent]);

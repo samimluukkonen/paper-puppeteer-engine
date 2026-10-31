@@ -267,9 +267,11 @@ export class ArtworkController {
       this.refreshTargets();
       return;
     }
-    const targets = this.artworkTargets(puppet, scene.textures, definition);
     const sharedTextures = !this.textures || this.textures === scene.textures;
+    if (sharedTextures) this.prepareTextures(scene);
+    const targets = this.artworkTargets(puppet, scene.textures, definition);
     const state = sharedTextures ? this.applied : new Map<string, SpriteResource>();
+    if (!this.textures) this.textures = scene.textures;
     // Validate retained replacements before canceling a proposal or changing either puppet.
     for (const resource of state.values()) {
       this.register(resource);
@@ -302,6 +304,14 @@ export class ArtworkController {
       selectedKey: this.targetSelection(targets),
       message: 'Choose shared artwork or one logical attachment/bone, then import a PNG or WebP.',
     });
+  }
+
+  /** Restore project-owned additions before constructing a puppet that references them. */
+  prepareTextures(scene: Phaser.Scene): void {
+    for (const [key, sprite] of this.importedAssets) {
+      if (!scene.textures.exists(key) && !scene.textures.addImage(key, sprite.image))
+        throw new Error('Could not restore imported artwork.');
+    }
   }
 
   select(key: string): void {
@@ -693,6 +703,22 @@ export class ArtworkController {
         this.resources.delete(resource);
       }
     }
+  }
+
+  /** Release every renderer reference while retaining authored blobs and artwork history. */
+  suspend(): void {
+    this.cancel();
+    this.install(new Map());
+    for (const resource of this.resources) this.releaseTexture(resource);
+    for (const key of this.importedAssets.keys()) {
+      if (this.textures?.exists(key)) this.textures.remove(key);
+    }
+    this.rendered.clear();
+    this.puppet = undefined;
+    this.textures = undefined;
+    this.definition = undefined;
+    this.refreshAppearance = () => {};
+    this.publish({ ready: false, targets: [], proposed: null, applied: null, previewing: false, importing: false });
   }
 
   unbind(): void {

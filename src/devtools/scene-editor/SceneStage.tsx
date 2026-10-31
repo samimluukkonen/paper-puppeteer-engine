@@ -16,9 +16,10 @@ import { CLEAR_SCENE_TRANSITION, evaluateTransitionAtTime } from '../../engine/s
 import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
+import { projectEditorContext } from '../project/projectBridge.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { roundEditorNumber } from '../shared/editorData.js';
-import { createEditorGame } from '../shared/editorGame.js';
+import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
 import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -692,14 +693,34 @@ export function SceneStageView({
     setStage(scene);
     const game = createEditorGame('scene-stage-canvas', scene, SCENE_OUTPUT_VIEWPORT);
     const release = observePreview(window.document.querySelector<HTMLElement>('#scene-stage-canvas')!, game);
+    let rendererActive = true;
+    game.events.once(Phaser.Core.Events.READY, () =>
+      queueMicrotask(() => {
+        if (!rendererActive && game.isRunning) game.loop.stop();
+      }),
+    );
+    const releaseRenderer = projectEditorContext()?.bindRenderer({
+      activate: () => {
+        rendererActive = true;
+        if (game.isRunning && !game.loop.running) game.loop.start(game.loop.callback);
+      },
+      suspend: () => {
+        rendererActive = false;
+        playback.pause();
+        game.loop.stop();
+      },
+      // The scene host's bindScene callback unmounts this React owner.
+      dispose: () => {},
+    });
     return () => {
+      releaseRenderer?.();
       release();
       document.cancelImageDrag();
       document.cancelActorDrag();
       // A project retains this document after its iframe is removed. Release scene
       // subscriptions now; Game.destroy otherwise waits for another animation frame.
       game.scene.stop(scene);
-      game.destroy(true);
+      destroyEditorGame(game);
     };
   }, [document, registry, playback]);
   return (

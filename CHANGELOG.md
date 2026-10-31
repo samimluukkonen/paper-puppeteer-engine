@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Keep character documents and artwork history in the project, suspend inactive editor playback/rendering, and bound the renderer cache to two hosts with least-recently-used eviction. Release evicted Phaser games and runtime leases while preserving drafts, history and project exports.
+
 - Serialize character and project autosaves by authored revision, reusing unchanged documents and validated artwork instead of rebuilding exports and temporary projects. Cache draft metadata validation by revision and keep complete package validation on explicit exports and recovery.
 
 - Preserve immutable scene branches across edits, drags and undo snapshots; validate affected domains incrementally while keeping asset-catalog and export-size checks current.

@@ -38,6 +38,7 @@ import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { sceneFingerprint } from '../shared/sceneFingerprint.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { ProjectCharacterDocument } from './ProjectCharacterDocument.js';
 import { parseProjectDefinition, type ProjectDefinition } from './ProjectDefinition.js';
 import {
   assetDependents,
@@ -51,7 +52,8 @@ import {
 export interface ProjectCharacter {
   readonly definition: CharacterDefinition;
   readonly files: PackageFiles;
-  /** The mounted character editor is the sole working-copy owner. */
+  /** Project-owned documents outlive renderer eviction, including their histories. */
+  documents?: ProjectCharacterDocument;
   capture?: () => PackageSnapshot;
   pending?: () => boolean;
   loading: boolean;
@@ -203,6 +205,42 @@ export class ProjectWorkspace {
     const entry = this.metadata.characters.find((entry) => entry.id === id);
     if (!entry) throw new Error(`Unknown project character "${id}".`);
     return entry.manifest;
+  }
+  characterDocuments(id: string): ProjectCharacterDocument {
+    const entry = this.character(id);
+    if (!entry.documents) {
+      entry.documents = new ProjectCharacterDocument(
+        entry.definition,
+        (texture) => {
+          const dependents = this.dependents({ kind: 'texture', owner: id, id: texture }).filter(
+            ({ from }) => from.kind !== 'character',
+          );
+          return (
+            !dependents.length ||
+            window.confirm(
+              `Replace texture "${texture}"? This affects:\n${dependents.map(({ label }) => label).join('\n')}\n\nReferences will be kept. Continue?`,
+            )
+          );
+        },
+        (skin) =>
+          this.dependents({ kind: 'skin', owner: id, id: skin })
+            .filter(({ from }) => from.kind === 'actor')
+            .map(({ label }) => label),
+      );
+      entry.capture = entry.documents.capture;
+    }
+    return entry.documents;
+  }
+  disposeCharacterDocuments(): void {
+    const errors: unknown[] = [];
+    for (const entry of this.characters.values()) {
+      try {
+        entry.documents?.artwork.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) throw new AggregateError(errors, 'Character document disposal failed.');
   }
   resolveCharacter(reference: string): string {
     const entry = this.metadata.characters.find((entry) => entry.manifest === reference);

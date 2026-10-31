@@ -4,7 +4,7 @@ import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { Puppet } from '../../engine/Puppet.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import type { AnimationPreviewLease } from './AnimationLibraryPreviewDialog.js';
-import { createEditorGame } from './editorGame.js';
+import { createEditorGame, destroyEditorGame } from './editorGame.js';
 import type { GroundGuide } from './groundGuide.js';
 import { GroundGuideOverlay } from './GroundGuideOverlay.js';
 import { RetargetComparisonPlayback } from './RetargetComparisonPlayback.js';
@@ -233,7 +233,7 @@ export function RetargetComparison({
       request.abort();
       scene.current?.dispose();
       scene.current = undefined;
-      if (game) game.destroy(true);
+      if (game) destroyEditorGame(game);
       else release();
     };
   }, [load, sourceAnimation, targetAnimation, parent, onReady, groundReference]);

@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { afterEach, assert, test, vi } from 'vitest';
+import { afterEach, assert, expect, test, vi } from 'vitest';
 import {
   AnimationEditorGhostLayer,
   AnimationPoseOverlay,
@@ -125,6 +125,35 @@ function fixture(frame?: string | number, overrideRig?: Rig, confirmReplacement?
   };
 }
 const file = () => new File(['image'], 'replacement.png', { type: 'image/png' });
+
+test('project artwork suspends textures and rebinds authored additions, replacements and history', async () => {
+  const f = fixture();
+  await f.controller.import(file());
+  f.controller.preview();
+  f.controller.apply();
+  const replacements = f.controller.appliedReplacements();
+  f.setNext(sprite('extra.png'));
+  await f.controller.importAsset(new File(['image'], 'extra.png', { type: 'image/png' }));
+  const added = f.controller.appliedReplacements().find((entry) => entry.newAsset)!;
+  f.controller.suspend();
+  assert.deepEqual([...f.textures.keys()], ['shared']);
+  assert.equal(f.controller.getSnapshot().ready, false);
+  assert.equal(f.controller.appliedReplacements().length, 2);
+  expect(f.next.dispose).not.toHaveBeenCalled();
+  const next = fixture();
+  f.controller.prepareTextures(next.scene);
+  assert.isTrue(next.textures.has(added.assetKey));
+  f.controller.bind(next.scene, next.puppet, next.definition);
+  assert.strictEqual(f.controller.appliedReplacements().find((entry) => !entry.newAsset)!.blob, replacements[0]!.blob);
+  assert.isTrue(f.controller.getSnapshot().canUndo);
+  f.controller.undo();
+  assert.equal(f.controller.appliedReplacements().length, 1); // The independent addition remains.
+  f.controller.redo();
+  assert.equal(f.controller.appliedReplacements().length, 2);
+  f.controller.dispose();
+  assert.deepEqual([...next.textures.keys()], ['shared']);
+  next.controller.dispose();
+});
 
 test('shared image replacement and source restoration preserve the proposal when dependent confirmation is declined', async () => {
   const guard = vi.fn(() => false);

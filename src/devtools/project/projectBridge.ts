@@ -7,10 +7,19 @@ import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import type { AnimationPreviewLease } from '../shared/AnimationLibraryPreview.js';
 import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
-import type { PackageSnapshot, PackageFiles } from '../shared/package/characterPackage.js';
+import type { PackageFiles } from '../shared/package/characterPackage.js';
+import type { ProjectCharacterDocument } from './ProjectCharacterDocument.js';
 
-/** Same-origin retained editor hosts reuse the existing applications and their single owners. */
+export interface ProjectRenderer {
+  activate(): void;
+  suspend(): void;
+  dispose(): void;
+}
+
+/** Same-origin renderer hosts borrow the project's single document owners. */
 export interface ProjectEditorContext {
+  readonly characterDocuments?: ProjectCharacterDocument;
+  bindRenderer(renderer: ProjectRenderer): () => void;
   readonly autosave?: LocalAutosave;
   readonly projectId?: string;
   readonly projectName: string;
@@ -43,11 +52,7 @@ export interface ProjectEditorContext {
   buildScenePackage(scene: ReadonlyScene): Promise<PackageFiles>;
   confirmReplacement(kind: 'animation' | 'texture', id: string): boolean;
   assetReferences(kind: 'skin', id: string): readonly string[];
-  bindCharacter(
-    capture: () => PackageSnapshot,
-    pending: () => boolean,
-    navigate: (view: 'rig' | 'animation') => void,
-  ): () => void;
+  bindCharacter(pending: () => boolean, navigate: (view: 'rig' | 'animation') => void): () => void;
   navigate(view: 'project' | 'rig' | 'animation'): void;
 }
 

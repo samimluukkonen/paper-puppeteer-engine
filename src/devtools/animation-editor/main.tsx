@@ -18,7 +18,7 @@ import { buildCharacterDraft } from '../shared/autosave/editorDrafts.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
-import { createEditorGame } from '../shared/editorGame.js';
+import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
 import { defaultGroundGuide } from '../shared/groundGuide.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
@@ -87,10 +87,12 @@ const footContacts = new FootContactGroundController();
 const environment = new EnvironmentPreviewController(projectContext?.imageAssets);
 const motionPreview = new MotionPreviewController();
 const packages = new PackageController(undefined, projectContext?.fetcher);
-const artwork = new ArtworkController(
-  undefined,
-  projectContext ? (key) => projectContext.confirmReplacement('texture', key) : undefined,
-);
+const artwork =
+  projectContext?.characterDocuments?.artwork ??
+  new ArtworkController(
+    undefined,
+    projectContext ? (key) => projectContext.confirmReplacement('texture', key) : undefined,
+  );
 const attachments = new AttachmentController(artwork);
 const rigTweak = new RigTweakController(attachments);
 const newAnimation = new NewAnimationController();
@@ -310,14 +312,11 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       state.setReplacementGuard(
         projectContext ? (name) => projectContext.confirmReplacement('animation', name) : undefined,
       );
-      editorScene.rigEditor!.state.skinReferences = projectContext
-        ? (name) => projectContext.assetReferences('skin', name)
-        : undefined;
+      if (!projectContext?.characterDocuments) editorScene.rigEditor!.state.skinReferences = undefined;
       autosave?.dispose();
       clearInterval(pollAutosave);
       releaseProject?.();
       releaseProject = projectContext?.bindCharacter(
-        () => editorScene.packageSnapshot(),
         () =>
           editorScene.hasPendingArtworkProposal ||
           artwork.getSnapshot().importing ||
@@ -506,6 +505,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
         : initialDraft
           ? { definition: initialDraft.definition }
           : {}),
+      ...(projectContext?.characterDocuments ? { documents: projectContext.characterDocuments } : {}),
       ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
       groundGuide,
       environment,
@@ -565,6 +565,27 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     width: 630,
     height: 891,
   });
+  let rendererActive = true;
+  // Phaser may finish booting after its host was already suspended.
+  game.events.once('ready', () =>
+    queueMicrotask(() => {
+      if (!rendererActive && game.isRunning) game.loop.stop();
+    }),
+  );
+  const releaseRenderer = projectContext?.bindRenderer({
+    activate: () => {
+      rendererActive = true;
+      if (game.isRunning && !game.loop.running) game.loop.start(game.loop.callback);
+      game.scale.refresh();
+    },
+    suspend: () => {
+      rendererActive = false;
+      stateOwner?.pause();
+      packages.closePreview();
+      game.loop.stop();
+    },
+    dispose: () => unmount(),
+  });
   movePreview = () => {
     const rigView = stateOwner ? stateOwner.editorMode === 'rig' : initialRigView;
     const target = root.querySelector<HTMLElement>(rigView ? '#editor-stage' : '#animation-stage')!;
@@ -601,6 +622,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   });
 
   return () => {
+    releaseRenderer?.();
     previewPreferences?.dispose();
     autosave?.dispose();
     clearInterval(pollAutosave);
@@ -643,11 +665,14 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
     onionControls.dispose();
     previewControls.abort();
     releaseCharacterSelection();
-    game.destroy(true);
+    editorScene.disposePreview();
+    projectContext?.characterDocuments?.releaseRenderer();
+    game.scene.stop(editorScene);
+    destroyEditorGame(game);
     environment.dispose();
     motionPreview.dispose();
     attachments.dispose();
-    artwork.dispose();
+    if (!projectContext?.characterDocuments) artwork.dispose();
     scene = undefined;
   };
 });

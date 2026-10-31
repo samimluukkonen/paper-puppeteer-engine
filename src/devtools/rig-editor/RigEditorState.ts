@@ -293,11 +293,17 @@ export class RigEditorState {
   private readonly savedExternalSkins = new Map<string, SkinDefinition>();
   readonly defaultSkin: string;
   private selectedSkin: string;
-  private readonly artworkIssue: RigEditorStateOptions['artworkIssue'];
+  private artworkIssue: RigEditorStateOptions['artworkIssue'];
   private readonly meshReferences: RigEditorStateOptions['meshReferences'];
   private readonly boneReferences: RigEditorStateOptions['boneReferences'];
   private readonly ikReferences: RigEditorStateOptions['ikReferences'];
   private readonly footContactReferences: RigEditorStateOptions['footContactReferences'];
+
+  /** Renderer validation is borrowed only while a preview is mounted. */
+  setArtworkValidator(validate: RigEditorStateOptions['artworkIssue']): void {
+    this.artworkIssue = validate;
+    this.validationDirty = true;
+  }
 
   constructor(source: Rig, file?: RigJsonDefinition, options: RigEditorStateOptions = {}) {
     this.history = new SnapshotHistory(

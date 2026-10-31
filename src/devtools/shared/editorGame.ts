@@ -12,3 +12,9 @@ export function createEditorGame(parent: string, scene: Phaser.Scene, size = { w
     scene: [scene],
   });
 }
+
+/** Complete Phaser's deferred destruction before a project removes a suspended iframe. */
+export function destroyEditorGame(game: Phaser.Game): void {
+  game.destroy(true);
+  if (game.isRunning) game.loop.tick();
+}

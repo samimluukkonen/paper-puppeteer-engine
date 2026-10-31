@@ -9,6 +9,7 @@ import { Puppet } from '../../engine/Puppet.js';
 import { Rig } from '../../engine/Rig.js';
 import type { Facing } from '../../engine/types.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
+import type { ProjectCharacterDocument } from '../project/ProjectCharacterDocument.js';
 import { RigEditor } from '../rig-editor/RigEditor.js';
 import type { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
@@ -43,6 +44,7 @@ export interface AnimationEditorSceneOptions {
   /** Resolved relative to the editor document, including when served under a base path. */
   readonly characterUrl?: string;
   readonly definition?: CharacterDefinition;
+  readonly documents?: ProjectCharacterDocument;
   readonly ikChains?: readonly TwoBoneIKDefinition[];
   readonly groundGuide?: GroundGuideWorkspace;
   readonly footContacts?: FootContactGroundController;
@@ -147,6 +149,14 @@ export class AnimationEditorScene extends Phaser.Scene {
   private ikPreviewEnabled = false;
   private readonly previewTargetProviders = new Map<string, IKTargetProvider>();
   private readonly options: AnimationEditorSceneOptions;
+  private releasePreview: (() => void) | undefined;
+
+  /** Release consumers before Phaser's shutdown destroys display-list objects. */
+  disposePreview(): void {
+    const release = this.releasePreview;
+    this.releasePreview = undefined;
+    release?.();
+  }
 
   constructor(
     private readonly onReady: (state: AnimationEditorState, characterId: string) => void,
@@ -164,7 +174,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   create(): void {
     const session = ++this.loadSession;
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    this.releasePreview = () => {
       ++this.loadSession;
       this.environmentCamera?.dispose();
       this.environmentCamera = undefined;
@@ -213,10 +223,12 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.preview?.dispose();
       this.preview = undefined;
       this.motionPreview.unbind();
-      this.artwork?.unbind();
+      if (this.options.documents) this.artwork?.suspend();
+      else this.artwork?.unbind();
       this.puppet?.destroy();
       this.puppet = undefined;
-    });
+    };
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.disposePreview());
     if (this.options.environment) this.environmentLayer = new EnvironmentPreviewLayer(this, this.options.environment);
     void this.loadCharacter(session);
   }
@@ -558,31 +570,45 @@ export class AnimationEditorScene extends Phaser.Scene {
         ? loadSceneCharacter(this, url.href, { definition: this.options.definition, allowWebp: true })
         : loadSceneCharacter(this, url.href, { allowWebp: true }));
       if (!definition || session !== this.loadSession || !this.sys.isActive()) return;
-      const documents = createCharacterDocuments(definition, {
-        artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
-        boneReferences: (id) =>
-          (this.options.ikChains ?? [])
-            .filter((chain) => [chain.rootBone, chain.middleBone, chain.endBone].includes(id))
-            .map((chain) => `preview IK constraint "${chain.name}"`),
-        ikReferences: (id) =>
-          (this.options.ikChains ?? [])
-            .filter((chain) => chain.name === id)
-            .map((chain) => `preview IK constraint "${chain.name}" (target/provider ownership)`),
-      });
+      const documents =
+        this.options.documents ??
+        createCharacterDocuments(definition, {
+          artworkIssue: (key, frame) => artworkIssue(this.textures, key, frame),
+          boneReferences: (id) =>
+            (this.options.ikChains ?? [])
+              .filter((chain) => [chain.rootBone, chain.middleBone, chain.endBone].includes(id))
+              .map((chain) => `preview IK constraint "${chain.name}"`),
+          ikReferences: (id) =>
+            (this.options.ikChains ?? [])
+              .filter((chain) => chain.name === id)
+              .map((chain) => `preview IK constraint "${chain.name}" (target/provider ownership)`),
+        });
+      documents.rig.setArtworkValidator((key, frame) => artworkIssue(this.textures, key, frame));
       const state = documents.animation;
-      state.selectAnimation(state.animationIds[0] ?? null);
+      if (!this.options.documents) state.selectAnimation(state.animationIds[0] ?? null);
+      this.artwork?.prepareTextures(this);
+      let renderRig = definition.rig;
+      if (this.options.documents) {
+        try {
+          renderRig = new Rig(documents.rig.workingCopy, documents.rig.skins);
+        } catch {
+          // Invalid focused field drafts retain the last valid preview and remain editable.
+          renderRig = state.rig ?? definition.rig;
+        }
+        state.updatePreviewRig(renderRig);
+      }
       puppet = new Puppet(this, {
-        rig: definition.rig,
-        skin: definition.defaultSkin,
+        rig: renderRig,
+        skin: documents.rig.activeSkin,
         x: CHARACTER_PREVIEW_ORIGIN.x,
         y: CHARACTER_PREVIEW_ORIGIN.y,
         autoUpdate: false,
         facing: this.facing,
         debug: this.bonesVisible,
         ik: [
-          ...(definition.rig.ik ?? []),
+          ...(renderRig.ik ?? []),
           ...(this.options.ikChains ?? [])
-            .filter((chain) => !definition.rig.ik?.some((authored) => authored.name === chain.name))
+            .filter((chain) => !renderRig.ik?.some((authored) => authored.name === chain.name))
             .map((chain) => ({ ...chain, enabled: false })),
         ],
       });
@@ -679,8 +705,8 @@ export class AnimationEditorScene extends Phaser.Scene {
         },
         (pointer) => this.groundHandle?.pointerDown(pointer) ?? false,
       );
-      let previousMode = state.editorMode;
-      this.releaseMode = state.subscribe(() => {
+      let previousMode: typeof state.editorMode | undefined = this.options.documents ? undefined : state.editorMode;
+      const syncMode = () => {
         if (state.editorMode === previousMode) return;
         const leavingBindPose = previousMode === 'rig';
         previousMode = state.editorMode;
@@ -711,8 +737,10 @@ export class AnimationEditorScene extends Phaser.Scene {
           this.rigEditor?.refresh(false);
           preview?.refresh(true);
         }
-      });
+      };
+      this.releaseMode = state.subscribe(syncMode);
       this.artwork?.bind(this, puppet, definition, () => this.refreshArtwork());
+      syncMode();
       if (this.ikPreviewEnabled) this.setIKPreview(true);
       this.ikHandles = this.createIKHandles(state, puppet);
       this.ikHandles.setVisible(this.ikHandlesVisible);
@@ -773,7 +801,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.ghosts = undefined;
       preview?.dispose();
       this.motionPreview.unbind();
-      this.artwork?.unbind();
+      if (this.options.documents) this.artwork?.suspend();
+      else this.artwork?.unbind();
       puppet?.destroy();
       this.preview = undefined;
       this.puppet = undefined;

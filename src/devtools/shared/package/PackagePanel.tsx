@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CharacterDefinition } from '../../../engine/CharacterDefinition.js';
 import { Puppet } from '../../../engine/Puppet.js';
 import { loadSceneCharacter } from '../../../shared/loadSceneCharacter.js';
-import { createEditorGame } from '../editorGame.js';
+import { createEditorGame, destroyEditorGame } from '../editorGame.js';
 import { GUIDE_TARGETS } from '../guides/anchors.js';
 import { openPackageRuntime, type PackageFiles } from './characterPackage.js';
 import type { PackageController } from './PackageController.js';
@@ -78,7 +78,7 @@ function PackageRuntimePreview({ files, close }: { files: PackageFiles; close: (
     return () => {
       request.abort();
       scene.current = null;
-      if (game) game.destroy(true);
+      if (game) destroyEditorGame(game);
       else release?.();
     };
   }, [files]);

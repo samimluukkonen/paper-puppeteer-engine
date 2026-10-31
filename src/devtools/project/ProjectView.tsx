@@ -33,7 +33,7 @@ import '../../ui/theme.css';
 import '../../ui/viewShell.css';
 import '../../ui/workspace.css';
 
-/** Each retained host runs the existing editor app; hiding it never destroys authored state/history. */
+/** Project documents outlive the bounded cache of disposable editor renderers. */
 export function ProjectView() {
   const [sessions, setSessions] = useState<ProjectSession[]>([]);
   const [selected, setSelected] = useState<ProjectSession>();
@@ -139,7 +139,11 @@ export function ProjectView() {
       }
       window.removeEventListener('beforeunload', guard);
       if (window.paperProjectEditor === resolve) delete window.paperProjectEditor;
-      editors.dispose();
+      try {
+        editors.dispose();
+      } finally {
+        for (const session of current.current.sessions) session.workspace.disposeCharacterDocuments();
+      }
     };
   }, [editors]);
   const run = (task: () => Promise<void>): void => {

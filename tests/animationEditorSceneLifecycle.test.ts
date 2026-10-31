@@ -65,6 +65,21 @@ test('shutdown releases editor state, filename, and character even while metadat
   assert.equal(destroy.mock.calls.length, 1);
 });
 
+test('explicit preview disposal releases consumers before the puppet and remains safe at scene shutdown', () => {
+  const { scene } = fixture();
+  scene.create();
+  const order: string[] = [];
+  Object.assign(scene, {
+    preview: { dispose: () => order.push('preview') },
+    puppet: { destroy: () => order.push('puppet') },
+  });
+  scene.disposePreview();
+  assert.deepEqual(order, ['preview', 'puppet']);
+  scene.events.emit('shutdown');
+  scene.disposePreview();
+  assert.deepEqual(order, ['preview', 'puppet']);
+});
+
 test.each(['result', 'error'] as const)('a late load %s cannot affect a restarted scene', async (outcome) => {
   const { scene, error } = fixture();
   let resolve!: (definition: CharacterDefinition) => void;

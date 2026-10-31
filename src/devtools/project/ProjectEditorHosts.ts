@@ -7,7 +7,7 @@ import { rigCompatibilityRevision } from '../../engine/rigBoneMapping.js';
 import { parseSceneJson } from '../../engine/SceneDefinition.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { buildCharacterPackage, openPackageRuntime, packageJson } from '../shared/package/characterPackage.js';
-import type { ProjectEditorContext } from './projectBridge.js';
+import type { ProjectEditorContext, ProjectRenderer } from './projectBridge.js';
 import { ProjectValidationError, requireValidExport, type ProjectInspection } from './projectInspection.js';
 import { buildProjectScenePackage, characterFileFetcher } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
@@ -25,6 +25,8 @@ export interface ProjectEditorHost {
   kind: 'character' | 'scene';
   src: string;
   context: ProjectEditorContext;
+  active: boolean;
+  renderer?: ProjectRenderer;
   pending?: () => boolean;
   openView?: (view: 'rig' | 'animation') => void;
   openGuide?: (guideId?: string) => void;
@@ -49,10 +51,12 @@ interface ProjectEditorHostOptions {
 
 /** Own retained editor contexts, runtime leases and preview teardown independently of React rendering. */
 export class ProjectEditorHosts {
+  static readonly rendererLimit = 2;
   private readonly owners = new Map<string, ProjectEditorHost>();
   private readonly leases = new Set<RuntimeLease>();
   private readonly closers = new Map<string, () => void>();
   private readonly lifetime = new AbortController();
+  private opening: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: ProjectEditorHostOptions) {}
 
@@ -64,6 +68,34 @@ export class ProjectEditorHosts {
 
   private releaseLease(lease: RuntimeLease): void {
     if (this.leases.delete(lease)) lease.dispose();
+  }
+
+  private activateHost(token: string | undefined): void {
+    for (const host of this.owners.values()) {
+      const active = host.token === token;
+      if (host.active === active) continue;
+      host.active = active;
+      if (active) host.renderer?.activate();
+      else host.renderer?.suspend();
+    }
+    const host = token && this.owners.get(token);
+    if (host) {
+      // Map insertion order is the renderer cache's least-recently-used order.
+      this.owners.delete(host.token);
+      this.owners.set(host.token, host);
+    }
+    this.options.activate(token);
+  }
+
+  private evict(token: string): void {
+    const close = this.closers.get(token);
+    try {
+      close?.();
+    } finally {
+      this.closers.delete(token);
+      this.owners.delete(token);
+      this.publish();
+    }
   }
 
   dispose(): void {
@@ -86,17 +118,24 @@ export class ProjectEditorHosts {
     throwNotificationErrors(errors, 'Project editor disposal failed.');
   }
 
-  private async runtime(workspace: ProjectWorkspace, id: string, namespace?: string): Promise<RuntimeLease> {
-    const snapshot = workspace.captureCharacter(id);
-    const files = await buildCharacterPackage(
-      snapshot,
-      characterFileFetcher(workspace.character(id).files),
-      this.lifetime.signal,
-    );
-    const lease = await openPackageRuntime(files, this.lifetime.signal, namespace);
-    if (this.lifetime.signal.aborted) {
+  private async runtime(
+    workspace: ProjectWorkspace,
+    id: string,
+    namespace?: string,
+    signal = this.lifetime.signal,
+    source = false,
+  ): Promise<RuntimeLease> {
+    const files = source
+      ? workspace.character(id).files
+      : await buildCharacterPackage(
+          workspace.captureCharacter(id),
+          characterFileFetcher(workspace.character(id).files),
+          signal,
+        );
+    const lease = await openPackageRuntime(files, signal, namespace);
+    if (signal.aborted) {
       lease.dispose();
-      this.lifetime.signal.throwIfAborted();
+      signal.throwIfAborted();
     }
     this.leases.add(lease);
     return lease;
@@ -151,12 +190,28 @@ export class ProjectEditorHosts {
       throw error;
     }
   }
-  async open(
+  open(
     session: ProjectSession,
     kind: 'character' | 'scene',
     id: string,
     view: 'rig' | 'animation' = 'rig',
     guide = false,
+    guideId?: string,
+    animationRequest?: { name: string; copy: boolean },
+  ): Promise<void> {
+    const opening = this.opening
+      .catch(() => {})
+      .then(() => this.openHost(session, kind, id, view, guide, guideId, animationRequest));
+    this.opening = opening;
+    return opening;
+  }
+
+  private async openHost(
+    session: ProjectSession,
+    kind: 'character' | 'scene',
+    id: string,
+    view: 'rig' | 'animation',
+    guide: boolean,
     guideId?: string,
     animationRequest?: { name: string; copy: boolean },
   ): Promise<void> {
@@ -167,7 +222,7 @@ export class ProjectEditorHosts {
     );
     if (existing) {
       existing.openView?.(view);
-      this.options.activate(existing.token);
+      this.activateHost(existing.token);
       if (animationRequest) {
         if (existing.selectAnimation) existing.selectAnimation(animationRequest.name, animationRequest.copy);
         else existing.animationRequest = animationRequest;
@@ -181,21 +236,47 @@ export class ProjectEditorHosts {
       }
       return;
     }
+    if (this.owners.size >= ProjectEditorHosts.rendererLimit) {
+      const candidate = [...this.owners.values()].find(
+        (host) => !host.active && !host.pending?.() && !host.pendingCreation,
+      );
+      if (!candidate) throw new Error('Finish temporary edits in an open editor before opening another character.');
+      this.evict(candidate.token);
+    }
     const token = crypto.randomUUID();
+    const lifetime = new AbortController();
+    const signal = AbortSignal.any([this.lifetime.signal, lifetime.signal]);
     const ownedLeases = new Set<RuntimeLease>();
     let closed = false;
     let failed = false;
     let disposeScene: (() => void) | undefined;
     const character = kind === 'character' ? workspace.character(id) : undefined;
     const close = (): void => {
+      if (closed) return;
       closed = true;
+      lifetime.abort(new DOMException('Editor renderer closed.', 'AbortError'));
       this.owners.get(token)?.pendingCreation?.reject(new Error('Target editor closed before animation creation.'));
       if (character) character.loading = false;
       const dispose = disposeScene;
       disposeScene = undefined;
-      dispose?.();
+      const errors: unknown[] = [];
+      for (const release of [
+        () => this.owners.get(token)?.renderer?.dispose(),
+        () => dispose?.(),
+        ...[...ownedLeases].map((lease) => () => this.releaseLease(lease)),
+      ]) {
+        try {
+          release();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      ownedLeases.clear();
+      throwNotificationErrors(errors, 'Editor renderer disposal failed.');
     };
-    const initialLease = kind === 'character' ? await this.runtime(workspace, id) : undefined;
+    const documents = kind === 'character' ? workspace.characterDocuments(id) : undefined;
+    // The document owns edits and artwork overrides; this lease supplies only original source textures.
+    const initialLease = kind === 'character' ? await this.runtime(workspace, id, undefined, signal, true) : undefined;
     if (initialLease) ownedLeases.add(initialLease);
     const definition = initialLease?.definition;
     if (kind === 'scene') workspace.scenes.selectScene(id);
@@ -208,6 +289,20 @@ export class ProjectEditorHosts {
     const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
     let lastAuthoredRevision = workspace.autosaveRevision;
     const context: ProjectEditorContext = {
+      ...(documents ? { characterDocuments: documents } : {}),
+      bindRenderer: (renderer) => {
+        const host = this.owners.get(token);
+        if (!host || closed) {
+          renderer.dispose();
+          return () => {};
+        }
+        host.renderer = renderer;
+        if (host.active) renderer.activate();
+        else renderer.suspend();
+        return () => {
+          if (host.renderer === renderer) delete host.renderer;
+        };
+      },
       autosave: session.autosave,
       projectId: workspace.definition.id,
       get projectName() {
@@ -364,6 +459,7 @@ export class ProjectEditorHosts {
             workspace,
             characterId,
             `project_${token.replaceAll('-', '_')}_${runtimeCharacters.size}`,
+            signal,
           ).then((lease) => {
             if (closed) {
               this.releaseLease(lease);
@@ -376,10 +472,9 @@ export class ProjectEditorHosts {
         }
         return request;
       },
-      bindCharacter: (capture, pending, navigate) => {
+      bindCharacter: (pending, navigate) => {
         failed = false;
         const entry = workspace.character(id);
-        entry.capture = capture;
         entry.pending = pending;
         entry.loading = false;
         const host = this.owners.get(token)!;
@@ -387,7 +482,6 @@ export class ProjectEditorHosts {
         host.openView = navigate;
         workspace.refresh();
         return () => {
-          delete entry.capture;
           delete entry.pending;
           entry.loading = false;
           delete host.pending;
@@ -395,22 +489,13 @@ export class ProjectEditorHosts {
         };
       },
       navigate: () => {
-        this.options.activate(undefined);
+        if (closed) return;
+        this.activateHost(undefined);
         workspace.refresh();
         // Scene stages cache textures by reference. Dispose this preview on return so later
         // character edits are reflected on its next opening; authored scene history is retained.
         if (kind === 'scene' || failed) {
-          close();
-          this.closers.delete(token);
-          this.owners.delete(token);
-          this.publish();
-          // React removes the iframe and its Phaser consumers before releasing their URLs.
-          setTimeout(() => {
-            for (const lease of ownedLeases) {
-              this.releaseLease(lease);
-            }
-            ownedLeases.clear();
-          }, 0);
+          this.evict(token);
         }
       },
     };
@@ -427,6 +512,7 @@ export class ProjectEditorHosts {
       kind,
       src: url.href,
       context,
+      active: false,
       guidePending: guide,
       guideId,
       animationRequest,
@@ -434,6 +520,6 @@ export class ProjectEditorHosts {
     this.owners.set(token, host);
     this.closers.set(token, close);
     this.publish();
-    this.options.activate(token);
+    this.activateHost(token);
   }
 }
