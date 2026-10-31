@@ -88,6 +88,19 @@ The sample's skin button calls `puppet.setSkin(definition.defaultSkin).applySkin
 
 Puppets update automatically from Phaser scene `UPDATE` by default and apply animation/IK/render synchronization. Do not also advance them manually in a scene update. A host with its own clock may construct with `autoUpdate: false` and call `puppet.update(deltaMilliseconds)`. Times and durations are milliseconds. Bone positions are local pixels relative to parents, rotations are radians (positive clockwise with downward Y), sprite origins are normalized and the outer puppet position is in scene coordinates. Facing mirrors the puppet root; camera transforms stay host-owned.
 
+For static puppets, opt into `idleSync: 'dirty'` at construction. When animation evaluation reports no work (including paused, stopped and completed playback), unchanged puppets skip bone transforms, render projection, IK, meshes and debug refreshes. Animation evaluation and `onUpdate` callbacks continue normally. The default `idleSync: 'always'` preserves automatic synchronization of directly mutable poses on every update.
+
+In dirty mode, call `puppet.markPoseDirty()` after directly editing bone poses, constraint properties or the puppet/ancestor transforms; multiple invalidations coalesce into one synchronization on the next update. Call `syncPose()` instead for immediate projection. `preparePose()` also invalidates before manual editing, and Puppet setters such as `setIKTarget()` invalidate deferred work. Setters that already synchronize immediately retain that behavior. `syncIK()` retains any pending full pose synchronization.
+
+```ts
+const puppet = new Puppet(this, { definition, idleSync: 'dirty' });
+puppet.preparePose();
+puppet.getBone('root').pose.rotation = 0.2;
+puppet.markPoseDirty(); // Project on the next scene update; syncPose() projects immediately.
+```
+
+IK target providers continue to run on idle updates, including providers currently returning `undefined`. External IK animation and mesh deformation sources also keep synchronization active because their values may change independently. After changing a constraint directly (for example `puppet.getIK('arm').enabled = false`), invalidate or synchronize explicitly. Debug overlays follow the same contract; use `refreshDebugViews()` when only their host presentation changes.
+
 ## Resource ownership and cleanup
 
 The scene owns each puppet, which subscribes to scene update and shutdown. The host's Phaser texture manager owns loaded textures and may share them across puppets/scenes. Destroying a puppet releases its render objects, animation subscriptions, IK constraints and providers; it retains shared textures. Character definitions/compiled clips are immutable and can be reused with independent puppet clocks. Different characters using the same texture key must refer to the same artwork or use unique keys; loading conflicting URLs under a live key fails.

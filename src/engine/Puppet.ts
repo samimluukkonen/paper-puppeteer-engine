@@ -56,6 +56,10 @@ interface PuppetSettings {
   skin?: string;
   /** Disable if the host calls update(deltaMilliseconds) itself. */
   autoUpdate?: boolean;
+  /** Opt into skipping unchanged idle poses. Direct edits require markPoseDirty() or syncPose().
+   * IK target providers and external animation/deformation sources still synchronize every update.
+   */
+  idleSync?: 'always' | 'dirty';
 }
 
 export type PuppetOptions = PuppetSettings &
@@ -78,6 +82,9 @@ export class Puppet {
   private readonly renderedSlotDefinitions = new Map<string, Readonly<AttachmentDefinition>>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
   private readonly poseController: PuppetPoseController;
+  private readonly idleSync: 'always' | 'dirty';
+  private poseRevision = 0;
+  private synchronizedPoseRevision = -1;
   private ikAnimationSource: Pick<AnimationPlayer, 'ikAnimation'> | undefined;
   private readonly prepareAnimationPose = (): void => this.preparePose();
   private readonly synchronizeAnimationPose = (): void => this.syncPose();
@@ -104,6 +111,9 @@ export class Puppet {
     private readonly scene: Phaser.Scene,
     options: PuppetOptions,
   ) {
+    this.idleSync = options.idleSync ?? 'always';
+    if (this.idleSync !== 'always' && this.idleSync !== 'dirty')
+      throw new Error(`Invalid idle sync mode: ${String(this.idleSync)}.`);
     const rig = options.rig ?? options.definition?.rig;
     if (!rig) throw new Error('Puppet requires a rig or character definition.');
     this.rig = rig instanceof Rig ? rig : new Rig(rig);
@@ -587,6 +597,7 @@ export class Puppet {
     sync = true,
   ): this {
     this.renderer.setSlotTransform(id, values);
+    this.markPoseDirty();
     if (sync) this.syncPose();
     return this;
   }
@@ -668,6 +679,7 @@ export class Puppet {
     if (enabled) this.slotDebugView ??= new SlotDebug(this.scene, this.rig, this.renderer, () => this.slotState);
     this.slotDebugView?.container.setDepth(this.container.depth + 3);
     this.slotDebugView?.setVisible(enabled);
+    this.markPoseDirty();
     return this;
   }
 
@@ -685,6 +697,7 @@ export class Puppet {
     if (this.renderedSlotAttachments.get(slot) === id && this.renderedSlotDefinitions.get(slot) === definition)
       return false;
     this.renderer.setSlotAttachment(slot, definition);
+    this.markPoseDirty();
     if (definition) this.renderedSlotDefinitions.set(slot, definition);
     else this.renderedSlotDefinitions.delete(slot);
     if (id) this.renderedSlotAttachments.set(slot, id);
@@ -716,6 +729,7 @@ export class Puppet {
     }
     this.debugView?.container.setDepth(this.container.depth + 1);
     this.debugView?.setVisible(enabled);
+    this.markPoseDirty();
     return this;
   }
 
@@ -726,6 +740,7 @@ export class Puppet {
     }
     const constraint = new TwoBoneIKConstraint(definition, this.rig, this.bones);
     this.ikConstraints.set(constraint.name, constraint);
+    this.markPoseDirty();
     return constraint;
   }
 
@@ -743,6 +758,7 @@ export class Puppet {
       if (y === undefined) throw new Error('IK target needs x and y.');
       constraint.setTarget(targetOrX, y);
     } else constraint.setTarget(targetOrX);
+    this.markPoseDirty();
     return this;
   }
 
@@ -753,6 +769,7 @@ export class Puppet {
       this.ikDebugView.container.setDepth(this.container.depth + 2).setVisible(enabled);
       this.ikDebugView.update(this.poseController.getOrderedConstraints());
     }
+    this.markPoseDirty();
     return this;
   }
 
@@ -764,7 +781,21 @@ export class Puppet {
     if (side === undefined) this.debugLabelSides.delete(boneId);
     else this.debugLabelSides.set(boneId, side);
     this.debugView?.setLabelSide(boneId, side);
+    this.markPoseDirty();
     return this;
+  }
+
+  private shouldSyncIdlePose(): boolean {
+    if (
+      this.idleSync === 'always' ||
+      this.poseRevision !== this.synchronizedPoseRevision ||
+      this.ikAnimationSource ||
+      this.meshDeformationSource
+    )
+      return true;
+    // Providers may change their result (including from undefined) without a host edit.
+    for (const constraint of this.ikConstraints.values()) if (constraint.targetProvider) return true;
+    return false;
   }
 
   update(delta: number): void {
@@ -775,7 +806,7 @@ export class Puppet {
     try {
       if (!this.destroyed) {
         const evaluated = this.animationPlayer.update(delta, this.prepareAnimationPose, this.synchronizeAnimationPose);
-        if (!evaluated) this.syncPose();
+        if (!evaluated && this.shouldSyncIdlePose()) this.syncPose();
       }
     } catch (error) {
       errors.push(error);
@@ -869,7 +900,17 @@ export class Puppet {
 
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
   preparePose(): void {
+    this.markPoseDirty();
     this.poseController.preparePose();
+  }
+
+  /** Schedule one full synchronization on the next update in idleSync: 'dirty' mode.
+   * Call after direct bone/constraint edits or changes to the puppet/ancestor transforms.
+   * syncPose() remains available for immediate projection.
+   */
+  markPoseDirty(): this {
+    this.poseRevision += 1;
+    return this;
   }
 
   private meshDeformationSource: Pick<AnimationPlayer, 'meshDeformation'> | undefined;
@@ -878,17 +919,28 @@ export class Puppet {
   }
   setMeshDeformationSource(source: Pick<AnimationPlayer, 'meshDeformation'> | undefined): void {
     this.meshDeformationSource = source;
+    this.markPoseDirty();
   }
 
   /** @internal Editor preview bridge; undefined restores the runtime player's IK channels. */
   setIKAnimationSource(player: Pick<AnimationPlayer, 'ikAnimation'> | undefined): void {
     if (this.destroyed) throw new Error('Puppet has been destroyed.');
     this.ikAnimationSource = player;
+    this.markPoseDirty();
   }
 
   /** Apply the evaluated pose, solve IK in priority order, then project rendering. */
   syncPose(options: SyncPoseOptions = {}): void {
-    if (!this.destroyed) this.poseController.syncPose(options);
+    if (this.destroyed) return;
+    const revision = this.poseRevision;
+    try {
+      this.poseController.syncPose(options);
+      this.synchronizedPoseRevision = revision;
+    } catch (error) {
+      // Retry incomplete projection even when this was an explicit sync of a clean pose.
+      this.markPoseDirty();
+      throw error;
+    }
   }
 
   /** Rerun constraints after changing targets, mix, enabled state, offsets, bend direction, or priorities.
@@ -896,7 +948,13 @@ export class Puppet {
    * Retains active pose presets and projects only the restored/solved IK joints.
    */
   syncIK(options: SyncPoseOptions = {}): void {
-    if (!this.destroyed) this.poseController.syncIK(options);
+    if (this.destroyed) return;
+    try {
+      this.poseController.syncIK(options);
+    } catch (error) {
+      this.markPoseDirty();
+      throw error;
+    }
   }
 
   /** Refresh overlays from the final synchronized pose without running animation or IK again. */

@@ -54,7 +54,8 @@ The Editor entry points remain the Vite application modules `src/devtools/rig-ed
 | Load immutable character metadata     | `CharacterLoader.load(url, fetcher?, options?)`, `CharacterDefinition.fromData(data, baseUrl?)`                                                  |
 | Load scene artwork                    | `loadSceneCharacter(scene, url, options?)`; optionally pass `options.definition` to reuse loaded metadata                                        |
 | Queue artwork in a host preload phase | `queueCharacterTextures(scene, definition, options?)`                                                                                            |
-| Create and position a puppet          | `new Puppet(scene, { definition, x?, y?, scale?, facing?, skin?, autoUpdate? })`; rig-based construction remains supported                       |
+| Create and position a puppet          | `new Puppet(scene, { definition, x?, y?, scale?, facing?, skin?, autoUpdate?, idleSync? })`; rig-based construction remains supported            |
+| Skip unchanged idle synchronization   | Opt into `idleSync: 'dirty'`; call `markPoseDirty()` after direct edits or `syncPose()` for immediate projection; providers remain live          |
 | Play, switch and crossfade            | `puppet.play(name, { fadeDuration?, restart?, speed?, layer? })`                                                                                 |
 | Control playback                      | `stop`, `pause`, `resume`, `restart`, `setSpeed`, `setPlaybackMode`, `setAnimationFPS`, `sampleAnimation`                                        |
 | Layers                                | `setLayerMask`, `setLayerWeight`, `clearLayer`; base layer behavior is unchanged                                                                 |

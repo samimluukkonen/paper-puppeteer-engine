@@ -379,8 +379,13 @@ test('successive partial slot transforms preserve runtime values and allow compl
 test('slot transforms synchronize immediately by default and can defer synchronization for a batch', () => {
   const { renderer } = fixture();
   const syncPose = vi.fn();
-  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
-  const puppet = { renderer, syncPose, setSlotTransform: Puppet.prototype.setSlotTransform } as unknown as Puppet;
+  const puppet = {
+    renderer,
+    syncPose,
+    markPoseDirty: vi.fn(),
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
+    setSlotTransform: Puppet.prototype.setSlotTransform,
+  } as unknown as Puppet;
   assert.strictEqual(puppet.setSlotTransform('item', { x: 8 }), puppet);
   assert.equal(syncPose.mock.calls.length, 1);
   syncPose.mockClear();
@@ -402,6 +407,7 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     getBone: (id: string) => joints.get(id)!,
     preparePose: vi.fn(),
     syncPose: vi.fn(),
+    markPoseDirty: vi.fn(),
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setRenderOrder: Puppet.prototype.setRenderOrder,
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
@@ -573,6 +579,7 @@ test.each([undefined, 0, -5, 40])(
       getBone: (id: string) => joints.get(id)!,
       preparePose: vi.fn(),
       syncPose: vi.fn(),
+      markPoseDirty: vi.fn(),
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setRenderOrder: Puppet.prototype.setRenderOrder,
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
