@@ -12,6 +12,7 @@ import { bindExportShortcut, blocksEditorShortcut, historyShortcut } from '../..
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { ViewHeader } from '../../ui/viewShell.js';
 import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { buildProjectDraft } from '../shared/autosave/projectDrafts.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { GuideTargets } from '../shared/guides/GuideTargets.js';
@@ -174,7 +175,7 @@ export function ProjectView() {
               revision,
               name: workspace.definition.name,
               dirty: workspace.hasUnsavedChanges,
-              build: async (signal) => (await buildProjectPackage(workspace, signal)).files,
+              build: (signal) => buildProjectDraft(workspace, signal),
             };
       },
     );

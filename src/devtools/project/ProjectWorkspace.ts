@@ -395,6 +395,13 @@ export class ProjectWorkspace {
     if (entry.loading) throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
     return capturePackage(this.workingCharacter(entry));
   }
+  /** Draft serialization captures changed branches itself and reuses unchanged revisions. */
+  characterDraft(id: string): PackageSnapshot {
+    const entry = this.character(id);
+    if (entry.loading || entry.pending?.())
+      throw new Error(`Character "${id}" is opening or has pending edits. Finish them first.`);
+    return this.workingCharacter(entry);
+  }
   /** Borrow the current authored rig, never the preview's animated joints. */
   rigSource(id: string): IdentifiedRig {
     const entry = this.character(id);

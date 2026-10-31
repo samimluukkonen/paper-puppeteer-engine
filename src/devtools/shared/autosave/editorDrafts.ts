@@ -2,6 +2,7 @@ import { canonicalJson } from '../../../engine/authoredSerialization.js';
 import { characterManifestSchema } from '../../../engine/CharacterDefinition.js';
 import { freezeData, type DeepReadonly } from '../../../engine/readonlyData.js';
 import { parseSceneDefinition } from '../../../engine/SceneDefinition.js';
+import { parseProjectDefinition } from '../../project/ProjectDefinition.js';
 import { buildProjectPackage, packageHostedCharacter } from '../../project/projectPackage.js';
 import { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
 import type { SceneCharacterRegistry } from '../../scene-editor/SceneCharacterRegistry.js';
@@ -11,13 +12,13 @@ import { animationPreviewPreferencesSchema } from '../animationPreviewPreference
 import type { AnimationPreviewPreferences } from '../animationPreviewPreferences.js';
 import { draftSource } from '../draftSource.js';
 import {
-  buildCharacterPackage,
-  capturePackage,
+  CharacterDraftSerializer,
   packageJson,
   type PackageFiles,
   type PackageSnapshot,
 } from '../package/characterPackage.js';
 import { sceneFingerprint } from '../sceneFingerprint.js';
+import { assembleProjectDraft, draftImages } from './projectDrafts.js';
 
 function samePackage(first: PackageFiles, second: PackageFiles): boolean {
   return (
@@ -29,6 +30,8 @@ function samePackage(first: PackageFiles, second: PackageFiles): boolean {
   );
 }
 
+const characters = new WeakMap<PackageSnapshot['definition'], CharacterDraftSerializer>();
+
 /** Standalone drafts use the same complete portable project payload as project recovery. */
 export async function buildCharacterDraft(
   input: PackageSnapshot,
@@ -36,15 +39,38 @@ export async function buildCharacterDraft(
   signal?: AbortSignal,
   preview?: { preferences: DeepReadonly<AnimationPreviewPreferences>; images: SceneImageRegistry },
 ) {
-  const snapshot = capturePackage(input);
-  // Capture metadata and binaries before the asynchronous character package work.
+  signal?.throwIfAborted();
+  let serializer = characters.get(input.definition);
+  if (!serializer) characters.set(input.definition, (serializer = new CharacterDraftSerializer()));
   const preferences = preview && freezeData(animationPreviewPreferencesSchema.parse(preview.preferences));
-  const images = preview?.images.entries.map((image) => ({ ...image, bytes: preview.images.read(image.reference) }));
-  const workspace = new ProjectWorkspace(snapshot.rig.name ?? snapshot.definition.id, id);
-  await workspace.addCharacter(await buildCharacterPackage(snapshot, undefined, signal));
-  if (preferences) workspace.setAnimationPreviewPreferences(snapshot.definition.id, preferences);
-  for (const image of images ?? []) workspace.scenes.images.register(image.reference, image.bytes, image.name);
-  return (await buildProjectPackage(workspace, signal)).files;
+  const images = preview && draftImages(preview.images);
+  const metadata = parseProjectDefinition({
+    version: 1,
+    id,
+    name: input.rig.name ?? input.definition.id,
+    characters: [
+      {
+        id: input.definition.id,
+        name: input.rig.name ?? input.definition.id,
+        manifest: 'characters/character-1/character.json',
+      },
+    ],
+    scenes: [],
+    ...(preferences ? { editorPreferences: { animationPreview: { [input.definition.id]: preferences } } } : {}),
+    ...(images?.size
+      ? {
+          images: preview!.images.entries.map((image) => ({
+            id: image.reference.slice(3),
+            name: image.name,
+            path: image.reference.slice(3),
+          })),
+        }
+      : {}),
+  });
+  const resources = new Map([...(images ?? [])].map(([reference, bytes]) => [reference.slice(3), bytes]));
+  const files = await serializer.build(input, undefined, signal);
+  signal?.throwIfAborted();
+  return assembleProjectDraft(metadata, new Map([[input.definition.id, files]]), resources);
 }
 
 export function sceneDraftSource(document: SceneEditorDocument, registry: SceneCharacterRegistry, id: string) {

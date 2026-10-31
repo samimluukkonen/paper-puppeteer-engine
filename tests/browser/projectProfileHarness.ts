@@ -5,6 +5,7 @@ import {
 } from '../../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../../src/devtools/project/ProjectWorkspace.js';
 import { LocalDraftStore } from '../../src/devtools/shared/autosave/LocalDraftStore.js';
+import { buildProjectDraft } from '../../src/devtools/shared/autosave/projectDrafts.js';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import type { AudioAssetDefinition } from '../../src/engine/AudioAsset.js';
 import { canonicalJson } from '../../src/engine/authoredSerialization.js';
@@ -135,7 +136,7 @@ export async function profileProject() {
           throw new Error('Audio binary changed.');
       }
       const saveStart = performance.now();
-      await store.save(key, owner, project.definition.name, String(run), (await buildProjectPackage(project)).files);
+      await store.save(key, owner, project.definition.name, String(run), await buildProjectDraft(project));
       const autosaveMs = performance.now() - saveStart;
       const recoveryStart = performance.now();
       const latest = (await store.list()).find((entry) => entry.key === key)!;

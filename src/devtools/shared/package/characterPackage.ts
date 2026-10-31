@@ -8,13 +8,14 @@ import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
 import { assertJsonInputSize } from '../../../engine/jsonInput.js';
 import { assertMeshImageSize } from '../../../engine/meshGeometry.js';
 import type { PoseDefinition } from '../../../engine/Pose.js';
-import type { DeepReadonly } from '../../../engine/readonlyData.js';
+import { isFullyFrozen, type DeepReadonly } from '../../../engine/readonlyData.js';
 import { readResponseBytes, withResourceResponse } from '../../../engine/resourceInput.js';
 import { identifierSchema } from '../../../engine/schemas.js';
 import type { SkinDefinition, SpriteDefinition, AttachmentDefinition } from '../../../engine/types.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
 import { safeFilename } from '../assetFilename.js';
+import { PackageFingerprints } from './PackageFingerprints.js';
 import { PACKAGE_MAX_FILE_BYTES, packagePath, validatePackageFiles } from './packageZip.js';
 
 export interface PackageSnapshot {
@@ -184,14 +185,124 @@ function migrateOrigin(
   sprite.originY = ny;
 }
 
-/** Construct, validate and return a complete proposal. Working editor definitions are never installed or marked saved. */
+/** Full export preparation remains independent of the local draft caches. */
 export async function buildCharacterPackage(
   input: PackageSnapshot,
   fetcher: typeof fetch = fetch,
   signal: AbortSignal = new AbortController().signal,
 ): Promise<PackageFiles> {
   signal.throwIfAborted();
-  const snapshot = capturePackage(input);
+  const files = await serializeCharacterFiles(capturePackage(input), fetcher, signal);
+  await validatePackage(files, signal);
+  return files;
+}
+
+/** One editor/character owns this cache; only completed revisions and immutable binaries are retained. */
+export class CharacterDraftSerializer {
+  private readonly fingerprints = new PackageFingerprints();
+  private definition: CharacterDefinition | undefined;
+  private previous: { revision: string; files: PackageFiles } | undefined;
+  private readonly sources = new WeakMap<CharacterDefinition, Map<string, Uint8Array<ArrayBuffer>>>();
+  private readonly replacements = new WeakMap<Blob, Uint8Array<ArrayBuffer>>();
+  private readonly documents = new WeakMap<object, Uint8Array<ArrayBuffer>>();
+
+  /** Project registration already validated and detached these source binaries. */
+  constructor(source?: { definition: CharacterDefinition; files: PackageFiles }) {
+    if (source) {
+      const textures = new Map<string, Uint8Array<ArrayBuffer>>();
+      for (const [key, path] of Object.entries(source.definition.manifest!.textures))
+        textures.set(source.definition.textureUrl(key), source.files.get(path)!);
+      this.sources.set(source.definition, textures);
+    }
+  }
+
+  async build(
+    input: PackageSnapshot,
+    fetcher: typeof fetch = fetch,
+    signal: AbortSignal = new AbortController().signal,
+    options: { metadataValidated?: boolean } = {},
+  ): Promise<PackageFiles> {
+    signal.throwIfAborted();
+    if (input.pendingArtwork) throw new Error('Apply or cancel the artwork proposal before saving a draft.');
+    const revision = canonicalJson(this.fingerprints.compute(input));
+    if (this.definition === input.definition && this.previous?.revision === revision) return this.previous.files;
+    // Artwork migration needs an owned rig. Other frozen branches can be borrowed;
+    // mutable callers are detached now, before any asynchronous asset reads.
+    const own = <T extends object>(value: T): T => (isFullyFrozen(value) ? value : structuredClone(value));
+    const snapshot: PackageSnapshot = {
+      definition: input.definition,
+      rig: input.replacements.length ? structuredClone(input.rig) : own(input.rig),
+      skins: input.skins.map(own),
+      animations: input.animations.map(own),
+      poses: (input.poses ?? input.definition.poses).map(own),
+      replacements: input.replacements.map((entry) => ({ ...entry })),
+    };
+    const files = await serializeCharacterFiles(snapshot, fetcher, signal, this, options.metadataValidated);
+    signal.throwIfAborted();
+    this.definition = input.definition;
+    this.previous = { revision, files };
+    return files;
+  }
+
+  json(data: object, value: () => unknown = () => data): Uint8Array<ArrayBuffer> {
+    const reusable = isFullyFrozen(data);
+    const previous = reusable && this.documents.get(data);
+    if (previous) return previous;
+    const text = canonicalJson(value());
+    assertJsonInputSize(text);
+    const bytes = encoder.encode(text);
+    if (reusable) this.documents.set(data, bytes);
+    return bytes;
+  }
+
+  private async validateAsset(bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<void> {
+    const header = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
+    new CharacterTextureBudget({ allowWebp: true }).checkImage('draft', bytes);
+    if (typeof Image !== 'undefined') {
+      const sprite = await importSprite(
+        new File([bytes], header.format === 'image/png' ? 'draft.png' : 'draft.webp', { type: header.format }),
+        signal,
+      );
+      sprite.dispose();
+    }
+    signal.throwIfAborted();
+  }
+
+  async replacement(blob: Blob, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
+    const previous = this.replacements.get(blob);
+    if (previous) return previous;
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await this.validateAsset(bytes, signal);
+    this.replacements.set(blob, bytes);
+    return bytes;
+  }
+
+  async texture(
+    definition: CharacterDefinition,
+    key: string,
+    fetcher: typeof fetch,
+    signal: AbortSignal,
+  ): Promise<Uint8Array<ArrayBuffer>> {
+    const sources = this.sources.get(definition) ?? new Map<string, Uint8Array<ArrayBuffer>>();
+    this.sources.set(definition, sources);
+    const url = definition.textureUrl(key);
+    const previous = sources.get(url);
+    if (previous) return previous;
+    const bytes = await readImage(url, fetcher, signal);
+    await this.validateAsset(bytes, signal);
+    sources.set(url, bytes);
+    return bytes;
+  }
+}
+
+/** Shared portable layout/artwork migration; complete package preparation stays at export boundaries. */
+async function serializeCharacterFiles(
+  snapshot: PackageSnapshot,
+  fetcher: typeof fetch,
+  signal: AbortSignal,
+  draft?: CharacterDraftSerializer,
+  metadataValidated = false,
+): Promise<PackageFiles> {
   const { definition, rig } = snapshot;
   if (!definition.manifest) throw new Error('Character has no source manifest.');
   const skinNames = snapshot.skins.map((skin) => skin.name);
@@ -216,10 +327,13 @@ export async function buildCharacterPackage(
       throw new Error(`Conflicting package path "${path}". Assign distinct manifest paths.`);
     files.set(path, bytes);
   };
-  const json = (path: string, data: unknown): void => {
-    const text = canonicalJson(data);
-    assertJsonInputSize(text);
-    add(path, encoder.encode(text));
+  const json = (path: string, data: object, value: () => unknown = () => data): void => {
+    if (draft) add(path, draft.json(data, value));
+    else {
+      const text = canonicalJson(value());
+      assertJsonInputSize(text);
+      add(path, encoder.encode(text));
+    }
   };
   const assigned = new Map<string, PackageSnapshot['replacements'][number] & { sourceKey: string }>();
   const textures = new Map<string, Uint8Array<ArrayBuffer>>();
@@ -247,7 +361,10 @@ export async function buildCharacterPackage(
       // overwrite artwork still referenced by another key in the package.
       manifest.textures[key] = allocatePath('images', `${key}_replacement`, extension);
     }
-    textures.set(key, new Uint8Array(await replacement.blob.arrayBuffer()));
+    textures.set(
+      key,
+      draft ? await draft.replacement(replacement.blob, signal) : new Uint8Array(await replacement.blob.arrayBuffer()),
+    );
     const scope = replacement.reference ?? `texture:${replacement.assetKey}`;
     if (assigned.has(scope)) throw new Error(`Duplicate artwork replacement scope "${scope}".`);
     assigned.set(scope, { ...replacement, sourceKey: replacement.assetKey, assetKey: key });
@@ -294,7 +411,7 @@ export async function buildCharacterPackage(
     const path = Object.hasOwn(definition.animationPaths, clip.name)
       ? definition.animationPaths[clip.name]!
       : allocatePath('animations', clip.name, '.json');
-    json(path, { ...clip, version: 1 });
+    json(path, clip, () => ({ ...clip, version: 1 }));
     return path;
   });
   const sourcePosePaths = new Map(
@@ -315,28 +432,51 @@ export async function buildCharacterPackage(
   json('character.json', manifest);
   // Reject authored reference errors before fetching any source artwork. Use the same
   // cross-file validator as CharacterLoader, with the actual generated paths/documents.
-  CharacterDefinition.fromData({
-    manifest,
-    rig: packageJson(files, manifest.rig),
-    skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, packageJson(files, path)])),
-    animations: Object.fromEntries(manifest.animations.map((path) => [path, packageJson(files, path)])),
-    poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, packageJson(files, path)])),
-  });
+  if (!metadataValidated)
+    CharacterDefinition.fromData({
+      manifest,
+      rig: packageJson(files, manifest.rig),
+      skins: Object.fromEntries(Object.values(manifest.skins).map((path) => [path, packageJson(files, path)])),
+      animations: Object.fromEntries(manifest.animations.map((path) => [path, packageJson(files, path)])),
+      poses: Object.fromEntries((manifest.poses ?? []).map((path) => [path, packageJson(files, path)])),
+    });
   // Sequential fetching bounds memory and gives every failure a precise resource name.
   let includedImageBytes = 0;
+  const budget = draft && new CharacterTextureBudget({ allowWebp: true });
   for (const [key, path] of Object.entries(manifest.textures)) {
     signal.throwIfAborted();
     const bytes =
-      textures.get(key) ?? files.get(path) ?? (await readImage(definition.textureUrl(key), fetcher, signal));
+      textures.get(key) ??
+      files.get(path) ??
+      (draft
+        ? await draft.texture(definition, key, fetcher, signal)
+        : await readImage(definition.textureUrl(key), fetcher, signal));
+    if (budget) budget.checkImage(key, bytes);
     const existing = files.get(path);
-    if (existing && existing.length === bytes.length && existing.every((byte, index) => byte === bytes[index]))
+    if (
+      existing === bytes ||
+      (existing && existing.length === bytes.length && existing.every((byte, index) => byte === bytes[index]))
+    )
       continue;
     includedImageBytes += bytes.length;
     if (includedImageBytes > DEFAULT_CHARACTER_TEXTURE_LIMITS.maxTotalImageBytes)
       throw new Error('Package images exceed 50 MiB.');
     add(path, bytes);
   }
-  await validatePackage(files, signal);
+  if (draft) {
+    for (const sprite of [
+      ...rig.bones.flatMap((bone) => (bone.sprite ? [bone.sprite] : [])),
+      ...(rig.attachments ?? []),
+    ]) {
+      if ('type' in sprite && sprite.type === 'mesh')
+        assertMeshImageSize(sprite, inspectSpriteHeader(files.get(manifest.textures[sprite.texture]!)!));
+      if (sprite.frame !== undefined && sprite.frame !== '__BASE')
+        throw new Error(
+          `Texture "${sprite.texture}" references frame "${sprite.frame}". Package images are static; resolve atlas frames before export.`,
+        );
+    }
+  }
+  signal.throwIfAborted();
   return files;
 }
 
