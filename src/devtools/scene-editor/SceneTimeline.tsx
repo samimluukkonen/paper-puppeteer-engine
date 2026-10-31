@@ -65,7 +65,7 @@ export function SceneTimeline({
   const [viewportWidth, setViewportWidth] = useState(600);
   const [zoom, setZoom] = useState(1);
   const [snap, setSnap] = useState(true);
-  const setPlayhead = (time: number): void => playback.seek(time);
+  const setPlayhead = (time: number): void => playback.queueSeek(time);
   const [kind, setKind] = useState<SceneActionDefinition['type']>('animation');
   const [fadeType, setFadeType] = useState<'fade-in' | 'fade-out'>('fade-in');
   const cuts = [
@@ -89,6 +89,7 @@ export function SceneTimeline({
   }, []);
   useEffect(() => {
     const cancel = (): void => {
+      playback.cancelSeek();
       audioGesture.current = null;
       document.cancelAudioDrag();
       gesture.current = null;
@@ -114,7 +115,7 @@ export function SceneTimeline({
       window.removeEventListener('keydown', escape);
       cancel();
     };
-  }, [document]);
+  }, [document, playback, scene.id]);
   const add = (animationName?: string): void => {
     if (!actor) return;
     const time = Math.min(playback.time, scene.duration);
@@ -426,6 +427,12 @@ export function SceneTimeline({
           drag.valid = document.changeActionDrag(next);
         }}
         onPointerUp={(event) => {
+          if (scrub.current === event.pointerId) {
+            scrub.current = null;
+            playback.flushSeek();
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            return;
+          }
           scrub.current = null;
           const audioDrag = audioGesture.current;
           if (audioDrag?.pointer === event.pointerId) {
@@ -453,6 +460,7 @@ export function SceneTimeline({
           event.currentTarget.releasePointerCapture(event.pointerId);
         }}
         onPointerCancel={() => {
+          playback.cancelSeek();
           scrub.current = null;
           audioGesture.current = null;
           document.cancelAudioDrag();
@@ -462,6 +470,7 @@ export function SceneTimeline({
           document.cancelCameraDrag();
         }}
         onLostPointerCapture={() => {
+          playback.cancelSeek();
           scrub.current = null;
           audioGesture.current = null;
           document.cancelAudioDrag();

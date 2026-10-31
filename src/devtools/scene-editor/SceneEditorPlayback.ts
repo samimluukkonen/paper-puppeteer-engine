@@ -18,6 +18,8 @@ export class SceneEditorPlayback {
   private message = '';
   private audioOptions: SceneAudioOptions | undefined;
   private transportGeneration = 0;
+  private seekFrame: number | undefined;
+  private pendingSeek: number | undefined;
   private muted = false;
   private readonly listeners = new Set<() => void>();
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -70,6 +72,7 @@ export class SceneEditorPlayback {
     audio?: SceneAudioOptions,
   ): void {
     if (this.source === source && this.runner && ready) return;
+    this.cancelSeek();
     if (this.source && source && this.runner && ready) {
       const {
         audioAssets: _previousAudioAssets,
@@ -151,6 +154,7 @@ export class SceneEditorPlayback {
     this.start(false);
   }
   pause(): void {
+    this.cancelSeek();
     this.transportGeneration++;
     this.command(() => this.runner?.pause());
   }
@@ -158,6 +162,8 @@ export class SceneEditorPlayback {
     this.start(true);
   }
   private start(restart: boolean): void {
+    if (restart) this.cancelSeek();
+    else this.flushSeek();
     const runner = this.runner;
     if (!runner) return;
     const generation = ++this.transportGeneration;
@@ -204,6 +210,7 @@ export class SceneEditorPlayback {
     });
   }
   stop(): void {
+    this.cancelSeek();
     this.transportGeneration++;
     this.command(() => {
       this.runner?.stop();
@@ -211,8 +218,27 @@ export class SceneEditorPlayback {
     });
   }
   seek(time: number): void {
+    this.cancelSeek();
     this.transportGeneration++;
     this.command(() => this.runner?.seek(time));
+  }
+  /** Pointer scrubbing samples only the latest position once per display frame. */
+  queueSeek(time: number): void {
+    if (this.status === 'playing') this.pause();
+    this.transportGeneration++;
+    this.pendingSeek = time;
+    this.seekFrame ??= requestAnimationFrame(() => this.flushSeek());
+  }
+  /** Pointer release commits the last sample even before its scheduled frame. */
+  flushSeek(): void {
+    const time = this.pendingSeek;
+    this.cancelSeek();
+    if (time !== undefined) this.seek(time);
+  }
+  cancelSeek(): void {
+    if (this.seekFrame !== undefined) cancelAnimationFrame(this.seekFrame);
+    this.seekFrame = undefined;
+    this.pendingSeek = undefined;
   }
   setSpeed(speed: number): void {
     this.command(() => {
@@ -235,6 +261,7 @@ export class SceneEditorPlayback {
     this.sync(source, true, this.factory, this.audioOptions);
   }
   dispose(): void {
+    this.cancelSeek();
     this.transportGeneration++;
     const runner = this.runner;
     this.runner = undefined;

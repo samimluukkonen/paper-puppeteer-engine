@@ -48,7 +48,8 @@ export interface SceneRunnerOptions {
   readonly audio?: SceneAudioOptions;
   /** Return a fresh, exclusively owned Actor with autoUpdate:false, no state policy,
    * gameplay lifecycle/update listeners, queued commands, or procedural IK target providers. The runner
-   * disposes these isolated contexts on seek/restart. Shared character assets are fine.
+   * may reuse these isolated contexts on forward/same-position seeks and disposes them
+   * on reconstruction/restart. Shared character assets are fine.
    */
   readonly createActor: (definition: DeepReadonly<SceneActorDefinition>, depth: number) => Actor;
   /** Only delivered by actual playback, never by snapshot reconstruction. */
@@ -228,8 +229,9 @@ export class SceneRunner {
     this.assertActive();
     this.halt('cancelled');
   }
-  /** A seek always pauses. Recreate from initial data and simulate only validated
-   * declarations in a fresh context, with animation gameplay events and cues disabled.
+  /** A seek always pauses (or holds completion). Reuse the current owned state for
+   * forward/same-position seeks; reconstruct backward seeks from initial data.
+   * Only validated declarations run, with animation gameplay events and cues disabled.
    * On resume, events at/before the seek position are already consumed.
    */
   seek(milliseconds: number): void {
@@ -239,10 +241,24 @@ export class SceneRunner {
     this.execute(() => {
       this.seeking = true;
       try {
-        this.rebuild(false);
-        this.started = true;
-        this.state = 'paused';
-        this.atBoundary(true);
+        // Reentrant callbacks may observe a partially stepped Actor set/boundary.
+        const reusable = this.started && !this.stepping && !this.ownCommand;
+        this.checkOwnership();
+        if (reusable && target === this.cursor && (this.state === 'paused' || this.state === 'completed')) return;
+        if (reusable && target >= this.cursor && (this.state === 'paused' || this.state === 'playing')) {
+          // The current clock and boundary index are a live checkpoint. Keep playback/
+          // movement identities, event cursors and root-motion origins together.
+          this.state = 'paused';
+          for (const actor of this.instances.values()) {
+            actor.puppet.animationPlayer.setPreviewMode(true, { applyRootMotion: true });
+            actor.resumeAnimation();
+          }
+        } else {
+          this.rebuild(false);
+          this.started = true;
+          this.state = 'paused';
+          this.atBoundary(true);
+        }
         this.advance(target, true);
         for (const actor of this.instances.values()) actor.pauseAnimation();
       } finally {

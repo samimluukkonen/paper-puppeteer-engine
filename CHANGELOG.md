@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Reuse owned Actors for same-position and forward scene seeks, skipping consumed action boundaries and gameplay events. Coalesce ruler scrubbing per display frame, flush on release, cancel obsolete samples on transport/scene changes, and document the remaining backward-seek checkpoint tradeoffs.
+
 - Deduplicate in-flight editor openings by project session, asset and host kind, sharing preparation failures while retaining requested views, guides and animation selections. Clear failed openings so later requests can retry.
 
 - Collect removed project characters, shared artwork, audio and scene owners once current documents, saved checkpoints and retained undo/redo history no longer reference them, releasing expired IDs for reuse.

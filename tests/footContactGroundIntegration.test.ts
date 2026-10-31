@@ -488,7 +488,9 @@ test('scene playback and bidirectional seeks show current evaluated contacts wit
       assert.isFalse(f.document.alignSelectedActorFeetToGround());
       assert.strictEqual(f.document.workingScene, source);
     }
-    assert.deepEqual(positions[0], positions[2]);
+    // Incremental movement partitions the same travel into different floating-point steps.
+    assert.closeTo(positions[0]!.x, positions[2]!.x, 1e-9);
+    assert.closeTo(positions[0]!.y, positions[2]!.y, 1e-9);
     assert.notDeepEqual(positions[0], positions[1]);
     playback.play();
     playback.update(100);

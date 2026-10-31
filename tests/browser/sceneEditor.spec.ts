@@ -457,6 +457,15 @@ test('two-character encounter playback, pause, restart, deterministic scrubbing 
   await time.fill('1.5');
   await expect(status).toContainText('paused');
   await expect(position).toHaveText('195.000, 120.000');
+  const ruler = await page.locator('.scene-ruler').boundingBox();
+  if (!ruler) throw new Error('Scene ruler is missing.');
+  await page.mouse.move(ruler.x + (ruler.width * 1.5) / 6.5, ruler.y + ruler.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ruler.x + (ruler.width * 2.5) / 6.5, ruler.y + ruler.height / 2, { steps: 20 });
+  await page.mouse.up();
+  await expect(time).toHaveValue('2.5');
+  await expect(status).toContainText('paused');
+  await expect(position).toHaveText('110.000, 120.000');
   await time.fill('6.5');
   await expect(status).toContainText('completed');
   await page.getByRole('button', { name: 'Stop', exact: true }).click();

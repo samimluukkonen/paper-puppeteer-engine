@@ -21,6 +21,7 @@ vi.mock('phaser', () => ({
 const runners: SceneRunner[] = [];
 afterEach(() => {
   for (const runner of runners.splice(0)) runner.dispose();
+  vi.unstubAllGlobals();
 });
 const cue = (time: number, name = `cue-${time}`): SceneActionDefinition => ({
   id: name,
@@ -120,6 +121,88 @@ function snapshot(runner: SceneRunner) {
     pose: actor.puppet.getBone('root').pose.x,
   }));
 }
+
+function seekFrames() {
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  return {
+    frames,
+    run() {
+      const pending = [...frames.values()];
+      frames.clear();
+      for (const callback of pending) callback(0);
+    },
+  };
+}
+
+test('pointer seeks pause immediately, coalesce to the latest frame sample and flush on release or play', () => {
+  const clock = seekFrames();
+  const assets = factory();
+  const playback = new SceneEditorPlayback();
+  try {
+    playback.sync(scene([move('a', 0)]), true, assets.createActor);
+    playback.play();
+    playback.update(100);
+    const actor = playback.actors!.get('a');
+    const notify = vi.fn();
+    playback.subscribe(notify);
+    for (const time of [200, 300, 400]) playback.queueSeek(time);
+    assert.equal(playback.status, 'paused');
+    assert.equal(playback.time, 100);
+    assert.equal(clock.frames.size, 1);
+    notify.mockClear();
+    clock.run();
+    assert.equal(playback.time, 400);
+    assert.equal(notify.mock.calls.length, 1);
+    assert.strictEqual(playback.actors!.get('a'), actor);
+    playback.queueSeek(500);
+    playback.queueSeek(600);
+    playback.flushSeek();
+    assert.equal(playback.time, 600);
+    assert.equal(clock.frames.size, 0);
+    clock.run();
+    assert.equal(playback.time, 600);
+    playback.queueSeek(700);
+    playback.play();
+    assert.equal(playback.time, 700);
+    assert.equal(playback.status, 'playing');
+    assert.equal(clock.frames.size, 0);
+  } finally {
+    playback.dispose();
+  }
+});
+
+test.each(['cancelSeek', 'pause', 'seek', 'stop', 'restart', 'sync', 'unbind', 'dispose'] as const)(
+  '%s cancels pending pointer samples before they can change the transport or scene',
+  (operation) => {
+    const clock = seekFrames();
+    const assets = factory();
+    const playback = new SceneEditorPlayback();
+    const data = scene([move('a', 0)]);
+    try {
+      playback.sync(data, true, assets.createActor);
+      playback.seek(100);
+      playback.queueSeek(900);
+      if (operation === 'seek') playback.seek(200);
+      else if (operation === 'sync') playback.sync({ ...data, id: 'other' }, true, assets.createActor);
+      else if (operation === 'unbind') playback.sync(data, false, assets.createActor);
+      else playback[operation]();
+      const time = playback.time;
+      const status = playback.status;
+      assert.equal(clock.frames.size, 0);
+      clock.run();
+      assert.equal(playback.time, time);
+      assert.equal(playback.status, status);
+    } finally {
+      playback.dispose();
+    }
+  },
+);
 
 test.each(['camera', 'transition', 'pause'] as const)(
   'failed construction releases every owned Actor after an initial %s callback failure',
@@ -348,7 +431,7 @@ test('facing uses runtime direction, point, Actor targeting and tie rules at sch
   assert.equal(runner.actors.get('a')!.facingDirection, 'left');
 });
 
-test('forward/backward seeking rebuilds deterministically from any previous state with no cues or animation gameplay callbacks', () => {
+test('forward/backward seeking samples deterministically from any previous state with no cues or animation gameplay callbacks', () => {
   const { runner, onCue, events, completions } = fixture([
     move('a'),
     clip(100, 2000, true),
@@ -381,6 +464,93 @@ test('forward/backward seeking rebuilds deterministically from any previous stat
   assert.equal(runner.status, 'completed');
   runner.restart();
   assert.equal(onCue.mock.calls.length, 1);
+});
+
+test('same-position and nearby forward seeks retain Actors and only step newly crossed boundaries', () => {
+  const { runner, created, onCue, events, completions } = fixture([
+    move('a'),
+    clip(100, 2000, true),
+    ...Array.from({ length: 250 }, (_, index) => cue(index * 10)),
+  ]);
+  runner.seek(600);
+  const actor = runner.actors.get('a')!;
+  const playbackId = actor.puppet.getPlaybackStatus()!.playbackId;
+  const movementId = actor.movementStatus!.requestId;
+  const updates = vi.spyOn(actor.puppet, 'update');
+  const count = created.length;
+  for (let repeat = 0; repeat < 10; repeat++) runner.seek(600);
+  assert.equal(updates.mock.calls.length, 0);
+  runner.seek(601);
+  runner.seek(625);
+  assert.deepEqual(updates.mock.calls, [[1], [9], [10], [5]]);
+  assert.equal(created.length, count);
+  assert.strictEqual(runner.actors.get('a'), actor);
+  assert.equal(actor.puppet.getPlaybackStatus()!.playbackId, playbackId);
+  assert.equal(actor.movementStatus!.requestId, movementId);
+  assert.closeTo(actor.position.x, 52.5, 1e-9);
+  assert.equal(events.mock.calls.length, 0);
+  assert.equal(completions.mock.calls.length, 0);
+  assert.equal(onCue.mock.calls.length, 0);
+  runner.play();
+  runner.update(5);
+  assert.deepEqual(
+    onCue.mock.calls.map(([event]) => event.time),
+    [630],
+  );
+});
+
+test('seeking the playing position pauses without replaying actions and terminal repeats hold completion', () => {
+  const { runner, created, onCue } = fixture([move('a', 0), clip(0, 2000, true), cue(0), cue(500)]);
+  runner.play();
+  runner.update(500);
+  const actor = runner.actors.get('a')!;
+  const count = created.length;
+  const held = snapshot(runner);
+  const updates = vi.spyOn(actor.puppet, 'update');
+  runner.seek(500);
+  assert.equal(runner.status, 'paused');
+  assert.deepEqual(snapshot(runner), held);
+  assert.equal(updates.mock.calls.length, 0);
+  assert.equal(created.length, count);
+  assert.deepEqual(
+    onCue.mock.calls.map(([event]) => event.time),
+    [0, 500],
+  );
+  runner.seek(3000);
+  runner.seek(9999);
+  assert.equal(runner.status, 'completed');
+  assert.equal(created.length, count);
+  runner.seek(0);
+  assert.isTrue(actor.isDisposed);
+  const initial = runner.actors.get('a')!;
+  runner.seek(-1);
+  assert.strictEqual(runner.actors.get('a'), initial);
+});
+
+test('forward seeks recover from invalidated movement ownership and ignore obsolete outcomes', async () => {
+  const { runner } = fixture([move('a', 0, 2000), clip(0, 2000, true)]);
+  runner.seek(100);
+  const previous = runner.actors.get('a')!;
+  previous.cancelMovement();
+  runner.seek(200);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.isTrue(previous.isDisposed);
+  assert.equal(runner.status, 'paused');
+  assert.closeTo(runner.actors.get('a')!.position.x, 10, 1e-9);
+});
+
+test.each(['cue', 'animation'] as const)('reentrant %s seeks reconstruct a complete Actor sample', (source) => {
+  const { runner, onCue } = fixture([move('a', 0), move('b', 0), clip(0, 2000, true), cue(250)]);
+  runner.play();
+  const previous = runner.actors.get('a')!;
+  if (source === 'cue') onCue.mockImplementation(() => runner.seek(250));
+  else previous.puppet.onAnimationEvent(() => runner.seek(250));
+  runner.update(250);
+  assert.equal(runner.status, 'paused');
+  assert.isTrue(previous.isDisposed);
+  assert.equal(runner.actors.get('a')!.position.x, 25);
+  assert.equal(runner.actors.get('b')!.position.x, 175);
 });
 
 test('natural clip completion during seek holds pose and still settles lifecycle waits', async () => {
