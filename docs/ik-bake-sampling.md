@@ -25,6 +25,14 @@ All times use runtime **milliseconds**. The default density is the authored step
 
 The grid contains zero, each interior frame, and the exact duration once. Integer frame indices avoid accumulated interval drift; an off-frame endpoint is never snapped. Looping clips are sampled over one complete authored duration, including their exact endpoint rather than wrapping it to zero. `getIKBakeSampleTimes(duration, fps)` exposes the same grid independently. Invalid/nonpositive rates and durations are rejected; eager grids are limited to 100,000 samples. Source key times and playback metadata remain unchanged. Partial ranges are unavailable.
 
+Baking also preflights the full proposal and commit workload before allocating samples or keys. Admission limits are 25 million estimated bone/constraint work units, 100,000 generated rotation keys and 128 MiB estimated incremental bake memory. For sample count `S`, rig bones `B`, all rig constraints `C`, distinct selected driven bones `D` and selected constraints `K`, the estimates are:
+
+- Work: `10 × S × (B + C × (B + C))`, allowing for repeated sampling, fidelity passes, ancestor traversal and constraint lookup. Unselected and disabled constraints count because the sampler visits them.
+- Generated keys: `S × D`.
+- Incremental bytes: `1024 × S × D + S × (2048 + 512 × K) + 2048 × (B + C)`, allowing for retained poses/maps, key and fidelity copies, reports, worker reply cloning and transient rig poses. This is a conservative estimate rather than a measured heap limit; the existing authored document is outside this estimate.
+
+Oversized requests return an atomic failure with guidance to lower FPS or select fewer constraints. Engine generation and fidelity entry points recheck budgets independently. The editor checks before worker snapshot cloning, and worker planning checks again before constructing the rig. Each editor planning worker has a 30-second deadline covering sampling, generation and commit verification; expiry terminates computation and returns a timeout error. Success, cancellation and failures release the deadline and worker listeners. Results retain their existing complete, immutable snapshot format; streaming generation would require changes to the fidelity and commit APIs, so admission limits bound retained output here.
+
 ## Evaluation and transforms
 
 An isolated renderer-independent context owns fresh `Joint` instances and rig-defined `TwoBoneIKConstraint` instances. The bone pose buffer, IK channel evaluator, playback quantizer, affine math and existing two-bone solver remain authoritative. The inspector sampler now shares this context, retaining its last immutable sample cache. Ghost sampling continues to return authored poses before IK.

@@ -1,5 +1,6 @@
 import type { AnimationClip } from '../../engine/AnimationClip.js';
 import type { ValidationIssue } from '../../engine/externalData.js';
+import { preflightIKBakeSelection } from '../../engine/ik/IKBakeBudget.js';
 import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
 import { generateBakedBoneKeys, type IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
 import type { IKBakeMotionFidelity } from '../../engine/ik/IKBakeMotionFidelity.js';
@@ -48,6 +49,14 @@ export function bakeRigSnapshot(rig: Rig): RigDefinition {
 
 /** Entire expensive proposal/verification phase runs in the worker; never installs authored data. */
 export function planIKBake(request: IKBakePlanningRequest): IKBakePlanningResult {
+  try {
+    preflightIKBakeSelection(request.animation.duration, request.fps, request.rig, request.constraintIds);
+  } catch (error) {
+    return {
+      success: false,
+      issues: [{ severity: 'error', message: error instanceof Error ? error.message : String(error) }],
+    };
+  }
   const rig = new Rig(request.rig);
   const plan = generateBakedBoneKeys(
     sampleIKBake(request.animation, rig, request.constraintIds, { fps: request.fps }),

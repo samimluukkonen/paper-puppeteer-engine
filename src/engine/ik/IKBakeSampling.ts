@@ -6,6 +6,7 @@ import { type DeepReadonly, readonlyMap } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
 import type { JointTransform } from '../types.js';
 import { getValidatedAnimation } from '../validatedAnimation.js';
+import { getIKBakeSampleCount, preflightIKBake } from './IKBakeBudget.js';
 import { IsolatedIKSampler } from './IsolatedIKSampler.js';
 import type { TwoBoneIKConstraint } from './TwoBoneIKConstraint.js';
 import type { IKStatus, IKTarget } from './types.js';
@@ -61,20 +62,13 @@ export type IKBakeSampleResult =
     }
   | { readonly success: false; readonly samples: readonly []; readonly issues: readonly IKBakeIssue[] };
 
-// Bound an eager snapshot request before allocating arrays, including finite but impractical rates/durations.
-const MAX_BAKE_SAMPLES = 100_000;
-
 /** Entire-duration frame grid, in milliseconds. Integer frame indices avoid accumulated drift.
  * Invalid/impractical grids throw; sampleIKBake converts this into a structured failure.
  */
 export function getIKBakeSampleTimes(duration: number, fps: number): readonly number[] {
-  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(fps) || fps <= 0)
-    throw new Error('Bake duration and sampling FPS must be finite and greater than zero.');
-  const frameCount = (duration / 1000) * fps;
-  if (!Number.isFinite(frameCount) || Math.ceil(frameCount) + 1 > MAX_BAKE_SAMPLES)
-    throw new Error(`A bake may contain at most ${MAX_BAKE_SAMPLES} samples. Lower the sampling FPS.`);
+  const count = getIKBakeSampleCount(duration, fps);
   const times = [0];
-  for (let frame = 1; frame < Math.ceil(frameCount); ++frame) {
+  for (let frame = 1; frame < count - 1; ++frame) {
     const time = (frame / fps) * 1000;
     // Collapse only arithmetic roundoff against the exact endpoint, not an off-frame final interval.
     const tolerance = 4 * Number.EPSILON * Math.max(duration, time);
@@ -159,6 +153,18 @@ export function sampleIKBake(
   } catch (error) {
     return failure([{ code: 'invalid-animation', severity: 'error', message: messageFor(error) }]);
   }
+  const fps = options.fps ?? (validated.playback?.mode === 'stepped' ? validated.playback.fps : DEFAULT_ANIMATION_FPS);
+  try {
+    preflightIKBake(
+      getIKBakeSampleCount(validated.duration, fps),
+      rig.bones.length,
+      definitions.size,
+      boneIds.size,
+      constraintIds.length,
+    );
+  } catch (error) {
+    return failure([{ code: 'invalid-sampling', severity: 'error', message: messageFor(error) }]);
+  }
   for (const [id, definition] of definitions) {
     if (definition.enabled === false || validated.disabledIKConstraints?.includes(id)) continue;
     for (const selectedId of constraintIds) {
@@ -180,7 +186,6 @@ export function sampleIKBake(
   issues.push(...getIKBakeRuntimeIssues(rig, options.runtimeConstraints ?? []));
   if (issues.length) return failure(issues);
 
-  const fps = options.fps ?? (validated.playback?.mode === 'stepped' ? validated.playback.fps : DEFAULT_ANIMATION_FPS);
   let times: readonly number[];
   try {
     times = getIKBakeSampleTimes(validated.duration, fps);

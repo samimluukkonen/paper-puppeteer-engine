@@ -8,6 +8,7 @@ import { type DeepReadonly, freezeData } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
 import { createTransform, transformProperties } from '../types.js';
 import { getValidatedAnimation } from '../validatedAnimation.js';
+import { preflightIKBake } from './IKBakeBudget.js';
 import {
   getIKBakeSampleTimes,
   type IKBakeIssueCode,
@@ -135,6 +136,14 @@ export function compareIKBakeFidelity(
   const maximumErrors = { translation: 0, rotation: 0, scale: 0 };
   const issues: IKBakeGenerationIssue[] = [];
   try {
+    preflightIKBake(samples.length, rig.bones.length, rig.ik?.length ?? 0, 0, 0);
+    let drivenBoneCount = 0;
+    let selectedConstraintCount = 0;
+    for (const sample of samples) {
+      drivenBoneCount = Math.max(drivenBoneCount, sample.pose.size);
+      selectedConstraintCount = Math.max(selectedConstraintCount, sample.constraints.size);
+    }
+    preflightIKBake(samples.length, rig.bones.length, rig.ik?.length ?? 0, drivenBoneCount, selectedConstraintCount);
     tolerances = tolerancesFor(overrides);
     const clip = compileClip(animation, rig);
     if (!samples.length) throw new Error('Fidelity comparison needs at least one sample.');
@@ -211,6 +220,13 @@ export function generateBakedBoneKeys(
 ): IKBakePlan {
   if (!result.success) return freezeData({ success: false, issues: result.issues.map(copyIssue) });
   try {
+    preflightIKBake(
+      result.samples.length,
+      rig.bones.length,
+      rig.ik?.length ?? 0,
+      result.boneIds.length,
+      result.constraintIds.length,
+    );
     const source = getValidatedAnimation(options.animation, rig);
     tolerancesFor(options.tolerances ?? {});
     if (options.outputMode !== undefined && options.outputMode !== 'smooth' && options.outputMode !== 'stepped')

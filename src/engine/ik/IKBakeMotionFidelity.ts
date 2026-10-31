@@ -6,6 +6,7 @@ import type { ValidationIssue } from '../externalData.js';
 import { type DeepReadonly, freezeData } from '../readonlyData.js';
 import type { Rig } from '../Rig.js';
 import { transformProperties, type JointTransform } from '../types.js';
+import { preflightIKBakeSelection, preflightIKBake } from './IKBakeBudget.js';
 import { DEFAULT_IK_BAKE_TOLERANCES, type IKBakeTolerances } from './IKBakeGeneration.js';
 import { getIKBakeSampleTimes } from './IKBakeSampling.js';
 import { IsolatedIKSampler } from './IsolatedIKSampler.js';
@@ -75,6 +76,7 @@ export function compareIKBakeMotion(
   const tolerances = DEFAULT_IK_BAKE_MOTION_TOLERANCES;
   let withinBetweenKeyTolerance = true;
   try {
+    preflightIKBakeSelection(source.duration, fps, rig, constraintIds);
     const original = compileClip(source, rig);
     const candidate = compileClip(baked, rig);
     if (original.duration !== candidate.duration) throw new Error('Baking must preserve animation duration.');
@@ -93,6 +95,9 @@ export function compareIKBakeMotion(
       for (const id of [constraint.rootBone, constraint.middleBone])
         for (const key of getBoneTrack(baked, id)) if (key.rotation !== undefined) times.add(key.time);
     const keys = [...times].sort((a, b) => a - b);
+    // Caller-supplied clips may contain rotation times beyond the regular sample grid.
+    const drivenBoneIds = new Set(constraints.flatMap((entry) => [entry.rootBone, entry.middleBone]));
+    preflightIKBake(keys.length, rig.bones.length, rig.ik?.length ?? 0, drivenBoneIds.size, constraints.length);
     const phases = new Map<number, 'key' | 'between'>(keys.map((time) => [time, 'key']));
     for (let index = 1; index < keys.length; ++index) {
       const midpoint = keys[index - 1]! + (keys[index]! - keys[index - 1]!) / 2;
