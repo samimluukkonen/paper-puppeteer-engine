@@ -517,6 +517,111 @@ test('movement interruption is synchronous before later actions, even without a 
   assert.equal(onCue.mock.calls.length, 0);
 });
 
+test.each([8, 32])(
+  'ownership checking stays linear for %s concurrent Actors, including natural completions',
+  (count) => {
+    const data = scene();
+    data.actors = Array.from({ length: count }, (_, index) => ({ ...data.actors[0]!, id: `actor-${index}` }));
+    data.actions = data.actors.flatMap(({ id }) => [
+      move(id, 0, 500),
+      { ...clip(0, 2000), id: `${id}-clip`, actorId: id },
+    ]);
+    const runner = new SceneRunner(data, factory());
+    runners.push(runner);
+    runner.play();
+    const playbackReads = [...runner.actors.values()].map((actor) => vi.spyOn(actor.puppet, 'getPlaybackStatus'));
+    const movementReads = [...runner.actors.values()].map((actor) => vi.spyOn(actor, 'movementStatus', 'get'));
+    for (const delta of [250, 250, 250]) {
+      for (const spy of [...playbackReads, ...movementReads]) spy.mockClear();
+      runner.update(delta);
+      assert.equal(runner.status, 'playing');
+      assert.isAtMost(
+        playbackReads.reduce((sum, spy) => sum + spy.mock.calls.length, 0),
+        count,
+      );
+      assert.isAtMost(
+        movementReads.reduce((sum, spy) => sum + spy.mock.calls.length, 0),
+        count,
+      );
+    }
+    for (const actor of runner.actors.values()) {
+      assert.equal(actor.movementStatus?.status, 'completed');
+      assert.equal(actor.puppet.getPlaybackStatus()?.status, 'completed');
+    }
+  },
+);
+
+test.each(
+  (['a', 'b'] as const).flatMap((target) =>
+    (['cancel-move', 'replace-move', 'pause', 'stop', 'stop-queue', 'clear', 'replace', 'restart'] as const).map(
+      (operation) => ({ target, operation }),
+    ),
+  ),
+)('$operation from another Actor detects ownership loss immediately (target $target)', ({ target, operation }) => {
+  const { runner, onCue } = fixture([
+    move('a', 0, 2000),
+    move('b', 0, 2000),
+    clip(0, 2000, true),
+    { ...clip(0, 2000, true), id: 'b-clip', actorId: 'b' },
+    cue(1000),
+  ]);
+  runner.play();
+  runner.update(1); // Prime the revision before an external callback changes another Actor.
+  const actor = runner.actors.get(target)!;
+  const source = runner.actors.get(target === 'a' ? 'b' : 'a')!;
+  const targetUpdate = vi.spyOn(actor.puppet, 'update');
+  const player = actor.puppet.animationPlayer;
+  source.puppet.onUpdate(() => {
+    switch (operation) {
+      case 'cancel-move':
+        actor.cancelMovement();
+        break;
+      case 'replace-move':
+        void actor.moveTo(500, 0);
+        break;
+      case 'pause':
+        player.pause();
+        break;
+      case 'stop':
+        player.stop();
+        break;
+      case 'stop-queue':
+        player.stopQueue();
+        break;
+      case 'clear':
+        player.clearAllLayers();
+        break;
+      case 'replace':
+        actor.play('rest');
+        break;
+      case 'restart':
+        player.restart();
+        break;
+    }
+  });
+  runner.update(1500);
+  assert.equal(runner.status, 'interrupted');
+  assert.equal(onCue.mock.calls.length, 0);
+  assert.equal(targetUpdate.mock.calls.length, target === 'b' ? 0 : 1);
+  if (operation === 'replace-move') assert.equal(actor.movementStatus?.status, 'moving');
+  if (operation === 'replace' || operation === 'restart') assert.isTrue(actor.isPlaying);
+});
+
+test.each(['stop', 'stopQueue', 'clearAllLayers', 'restart'] as const)(
+  '%s of a held completed clip from another Actor interrupts before later cues',
+  (operation) => {
+    const { runner, onCue } = fixture([clip(0, 2000), cue(1000)]);
+    runner.play();
+    runner.update(600);
+    const player = runner.actors.get('a')!.puppet.animationPlayer;
+    assert.equal(player.getPlaybackStatus()?.status, 'completed');
+    runner.actors.get('b')!.puppet.onUpdate(() => player[operation]());
+    runner.update(1500);
+    assert.equal(runner.status, 'interrupted');
+    assert.equal(onCue.mock.calls.length, 0);
+  },
+);
+
 test('pausing inside a cue keeps simultaneous commands and all Actor clocks synchronized', () => {
   const { runner, onCue } = fixture([cue(500), clip(500, 1000), move('a', 500), move('b', 500)]);
   onCue.mockImplementation(() => runner.pause());

@@ -365,6 +365,25 @@ test('external movement interrupts the scene even during a root clip endpoint ho
   assert.equal((await movement).status, 'cancelled');
 });
 
+test('another Actor starting movement during a root endpoint hold interrupts before boundary cues', () => {
+  const { runner, actor, cue } = fixture(
+    scene([
+      clip('hold', 0, 'sword', { duration: 2000 }),
+      { id: 'later', actorId: 'a', type: 'cue', time: 1500, name: 'later' },
+    ]),
+  );
+  runner.play();
+  runner.update(1250);
+  runner.actors.get('b')!.puppet.onUpdate(() => {
+    void actor().moveTo(500, 50);
+  });
+  runner.update(500);
+  assert.equal(runner.status, 'interrupted');
+  assert.equal(cue.mock.calls.length, 0);
+  assert.deepEqual(actor().position, { x: 180, y: 50 });
+  assert.equal(actor().movementStatus?.status, 'moving');
+});
+
 test('root travel moves foot contacts through fixed or keyed cameras without changing artwork or world references', () => {
   const data = scene();
   data.camera = { x: 0, y: 0, zoom: 1 };

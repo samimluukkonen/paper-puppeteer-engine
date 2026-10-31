@@ -15,6 +15,7 @@ import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
 import { meshDeformationIssues } from './meshDeformation.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
+import { invalidateOwnership } from './ownershipRevision.js';
 import type {
   PlaybackLifecycleEvent,
   PlaybackLifecycleOptions,
@@ -380,6 +381,7 @@ export class AnimationPlayer {
         const lifecycle: PlaybackLifecycleEvent[] = [];
         this.finishPlayback(selected.state, selected.layer, 'stopped', lifecycle);
         layer.stopped = true;
+        invalidateOwnership();
         this.dispatchNotifications([], [], lifecycle);
       };
       const abort = (): void => {
@@ -531,6 +533,7 @@ export class AnimationPlayer {
         }
       : undefined;
     layer.stopped = false;
+    invalidateOwnership();
     select?.(layer.state, layerName);
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
@@ -582,6 +585,7 @@ export class AnimationPlayer {
     const lifecycle: PlaybackLifecycleEvent[] = [];
     if (layer?.state) this.finishPlayback(layer.state, 'base', 'stopped', lifecycle);
     if (layer) layer.stopped = true;
+    invalidateOwnership();
     this.dispatchNotifications([], [], lifecycle);
   }
 
@@ -678,6 +682,7 @@ export class AnimationPlayer {
       if (layer.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
       layer.stopped = true;
     }
+    invalidateOwnership();
     this.dispatchNotifications([], [], lifecycle);
   }
   /** Restart every selected layer together, preserving speeds, masks, weights, and pause state. */
@@ -719,6 +724,7 @@ export class AnimationPlayer {
       layer.transition = undefined;
       layer.stopped = false;
     }
+    invalidateOwnership();
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
       () => {
@@ -733,12 +739,14 @@ export class AnimationPlayer {
     this.assertActive();
     if (this.paused) return;
     this.paused = true;
+    invalidateOwnership();
     this.notifyPauseChange('paused');
   }
   resume(): void {
     this.assertActive();
     if (!this.paused) return;
     this.paused = false;
+    invalidateOwnership();
     this.notifyPauseChange('resumed');
   }
   setSpeed(speed: number): void {
@@ -795,6 +803,7 @@ export class AnimationPlayer {
     if (layer?.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
     if (layer) this.poseEvaluator.resetLayerProperties(layer);
     this.layers.delete(name);
+    invalidateOwnership();
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
       () => {
@@ -814,6 +823,7 @@ export class AnimationPlayer {
       if (layer.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
     }
     this.layers.clear();
+    invalidateOwnership();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
     this.poseEvaluator.ikEvaluator.clear();
     this.poseEvaluator.deformation = new Map();
@@ -1100,6 +1110,7 @@ export class AnimationPlayer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    invalidateOwnership();
     this.discardQueue();
     const lifecycle: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {

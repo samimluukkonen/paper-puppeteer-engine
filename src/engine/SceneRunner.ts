@@ -7,6 +7,7 @@ import {
   type CinematicCameraState,
 } from './cinematicCamera.js';
 import { throwNotificationErrors } from './notifications.js';
+import { getOwnershipRevision } from './ownershipRevision.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { SceneAudioController, type SceneAudioOptions } from './SceneAudioController.js';
 import {
@@ -83,6 +84,7 @@ export class SceneRunner {
   private readonly rootMotionActors = new Set<string>();
   private readonly ownedAnimations = new Map<string, number>();
   private readonly activeMoves = new Map<string, { actionId: string; requestId: number }>();
+  private checkedOwnershipRevision = -1;
   private generation = 0;
   private ownCommand = false;
   private started = false;
@@ -292,6 +294,7 @@ export class SceneRunner {
     }
   }
   private release(): void {
+    this.checkedOwnershipRevision = -1;
     const errors: unknown[] = [];
     try {
       this.audio?.stop();
@@ -459,6 +462,9 @@ export class SceneRunner {
     }
   }
   private checkOwnership(): void {
+    const revision = getOwnershipRevision();
+    if (revision === this.checkedOwnershipRevision) return;
+    this.checkedOwnershipRevision = revision;
     // Non-looping animations may finish before their authored window. Preserve the scene's
     // exclusive translation window even while the runtime holds that completed endpoint.
     for (const id of this.rootMotionActors) {
@@ -488,6 +494,8 @@ export class SceneRunner {
     }
   }
   private atBoundary(seeking: boolean): void {
+    // Authored actions can change the ownership being checked without a runtime command.
+    this.checkedOwnershipRevision = -1;
     this.ownCommand = true;
     const generation = this.generation;
     try {

@@ -1,6 +1,7 @@
 import { faceWorldDirection } from './ActorFacing.js';
 import type { Point } from './affineMath.js';
 import { AnimationStateController } from './AnimationStateController.js';
+import { invalidateOwnership } from './ownershipRevision.js';
 import type { Puppet } from './Puppet.js';
 import { assertFinite } from './types.js';
 
@@ -125,6 +126,7 @@ export class ActorMovement {
       };
       this.current = request;
       this.latest = Object.freeze({ requestId: request.requestId, status: 'moving' });
+      invalidateOwnership();
       request.unsubscribeUpdate = this.puppet.onUpdate((delta) => this.update(request, delta));
       if (options.signal) {
         const signal = options.signal;
@@ -166,6 +168,7 @@ export class ActorMovement {
           this.release(request);
           this.current = undefined;
           this.latest = Object.freeze({ requestId: request.requestId, status: 'cancelled' });
+          invalidateOwnership();
         }
         reject(error);
       }
@@ -200,6 +203,7 @@ export class ActorMovement {
       if (this.current === request) {
         this.current = undefined;
         this.latest = Object.freeze({ requestId: request.requestId, status: 'cancelled' });
+        invalidateOwnership();
         this.release(request);
         if (
           playbackId !== undefined &&
@@ -289,6 +293,7 @@ export class ActorMovement {
     if (!request) return;
     this.current = undefined;
     this.latest = Object.freeze({ requestId: request.requestId, status });
+    if (status !== 'completed') invalidateOwnership();
     const ownsPlayback = request.controller?.isActive;
     const result = Object.freeze({
       status,
