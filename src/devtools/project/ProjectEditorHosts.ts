@@ -56,6 +56,7 @@ export class ProjectEditorHosts {
   private readonly leases = new Set<RuntimeLease>();
   private readonly closers = new Map<string, () => void>();
   private readonly lifetime = new AbortController();
+  private readonly pendingOpenings = new Map<ProjectSession, Map<string, Promise<void>>>();
   private opening: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: ProjectEditorHostOptions) {}
@@ -199,9 +200,27 @@ export class ProjectEditorHosts {
     guideId?: string,
     animationRequest?: { name: string; copy: boolean },
   ): Promise<void> {
+    let pending = this.pendingOpenings.get(session);
+    if (!pending) {
+      pending = new Map();
+      this.pendingOpenings.set(session, pending);
+    }
+    const key = JSON.stringify([kind, id]);
+    const existing = pending.get(key);
     const opening = this.opening
       .catch(() => {})
-      .then(() => this.openHost(session, kind, id, view, guide, guideId, animationRequest));
+      .then(async () => {
+        // Share preparation failures, but preserve request ordering for activation and navigation.
+        await existing;
+        await this.openHost(session, kind, id, view, guide, guideId, animationRequest);
+      })
+      .finally(() => {
+        if (pending.get(key) === opening) {
+          pending.delete(key);
+          if (!pending.size) this.pendingOpenings.delete(session);
+        }
+      });
+    pending.set(key, opening);
     this.opening = opening;
     return opening;
   }

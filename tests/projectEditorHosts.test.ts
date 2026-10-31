@@ -44,7 +44,7 @@ async function session(): Promise<ProjectSession> {
   };
 }
 
-function fixture() {
+function fixture(changed?: (hosts: readonly ProjectEditorHost[]) => void) {
   let hosts: readonly ProjectEditorHost[] = [];
   const activate = vi.fn<(token: string | undefined) => void>();
   const controller = new ProjectEditorHosts({
@@ -52,6 +52,7 @@ function fixture() {
     activate,
     changed: (next) => {
       hosts = next;
+      changed?.(next);
     },
     validate: () => {},
   });
@@ -196,24 +197,144 @@ test('reusing a collected character ID replaces its cached renderer and document
 
 test('concurrent opens share one renderer and reactivate the retained host', async () => {
   const owner = await session();
-  const runtime = vi.spyOn(packages, 'openPackageRuntime').mockResolvedValue({
-    definition: owner.workspace.character('hero').definition,
-    dispose: vi.fn(),
+  let finish!: (value: Awaited<ReturnType<typeof packages.openPackageRuntime>>) => void;
+  const runtime = vi.spyOn(packages, 'openPackageRuntime').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const navigate = vi.fn();
+  const f = fixture((hosts) => {
+    hosts[0]?.context.bindCharacter(() => false, navigate);
   });
-  const f = fixture();
   try {
-    await Promise.all([f.controller.open(owner, 'character', 'hero'), f.controller.open(owner, 'character', 'hero')]);
+    const first = f.controller.open(owner, 'character', 'hero');
+    await vi.waitFor(() => expect(runtime).toHaveBeenCalledOnce());
+    const second = f.controller.open(owner, 'character', 'hero', 'animation', true, 'animation-guide', {
+      name: 'walk',
+      copy: true,
+    });
+    expect(f.hosts()).toHaveLength(0);
+    const dispose = vi.fn();
+    finish({ definition: owner.workspace.character('hero').definition, dispose });
+    await Promise.all([first, second]);
     expect(f.hosts()).toHaveLength(1);
     expect(runtime).toHaveBeenCalledOnce();
     const host = f.hosts()[0]!;
+    expect(navigate).toHaveBeenCalledExactlyOnceWith('animation');
+    const guide = vi.fn();
+    const select = vi.fn();
+    host.context.bindGuide(guide);
+    host.context.bindAnimationSelection!(select);
+    expect(guide).toHaveBeenCalledExactlyOnceWith('animation-guide');
+    expect(select).toHaveBeenCalledExactlyOnceWith('walk', true);
+    expect(owner.workspace.character('hero').capture).toBe(host.context.characterDocuments!.capture);
     const renderer = { activate: vi.fn(), suspend: vi.fn(), dispose: vi.fn() };
     host.context.bindRenderer(renderer);
     host.context.navigate('project');
     await f.controller.open(owner, 'character', 'hero');
     expect(renderer.activate).toHaveBeenCalledTimes(2);
     expect(renderer.suspend).toHaveBeenCalledOnce();
+    f.controller.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
   } finally {
     f.controller.dispose();
+    owner.workspace.disposeCharacterDocuments();
+    owner.autosave.dispose();
+  }
+});
+
+test('concurrent opening failures are shared and a later request can retry', async () => {
+  const owner = await session();
+  let fail!: (error: Error) => void;
+  const runtime = vi
+    .spyOn(packages, 'openPackageRuntime')
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        }),
+    )
+    .mockResolvedValue({ definition: owner.workspace.character('hero').definition, dispose: vi.fn() });
+  const f = fixture();
+  try {
+    const first = f.controller.open(owner, 'character', 'hero');
+    await vi.waitFor(() => expect(runtime).toHaveBeenCalledOnce());
+    const second = f.controller.open(owner, 'character', 'hero');
+    const error = new Error('Package preparation failed.');
+    const rejected = Promise.all([expect(first).rejects.toBe(error), expect(second).rejects.toBe(error)]);
+    fail(error);
+    await rejected;
+    expect(f.hosts()).toHaveLength(0);
+    expect(runtime).toHaveBeenCalledOnce();
+    await f.controller.open(owner, 'character', 'hero');
+    expect(f.hosts()).toHaveLength(1);
+    expect(runtime).toHaveBeenCalledTimes(2);
+  } finally {
+    f.controller.dispose();
+    owner.workspace.disposeCharacterDocuments();
+    owner.autosave.dispose();
+  }
+});
+
+test.each(['session', 'asset', 'kind'] as const)(
+  'openings with a different %s remain independent',
+  async (difference) => {
+    const owner = await session();
+    const other = difference === 'session' ? await session() : owner;
+    owner.workspace.createScene({ id: 'hero' });
+    if (difference === 'asset') owner.workspace.createScene({ id: 'other' });
+    if (other !== owner) other.workspace.createScene({ id: 'hero' });
+    vi.spyOn(packages, 'openPackageRuntime').mockResolvedValue({
+      definition: owner.workspace.character('hero').definition,
+      dispose: vi.fn(),
+    });
+    const f = fixture();
+    try {
+      const first = f.controller.open(owner, 'scene', 'hero');
+      const second = f.controller.open(
+        other,
+        difference === 'kind' ? 'character' : 'scene',
+        difference === 'asset' ? 'other' : 'hero',
+      );
+      expect(second).not.toBe(first);
+      await Promise.all([first, second]);
+      expect(f.hosts()).toHaveLength(2);
+      expect(f.hosts()[1]).toMatchObject({
+        session: other,
+        kind: difference === 'kind' ? 'character' : 'scene',
+        asset: difference === 'asset' ? 'other' : 'hero',
+      });
+    } finally {
+      f.controller.dispose();
+      for (const entry of new Set([owner, other])) {
+        entry.workspace.disposeCharacterDocuments();
+        entry.autosave.dispose();
+      }
+    }
+  },
+);
+
+test('interleaved duplicate requests preserve the latest requested host activation', async () => {
+  const owner = await session();
+  owner.workspace.createScene({ id: 'one' });
+  owner.workspace.createScene({ id: 'two' });
+  const f = fixture();
+  try {
+    await Promise.all([
+      f.controller.open(owner, 'scene', 'one'),
+      f.controller.open(owner, 'scene', 'two'),
+      f.controller.open(owner, 'scene', 'one'),
+    ]);
+    expect(f.hosts()).toHaveLength(2);
+    const latest = f.hosts().find((host) => host.asset === 'one')!;
+    expect(latest.active).toBe(true);
+    expect(f.activate).toHaveBeenLastCalledWith(latest.token);
+  } finally {
+    f.controller.dispose();
+    owner.workspace.disposeCharacterDocuments();
+    owner.autosave.dispose();
   }
 });
 
@@ -338,10 +459,13 @@ test('an opening that completes after teardown releases its lease without publis
   const opening = f.controller.open(owner, 'character', 'hero');
   const rejected = expect(opening).rejects.toMatchObject({ name: 'AbortError' });
   await vi.waitFor(() => assert.equal(runtime.mock.calls.length, 1));
+  const duplicate = f.controller.open(owner, 'character', 'hero');
+  const duplicateRejected = expect(duplicate).rejects.toMatchObject({ name: 'AbortError' });
   f.controller.dispose();
   const dispose = vi.fn();
   finish({ definition: owner.workspace.character('hero').definition, dispose });
   await rejected;
+  await duplicateRejected;
   assert.equal(dispose.mock.calls.length, 1);
   assert.equal(f.hosts().length, 0);
 });
