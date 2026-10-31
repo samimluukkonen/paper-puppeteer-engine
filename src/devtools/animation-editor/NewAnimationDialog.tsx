@@ -1,3 +1,4 @@
+import Plus from 'lucide-react/icons/plus';
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackCommands.js';
@@ -15,6 +16,7 @@ export function NewAnimationDialog({ controller }: { controller: NewAnimationCon
     <>
       <button
         id="animation-new"
+        aria-label="+ New Animation"
         data-guide-id={GUIDE_TARGETS.animationNew}
         type="button"
         className="workspace-primary"
@@ -30,7 +32,8 @@ export function NewAnimationDialog({ controller }: { controller: NewAnimationCon
           dialog.current?.showModal();
         }}
       >
-        + New Animation
+        <Plus size={16} aria-hidden="true" />
+        New Animation
       </button>
       <span id="animation-new-reason" className="editor-sr-only">
         {reason}

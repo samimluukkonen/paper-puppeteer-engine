@@ -1205,6 +1205,7 @@ a {
   font-size: 12px;
 }
 .animation-menu-content > button {
+  justify-content: flex-start;
   text-align: left;
   min-height: 32px;
 }

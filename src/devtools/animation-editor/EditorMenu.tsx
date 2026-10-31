@@ -1,15 +1,18 @@
+import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /** Native disclosure buttons retain Enter/Space and normal Tab navigation. */
 export function EditorMenu({
   id,
   label,
+  icon: Icon,
   children,
   compact = false,
   guideTargetId,
 }: {
   id: string;
   label: string;
+  icon?: LucideIcon;
   children: ReactNode;
   compact?: boolean;
   guideTargetId?: string;
@@ -23,7 +26,10 @@ export function EditorMenu({
             <span className="editor-sr-only">{label}</span>
           </>
         ) : (
-          label
+          <>
+            {Icon && <Icon size={16} aria-hidden="true" />}
+            {label}
+          </>
         )}
       </summary>
       <div

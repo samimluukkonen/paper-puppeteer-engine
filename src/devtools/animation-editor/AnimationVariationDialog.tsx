@@ -1,3 +1,4 @@
+import CopyPlus from 'lucide-react/icons/copy-plus';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { AnimationVariationController } from './AnimationVariationController.js';
@@ -33,6 +34,7 @@ export function AnimationVariationDialog({ controller }: { controller: Animation
           dialog.current?.showModal();
         }}
       >
+        <CopyPlus size={16} aria-hidden="true" />
         Create Variation
       </button>
       <dialog

@@ -262,6 +262,9 @@ test('animation inspector tabs wrap, retain drafts and skip inactive mode tabs',
   expect(await x.evaluate((element, initial) => element === initial, fieldHost)).toBe(true);
   await bones.focus();
   await bones.press('ArrowRight');
+  const deformation = tabs.getByRole('tab', { name: 'Mesh Deformation', exact: true });
+  await expect(deformation).toBeFocused();
+  await deformation.press('ArrowRight');
   await expect(selection).toBeFocused();
   await selection.press('End');
   await expect(tabs.getByRole('tab', { name: 'Artwork import & replacement', exact: true })).toBeFocused();

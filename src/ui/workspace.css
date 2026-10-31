@@ -247,14 +247,14 @@
   align-items: center;
   gap: 6px;
 }
-.workspace-command-bar :where(button:has(> svg)),
+:is(.workspace-command-bar, .animation-command-bar) :where(button:has(> svg)),
 .workspace-button-with-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
 }
-.workspace-command-bar :is(button, label) > svg,
+:is(.workspace-command-bar, .animation-command-bar) :is(button, label) > svg,
 .workspace-button-with-icon > svg,
 .workspace-heading-with-icon > svg {
   display: block;

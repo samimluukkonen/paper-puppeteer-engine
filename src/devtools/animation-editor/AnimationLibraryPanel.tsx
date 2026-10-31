@@ -1,3 +1,4 @@
+import Library from 'lucide-react/icons/library';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimationLibrary } from '../shared/AnimationLibrary.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -31,6 +32,7 @@ export function AnimationLibraryPanel({ controller }: { controller: AnimationLib
           dialog.current?.showModal();
         }}
       >
+        <Library size={16} aria-hidden="true" />
         Animation Library
       </button>
       <dialog ref={dialog} className="workspace-dialog animation-library-preview" aria-label="Animation Library">

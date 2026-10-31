@@ -1,3 +1,26 @@
+import Activity from 'lucide-react/icons/activity';
+import CircleHelp from 'lucide-react/icons/circle-help';
+import Diamond from 'lucide-react/icons/diamond';
+import Download from 'lucide-react/icons/download';
+import Eye from 'lucide-react/icons/eye';
+import FileJson from 'lucide-react/icons/file-json';
+import FlipHorizontal2 from 'lucide-react/icons/flip-horizontal-2';
+import Image from 'lucide-react/icons/image';
+import Layers from 'lucide-react/icons/layers';
+import LayoutTemplate from 'lucide-react/icons/layout-template';
+import Library from 'lucide-react/icons/library';
+import Link2 from 'lucide-react/icons/link-2';
+import Move from 'lucide-react/icons/move';
+import MoveHorizontal from 'lucide-react/icons/move-horizontal';
+import Network from 'lucide-react/icons/network';
+import PanelRight from 'lucide-react/icons/panel-right';
+import Ruler from 'lucide-react/icons/ruler';
+import SlidersHorizontal from 'lucide-react/icons/sliders-horizontal';
+import Target from 'lucide-react/icons/target';
+import Timer from 'lucide-react/icons/timer';
+import Triangle from 'lucide-react/icons/triangle';
+import WandSparkles from 'lucide-react/icons/wand-sparkles';
+import Wrench from 'lucide-react/icons/wrench';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
@@ -184,7 +207,10 @@ export function AnimationEditorView({
                       data-workspace-menu
                       inert={tweaking}
                     >
-                      <summary>Clip settings</summary>
+                      <summary>
+                        <SlidersHorizontal size={16} aria-hidden="true" />
+                        Clip settings
+                      </summary>
                       <div
                         className="animation-menu-content animation-clip-panel"
                         data-guide-id={GUIDE_TARGETS.animationSettings}
@@ -230,37 +256,44 @@ export function AnimationEditorView({
                       </div>
                     </details>
                     <div className="animation-authoring-tools" inert={tweaking}>
-                      <EditorMenu id="animation-authoring-tools" label="Tools">
+                      <EditorMenu id="animation-authoring-tools" label="Tools" icon={Wrench}>
                         {poseLibrary && (
                           <button
                             id="animation-pose-library-open"
                             type="button"
                             data-open-panel="animation-pose-library-panel"
                           >
+                            <Library size={16} aria-hidden="true" />
                             Pose Library…
                           </button>
                         )}
                         {motionDiagnostics && (
                           <button type="button" data-open-panel="animation-motion-panel">
+                            <Activity size={16} aria-hidden="true" />
                             Motion Diagnostics…
                           </button>
                         )}
                         <button id="animation-retime-open" type="button" data-open-panel="animation-retime-panel">
+                          <Timer size={16} aria-hidden="true" />
                           Retime selected keys…
                         </button>
                         <button id="animation-mirror-open" type="button" data-open-panel="animation-mirror-panel">
+                          <FlipHorizontal2 size={16} aria-hidden="true" />
                           Mirror tools…
                         </button>
                         <button id="animation-bake-open" type="button" data-open-panel="animation-bake-panel">
+                          <WandSparkles size={16} aria-hidden="true" />
                           Bake IK…
                         </button>
                       </EditorMenu>
                     </div>
-                    <EditorMenu id="animation-view-menu" label="View">
+                    <EditorMenu id="animation-view-menu" label="View" icon={Eye}>
                       <button id="animation-reset-layout" type="button">
+                        <LayoutTemplate size={16} aria-hidden="true" />
                         Reset layout
                       </button>
                       <button id="animation-help-open" type="button" aria-haspopup="dialog">
+                        <CircleHelp size={16} aria-hidden="true" />
                         Editor help…
                       </button>
                     </EditorMenu>
@@ -271,6 +304,7 @@ export function AnimationEditorView({
                       title="Open file tools for import and export (Ctrl/Cmd+S)"
                       inert={tweaking}
                     >
+                      <FileJson size={16} aria-hidden="true" />
                       File tools
                     </button>
                     <button
@@ -281,6 +315,7 @@ export function AnimationEditorView({
                       aria-controls="animation-inspector"
                       onClick={inspector.toggleOpen}
                     >
+                      <PanelRight size={16} aria-hidden="true" />
                       Inspector
                     </button>
                     <div className="animation-authoring-tools" inert={tweaking}>
@@ -297,6 +332,7 @@ export function AnimationEditorView({
                         type="button"
                         title="Download committed edits as JSON; move the file into your character folder"
                       >
+                        <Download size={16} aria-hidden="true" />
                         Download JSON
                       </button>
                     </div>
@@ -382,6 +418,7 @@ export function AnimationEditorView({
               {
                 id: 'animation-inspector-bones',
                 label: 'Bones',
+                icon: Network,
                 hidden: tweaking,
                 content: (
                   <div className="animation-bone-list" data-guide-id={GUIDE_TARGETS.animationBones}>
@@ -392,12 +429,14 @@ export function AnimationEditorView({
               {
                 id: 'animation-inspector-deformation',
                 label: 'Mesh Deformation',
+                icon: Triangle,
                 hidden: tweaking,
                 content: <MeshDeformationPanel />,
               },
               {
                 id: 'animation-inspector-selection',
                 label: 'Selection details',
+                icon: SlidersHorizontal,
                 hidden: tweaking,
                 content: (
                   <div className="animation-selection-details" data-guide-id={GUIDE_TARGETS.animationProperties}>
@@ -449,18 +488,21 @@ export function AnimationEditorView({
               {
                 id: 'animation-inspector-ik',
                 label: 'IK target',
+                icon: Target,
                 hidden: tweaking,
                 content: <IKInspectorPanel controller={ikInspector} />,
               },
               {
                 id: 'animation-inspector-root',
                 label: 'Root Motion',
+                icon: Move,
                 hidden: tweaking,
                 content: <RootMotionPanel />,
               },
               {
                 id: 'animation-inspector-key',
                 label: 'Key details',
+                icon: Diamond,
                 hidden: tweaking,
                 content: (
                   <div className="animation-key-details">
@@ -485,6 +527,7 @@ export function AnimationEditorView({
                     {
                       id: 'animation-inspector-displacement',
                       label: 'Preview displacement',
+                      icon: MoveHorizontal,
                       hidden: tweaking,
                       content: <MotionPreviewPanel controller={motionPreview} />,
                     },
@@ -495,6 +538,7 @@ export function AnimationEditorView({
                     {
                       id: 'animation-inspector-environment',
                       label: 'Environment Preview',
+                      icon: Eye,
                       hidden: tweaking,
                       content: (
                         <EnvironmentPreviewPanel
@@ -512,6 +556,7 @@ export function AnimationEditorView({
                     {
                       id: 'animation-inspector-ground',
                       label: 'Ground reference',
+                      icon: Ruler,
                       hidden: tweaking,
                       content: (
                         <AnimationGroundPanel
@@ -529,6 +574,7 @@ export function AnimationEditorView({
                     {
                       id: 'animation-inspector-rig-tweak',
                       label: 'Rig Tweak',
+                      icon: Wrench,
                       hidden: !tweaking,
                       content: <RigTweakPanel active={tweaking} />,
                     },
@@ -539,12 +585,14 @@ export function AnimationEditorView({
                     {
                       id: 'animation-inspector-rig-ik',
                       label: 'IK constraints',
+                      icon: Link2,
                       hidden: !tweaking,
                       content: <RigIKPanel controller={attachments} embedded />,
                     },
                     {
                       id: 'animation-inspector-attachments',
                       label: 'Attachments & skins',
+                      icon: Layers,
                       content: <AttachmentPanel controller={attachments} authoring={tweaking} embedded />,
                     },
                   ]
@@ -554,6 +602,7 @@ export function AnimationEditorView({
                     {
                       id: 'animation-inspector-artwork',
                       label: 'Artwork import & replacement',
+                      icon: Image,
                       hidden: tweaking,
                       content: <ArtworkPanel controller={artwork} embedded />,
                     },
