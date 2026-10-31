@@ -207,7 +207,7 @@
   color: var(--accent-fg);
 }
 @container (width < 380px) {
-  .editor-tabs [role="tab"] > svg {
+  .editor-tabs:not(.editor-tabs-wrap) [role="tab"] > svg {
     display: none;
   }
 }

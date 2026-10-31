@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Add matching Lucide icons to Rig Editor Edit-row buttons and every inspector tab, preserving visible labels and keyboard controls.
+
 - Update @types/node to 26.6.6, lucide-react to 1.66.0, oxfmt to 0.75.0 and oxlint to 1.90.0 with pinned versions and a synchronized lockfile. Refresh compatible Rolldown, PostCSS, Magic String and bundler type dependencies. Use Lucide's public per-icon exports to avoid processing unused icons, and record the upstream compatibility and feature review in `docs/dependency-review.md`.
 
 - Keep character documents and artwork history in the project, suspend inactive editor playback/rendering, and bound the renderer cache to two hosts with least-recently-used eviction. Release evicted Phaser games and runtime leases while preserving drafts, history and project exports.

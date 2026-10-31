@@ -1,3 +1,21 @@
+import CircleHelp from 'lucide-react/icons/circle-help';
+import Download from 'lucide-react/icons/download';
+import Eye from 'lucide-react/icons/eye';
+import FileJson from 'lucide-react/icons/file-json';
+import Footprints from 'lucide-react/icons/footprints';
+import Image from 'lucide-react/icons/image';
+import Info from 'lucide-react/icons/info';
+import Layers from 'lucide-react/icons/layers';
+import LayoutTemplate from 'lucide-react/icons/layout-template';
+import Link2 from 'lucide-react/icons/link-2';
+import Network from 'lucide-react/icons/network';
+import PanelRight from 'lucide-react/icons/panel-right';
+import Redo2 from 'lucide-react/icons/redo-2';
+import RotateCcw from 'lucide-react/icons/rotate-ccw';
+import Ruler from 'lucide-react/icons/ruler';
+import SlidersHorizontal from 'lucide-react/icons/sliders-horizontal';
+import Triangle from 'lucide-react/icons/triangle';
+import Undo2 from 'lucide-react/icons/undo-2';
 import type { ReactNode } from 'react';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
@@ -79,9 +97,11 @@ export function RigEditorView({
                     </label>
                     <span className="rig-history" data-guide-id={GUIDE_TARGETS.rigHistory}>
                       <button id="undo" type="button" aria-keyshortcuts="Control+Z Meta+Z">
+                        <Undo2 size={16} aria-hidden="true" />
                         Undo
                       </button>
                       <button id="redo" type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
+                        <Redo2 size={16} aria-hidden="true" />
                         Redo
                       </button>
                     </span>
@@ -95,6 +115,7 @@ export function RigEditorView({
                       aria-haspopup="dialog"
                       onClick={() => openWorkspaceDialog('rig-tools-dialog')}
                     >
+                      <FileJson size={16} aria-hidden="true" />
                       File tools
                     </button>
                     <button
@@ -103,9 +124,11 @@ export function RigEditorView({
                       aria-haspopup="dialog"
                       onClick={() => openWorkspaceDialog('rig-help-dialog')}
                     >
+                      <CircleHelp size={16} aria-hidden="true" />
                       Help
                     </button>
                     <button id="rig-reset-layout" type="button" onClick={inspector.reset}>
+                      <LayoutTemplate size={16} aria-hidden="true" />
                       Reset layout
                     </button>
                     <button
@@ -117,6 +140,7 @@ export function RigEditorView({
                       aria-controls="rig-inspector"
                       onClick={inspector.toggleOpen}
                     >
+                      <PanelRight size={16} aria-hidden="true" />
                       Inspector
                     </button>
                     <div className="workspace-save">
@@ -126,6 +150,7 @@ export function RigEditorView({
                         className="workspace-primary"
                         type="button"
                       >
+                        <Download size={16} aria-hidden="true" />
                         Download rig.json
                       </button>
                     </div>
@@ -202,6 +227,7 @@ export function RigEditorView({
               {
                 id: 'rig-inspector-hierarchy',
                 label: 'Hierarchy',
+                icon: Network,
                 content: (
                   <div className="workspace-hierarchy" data-guide-id={GUIDE_TARGETS.rigHierarchy}>
                     <div id="hierarchy" role="tree" />
@@ -212,6 +238,7 @@ export function RigEditorView({
               {
                 id: 'rig-inspector-selection',
                 label: 'Selection details',
+                icon: SlidersHorizontal,
                 content: (
                   <div className="rig-selection-details" data-guide-id={GUIDE_TARGETS.rigSelection}>
                     <section aria-label="Rig properties">
@@ -225,11 +252,13 @@ export function RigEditorView({
                     {
                       id: 'rig-inspector-ik',
                       label: 'IK constraints',
+                      icon: Link2,
                       content: <RigIKPanel controller={attachments} embedded />,
                     },
                     {
                       id: 'rig-inspector-contact-markers',
                       label: 'Foot contact markers',
+                      icon: Footprints,
                       content: <FootContactMarkersPanel controller={attachments} embedded />,
                     },
                   ]
@@ -239,6 +268,7 @@ export function RigEditorView({
                     {
                       id: 'rig-inspector-ground',
                       label: 'Ground reference',
+                      icon: Ruler,
                       content: (
                         <GroundGuideControls workspace={groundGuide} guideAnchors="rig" embedded>
                           <p className="workspace-caption">
@@ -255,11 +285,13 @@ export function RigEditorView({
                     {
                       id: 'rig-inspector-mesh',
                       label: 'Mesh geometry',
+                      icon: Triangle,
                       content: <MeshGeometryPanel controller={attachments} embedded />,
                     },
                     {
                       id: 'rig-inspector-attachments',
                       label: 'Attachments & skins',
+                      icon: Layers,
                       content: <AttachmentPanel controller={attachments} meshAuthoring embedded />,
                     },
                   ]
@@ -269,6 +301,7 @@ export function RigEditorView({
                     {
                       id: 'rig-inspector-artwork',
                       label: 'Artwork import & replacement',
+                      icon: Image,
                       content: <ArtworkPanel controller={artwork} embedded />,
                     },
                   ]
@@ -276,6 +309,7 @@ export function RigEditorView({
               {
                 id: 'rig-inspector-visibility',
                 label: 'Visibility',
+                icon: Eye,
                 content: (
                   <>
                     <div id="visibility" />
@@ -290,10 +324,11 @@ export function RigEditorView({
                   </>
                 ),
               },
-              { id: 'rig-inspector-session', label: 'Session', content: <div id="session-status" /> },
+              { id: 'rig-inspector-session', label: 'Session', icon: Info, content: <div id="session-status" /> },
               {
                 id: 'rig-inspector-reset',
                 label: 'Reset',
+                icon: RotateCcw,
                 content: (
                   <div className="action-grid">
                     <button id="reset-selected" type="button">

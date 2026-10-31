@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import ChevronDown from 'lucide-react/icons/chevron-down';
 import ChevronUp from 'lucide-react/icons/chevron-up';
 import FolderOpen from 'lucide-react/icons/folder-open';
@@ -9,7 +10,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 export interface EditorTab {
   id: string;
   label: string;
-  icon?: 'edit' | 'package' | 'draft' | 'project';
+  icon?: 'edit' | 'package' | 'draft' | 'project' | LucideIcon;
   content: ReactNode;
   /** Hide mode-specific tabs while retaining their controller hosts and drafts. */
   hidden?: boolean;
@@ -59,7 +60,7 @@ export function EditorTabs({
       <div className={`editor-tabs-heading${toolbar ? ' editor-tabs-heading-with-toolbar' : ''}`}>
         <div role="tablist" aria-label={label} aria-orientation="horizontal">
           {visibleTabs.map((tab, index) => {
-            const Icon = tab.icon ? icons[tab.icon] : undefined;
+            const Icon = typeof tab.icon === 'string' ? icons[tab.icon] : tab.icon;
             return (
               <button
                 key={tab.id}
