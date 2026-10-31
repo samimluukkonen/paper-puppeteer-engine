@@ -7,6 +7,7 @@ import { createBoneSymmetryMapping } from '../src/devtools/shared/boneSymmetry.j
 import { Actor } from '../src/engine/Actor.js';
 import { localToWorld, worldToLocal } from '../src/engine/affineMath.js';
 import { compileClip, type AnimationClip, type CompiledClip } from '../src/engine/AnimationClip.js';
+import { AnimationLayerEvaluator, type AnimationLayer } from '../src/engine/AnimationLayerEvaluator.js';
 import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
 import { serializeAnimationDefinition } from '../src/engine/authoredSerialization.js';
 import { sampleIKBake, generateBakedBoneKeys, commitIKBake } from '../src/engine/core.js';
@@ -15,7 +16,11 @@ import { Joint } from '../src/engine/Joint.js';
 import { createRectangleMeshAttachment, meshAttachmentToBindPose } from '../src/engine/meshAttachments.js';
 import { boneBindMatrix } from '../src/engine/meshBindPose.js';
 import {
+  emptyMeshDeformation,
+  emptyMeshVertexOffsets,
   evaluateMeshDeformation,
+  blendMeshDeformation,
+  MeshDeformationClipBuffer,
   sampleMeshDeformation,
   meshDeformationIssues,
   type MeshDeformationKey,
@@ -514,4 +519,219 @@ test('prototype-named mesh and vertex IDs never inherit phantom correction track
   });
   const compiled = compileClip(parseAnimationClip(JSON.parse(state.exportJson()), nextRig), nextRig);
   assert.deepEqual(evaluateMeshDeformation(compiled, 0).get('constructor')!.get('toString'), { x: 3, y: 5 });
+});
+
+test('neutral deformation results share immutable empties without losing explicit shape ownership', () => {
+  assert.strictEqual(evaluateMeshDeformation({}, 0), emptyMeshDeformation);
+  assert.strictEqual(evaluateMeshDeformation({ deformationTracks: {} }, 100), emptyMeshDeformation);
+  assert.strictEqual(sampleMeshDeformation([], 0), emptyMeshVertexOffsets);
+  assert.strictEqual(sampleMeshDeformation([{ time: 0, offsets: {} }], 0), emptyMeshVertexOffsets);
+  assert.strictEqual(blendMeshDeformation(new Map(), new Map(), 0.5), emptyMeshDeformation);
+  assert.isTrue(Object.isFrozen(emptyMeshDeformation));
+  assert.isFalse('set' in emptyMeshDeformation);
+  assert.isFalse('set' in emptyMeshVertexOffsets);
+  const owned = evaluateMeshDeformation({ deformationTracks: { mesh: [{ time: 0, offsets: {} }] } }, 0);
+  assert.isTrue(owned.has('mesh'));
+  assert.strictEqual(owned.get('mesh'), emptyMeshVertexOffsets);
+  assert.throws(() => evaluateMeshDeformation({}, NaN));
+});
+
+test('compiled sparse sampling reuses offsets, isolates players and clears vertices across seeks and clip switches', () => {
+  const { rig, clip } = fixture();
+  const animation = compileClip(
+    {
+      ...clip,
+      deformationTracks: {
+        mesh: [
+          { time: 0, offsets: { 'top-left': { x: 2, y: 4 } } },
+          { time: 500, offsets: { 'top-left': { x: 6, y: 8 } } },
+          { time: 750, offsets: { 'bottom-right': { x: 10, y: -2 } } },
+          { time: 1000, offsets: {} },
+        ],
+      },
+    },
+    rig,
+  );
+  const first = new MeshDeformationClipBuffer();
+  const second = new MeshDeformationClipBuffer();
+  const pose = first.evaluate(animation, 100);
+  const offsets = pose.get('mesh')!;
+  const vertex = offsets.get('top-left')!;
+  first.evaluate(animation, 200);
+  assert.strictEqual(first.evaluate(animation, 300), pose);
+  assert.strictEqual(pose.get('mesh'), offsets);
+  assert.strictEqual(offsets.get('top-left'), vertex);
+  assert.closeTo(vertex.x, 4.4, 1e-10);
+  second.evaluate(animation, 500);
+  assert.closeTo(vertex.x, 4.4, 1e-10);
+  for (const time of [800, 1000, 600, -100, 750, 300]) {
+    const actual = first.evaluate(animation, time).get('mesh')!;
+    const expected = sampleMeshDeformation(animation.deformationTracks!.mesh!, time);
+    assert.deepEqual([...actual], [...expected]);
+  }
+  assert.strictEqual(first.evaluate({}, 0), emptyMeshDeformation);
+  assert.deepEqual([...first.evaluate(animation, 200).get('mesh')!], [['top-left', { x: 3.6, y: 5.6 }]]);
+});
+
+test('playback reuses blended rendering data while public snapshots stay immutable through fades and resets', () => {
+  const { rig, clip } = fixture();
+  const neutral = { ...clip, name: 'neutral', deformationTracks: {} };
+  const runtime = player(rig, clip, neutral);
+  runtime.play(neutral.name);
+  runtime.setLayerWeight('overlay', 0.5);
+  runtime.play(clip.name, { layer: 'overlay', fadeDuration: 1000 });
+  runtime.update(100);
+  const live = runtime.getMeshDeformationForRendering();
+  const vertices = live.get('mesh')!;
+  const vertex = vertices.get('top-left')!;
+  const snapshot = runtime.meshDeformation;
+  assert.strictEqual(runtime.meshDeformation, snapshot);
+  const held = snapshot.get('mesh')!.get('top-left')!;
+  assert.isTrue(Object.isFrozen(held));
+  assert.isFalse('set' in snapshot);
+  assert.isFalse('set' in snapshot.get('mesh')!);
+  const expected = { ...held };
+  runtime.update(100);
+  assert.strictEqual(runtime.getMeshDeformationForRendering(), live);
+  assert.strictEqual(live.get('mesh'), vertices);
+  assert.strictEqual(vertices.get('top-left'), vertex);
+  assert.notEqual(vertex.x, held.x);
+  assert.deepEqual(held, expected);
+  const beforeInterrupt = vertex.x;
+  runtime.play(neutral.name, { layer: 'overlay', fadeDuration: 100 });
+  runtime.update(50);
+  assert.closeTo(runtime.meshDeformation.get('mesh')!.get('top-left')!.x, beforeInterrupt * 0.5, 1e-10);
+  assert.deepEqual(held, expected);
+  runtime.clearAllLayers();
+  assert.strictEqual(runtime.meshDeformation, emptyMeshDeformation);
+  assert.deepEqual(held, expected);
+  runtime.play(neutral.name);
+  for (let frame = 0; frame < 10; frame++) {
+    runtime.update(10);
+    assert.strictEqual(runtime.getMeshDeformationForRendering(), emptyMeshDeformation);
+    assert.strictEqual(runtime.meshDeformation, emptyMeshDeformation);
+  }
+  runtime.resetPose();
+  assert.strictEqual(runtime.meshDeformation, emptyMeshDeformation);
+  runtime.dispose();
+});
+
+test('mask eligibility compiles vertex influences once and refreshes for masks and attachment weight edits', () => {
+  const { rig, mesh, clip } = fixture();
+  const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+  const evaluator = new AnimationLayerEvaluator(rig, joints);
+  const layer: AnimationLayer = {
+    weight: 1,
+    stopped: false,
+    transition: undefined,
+    mask: new Set(['upper']),
+    state: {
+      playbackId: 1,
+      clip: compileClip({ ...clip, tracks: {} }, rig),
+      time: 250,
+      unwrappedTime: 250,
+      rootMotion: 'ignore',
+      speed: 1,
+      playing: true,
+    },
+  };
+  const maskReads = vi.spyOn(layer.mask!, 'has');
+  const layers = new Map([['overlay', layer]]);
+  const playback = { mode: 'smooth' } as const;
+  let reads = 0;
+  evaluator.updateMeshAttachments(
+    [
+      {
+        ...mesh,
+        get vertices() {
+          reads++;
+          return mesh.vertices;
+        },
+      },
+    ],
+    layers,
+    playback,
+  );
+  assert.equal(evaluator.deformation.size, 0);
+  const compiledReads = reads;
+  const eligibilityReads = maskReads.mock.calls.length;
+  for (let frame = 0; frame < 10; frame++) evaluator.applyCurrentPose(layers, playback);
+  assert.equal(reads, compiledReads);
+  assert.equal(maskReads.mock.calls.length, eligibilityReads);
+  maskReads.mockRestore();
+  layer.mask = new Set(['upper', 'lower']);
+  evaluator.applyCurrentPose(layers, playback);
+  assert.deepEqual(evaluator.deformation.get('mesh')!.get('top-left'), { x: 3, y: -2 });
+  layer.mask = new Set(['upper']);
+  evaluator.applyCurrentPose(layers, playback);
+  assert.equal(evaluator.deformation.size, 0);
+  evaluator.updateMeshAttachments(
+    [
+      {
+        ...mesh,
+        vertices: mesh.vertices.map((vertex) => ({
+          ...vertex,
+          influences: [
+            { boneId: 'upper', weight: 1 },
+            { boneId: 'lower', weight: 0 },
+          ],
+        })),
+      },
+    ],
+    layers,
+    playback,
+  );
+  assert.deepEqual(evaluator.deformation.get('mesh')!.get('top-left'), { x: 3, y: -2 });
+  evaluator.updateMeshAttachments([mesh], layers, playback);
+  assert.equal(evaluator.deformation.size, 0);
+  evaluator.updateMeshAttachments(
+    [
+      {
+        ...mesh,
+        vertices: mesh.vertices.map(({ influences: _influences, ...vertex }) => vertex),
+      },
+    ],
+    layers,
+    playback,
+  );
+  assert.deepEqual(evaluator.deformation.get('mesh')!.get('top-left'), { x: 3, y: -2 });
+  evaluator.dispose();
+});
+
+test('runtime and editor-source rendering consume live channels without creating public snapshots', () => {
+  const { rig, clip } = fixture();
+  const puppet = new Puppet(puppetScene(), { rig, animations: [clip], skin: 'default', autoUpdate: false });
+  const snapshotReads = vi.spyOn(puppet.animationPlayer, 'meshDeformation', 'get');
+  puppet.play(clip.name);
+  puppet.update(100);
+  puppet.update(100);
+  assert.equal(snapshotReads.mock.calls.length, 0);
+  const source = player(rig, clip);
+  const sourceReads = vi.spyOn(source, 'meshDeformation', 'get');
+  source.play(clip.name);
+  source.sample(500);
+  puppet.setMeshDeformationSource(source);
+  puppet.syncPose();
+  assert.equal(sourceReads.mock.calls.length, 0);
+  assert.deepEqual(puppet.meshDeformation.get('mesh')!.get('top-left'), { x: 6, y: -4 });
+  assert.equal(sourceReads.mock.calls.length, 1);
+  snapshotReads.mockRestore();
+  sourceReads.mockRestore();
+  puppet.setMeshDeformationSource(undefined);
+  source.dispose();
+  puppet.destroy();
+});
+
+test('public sampling sees edits to mutable and shallow frozen authored keys', () => {
+  const keys = [{ time: 0, offsets: { vertex: { x: 1, y: 2 } } }];
+  const first = sampleMeshDeformation(keys, 0);
+  Object.freeze(keys);
+  keys[0]!.offsets.vertex.x = 9;
+  assert.deepEqual(sampleMeshDeformation(keys, 0).get('vertex'), { x: 9, y: 2 });
+  assert.deepEqual(first.get('vertex'), { x: 1, y: 2 });
+  const clip = { deformationTracks: { mesh: keys } };
+  const pose = evaluateMeshDeformation(clip, 0);
+  keys[0]!.offsets.vertex.y = 7;
+  assert.deepEqual(evaluateMeshDeformation(clip, 0).get('mesh')!.get('vertex'), { x: 9, y: 7 });
+  assert.deepEqual(pose.get('mesh')!.get('vertex'), { x: 9, y: 2 });
 });

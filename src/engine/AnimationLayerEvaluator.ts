@@ -3,9 +3,14 @@ import { quantizePlaybackTime } from './animationMath.js';
 import { type AnimationPose, blendPose, blendPoseInto, ClipPoseBuffer } from './AnimationPose.js';
 import { AnimationIKEvaluator, type IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
-import { evaluateMeshDeformation, blendMeshDeformation, type MeshDeformationPose } from './meshDeformation.js';
+import {
+  emptyMeshDeformation,
+  MeshDeformationBlendBuffer,
+  MeshDeformationClipBuffer,
+  snapshotMeshDeformation,
+  type MeshDeformationPose,
+} from './meshDeformation.js';
 import type { PlaybackInstanceId, PlaybackOutcome } from './PlaybackLifecycle.js';
-import { readonlyMap } from './readonlyData.js';
 import type { Rig } from './Rig.js';
 import type { RootMotionPolicy } from './rootMotion.js';
 import { type AttachmentDefinition, type TransformProperty, transformProperties } from './types.js';
@@ -44,9 +49,31 @@ interface LayerBuffers {
   blended: AnimationPose;
 }
 
+interface DeformationLayerBuffers {
+  target: MeshDeformationClipBuffer;
+  source: MeshDeformationClipBuffer;
+  blended: MeshDeformationBlendBuffer;
+  applied: MeshDeformationBlendBuffer;
+}
+
 /** Owns pose buffers and sparse property ownership; the player retains clocks and notifications. */
 export class AnimationLayerEvaluator {
-  deformation: MeshDeformationPose = new Map();
+  private liveDeformation: MeshDeformationPose = emptyMeshDeformation;
+  private deformationSnapshot: MeshDeformationPose | undefined = emptyMeshDeformation;
+
+  get deformation(): MeshDeformationPose {
+    return (this.deformationSnapshot ??= snapshotMeshDeformation(this.liveDeformation));
+  }
+
+  set deformation(pose: MeshDeformationPose) {
+    this.liveDeformation = pose;
+    this.deformationSnapshot = undefined;
+  }
+
+  /** @internal Consumed synchronously by the renderer; never retained as a snapshot. */
+  get currentDeformation(): MeshDeformationPose {
+    return this.liveDeformation;
+  }
   private readonly workingPose: AnimationPose = new Map();
   private readonly emptyPose: AnimationPose = new Map();
   private readonly controlled = new Map<string, Set<TransformProperty>>();
@@ -55,13 +82,16 @@ export class AnimationLayerEvaluator {
   readonly ikEvaluator: AnimationIKEvaluator;
   private ikPlayback: AnimationPlaybackMode = { mode: 'smooth' };
   private sampleBuffer: ClipPoseBuffer | undefined;
-  private meshAttachments: readonly AttachmentDefinition[];
+  private readonly deformationLayers = new WeakMap<AnimationLayer, DeformationLayerBuffers>();
+  private deformationSample: MeshDeformationClipBuffer | undefined;
+  private readonly meshMaskBones = new Map<string, ReadonlySet<string>>();
+  private maskEligibility = new WeakMap<ReadonlySet<string>, ReadonlySet<string>>();
 
   constructor(
     private readonly rig: Rig,
     private joints: ReadonlyMap<string, Joint>,
   ) {
-    this.meshAttachments = rig.attachments;
+    this.compileMeshMasks(rig.attachments);
     this.ikEvaluator = new AnimationIKEvaluator(
       rig,
       (clip, time) => this.sampleTime(clip, time, this.ikPlayback),
@@ -91,7 +121,8 @@ export class AnimationLayerEvaluator {
       state.clip,
       usePlayback ? this.sampleTime(state.clip, clampedTime, playback) : clampedTime,
     );
-    this.deformation = evaluateMeshDeformation(
+    this.deformationSample ??= new MeshDeformationClipBuffer();
+    this.deformation = this.deformationSample.evaluate(
       state.clip,
       usePlayback ? this.sampleTime(state.clip, clampedTime, playback) : clampedTime,
     );
@@ -137,14 +168,64 @@ export class AnimationLayerEvaluator {
     layers: ReadonlyMap<string, AnimationLayer>,
     playback: AnimationPlaybackMode,
   ): void {
-    this.meshAttachments = attachments;
+    this.compileMeshMasks(attachments);
     this.refreshMeshDeformation(layers, playback);
   }
 
+  private compileMeshMasks(attachments: readonly AttachmentDefinition[]): void {
+    this.meshMaskBones.clear();
+    this.maskEligibility = new WeakMap();
+    for (const mesh of attachments) {
+      if (mesh.type !== 'mesh') continue;
+      const bones = new Set<string>();
+      for (const vertex of mesh.vertices) {
+        if (vertex.influences) {
+          for (const influence of vertex.influences) if (influence.weight !== 0) bones.add(influence.boneId);
+        } else {
+          for (const slot of mesh.bindPose.slots) bones.add(slot.bone);
+        }
+      }
+      this.meshMaskBones.set(mesh.id, bones);
+    }
+  }
+
+  private eligibleMeshes(mask: ReadonlySet<string>): ReadonlySet<string> {
+    let eligible = this.maskEligibility.get(mask);
+    if (!eligible) {
+      const ids = new Set<string>();
+      for (const [id, bones] of this.meshMaskBones) {
+        let allowed = true;
+        for (const bone of bones)
+          if (!mask.has(bone)) {
+            allowed = false;
+            break;
+          }
+        if (allowed) ids.add(id);
+      }
+      eligible = ids;
+      this.maskEligibility.set(mask, eligible);
+    }
+    return eligible;
+  }
+
+  private deformationBuffers(layer: AnimationLayer): DeformationLayerBuffers {
+    let buffers = this.deformationLayers.get(layer);
+    if (!buffers) {
+      buffers = {
+        target: new MeshDeformationClipBuffer(),
+        source: new MeshDeformationClipBuffer(),
+        blended: new MeshDeformationBlendBuffer(),
+        applied: new MeshDeformationBlendBuffer(),
+      };
+      this.deformationLayers.set(layer, buffers);
+    }
+    return buffers;
+  }
+
   private refreshMeshDeformation(layers: ReadonlyMap<string, AnimationLayer>, playback: AnimationPlaybackMode): void {
-    let deformation: MeshDeformationPose = new Map();
+    let deformation = emptyMeshDeformation;
     for (const layer of layers.values()) deformation = this.applyDeformationLayer(deformation, layer, playback);
-    this.deformation = readonlyMap(deformation);
+    this.deformation = deformation;
   }
 
   private applyDeformationLayer(
@@ -153,25 +234,15 @@ export class AnimationLayerEvaluator {
     playback: AnimationPlaybackMode,
   ): MeshDeformationPose {
     if (!layer.state || layer.weight === 0) return underlying;
-    let value = this.evaluateDeformationLayer(layer, playback, underlying);
-    // All weighted bones must be in the mask; unweighted legacy meshes require all bind slot bones.
-    if (layer.mask)
-      value = new Map(
-        [...value].filter(([id]) => {
-          const mesh = this.meshAttachments.find((entry) => entry.id === id);
-          return (
-            mesh?.type === 'mesh' &&
-            mesh.vertices.every((vertex) =>
-              vertex.influences
-                ? vertex.influences.every((entry) => entry.weight === 0 || layer.mask!.has(entry.boneId))
-                : mesh.bindPose.slots.every((slot) => layer.mask!.has(slot.bone)),
-            )
-          );
-        }),
-      );
-    const target = new Map(underlying);
-    for (const [id, offsets] of value) target.set(id, offsets);
-    return blendMeshDeformation(underlying, target, layer.weight);
+    const value = this.sampleDeformationLayer(layer, playback, underlying);
+    if (!value.size) return underlying;
+    if (!underlying.size && layer.weight === 1 && !layer.mask) return value;
+    return this.deformationBuffers(layer).applied.apply(
+      underlying,
+      value,
+      layer.weight,
+      layer.mask ? this.eligibleMeshes(layer.mask) : undefined,
+    );
   }
 
   underlyingDeformation(
@@ -179,39 +250,44 @@ export class AnimationLayerEvaluator {
     layers: ReadonlyMap<string, AnimationLayer>,
     playback: AnimationPlaybackMode,
   ): MeshDeformationPose {
-    let result: MeshDeformationPose = new Map();
+    let result = emptyMeshDeformation;
     for (const [name, layer] of layers) {
       if (name === layerName) break;
       result = this.applyDeformationLayer(result, layer, playback);
     }
-    return result;
+    return snapshotMeshDeformation(result);
   }
 
+  /** Interrupted transitions must retain a detached immutable source. */
   evaluateDeformationLayer(
     layer: AnimationLayer,
     playback: AnimationPlaybackMode,
-    underlying: MeshDeformationPose = new Map(),
+    underlying: MeshDeformationPose = emptyMeshDeformation,
+  ): MeshDeformationPose {
+    return snapshotMeshDeformation(this.sampleDeformationLayer(layer, playback, underlying));
+  }
+
+  private sampleDeformationLayer(
+    layer: AnimationLayer,
+    playback: AnimationPlaybackMode,
+    underlying: MeshDeformationPose,
   ): MeshDeformationPose {
     const state = layer.state!;
-    const target = evaluateMeshDeformation(state.clip, this.sampleTime(state.clip, state.time, playback));
+    const buffers = this.deformationBuffers(layer);
+    const target = buffers.target.evaluate(state.clip, this.sampleTime(state.clip, state.time, playback));
     const transition = layer.transition;
     if (!transition) return target;
-    const source: MeshDeformationPose =
+    const source =
       transition.deformationSource ??
       (transition.source instanceof Map
-        ? new Map()
-        : evaluateMeshDeformation(
+        ? emptyMeshDeformation
+        : buffers.source.evaluate(
             transition.source.clip,
             this.sampleTime(transition.source.clip, transition.source.time, playback),
           ));
-    const from = new Map(source),
-      to = new Map(target);
+    if (!source.size && !target.size) return emptyMeshDeformation;
     // Missing shape ownership fades against the lower layer, like sparse bone properties.
-    for (const id of new Set([...source.keys(), ...target.keys()])) {
-      if (!from.has(id)) from.set(id, underlying.get(id) ?? new Map());
-      if (!to.has(id)) to.set(id, underlying.get(id) ?? new Map());
-    }
-    return blendMeshDeformation(from, to, this.transitionWeight(state, transition, playback));
+    return buffers.blended.blend(source, target, this.transitionWeight(state, transition, playback), underlying);
   }
 
   private updateControlledProperties(layers: ReadonlyMap<string, AnimationLayer>): void {
@@ -333,7 +409,10 @@ export class AnimationLayerEvaluator {
 
   dispose(): void {
     this.ikEvaluator.clear();
-    this.deformation = new Map();
+    this.deformation = emptyMeshDeformation;
+    this.deformationSample = undefined;
+    this.meshMaskBones.clear();
+    this.maskEligibility = new WeakMap();
     this.sampleBuffer = undefined;
     this.workingPose.clear();
     this.emptyPose.clear();

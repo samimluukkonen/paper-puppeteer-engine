@@ -13,7 +13,7 @@ import {
 } from './animationTimeline.js';
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
-import { meshDeformationIssues } from './meshDeformation.js';
+import { emptyMeshDeformation, meshDeformationIssues } from './meshDeformation.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
 import { invalidateOwnership } from './ownershipRevision.js';
 import type {
@@ -164,6 +164,11 @@ export class AnimationPlayer {
   /** Immutable puppet-local target channels, including layer/fade ownership weights. */
   get meshDeformation() {
     return this.poseEvaluator.deformation;
+  }
+
+  /** @internal Live channels for synchronous rendering; public reads remain immutable snapshots. */
+  getMeshDeformationForRendering() {
+    return this.poseEvaluator.currentDeformation;
   }
 
   /** @internal Keep catalog edits compatible with every registered shape track and current layer mask. */
@@ -826,7 +831,7 @@ export class AnimationPlayer {
     invalidateOwnership();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
     this.poseEvaluator.ikEvaluator.clear();
-    this.poseEvaluator.deformation = new Map();
+    this.poseEvaluator.deformation = emptyMeshDeformation;
     this.poseEvaluator.invalidate();
     this.dispatchNotifications([], [], lifecycle);
   }
@@ -847,7 +852,7 @@ export class AnimationPlayer {
     this.assertActive();
     for (const joint of this.joints.values()) joint.reset();
     this.poseEvaluator.ikEvaluator.clear();
-    this.poseEvaluator.deformation = new Map();
+    this.poseEvaluator.deformation = emptyMeshDeformation;
   }
 
   /** Advance playback and return whether this call evaluated the authored pose.

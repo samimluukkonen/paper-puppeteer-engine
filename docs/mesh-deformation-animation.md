@@ -22,6 +22,8 @@ An absent vertex in a shape means zero correction. Neighboring shapes interpolat
 
 `sampleMeshDeformation` samples a single shape timeline; `evaluateMeshDeformation` returns an immutable attachment/vertex map. These APIs, schema validators and types are exported through `/core`; authored types are also available through `/data`. Compilation owns immutable correction data, including externally supplied compiled clips. JSON schemas include the optional tracks, and correction keys count toward the existing animation workload limit.
 
+Runtime playback compiles sparse neighboring shapes into vertex indices and reuses private sampling and layer-blending buffers. Bone masks compile mesh eligibility once per mask and rebuild it after attachment weight edits. The renderer consumes live channels synchronously; public `meshDeformation` reads create a detached immutable snapshot, cached until the next evaluation. Interrupted fades also retain detached snapshots. Clips without correction ownership share an immutable empty result.
+
 ## Evaluation and coordinates
 
 1. Read immutable attachment-local bind vertices.
@@ -73,6 +75,8 @@ Onion meshes evaluate each neighbor's correction shape and authored FK pose. Gho
 - Verification/release: `tests/meshDeformation.test.ts`, `tests/browser/animationMeshDeformation.spec.ts`, the generated animation schema, package/lockfile metadata, `CHANGELOG.md` and the development/schema guides cover the milestone.
 
 ## Verification
+
+A local comparison against the previous evaluator used 144 weighted vertices, a base layer and a masked overlay at weight 0.5 with an active fade. Across 100 changing frames after warmup, Map constructions fell from 2,000 to zero, Set constructions from 800 to zero, and `Object.freeze` calls from 73,100 to zero. The same two-layer setup without correction tracks fell from 1,200 Maps, 300 Sets and 600 freezes to zero. Both paths produced matching values. Five 500-frame batches gave median evaluator times of 0.619 ms before and 0.094 ms after for the shape workload, and 0.033 ms before and 0.013 ms after for neutral clips. These are local CPU diagnostics; public snapshots are allocated on demand.
 
 `tests/meshDeformation.test.ts` covers neutral/sparse/multiple-vertex sampling, supported curves, inverse-bind order, reflected/nonuniform transforms, FK/IK, root-motion separation, runtime/editor parity, deterministic direct seeking, stepped endpoints, fades, layers, invalid data, topology changes, history, provisional edits, copying and serialization. `tests/browser/animationMeshDeformation.spec.ts` exercises an animated weighted sleeve, square-handle editing/cancellation, neutral endpoints, interpolation, timeline commands, Undo/Redo and portable reload on desktop.
 

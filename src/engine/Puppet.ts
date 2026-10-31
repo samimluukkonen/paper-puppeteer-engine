@@ -164,13 +164,10 @@ export class Puppet {
       parent.add(bone.container);
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
-    this.renderer = new PuppetRenderer(
-      scene,
-      this.container,
-      this.rig,
-      this.bones,
-      () => (this.meshDeformationSource ?? this.animationPlayer).meshDeformation,
-    );
+    this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones, () => {
+      const source = this.meshDeformationSource ?? this.animationPlayer;
+      return source instanceof AnimationPlayer ? source.getMeshDeformationForRendering() : source.meshDeformation;
+    });
     this.attachments = new PuppetAttachments(
       scene,
       (id) => this.getBone(id).container,

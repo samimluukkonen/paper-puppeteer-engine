@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Compile sparse mesh deformation vertex indices and layer mask eligibility, reuse private sampling/blending buffers, and share immutable empty results. Render directly from live buffers while preserving detached public snapshots and interrupted fades.
+
 - Compute and validate the owning inverse transform once per weighted mesh update, applying it directly to the reusable vertex buffer without per-vertex inverse calculations or point allocations.
 
 - Virtualize Animation Editor timeline rows and property-key time ranges before creating elements, releasing offscreen markers and listeners. Keep selection, marquee bounds and navigation in the data model, and scroll to selections before revealing their virtualized controls.
