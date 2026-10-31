@@ -18,12 +18,17 @@ Standalone character drafts serialize directly into the portable project recover
 
 Standalone scene recovery merges equivalent character packages even when their manifest references differ. Distinct packages sharing a character ID receive unique `-recovery-N` IDs in the detached recovery project, with Actor references remapped to their own package. Original scene snapshots and character definitions retain their authored identities.
 
-Database: `paper-puppeteer-recovery`, database version **1**.
+Database: `paper-puppeteer-recovery`, database version **2**.
 
-- `drafts`: records keyed by a revision UUID, with a document `key` index. Each envelope has `version: 1`, `id`, `key`, `name`, an actual `savedAt` timestamp in epoch milliseconds, the authored `revision` fingerprint, and `files: [{ path, blob, digest }]`. JSON documents are canonical UTF-8 package files; image files contain actual binary data. Each digest is SHA-256.
+- `revisions`: lightweight records keyed by revision UUID, with a document `key` index. New records have `version: 2`, `id`, `key`, `name`, `savedAt`, the authored `revision` fingerprint, and `files: [{ path, digest }]`.
+- `binaries`: immutable Blobs keyed by their SHA-256 digest, shared across paths, revisions and projects. JSON documents are canonical UTF-8 package files; image/audio files contain actual binary data.
+- `references`: one `{ id, digests }` record per new revision, with a multi-entry `digest` index. Each digest occurs once per revision, even if several paths share it. Indexed counts retain a binary until its last revision reference disappears.
+- `drafts`: original version-one envelopes retained during upgrade. The upgrade copies their lightweight metadata into `revisions` without copying or rehashing Blobs. Compatible envelopes are removed as newer saves supersede them; corrupt/incompatible envelopes remain available for explicit recovery/discard.
 - `leases`: `{ key, owner, expires }` records for exclusive autosave writers.
 
-A read/write transaction checks/renews the lease, inserts the complete envelope and every Blob, and removes superseded revisions together. Interrupted or quota-failed transactions leave previous revisions intact. Validation, hashing and other asynchronous package work happen before that transaction. Existing package/path/JSON/image budgets remain in force.
+Save queries only the current document's metadata through its key index; the project limit uses a key-only cursor over distinct project keys. Listing reads metadata only, and Discard selects revision IDs through the key index. Content-addressed binary existence checks use keys without reading stored Blobs. Reused package byte arrays retain weakly cached digests and owned snapshots; byte comparisons detect mutable callers, while snapshots isolate changes during hashing. Blobs are created and inserted only for missing digests.
+
+A read/write transaction checks/renews the lease, inserts revision metadata, references and any new binaries, then prunes superseded revisions and binaries with zero references together. Interrupted or quota-failed transactions leave previous revisions and their references intact. Validation and hashing happen before that transaction; recovery still verifies every resource digest. Existing package/path/JSON/image budgets remain in force.
 
 Keep **two complete revisions per local draft**, across at most **ten local draft keys**. New draft keys beyond that limit fail with a cleanup instruction; they do not evict someone else's newest draft. Incompatible envelopes are preserved rather than automatically pruned. The recovery dialog lists individual revisions, allowing selection of the preceding revision when the newest cannot be restored. Export never deletes recovery data.
 

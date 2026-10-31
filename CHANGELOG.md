@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Separate local draft revision metadata from shared content-addressed binaries, reuse unchanged resource hashes, query projects through indexes and reclaim binaries after their final revision reference. Upgrade existing recovery drafts without copying their assets, preserving atomic retention and recovery.
+
 - Preflight decoded audio memory from WAV sample counts, MP3 frames and Ogg Vorbis/Opus granules, including Web Audio resampling and the remaining cache budget. Serialize decodes, retain occupied slots after timeouts, skip cancelled queue entries and keep post-decode budget checks.
 
 - Validate scenes against current immutable character catalogs once per manifest, avoiding full rig, skin, animation and pose clones for every Actor.

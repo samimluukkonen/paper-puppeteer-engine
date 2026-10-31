@@ -7,16 +7,22 @@ export const DRAFT_DATABASE = 'paper-puppeteer-recovery';
 export const DRAFT_RETENTION = 2;
 export const DRAFT_PROJECT_LIMIT = 10;
 const LEASE_MS = 15_000;
-const envelope = z.object({
+const savedAt = z.number().min(0).max(8_640_000_000_000_000);
+const legacyEnvelope = z.object({
   version: z.literal(1),
   id: z.string(),
   key: z.string(),
   name: z.string(),
-  savedAt: z.number().min(0).max(8_640_000_000_000_000),
+  savedAt,
   revision: z.string(),
   files: z.array(z.object({ path: z.string(), blob: z.instanceof(Blob), digest: z.string() })),
 });
-export type DraftRecord = z.infer<typeof envelope>;
+const revisionEnvelope = legacyEnvelope.extend({
+  version: z.literal(2),
+  files: z.array(z.object({ path: z.string(), digest: z.string() })),
+});
+export type DraftRecord = z.infer<typeof revisionEnvelope>;
+const legacyInfo = z.object({ legacy: z.literal(true), compatible: z.boolean() });
 export interface DraftInfo {
   id: string;
   key: string;
@@ -48,6 +54,36 @@ async function digest(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
     b.toString(16).padStart(2, '0'),
   ).join('');
 }
+function sameBytes(first: Uint8Array, second: Uint8Array): boolean {
+  if (first.length !== second.length) return false;
+  for (let i = 0; i < first.length; i++) if (first[i] !== second[i]) return false;
+  return true;
+}
+function info(value: unknown): DraftInfo {
+  const parsed = z
+    .object({
+      id: z.string(),
+      key: z.string().catch(''),
+      name: z.string().catch('Unreadable local draft'),
+      savedAt: savedAt.catch(0),
+    })
+    .parse(value);
+  return { ...parsed, key: parsed.key || `corrupt:${parsed.id}` };
+}
+
+/** Count distinct project keys without reading any revision values. */
+function projectCount(index: IDBIndex): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let count = 0;
+    const cursor = index.openKeyCursor(null, 'nextunique');
+    cursor.onerror = () => reject(cursor.error);
+    cursor.onsuccess = () => {
+      if (!cursor.result) return resolve(count);
+      count++;
+      cursor.result.continue();
+    };
+  });
+}
 export function storageError(error: unknown, operation = 'Autosave'): string {
   const message = error instanceof Error ? error.message : String(error);
   if (error instanceof DOMException && error.name === 'QuotaExceededError')
@@ -55,10 +91,31 @@ export function storageError(error: unknown, operation = 'Autosave'): string {
   return `${operation} failed: ${message} Export your work to keep a disk copy, then retry ${operation === 'Autosave' ? 'local saving' : 'recovery'}.`;
 }
 
-/** Complete packages and their Blob bytes share one transaction. Failed writes retain both previous revisions. */
+/** Revision metadata, shared binaries and their references commit/prune atomically. */
 export class LocalDraftStore implements DraftStorage {
   private database: Promise<IDBDatabase> | undefined;
   private readonly listeners = new Set<() => void>();
+  private readonly resources = new WeakMap<
+    Uint8Array<ArrayBuffer>,
+    {
+      bytes: Uint8Array<ArrayBuffer>;
+      digest: Promise<string>;
+    }
+  >();
+
+  private resource(bytes: Uint8Array<ArrayBuffer>) {
+    const previous = this.resources.get(bytes);
+    // Package serializers reuse bytes, but public callers may mutate them. Verify
+    // against an owned snapshot before reusing its hash; capture before any I/O.
+    if (previous && sameBytes(bytes, previous.bytes)) return previous;
+    const snapshot = bytes.slice();
+    const resource = { bytes: snapshot, digest: digest(snapshot) };
+    this.resources.set(bytes, resource);
+    void resource.digest.catch(() => {
+      if (this.resources.get(bytes) === resource) this.resources.delete(bytes);
+    });
+    return resource;
+  }
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -111,10 +168,30 @@ export class LocalDraftStore implements DraftStorage {
     this.database ??= new Promise<IDBDatabase>((resolve, reject) => {
       const factory = this.factory ?? globalThis.indexedDB;
       if (!factory) return reject(new Error('Browser storage is unavailable.'));
-      const opening = factory.open(DRAFT_DATABASE, 1);
+      const opening = factory.open(DRAFT_DATABASE, 2);
       opening.onupgradeneeded = () => {
-        opening.result.createObjectStore('drafts', { keyPath: 'id' }).createIndex('key', 'key');
-        opening.result.createObjectStore('leases', { keyPath: 'key' });
+        const db = opening.result;
+        if (!db.objectStoreNames.contains('drafts')) {
+          db.createObjectStore('drafts', { keyPath: 'id' }).createIndex('key', 'key');
+          db.createObjectStore('leases', { keyPath: 'key' });
+        }
+        const revisions = db.createObjectStore('revisions', { keyPath: 'id' });
+        revisions.createIndex('key', 'key');
+        db.createObjectStore('binaries');
+        db.createObjectStore('references', { keyPath: 'id' }).createIndex('digest', 'digests', { multiEntry: true });
+        // Existing envelopes stay in place until retention/discard removes them.
+        // Upgrade copies only metadata, preserving corrupt/future envelopes too.
+        const cursor = opening.transaction!.objectStore('drafts').openCursor();
+        cursor.onsuccess = () => {
+          const entry = cursor.result;
+          if (!entry) return;
+          revisions.add({
+            ...info(entry.value),
+            legacy: true,
+            compatible: legacyEnvelope.safeParse(entry.value).success,
+          });
+          entry.continue();
+        };
       };
       opening.onsuccess = () => {
         const db = opening.result;
@@ -185,72 +262,110 @@ export class LocalDraftStore implements DraftStorage {
       }
     }
   }
+  private async remove(tx: IDBTransaction, id: IDBValidKey): Promise<string[]> {
+    const references = tx.objectStore('references');
+    const value = z.object({ digests: z.array(z.string()) }).safeParse(await request(references.get(id)));
+    await request(references.delete(id));
+    await request(tx.objectStore('revisions').delete(id));
+    await request(tx.objectStore('drafts').delete(id));
+    return value.success ? value.data.digests : [];
+  }
+
+  private async collect(tx: IDBTransaction, digests: Set<string>): Promise<void> {
+    const index = tx.objectStore('references').index('digest');
+    for (const digest of digests) {
+      if ((await request(index.count(digest))) === 0) await request(tx.objectStore('binaries').delete(digest));
+    }
+  }
+
   async save(key: string, owner: string, name: string, revision: string, files: PackageFiles): Promise<void> {
     validatePackageFiles(files);
+    const prepared = [...files].map(([path, bytes]) => ({ path, ...this.resource(bytes) }));
+    const resources = new Map<string, Uint8Array<ArrayBuffer>>();
+    const entries = await Promise.all(
+      prepared.map(async ({ path, bytes, digest }) => {
+        const hash = await digest;
+        resources.set(hash, bytes);
+        return { path, digest: hash };
+      }),
+    );
     const record: DraftRecord = {
-      version: 1,
+      version: 2,
       id: crypto.randomUUID(),
       key,
       name,
       revision,
       savedAt: Date.now(),
-      files: await Promise.all(
-        [...files].map(async ([path, bytes]) => ({
-          path,
-          blob: new Blob([bytes]),
-          digest: await digest(bytes),
-        })),
-      ),
+      files: entries,
     };
     const exclusive = await this.lock(key, owner);
-    await this.transaction(['drafts', 'leases'], 'readwrite', async (tx) => {
+    await this.transaction(['revisions', 'references', 'binaries', 'drafts', 'leases'], 'readwrite', async (tx) => {
       await this.lease(tx, key, owner, exclusive);
-      const store = tx.objectStore('drafts');
-      const all = await request<unknown[]>(store.getAll());
-      const infos = all.map((value) => this.info(value));
-      const keys = new Set(infos.map((info) => info.key));
-      if (!keys.has(key) && keys.size >= DRAFT_PROJECT_LIMIT)
+      const store = tx.objectStore('revisions');
+      const index = store.index('key');
+      const values: unknown[] = await request(index.getAll(key));
+      if (!values.length && (await projectCount(index)) >= DRAFT_PROJECT_LIMIT)
         throw new Error('Local recovery holds 10 projects. Discard an obsolete draft before retrying.');
       // Never prune incompatible envelopes automatically: a newer application may own them.
-      const existing = all
-        .flatMap((value) => {
-          const parsed = envelope.safeParse(value);
-          return parsed.success && parsed.data.key === key ? [parsed.data] : [];
+      const existing = values
+        .filter((value) => {
+          const legacy = legacyInfo.safeParse(value);
+          return legacy.success ? legacy.data.compatible : revisionEnvelope.safeParse(value).success;
         })
+        .map(info)
         .sort((a, b) => b.savedAt - a.savedAt);
       record.savedAt = Math.max(Date.now(), ...existing.map((entry) => entry.savedAt + 1));
       await request(store.add(record));
-      for (const obsolete of existing.slice(DRAFT_RETENTION - 1)) await request(store.delete(obsolete.id));
+      await request(tx.objectStore('references').add({ id: record.id, digests: [...resources.keys()] }));
+      for (const [digest, bytes] of resources) {
+        // Key-only existence checks never deserialize/rewrite an existing Blob.
+        const binaries = tx.objectStore('binaries');
+        if ((await request(binaries.count(digest))) === 0) await request(binaries.add(new Blob([bytes]), digest));
+      }
+      const obsolete = new Set<string>();
+      for (const entry of existing.slice(DRAFT_RETENTION - 1))
+        for (const digest of await this.remove(tx, entry.id)) obsolete.add(digest);
+      await this.collect(tx, obsolete);
     });
     this.changed();
   }
-  private info(value: unknown): DraftInfo {
-    const parsed = z
-      .object({
-        id: z.string(),
-        key: z.string().catch(''),
-        name: z.string().catch('Unreadable local draft'),
-        savedAt: z.number().min(0).max(8_640_000_000_000_000).catch(0),
-      })
-      .parse(value);
-    return { ...parsed, key: parsed.key || `corrupt:${parsed.id}` };
-  }
+
   async list(): Promise<DraftInfo[]> {
-    return this.transaction(['drafts'], 'readonly', async (tx) => {
-      const all = await request<unknown[]>(tx.objectStore('drafts').getAll());
-      return all.map((value) => this.info(value)).sort((a, b) => b.savedAt - a.savedAt);
+    return this.transaction(['revisions'], 'readonly', async (tx) => {
+      const all: unknown[] = await request(tx.objectStore('revisions').getAll());
+      return all.map(info).sort((a, b) => b.savedAt - a.savedAt);
     });
   }
+
   async read(id: string): Promise<PackageFiles> {
-    const value: unknown = await this.transaction(['drafts'], 'readonly', (tx) =>
-      request(tx.objectStore('drafts').get(id)),
-    );
-    if (typeof value === 'object' && value !== null && 'version' in value && value.version !== 1)
-      throw new Error('Unsupported local snapshot version. Open this draft with a compatible application.');
-    const result = envelope.safeParse(value);
-    if (!result.success) throw new Error('Corrupt local snapshot or missing binary assets. Try the previous revision.');
+    const entries = await this.transaction(['revisions', 'drafts', 'binaries'], 'readonly', async (tx) => {
+      const metadata: unknown = await request(tx.objectStore('revisions').get(id));
+      const legacy = legacyInfo.safeParse(metadata);
+      const value: unknown = legacy.success ? await request(tx.objectStore('drafts').get(id)) : metadata;
+      const version = legacy.success ? 1 : 2;
+      if (typeof value === 'object' && value !== null && 'version' in value && value.version !== version)
+        throw new Error('Unsupported local snapshot version. Open this draft with a compatible application.');
+      if (legacy.success) {
+        const parsed = legacyEnvelope.safeParse(value);
+        if (!parsed.success)
+          throw new Error('Corrupt local snapshot or missing binary assets. Try the previous revision.');
+        return parsed.data.files;
+      }
+      const parsed = revisionEnvelope.safeParse(value);
+      if (!parsed.success)
+        throw new Error('Corrupt local snapshot or missing binary assets. Try the previous revision.');
+      const blobs = new Map<string, Blob>();
+      for (const { digest } of parsed.data.files) {
+        if (blobs.has(digest)) continue;
+        const blob: unknown = await request(tx.objectStore('binaries').get(digest));
+        if (!(blob instanceof Blob))
+          throw new Error('Corrupt local snapshot or missing binary assets. Try the previous revision.');
+        blobs.set(digest, blob);
+      }
+      return parsed.data.files.map((entry) => ({ ...entry, blob: blobs.get(entry.digest)! }));
+    });
     const files = new Map<string, Uint8Array<ArrayBuffer>>();
-    for (const entry of result.data.files) {
+    for (const entry of entries) {
       const bytes = new Uint8Array(await entry.blob.arrayBuffer());
       if (files.has(entry.path) || (await digest(bytes)) !== entry.digest)
         throw new Error(`Corrupt local resource "${entry.path}". Try the previous revision.`);
@@ -259,17 +374,16 @@ export class LocalDraftStore implements DraftStorage {
     validatePackageFiles(files);
     return files;
   }
+
   async discard(key: string, owner: string): Promise<void> {
     const exclusive = await this.lock(key, owner);
     try {
-      await this.transaction(['drafts', 'leases'], 'readwrite', async (tx) => {
+      await this.transaction(['revisions', 'references', 'binaries', 'drafts', 'leases'], 'readwrite', async (tx) => {
         await this.lease(tx, key, owner, exclusive);
-        const store = tx.objectStore('drafts');
-        const values = await request<unknown[]>(store.getAll());
-        for (const value of values) {
-          const info = this.info(value);
-          if (info.key === key) await request(store.delete(info.id));
-        }
+        const ids = await request(tx.objectStore('revisions').index('key').getAllKeys(key));
+        const obsolete = new Set<string>();
+        for (const id of ids) for (const digest of await this.remove(tx, id)) obsolete.add(digest);
+        await this.collect(tx, obsolete);
         await request(tx.objectStore('leases').delete(key));
       });
     } finally {

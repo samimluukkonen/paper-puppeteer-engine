@@ -194,32 +194,32 @@ test('corrupt newest binary snapshot leaves the previous complete project recove
   await saved(page);
   await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const opening = indexedDB.open('paper-puppeteer-recovery', 1);
+      const opening = indexedDB.open('paper-puppeteer-recovery', 2);
       opening.onsuccess = () => resolve(opening.result);
       opening.onerror = () => reject(opening.error);
     });
     try {
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction('drafts', 'readwrite');
-        const store = tx.objectStore('drafts');
+        const tx = db.transaction(['revisions', 'binaries'], 'readwrite');
+        const store = tx.objectStore('revisions');
         const request = store.getAll();
         request.onsuccess = () => {
-          // Fixtures were created by the application; deliberately damage one Blob,
-          // retaining its original digest and a fully valid envelope.
+          // Damage the changed project document while preserving its digest and
+          // the previous revision's independently addressed document.
           const records = request.result as {
             id: string;
             savedAt: number;
-            files: { path: string; blob: Blob; digest: string }[];
+            files: { path: string; digest: string }[];
           }[];
           if (records.length !== 2) {
             tx.abort();
             return;
           }
           const latest = records.sort((a, b) => b.savedAt - a.savedAt)[0]!;
-          store.put({
-            ...latest,
-            files: latest.files.map((file, index) => (index === 0 ? { ...file, blob: new Blob(['corrupt']) } : file)),
-          });
+          tx.objectStore('binaries').put(
+            new Blob(['corrupt']),
+            latest.files.find((file) => file.path === 'project.json')!.digest,
+          );
         };
         tx.oncomplete = () => resolve();
         tx.onabort = () => reject(tx.error ?? new Error('Expected two retained snapshots.'));
@@ -314,14 +314,14 @@ test('IndexedDB transactions retain two revisions, detect conflicts/corruption/v
     const intact = await store.list();
     const oldFiles = await store.read(entries[0]!.id);
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('paper-puppeteer-recovery', 1);
+      const request = indexedDB.open('paper-puppeteer-recovery', 2);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
     const mutate = (id: string, version: number, savedAt = Date.now()) =>
       new Promise<void>((resolve, reject) => {
-        const tx = db.transaction('drafts', 'readwrite');
-        const drafts = tx.objectStore('drafts');
+        const tx = db.transaction('revisions', 'readwrite');
+        const drafts = tx.objectStore('revisions');
         const get = drafts.get(id);
         get.onsuccess = () => {
           const value: unknown = get.result;
@@ -333,7 +333,7 @@ test('IndexedDB transactions retain two revisions, detect conflicts/corruption/v
       });
     await mutate(entries[0]!.id, 99);
     const incompatible = await error(() => store.read(entries[0]!.id));
-    await mutate(entries[0]!.id, 1, Number.MAX_VALUE);
+    await mutate(entries[0]!.id, 2, Number.MAX_VALUE);
     const corruptTime = (await store.list()).find((entry) => entry.id === entries[0]!.id)?.savedAt;
     const corrupt = await error(() => store.read(entries[0]!.id));
     const previous = await store.read(entries[1]!.id);
@@ -378,4 +378,245 @@ test('IndexedDB transactions retain two revisions, detect conflicts/corruption/v
   expect(results.quota).toContain('QuotaExceededError');
   expect(results.incompatible).toContain('Unsupported local snapshot version');
   expect(results.corrupt).toContain('Corrupt local snapshot');
+});
+
+test('draft persistence reuses hashes and binaries, reads metadata only and collects the last reference', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'development', 'Direct module harness uses the local Vite source server.');
+  await page.goto('project/');
+  await page.addScriptTag({
+    type: 'module',
+    content: `import { LocalDraftStore } from '/src/devtools/shared/autosave/LocalDraftStore.ts'; window.localDraftTest = new LocalDraftStore();`,
+  });
+  await page.waitForFunction(() => !!window.localDraftTest);
+  const result = await page.evaluate(async () => {
+    const store = window.localDraftTest;
+    const image = new Uint8Array([1, 2, 3]);
+    const files = new Map([
+      ['project.json', new TextEncoder().encode('{}')],
+      ['image.png', image],
+      ['alias.png', image],
+    ]);
+    const reads: string[] = [];
+    let hashes = 0;
+    let writes = 0;
+    // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+    const originalDigest = crypto.subtle.digest;
+    // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+    const originalAdd = IDBObjectStore.prototype.add;
+    // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+    const originalGet = IDBObjectStore.prototype.get;
+    // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+    const originalGetAll = IDBObjectStore.prototype.getAll;
+    crypto.subtle.digest = function (algorithm, data) {
+      hashes++;
+      return originalDigest.call(this, algorithm, data);
+    };
+    IDBObjectStore.prototype.add = function (value: unknown, key?: IDBValidKey) {
+      if (this.name === 'binaries') writes++;
+      return originalAdd.call(this, value, key);
+    };
+    IDBObjectStore.prototype.get = function (key) {
+      reads.push(this.name);
+      return originalGet.call(this, key);
+    };
+    IDBObjectStore.prototype.getAll = function (query?: IDBValidKey | IDBKeyRange | null, count?: number) {
+      reads.push(this.name);
+      return originalGetAll.call(this, query, count);
+    };
+    await store.list();
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('paper-puppeteer-recovery', 2);
+      opening.onsuccess = () => resolve(opening.result);
+      opening.onerror = () => reject(opening.error);
+    });
+    const counts = () =>
+      new Promise<number[]>((resolve, reject) => {
+        const tx = db.transaction(['binaries', 'references'], 'readonly');
+        const binaries = tx.objectStore('binaries').count();
+        const references = tx.objectStore('references').count();
+        tx.oncomplete = () => resolve([binaries.result, references.result]);
+        tx.onabort = () => reject(tx.error);
+      });
+    try {
+      await store.save('film', 'tab', 'Film', '1', files);
+      await store.save('film', 'tab', 'Film', '2', files);
+      const unchanged = { hashes, writes, counts: await counts() };
+      files.set('project.json', new TextEncoder().encode('{"frame":2}'));
+      await store.save('film', 'tab', 'Film', '3', files);
+      files.set('project.json', new TextEncoder().encode('{"frame":3}'));
+      await store.save('film', 'tab', 'Film', '4', files);
+      // Independently allocated equal content shares storage across projects too.
+      const otherImage = image.slice();
+      await store.save(
+        'other',
+        'tab',
+        'Other',
+        '1',
+        new Map([
+          ['project.json', files.get('project.json')!.slice()],
+          ['image.png', otherImage],
+          ['alias.png', otherImage],
+        ]),
+      );
+      const retained = { hashes, writes, counts: await counts() };
+      const oldId = (await store.list())[0]!.id;
+      image[0] = 9;
+      const saving = store.save('film', 'tab', 'Film', '5', files);
+      // Changes during hashing must not alter the detached save capture.
+      image[0] = 7;
+      await saving;
+      const mutated = { hashes, writes };
+      const newest = (await store.list()).find((entry) => entry.key === 'film')!;
+      const metadataReads = [...reads];
+      const recovered = [...(await store.read(newest.id)).get('image.png')!];
+      const previous = [...(await store.read(oldId)).get('image.png')!];
+      const checkpoint = { entries: await store.list(), counts: await counts() };
+      // Abort after inserting new binaries/references and starting retention.
+      // oxlint-disable-next-line typescript/unbound-method -- Called with the original receiver below.
+      const originalDelete = IDBObjectStore.prototype.delete;
+      let interrupted = '';
+      IDBObjectStore.prototype.delete = function (key) {
+        const result = originalDelete.call(this, key);
+        if (this.name === 'revisions') this.transaction.abort();
+        return result;
+      };
+      try {
+        await store.save('film', 'tab', 'Film', 'interrupted', files);
+      } catch (error) {
+        interrupted = String(error);
+      } finally {
+        IDBObjectStore.prototype.delete = originalDelete;
+      }
+      const rollback = { entries: await store.list(), counts: await counts() };
+      reads.length = 0;
+      await store.discard('film', 'tab');
+      const shared = await counts();
+      await store.discard('other', 'tab');
+      return {
+        unchanged,
+        retained,
+        mutated,
+        checkpoint,
+        rollback,
+        interrupted,
+        metadataReads,
+        discardReads: reads,
+        recovered,
+        previous,
+        shared,
+        empty: await counts(),
+      };
+    } finally {
+      crypto.subtle.digest = originalDigest;
+      IDBObjectStore.prototype.add = originalAdd;
+      IDBObjectStore.prototype.get = originalGet;
+      IDBObjectStore.prototype.getAll = originalGetAll;
+      db.close();
+    }
+  });
+  expect(result.unchanged).toEqual({ hashes: 2, writes: 2, counts: [2, 2] });
+  expect(result.retained).toEqual({ hashes: 6, writes: 4, counts: [3, 3] });
+  expect(result.mutated).toEqual({ hashes: 7, writes: 5 });
+  expect(result.metadataReads.every((name) => ['leases', 'revisions', 'references'].includes(name))).toBe(true);
+  expect(result.discardReads.every((name) => name === 'leases' || name === 'references')).toBe(true);
+  expect(result.recovered).toEqual([9, 2, 3]);
+  expect(result.previous).toEqual([1, 2, 3]);
+  expect(result.interrupted).toBeTruthy();
+  expect(result.rollback).toEqual(result.checkpoint);
+  expect(result.shared).toEqual([2, 1]);
+  expect(result.empty).toEqual([0, 0]);
+});
+
+test('version-one drafts migrate metadata without copying binaries and preserve incompatible revisions', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'development', 'Direct module harness uses the local Vite source server.');
+  // Seed before loading an authoring route, which opens recovery storage itself.
+  await page.route('**/src/main.ts', (route) => route.fulfill({ contentType: 'text/javascript', body: '' }));
+  await page.goto('index.html');
+  await page.evaluate(async () => {
+    const bytes = new TextEncoder().encode('{}');
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('paper-puppeteer-recovery', 1);
+      opening.onupgradeneeded = () => {
+        opening.result.createObjectStore('drafts', { keyPath: 'id' }).createIndex('key', 'key');
+        opening.result.createObjectStore('leases', { keyPath: 'key' });
+      };
+      opening.onsuccess = () => resolve(opening.result);
+      opening.onerror = () => reject(opening.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('drafts', 'readwrite');
+      const drafts = tx.objectStore('drafts');
+      const record = {
+        version: 1,
+        id: 'old',
+        key: 'film',
+        name: 'Film',
+        revision: '1',
+        savedAt: 1,
+        files: [{ path: 'project.json', blob: new Blob([bytes]), digest }],
+      };
+      drafts.add(record);
+      drafts.add({ ...record, id: 'future', version: 99 });
+      drafts.add({ id: 'broken', version: 1, savedAt: Number.MAX_VALUE });
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await page.addScriptTag({
+    type: 'module',
+    content: `import { LocalDraftStore } from '/src/devtools/shared/autosave/LocalDraftStore.ts'; window.localDraftTest = new LocalDraftStore();`,
+  });
+  await page.waitForFunction(() => !!window.localDraftTest);
+  const result = await page.evaluate(async () => {
+    const store = window.localDraftTest;
+    const initial = await store.list();
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const opening = indexedDB.open('paper-puppeteer-recovery', 2);
+      opening.onsuccess = () => resolve(opening.result);
+      opening.onerror = () => reject(opening.error);
+    });
+    const counts = () =>
+      new Promise<number[]>((resolve, reject) => {
+        const tx = db.transaction(['drafts', 'binaries'], 'readonly');
+        const legacy = tx.objectStore('drafts').count();
+        const binaries = tx.objectStore('binaries').count();
+        tx.oncomplete = () => resolve([legacy.result, binaries.result]);
+        tx.onabort = () => reject(tx.error);
+      });
+    const before = await counts();
+    const recovered = new TextDecoder().decode((await store.read('old')).get('project.json'));
+    const files = new Map([['project.json', new TextEncoder().encode('{}')]]);
+    await store.save('film', 'tab', 'Film', '2', files);
+    const retainedOld = (await store.list()).some((entry) => entry.id === 'old');
+    await store.save('film', 'tab', 'Film', '3', files);
+    const after = await counts();
+    let future = '';
+    try {
+      await store.read('future');
+    } catch (error) {
+      future = String(error);
+    }
+    await store.discard('film', 'tab');
+    await store.discard('corrupt:broken', 'tab');
+    const empty = await counts();
+    db.close();
+    return { initial, before, recovered, retainedOld, after, future, empty, remaining: await store.list() };
+  });
+  expect(result.initial).toHaveLength(3);
+  expect(result.initial.find((entry) => entry.id === 'broken')).toMatchObject({ key: 'corrupt:broken', savedAt: 0 });
+  expect(result.before).toEqual([3, 0]);
+  expect(result.recovered).toBe('{}');
+  expect(result.retainedOld).toBe(true);
+  expect(result.after).toEqual([2, 1]);
+  expect(result.future).toContain('Unsupported local snapshot version');
+  expect(result.empty).toEqual([0, 0]);
+  expect(result.remaining).toEqual([]);
 });
