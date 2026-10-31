@@ -6,6 +6,7 @@ import { cinematicCameraSchema, CINEMATIC_CAMERA_MIN_ZOOM, CINEMATIC_CAMERA_MAX_
 import { inspectVersion, shapeIssues, type ValidationResult } from './externalData.js';
 import { checkJson } from './jsonData.js';
 import { assertJsonInputSize } from './jsonInput.js';
+import type { DeepReadonly } from './readonlyData.js';
 import { sceneAudioClipSchema, sceneAudioTrackSchema } from './sceneAudio.js';
 import { sceneDialogueLineSchema } from './sceneDialogue.js';
 import { sceneTransitionSchema } from './sceneTransitions.js';
@@ -136,24 +137,29 @@ export const sceneAudioAssetSchema = audioAssetDefinitionSchema.extend({
     .refine(safeSceneManifest, 'Use a stable audio path without aliases or internal traversal.'),
 });
 
-export const sceneDefinitionSchema = z.strictObject({
-  version: z.literal(SCENE_FORMAT_VERSION),
-  id: sceneIdentifier,
-  name: sceneIdentifier,
-  /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
-  duration: z.number().positive(),
-  audioAssets: z.array(sceneAudioAssetSchema).max(128).exactOptional(),
-  audioTracks: z.array(sceneAudioTrackSchema).max(128).exactOptional(),
-  audioClips: z.array(sceneAudioClipSchema).max(4000).exactOptional(),
-  dialogue: z.array(sceneDialogueLineSchema).max(4000).exactOptional(),
-  camera: cinematicCameraSchema.exactOptional(),
-  cameraTracks: cameraTracksSchema.exactOptional(),
-  transitions: z.array(sceneTransitionSchema).max(1000).exactOptional(),
-  layers: z.array(sceneLayerDefinitionSchema).min(2).max(64).exactOptional(),
-  images: z.array(sceneImageDefinitionSchema).max(256).exactOptional(),
-  actors: z.array(sceneActorDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors),
-  actions: z.array(sceneActionDefinitionSchema).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions),
-});
+/** @internal Editors can reuse schema-checked branches while retaining the strict file schema. */
+export function createSceneDefinitionSchema(branch: <T>(schema: z.ZodType<T>) => z.ZodType<T> = (schema) => schema) {
+  return z.strictObject({
+    version: z.literal(SCENE_FORMAT_VERSION),
+    id: sceneIdentifier,
+    name: sceneIdentifier,
+    /** Milliseconds, matching Actor, animation and choreography runtime APIs. */
+    duration: z.number().positive(),
+    audioAssets: branch(z.array(branch(sceneAudioAssetSchema)).max(128)).exactOptional(),
+    audioTracks: branch(z.array(branch(sceneAudioTrackSchema)).max(128)).exactOptional(),
+    audioClips: branch(z.array(branch(sceneAudioClipSchema)).max(4000)).exactOptional(),
+    dialogue: branch(z.array(branch(sceneDialogueLineSchema)).max(4000)).exactOptional(),
+    camera: branch(cinematicCameraSchema).exactOptional(),
+    cameraTracks: branch(cameraTracksSchema).exactOptional(),
+    transitions: branch(z.array(branch(sceneTransitionSchema)).max(1000)).exactOptional(),
+    layers: branch(z.array(branch(sceneLayerDefinitionSchema)).min(2).max(64)).exactOptional(),
+    images: branch(z.array(branch(sceneImageDefinitionSchema)).max(256)).exactOptional(),
+    actors: branch(z.array(branch(sceneActorDefinitionSchema)).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActors)),
+    actions: branch(z.array(branch(sceneActionDefinitionSchema)).max(DEFAULT_SCENE_WORKLOAD_LIMITS.maxActions)),
+  });
+}
+
+export const sceneDefinitionSchema = createSceneDefinitionSchema();
 
 export type SceneDefinition = z.infer<typeof sceneDefinitionSchema>;
 export type SceneActorDefinition = z.infer<typeof sceneActorDefinitionSchema>;
@@ -182,7 +188,8 @@ export class SceneValidationError extends Error {
   }
 }
 
-function inspectSceneDefinition(input: unknown, options: SceneValidationOptions): ValidationResult<SceneDefinition> {
+/** @internal Bound raw collections before walking entries or allocating schema diagnostics. */
+export function checkSceneCollectionLimits(input: unknown): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   // Bound raw collections before walking/cloning entries or allocating schema issues.
   if (input !== null && typeof input === 'object') {
@@ -201,8 +208,13 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
       if (Array.isArray(entries) && entries.length > limit)
         issues.push({ severity: 'error', path: field, message: `Scene exceeds the ${limit}-${field} limit.` });
     }
-    if (issues.length) return { issues };
   }
+  return issues;
+}
+
+function inspectSceneDefinition(input: unknown, options: SceneValidationOptions): ValidationResult<SceneDefinition> {
+  const issues = checkSceneCollectionLimits(input);
+  if (issues.length) return { issues };
   checkJson(input, '', issues);
   if (issues.length) return { issues };
   const { issues: versionIssues, versionError } = inspectVersion(input, SCENE_FORMAT_VERSION, 'scene');
@@ -214,6 +226,32 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
   }
   // Payloads use the same unknown + checkJson contract as animation events. Own them deeply.
   const scene = structuredClone(result.data);
+  issues.push(...checkSceneDefinitionDomains(scene, options));
+  return issues.length ? { issues, versionError } : { issues, data: scene };
+}
+
+/** @internal Only successful domain checks may be reused with identical dependencies. */
+export class SceneValidationCache {
+  private readonly domains = new Map<string, readonly unknown[]>();
+
+  check(domain: string, dependencies: readonly unknown[], issues: ValidationIssue[], inspect: () => void): void {
+    const previous = this.domains.get(domain);
+    if (previous?.length === dependencies.length && previous.every((value, index) => value === dependencies[index]))
+      return;
+    const before = issues.length;
+    inspect();
+    if (issues.length === before) this.domains.set(domain, dependencies);
+    else this.domains.delete(domain);
+  }
+}
+
+/** @internal Validate schema-checked data; editor caches use owned immutable dependencies. */
+export function checkSceneDefinitionDomains(
+  scene: DeepReadonly<SceneDefinition>,
+  options: SceneValidationOptions = {},
+  cache = new SceneValidationCache(),
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
   const report = (path: string, message: string): void => {
     issues.push({ severity: 'error', path, message });
   };
@@ -223,213 +261,262 @@ function inspectSceneDefinition(input: unknown, options: SceneValidationOptions)
       assetCache.set(manifest, options.characters?.get(manifest) ?? options.getCharacterAssets?.(manifest));
     return assetCache.get(manifest);
   };
-  for (const property of CAMERA_PROPERTIES) {
-    const keys = scene.cameraTracks?.[property] ?? [];
-    const ids = new Set<string>();
-    for (const [index, key] of keys.entries()) {
-      const path = `cameraTracks.${property}[${index}]`;
-      if (ids.has(key.id)) report(`${path}.id`, 'Camera key IDs must be unique within a channel.');
-      ids.add(key.id);
-      if (key.time > scene.duration) report(`${path}.time`, 'Camera keys must stay within scene duration.');
-      if (index > 0 && key.time <= keys[index - 1]!.time)
-        report(`${path}.time`, 'Camera keys must have strictly increasing times.');
-      if (property === 'zoom' && (key.value < CINEMATIC_CAMERA_MIN_ZOOM || key.value > CINEMATIC_CAMERA_MAX_ZOOM))
-        report(`${path}.value`, 'Camera zoom keys must stay between 0.1 and 8.');
-      if (key.curve?.mode === 'bezier' && key.curve.control1.x > key.curve.control2.x)
-        report(`${path}.curve`, 'Bézier time handles must be monotonic.');
-    }
-  }
-  const audioIds = new Set<string>();
-  for (const [index, asset] of (scene.audioAssets ?? []).entries()) {
-    if (audioIds.has(asset.id)) report(`audioAssets[${index}].id`, 'Audio asset IDs must be unique.');
-    audioIds.add(asset.id);
-  }
+  const actors = new Map(scene.actors.map((actor) => [actor.id, actor]));
+  // Host catalogs may allocate fresh arrays or mutate previously returned arrays in place.
+  const actorReferences = JSON.stringify(scene.actors.map((actor) => [actor.id, actor.character.manifest]));
+  const actorIds = JSON.stringify([...actors.keys()]);
+  const characters = JSON.stringify(
+    [...new Set(scene.actors.map((actor) => actor.character.manifest))].map((manifest) => {
+      const assets = characterAssets(manifest);
+      return [manifest, assets && [assets.animations, assets.skins, assets.rootMotionAnimations]];
+    }),
+  );
   const audioCatalog = new Map(
     (options.getAudioAssets?.() ?? scene.audioAssets ?? []).map((asset) => [asset.id, asset]),
   );
-  const audioTrackIds = new Set<string>();
-  for (const [index, track] of (scene.audioTracks ?? []).entries()) {
-    if (audioTrackIds.has(track.id)) report(`audioTracks[${index}].id`, 'Audio track IDs must be unique.');
-    audioTrackIds.add(track.id);
-  }
-  const audioClipIds = new Set<string>();
-  for (const [index, clip] of (scene.audioClips ?? []).entries()) {
-    const path = `audioClips[${index}]`;
-    if (audioClipIds.has(clip.id)) report(`${path}.id`, 'Audio clip IDs must be unique.');
-    audioClipIds.add(clip.id);
-    const asset = audioCatalog.get(clip.assetId);
-    if (!asset) report(`${path}.assetId`, `Missing audio asset "${clip.assetId}". Import or replace it before saving.`);
-    if (!audioIds.has(clip.assetId)) report(`${path}.assetId`, 'Missing scene audio asset reference.');
-    const reference = scene.audioAssets?.find((entry) => entry.id === clip.assetId);
-    if (
-      asset &&
-      reference &&
-      options.getAudioAssets &&
-      reference.path.replace(/^(?:\.\.\/)+/, '') !== asset.path.replace(/^(?:\.\.\/)+/, '')
-    )
-      report(`${path}.assetId`, 'Scene audio path differs from its project registration.');
-    if (!audioTrackIds.has(clip.trackId)) report(`${path}.trackId`, 'Choose an existing audio track.');
-    const end = clip.time + clip.duration;
-    if (!Number.isFinite(end) || end <= clip.time || end > scene.duration)
-      report(`${path}.duration`, 'Audio clip end must advance time and stay within scene duration.');
-    for (const field of ['fadeIn', 'fadeOut'] as const)
-      if ((clip[field] ?? 0) > clip.duration) report(`${path}.${field}`, 'Fade duration cannot exceed clip duration.');
-    const mediaDuration = asset?.durationSeconds === undefined ? undefined : asset.durationSeconds * 1000;
-    if (!Number.isFinite(clip.sourceOffset + clip.duration))
-      report(`${path}.sourceOffset`, 'Source range must be finite.');
-    if (mediaDuration !== undefined) {
-      if (clip.sourceOffset >= mediaDuration)
-        report(`${path}.sourceOffset`, 'Source offset must be before the media end.');
-      if (!clip.loop && clip.sourceOffset + clip.duration > mediaDuration + 0.000001)
-        report(`${path}.duration`, 'Non-looping trim range exceeds the media duration.');
+  const audioClipIds = new Set((scene.audioClips ?? []).map((clip) => clip.id));
+  const check = (domain: string, dependencies: readonly unknown[], inspect: () => void): void =>
+    cache.check(domain, dependencies, issues, inspect);
+
+  check('camera', [scene.cameraTracks, scene.duration], () => {
+    for (const property of CAMERA_PROPERTIES) {
+      const keys = scene.cameraTracks?.[property] ?? [];
+      const ids = new Set<string>();
+      for (const [index, key] of keys.entries()) {
+        const path = `cameraTracks.${property}[${index}]`;
+        if (ids.has(key.id)) report(`${path}.id`, 'Camera key IDs must be unique within a channel.');
+        ids.add(key.id);
+        if (key.time > scene.duration) report(`${path}.time`, 'Camera keys must stay within scene duration.');
+        if (index > 0 && key.time <= keys[index - 1]!.time)
+          report(`${path}.time`, 'Camera keys must have strictly increasing times.');
+        if (property === 'zoom' && (key.value < CINEMATIC_CAMERA_MIN_ZOOM || key.value > CINEMATIC_CAMERA_MAX_ZOOM))
+          report(`${path}.value`, 'Camera zoom keys must stay between 0.1 and 8.');
+        if (key.curve?.mode === 'bezier' && key.curve.control1.x > key.curve.control2.x)
+          report(`${path}.curve`, 'Bézier time handles must be monotonic.');
+      }
     }
-  }
-  const transitionIds = new Set<string>();
-  const transitions = (scene.transitions ?? []).map((transition, index) => ({ transition, index }));
-  transitions.sort((a, b) => a.transition.time - b.transition.time);
-  let previousEnd = -1;
-  for (const { transition, index } of transitions) {
-    const path = `transitions[${index}]`;
-    if (transitionIds.has(transition.id)) report(`${path}.id`, 'Transition IDs must be unique.');
-    transitionIds.add(transition.id);
-    const end = transition.time + transition.duration;
-    if (end <= transition.time) report(`${path}.duration`, 'Transition duration must advance scene time.');
-    if (!Number.isFinite(end) || end > scene.duration)
-      report(`${path}.duration`, 'Transition end must stay within scene duration.');
-    if (transition.time < previousEnd)
-      report(`${path}.time`, 'Fade intervals must not overlap. Move or shorten this fade.');
-    previousEnd = Math.max(previousEnd, end);
-  }
-  const layerIds = new Set<string>();
-  for (const [index, layer] of (scene.layers ?? []).entries()) {
-    if (layerIds.has(layer.id)) report(`layers[${index}].id`, `Duplicate layer ID "${layer.id}".`);
-    layerIds.add(layer.id);
-    if (layer.id === 'actors' && layer.parallax !== 1)
-      report(`layers[${index}].parallax`, 'The Actors band uses normal world scrolling (1).');
-  }
-  if (scene.layers) {
-    for (const id of ['background', 'actors'])
-      if (!layerIds.has(id)) report('layers', `Missing reserved "${id}" layer.`);
-  } else {
-    layerIds.add('background');
-    layerIds.add('actors');
-  }
-  const imageIds = new Set<string>();
-  for (const [index, image] of (scene.images ?? []).entries()) {
-    if (imageIds.has(image.id)) report(`images[${index}].id`, `Duplicate image element ID "${image.id}".`);
-    imageIds.add(image.id);
-    if (!layerIds.has(image.layerId ?? 'background') || image.layerId === 'actors')
-      report(`images[${index}].layerId`, 'Choose an existing artwork layer; the Actors band contains only Puppets.');
-    if (options.images && !options.images.has(image.image))
-      report(`images[${index}].image`, `Missing image "${image.image}". Import or replace it before export.`);
-  }
-  const actors = new Map<string, SceneActorDefinition>();
-  for (const [index, actor] of scene.actors.entries()) {
-    const path = `actors[${index}]`;
-    if (actors.has(actor.id)) report(`${path}.id`, `Duplicate actor ID "${actor.id}".`);
-    actors.set(actor.id, actor);
-    const assets = characterAssets(actor.character.manifest);
-    if (options.characters && !assets)
-      report(`${path}.character.manifest`, `Unknown character "${actor.character.manifest}".`);
-    if (assets && actor.animation !== undefined && !assets.animations.includes(actor.animation))
-      report(`${path}.animation`, `Unknown animation "${actor.animation}".`);
-    if (assets && actor.skin !== undefined && !assets.skins.includes(actor.skin))
-      report(`${path}.skin`, `Unknown skin "${actor.skin}".`);
-  }
-  const dialogueIds = new Set<string>();
-  const dialogue = (scene.dialogue ?? []).map((line, index) => ({ line, index }));
-  dialogue.sort((a, b) => a.line.time - b.line.time);
-  let dialogueEnd = -1;
-  for (const { line, index } of dialogue) {
-    const path = `dialogue[${index}]`;
-    if (dialogueIds.has(line.id)) report(`${path}.id`, 'Dialogue line IDs must be unique.');
-    dialogueIds.add(line.id);
-    if (line.actorId !== undefined && !actors.has(line.actorId))
-      report(
-        `${path}.actorId`,
-        `Missing Actor "${line.actorId}". Choose an existing Actor or change the line to narration.`,
-      );
-    if (line.voiceClipId !== undefined && !audioClipIds.has(line.voiceClipId))
-      report(
-        `${path}.voiceClipId`,
-        `Missing voice clip "${line.voiceClipId}". Choose an existing audio clip or clear the voice reference.`,
-      );
-    const end = line.time + line.duration;
-    if (!Number.isFinite(end) || end <= line.time || end > scene.duration)
-      report(`${path}.duration`, 'Dialogue end must advance time and stay within scene duration.');
-    if (line.time < dialogueEnd)
-      report(`${path}.time`, 'Dialogue intervals must not overlap. Move or shorten this line.');
-    dialogueEnd = Math.max(dialogueEnd, end);
-  }
-  const identities = new Set<string>();
-  const ownership = new Map<string, { action: SceneActionDefinition; index: number }[]>();
-  for (const [index, action] of scene.actions.entries()) {
-    const path = `actions[${index}]`;
-    if (identities.has(action.id)) report(`${path}.id`, `Duplicate action ID "${action.id}".`);
-    identities.add(action.id);
-    const actor = actors.get(action.actorId);
-    if (!actor) report(`${path}.actorId`, `Unknown actor "${action.actorId}".`);
-    if (action.time > scene.duration) report(`${path}.time`, 'Action time must stay within the scene duration.');
-    const end = action.time + sceneActionDuration(action);
-    if (sceneActionDuration(action) > 0 && end <= action.time)
-      report(`${path}.duration`, 'Action duration must advance scene time.');
-    if (!Number.isFinite(end) || end > scene.duration)
-      report(`${path}.duration`, 'Action end must stay within the scene duration.');
-    const assets = actor && characterAssets(actor.character.manifest);
-    if (assets && action.type === 'animation' && !assets.animations.includes(action.animation))
-      report(`${path}.animation`, `Unknown animation "${action.animation}".`);
-    if (action.type === 'animation') {
-      const elapsed = action.duration * action.speed;
-      if (!Number.isFinite(elapsed) || elapsed <= 0)
-        report(`${path}.speed`, 'Scaled animation duration must be finite and positive.');
-      if (action.movementSource === 'rootMotion' && assets && !assets.rootMotionAnimations?.includes(action.animation))
-        report(`${path}.movementSource`, `Animation "${action.animation}" has no root-motion translation keys.`);
+  });
+  check(
+    'audio',
+    [
+      scene.audioAssets,
+      scene.audioTracks,
+      scene.audioClips,
+      scene.duration,
+      JSON.stringify([...audioCatalog].map(([id, asset]) => [id, asset.path, asset.durationSeconds])),
+      !!options.getAudioAssets,
+    ],
+    () => {
+      const audioIds = new Set<string>();
+      for (const [index, asset] of (scene.audioAssets ?? []).entries()) {
+        if (audioIds.has(asset.id)) report(`audioAssets[${index}].id`, 'Audio asset IDs must be unique.');
+        audioIds.add(asset.id);
+      }
+      const audioTrackIds = new Set<string>();
+      for (const [index, track] of (scene.audioTracks ?? []).entries()) {
+        if (audioTrackIds.has(track.id)) report(`audioTracks[${index}].id`, 'Audio track IDs must be unique.');
+        audioTrackIds.add(track.id);
+      }
+      const seenAudioClips = new Set<string>();
+      for (const [index, clip] of (scene.audioClips ?? []).entries()) {
+        const path = `audioClips[${index}]`;
+        if (seenAudioClips.has(clip.id)) report(`${path}.id`, 'Audio clip IDs must be unique.');
+        seenAudioClips.add(clip.id);
+        const asset = audioCatalog.get(clip.assetId);
+        if (!asset)
+          report(`${path}.assetId`, `Missing audio asset "${clip.assetId}". Import or replace it before saving.`);
+        if (!audioIds.has(clip.assetId)) report(`${path}.assetId`, 'Missing scene audio asset reference.');
+        const reference = scene.audioAssets?.find((entry) => entry.id === clip.assetId);
+        if (
+          asset &&
+          reference &&
+          options.getAudioAssets &&
+          reference.path.replace(/^(?:\.\.\/)+/, '') !== asset.path.replace(/^(?:\.\.\/)+/, '')
+        )
+          report(`${path}.assetId`, 'Scene audio path differs from its project registration.');
+        if (!audioTrackIds.has(clip.trackId)) report(`${path}.trackId`, 'Choose an existing audio track.');
+        const end = clip.time + clip.duration;
+        if (!Number.isFinite(end) || end <= clip.time || end > scene.duration)
+          report(`${path}.duration`, 'Audio clip end must advance time and stay within scene duration.');
+        for (const field of ['fadeIn', 'fadeOut'] as const)
+          if ((clip[field] ?? 0) > clip.duration)
+            report(`${path}.${field}`, 'Fade duration cannot exceed clip duration.');
+        const mediaDuration = asset?.durationSeconds === undefined ? undefined : asset.durationSeconds * 1000;
+        if (!Number.isFinite(clip.sourceOffset + clip.duration))
+          report(`${path}.sourceOffset`, 'Source range must be finite.');
+        if (mediaDuration !== undefined) {
+          if (clip.sourceOffset >= mediaDuration)
+            report(`${path}.sourceOffset`, 'Source offset must be before the media end.');
+          if (!clip.loop && clip.sourceOffset + clip.duration > mediaDuration + 0.000001)
+            report(`${path}.duration`, 'Non-looping trim range exceeds the media duration.');
+        }
+      }
+    },
+  );
+  check('transitions', [scene.transitions, scene.duration], () => {
+    const transitionIds = new Set<string>();
+    const transitions = (scene.transitions ?? []).map((transition, index) => ({ transition, index }));
+    transitions.sort((a, b) => a.transition.time - b.transition.time);
+    let previousEnd = -1;
+    for (const { transition, index } of transitions) {
+      const path = `transitions[${index}]`;
+      if (transitionIds.has(transition.id)) report(`${path}.id`, 'Transition IDs must be unique.');
+      transitionIds.add(transition.id);
+      const end = transition.time + transition.duration;
+      if (end <= transition.time) report(`${path}.duration`, 'Transition duration must advance scene time.');
+      if (!Number.isFinite(end) || end > scene.duration)
+        report(`${path}.duration`, 'Transition end must stay within scene duration.');
+      if (transition.time < previousEnd)
+        report(`${path}.time`, 'Fade intervals must not overlap. Move or shorten this fade.');
+      previousEnd = Math.max(previousEnd, end);
     }
-    if (action.type === 'face' && action.target.type === 'actor') {
-      if (!actors.has(action.target.actorId))
-        report(`${path}.target.actorId`, `Unknown target actor "${action.target.actorId}".`);
-      if (action.target.actorId === action.actorId) report(`${path}.target.actorId`, 'An actor cannot look at itself.');
+  });
+  const imageAvailability = options.images
+    ? JSON.stringify((scene.images ?? []).map((image) => options.images!.has(image.image)))
+    : undefined;
+  check('artwork', [scene.layers, scene.images, imageAvailability], () => {
+    const layerIds = new Set<string>();
+    for (const [index, layer] of (scene.layers ?? []).entries()) {
+      if (layerIds.has(layer.id)) report(`layers[${index}].id`, `Duplicate layer ID "${layer.id}".`);
+      layerIds.add(layer.id);
+      if (layer.id === 'actors' && layer.parallax !== 1)
+        report(`layers[${index}].parallax`, 'The Actors band uses normal world scrolling (1).');
     }
-    const channel =
-      action.type === 'animation'
-        ? 'animation'
-        : action.type === 'move'
-          ? 'position'
-          : action.type === 'face'
-            ? 'facing'
-            : null;
-    const channels = channel ? [channel] : [];
-    if (action.type === 'animation' && action.movementSource === 'rootMotion') channels.push('position');
-    for (const channel of channels) {
-      const key = JSON.stringify([action.actorId, channel]);
-      const group = ownership.get(key) ?? [];
-      group.push({ action, index });
-      ownership.set(key, group);
+    if (scene.layers) {
+      for (const id of ['background', 'actors'])
+        if (!layerIds.has(id)) report('layers', `Missing reserved "${id}" layer.`);
+    } else {
+      layerIds.add('background');
+      layerIds.add('actors');
     }
-  }
-  // Half-open intervals allow adjacent clips. Equal-time facing markers are ambiguous.
-  for (const group of ownership.values()) {
-    group.sort((a, b) => a.action.time - b.action.time || a.index - b.index);
-    let previous: (typeof group)[number] | undefined;
-    for (const current of group) {
-      if (
-        previous &&
-        (current.action.time < previous.action.time + sceneActionDuration(previous.action) ||
-          (current.action.type === 'face' && current.action.time === previous.action.time))
-      )
+    const imageIds = new Set<string>();
+    for (const [index, image] of (scene.images ?? []).entries()) {
+      if (imageIds.has(image.id)) report(`images[${index}].id`, `Duplicate image element ID "${image.id}".`);
+      imageIds.add(image.id);
+      if (!layerIds.has(image.layerId ?? 'background') || image.layerId === 'actors')
+        report(`images[${index}].layerId`, 'Choose an existing artwork layer; the Actors band contains only Puppets.');
+      if (options.images && !options.images.has(image.image))
+        report(`images[${index}].image`, `Missing image "${image.image}". Import or replace it before export.`);
+    }
+  });
+  check('actors', [scene.actors, characters, !!options.characters], () => {
+    const seenActors = new Set<string>();
+    for (const [index, actor] of scene.actors.entries()) {
+      const path = `actors[${index}]`;
+      if (seenActors.has(actor.id)) report(`${path}.id`, `Duplicate actor ID "${actor.id}".`);
+      seenActors.add(actor.id);
+      const assets = characterAssets(actor.character.manifest);
+      if (options.characters && !assets)
+        report(`${path}.character.manifest`, `Unknown character "${actor.character.manifest}".`);
+      if (assets && actor.animation !== undefined && !assets.animations.includes(actor.animation))
+        report(`${path}.animation`, `Unknown animation "${actor.animation}".`);
+      if (assets && actor.skin !== undefined && !assets.skins.includes(actor.skin))
+        report(`${path}.skin`, `Unknown skin "${actor.skin}".`);
+    }
+  });
+  check('dialogue', [scene.dialogue, scene.duration, actorIds, JSON.stringify([...audioClipIds])], () => {
+    const dialogueIds = new Set<string>();
+    const dialogue = (scene.dialogue ?? []).map((line, index) => ({ line, index }));
+    dialogue.sort((a, b) => a.line.time - b.line.time);
+    let dialogueEnd = -1;
+    for (const { line, index } of dialogue) {
+      const path = `dialogue[${index}]`;
+      if (dialogueIds.has(line.id)) report(`${path}.id`, 'Dialogue line IDs must be unique.');
+      dialogueIds.add(line.id);
+      if (line.actorId !== undefined && !actors.has(line.actorId))
         report(
-          `actions[${current.index}].time`,
-          `Conflicting ${current.action.type} ownership with action "${previous.action.id}".`,
+          `${path}.actorId`,
+          `Missing Actor "${line.actorId}". Choose an existing Actor or change the line to narration.`,
         );
-      if (
-        !previous ||
-        current.action.time + sceneActionDuration(current.action) >=
-          previous.action.time + sceneActionDuration(previous.action)
-      )
-        previous = current;
+      if (line.voiceClipId !== undefined && !audioClipIds.has(line.voiceClipId))
+        report(
+          `${path}.voiceClipId`,
+          `Missing voice clip "${line.voiceClipId}". Choose an existing audio clip or clear the voice reference.`,
+        );
+      const end = line.time + line.duration;
+      if (!Number.isFinite(end) || end <= line.time || end > scene.duration)
+        report(`${path}.duration`, 'Dialogue end must advance time and stay within scene duration.');
+      if (line.time < dialogueEnd)
+        report(`${path}.time`, 'Dialogue intervals must not overlap. Move or shorten this line.');
+      dialogueEnd = Math.max(dialogueEnd, end);
     }
-  }
-  return issues.length ? { issues, versionError } : { issues, data: scene };
+  });
+  check('actions', [scene.actions, scene.duration, actorReferences, characters], () => {
+    const identities = new Set<string>();
+    const ownership = new Map<string, { action: DeepReadonly<SceneActionDefinition>; index: number }[]>();
+    for (const [index, action] of scene.actions.entries()) {
+      const path = `actions[${index}]`;
+      if (identities.has(action.id)) report(`${path}.id`, `Duplicate action ID "${action.id}".`);
+      identities.add(action.id);
+      const actor = actors.get(action.actorId);
+      if (!actor) report(`${path}.actorId`, `Unknown actor "${action.actorId}".`);
+      if (action.time > scene.duration) report(`${path}.time`, 'Action time must stay within the scene duration.');
+      const end = action.time + sceneActionDuration(action);
+      if (sceneActionDuration(action) > 0 && end <= action.time)
+        report(`${path}.duration`, 'Action duration must advance scene time.');
+      if (!Number.isFinite(end) || end > scene.duration)
+        report(`${path}.duration`, 'Action end must stay within the scene duration.');
+      const assets = actor && characterAssets(actor.character.manifest);
+      if (assets && action.type === 'animation' && !assets.animations.includes(action.animation))
+        report(`${path}.animation`, `Unknown animation "${action.animation}".`);
+      if (action.type === 'animation') {
+        const elapsed = action.duration * action.speed;
+        if (!Number.isFinite(elapsed) || elapsed <= 0)
+          report(`${path}.speed`, 'Scaled animation duration must be finite and positive.');
+        if (
+          action.movementSource === 'rootMotion' &&
+          assets &&
+          !assets.rootMotionAnimations?.includes(action.animation)
+        )
+          report(`${path}.movementSource`, `Animation "${action.animation}" has no root-motion translation keys.`);
+      }
+      if (action.type === 'face' && action.target.type === 'actor') {
+        if (!actors.has(action.target.actorId))
+          report(`${path}.target.actorId`, `Unknown target actor "${action.target.actorId}".`);
+        if (action.target.actorId === action.actorId)
+          report(`${path}.target.actorId`, 'An actor cannot look at itself.');
+      }
+      const channel =
+        action.type === 'animation'
+          ? 'animation'
+          : action.type === 'move'
+            ? 'position'
+            : action.type === 'face'
+              ? 'facing'
+              : null;
+      const channels = channel ? [channel] : [];
+      if (action.type === 'animation' && action.movementSource === 'rootMotion') channels.push('position');
+      for (const channel of channels) {
+        const key = JSON.stringify([action.actorId, channel]);
+        const group = ownership.get(key) ?? [];
+        group.push({ action, index });
+        ownership.set(key, group);
+      }
+    }
+    // Half-open intervals allow adjacent clips. Equal-time facing markers are ambiguous.
+    for (const group of ownership.values()) {
+      group.sort((a, b) => a.action.time - b.action.time || a.index - b.index);
+      let previous: (typeof group)[number] | undefined;
+      for (const current of group) {
+        if (
+          previous &&
+          (current.action.time < previous.action.time + sceneActionDuration(previous.action) ||
+            (current.action.type === 'face' && current.action.time === previous.action.time))
+        )
+          report(
+            `actions[${current.index}].time`,
+            `Conflicting ${current.action.type} ownership with action "${previous.action.id}".`,
+          );
+        if (
+          !previous ||
+          current.action.time + sceneActionDuration(current.action) >=
+            previous.action.time + sceneActionDuration(previous.action)
+        )
+          previous = current;
+      }
+    }
+  });
+  return issues;
 }
 
 /** Structural validation needs no asset loading; a supplied catalog also checks asset existence. */

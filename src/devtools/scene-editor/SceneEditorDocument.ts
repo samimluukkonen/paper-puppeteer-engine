@@ -31,7 +31,6 @@ import type { SceneDialogueLine } from '../../engine/sceneDialogue.js';
 import type { SceneTransition } from '../../engine/sceneTransitions.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
-import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { SceneArtworkCommands } from './SceneArtworkCommands.js';
@@ -39,6 +38,7 @@ import { SceneAudioCommands } from './SceneAudioCommands.js';
 import { SceneCameraCommands } from './SceneCameraCommands.js';
 import { SceneDialogueCommands, type SceneDialoguePatch } from './SceneDialogueCommands.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
+import { SceneSnapshotParser } from './SceneSnapshotParser.js';
 import { SceneTransitionCommands } from './SceneTransitionCommands.js';
 
 export type ReadonlyScene = DeepReadonly<SceneDefinition>;
@@ -101,13 +101,16 @@ export class SceneEditorDocument {
   showFootContacts = false;
   private readonly listeners = new Set<() => void>();
   private issues: readonly ValidationIssue[] = [];
+  private readonly snapshots: SceneSnapshotParser;
 
   constructor(
     private readonly validation: SceneValidationOptions = {},
     private readonly animationIds?: (manifest: string) => readonly string[] | undefined,
     private readonly retainedImageReferences?: () => Iterable<string>,
     private readonly readProjectAudio?: (id: string) => Uint8Array<ArrayBuffer> | undefined,
-  ) {}
+  ) {
+    this.snapshots = new SceneSnapshotParser(validation, animationIds);
+  }
 
   private parse(input: unknown): SceneDefinition {
     const scene = parseSceneDefinition(input, this.validation);
@@ -212,8 +215,7 @@ export class SceneEditorDocument {
     return true;
   }
   private register(scene: SceneDefinition, unsavedNew: boolean): void {
-    assertJsonExportSize(scene);
-    const source = freezeData(scene);
+    const source = this.snapshots.parse(scene);
     const entry: SceneEntry = {
       source,
       saved: source,
@@ -299,11 +301,9 @@ export class SceneEditorDocument {
     const entry = this.entry;
     if (!entry) return this.reportError(new Error('No scene is selected.'));
     try {
-      const next = freezeData(this.parse(input));
+      const next = this.snapshots.parse(input);
       if (next.id !== this.selected)
         throw new Error('Scene ID must remain stable; create a separate scene for a new ID.');
-      // Retain the shared bounded JSON export/import contract before installing a snapshot.
-      assertJsonExportSize(next);
       entry.history.change(() => {
         entry.working = next;
       });
@@ -1121,7 +1121,7 @@ export class SceneEditorDocument {
   markSaved(snapshot: ReadonlyScene | null = this.workingScene): boolean {
     const entry = snapshot && this.entries.get(snapshot.id);
     if (!entry) return false;
-    entry.saved = freezeData(parseSceneDefinition(snapshot, this.validation));
+    entry.saved = this.snapshots.parse(snapshot);
     entry.unsavedNew = false;
     return this.success();
   }

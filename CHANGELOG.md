@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Preserve immutable scene branches across edits, drags and undo snapshots; validate affected domains incrementally while keeping asset-catalog and export-size checks current.
+
 - Block project Undo/Redo when restoring membership would orphan scene audio clips, preserving assets and history until the scene references are undone.
 
 - Preserve mesh deformation tracks during worker IK baking by retaining attachment and slot validation data alongside exact logical joints.
