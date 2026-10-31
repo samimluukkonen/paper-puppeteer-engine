@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { timelineControl, animationMenuControl, test } from './fixtures.js';
+import { timelineControl, animationMenuControl, test, timelineButton } from './fixtures.js';
 
 async function openEditor(page: Page, duration = 10000): Promise<void> {
   await page.route('**/animations/idle.json', async (route) => {
@@ -65,9 +65,10 @@ test('pointer zoom, pan, zoomed scrubbing and dragging retain the shared time pr
   test.setTimeout(60000);
   await openEditor(page);
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Expand rightArmIK properties', exact: true })
-    .evaluate((element) => (element as HTMLElement).click());
+  await (await timelineButton(page, 'Expand rightArmIK properties')).click();
+  await page.locator('.timeline-inset').evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await (await timelineControl(page, '#timeline-zoom')).selectOption('4');
   await jump(page, '5');
   const inset = (await page.locator('.timeline-inset').boundingBox())!;
@@ -159,7 +160,8 @@ test('fit includes hidden keys across properties; time and frame jumps, shortcut
   await expect
     .poll(() => page.locator('#timeline-ruler').getAttribute('aria-valuenow').then(Number))
     .toBeCloseTo(59 / 12, 10);
-  await expect(page.locator('.timeline-keyframe[aria-pressed="true"]')).toHaveCount(2);
+  await expect(page.locator('.timeline-keyframe[aria-pressed="true"]')).toHaveCount(0);
+  await expect(page.locator('#timeline-delete-key')).toContainText('2 hidden');
   await (await animationMenuControl(page, '#timeline-center-playhead')).click();
   await checkAlignment(page);
   await page.setViewportSize({ width: 1280, height: 900 });

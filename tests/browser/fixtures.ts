@@ -158,6 +158,28 @@ export async function timelineControl(page: Page, selector: string): Promise<Loc
   return inspectorControl(page, selector);
 }
 
+/** Find a virtualized label by scrolling the timeline, then let its native button handle the action. */
+export async function timelineButton(page: Page, name: string): Promise<Locator> {
+  const button = page.getByRole('button', { name, exact: true });
+  if (await button.count()) return button;
+  const inset = page.locator('.timeline-inset');
+  await inset.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  for (;;) {
+    await inset.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+    if (await button.count()) return button;
+    const more = await inset.evaluate((element) => {
+      const before = element.scrollTop;
+      element.scrollTop += Math.max(30, element.clientHeight / 2);
+      return element.scrollTop > before;
+    });
+    if (!more) throw new Error(`Timeline button not found: ${name}`);
+  }
+}
+
 /** Reveal the tab and disclosure containing a secondary animation command. */
 export async function animationMenuControl(page: Page, selector: string): Promise<Locator> {
   return inspectorControl(page, selector);

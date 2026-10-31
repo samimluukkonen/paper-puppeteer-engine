@@ -12,6 +12,14 @@ import type { RootMotionController } from './RootMotionController.js';
 import { timeToTimelineX } from './timeline.js';
 import { summarizeKeyframeTimes } from './timelineSummaries.js';
 import { type KeyframeSelection, type TimelineTrack, timelineTrackKey } from './timelineTracks.js';
+import {
+  timelineKeysInRange,
+  timelineRowLayout,
+  timelineRowWindow,
+  TIMELINE_MARKER_OVERSCAN,
+  TIMELINE_ROW_HEIGHT,
+  type TimelineTrackViewport,
+} from './timelineVirtualization.js';
 
 interface TrackElements {
   readonly label: HTMLElement;
@@ -23,12 +31,20 @@ interface TrackElements {
   readonly markers: Map<number, HTMLButtonElement>;
   readonly summaries: Map<number, HTMLElement>;
   track?: TimelineTrack;
-  summary?: { keys: readonly Keyframe[]; expanded: boolean; duration: number; width: number };
+  visibleKeys?: readonly TimelineMarkerKey[];
+  summary?: {
+    keys: readonly Keyframe[];
+    expanded: boolean;
+    duration: number;
+    width: number;
+    times: readonly { time: number }[];
+  };
 }
 
 const emptyKeys: readonly Keyframe[] = Object.freeze([]);
 
 type TimelineKey = KeyframeSelection | IKKeyframeSelection;
+type TimelineMarkerKey = Extract<TimelineTrack, { kind: 'property' | 'ik-property' }>['keyframes'][number];
 function isIKKey(key: TimelineKey): key is IKKeyframeSelection {
   return 'kind' in key;
 }
@@ -73,6 +89,25 @@ export class TimelineTracksController {
   private duration = -1;
   private drag: AnimationEditorState['keyframeDrag'] | undefined;
   private summaryAnimation: AnimationEditorState['workingAnimation'] | undefined;
+  private viewportKey = '';
+  private rangeKey = '';
+  private visibility: AnimationEditorState['timelineVisibility'] | undefined;
+  private visibilityRendered: AnimationEditorState['timelineVisibility'] | undefined;
+  private layout: ReturnType<typeof timelineRowLayout> = [];
+  private readonly labelSpacers = [this.spacer(), this.spacer()];
+  private readonly laneSpacers = [this.spacer(), this.spacer()];
+
+  private spacer(): HTMLElement {
+    const spacer = document.createElement('div');
+    spacer.className = 'timeline-virtual-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+    return spacer;
+  }
+
+  private remove(element: HTMLElement): void {
+    if (element.contains(document.activeElement)) this.lanes.parentElement?.focus({ preventScroll: true });
+    element.remove();
+  }
 
   constructor(
     private readonly labels: HTMLElement,
@@ -149,11 +184,36 @@ export class TimelineTracksController {
     else this.state?.selectKeyframe(key, modifiers);
   }
 
-  render(state: AnimationEditorState, width: number): void {
+  render(state: AnimationEditorState, width: number, viewport: TimelineTrackViewport): void {
     this.state = state;
     this.events.render(state, width);
-    const tracks = state.timelineTracks;
-    const changed = tracks !== this.tracks || this.deformationRevision !== (this.deformation?.revision ?? -1);
+    const visibility = state.timelineVisibility;
+    if (state.timelineTracks !== this.tracks || visibility !== this.visibility) {
+      this.layout = timelineRowLayout(state.timelineTracks, visibility.rows);
+      this.visibility = visibility;
+    }
+    const prefixHeight =
+      (this.root?.lanes.filter((lane) => !lane.hidden).length ?? 0) * TIMELINE_ROW_HEIGHT +
+      (visibility.eventVisible ? state.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
+    const { first, end } = timelineRowWindow(this.layout.length, viewport.top, viewport.height, prefixHeight);
+    const tracks = this.layout.slice(first, end).map(({ track }) => track);
+    const rangeKey = `${viewport.left}:${viewport.width}:${width}:${state.duration}`;
+    const rangeChanged = this.rangeKey !== rangeKey;
+    this.rangeKey = rangeKey;
+    const viewportKey = `${first}:${end}:${rangeKey}`;
+    const viewportChanged = this.viewportKey !== viewportKey;
+    const changed =
+      state.timelineTracks !== this.tracks ||
+      viewportChanged ||
+      visibility !== this.visibilityRendered ||
+      this.deformationRevision !== (this.deformation?.revision ?? -1) ||
+      this.drag !== state.keyframeDrag;
+    this.viewportKey = viewportKey;
+    this.visibilityRendered = visibility;
+    const startTime = ((viewport.left - TIMELINE_MARKER_OVERSCAN) / Math.max(1, width)) * state.duration;
+    const endTime = ((viewport.left + viewport.width + TIMELINE_MARKER_OVERSCAN) / Math.max(1, width)) * state.duration;
+    const movingKeys = keyframeSelectionIndex(state.keyframeDrag?.originalKeys ?? []);
+    const delta = state.keyframeDrag?.previewDelta ?? 0;
     this.deformationRevision = this.deformation?.revision ?? -1;
     const summariesChanged = changed || this.summaryAnimation !== state.workingAnimation;
     this.summaryAnimation = state.workingAnimation;
@@ -162,11 +222,16 @@ export class TimelineTracksController {
     const changedRows = new Set<TrackElements>();
     const newMarkers = new Set<HTMLButtonElement>();
     if (changed) {
-      this.tracks = tracks;
+      this.tracks = state.timelineTracks;
       const keys = new Set(tracks.map(trackKey));
-      for (const key of this.rows.keys()) if (!keys.has(key)) this.rows.delete(key);
-      const labels: HTMLElement[] = [...(this.root?.labels ?? []), this.events.label];
-      const lanes: HTMLElement[] = [...(this.root?.lanes ?? []), this.events.lane];
+      for (const [key, row] of this.rows)
+        if (!keys.has(key)) {
+          this.remove(row.label);
+          this.remove(row.lane);
+          this.rows.delete(key);
+        }
+      const labels: HTMLElement[] = [...(this.root?.labels ?? []), this.events.label, this.labelSpacers[0]!];
+      const lanes: HTMLElement[] = [...(this.root?.lanes ?? []), this.events.lane, this.laneSpacers[0]!];
       for (const track of tracks) {
         const key = trackKey(track);
         let row = this.rows.get(key);
@@ -176,32 +241,46 @@ export class TimelineTracksController {
         }
         labels.push(row.label);
         lanes.push(row.lane);
-        if (row.track === track) continue;
+        const trackChanged = row.track !== track;
+        if (!trackChanged && !viewportChanged && this.drag === state.keyframeDrag) continue;
         changedRows.add(row);
         row.track = track;
-        row.label.style.paddingLeft = `${4 + track.depth * 12}px`;
-        for (const element of [row.label, row.lane]) setAttribute(element, 'data-has-keys', String(track.hasKeys));
-        row.indicator.textContent = track.hasKeys ? '●' : '○';
-        row.indicator.title = track.hasKeys ? 'Contains authored keys' : 'No authored keys';
-        row.indicator.setAttribute('aria-label', row.indicator.title);
-        if (row.expand && (track.kind === 'bone' || track.kind === 'ik')) {
-          row.expand.textContent = track.expanded ? '▼' : '▶';
-          setAttribute(row.expand, 'aria-expanded', String(track.expanded));
-          setAttribute(
-            row.expand,
-            'aria-label',
-            `${track.expanded ? 'Collapse' : 'Expand'} ${trackOwner(track)} properties`,
-          );
+        if (trackChanged) {
+          row.label.style.paddingLeft = `${4 + track.depth * 12}px`;
+          for (const element of [row.label, row.lane]) setAttribute(element, 'data-has-keys', String(track.hasKeys));
+          row.indicator.textContent = track.hasKeys ? '●' : '○';
+          row.indicator.title = track.hasKeys ? 'Contains authored keys' : 'No authored keys';
+          row.indicator.setAttribute('aria-label', row.indicator.title);
+          if (row.expand && (track.kind === 'bone' || track.kind === 'ik')) {
+            row.expand.textContent = track.expanded ? '▼' : '▶';
+            setAttribute(row.expand, 'aria-expanded', String(track.expanded));
+            setAttribute(
+              row.expand,
+              'aria-label',
+              `${track.expanded ? 'Collapse' : 'Expand'} ${trackOwner(track)} properties`,
+            );
+          }
         }
         if (isProperty(track)) {
-          const times = new Set(track.keyframes.map((key) => key.time));
+          const visible = new Map(
+            timelineKeysInRange<TimelineMarkerKey>(track.keyframes, startTime, endTime).map((key) => [key.time, key]),
+          );
+          if (delta && track.kind === 'property')
+            for (const key of timelineKeysInRange(track.keyframes, startTime - delta, endTime - delta))
+              if (movingKeys.has(keyIdentity(key))) visible.set(key.time, key);
+          for (const [time, key] of visible) {
+            const preview = time + (!isIKKey(key) && movingKeys.has(keyIdentity(key)) ? delta : 0);
+            if (preview < startTime || preview > endTime) visible.delete(time);
+          }
+          row.visibleKeys = [...visible.values()];
+          const times = new Set(visible.keys());
           for (const [time, marker] of row.markers) {
             if (times.has(time)) continue;
             if (document.activeElement === marker) this.lanes.parentElement?.focus({ preventScroll: true });
             marker.remove();
             row.markers.delete(time);
           }
-          for (const keyframe of track.keyframes) {
+          for (const keyframe of row.visibleKeys) {
             let marker = row.markers.get(keyframe.time);
             if (!marker) {
               marker = document.createElement('button');
@@ -238,15 +317,19 @@ export class TimelineTracksController {
           }
           reconcileRows(
             row.lane,
-            track.keyframes.map((keyframe) => row.markers.get(keyframe.time)!),
+            row.visibleKeys.map((keyframe) => row.markers.get(keyframe.time)!),
           );
         }
       }
-      labels.push(...(this.deformation?.labels ?? []));
-      lanes.push(...(this.deformation?.lanes ?? []));
+      for (const spacers of [this.labelSpacers, this.laneSpacers]) {
+        spacers[0]!.style.height = `${first * TIMELINE_ROW_HEIGHT}px`;
+        spacers[1]!.style.height = `${(this.layout.length - end) * TIMELINE_ROW_HEIGHT}px`;
+      }
+      labels.push(this.labelSpacers[1]!, ...(this.deformation?.labels ?? []));
+      lanes.push(this.laneSpacers[1]!, ...(this.deformation?.lanes ?? []));
       reconcileRows(this.labels, labels);
       reconcileRows(this.lanes, lanes);
-      if (!tracks.length) {
+      if (!state.timelineTracks.length) {
         const empty = document.createElement('p');
         empty.className = 'timeline-empty';
         empty.textContent = 'No bones available.';
@@ -258,7 +341,7 @@ export class TimelineTracksController {
       for (const row of this.rows.values()) {
         const track = row.track;
         if (!track || !isProperty(track) || (!interpolationChanged && !changedRows.has(row))) continue;
-        for (const key of track.keyframes) {
+        for (const key of row.visibleKeys ?? []) {
           const marker = row.markers.get(key.time)!;
           const segment = isIKKey(key) ? undefined : state.getSegmentInterpolation(key);
           const ikCurve = isIKKey(key)
@@ -291,18 +374,33 @@ export class TimelineTracksController {
           summary?.keys === keys &&
           summary.expanded === track.expanded &&
           summary.duration === state.duration &&
-          summary.width === width
+          summary.width === width &&
+          !rangeChanged
         )
           continue;
-        row.summary = { keys, expanded: track.expanded, duration: state.duration, width };
-        const times = track.expanded
-          ? new Set<number>()
-          : summarizeKeyframeTimes(
-              keys,
-              state.duration,
-              width,
-              track.kind === 'ik' ? ikAnimationProperties : undefined,
-            );
+        if (
+          summary?.keys !== keys ||
+          summary.expanded !== track.expanded ||
+          summary.duration !== state.duration ||
+          summary.width !== width
+        ) {
+          const times = track.expanded
+            ? new Set<number>()
+            : summarizeKeyframeTimes(
+                keys,
+                state.duration,
+                width,
+                track.kind === 'ik' ? ikAnimationProperties : undefined,
+              );
+          row.summary = {
+            keys,
+            expanded: track.expanded,
+            duration: state.duration,
+            width,
+            times: [...times].map((time) => ({ time })),
+          };
+        }
+        const times = new Set(timelineKeysInRange(row.summary!.times, startTime, endTime).map(({ time }) => time));
         for (const [time, marker] of row.summaries) {
           if (times.has(time)) continue;
           marker.remove();
@@ -337,7 +435,7 @@ export class TimelineTracksController {
       for (const row of positionedRows) {
         const track = row.track;
         if (!track || !isProperty(track)) continue;
-        for (const key of track.keyframes) position(key, row.markers.get(key.time)!);
+        for (const key of row.visibleKeys ?? []) position(key, row.markers.get(key.time)!);
       }
       if (previousDrag !== this.drag) {
         const affected = keyframeSelectionIndex([
@@ -378,7 +476,8 @@ export class TimelineTracksController {
             (track.kind === 'ik' || track.property === state.selectedIKProperty)
           : track.boneId === this.selectedBone && (track.kind === 'bone' || track.property === this.selectedProperty);
       if (track.kind === 'ik-property')
-        for (const key of track.keyframes) {
+        for (const key of row.visibleKeys ?? []) {
+          if (!isIKKey(key)) continue;
           const marker = row.markers.get(key.time)!;
           const active =
             this.selectedIKKey?.constraintId === key.constraintId &&
@@ -410,7 +509,7 @@ export class TimelineTracksController {
     }
   }
 
-  /** Keep original row indices for marquee selection while changing only visibility. */
+  /** Event visibility and context presentation; property filtering precedes DOM allocation. */
   filter(state: AnimationEditorState): void {
     const visibility = state.timelineVisibility;
     const setHidden = (label: HTMLElement, lane: HTMLElement, hidden: boolean): void => {
@@ -430,6 +529,11 @@ export class TimelineTracksController {
   dispose(): void {
     this.events.dispose();
     this.state = undefined;
+    this.tracks = undefined;
+    this.visibility = undefined;
+    this.visibilityRendered = undefined;
+    this.layout = [];
+    this.summaryAnimation = undefined;
     this.rows.clear();
     this.labels.replaceChildren();
     this.lanes.replaceChildren();

@@ -36,6 +36,9 @@ async function openEditor(page: Page) {
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   for (const bone of ['root', 'torso'])
     await page.getByRole('button', { name: `Expand ${bone} properties`, exact: true }).click();
+  // Keep every group member in the viewport; unmounted rows are covered by the virtualization scenarios.
+  await (await timelineControl(page, '#timeline-filter')).selectOption('keyed');
+  await page.locator('#timeline-tracks-tools-tab').click();
   await page.addStyleTag({ content: '.timeline-inset { max-height: 650px; }' });
 }
 async function marquee(page: Page, start = 0.15, end = 0.65) {

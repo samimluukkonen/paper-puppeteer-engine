@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { test, timelineControl } from './fixtures.js';
 
 async function openEditor(page: Page) {
   await page.route('**/animations/idle.json', async (route) => {
@@ -30,6 +30,8 @@ async function openEditor(page: Page) {
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   for (const bone of ['root', 'torso'])
     await page.getByRole('button', { name: `Expand ${bone} properties`, exact: true }).click();
+  await (await timelineControl(page, '#timeline-filter')).selectOption('keyed');
+  await page.locator('#timeline-tracks-tools-tab').click();
 }
 const lane = (page: Page, bone = 'root', property = 'x') =>
   page.locator(`#timeline-tracks .timeline-track-lane[data-bone-id="${bone}"][data-property="${property}"]`);
@@ -141,7 +143,7 @@ test('marquee coordinates follow scrolling and resize; additive union, cancel, a
   await page.setViewportSize({ width: 1100, height: 1900 });
   await page.addStyleTag({
     content:
-      '.timeline-inset { max-width: 600px; max-height: 310px; overflow-x: auto; grid-template-columns: 160px 520px; }',
+      '.timeline-inset { max-width: 600px; max-height: 250px; overflow-x: auto; grid-template-columns: 160px 520px; }',
   });
   await page.locator('.timeline-inset').evaluate((element) => {
     element.scrollLeft = 70;

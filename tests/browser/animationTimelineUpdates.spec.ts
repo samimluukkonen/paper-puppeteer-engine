@@ -123,10 +123,12 @@ test('dense collapsed summaries follow zoom while individual keys retain exact t
   await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
   await expect(summaries).toHaveCount(0);
   const keys = page.locator('#timeline-tracks [data-bone-id="root"][data-property="x"] .timeline-keyframe');
-  await expect(keys).toHaveCount(513);
+  await expect.poll(() => keys.count()).toBeGreaterThan(0);
+  expect(await keys.count()).toBeLessThan(80);
+  const mountedCount = await keys.count();
   expect(
     await keys.evaluateAll((markers) => markers.map((marker) => Number(marker.getAttribute('data-time')))),
-  ).toEqual(Array.from({ length: 513 }, (_, index) => (index * 10) / 1000));
+  ).toEqual(Array.from({ length: mountedCount }, (_, index) => (index * 10) / 1000));
   await (await timelineControl(page, '#timeline-zoom')).selectOption('1');
   await expect(keys).toHaveCount(513);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');

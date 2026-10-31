@@ -1,3 +1,4 @@
+import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { GraphKeyRef } from './graphEditor.js';
 import { rootKeys } from './rootMotionEdits.js';
@@ -211,8 +212,8 @@ export class RootMotionController {
     }
     for (const [index, property] of ([null, 'x', 'y'] as const).entries()) {
       const selected = state.rootMotionSelected && (!property || state.rootMotionProperty === property);
-      this.labels[index]!.dataset.selected = String(selected);
-      this.labels[index]!.querySelector('button')!.setAttribute('aria-pressed', String(selected));
+      setAttribute(this.labels[index]!, 'data-selected', String(selected));
+      setAttribute(this.labels[index]!.querySelector('button')!, 'aria-pressed', String(selected));
       if (property)
         for (const key of state.workingAnimation ? rootKeys(state.workingAnimation, property) : []) {
           const time = key.time / 1000;

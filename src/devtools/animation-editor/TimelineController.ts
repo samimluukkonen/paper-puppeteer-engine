@@ -14,6 +14,7 @@ import { viewportXToTime } from './timelineNavigation.js';
 import { TimelineNavigationController } from './TimelineNavigationController.js';
 import { TimelineSessionController } from './TimelineSessionController.js';
 import { TimelineTracksController } from './TimelineTracksController.js';
+import { timelineRowLayout, TIMELINE_ROW_HEIGHT, TIMELINE_RULER_HEIGHT } from './timelineVirtualization.js';
 
 /** Coordinates session adapters and renders the ruler, tracks, and playhead. */
 export class TimelineController {
@@ -86,7 +87,14 @@ export class TimelineController {
       },
       () => this.input.cancelGesture(),
     );
-    this.input = new TimelineInputController(app, this.timeline, () => this.state, this.ruler, this.navigation);
+    this.input = new TimelineInputController(
+      app,
+      this.timeline,
+      () => this.state,
+      this.ruler,
+      this.navigation,
+      () => this.revealSelection(),
+    );
     this.width = this.timeline.getBoundingClientRect().width;
     this.resize = new ResizeObserver(() => {
       if (this.resizeFrame) return;
@@ -143,6 +151,7 @@ export class TimelineController {
       () => {
         this.input.cancelGesture();
         this.state.revealTimelineSelection();
+        this.revealSelection();
         const selected =
           this.element('#timeline-tracks').querySelector<HTMLElement>(
             '[data-primary="true"], .timeline-event[aria-pressed="true"]',
@@ -174,6 +183,37 @@ export class TimelineController {
     const element = this.app.querySelector<T>(selector);
     if (!element) throw new Error(`Missing animation editor element ${selector}.`);
     return element;
+  }
+
+  /** Scroll using model geometry before looking for a virtualized selection's element. */
+  private revealSelection(): void {
+    const state = this.state;
+    const layout = timelineRowLayout(state.timelineTracks, state.timelineVisibility.rows);
+    const key = state.selectedIKKeyframe ?? state.primaryKey;
+    const index = layout.findIndex(({ track }) =>
+      'constraintId' in track
+        ? track.constraintId === state.selectedIKConstraintId &&
+          (state.selectedIKProperty
+            ? track.kind === 'ik-property' && track.property === state.selectedIKProperty
+            : track.kind === 'ik')
+        : track.boneId === state.selectedBoneId &&
+          (state.selectedTimelineProperty
+            ? track.kind === 'property' && track.property === state.selectedTimelineProperty
+            : track.kind === 'bone'),
+    );
+    if (index >= 0) {
+      const prefix =
+        (state.workingAnimation ? 3 * TIMELINE_ROW_HEIGHT : 0) +
+        (state.timelineVisibility.eventVisible ? state.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
+      const top = TIMELINE_RULER_HEIGHT + prefix + index * TIMELINE_ROW_HEIGHT;
+      if (top < this.inset.scrollTop + TIMELINE_RULER_HEIGHT) this.inset.scrollTop = top - TIMELINE_RULER_HEIGHT;
+      else if (top + TIMELINE_ROW_HEIGHT > this.inset.scrollTop + this.inset.clientHeight)
+        this.inset.scrollTop = top + TIMELINE_ROW_HEIGHT - this.inset.clientHeight;
+    }
+    if (key)
+      this.inset.scrollLeft =
+        timeToTimelineX(key.time, state.duration, this.width) - this.navigation.view.viewportWidth / 2;
+    this.render();
   }
 
   bind(state: AnimationEditorState, characterId?: string): void {
@@ -222,11 +262,20 @@ export class TimelineController {
       state.keyframeDrag,
       state.eventDrag,
       width,
+      this.navigation.view.scrollLeft,
+      this.navigation.view.viewportWidth,
+      this.inset.scrollTop,
+      this.inset.clientHeight,
       filters,
       visibility,
     ];
     if (!this.renderedView || view.some((value, index) => value !== this.renderedView![index])) {
-      this.tracks.render(state, width);
+      this.tracks.render(state, width, {
+        top: this.inset.scrollTop - TIMELINE_RULER_HEIGHT,
+        height: this.inset.clientHeight,
+        left: this.navigation.view.scrollLeft,
+        width: this.navigation.view.viewportWidth,
+      });
       this.tracks.filter(state);
       if (this.search.value !== filters.search) this.search.value = filters.search;
       if (this.filter.value !== filters.mode) this.filter.value = filters.mode;

@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Virtualize Animation Editor timeline rows and property-key time ranges before creating elements, releasing offscreen markers and listeners. Keep selection, marquee bounds and navigation in the data model, and scroll to selections before revealing their virtualized controls.
+
 - Use Phaser's GPU-clamped texture limit in editor previews so separate puppet images can batch together. Add a local rendering diagnostic comparing draw calls, submission timings and pixel hashes against the original one-texture configuration.
 
 - Reuse owned Actors for same-position and forward scene seeks, skipping consumed action boundaries and gameplay events. Coalesce ruler scrubbing per display frame, flush on release, cancel obsolete samples on transport/scene changes, and document the remaining backward-seek checkpoint tradeoffs.

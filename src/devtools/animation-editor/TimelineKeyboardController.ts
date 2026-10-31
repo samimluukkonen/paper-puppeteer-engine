@@ -6,6 +6,7 @@ interface KeyboardGestureActions {
   cancelGesture(): void;
   hasMarquee(): boolean;
   navigation?: TimelineNavigationActions | undefined;
+  revealSelection?: (() => void) | undefined;
 }
 
 /** Routes timeline shortcuts and ruler navigation while preserving native typing and pointer cancellation. */
@@ -106,7 +107,10 @@ export class TimelineKeyboardController {
             event.preventDefault();
             if (!event.repeat) {
               action();
-              if (command === '[' || command === ']') navigation?.centerPlayhead();
+              if (command === '[' || command === ']') {
+                navigation?.centerPlayhead();
+                this.gestures.revealSelection?.();
+              }
             }
             return;
           }

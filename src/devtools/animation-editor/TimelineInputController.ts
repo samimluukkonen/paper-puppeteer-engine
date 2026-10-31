@@ -4,6 +4,7 @@ import type { IKKeyframeSelection } from './ikTimeline.js';
 import { timelineXToTime, timeToTimelineX } from './timeline.js';
 import { TimelineKeyboardController } from './TimelineKeyboardController.js';
 import type { KeyframeSelection } from './timelineTracks.js';
+import { timelineRowLayout, TIMELINE_ROW_HEIGHT, TIMELINE_RULER_HEIGHT } from './timelineVirtualization.js';
 
 export interface TimelineNavigationActions {
   zoomBy(factor: number): void;
@@ -59,12 +60,14 @@ export class TimelineInputController {
     private readonly getState: () => AnimationEditorState,
     private readonly scrubber: HTMLElement,
     navigation?: TimelineNavigationActions,
+    revealSelection?: () => void,
   ) {
     const options = { signal: this.abort.signal };
     this.keyboard = new TimelineKeyboardController(app, timeline, getState, scrubber, {
       cancelGesture: () => this.cancelGesture(),
       hasMarquee: () => this.gesture?.kind === 'marquee',
       navigation,
+      revealSelection,
     });
     this.timeline.addEventListener(
       'pointerdown',
@@ -323,16 +326,15 @@ export class TimelineInputController {
     const bounds = this.timeline.getBoundingClientRect();
     const minY = Math.min(box.startY, box.clientY - bounds.top);
     const maxY = Math.max(box.startY, box.clientY - bounds.top);
-    // Event lanes have their own height/identity and never participate in key marquee row indices.
-    const rows = Array.from(
-      this.timeline.querySelectorAll<HTMLElement>(
-        '.timeline-track-lane:not(.timeline-event-track):not(.timeline-root-track):not(.timeline-deformation-track)',
-      ),
-    );
-    const included = rows.flatMap((row, index) => {
-      const rect = row.getBoundingClientRect();
-      if (rect.height === 0) return [];
-      const center = rect.top - bounds.top + rect.height / 2;
+    // The model includes unmounted rows crossed while scrolling a marquee.
+    const visibility = this.state.timelineVisibility;
+    const prefix =
+      TIMELINE_RULER_HEIGHT +
+      (this.state.workingAnimation ? 3 * TIMELINE_ROW_HEIGHT : 0) +
+      (visibility.eventVisible ? this.state.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
+    const rows = timelineRowLayout(this.state.timelineTracks, visibility.rows);
+    const included = rows.flatMap(({ index }, position) => {
+      const center = prefix + (position + 0.5) * TIMELINE_ROW_HEIGHT;
       return center >= minY && center <= maxY ? [index] : [];
     });
     this.state.selectKeyframeMarquee(

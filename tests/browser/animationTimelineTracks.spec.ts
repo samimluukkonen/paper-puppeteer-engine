@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { animationFileSchema } from '../../src/engine/schemas.js';
-import { timelineControl, animationHierarchy, test, inspectorControl } from './fixtures.js';
+import { timelineControl, animationHierarchy, test, inspectorControl, timelineButton } from './fixtures.js';
 
 async function openEditor(page: Page): Promise<void> {
   await page.goto('animation-editor/');
@@ -13,6 +13,7 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   page,
 }) => {
   await openEditor(page);
+  await page.addStyleTag({ content: '.animation-layout.view-content { --upper-share: 10; }' });
   const labels = page.locator('#timeline-track-labels');
   const expectedBones = await (await animationHierarchy(page)).locator('.tree-entry').allTextContents();
   expect(
@@ -25,20 +26,17 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   const initialTime = await page.locator('#timeline-ruler').getAttribute('aria-valuenow');
   await (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }).click();
   await inspectorControl(page, '#animation-bone-inspector');
-  await expect(labels.getByRole('button', { name: 'Select bone rightForearm', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await labels.getByRole('button', { name: 'Expand rightForearm properties', exact: true }).click();
+  await expect(await timelineButton(page, 'Select bone rightForearm')).toHaveAttribute('aria-pressed', 'true');
+  await (await timelineButton(page, 'Expand rightForearm properties')).click();
   await expect(
     labels.locator('.timeline-property-track[data-bone-id="rightForearm"] .timeline-track-select'),
   ).toHaveText(['x', 'y', 'rotation', 'scaleX', 'scaleY']);
-  await labels.getByRole('button', { name: 'Select rightForearm rotation track', exact: true }).click();
+  await (await timelineButton(page, 'Select rightForearm rotation track')).click();
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: rightForearm');
   await expect(
     (await animationHierarchy(page)).getByRole('button', { name: 'rightForearm', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await expect(labels.getByRole('button', { name: 'Select rightForearm rotation track', exact: true })).toHaveAttribute(
+  await expect(await timelineButton(page, 'Select rightForearm rotation track')).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -47,12 +45,12 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
   ).toHaveAttribute('data-selected', 'true');
   await expect(page.locator('#timeline-ruler')).toHaveAttribute('aria-valuenow', initialTime!);
 
-  await labels.getByRole('button', { name: 'Select bone torso', exact: true }).click();
+  await (await timelineButton(page, 'Select bone torso')).click();
   await expect((await animationHierarchy(page)).getByRole('button', { name: 'torso', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
-  await expect(labels.getByRole('button', { name: 'Select rightForearm rotation track', exact: true })).toHaveAttribute(
+  await expect(await timelineButton(page, 'Select rightForearm rotation track')).toHaveAttribute(
     'aria-pressed',
     'false',
   );
@@ -97,26 +95,23 @@ test('demo tracks match hierarchy order and synchronize bone/property selection 
     })
     .toBe(true);
   if (!rootPoint) throw new Error('Missing rendered root selection ring.');
-  await labels.getByRole('button', { name: 'Select bone torso', exact: true }).click();
+  await (await timelineButton(page, 'Select bone torso')).click();
   await (await timelineControl(page, '#timeline-search')).fill('IK:');
   await canvas.click({ position: rootPoint });
   await expect(page.locator('#animation-bone-title')).toHaveText('Bone: root');
   await expect(page.locator('#timeline-selection-status')).toContainText('The selected track is hidden');
   await (await timelineControl(page, '#timeline-reveal-selection')).click();
   await expect(page.locator('#timeline-search')).toHaveValue('');
-  await expect(labels.getByRole('button', { name: 'Select bone root', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(await timelineButton(page, 'Select bone root')).toHaveAttribute('aria-pressed', 'true');
   await expect((await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
 
-  const collapse = labels.getByRole('button', { name: 'Collapse rightForearm properties', exact: true });
+  const collapse = await timelineButton(page, 'Collapse rightForearm properties');
   await collapse.focus();
   await page.keyboard.press('Space');
-  await expect(labels.getByRole('button', { name: 'Expand rightForearm properties', exact: true })).toBeFocused();
+  await expect(await timelineButton(page, 'Expand rightForearm properties')).toBeFocused();
   await expect(labels.locator('.timeline-property-track[data-bone-id="rightForearm"]')).toHaveCount(0);
   await expect(page.locator('#play-pause')).toHaveText('Play');
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -128,8 +123,8 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
 }) => {
   await openEditor(page);
   for (const bone of ['root', 'torso', 'rightUpperArm'])
-    await page.getByRole('button', { name: `Expand ${bone} properties`, exact: true }).click();
-  await page.getByRole('button', { name: 'Select torso y track', exact: true }).click();
+    await (await timelineButton(page, `Expand ${bone} properties`)).click();
+  await (await timelineButton(page, 'Select torso y track')).click();
   const alignment = async () => {
     const result = await page.evaluate(() => {
       const labels = Array.from(document.querySelectorAll('#timeline-track-labels .timeline-track-label'));
@@ -168,7 +163,7 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
   expect(Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow'))).toBeCloseTo(1.8 * 0.4, 2);
   const playhead = await page.locator('#timeline-playhead').boundingBox();
   expect(playhead!.x).toBeCloseTo(box.x + box.width * 0.4, 0);
-  const lastLane = await page.locator('#timeline-tracks .timeline-track-lane').last().boundingBox();
+  const lastLane = await page.locator('#timeline-tracks').boundingBox();
   expect(playhead!.y + playhead!.height).toBeCloseTo(lastLane!.y + lastLane!.height, 0);
 
   await page.locator('#preview-loop').click();
@@ -178,16 +173,10 @@ test('labels and full-width lanes stay aligned through expansion, scrolling, pla
   await expect
     .poll(async () => Number(await page.locator('#timeline-ruler').getAttribute('aria-valuenow')))
     .not.toBe(time);
-  await expect(page.getByRole('button', { name: 'Select torso y track', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await expect(page.getByRole('button', { name: 'Collapse torso properties', exact: true })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  await expect(await timelineButton(page, 'Select torso y track')).toHaveAttribute('aria-pressed', 'true');
+  await expect(await timelineButton(page, 'Collapse torso properties')).toHaveAttribute('aria-expanded', 'true');
   expect(await page.locator('.timeline-inset').evaluate((element) => element.scrollTop)).toBe(scrollTop);
-  await page.getByRole('button', { name: 'Expand head properties', exact: true }).click();
+  await (await timelineButton(page, 'Expand head properties')).click();
   await expect(page.locator('#play-pause')).toHaveText('Pause');
   await page.locator('#play-pause').click();
   await alignment();
@@ -218,9 +207,9 @@ test('unkeyed bones/properties remain available, key presence refreshes, and no 
   const labels = page.locator('#timeline-track-labels');
   expect(await labels.locator('.timeline-bone-track').count()).toBeGreaterThan(1);
   await expect(labels.locator('[data-has-keys="true"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Expand root properties', exact: true }).click();
-  await page.getByRole('button', { name: 'Select root x track', exact: true }).click();
-  await page.getByRole('button', { name: 'Set X key', exact: true }).click();
+  await (await timelineButton(page, 'Expand root properties')).click();
+  await (await timelineButton(page, 'Select root x track')).click();
+  await (await timelineButton(page, 'Set X key')).click();
   await expect(labels.locator('[data-bone-id="root"][data-property="x"]')).toHaveAttribute('data-has-keys', 'true');
   await expect(labels.locator('.timeline-bone-track[data-bone-id="root"]')).toHaveAttribute('data-has-keys', 'true');
   await page.locator('#animation-undo').click();
@@ -228,11 +217,8 @@ test('unkeyed bones/properties remain available, key presence refreshes, and no 
   await page.locator('#animation-selection').selectOption('');
   await expect(page.locator('#timeline')).toHaveAttribute('aria-disabled', 'true');
   await expect(page.locator('#current-time')).toHaveText('0.000 / 0.000 s');
-  await expect(page.getByRole('button', { name: 'Collapse root properties', exact: true })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
-  await page.getByRole('button', { name: 'Select root rotation track', exact: true }).click();
+  await expect(await timelineButton(page, 'Collapse root properties')).toHaveAttribute('aria-expanded', 'true');
+  await (await timelineButton(page, 'Select root rotation track')).click();
   await expect((await animationHierarchy(page)).getByRole('button', { name: 'root', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',

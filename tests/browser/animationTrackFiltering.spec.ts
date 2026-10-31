@@ -1,8 +1,10 @@
 import { expect, type Page } from '@playwright/test';
-import { timelineControl, animationMenuControl, test } from './fixtures.js';
+import { timelineControl, animationMenuControl, test, timelineButton } from './fixtures.js';
 
 async function openEditor(page: Page) {
+  await page.setViewportSize({ width: 1600, height: 1800 });
   await page.goto('animation-editor/');
+  await page.addStyleTag({ content: '.animation-layout.view-content { --upper-share: 10; }' });
   await expect(page.locator('#animation-status')).toHaveText('Validation: OK');
   await expect(page.locator('#animation-stage canvas')).toBeVisible();
 }
@@ -56,9 +58,14 @@ test('search, keyed/IK/event filters, expansion and playback preserve the author
   await page.locator('#play-pause').click();
   await (await timelineControl(page, '#timeline-search')).fill('missing-track-name');
   await expect(page.locator('#timeline-filter-empty')).toBeVisible();
-  await expect(labels.locator('.timeline-track-label:visible')).toHaveCount(0);
+  await expect(
+    labels.locator('.timeline-track-label:not(.timeline-root-track):not(.timeline-deformation-track):visible'),
+  ).toHaveCount(0);
   await (await animationMenuControl(page, '#timeline-clear-filters')).click();
+  // Expanded rows can exceed the viewport; collapse before checking the complete bone inventory.
+  await (await animationMenuControl(page, '#timeline-collapse-all')).click();
   await expect(labels.locator('.timeline-bone-track:visible')).toHaveCount(allBones);
+  await (await timelineButton(page, 'Expand torso properties')).click();
   await expect(labels.locator('.timeline-property-track[data-bone-id="torso"]')).toHaveCount(5);
   await expect(labels.locator('.timeline-property-track[data-bone-id="rightForearm"]')).toHaveCount(0);
   await expect(page.locator('#animation-dirty')).toHaveText('No unsaved changes');
@@ -80,12 +87,11 @@ test('hidden selected keys retain their count, deletion scope and reveal behavio
     });
   });
   await openEditor(page);
-  for (const bone of ['root', 'rightForearm'])
-    await page.getByRole('button', { name: `Expand ${bone} properties`, exact: true }).click();
-  await page.getByRole('button', { name: 'Select root x key at 0 s', exact: true }).click();
+  for (const bone of ['root', 'rightForearm']) await (await timelineButton(page, `Expand ${bone} properties`)).click();
+  await page.getByRole('button', { name: 'Select root x key at 0 s', exact: true }).press('Enter');
   await page
     .getByRole('button', { name: 'Select rightForearm rotation key at 0 s', exact: true })
-    .click({ modifiers: ['ControlOrMeta'] });
+    .dispatchEvent('click', { detail: 0, ctrlKey: true });
   await (await timelineControl(page, '#timeline-search')).fill('forearm');
   await expect(page.locator('#timeline-delete-key')).toHaveText('Delete 2 Selected Keys (1 hidden)');
   await expect(page.locator('#timeline-selection-status')).toContainText('Commands affect all selected keys');
@@ -99,8 +105,8 @@ test('hidden selected keys retain their count, deletion scope and reveal behavio
   await page.locator('#animation-undo').click();
   await (await animationMenuControl(page, '#timeline-clear-filters')).click();
   await expect(page.locator('.timeline-keyframe[data-time="0"]')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Expand rightArmIK properties', exact: true }).click();
-  await page.getByRole('button', { name: 'Select rightArmIK mix key at 0 s', exact: true }).click();
+  await (await timelineButton(page, 'Expand rightArmIK properties')).click();
+  await page.getByRole('button', { name: 'Select rightArmIK mix key at 0 s', exact: true }).press('Enter');
   await (await animationMenuControl(page, '#timeline-show-ik')).uncheck();
   await expect(page.locator('#timeline-delete-key')).toHaveText('Delete 1 Selected Key (1 hidden)');
   await (await timelineControl(page, '#timeline-reveal-selection')).click();
