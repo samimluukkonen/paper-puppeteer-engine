@@ -54,6 +54,15 @@
 .project-assets span {
   display: block;
 }
+.project-template-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.project-template-toggle input {
+  flex: none;
+  margin: 0;
+}
 .project-editor-host {
   display: block;
   width: 100%;

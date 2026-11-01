@@ -554,7 +554,7 @@ export function ProjectView() {
                         </label>
                       )}
                       {!entry.variant && (
-                        <label>
+                        <label className="project-template-toggle">
                           <input
                             type="checkbox"
                             checked={!!entry.template}
@@ -562,7 +562,7 @@ export function ProjectView() {
                             onChange={(event) =>
                               attempt(() => workspace.setCharacterTemplate(entry.id, event.target.checked))
                             }
-                          />{' '}
+                          />
                           Reusable template
                         </label>
                       )}
