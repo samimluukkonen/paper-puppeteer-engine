@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Add matching Lucide icons to Scene Editor Edit-row buttons, inspector tabs and timeline tabs, preserving visible labels and keyboard controls.
+
 - Vertically center the Reusable template checkbox with its label in Project Workspace’s Characters section.
 
 - Prioritize installation, first-project setup, runtime integration and current limitations in the README; move historical milestone summaries and readiness links into dedicated release notes.

@@ -1,3 +1,13 @@
+import ClipboardPaste from 'lucide-react/icons/clipboard-paste';
+import Copy from 'lucide-react/icons/copy';
+import Download from 'lucide-react/icons/download';
+import FilePlus2 from 'lucide-react/icons/file-plus-2';
+import Library from 'lucide-react/icons/library';
+import Package from 'lucide-react/icons/package';
+import Redo2 from 'lucide-react/icons/redo-2';
+import RotateCcw from 'lucide-react/icons/rotate-ccw';
+import ShieldCheck from 'lucide-react/icons/shield-check';
+import Undo2 from 'lucide-react/icons/undo-2';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { readJsonFile } from '../../engine/jsonInput.js';
 import { encodePackageZip, PACKAGE_MAX_FILE_BYTES } from '../../engine/packageZip.js';
@@ -221,6 +231,7 @@ export function SceneEditorView({
               <div className="workspace-command-bar" aria-label="Scene document commands">
                 <div hidden={!!project} className="scene-transfer-commands">
                   <button type="button" data-guide-id={GUIDE_TARGETS.sceneNew} onClick={openNew}>
+                    <FilePlus2 size={16} aria-hidden="true" />
                     New Scene
                   </button>
                   <label className="scene-open">
@@ -242,6 +253,7 @@ export function SceneEditorView({
                     />
                   </label>
                   <button type="button" disabled={loading} onClick={() => pasteDialog.current?.showModal()}>
+                    <ClipboardPaste size={16} aria-hidden="true" />
                     Paste scene JSON
                   </button>
                 </div>
@@ -269,6 +281,7 @@ export function SceneEditorView({
                   disabled={!scene || document.hasActiveGesture}
                   onClick={() => setReuseOpen(true)}
                 >
+                  <Library size={16} aria-hidden="true" />
                   Choreography & templates
                 </button>
                 <button
@@ -279,6 +292,7 @@ export function SceneEditorView({
                     document.undo();
                   }}
                 >
+                  <Undo2 size={16} aria-hidden="true" />
                   Undo
                 </button>
                 <button
@@ -288,6 +302,7 @@ export function SceneEditorView({
                     document.redo();
                   }}
                 >
+                  <Redo2 size={16} aria-hidden="true" />
                   Redo
                 </button>
                 <button
@@ -298,12 +313,15 @@ export function SceneEditorView({
                       document.revertScene({ discardChanges: true });
                   }}
                 >
+                  <RotateCcw size={16} aria-hidden="true" />
                   Revert
                 </button>
                 <button type="button" disabled={!scene || loading} onClick={() => exportScene('validate')}>
+                  <ShieldCheck size={16} aria-hidden="true" />
                   Validate Scene
                 </button>
                 <button type="button" disabled={!scene || loading} onClick={() => exportScene('copy')}>
+                  <Copy size={16} aria-hidden="true" />
                   Copy Scene JSON
                 </button>
                 <button
@@ -313,6 +331,7 @@ export function SceneEditorView({
                   title="Download scene JSON (Ctrl/Cmd+S)"
                   onClick={() => exportScene('json')}
                 >
+                  <Download size={16} aria-hidden="true" />
                   Download scene JSON
                 </button>
                 <button
@@ -321,6 +340,7 @@ export function SceneEditorView({
                   disabled={!scene || loading}
                   onClick={() => exportScene('zip')}
                 >
+                  <Package size={16} aria-hidden="true" />
                   Download scene package
                 </button>
               </div>

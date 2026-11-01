@@ -1,3 +1,9 @@
+import Blend from 'lucide-react/icons/blend';
+import Camera from 'lucide-react/icons/camera';
+import Eye from 'lucide-react/icons/eye';
+import ListVideo from 'lucide-react/icons/list-video';
+import MessagesSquare from 'lucide-react/icons/messages-square';
+import Volume2 from 'lucide-react/icons/volume-2';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
 import type { SceneAudioClip } from '../../engine/sceneAudio.js';
@@ -174,6 +180,7 @@ export function SceneTimeline({
           {
             id: 'scene-timeline-actions',
             label: 'Actions',
+            icon: ListVideo,
             content: (
               <>
                 <div className="scene-timeline-toolbar">
@@ -222,6 +229,7 @@ export function SceneTimeline({
           {
             id: 'scene-timeline-camera',
             label: 'Camera',
+            icon: Camera,
             content: (
               <div className="scene-timeline-toolbar">
                 <button
@@ -253,6 +261,7 @@ export function SceneTimeline({
           {
             id: 'scene-timeline-transitions',
             label: 'Transitions',
+            icon: Blend,
             content: (
               <div className="scene-timeline-toolbar">
                 <label>
@@ -288,11 +297,13 @@ export function SceneTimeline({
           {
             id: 'scene-timeline-dialogue',
             label: 'Dialogue',
+            icon: MessagesSquare,
             content: <SceneDialogueControls document={document} playback={playback} />,
           },
           {
             id: 'scene-timeline-audio',
             label: 'Audio',
+            icon: Volume2,
             content: (
               <>
                 <SceneAudioControls document={document} playback={playback} />
@@ -305,6 +316,7 @@ export function SceneTimeline({
           {
             id: 'scene-timeline-view',
             label: 'View',
+            icon: Eye,
             content: (
               <>
                 <div className="scene-timeline-toolbar">

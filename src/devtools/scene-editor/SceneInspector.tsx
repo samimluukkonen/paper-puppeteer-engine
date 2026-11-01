@@ -1,3 +1,10 @@
+import Blend from 'lucide-react/icons/blend';
+import Camera from 'lucide-react/icons/camera';
+import Clapperboard from 'lucide-react/icons/clapperboard';
+import Image from 'lucide-react/icons/image';
+import MessagesSquare from 'lucide-react/icons/messages-square';
+import Users from 'lucide-react/icons/users';
+import Volume2 from 'lucide-react/icons/volume-2';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -102,6 +109,7 @@ export function SceneInspector({
           {
             id: 'scene-inspector-scene',
             label: 'Scene',
+            icon: Clapperboard,
             content: (
               <>
                 <SceneProperties scene={scene} document={document} />
@@ -118,6 +126,7 @@ export function SceneInspector({
           {
             id: 'scene-inspector-actors',
             label: 'Actors',
+            icon: Users,
             content: (
               <>
                 <SceneActorsPanel scene={scene} document={document} registry={registry} />
@@ -130,11 +139,13 @@ export function SceneInspector({
           {
             id: 'scene-inspector-camera',
             label: 'Camera',
+            icon: Camera,
             content: <SceneCameraPanel document={document} playback={playback} />,
           },
           {
             id: 'scene-inspector-artwork',
             label: 'Artwork',
+            icon: Image,
             content: (
               <>
                 <SceneArtworkPanel document={document} />
@@ -145,16 +156,19 @@ export function SceneInspector({
           {
             id: 'scene-inspector-dialogue',
             label: 'Dialogue',
+            icon: MessagesSquare,
             content: <SceneDialogueInspector document={document} />,
           },
           {
             id: 'scene-inspector-audio',
             label: 'Audio',
+            icon: Volume2,
             content: <SceneAudioInspector document={document} />,
           },
           {
             id: 'scene-inspector-transitions',
             label: 'Transitions',
+            icon: Blend,
             content: <SceneTransitionPanel document={document} />,
           },
         ]}
