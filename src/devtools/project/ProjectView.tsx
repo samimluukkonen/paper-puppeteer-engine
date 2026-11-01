@@ -667,7 +667,12 @@ export function ProjectView() {
                         {entry.id} · {workspace.sceneDirty(entry.id) ? 'Document modified' : 'Project checkpoint'}
                       </span>
                       <div className="project-actions">
-                        <button disabled={busy} onClick={() => run(() => openAsset('scene', entry.id))}>
+                        <button
+                          className="workspace-button-with-icon"
+                          disabled={busy}
+                          onClick={() => run(() => openAsset('scene', entry.id))}
+                        >
+                          <LayoutTemplate size={16} aria-hidden="true" />
                           Scene Editor
                         </button>
                         <button
