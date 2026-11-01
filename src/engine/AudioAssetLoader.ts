@@ -244,6 +244,7 @@ export class AudioAssetLoader {
   private readonly resources = new Set<DecodedAudioResource>();
   private readonly decodes = new AudioDecodeQueue();
   private decodedBytes = 0;
+  private readonly resourceKeys = new Map<DecodedAudioResource, string>();
   private playback: AudioPlayback | undefined;
   private generation = 0;
   private cacheGeneration = 0;
@@ -309,6 +310,7 @@ export class AudioAssetLoader {
           throw new Error(AUDIO_DECODE_BUDGET_ERROR);
         }
         this.resources.add(resource);
+        this.resourceKeys.set(resource, digest);
         this.decodedBytes += resource.byteLength;
         return resource;
       });
@@ -360,6 +362,15 @@ export class AudioAssetLoader {
     this.playback = undefined;
     playback?.stop();
   }
+  /** Evict only after the host has released every consumer of this resource. */
+  evict(resource: DecodedAudioResource): void {
+    if (!this.resources.delete(resource)) return;
+    const key = this.resourceKeys.get(resource);
+    if (key) this.cache.delete(key);
+    this.resourceKeys.delete(resource);
+    this.decodedBytes -= resource.byteLength;
+    resource.dispose();
+  }
   /** Release decoded memory while retaining the backend for a later audition. */
   clear(): void {
     const errors: unknown[] = [];
@@ -373,6 +384,7 @@ export class AudioAssetLoader {
     this.cacheGeneration++;
     const resources = [...this.resources];
     this.resources.clear();
+    this.resourceKeys.clear();
     this.cache.clear();
     this.decodedBytes = 0;
     for (const resource of resources) {

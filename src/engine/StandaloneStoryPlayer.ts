@@ -1,12 +1,15 @@
 import type Phaser from 'phaser';
 import type { CameraViewport } from './cinematicCamera.js';
 import { DialogueKeyboardInput } from './DialogueKeyboardInput.js';
-import type { LoadedScene } from './SceneLoader.js';
+import type { LoadedScene, PreparedScene } from './SceneLoader.js';
 import type { AdvanceResult } from './ScenePlayback.js';
 import { StoryPlayer, type StoryPlayerOptions, type StoryPlayerStatus } from './StoryPlayer.js';
 
-export interface StandaloneStorySource extends Omit<StoryPlayerOptions, 'loadScene'> {
+export interface StandaloneStorySource extends Omit<StoryPlayerOptions, 'loadScene' | 'prepareScene'> {
   readonly definition: unknown;
+  readonly prepareScene?: (...args: Parameters<StoryPlayerOptions['loadScene']>) => Promise<PreparedScene>;
+  /** Release archive caches/context after the player's sessions have been disposed. */
+  dispose?(): void;
   /** Use SceneLoader.fromDefinition, load or loadPackage with context.signal. */
   readonly loadScene: (...args: Parameters<StoryPlayerOptions['loadScene']>) => Promise<LoadedScene>;
 }
@@ -23,6 +26,7 @@ export interface StandaloneStoryPlayerOptions {
  */
 export class StandaloneStoryPlayer {
   private player: StoryPlayer | undefined;
+  private source: StandaloneStorySource | undefined;
   private loaded: LoadedScene | undefined;
   private controller: AbortController | undefined;
   private readonly keyboard: DialogueKeyboardInput;
@@ -95,6 +99,8 @@ export class StandaloneStoryPlayer {
     this.stop();
     this.player?.dispose();
     this.player = undefined;
+    this.source?.dispose?.();
+    this.source = undefined;
     const generation = this.generation;
     const controller = new AbortController();
     this.controller = controller;
@@ -102,35 +108,54 @@ export class StandaloneStoryPlayer {
     this.publish();
     try {
       const source = await this.options.loadStory(storyId, controller.signal);
-      if (generation !== this.generation) return;
-      this.player = new StoryPlayer(source.definition, {
-        ...source,
-        loadScene: async (definition, context) => {
-          const loaded = await source.loadScene(definition, context);
-          try {
-            context.signal.throwIfAborted();
-            loaded.applyCamera(this.scene.cameras.main, this.options.viewport);
-          } catch (error) {
+      if (generation !== this.generation) {
+        source.dispose?.();
+        return;
+      }
+      this.source = source;
+      const attach = (loaded: LoadedScene, signal: AbortSignal): LoadedScene => {
+        try {
+          signal.throwIfAborted();
+          loaded.applyCamera(this.scene.cameras.main, this.options.viewport);
+        } catch (error) {
+          loaded.dispose();
+          throw error;
+        }
+        this.loaded = loaded;
+        return {
+          ...loaded,
+          dispose: () => {
+            if (this.loaded === loaded) this.loaded = undefined;
             loaded.dispose();
-            throw error;
-          }
-          this.loaded = loaded;
-          return {
-            runner: loaded.runner,
-            dispose: () => {
-              if (this.loaded === loaded) this.loaded = undefined;
-              loaded.dispose();
-            },
-          };
-        },
+          },
+        };
+      };
+      const { prepareScene, ...sourceOptions } = source;
+      this.player = new StoryPlayer(source.definition, {
+        ...sourceOptions,
+        ...(prepareScene
+          ? {
+              prepareScene: async (definition, context) => {
+                const prepared = await prepareScene(definition, context);
+                return {
+                  dispose: () => prepared.dispose(),
+                  activate: async () => attach(await prepared.activate(), context.signal),
+                };
+              },
+            }
+          : {}),
+        loadScene: async (definition, context) => attach(await source.loadScene(definition, context), context.signal),
       });
     } catch (error) {
       if (generation !== this.generation) return;
+      this.source?.dispose?.();
+      this.source = undefined;
       this.failure = error;
       throw error;
     } finally {
       if (generation === this.generation) {
         this.loading = false;
+        this.controller = undefined;
         this.publish();
       }
     }
@@ -195,10 +220,16 @@ export class StandaloneStoryPlayer {
     this.indicator.remove();
     this.player?.dispose();
     this.player = undefined;
+    this.source?.dispose?.();
+    this.source = undefined;
   };
 
   private readonly tick = (_time: number, delta: number): void => {
-    if (this.closed || this.ticking === this.generation || !this.player) return;
+    if (this.closed || !this.player) return;
+    if (this.ticking === this.generation) {
+      this.publish();
+      return;
+    }
     const generation = this.generation;
     this.ticking = generation;
     void this.player
@@ -227,7 +258,11 @@ export class StandaloneStoryPlayer {
           ? 'Story complete'
           : this.status === 'failed'
             ? `Story playback failed: ${this.error instanceof Error ? this.error.message : String(this.error)}`
-            : '';
+            : this.status === 'loading'
+              ? 'Loading story scene...'
+              : this.status === 'transitioning'
+                ? 'Scene transition...'
+                : '';
     if (this.indicator.textContent !== text) this.indicator.textContent = text;
     this.indicator.hidden = !text;
   }

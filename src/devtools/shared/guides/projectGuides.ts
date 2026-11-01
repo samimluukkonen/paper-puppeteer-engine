@@ -36,6 +36,12 @@ export const projectGuides: readonly GuideDefinition[] = [
         'Create scenes in **Scenes** first. In **Story Sequence**, choose an **Existing scene** and **Add Scene**. Use **Up** and **Down** to change playback order; each completed move is one project history operation. **Duplicate entry** inserts another reference immediately after the original. Repeated scenes have independent playback sessions.',
       ),
       step(
+        'handoff',
+        'Choose scene arrival transitions',
+        T.projectStories,
+        'Each **Entry transition** defaults to **Direct cut**. Choose **Fade through color**, then set **Fade duration (ms)** and **Fade color**. The story covers the outgoing scene, holds the color during loading and reveals the next scene before starting its clock. Its opening **Wait for Enter** line remains waiting. Only current/next assets are prepared. Transitions belong to entries and use **Undo Project / Redo Project**. This tour only explains the controls.',
+      ),
+      step(
         'source',
         'Edit the shared source',
         T.projectStories,
@@ -63,7 +69,7 @@ export const projectGuides: readonly GuideDefinition[] = [
         'save',
         'Save and recover the complete story',
         T.projectExport,
-        '**Undo Project / Redo Project** restore story names and sequence edits. Scene dialogue uses its own Undo/Redo. Browser autosave includes committed stories and scenes; use **Local draft** for status and recovery. **Export Project** creates a portable ZIP; **Import Project** restores all stories, shared scenes and dependencies. This tour never exports, changes checkpoints or authors history.',
+        '**Undo Project / Redo Project** restore story names and sequence edits. Scene dialogue uses its own Undo/Redo. Browser autosave includes committed stories and scenes; use **Local draft** for status and recovery. **Download story package** exports this story and its dependencies for the standalone runtime, sharing identical artwork/audio binaries. **Export Project** creates an editable workspace ZIP; **Import Project** restores all stories, shared scenes and dependencies. This tour never exports, changes checkpoints or authors history.',
       ),
     ],
   },

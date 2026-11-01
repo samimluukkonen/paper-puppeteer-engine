@@ -2,9 +2,13 @@ import ArrowDown from 'lucide-react/icons/arrow-down';
 import ArrowUp from 'lucide-react/icons/arrow-up';
 import ListOrdered from 'lucide-react/icons/list-ordered';
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { safeFilename } from '../../engine/assetFilename.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { StoryDefinition } from '../../engine/StoryDefinition.js';
+import { downloadBlob } from '../../shared/downloadJson.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
+import { buildProjectStoryPackage } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 import { storyDiagnostics } from './storyDiagnostics.js';
 
@@ -27,6 +31,9 @@ export function StorySequencePanel({
   const [name, setName] = useState('');
   const [sceneId, setSceneId] = useState('');
   const [message, setMessage] = useState('');
+  const transfer = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => transfer.current?.abort(), [workspace]);
+  const [exporting, setExporting] = useState(false);
   const [preview, setPreview] = useState<DeepReadonly<StoryDefinition>>();
   const createDialog = useRef<HTMLDialogElement>(null);
   const [newName, setNewName] = useState('');
@@ -87,6 +94,33 @@ export function StorySequencePanel({
           onClick={() => story && setPreview(story)}
         >
           Preview Entire Story
+        </button>
+        <button
+          className="workspace-primary"
+          disabled={
+            busy || exporting || !story?.scenes.length || issues.some(({ issue }) => issue.severity === 'error')
+          }
+          onClick={() => {
+            if (!story) return;
+            const controller = new AbortController();
+            transfer.current = controller;
+            const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(60_000)]);
+            setExporting(true);
+            setMessage('Preparing story package...');
+            void buildProjectStoryPackage(workspace, story.id, signal)
+              .then(async (files) => {
+                const { bytes } = await packageZipWorker.encode(files, signal);
+                signal.throwIfAborted();
+                downloadBlob(new Blob([bytes], { type: 'application/zip' }), `${safeFilename(story.id)}.story.zip`);
+                setMessage('Story ZIP download started. Use Import Project for editable workspace backups.');
+              })
+              .catch((error: unknown) => {
+                if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : String(error));
+              })
+              .finally(() => setExporting(false));
+          }}
+        >
+          {exporting ? 'Preparing story package...' : 'Download story package'}
         </button>
       </div>
       {!story && <p>Create a story, then add existing scenes in playback order.</p>}
@@ -150,6 +184,71 @@ export function StorySequencePanel({
                   {entry.id} · {entry.sceneAssetId}
                 </span>
                 <div className="project-actions">
+                  <label>
+                    Entry transition{' '}
+                    <select
+                      aria-label={`Entry ${index + 1} transition`}
+                      disabled={busy}
+                      value={entry.transition?.type ?? 'cut'}
+                      onChange={(event) =>
+                        attempt(() =>
+                          workspace.setStorySceneTransition(
+                            story.id,
+                            entry.id,
+                            event.target.value === 'fade'
+                              ? { type: 'fade', duration: 600, color: '#000000' }
+                              : { type: 'cut' },
+                          ),
+                        )
+                      }
+                    >
+                      <option value="cut">Direct cut</option>
+                      <option value="fade">Fade through color</option>
+                    </select>
+                  </label>
+                  {entry.transition?.type === 'fade' && (
+                    <>
+                      <label>
+                        Fade duration (ms){' '}
+                        <input
+                          type="number"
+                          min={1}
+                          max={60000}
+                          step={100}
+                          aria-label={`Entry ${index + 1} fade duration`}
+                          disabled={busy}
+                          value={entry.transition.duration}
+                          onChange={(event) =>
+                            attempt(() => {
+                              if (entry.transition?.type === 'fade')
+                                workspace.setStorySceneTransition(story.id, entry.id, {
+                                  ...entry.transition,
+                                  duration: Number(event.target.value),
+                                });
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Fade color{' '}
+                        <input
+                          type="color"
+                          aria-label={`Entry ${index + 1} fade color`}
+                          disabled={busy}
+                          value={entry.transition.color}
+                          onChange={(event) =>
+                            attempt(() => {
+                              if (entry.transition?.type === 'fade')
+                                workspace.setStorySceneTransition(story.id, entry.id, {
+                                  ...entry.transition,
+                                  color: event.target.value,
+                                });
+                            })
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
                   <button
                     aria-label={`Move entry ${index + 1} up`}
                     disabled={busy || index === 0}

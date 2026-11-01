@@ -10,7 +10,22 @@ export const STORY_FORMAT_VERSION = 1;
 const identity = z.string().min(1).max(200).regex(/\S/);
 
 /** Array position is the sole ordering authority. References never embed scene documents. */
-export const storySceneEntrySchema = z.strictObject({ id: identity, sceneAssetId: identity });
+export const storyEntryTransitionSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('cut') }),
+  z.strictObject({
+    type: z.literal('fade'),
+    /** Total fade time; half before handoff, half after. Loading extends the opaque midpoint. */
+    duration: z.number().positive().max(60_000),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  }),
+]);
+export type StoryEntryTransition = z.infer<typeof storyEntryTransitionSchema>;
+export const storySceneEntrySchema = z.strictObject({
+  id: identity,
+  sceneAssetId: identity,
+  /** Arrival transition. Omitted means a direct cut, including the first entry. */
+  transition: storyEntryTransitionSchema.exactOptional(),
+});
 export const storyDefinitionSchema = z.strictObject({
   version: z.literal(STORY_FORMAT_VERSION),
   id: identity,

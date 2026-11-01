@@ -62,7 +62,13 @@ export type {
 } from './artworkReplacement.js';
 export { loadSceneCharacter, type SceneCharacterLoadOptions } from './loadSceneCharacter.js';
 
-export { SceneLoader, type SceneLoadOptions, type LoadedScene } from './SceneLoader.js';
+export {
+  SceneLoader,
+  type SceneLoadOptions,
+  type LoadedScene,
+  type PreparedScene,
+  ScenePackageCharacterCache,
+} from './SceneLoader.js';
 export { SceneTransitionOverlay } from './SceneTransitionOverlay.js';
 
 export type { SceneDialogueLine, ActiveSceneDialogue, SceneDialogueTarget } from './sceneDialogue.js';
@@ -76,3 +82,8 @@ export {
   type StandaloneStoryPlayerOptions,
   type StandaloneStorySource,
 } from './StandaloneStoryPlayer.js';
+
+export { StoryPackageLoader } from './StoryPackageLoader.js';
+export { StoryAudioPool } from './StoryAudioPool.js';
+
+export { SceneImageTextureCache } from './SceneImageTextureCache.js';

@@ -10,9 +10,17 @@ export class SceneTransitionOverlay implements SceneTransitionTarget {
   private graphics: Phaser.GameObjects.Graphics | undefined;
   private state = CLEAR_SCENE_TRANSITION;
   private camera: Readonly<CinematicCameraState> = DEFAULT_CINEMATIC_CAMERA;
-  constructor(private readonly scene: Phaser.Scene) {
-    this.graphics = scene.add.graphics().setDepth(8000);
+  private outputCamera: Phaser.Cameras.Scene2D.Camera | undefined;
+  constructor(
+    private readonly scene: Phaser.Scene,
+    depth = 8000,
+  ) {
+    this.graphics = scene.add.graphics().setDepth(depth);
     scene.events.once('shutdown', this.dispose);
+  }
+  setOutputCamera(camera: Phaser.Cameras.Scene2D.Camera): void {
+    this.outputCamera = camera;
+    this.render();
   }
   setCamera(camera: Readonly<CinematicCameraState>): void {
     this.camera = camera;
@@ -27,7 +35,15 @@ export class SceneTransitionOverlay implements SceneTransitionTarget {
     if (!graphics) return;
     graphics.clear();
     if (this.state.opacity <= 0) return;
-    const frame = cinematicFrame(this.camera);
+    const output = this.outputCamera;
+    const frame = output
+      ? {
+          x: output.scrollX + output.width / 2 - output.width / (2 * output.zoom),
+          y: output.scrollY + output.height / 2 - output.height / (2 * output.zoom),
+          width: output.width / output.zoom,
+          height: output.height / output.zoom,
+        }
+      : cinematicFrame(this.camera);
     graphics.fillStyle(Number.parseInt(this.state.color.slice(1), 16), this.state.opacity);
     graphics.fillRect(frame.x, frame.y, frame.width, frame.height);
   }

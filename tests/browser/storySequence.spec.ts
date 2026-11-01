@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
+import { decodePackageZip } from '../../src/engine/packageZip.js';
 import { createEmptyScene, parseSceneJson } from '../../src/engine/SceneDefinition.js';
+import { validateStoryPackage } from '../../src/engine/StoryPackage.js';
 import { sceneInspectorGroup, test } from './fixtures.js';
 
 test('artist assembles, previews, advances, restarts and round trips a linear story', async ({ page }, info) => {
@@ -39,6 +41,15 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await entries.nth(1).getByRole('button', { name: 'Remove entry', exact: true }).click();
   await expect(entries).toHaveCount(2);
   await expect(page.locator('[data-guide-id="project-scenes"] .project-assets > li')).toHaveCount(2);
+  await panel.getByLabel('Entry 2 transition', { exact: true }).selectOption('fade');
+  await panel.getByLabel('Entry 2 fade color', { exact: true }).fill('#123456');
+  const storyDownloading = page.waitForEvent('download');
+  await panel.getByRole('button', { name: 'Download story package', exact: true }).click();
+  const storyDownload = await storyDownloading;
+  const storyPath = info.outputPath('film.story.zip');
+  await storyDownload.saveAs(storyPath);
+  const portable = await validateStoryPackage(decodePackageZip(new Uint8Array(await readFile(storyPath))));
+  expect(portable.definition.scenes[1]!.transition).toEqual({ type: 'fade', duration: 600, color: '#123456' });
   await panel.getByRole('button', { name: 'Preview Entire Story', exact: true }).click();
   const preview = page.getByRole('dialog', { name: 'Entire story preview', exact: true });
   const status = preview.getByRole('status');
@@ -76,6 +87,7 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await expect(panel.getByLabel('Select story')).toContainText('The encounter');
   await expect(entries).toHaveCount(2);
   await expect(entries.first()).toContainText('forest');
+  await expect(panel.getByLabel('Entry 2 transition', { exact: true })).toHaveValue('fade');
 });
 
 test('dialogue inspector authors progression and idle with Enter markers and passive scrubbing', async ({ page }) => {

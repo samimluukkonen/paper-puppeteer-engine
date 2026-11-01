@@ -4,6 +4,7 @@ import type { CharacterTextureBudget } from './characterTextureLimits.js';
 import { decodeImage } from './decodeImage.js';
 import type { DeepReadonly } from './readonlyData.js';
 import type { SceneImageDefinition, SceneLayerDefinition } from './SceneDefinition.js';
+import type { SceneImageTextureCache } from './SceneImageTextureCache.js';
 import { parallaxPosition, sceneImageDepth, sceneLayer } from './sceneLayers.js';
 import { createSceneTextureBudget } from './sceneTextureBudget.js';
 
@@ -12,6 +13,7 @@ interface TextureLease {
   key: string;
   controller: AbortController;
   dispose?: () => void;
+  shared?: boolean;
 }
 interface ImageRequest {
   controller: AbortController;
@@ -35,6 +37,7 @@ export class SceneImageLayer {
     private readonly load: (reference: string) => Promise<Uint8Array<ArrayBuffer>>,
     private readonly changed: (error: string) => void = () => {},
     private readonly sharedBudget?: CharacterTextureBudget,
+    private readonly imageTextures?: SceneImageTextureCache,
   ) {}
   get error(): string {
     return [...this.failures.values()].join('\n');
@@ -128,6 +131,15 @@ export class SceneImageLayer {
     if (!this.alive || !this.elements.some((image) => image.image === reference)) return;
     const budget = createSceneTextureBudget();
     budget.checkImage(reference, bytes);
+    if (this.imageTextures) {
+      const resource = await this.imageTextures.acquire(bytes, controller.signal);
+      if (!this.alive || controller.signal.aborted) {
+        resource.dispose();
+        return;
+      }
+      this.textures.set(reference, { key: resource.key, controller, dispose: resource.dispose, shared: true });
+      return;
+    }
     const key = `${this.prefix}${++this.serial}`;
     const lease: TextureLease = { key, controller };
     this.textures.set(reference, lease);
@@ -158,7 +170,7 @@ export class SceneImageLayer {
     this.textures.delete(reference);
     lease.controller.abort();
     try {
-      if (this.scene.textures.exists(lease.key)) this.scene.textures.remove(lease.key);
+      if (!lease.shared && this.scene.textures.exists(lease.key)) this.scene.textures.remove(lease.key);
     } finally {
       this.sharedBudget?.release(lease.key);
       lease.dispose?.();

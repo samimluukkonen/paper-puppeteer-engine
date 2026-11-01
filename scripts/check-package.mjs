@@ -72,6 +72,7 @@ try {
     'reusing-animations-and-scenes.md',
     'linear-stories.md',
     'standalone-story-player.md',
+    'story-handoffs-and-packages.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 
@@ -184,7 +185,7 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
 import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
 import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
 import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
-import { SceneLoader, SceneDialogueOverlay, StoryPlayer, StandaloneStoryPlayer, DialogueKeyboardInput, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
+import { SceneLoader, SceneDialogueOverlay, StoryPlayer, StandaloneStoryPlayer, StoryPackageLoader, DialogueKeyboardInput, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
 import type { SceneDialogueTarget, SceneDefinition, SceneRunner, StoryDefinition } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
@@ -221,6 +222,12 @@ export function viewer(scene: import('phaser').Scene, target: HTMLElement, story
   });
   keyboard.dispose();
   return player;
+}
+
+export function portableViewer(scene: import('phaser').Scene, target: HTMLElement, bytes: Uint8Array<ArrayBuffer>): StandaloneStoryPlayer {
+  return new StandaloneStoryPlayer(scene, target, {
+    loadStory: (_id, signal) => StoryPackageLoader.load(scene, bytes, { signal }),
+  });
 }
 
 export function dialogue(scene: import('phaser').Scene, definition: SceneDefinition, runner: SceneRunner): void {

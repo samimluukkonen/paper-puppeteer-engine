@@ -1,9 +1,17 @@
 import Phaser from 'phaser';
-import { SceneLoader, StandaloneStoryPlayer, createEmptyScene } from '../../src/engine/runtime.js';
+import {
+  SceneLoader,
+  StandaloneStoryPlayer,
+  StoryPackageLoader,
+  buildStoryPackage,
+  buildScenePackage,
+  encodePackageZip,
+  createEmptyScene,
+} from '../../src/engine/runtime.js';
 import { silentWav, trackedAudioBackend } from './trackedAudioBackend.js';
 
 /** Public runtime consumer: no React or authoring modules. */
-export async function mountStory(space = false, audio = false) {
+export async function mountStory(space = false, audio = false, portable = false) {
   const host = document.createElement('div');
   host.tabIndex = 0;
   host.setAttribute('aria-label', 'Standalone story');
@@ -44,6 +52,26 @@ export async function mountStory(space = false, audio = false) {
         duration: 0,
         progression: 'advance-required' as const,
       }));
+      if (portable) {
+        definition.actors = [
+          {
+            id: 'hero',
+            character: { manifest: new URL('characters/demo-puppet/character.json', location.href).href },
+            position: { x: 0, y: 0 },
+            animation: 'idle',
+          },
+        ];
+        definition.images = [
+          {
+            id: 'paper',
+            image: 'paper.png',
+            position: { x: -400, y: -300 },
+            scale: { x: 800, y: 600 },
+            visible: true,
+            order: 0,
+          },
+        ];
+      }
       if (audio) {
         definition.audioAssets = [{ id: 'tone', name: 'Tone', path: 'tone.wav', category: 'music' }];
         definition.audioTracks = [{ id: 'music', name: 'Music', category: 'music' }];
@@ -68,14 +96,56 @@ export async function mountStory(space = false, audio = false) {
     version: 1,
     id: 'film',
     name: 'Film',
-    scenes: [...scenes.keys()].map((sceneAssetId) => ({ id: sceneAssetId, sceneAssetId })),
+    scenes: [...scenes.keys()].map((sceneAssetId, index) => ({
+      id: sceneAssetId,
+      sceneAssetId,
+      ...(portable && index === 1 ? { transition: { type: 'fade', duration: 300, color: '#000000' } } : {}),
+    })),
   };
   const loaded: Awaited<ReturnType<typeof SceneLoader.fromDefinition>>[] = [];
   let viewer!: StandaloneStoryPlayer;
   const mount = async () => {
     viewer = new StandaloneStoryPlayer(scene, host, {
       ...(space ? { advanceKeys: [' '], advanceLabel: 'Space' } : {}),
-      loadStory: (id, signal) => {
+      loadStory: async (id, signal) => {
+        if (portable) {
+          const backend = trackedAudioBackend();
+          tracking.push(backend);
+          const png = Uint8Array.from(
+            atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),
+            (value) => value.charCodeAt(0),
+          );
+          const files = await buildStoryPackage(definition, {
+            scenes,
+            signal,
+            buildScene: (definition) =>
+              buildScenePackage(definition, {
+                baseUrl: location.href,
+                signal,
+                loadImage: () => Promise.resolve(png),
+                loadAudio: () => Promise.resolve(silentWav(1)),
+              }),
+          });
+          const source = await StoryPackageLoader.load(scene, encodePackageZip(files), {
+            signal,
+            ...(audio ? { audioBackend: backend.backend } : {}),
+          });
+          const prepare = source.prepareScene!;
+          return {
+            ...source,
+            prepareScene: async (...args: Parameters<typeof prepare>) => {
+              const prepared = await prepare(...args);
+              return {
+                ...prepared,
+                activate: async () => {
+                  const session = await prepared.activate();
+                  loaded.push(session);
+                  return session;
+                },
+              };
+            },
+          };
+        }
         signal.throwIfAborted();
         if (id !== 'film') return Promise.reject(new Error('Unknown story'));
         return Promise.resolve({
@@ -117,6 +187,9 @@ export async function mountStory(space = false, audio = false) {
         text: subtitle instanceof Phaser.GameObjects.Text ? subtitle.text : '',
         audio: loaded.at(-1)?.runner.audio?.status,
         objects: scene.children.list.length,
+        textures: scene.textures
+          .getTextureKeys()
+          .filter((key) => key.startsWith('scene_package_') || key.startsWith('story_image_')).length,
         voices: tracking.reduce((sum, backend) => sum + backend.remainingVoices, 0),
         contextsClosed: tracking.reduce((sum, backend) => sum + backend.stats.contextsClosed, 0),
         decoded: tracking.reduce((sum, backend) => sum + backend.stats.decodedBytes, 0),

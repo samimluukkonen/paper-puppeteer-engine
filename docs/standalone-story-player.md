@@ -4,6 +4,8 @@
 
 `StandaloneStoryPlayer` plays an authored linear story in a host-owned Phaser scene. It uses the existing `StoryPlayer`, `SceneLoader`, Actors, skeletal/mesh animation, root motion, camera, fades, audio and camera-relative subtitles. It imports no React components. The viewer's only narrative command is dialogue advancement; there are no gameplay actions or route choices.
 
+For complete ZIP loading, entry fades and current/next shared assets, use the [portable story package guide](story-handoffs-and-packages.md).
+
 ## Connect an application's story catalog
 
 Create the player in an active Phaser scene, typically its `create()` method. Give it a focusable desktop container that contains the Phaser canvas. The container receives a small live advance hint and an **Enable story audio** button when needed. Style the host and its controls to match your application. The viewer never moves focus on load or play; the application chooses when to focus it.
@@ -66,7 +68,7 @@ host.focus();
 
 Phaser's `update` event supplies frame deltas automatically. **Do not also call the underlying runner's update.** The host still owns game creation/destruction, resizing and shared assets. Scene shutdown or destruction disposes the viewer; dispose it explicitly when removing its container before shutdown. Construct a fresh viewer when mounting again.
 
-Only one scene session exists at a time. A completed scene is disposed before the next is loaded; excess frame time is discarded. Completing a final dialogue hold allows transition on the next Phaser update. Holding Enter through that transition cannot advance the next scene's first line. Stop, replacement loads, errors and disposal invalidate pending work; late sessions are released even when an application loader ignores cancellation.
+Only one scene session exists at a time. With a custom loader, a completed scene is disposed before the next is loaded; excess frame time is discarded. The portable loader retains outgoing resource leases until next-scene preparation finishes, then activates the next scene behind the story overlay. Completing a final dialogue hold allows transition on the next Phaser update. Holding Enter through that transition cannot advance the next scene's first line. Stop, replacement loads, errors and disposal invalidate pending work; late sessions are released even when an application loader ignores cancellation.
 
 The default camera framing uses SceneLoader's output viewport. Supply `viewport` for a fixed custom output rectangle. Recreate the viewer with the updated viewport if the application's output geometry changes.
 
@@ -82,7 +84,7 @@ The live hint says **Press Enter to continue** only while waiting, and announces
 
 Playback does not assume audio autoplay permission. Locked audio exposes **Enable story audio**. Clicking it calls the normal scene audio unlock API and returns focus to the viewer without advancing a line. While a dialogue hold is waiting, the first configured key press can also unlock audio. **That entire press belongs to audio activation; the current line remains visible.** Release and press again to advance after audio is ready. Enter before `play()` does nothing, so a host's initial start gesture cannot also consume the first line.
 
-Audio activation applies to the current scene session. A later scene may require another activation because it owns another audio backend. Cinematic playback can continue silently before activation; unlock resumes eligible sound from the current scene/hold position. To guarantee that the opening is read/heard before the cinematic timeline proceeds, author an advance-required opening line. Hosts calling `unlockAudio()` directly must do so from the actual click/key handler, before awaiting unrelated work. Unsupported media/permission failures leave the enable control available to retry. Host-supplied `advanceDialogue()` remains independent from audio permission.
+Audio activation applies to the current scene session. A custom-loader scene may require another activation because it owns another audio backend. The portable story loader shares an explicitly owned context and reuses its unlocked state across scenes. Cinematic playback can continue silently before activation; unlock resumes eligible sound from the current scene/hold position. To guarantee that the opening is read/heard before the cinematic timeline proceeds, author an advance-required opening line. Hosts calling `unlockAudio()` directly must do so from the actual click/key handler, before awaiting unrelated work. Unsupported media/permission failures leave the enable control available to retry. Host-supplied `advanceDialogue()` remains independent from audio permission.
 
 The existing [dialogue hold presentation](dialogue-hold-presentation.md) policy controls idle animation and hold-safe music/ambience. The standalone player adds no clocks or animation evaluators.
 

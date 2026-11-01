@@ -200,7 +200,26 @@ export class ProjectWorkspace {
   duplicateStoryScene(id: string, entryId: string): string {
     const entry = this.story(id).scenes.find((entry) => entry.id === entryId);
     if (!entry) throw new Error(`Unknown story entry "${entryId}".`);
-    return this.addStoryScene(id, entry.sceneAssetId, entry.id);
+    const story = this.story(id);
+    let index = 1;
+    while (story.scenes.some((item) => item.id.toLowerCase() === `entry-${index}`)) index++;
+    const duplicate = { ...entry, id: `entry-${index}` };
+    const scenes = [...story.scenes];
+    scenes.splice(scenes.findIndex((item) => item.id === entryId) + 1, 0, duplicate);
+    this.setStory({ ...story, scenes });
+    return duplicate.id;
+  }
+  setStorySceneTransition(
+    id: string,
+    entryId: string,
+    transition: import('../../engine/StoryDefinition.js').StoryEntryTransition,
+  ): void {
+    const story = this.story(id);
+    if (!story.scenes.some((entry) => entry.id === entryId)) throw new Error(`Unknown story entry "${entryId}".`);
+    this.setStory({
+      ...story,
+      scenes: story.scenes.map((entry) => (entry.id === entryId ? { ...entry, transition } : entry)),
+    });
   }
   removeStoryScene(id: string, entryId: string): void {
     const story = this.story(id);

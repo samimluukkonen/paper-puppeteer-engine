@@ -18,7 +18,11 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
 
 /** Resolve only files from the archive. No network fallback, redirects, traversal or URL aliases. */
-export async function validateScenePackage(files: ScenePackageFiles, signal?: AbortSignal): Promise<ResolvedScene> {
+export async function validateScenePackage(
+  files: ScenePackageFiles,
+  signal?: AbortSignal,
+  options: { decodeImages?: boolean } = {},
+): Promise<ResolvedScene> {
   signal?.throwIfAborted();
   validatePackageFiles(files);
   const bytes = files.get('scene.json');
@@ -63,7 +67,7 @@ export async function validateScenePackage(files: ScenePackageFiles, signal?: Ab
   const sceneBudget = createSceneTextureBudget();
   for (const [reference, bytes] of resolved.images ?? []) {
     sceneBudget.checkImage(`image:${reference}`, bytes);
-    if (typeof Image !== 'undefined') {
+    if (options.decodeImages !== false && typeof Image !== 'undefined') {
       const decoded = await decodeImage(bytes, signal ?? new AbortController().signal);
       decoded.dispose();
     }

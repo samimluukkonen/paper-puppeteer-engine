@@ -2,11 +2,13 @@ import Phaser from 'phaser';
 import { useEffect, useId, useRef, useState } from 'react';
 import { DialogueKeyboardInput } from '../../engine/DialogueKeyboardInput.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
-import { SceneLoader, type LoadedScene } from '../../engine/SceneLoader.js';
+import type { LoadedScene } from '../../engine/SceneLoader.js';
+import type { StandaloneStorySource } from '../../engine/StandaloneStoryPlayer.js';
 import type { StoryDefinition } from '../../engine/StoryDefinition.js';
+import { StoryPackageLoader } from '../../engine/StoryPackageLoader.js';
 import { StoryPlayer } from '../../engine/StoryPlayer.js';
 import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
-import { buildProjectScenePackage } from './projectPackage.js';
+import { buildProjectStoryPackage } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 
 type PreviewState = { status: string; index: number; waiting: boolean; text: string; audio: string; error: string };
@@ -15,6 +17,8 @@ type PreviewState = { status: string; index: number; waiting: boolean; text: str
 class StoryPreviewScene extends Phaser.Scene {
   private player: StoryPlayer | undefined;
   private loaded: LoadedScene | undefined;
+  private source: StandaloneStorySource | undefined;
+  private readonly lifetime = new AbortController();
   private ticking = false;
   private closed = false;
   private failure = '';
@@ -29,38 +33,45 @@ class StoryPreviewScene extends Phaser.Scene {
   create(): void {
     if (this.closed) return;
     this.events.once('shutdown', () => this.disposePreview());
-    const scenes = new Map(
-      this.story.scenes.map(({ sceneAssetId }) => [sceneAssetId, this.workspace.scenes.scene(sceneAssetId)]),
-    );
-    try {
-      this.player = new StoryPlayer(this.story, {
-        scenes,
-        loadScene: async (definition, context) => {
-          const files = await buildProjectScenePackage(this.workspace, definition);
-          context.signal.throwIfAborted();
-          const loaded = await SceneLoader.loadPackage(this, files, { signal: context.signal });
-          try {
-            context.signal.throwIfAborted();
-            loaded.applyCamera(this.cameras.main, { x: 0, y: 0, width: 960, height: 540 });
-            this.loaded = loaded;
-          } catch (error) {
-            loaded.dispose();
-            throw error;
-          }
-          return {
-            runner: loaded.runner,
-            dispose: () => {
-              if (this.loaded === loaded) this.loaded = undefined;
-              loaded.dispose();
-            },
-          };
-        },
-      });
-      this.restart();
-    } catch (error) {
-      this.failed(error);
-    }
+    void this.prepare().catch((error: unknown) => this.failed(error));
   }
+  private async prepare(): Promise<void> {
+    const files = await buildProjectStoryPackage(this.workspace, this.story.id, this.lifetime.signal);
+    this.lifetime.signal.throwIfAborted();
+    const source = await StoryPackageLoader.load(this, files, { signal: this.lifetime.signal });
+    if (this.closed) {
+      source.dispose?.();
+      return;
+    }
+    this.source = source;
+    const attach = (loaded: LoadedScene): LoadedScene => {
+      try {
+        loaded.applyCamera(this.cameras.main, { x: 0, y: 0, width: 960, height: 540 });
+      } catch (error) {
+        loaded.dispose();
+        throw error;
+      }
+      this.loaded = loaded;
+      return {
+        ...loaded,
+        dispose: () => {
+          if (this.loaded === loaded) this.loaded = undefined;
+          loaded.dispose();
+        },
+      };
+    };
+    this.player = new StoryPlayer(source.definition, {
+      scenes: source.scenes,
+      ...(source.transitionOverlay ? { transitionOverlay: source.transitionOverlay } : {}),
+      prepareScene: async (definition, context) => {
+        const prepared = await source.prepareScene!(definition, context);
+        return { dispose: () => prepared.dispose(), activate: async () => attach(await prepared.activate()) };
+      },
+      loadScene: async (definition, context) => attach(await source.loadScene(definition, context)),
+    });
+    this.restart();
+  }
+
   private failed(error: unknown): void {
     if (this.closed) return;
     this.failure = error instanceof Error ? error.message : String(error);
@@ -110,12 +121,19 @@ class StoryPreviewScene extends Phaser.Scene {
   }
   enableAudio(): void {
     void this.loaded?.runner.audio?.unlock().then(
-      () => this.publish(),
+      () => {
+        this.loaded?.runner.syncAudio();
+        this.publish();
+      },
       (error: unknown) => this.failed(error),
     );
   }
   update(_time: number, delta: number): void {
-    if (this.closed || this.ticking || !this.player) return;
+    if (this.closed || !this.player) return;
+    if (this.ticking) {
+      this.publish();
+      return;
+    }
     this.ticking = true;
     void this.player
       .update(delta)
@@ -132,6 +150,9 @@ class StoryPreviewScene extends Phaser.Scene {
     this.closed = true;
     this.player?.dispose();
     this.player = undefined;
+    this.lifetime.abort();
+    this.source?.dispose?.();
+    this.source = undefined;
   }
 }
 

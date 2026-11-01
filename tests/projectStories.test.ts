@@ -151,3 +151,24 @@ test('inspection reports missing scenes and transitive broken character assets o
   expect(issues.some(({ message }) => message.includes('Missing scene asset "b"'))).toBe(true);
   expect(issues.some(({ message }) => message.includes('Working document is missing'))).toBe(true);
 });
+
+test('entry transitions validate atomically, duplicate in one history operation and survive project export', async () => {
+  const { workspace, story } = fixture();
+  workspace.setStory(story);
+  workspace.setStorySceneTransition('film', 'middle', { type: 'fade', duration: 600, color: '#334455' });
+  const before = workspace.definition.stories;
+  expect(() =>
+    workspace.setStorySceneTransition('film', 'middle', { type: 'fade', duration: -1, color: '#334455' }),
+  ).toThrow();
+  expect(workspace.definition.stories).toEqual(before);
+  const duplicate = workspace.duplicateStoryScene('film', 'middle');
+  expect(workspace.definition.stories![0]!.scenes.find(({ id }) => id === duplicate)?.transition).toEqual({
+    type: 'fade',
+    duration: 600,
+    color: '#334455',
+  });
+  workspace.undo();
+  expect(workspace.definition.stories).toEqual(before);
+  const reopened = await importProjectPackage((await buildProjectPackage(workspace)).files);
+  expect(reopened.definition.stories).toEqual(before);
+});

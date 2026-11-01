@@ -99,6 +99,22 @@ export class SceneAudioController {
         );
     }
   }
+  /** Decode without resuming the audio context or starting voices. Safe during scene preparation. */
+  async prepare(): Promise<void> {
+    if (this.state === 'disposed') throw new Error('Scene audio is disposed.');
+    const generation = this.generation;
+    for (const id of new Set(this.scene.audioClips?.map((clip) => clip.assetId))) {
+      const resource = await this.loader.load(id);
+      if (generation !== this.generation) return;
+      if (!resource.playTimeline)
+        throw new Error('This audio backend supports audition only. Use a timeline-capable audio backend.');
+      this.validateResource(id, resource);
+      this.resources.set(id, resource);
+      this.durations.set(id, resource.durationSeconds * 1000);
+    }
+    if (generation === this.generation && this.scene.audioClips?.length)
+      this.state = this.loader.running ? 'ready' : 'locked';
+  }
   /** Call directly from Play/Enable audio. Decoding alone never unlocks playback. */
   async unlock(): Promise<void> {
     if (this.state === 'disposed') throw new Error('Scene audio is disposed.');
@@ -108,20 +124,7 @@ export class SceneAudioController {
     this.message = '';
     try {
       const resumed = this.loader.unlock();
-      await Promise.all([
-        resumed,
-        (async () => {
-          for (const id of new Set(this.scene.audioClips?.map((clip) => clip.assetId))) {
-            const resource = await this.loader.load(id);
-            if (generation !== this.generation) return;
-            if (!resource.playTimeline)
-              throw new Error('This audio backend supports audition only. Use a timeline-capable audio backend.');
-            this.validateResource(id, resource);
-            this.resources.set(id, resource);
-            this.durations.set(id, resource.durationSeconds * 1000);
-          }
-        })(),
-      ]);
+      await Promise.all([resumed, this.prepare()]);
       if (generation === this.generation) this.state = 'ready';
     } catch (error) {
       if (generation !== this.generation) return;

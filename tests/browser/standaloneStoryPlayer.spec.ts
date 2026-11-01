@@ -19,7 +19,7 @@ test.beforeAll(async () => {
   if (!consumerScript) throw new Error('Missing standalone story consumer.');
 });
 
-async function mount(page: Page, space = false, audio = false) {
+async function mount(page: Page, space = false, audio = false, portable = false) {
   await page.route('**/story-host', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Story viewer</title>' }),
   );
@@ -28,12 +28,12 @@ async function mount(page: Page, space = false, audio = false) {
   );
   await page.goto('story-host');
   await page.evaluate(
-    async ({ space, audio }) => {
+    async ({ space, audio, portable }) => {
       const url = new URL('story-consumer.js', location.href).href;
       const api = (await import(/* @vite-ignore */ url)) as typeof import('./standaloneStoryHarness.js');
-      window.storyConsumer = await api.mountStory(space, audio);
+      window.storyConsumer = await api.mountStory(space, audio, portable);
     },
-    { space, audio },
+    { space, audio, portable },
   );
 }
 const snapshot = (page: Page) => page.evaluate(() => window.storyConsumer.snapshot());
@@ -149,4 +149,38 @@ test('audio unlock press preserves the first line and releases real browser voic
   expect(destroyed).toMatchObject({ status: 'disposed', voices: 0, contextsClosed: 3 });
   expect(destroyed.released).toBe(destroyed.decoded);
   await expect(page.getByRole('status')).toHaveCount(0);
+});
+
+test('portable story ZIP shares rendered artwork and decoded audio through a fade and cleans up', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await mount(page, false, true, true);
+  await expect.poll(() => snapshot(page)).toMatchObject({ index: 0, waiting: true });
+  // Chromium may grant audio activation to the initial evaluate call; both permission states are valid.
+  if ((await snapshot(page)).audio === 'locked') await page.getByRole('button', { name: 'Enable story audio' }).click();
+  await expect.poll(() => snapshot(page)).toMatchObject({ audio: 'ready', voices: 1 });
+  const first = await snapshot(page);
+  expect(first.textures).toBeGreaterThan(1);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({ status: 'playing', index: 1, line: '01-first', audio: 'ready', voices: 1 });
+  const second = await snapshot(page);
+  expect(second.textures).toBe(first.textures);
+  expect(second.decoded).toBe(first.decoded);
+  expect(second.contextsClosed).toBe(0);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => snapshot(page)).toMatchObject({ status: 'completed', voices: 0, textures: 0 });
+  const completed = await snapshot(page);
+  expect(completed.released).toBe(completed.decoded);
+  await page.evaluate(() => window.storyConsumer.restart());
+  await expect.poll(() => snapshot(page)).toMatchObject({ index: 0, waiting: true, audio: 'ready', voices: 1 });
+  await page.evaluate(() => window.storyConsumer.dispose());
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({ status: 'disposed', objects: 0, textures: 0, voices: 0, contextsClosed: 1 });
+  await page.evaluate(() => window.storyConsumer.destroy());
+  expect(errors).toEqual([]);
 });

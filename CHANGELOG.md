@@ -151,6 +151,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.5
+
+- Add story-entry cuts and fades through color, a story-owned handoff overlay, loading feedback and frozen incoming clocks through preparation/reveal, preserving time-zero dialogue holds.
+- Prepare current/next character/background artwork and audio; retain shared texture/sample leases across handoffs, dispose outgoing Actors/controllers/cues and stop every scene-owned voice. Share one explicitly owned story audio context without continuous cross-scene music.
+- Add complete portable story ZIP export/import with scene/character dependency validation, content-deduplicated binaries and a React-free `StoryPackageLoader` standalone adapter. Route editor story preview through that same runtime.
+- Add Story Sequence transition controls, portable story downloads, an updated Feature Guide and a scene handoff/package guide. Cover delayed loading, transitions, clocks, shared assets/audio, validation, history, ZIP round trips and disposal.
+
 ## 1.6.4
 
 - Add a React-free standalone story viewer with load/play/stop/advance/dispose lifecycle, automatic scene sequencing, cinematic camera/subtitles and Phaser-owned updates.

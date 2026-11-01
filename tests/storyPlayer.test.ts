@@ -315,3 +315,125 @@ test('dialogue holds keep the story session alive through its final boundary unt
   expect(f.loaded.at(-1)!.runner.dialogue?.line.id).toBe('opening');
   player.dispose();
 });
+
+test('entry fades own the handoff clock, hold opaque during loading, and preserve next time-zero dialogue', async () => {
+  const f = fixture(['a', 'b']);
+  f.scenes.get('b')!.dialogue = [{ id: 'first', time: 0, duration: 0, text: 'Start', progression: 'advance-required' }];
+  const story = {
+    ...f.story,
+    scenes: [
+      f.story.scenes[0]!,
+      { ...f.story.scenes[1]!, transition: { type: 'fade', duration: 200, color: '#123456' } },
+    ],
+  };
+  const overlay = { setTransition: vi.fn() };
+  let finish!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const player = new StoryPlayer(story, {
+    ...f,
+    transitionOverlay: overlay,
+    loadScene: async (definition, context) => {
+      if (context.index === 1) await gate;
+      return f.loadScene(definition, context);
+    },
+  });
+  await player.start();
+  await player.update(100);
+  expect(player.status).toBe('transitioning');
+  await player.update(50);
+  expect(overlay.setTransition).toHaveBeenLastCalledWith({ color: '#123456', opacity: 0.5 });
+  expect(f.loaded[0]!.dispose).not.toHaveBeenCalled();
+  const handoff = player.update(50);
+  expect(player.status).toBe('loading');
+  expect(overlay.setTransition).toHaveBeenLastCalledWith({ color: '#123456', opacity: 1 });
+  await player.update(999999);
+  finish();
+  await handoff;
+  expect(f.loaded[1]!.runner.time).toBe(0);
+  expect(f.loaded[1]!.runner.status).toBe('stopped');
+  expect(player.advanceDialogue()).toEqual({ advanced: false });
+  await player.update(100);
+  expect(player.status).toBe('playing');
+  expect(f.loaded[1]!.runner.status).toBe('waiting-for-dialogue-advance');
+  expect(f.loaded[1]!.runner.time).toBe(0);
+  player.dispose();
+});
+
+test('preloads only the next entry, activates on handoff, and releases late work on stop', async () => {
+  const f = fixture(['a', 'b', 'c']);
+  const prepared: {
+    index: number;
+    dispose: ReturnType<typeof vi.fn>;
+    activate: ReturnType<typeof vi.fn>;
+    signal: AbortSignal;
+  }[] = [];
+  let finish!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const player = new StoryPlayer(f.story, {
+    ...f,
+    prepareScene: async (definition, context) => {
+      const value = {
+        index: context.index,
+        signal: context.signal,
+        dispose: vi.fn(),
+        activate: vi.fn(() => f.loadScene(definition, context)),
+      };
+      prepared.push(value);
+      if (context.index === 1) await gate;
+      return value;
+    },
+  });
+  await player.start();
+  await Promise.resolve();
+  expect(prepared.map(({ index }) => index)).toEqual([0, 1]);
+  expect(prepared[1]!.activate).not.toHaveBeenCalled();
+  player.stop();
+  expect(prepared[1]!.signal.aborted).toBe(true);
+  finish();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(prepared[0]!.dispose).toHaveBeenCalledOnce();
+  expect(prepared[1]!.dispose).toHaveBeenCalledOnce();
+  expect(prepared[1]!.activate).not.toHaveBeenCalled();
+  expect(f.loaded).toHaveLength(1);
+  player.dispose();
+});
+
+test('failed background preparation is observed at the boundary and releases the active session', async () => {
+  const f = fixture(['a', 'b']);
+  const error = new Error('Missing next texture');
+  const player = new StoryPlayer(f.story, {
+    ...f,
+    prepareScene: (definition, context) =>
+      context.index === 1
+        ? Promise.reject(error)
+        : Promise.resolve({ activate: () => f.loadScene(definition, context), dispose() {} }),
+  });
+  await player.start();
+  await Promise.resolve();
+  await expect(player.update(100)).rejects.toBe(error);
+  expect(player.status).toBe('failed');
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledOnce();
+  player.dispose();
+});
+
+test('a fade on the first entry reveals before starting, and stop clears its overlay', async () => {
+  const f = fixture(['a']);
+  const overlay = { setTransition: vi.fn() };
+  const player = new StoryPlayer(
+    { ...f.story, scenes: [{ ...f.story.scenes[0], transition: { type: 'fade', duration: 100, color: '#000000' } }] },
+    { ...f, transitionOverlay: overlay },
+  );
+  await player.start();
+  expect(player.status).toBe('transitioning');
+  expect(f.loaded[0]!.runner.time).toBe(0);
+  await player.update(25);
+  expect(overlay.setTransition).toHaveBeenLastCalledWith({ color: '#000000', opacity: 0.5 });
+  player.stop();
+  expect(overlay.setTransition).toHaveBeenLastCalledWith({ color: '#000000', opacity: 0 });
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledOnce();
+  player.dispose();
+});

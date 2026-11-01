@@ -8,6 +8,7 @@ import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import { PACKAGE_MAX_BYTES, packagePath, validatePackageFiles } from '../../engine/packageZip.js';
 import { parseSceneJson, serializeSceneDefinition } from '../../engine/SceneDefinition.js';
 import { buildScenePackage, validateScenePackage } from '../../engine/ScenePackage.js';
+import { buildStoryPackage } from '../../engine/StoryPackage.js';
 import type { ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
 import {
   buildCharacterPackage,
@@ -315,7 +316,9 @@ export type ProjectExport = { readonly characters: ReadonlyMap<string, PackageSn
 export async function buildProjectScenePackage(
   workspace: ProjectWorkspace,
   input: ReadonlyScene,
+  signal?: AbortSignal,
 ): Promise<PackageFiles> {
+  signal?.throwIfAborted();
   const report = workspace.inspect('export', true, parseSceneJson(JSON.stringify(input)));
   requireValidExport(report);
   const scene = workspace.validateScene(input);
@@ -325,15 +328,21 @@ export async function buildProjectScenePackage(
       workspace.captureCharacter(id),
     ]),
   );
+  const sourceReferences = new Map([...captures.keys()].map((id) => [id, workspace.characterReference(id)]));
+  const sourceFetchers = new Map(
+    [...captures.keys()].map((id) => [id, characterFileFetcher(workspace.character(id).files)]),
+  );
+  const sourceImages = new Map(
+    (scene.images ?? []).map((image) => [image.image, workspace.scenes.images.read(image.image)]),
+  );
+  const sourceAudio = new Map((scene.audioAssets ?? []).map((asset) => [asset.id, workspace.audioSource(asset.id)]));
   const files = new Map<string, Uint8Array<ArrayBuffer>>();
   const references = new Map<string, string>();
   for (const [id, snapshot] of captures) {
-    const packaged = await buildCharacterPackage(snapshot, characterFileFetcher(workspace.character(id).files)).catch(
-      (error: unknown) => {
-        throw packageExportFailure(report, { kind: 'character', owner: id, id }, error);
-      },
-    );
-    const reference = workspace.characterReference(id);
+    const packaged = await buildCharacterPackage(snapshot, sourceFetchers.get(id), signal).catch((error: unknown) => {
+      throw packageExportFailure(report, { kind: 'character', owner: id, id }, error);
+    });
+    const reference = sourceReferences.get(id)!;
     // A project may register custom manifest paths. Standalone scene ZIPs have
     // their own confined character.json layout, independent of project storage.
     const prefix = `characters/character-${references.size + 1}/`;
@@ -346,7 +355,7 @@ export async function buildProjectScenePackage(
     if (!path) {
       path = `images/image-${images.size + 1}.${image.image.toLowerCase().endsWith('.webp') ? 'webp' : 'png'}`;
       images.set(image.image, path);
-      files.set(path, workspace.scenes.images.read(image.image));
+      files.set(path, sourceImages.get(image.image)!);
     }
     image.image = path;
   }
@@ -355,15 +364,37 @@ export async function buildProjectScenePackage(
     scene.audioAssets = scene.audioAssets
       .filter((asset) => scene.audioClips?.some((clip) => clip.assetId === asset.id))
       .map((asset, index) => {
-        const source = workspace.audioSource(asset.id);
+        const source = sourceAudio.get(asset.id);
         if (!source) throw new Error(`Missing audio asset "${asset.id}".`);
         const path = `audio/clip-${index + 1}.${source.definition.path.split('.').at(-1)!}`;
         files.set(path, source.bytes);
         return { ...source.definition, path };
       });
   files.set('scene.json', encoder.encode(serializeSceneDefinition(scene)));
-  await validateScenePackage(files).catch((error: unknown) => {
+  signal?.throwIfAborted();
+  await validateScenePackage(files, signal).catch((error: unknown) => {
     throw packageExportFailure(report, { kind: 'scene', owner: scene.id, id: scene.id }, error);
   });
   return files;
+}
+
+/** Story export captures referenced scenes/characters/images/audio only; project exports retain all stories. */
+export function buildProjectStoryPackage(workspace: ProjectWorkspace, storyId: string, signal?: AbortSignal) {
+  const story = workspace.definition.stories?.find((entry) => entry.id === storyId);
+  if (!story) throw new Error(`Unknown story "${storyId}".`);
+  const scenes = new Map(
+    [...new Set(story.scenes.map((entry) => entry.sceneAssetId))].map((id) => [id, workspace.scenes.scene(id)]),
+  );
+  const packages = new Map(
+    [...scenes].map(([id, scene]) => {
+      const pending = buildProjectScenePackage(workspace, scene!, signal);
+      void pending.catch(() => {});
+      return [id, pending];
+    }),
+  );
+  return buildStoryPackage(story, {
+    scenes,
+    buildScene: (scene) => packages.get(scene.id)!,
+    ...(signal ? { signal } : {}),
+  });
 }
