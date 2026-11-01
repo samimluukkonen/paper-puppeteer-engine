@@ -4,6 +4,7 @@ import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import { packagePath } from '../../engine/packageZip.js';
 import { rigBoneMappingSchema } from '../../engine/rigBoneMapping.js';
 import { animationPreviewPreferencesSchema } from '../shared/animationPreviewPreferences.js';
+import { parseSceneReuseLibrary, sceneReuseLibrarySchema } from '../shared/sceneReuse.js';
 
 const identity = z.string().min(1).max(200).regex(/\S/);
 const path = z.string().transform((value) => packagePath(value));
@@ -11,6 +12,7 @@ export const projectDefinitionSchema = z.strictObject({
   version: z.literal(1),
   id: identity,
   name: identity,
+  sceneReuse: sceneReuseLibrarySchema.exactOptional(),
   rigMappings: z.array(rigBoneMappingSchema).max(128).exactOptional(),
   audio: z.array(audioAssetDefinitionSchema).max(128).exactOptional(),
   characters: z.array(
@@ -40,6 +42,7 @@ export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>;
 
 export function parseProjectDefinition(input: unknown): ProjectDefinition {
   const project = projectDefinitionSchema.parse(input);
+  if (project.sceneReuse) project.sceneReuse = parseSceneReuseLibrary(project.sceneReuse);
   for (const entry of project.characters) {
     if (!entry.variant) continue;
     const owner = project.characters.find(({ id }) => id === entry.variant!.rig);

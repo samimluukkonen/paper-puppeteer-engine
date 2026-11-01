@@ -271,3 +271,7 @@ Use the collapsed **Cinematic Camera** inspector to author a center and zoom ind
 ## Dialogue and subtitle authoring
 
 The **Dialogue** timeline track and collapsed **Dialogue line** inspector support multiline plain text, scene-local Actor speakers, optional labels and voice-clip metadata, timing, duplication, deletion and scene Undo/Redo. Lines use non-overlapping half-open intervals within scene duration. JSON, portable ZIPs and recovery preserve dialogue without changing legacy scene data. See the [dialogue authoring guide](scene-dialogue.md) for the workflow, schema, reference repair and timing rules. Playback and silent seeks display deterministic Phaser subtitles above fades, fixed to the cinematic frame. See the same guide for default/custom standalone presentation and cue/audio semantics.
+
+## Reusable choreography and scene templates
+
+Use **Choreography & templates** in the Edit command bar to save multi-action selections, map Actor roles, preview detached candidates and insert independent copies in one Undo/Redo step. The same panel saves scene layouts as templates with optional Actors, timelines, audio and dialogue. See the [reusable scenes guide](reusable-scenes.md) for position origins, rig compatibility, fresh IDs and project/library transfer.

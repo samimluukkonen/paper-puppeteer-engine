@@ -299,6 +299,18 @@ export class ProjectEditorHosts {
       ownedLeases.clear();
       throwNotificationErrors(errors, 'Editor renderer disposal failed.');
     };
+    const renderers = new Set<ProjectRenderer>();
+    const rendererGroup: ProjectRenderer = {
+      activate: () => {
+        for (const renderer of renderers) renderer.activate();
+      },
+      suspend: () => {
+        for (const renderer of renderers) renderer.suspend();
+      },
+      dispose: () => {
+        for (const renderer of renderers) renderer.dispose();
+      },
+    };
     const documents = kind === 'character' ? workspace.characterDocuments(id) : undefined;
     // The document owns edits and artwork overrides; this lease supplies only original source textures.
     const initialLease = kind === 'character' ? await this.runtime(workspace, id, undefined, signal, true) : undefined;
@@ -322,11 +334,13 @@ export class ProjectEditorHosts {
           renderer.dispose();
           return () => {};
         }
-        host.renderer = renderer;
+        renderers.add(renderer);
+        host.renderer = rendererGroup;
         if (host.active) renderer.activate();
         else renderer.suspend();
         return () => {
-          if (host.renderer === renderer) delete host.renderer;
+          renderers.delete(renderer);
+          if (!renderers.size && host.renderer === rendererGroup) delete host.renderer;
         };
       },
       autosave: session.autosave,
@@ -394,6 +408,13 @@ export class ProjectEditorHosts {
           .get(token)
           ?.pendingCreation?.reject(new Error('Target character failed to load. Repair it and retry.'));
         workspace.refresh();
+      },
+      get sceneReuse() {
+        return workspace.sceneReuse;
+      },
+      saveSceneReuse: (input) => workspace.setSceneReuse(input),
+      createSceneCopy: (scene) => {
+        workspace.addScene(scene);
       },
       animationLibrary: () => workspace.animationLibrary(),
       animationLibraryRevision: workspace.getSnapshot,

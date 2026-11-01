@@ -42,6 +42,7 @@ export function SceneTimeline({
   playback: SceneEditorPlayback;
 }) {
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
+  const selectedActionIds = new Set(document.selectedActionIds);
   const viewport = useRef<HTMLDivElement>(null);
   const audioGesture = useRef<{
     pointer: number;
@@ -329,11 +330,11 @@ export function SceneTimeline({
                 <details className="scene-timeline-help">
                   <summary>Timeline help</summary>
                   <p className="workspace-caption">
-                    Select an Actor to add actions. Drag clips to move; drag the right edge to resize. Alt bypasses
-                    snapping. Scroll to pan. Scrubbing pauses playback. Stop restores initial placement for stage
-                    editing. Camera diamonds select keys; drag to move their time. Set Camera Cut holds the preceding
-                    shot until this key; edit the new shot in Cinematic Camera. Select fades to edit start, duration and
-                    color in Transition properties.
+                    Select an Actor to add actions. Ctrl/Cmd/Shift-click clips to select several for choreography. Drag
+                    clips to move; drag the right edge to resize. Alt bypasses snapping. Scroll to pan. Scrubbing pauses
+                    playback. Stop restores initial placement for stage editing. Camera diamonds select keys; drag to
+                    move their time. Set Camera Cut holds the preceding shot until this key; edit the new shot in
+                    Cinematic Camera. Select fades to edit start, duration and color in Transition properties.
                   </p>
                 </details>
               </>
@@ -537,7 +538,7 @@ export function SceneTimeline({
                         key={action.id}
                         type="button"
                         className={`scene-action ${duration ? 'clip' : 'marker'} scene-action-${action.type}`}
-                        aria-pressed={action.id === document.selectedActionId}
+                        aria-pressed={selectedActionIds.has(action.id)}
                         aria-label={`${actor.id}: ${action.type} ${action.id}`}
                         title={`${action.type} · ${action.time / 1000} s · ${duration / 1000} s`}
                         style={{
@@ -545,10 +546,17 @@ export function SceneTimeline({
                           width: duration ? Math.max(6, x(duration)) : 16,
                           top: lane * 26 + 4,
                         }}
-                        onClick={() => document.selectAction(action.id)}
+                        onClick={(event) => {
+                          if (event.detail === 0)
+                            document.selectAction(action.id, event.ctrlKey || event.metaKey || event.shiftKey);
+                        }}
                         onPointerDown={(event) => {
                           if (event.button !== 0) return;
                           event.preventDefault();
+                          if (event.ctrlKey || event.metaKey || event.shiftKey) {
+                            document.selectAction(action.id, true);
+                            return;
+                          }
                           viewport.current?.focus();
                           if (!document.beginActionDrag(action.id)) return;
                           viewport.current?.setPointerCapture(event.pointerId);

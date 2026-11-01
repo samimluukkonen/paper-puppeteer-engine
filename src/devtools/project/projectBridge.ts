@@ -8,6 +8,7 @@ import type { AnimationPreviewLease } from '../shared/AnimationLibraryPreview.js
 import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import type { PackageFiles } from '../shared/package/characterPackage.js';
+import type { SceneReuseLibrary } from '../shared/sceneReuse.js';
 import type { ProjectCharacterDocument } from './ProjectCharacterDocument.js';
 
 export interface ProjectRenderer {
@@ -49,6 +50,9 @@ export interface ProjectEditorContext {
   animationLibrary?(): readonly AnimationLibraryEntry[];
   animationLibraryRevision?(this: void): number;
   loadAnimationPreview?(characterId: string, signal: AbortSignal): Promise<AnimationPreviewLease>;
+  readonly sceneReuse?: DeepReadonly<SceneReuseLibrary>;
+  saveSceneReuse?(input: unknown): void;
+  createSceneCopy?(scene: ReadonlyScene): void;
   validateScene(scene: ReadonlyScene): void;
   buildScenePackage(scene: ReadonlyScene): Promise<PackageFiles>;
   confirmReplacement(kind: 'animation' | 'texture', id: string): boolean;

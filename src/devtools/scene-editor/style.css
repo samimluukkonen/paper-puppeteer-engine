@@ -38,13 +38,13 @@
   padding: 8px;
   font-size: 11px;
 }
-#scene-stage-canvas {
+.scene-stage-canvas {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-preview);
 }
-#scene-stage-canvas canvas {
+.scene-stage-canvas canvas {
   touch-action: none;
 }
 .scene-preview-error {
@@ -510,4 +510,70 @@
 
 .scene-dialogue-line {
   cursor: pointer;
+}
+
+.scene-reuse-dialog {
+  width: min(920px, calc(100vw - 64px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+}
+
+.scene-reuse-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.scene-reuse-fields details {
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.scene-reuse-fields details[open] > summary {
+  margin-bottom: 16px;
+}
+
+.scene-workspace .scene-reuse-fields details > label {
+  flex-direction: row;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.scene-reuse-role {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.scene-workspace .scene-reuse-role label {
+  margin: 0;
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+}
+
+.scene-reuse-role input[type="number"] {
+  width: 120px;
+}
+
+.scene-reuse-preview {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  height: 360px;
+  border: 1px solid var(--border-default);
+  margin: 8px 0;
+}
+
+.scene-workspace .scene-reuse-dialog :is(.scene-stage-toolbar, .scene-timeline-toolbar) label {
+  flex-direction: row;
+  align-items: center;
+  margin: 0;
 }

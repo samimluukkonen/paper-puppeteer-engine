@@ -31,6 +31,7 @@ import type { SceneDialogueLine } from '../../engine/sceneDialogue.js';
 import type { SceneTransition } from '../../engine/sceneTransitions.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
+import { emptySceneReuseLibrary, parseSceneReuseLibrary, type SceneReuseLibrary } from '../shared/sceneReuse.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { SceneArtworkCommands } from './SceneArtworkCommands.js';
 import { SceneAudioCommands } from './SceneAudioCommands.js';
@@ -61,6 +62,7 @@ interface SceneEntry {
   selectedImage: string | null;
   selectedActor: string | null;
   selectedAction: string | null;
+  selectedActions: string[];
   selectedTransition: string | null;
   selectedAudioClip: string | null;
   selectedDialogueLine: string | null;
@@ -69,6 +71,15 @@ interface SceneEntry {
 
 /** Independent scene sessions. Only validated, detached immutable authored snapshots enter history. */
 export class SceneEditorDocument {
+  private reuseLibrary = freezeData(emptySceneReuseLibrary());
+  get sceneReuse(): DeepReadonly<SceneReuseLibrary> {
+    return this.reuseLibrary;
+  }
+  setSceneReuse(input: unknown): void {
+    this.reuseLibrary = freezeData(parseSceneReuseLibrary(input));
+    this.notify('presentation');
+  }
+
   readonly groundGuide = new GroundGuideWorkspace('scene-world', undefined, true);
   private readonly entries = new Map<string, SceneEntry>();
   private selected: string | null = null;
@@ -256,6 +267,7 @@ export class SceneEditorDocument {
       selectedImage: null,
       selectedActor: null,
       selectedAction: null,
+      selectedActions: [],
       selectedTransition: null,
       selectedAudioClip: null,
       selectedDialogueLine: null,
@@ -281,6 +293,17 @@ export class SceneEditorDocument {
   createScene(options: Parameters<typeof createEmptyScene>[0]): boolean {
     try {
       const scene = createEmptyScene(options);
+      if (this.entries.has(scene.id)) throw new Error(`Scene "${scene.id}" is already open.`);
+      this.register(scene, true);
+      return this.success();
+    } catch (error) {
+      return this.reportError(error);
+    }
+  }
+
+  createSceneCopy(input: unknown): boolean {
+    try {
+      const scene = this.parse(input);
       if (this.entries.has(scene.id)) throw new Error(`Scene "${scene.id}" is already open.`);
       this.register(scene, true);
       return this.success();
@@ -419,6 +442,7 @@ export class SceneEditorDocument {
     if (selected) {
       this.entry.selectedImage = null;
       this.entry.selectedAction = null;
+      this.entry.selectedActions = [];
     }
     this.notify('selection');
   }
@@ -545,6 +569,7 @@ export class SceneEditorDocument {
     this.entry.selectedImage = id;
     this.entry.selectedActor = null;
     this.entry.selectedAction = null;
+    this.entry.selectedActions = [];
     this.notify('selection');
   }
   addImage(reference: string): boolean {
@@ -596,6 +621,7 @@ export class SceneEditorDocument {
     this.cancelAudioDrag();
     this.cancelActionDrag();
     this.entry.selectedAction = null;
+    this.entry.selectedActions = [];
     this.entry.selectedImage = null;
     this.entry.cameraSelected = false;
     this.entry.selectedTransition = null;
@@ -915,7 +941,11 @@ export class SceneEditorDocument {
   removeTransition(id: string): boolean {
     return this.transitionCommands.removeTransition(id);
   }
-  selectAction(id: string | null): void {
+  get selectedActionIds(): readonly string[] {
+    const existing = new Set(this.workingScene?.actions.map((action) => action.id));
+    return (this.entry?.selectedActions ?? []).filter((id) => existing.has(id));
+  }
+  selectAction(id: string | null, additive = false): void {
     const action = this.workingScene?.actions.find((action) => action.id === id);
     if (!this.entry || (id !== null && !action)) return;
     this.cancelAudioDrag();
@@ -928,8 +958,17 @@ export class SceneEditorDocument {
     this.entry.selectedTransition = null;
     this.entry.selectedAudioClip = null;
     this.entry.selectedDialogueLine = null;
-    this.entry.selectedAction = id;
-    if (action) this.entry.selectedActor = action.actorId;
+    this.entry.selectedActions =
+      additive && id
+        ? this.entry.selectedActions.includes(id)
+          ? this.entry.selectedActions.filter((value) => value !== id)
+          : [...this.entry.selectedActions, id]
+        : id
+          ? [id]
+          : [];
+    this.entry.selectedAction = this.entry.selectedActions.at(-1) ?? null;
+    const primary = this.workingScene?.actions.find((value) => value.id === this.entry!.selectedAction);
+    if (primary) this.entry.selectedActor = primary.actorId;
     this.notify('selection');
   }
   private nextActionId(): string {

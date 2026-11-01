@@ -20,6 +20,7 @@ import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneInspector } from './SceneInspector.js';
 import { bindSceneShortcuts } from './SceneKeyboardController.js';
+import { SceneReusePanel } from './SceneReusePanel.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
 import { exportSceneJson, importSceneJson, sceneExportFilename } from './SceneTransfer.js';
@@ -97,6 +98,7 @@ export function SceneEditorView({
   }, []);
   const newId = useRef<HTMLInputElement>(null);
   const pasteDialog = useRef<HTMLDialogElement>(null);
+  const [reuseOpen, setReuseOpen] = useState(false);
   const [pasteJson, setPasteJson] = useState('');
   const [transferStatus, setTransferStatus] = useState('');
   const transfer = useRef<AbortController | null>(null);
@@ -263,6 +265,14 @@ export function SceneEditorView({
                 </label>
                 <button
                   type="button"
+                  data-guide-id={GUIDE_TARGETS.sceneReuse}
+                  disabled={!scene || document.hasActiveGesture}
+                  onClick={() => setReuseOpen(true)}
+                >
+                  Choreography & templates
+                </button>
+                <button
+                  type="button"
                   data-guide-id={GUIDE_TARGETS.sceneHistory}
                   disabled={!document.canUndo}
                   onClick={() => {
@@ -410,6 +420,14 @@ export function SceneEditorView({
           )}
         </section>
       </main>
+      {reuseOpen && (
+        <SceneReusePanel
+          document={document}
+          registry={registry}
+          playback={playback}
+          close={() => setReuseOpen(false)}
+        />
+      )}
       <dialog ref={pasteDialog} className="workspace-dialog" aria-labelledby="paste-scene-title">
         <h2 id="paste-scene-title">Import scene JSON</h2>
         <form

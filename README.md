@@ -84,6 +84,7 @@ The [runtime integration guide](docs/runtime-integration.md) covers portable cha
 - [Visual root-motion authoring and sword-attack walkthrough](docs/root-motion-authoring.md)
 - [Root motion and Environment Preview integration](docs/root-motion-environment-preview.md)
 - [Scene root motion, ownership and choreography](docs/scene-root-motion.md)
+- [Reusable choreography and scene templates](docs/reusable-scenes.md)
 - [Root-motion workflow, tool compatibility and hardening](docs/root-motion-hardening.md)
 
 | Guide                                                                  | Contents                                                                                                               |

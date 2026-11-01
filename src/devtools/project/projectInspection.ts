@@ -505,6 +505,29 @@ export class ProjectInspector {
         );
       }
     }
+    for (const entry of [...(project.sceneReuse?.choreographies ?? []), ...(project.sceneReuse?.templates ?? [])]) {
+      const target = asset('scene', `reuse:${entry.id}`);
+      const label = `Reusable asset "${entry.name}"`;
+      for (const issue of validateSceneDefinition(entry.scene, {
+        characters: catalog,
+        images: new Set(project.images?.map((image) => `../${image.path}`)),
+        getAudioAssets: () => project.audio ?? [],
+      }))
+        add(target, `${label}: ${issue.message}`, issue.path, issue.severity, 'project');
+      for (const actor of entry.scene.actors) {
+        const owner = referenceIds.get(actor.character.manifest) ?? actor.character.manifest;
+        edge(target, asset('character', owner), label);
+        if (actor.animation) edge(target, asset('animation', owner, actor.animation), label);
+        if (actor.skin) edge(target, asset('skin', owner, actor.skin), label);
+      }
+      for (const action of entry.scene.actions) {
+        if (action.type !== 'animation') continue;
+        const actor = entry.scene.actors.find((actor) => actor.id === action.actorId)!;
+        const owner = referenceIds.get(actor.character.manifest) ?? actor.character.manifest;
+        edge(target, asset('animation', owner, action.animation), label);
+      }
+      for (const clip of entry.scene.audioClips ?? []) edge(target, asset('audio', project.id, clip.assetId), label);
+    }
     for (const entry of project.scenes) {
       const target = asset('scene', entry.id);
       edge(asset('project', project.id), target, `Project "${project.name}"`);

@@ -297,6 +297,8 @@ export async function importProjectPackage(
     if (scene.id !== entry.id) throw new Error(`Scene ID mismatch for "${entry.id}".`);
     workspace.addScene(scene);
   }
+  for (const entry of [...(metadata.sceneReuse?.choreographies ?? []), ...(metadata.sceneReuse?.templates ?? [])])
+    workspace.validateScene(entry.scene);
   workspace.installImportedMetadata(importedMetadata);
   options.signal?.throwIfAborted();
   return workspace;

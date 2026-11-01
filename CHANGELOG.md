@@ -145,6 +145,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.5
+
+- Add reusable choreography presets with multi-action timeline selection, named Actor roles, relative timing, explicit relative origins or absolute world positions, unchanged root-motion ownership and detached playback previews. Insertion validates assets, rig identity, duration and channel conflicts and copies actions in one Undo/Redo step.
+- Add scene templates with optional Actors, action/camera/fade tracks and explicit audio/dialogue inclusion. Copy-on-create remaps local identities, look targets, dialogue speakers, voice clips, artwork layers and camera keys while preserving shared project asset references and source isolation.
+- Persist reusable assets in project exports and local recovery drafts; add portable library JSON transfer, dependency validation and retention, a Scene Editor Feature Guide and a written choreography/template workflow.
+
 ## 1.5.4
 
 - Add Character Variants with stable identities and explicit shared rig/animation ownership, per-character appearance selection and inherited default-skin artwork. Route shared editing to one document owner and show every affected character in the shared header.

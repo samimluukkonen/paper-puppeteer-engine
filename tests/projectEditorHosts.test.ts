@@ -597,3 +597,32 @@ test('failed target loading, stale revisions and disposal reject creation before
   expect(owner.workspace.animationLibrary()).toEqual([]);
   owner.autosave.dispose();
 });
+
+test('scene stage and detached preview renderers suspend together and release independently', async () => {
+  const owner = await session();
+  owner.workspace.createScene({ id: 'reuse-preview' });
+  owner.workspace.createScene({ id: 'another-scene' });
+  const f = fixture();
+  const stage = { activate: vi.fn(), suspend: vi.fn(), dispose: vi.fn() };
+  const preview = { activate: vi.fn(), suspend: vi.fn(), dispose: vi.fn() };
+  try {
+    await f.controller.open(owner, 'scene', 'reuse-preview');
+    const host = f.hosts()[0]!;
+    host.context.bindRenderer(stage);
+    const releasePreview = host.context.bindRenderer(preview);
+    await f.controller.open(owner, 'scene', 'another-scene');
+    expect(stage.suspend).toHaveBeenCalledOnce();
+    expect(preview.suspend).toHaveBeenCalledOnce();
+    releasePreview();
+    const previous = stage.activate.mock.calls.length;
+    await f.controller.open(owner, 'scene', 'reuse-preview');
+    expect(stage.activate.mock.calls.length).toBe(previous + 1);
+    expect(preview.activate).toHaveBeenCalledOnce();
+  } finally {
+    f.controller.dispose();
+    owner.workspace.disposeCharacterDocuments();
+    owner.autosave.dispose();
+  }
+  expect(stage.dispose).toHaveBeenCalledOnce();
+  expect(preview.dispose).not.toHaveBeenCalled();
+});

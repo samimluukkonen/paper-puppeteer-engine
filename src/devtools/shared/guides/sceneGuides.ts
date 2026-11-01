@@ -748,6 +748,44 @@ function focusedGuide(id: string, title: string, description: string, sourceId: 
 export const sceneGuides: readonly GuideDefinition[] = [
   ...workflowGuides,
   guide(
+    'scene-reusable-choreography',
+    'Reusable Choreography and Scene Templates',
+    'Save timed action groups, map Actor roles, preview independent copies and reuse scene layouts.',
+    scene,
+    [
+      step(
+        'select',
+        'Select and save a sequence',
+        T.sceneReuse,
+        'After exiting this tour, **Ctrl/Cmd/Shift-click** timeline actions across Actors, then open **Choreography & templates**. Expand **Save selected actions as choreography**, name the preset and its roles. Times become relative to the first action. Audio, dialogue, camera keys and fades are opt-in; only complete items inside that range are copied.',
+      ),
+      step(
+        'positions',
+        'Choose position semantics',
+        T.sceneReuse,
+        '**Relative to role origins** offsets move destinations and point-facing targets from each source origin to its destination origin. Origins default to initial Actor placement; enter the actual start position when earlier movement precedes the sequence. **Absolute** preserves scene-world positions. Root-motion clips remain unchanged and own translation only once.',
+      ),
+      step(
+        'insert',
+        'Map, preview and insert',
+        T.sceneReuse,
+        'Choose a preset in **Insert choreography**, assign a different compatible Actor to each role, and enter **Insertion time** and destination origins. **Preview choreography** checks references, rig identity, ownership, duration, camera, fades, dialogue and audio without editing the scene. Different rigs require **Animation Library / Retarget to Another Character** first. **Confirm insertion** creates independent actions in one Undo step.',
+      ),
+      step(
+        'templates',
+        'Create an independent scene',
+        T.sceneReuse,
+        'In **Scene templates**, choose whether to include Actors, timeline, audio and dialogue, then **Save Scene as Template**. Choose a template, unique scene ID and name, **Preview template**, then **Create Scene from Template**. Local IDs are remapped; shared assets stay referenced. Editing a copy never changes its template or source scene.',
+      ),
+      step(
+        'save',
+        'Keep reusable assets',
+        T.sceneReuse,
+        '**Export Project** and project local drafts retain the library and shared assets. Standalone scenes require **Download library JSON** as well as scene downloads. Library JSON contains references, not character, artwork or audio binaries. This tour does not open dialogs, save presets, insert copies or start playback.',
+      ),
+    ],
+  ),
+  guide(
     'scene-importing-audio',
     'Importing Audio',
     'Find the project audio library, import and audition audio, then return to this scene.',

@@ -44,6 +44,7 @@ import {
 } from '../shared/package/characterPackage.js';
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { sceneFingerprint } from '../shared/sceneFingerprint.js';
+import { emptySceneReuseLibrary, parseSceneReuseLibrary, type SceneReuseLibrary } from '../shared/sceneReuse.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { ProjectCharacterDocument } from './ProjectCharacterDocument.js';
@@ -109,10 +110,15 @@ export class ProjectWorkspace {
       },
     },
     undefined,
-    () =>
-      Object.values(this.previewPreferences).flatMap((preferences) =>
+    () => [
+      ...Object.values(this.previewPreferences).flatMap((preferences) =>
         preferences.environment.image ? [preferences.environment.image] : [],
       ),
+      ...[this.metadata, ...this.history.retainedSnapshots, ...(this.saved ? [this.saved] : [])].flatMap(
+        (project) =>
+          project.sceneReuse?.templates.flatMap((entry) => entry.scene.images?.map((image) => image.image) ?? []) ?? [],
+      ),
+    ],
     (id) => this.audioFiles.get(id),
   );
   private revision = 0;
@@ -157,6 +163,13 @@ export class ProjectWorkspace {
         : {}),
     };
   }
+  get sceneReuse(): DeepReadonly<SceneReuseLibrary> {
+    return this.metadata.sceneReuse ?? this.scenes.sceneReuse;
+  }
+  setSceneReuse(input: unknown): void {
+    this.change({ ...this.metadata, sceneReuse: parseSceneReuseLibrary(input) });
+  }
+
   animationPreviewPreferences(id: string): DeepReadonly<AnimationPreviewPreferences> | undefined {
     return this.previewPreferences[id];
   }
@@ -208,8 +221,13 @@ export class ProjectWorkspace {
         const audio = new Set(value.audio?.map((entry) => entry.id));
         // Images live in the scene registry, so membership restoration cannot remove them.
         // Check every scene in the target membership, including documents being restored.
-        for (const { id } of value.scenes) {
-          const scene = this.scenes.scene(id);
+        for (const scene of [
+          ...value.scenes.map(({ id }) => this.scenes.scene(id)),
+          ...[...(value.sceneReuse?.choreographies ?? []), ...(value.sceneReuse?.templates ?? [])].map(
+            (entry) => entry.scene,
+          ),
+        ]) {
+          const id = scene?.id;
           if (scene?.actors.some((actor) => !characters.has(actor.character.manifest)))
             throw new Error(
               `Project history would remove a character used by scene "${id}". Undo the scene edit first.`,
@@ -437,7 +455,12 @@ export class ProjectWorkspace {
     const audio = new Set(projects.flatMap((project) => project.audio?.map(({ id }) => id) ?? []));
     if (collectScenes) this.scenes.retainScenes(scenes);
     const referencedManifests = new Set<string>();
-    for (const scene of this.scenes.retainedSnapshots) {
+    const reusableScenes = projects.flatMap((project) =>
+      [...(project.sceneReuse?.choreographies ?? []), ...(project.sceneReuse?.templates ?? [])].map(
+        (entry) => entry.scene,
+      ),
+    );
+    for (const scene of [...this.scenes.retainedSnapshots, ...reusableScenes]) {
       for (const actor of scene.actors) referencedManifests.add(actor.character.manifest);
       for (const clip of scene.audioClips ?? []) audio.add(clip.assetId);
     }
@@ -760,6 +783,7 @@ export class ProjectWorkspace {
       ? {
           ...this.definition,
           rigMappings: [],
+          sceneReuse: emptySceneReuseLibrary(),
           characters: this.metadata.characters.filter(
             (entry) =>
               references.has(entry.manifest) ||

@@ -701,7 +701,9 @@ export function SceneStageView({
   document,
   registry,
   playback,
+  canvasId = 'scene-stage-canvas',
 }: {
+  canvasId?: string;
   document: SceneEditorDocument;
   registry: SceneCharacterRegistry;
   playback: SceneEditorPlayback;
@@ -714,8 +716,8 @@ export function SceneStageView({
   useLayoutEffect(() => {
     const scene = new SceneStage(document, registry, playback, setError);
     setStage(scene);
-    const game = createEditorGame('scene-stage-canvas', scene, SCENE_OUTPUT_VIEWPORT);
-    const release = observePreview(window.document.querySelector<HTMLElement>('#scene-stage-canvas')!, game);
+    const game = createEditorGame(canvasId, scene, SCENE_OUTPUT_VIEWPORT);
+    const release = observePreview(window.document.getElementById(canvasId)!, game);
     let rendererActive = true;
     game.events.once(Phaser.Core.Events.READY, () =>
       queueMicrotask(() => {
@@ -745,7 +747,7 @@ export function SceneStageView({
       game.scene.stop(scene);
       destroyEditorGame(game);
     };
-  }, [document, registry, playback]);
+  }, [document, registry, playback, canvasId]);
   return (
     <>
       <div className="scene-stage-toolbar" data-guide-id={GUIDE_TARGETS.sceneParallaxPreview}>
@@ -815,7 +817,7 @@ export function SceneStageView({
           1000 × 700 · 10:7 · Wheel: zoom · Middle/right/Alt-drag: pan · Shift: bypass ground snap · Escape: cancel drag
         </span>
       </div>
-      <div id="scene-stage-canvas" />
+      <div id={canvasId} className="scene-stage-canvas" />
       {error && (
         <p className="scene-preview-error" role="alert">
           {error} Check the character references and required artwork, then retry preview.{' '}
