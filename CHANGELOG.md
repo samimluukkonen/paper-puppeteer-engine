@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Prioritize installation, first-project setup, runtime integration and current limitations in the README; move historical milestone summaries and readiness links into dedicated release notes.
+
 - Extract root-motion state and graph gestures behind typed context/action interfaces. Centralize scene gesture history ownership and revision notifications, including separate authored, selection and presentation subscriptions, while retaining editor APIs and atomic history/preview behavior.
 
 - Transfer exclusively owned ZIP import buffers into workers without copying, while preserving cloned inputs for shared document resources and normal decode callers.
