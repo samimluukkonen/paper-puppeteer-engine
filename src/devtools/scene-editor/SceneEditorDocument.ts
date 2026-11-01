@@ -32,11 +32,12 @@ import type { SceneTransition } from '../../engine/sceneTransitions.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import { SceneArtworkCommands } from './SceneArtworkCommands.js';
 import { SceneAudioCommands } from './SceneAudioCommands.js';
 import { SceneCameraCommands } from './SceneCameraCommands.js';
 import { SceneDialogueCommands, type SceneDialoguePatch } from './SceneDialogueCommands.js';
+import { SceneEditorGestures } from './SceneEditorGestures.js';
+import { SceneEditorNotifications } from './SceneEditorNotifications.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
 import { SceneSnapshotParser } from './SceneSnapshotParser.js';
 import { SceneTransitionCommands } from './SceneTransitionCommands.js';
@@ -71,30 +72,20 @@ export class SceneEditorDocument {
   readonly groundGuide = new GroundGuideWorkspace('scene-world', undefined, true);
   private readonly entries = new Map<string, SceneEntry>();
   private selected: string | null = null;
-  private revision = 0;
-  private authoredRevision = 0;
-  private selectionRevision = 0;
-  private presentationRevision = 0;
-  private notifiedScene: ReadonlyScene | null = null;
-  private dragAudio: string | null = null;
+  private readonly notifications = new SceneEditorNotifications();
+  private readonly gestures = new SceneEditorGestures(() => this.notify('presentation'));
   private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly audioCommands = new SceneAudioCommands(this, () => this.finishLayerGestures());
   private readonly dialogueCommands = new SceneDialogueCommands(this, () => this.finishLayerGestures());
-  private dragAction: string | null = null;
-  private dragActor: string | null = null;
-  private dragCamera = false;
-  private dragCameraKey = false;
-  private cameraDragTime = 0;
   private cameraTime: (() => number) | undefined;
   private actorBounds: ((id: string) => CameraViewport | undefined) | undefined;
-  private dragImage: string | null = null;
   private readonly lockedLayers = new Map<string, Set<string>>();
   readonly images = new SceneImageRegistry();
   private readonly cameraCommands = new SceneCameraCommands(this);
   private readonly artworkCommands = new SceneArtworkCommands(
     this,
     () => this.finishLayerGestures(),
-    () => this.dragImage !== null,
+    () => this.gestures.target('image') !== null,
   );
   private readonly transitionCommands = new SceneTransitionCommands(this, () => this.finishLayerGestures());
   private groundOffsets: ReadonlyMap<string, number> = new Map();
@@ -103,7 +94,6 @@ export class SceneEditorDocument {
   private groundCharacters = new Map<string, string>();
   private groundPreviewing = false;
   showFootContacts = false;
-  private readonly listeners = new Set<() => void>();
   private issues: readonly ValidationIssue[] = [];
   private readonly snapshots: SceneSnapshotParser;
 
@@ -135,35 +125,20 @@ export class SceneEditorDocument {
     return scene;
   }
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
-  readonly getAuthoredSnapshot = (): number => this.authoredRevision;
-  readonly getSelectionSnapshot = (): number => this.selectionRevision;
-  readonly getPresentationSnapshot = (): number => this.presentationRevision;
-  /** Consume the revision before calling back: stage measurements can notify reentrantly. */
-  readonly subscribeAuthored = (listener: () => void): (() => void) => {
-    let revision = this.authoredRevision;
-    return this.subscribe(() => {
-      if (revision === this.authoredRevision) return;
-      revision = this.authoredRevision;
-      listener();
-    });
-  };
+  readonly subscribe = this.notifications.subscribe;
+  readonly getSnapshot = this.notifications.getSnapshot;
+  readonly getAuthoredSnapshot = this.notifications.getAuthoredSnapshot;
+  readonly getSelectionSnapshot = this.notifications.getSelectionSnapshot;
+  readonly getPresentationSnapshot = this.notifications.getPresentationSnapshot;
+  readonly subscribeAuthored = (listener: () => void): (() => void) =>
+    this.notifications.subscribeRevision('authored', listener);
+  readonly subscribeSelection = (listener: () => void): (() => void) =>
+    this.notifications.subscribeRevision('selection', listener);
+  readonly subscribePresentation = (listener: () => void): (() => void) =>
+    this.notifications.subscribeRevision('presentation', listener);
+
   private notify(kind?: 'selection' | 'presentation'): void {
-    const scene = this.workingScene;
-    const authoredChanged = scene !== this.notifiedScene;
-    if (scene?.id !== this.notifiedScene?.id) this.selectionRevision++;
-    if (authoredChanged) {
-      this.notifiedScene = scene;
-      this.authoredRevision++;
-    }
-    if (kind === 'selection') this.selectionRevision++;
-    else if (kind === 'presentation' || !authoredChanged) this.presentationRevision++;
-    this.revision++;
-    notifySubscribers(this.listeners, 'Scene document subscribers failed.');
+    this.notifications.publish(this.workingScene, kind);
   }
   private get entry(): SceneEntry | undefined {
     return this.selected === null ? undefined : this.entries.get(this.selected);
@@ -292,11 +267,7 @@ export class SceneEditorDocument {
         equalJsonData,
       ),
     };
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
+    this.gestures.cancel();
     this.groundGuide.cancelDrag();
     this.groundOffsets = new Map();
     this.groundContacts = new Map();
@@ -321,11 +292,7 @@ export class SceneEditorDocument {
   /** Selecting retains all documents, saved baselines and undo/redo histories. */
   selectScene(id: string): boolean {
     if (!this.entries.has(id)) return this.reportError(new Error(`Unknown scene "${id}".`));
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
+    this.gestures.cancel();
     this.groundGuide.cancelDrag();
     if (this.selected === id) return this.success();
     this.selected = id;
@@ -397,7 +364,7 @@ export class SceneEditorDocument {
   }
   /** Explicit capture; channels at the same time are replaced without duplicating keys. */
   setCameraKey(time = this.cameraTime?.() ?? 0, values: Partial<CinematicCameraState> = this.cinematicCamera): boolean {
-    if (!this.dragCamera) this.finishLayerGestures();
+    if (this.gestures.target('camera') === null) this.finishLayerGestures();
     return this.cameraCommands.setCameraKey(time, values);
   }
   /** A cut uses the existing camera owner: each preceding channel key holds until
@@ -409,7 +376,7 @@ export class SceneEditorDocument {
     return this.cameraCommands.setCameraCut(time, values);
   }
   updateCameraKey(property: CameraProperty, id: string, patch: Partial<Omit<CameraKeyframe, 'id'>>): boolean {
-    if (!this.dragCameraKey) this.finishLayerGestures();
+    if (!this.gestures.target('cameraKey')) this.finishLayerGestures();
     return this.cameraCommands.updateCameraKey(property, id, patch);
   }
   removeCameraKey(property: CameraProperty, id: string): boolean {
@@ -423,13 +390,14 @@ export class SceneEditorDocument {
   beginCameraKeyDrag(property: CameraProperty, id: string): boolean {
     this.selectCameraKey(property, id);
     if (!this.selectedCameraKey) return false;
-    this.entry!.history.beginOperation();
-    this.dragCameraKey = true;
+    this.gestures.begin('cameraKey', true, this.entry!.history);
     return true;
   }
   changeCameraKeyDrag(time: number): boolean {
     const selected = this.selectedCameraKey;
-    return this.dragCameraKey && selected ? this.updateCameraKey(selected.property, selected.key.id, { time }) : false;
+    return this.gestures.target('cameraKey') && selected
+      ? this.updateCameraKey(selected.property, selected.key.id, { time })
+      : false;
   }
   get cameraSelected(): boolean {
     return this.entry?.cameraSelected ?? false;
@@ -441,11 +409,7 @@ export class SceneEditorDocument {
     return this.entry?.cameraOverlays ?? false;
   }
   selectCamera(selected = true): void {
-    this.cancelCameraDrag();
-    this.cancelImageDrag();
-    this.cancelActorDrag();
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
+    this.gestures.cancel();
     if (!this.entry) return;
     this.entry.selectedTransition = null;
     this.entry.selectedAudioClip = null;
@@ -475,10 +439,10 @@ export class SceneEditorDocument {
     this.notify('presentation');
   }
   updateCamera(patch: Partial<CinematicCameraState>): boolean {
-    if (!this.dragCamera) this.finishLayerGestures();
+    if (this.gestures.target('camera') === null) this.finishLayerGestures();
     if (!this.workingScene) return false;
     if (this.cameraKeyEditing)
-      return this.setCameraKey(this.dragCamera ? this.cameraDragTime : (this.cameraTime?.() ?? 0), patch);
+      return this.setCameraKey(this.gestures.target('camera') ?? this.cameraTime?.() ?? 0, patch);
     return this.replaceScene({
       ...this.workingScene,
       camera: { ...(this.workingScene.camera ?? DEFAULT_CINEMATIC_CAMERA), ...patch },
@@ -512,27 +476,17 @@ export class SceneEditorDocument {
       CAMERA_PROPERTIES.some((property) => this.workingScene?.cameraTracks?.[property]?.length)
     )
       return false;
-    this.entry.history.beginOperation();
-    this.dragCamera = true;
-    this.cameraDragTime = this.cameraTime?.() ?? 0;
+    this.gestures.begin('camera', this.cameraTime?.() ?? 0, this.entry.history);
     return true;
   }
   moveCameraDrag(position: { x: number; y: number }): boolean {
-    return this.dragCamera ? this.updateCamera(position) : false;
+    return this.gestures.target('camera') !== null ? this.updateCamera(position) : false;
   }
   endCameraDrag(): void {
-    if (!this.dragCamera && !this.dragCameraKey) return;
-    this.dragCamera = false;
-    this.dragCameraKey = false;
-    this.entry?.history.endOperation();
-    this.notify('presentation');
+    this.gestures.end('camera', 'cameraKey');
   }
   cancelCameraDrag(): void {
-    if (!this.dragCamera && !this.dragCameraKey) return;
-    this.dragCamera = false;
-    this.dragCameraKey = false;
-    this.entry?.history.cancelOperation();
-    this.notify('presentation');
+    this.gestures.cancel('camera', 'cameraKey');
   }
 
   get selectedImageId(): string | null {
@@ -556,11 +510,7 @@ export class SceneEditorDocument {
     return !!image && this.isLayerLocked(image.layerId ?? 'background');
   }
   private finishLayerGestures(): void {
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
-    this.endAudioDrag();
-    this.endActionDrag();
+    this.gestures.end();
   }
   addLayer(): boolean {
     return this.artworkCommands.addLayer();
@@ -611,24 +561,18 @@ export class SceneEditorDocument {
     this.cancelImageDrag();
     this.selectImage(id);
     if (!this.entry || this.selectedImageId !== id) return false;
-    this.entry.history.beginOperation();
-    this.dragImage = id;
+    this.gestures.begin('image', id, this.entry.history);
     return true;
   }
   moveImageDrag(patch: Pick<SceneImageDefinition, 'position' | 'scale'>): boolean {
-    return this.dragImage ? this.updateImage(this.dragImage, patch) : false;
+    const id = this.gestures.target('image');
+    return id ? this.updateImage(id, patch) : false;
   }
   endImageDrag(): void {
-    if (!this.dragImage) return;
-    this.dragImage = null;
-    this.entry?.history.endOperation();
-    this.notify('presentation');
+    this.gestures.end('image');
   }
   cancelImageDrag(): void {
-    if (!this.dragImage) return;
-    this.dragImage = null;
-    this.entry?.history.cancelOperation();
-    this.notify('presentation');
+    this.gestures.cancel('image');
   }
   /** Sources, checkpoints, undo, redo and active gestures all keep their binary dependencies. */
   cleanupImages(): number {
@@ -642,14 +586,7 @@ export class SceneEditorDocument {
     return this.workingScene?.actors.some((actor) => actor.id === id) ? id! : null;
   }
   get hasActiveGesture(): boolean {
-    return (
-      this.dragAudio !== null ||
-      this.dragCamera ||
-      this.dragCameraKey ||
-      this.dragImage !== null ||
-      this.dragActor !== null ||
-      this.dragAction !== null
-    );
+    return this.gestures.hasActiveGesture;
   }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;
@@ -674,11 +611,7 @@ export class SceneEditorDocument {
     return id;
   }
   addActor(manifest: string, position = { x: 0, y: 0 }): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene) return this.reportError(new Error('No scene is selected.'));
     const id = this.nextActorId();
@@ -688,11 +621,7 @@ export class SceneEditorDocument {
     return true;
   }
   updateActor(id: string, patch: Partial<SceneActorDefinition>): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
     const nextId = patch.id ?? id;
@@ -714,11 +643,7 @@ export class SceneEditorDocument {
     return changed;
   }
   setActorAppearance(id: string, property: 'animation' | 'skin', value: string | null): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
     return this.replaceScene({
@@ -733,11 +658,7 @@ export class SceneEditorDocument {
     });
   }
   duplicateActor(id: string): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     const actor = scene?.actors.find((entry) => entry.id === id);
     if (!scene || !actor) return false;
@@ -769,11 +690,7 @@ export class SceneEditorDocument {
     );
   }
   removeActor(id: string, options: { removeActions?: boolean } = {}): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return false;
     const dialogue = scene.dialogue?.filter((line) => line.actorId === id) ?? [];
@@ -798,11 +715,7 @@ export class SceneEditorDocument {
     });
   }
   reorderActor(id: string, offset: -1 | 1): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene) return false;
     const actors = [...scene.actors];
@@ -813,15 +726,10 @@ export class SceneEditorDocument {
     return this.replaceScene({ ...scene, actors });
   }
   beginActorDrag(id: string): boolean {
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
+    this.gestures.cancel();
     if (!this.workingScene?.actors.some((actor) => actor.id === id)) return false;
     this.selectActor(id);
-    this.entry!.history.beginOperation();
-    this.dragActor = id;
+    this.gestures.begin('actor', id, this.entry!.history);
     return true;
   }
   /** Stage measurements are view state; they never enter exports or document history. */
@@ -885,31 +793,24 @@ export class SceneEditorDocument {
   }
   moveActorDrag(position: { x: number; y: number }, options: { bypassGround?: boolean } = {}): boolean {
     const scene = this.workingScene;
-    if (!scene || !this.dragActor) return false;
+    const id = this.gestures.target('actor');
+    if (!scene || !id) return false;
     const { guide } = this.groundGuide.getSnapshot();
-    const offset = this.actorGroundOffset(this.dragActor);
+    const offset = this.actorGroundOffset(id);
     const initialPosition =
       guide.enabled && guide.snapEnabled && offset !== undefined && !options.bypassGround
         ? { x: position.x, y: guide.y - offset }
         : position;
     return this.replaceScene({
       ...scene,
-      actors: scene.actors.map((actor) =>
-        actor.id === this.dragActor ? { ...actor, position: initialPosition } : actor,
-      ),
+      actors: scene.actors.map((actor) => (actor.id === id ? { ...actor, position: initialPosition } : actor)),
     });
   }
   endActorDrag(): void {
-    if (!this.dragActor) return;
-    this.dragActor = null;
-    this.entry?.history.endOperation();
-    this.notify('presentation');
+    this.gestures.end('actor');
   }
   cancelActorDrag(): void {
-    if (!this.dragActor) return;
-    this.dragActor = null;
-    this.entry?.history.cancelOperation();
-    this.notify('presentation');
+    this.gestures.cancel('actor');
   }
 
   /** Project assets remain owned by Project Workspace; standalone imports retain binaries by stable path. */
@@ -966,7 +867,7 @@ export class SceneEditorDocument {
     return this.audioCommands.addClip(input);
   }
   updateAudioClip(id: string, patch: Partial<Omit<SceneAudioClip, 'id'>>): boolean {
-    if (!this.dragAudio) this.finishLayerGestures();
+    if (!this.gestures.target('audio')) this.finishLayerGestures();
     return this.audioCommands.updateClip(id, patch);
   }
   removeAudioClip(id: string): boolean {
@@ -979,24 +880,17 @@ export class SceneEditorDocument {
   beginAudioDrag(id: string): boolean {
     this.selectAudioClip(id);
     if (this.selectedAudioClip?.id !== id) return false;
-    this.entry!.history.beginOperation();
-    this.dragAudio = id;
+    this.gestures.begin('audio', id, this.entry!.history);
     return true;
   }
   changeAudioDrag(clip: SceneAudioClip): boolean {
-    return this.dragAudio === clip.id ? this.audioCommands.updateClip(clip.id, clip) : false;
+    return this.gestures.target('audio') === clip.id ? this.audioCommands.updateClip(clip.id, clip) : false;
   }
   endAudioDrag(): void {
-    if (!this.dragAudio) return;
-    this.dragAudio = null;
-    this.entry?.history.endOperation();
-    this.notify('presentation');
+    this.gestures.end('audio');
   }
   cancelAudioDrag(): void {
-    if (!this.dragAudio) return;
-    this.dragAudio = null;
-    this.entry?.history.cancelOperation();
-    this.notify('presentation');
+    this.gestures.cancel('audio');
   }
 
   get selectedActionId(): string | null {
@@ -1044,11 +938,7 @@ export class SceneEditorDocument {
     return `action-${index}`;
   }
   addAction(input: SceneActionInput): boolean {
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
-    this.endAudioDrag();
-    this.endActionDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene) return false;
     const id = this.nextActionId();
@@ -1057,11 +947,7 @@ export class SceneEditorDocument {
     return true;
   }
   updateAction(id: string, input: SceneActionDefinition): boolean {
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
-    this.endAudioDrag();
-    this.endActionDrag();
+    this.gestures.end();
     return this.replaceAction(id, input);
   }
   private replaceAction(id: string, input: SceneActionDefinition): boolean {
@@ -1072,11 +958,7 @@ export class SceneEditorDocument {
     return this.replaceScene({ ...scene, actions: scene.actions.map((action) => (action.id === id ? input : action)) });
   }
   removeAction(id: string): boolean {
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
-    this.endAudioDrag();
-    this.endActionDrag();
+    this.gestures.end();
     const scene = this.workingScene;
     if (!scene?.actions.some((action) => action.id === id)) return false;
     return this.replaceScene({ ...scene, actions: scene.actions.filter((action) => action.id !== id) });
@@ -1087,67 +969,41 @@ export class SceneEditorDocument {
     return action ? this.addAction({ ...action, time }) : false;
   }
   beginActionDrag(id: string): boolean {
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
+    this.gestures.cancel();
     if (!this.workingScene?.actions.some((action) => action.id === id)) return false;
     this.selectAction(id);
-    this.entry!.history.beginOperation();
-    this.dragAction = id;
+    this.gestures.begin('action', id, this.entry!.history);
     return true;
   }
   changeActionDrag(input: SceneActionDefinition): boolean {
-    return this.dragAction ? this.replaceAction(this.dragAction, input) : false;
+    const id = this.gestures.target('action');
+    return id ? this.replaceAction(id, input) : false;
   }
   endActionDrag(): void {
-    if (!this.dragAction) return;
-    this.dragAction = null;
-    this.entry?.history.endOperation();
-    this.notify('presentation');
+    this.gestures.end('action');
   }
   cancelActionDrag(): void {
-    if (!this.dragAction) return;
-    this.dragAction = null;
-    this.entry?.history.cancelOperation();
-    this.notify('presentation');
+    this.gestures.cancel('action');
   }
 
   updateProperties(properties: { name?: string; duration?: number }): boolean {
-    this.endAudioDrag();
-    this.endActionDrag();
-    this.endImageDrag();
-    this.endCameraDrag();
-    this.endActorDrag();
+    this.gestures.end();
     return this.replaceScene({ ...this.workingScene, ...properties });
   }
   undo(): boolean {
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
+    this.gestures.cancel();
     if (!this.entry?.history.undo()) return false;
     return this.success();
   }
   redo(): boolean {
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
+    this.gestures.cancel();
     if (!this.entry?.history.redo()) return false;
     return this.success();
   }
   revertScene(options: { discardChanges?: boolean } = {}): boolean {
     const entry = this.entry;
     if (!entry || (this.dirty && !options.discardChanges)) return false;
-    this.cancelAudioDrag();
-    this.cancelActionDrag();
-    this.cancelImageDrag();
-    this.cancelCameraDrag();
-    this.cancelActorDrag();
+    this.gestures.cancel();
     entry.history.change(() => {
       entry.working = entry.source;
     });

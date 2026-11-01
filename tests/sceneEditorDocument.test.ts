@@ -17,6 +17,37 @@ const source = () => ({
   ],
 });
 
+test('selection and presentation subscriptions publish only their revisions and unsubscribe independently', () => {
+  const document = new SceneEditorDocument();
+  document.importJson(JSON.stringify(source()));
+  const authored = vi.fn();
+  const selection = vi.fn();
+  const presentation = vi.fn(() => document.selectActor('hero'));
+  const unsubscribeAuthored = document.subscribeAuthored(authored);
+  const unsubscribeSelection = document.subscribeSelection(selection);
+  const unsubscribePresentation = document.subscribePresentation(presentation);
+  document.setFootContactsVisible(true);
+  assert.equal(presentation.mock.calls.length, 1, 'reentrant selection does not repeat presentation');
+  assert.equal(selection.mock.calls.length, 1);
+  assert.equal(authored.mock.calls.length, 0);
+  document.updateProperties({ name: 'Authored edit' });
+  assert.equal(authored.mock.calls.length, 1);
+  assert.equal(presentation.mock.calls.length, 1);
+  assert.equal(selection.mock.calls.length, 1);
+  document.createScene({ id: 'another' });
+  assert.equal(authored.mock.calls.length, 2);
+  assert.equal(selection.mock.calls.length, 2, 'scene switches invalidate selection');
+  unsubscribeSelection();
+  document.selectActor(null);
+  assert.equal(selection.mock.calls.length, 2);
+  unsubscribePresentation();
+  document.setFootContactsVisible(false);
+  assert.equal(presentation.mock.calls.length, 1);
+  unsubscribeAuthored();
+  document.updateProperties({ name: 'Unsubscribed edit' });
+  assert.equal(authored.mock.calls.length, 2);
+});
+
 test('authored subscriptions ignore selection, diagnostics and checkpoints, including reentrant measurements', () => {
   const document = new SceneEditorDocument();
   document.importJson(JSON.stringify(source()));

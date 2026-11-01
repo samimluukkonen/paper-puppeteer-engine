@@ -63,6 +63,36 @@ function fixture(root = true) {
 }
 const x = { kind: 'root', id: 'Root Motion', property: 'x' } as const;
 
+test('root and graph owners hand off previews and publish committed selection with the document atomically', () => {
+  const state = fixture();
+  state.setRootMotionView({ editing: true });
+  const base = state.workingAnimation;
+  state.beginRootMotionDrag();
+  state.previewRootMotionDrag({ x: 15, y: 20 });
+  assert.notStrictEqual(state.previewAnimation, base);
+  state.beginGraphEdit({ channel: x, time: 0 });
+  assert.isFalse(state.rootMotionDragActive);
+  assert.strictEqual(state.previewAnimation, base, 'graph begins from authored data, discarding the XY proposal');
+  state.previewGraphEdit({ time: 0.25, value: 30 });
+  const observations: unknown[] = [];
+  const unsubscribe = state.subscribe(() =>
+    observations.push({
+      active: state.hasPendingAnimationEdits,
+      selected: state.selectedRootKey,
+      time: rootKeys(state.workingAnimation!, 'x')[0]!.time,
+      preview: state.previewAnimation === state.workingAnimation,
+    }),
+  );
+  assert.isTrue(state.commitGraphEdit());
+  assert.deepEqual(observations, [
+    { active: false, selected: { property: 'x', time: 0.25 }, time: 250, preview: true },
+  ]);
+  assert.equal(state.historyLength, 1);
+  unsubscribe();
+  state.undo();
+  assert.strictEqual(state.workingAnimation, base);
+});
+
 test('old clips stay without root data until an explicit atomic XY creation; skeletal and IK branches retain identity', () => {
   const state = fixture(false);
   const before = state.workingAnimation!;

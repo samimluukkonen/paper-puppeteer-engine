@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Extract root-motion state and graph gestures behind typed context/action interfaces. Centralize scene gesture history ownership and revision notifications, including separate authored, selection and presentation subscriptions, while retaining editor APIs and atomic history/preview behavior.
+
 - Transfer exclusively owned ZIP import buffers into workers without copying, while preserving cloned inputs for shared document resources and normal decode callers.
 
 - Separate scene authored, selection and presentation revisions so selection and grounding feedback skip stage reconciliation. Update only changed Actor transforms, appearance and layer state, and refresh grounding measurements only for affected Actors.

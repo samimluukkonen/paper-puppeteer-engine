@@ -18,7 +18,7 @@ import { dispatchListeners, throwNotificationErrors } from '../../engine/notific
 import type { PoseDefinition } from '../../engine/Pose.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
-import { sampleRootMotion, type RootMotionProperty, type RootMotionOffset } from '../../engine/rootMotion.js';
+import type { RootMotionProperty, RootMotionOffset } from '../../engine/rootMotion.js';
 import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
 import {
   type BoneSymmetryIssue,
@@ -36,12 +36,14 @@ import {
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
 import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
+import { AnimationEditorGraphGestures } from './AnimationEditorGraphGestures.js';
 import { AnimationEditorIKCommands } from './AnimationEditorIKCommands.js';
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
 import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
 import { AnimationEditorPreviewCommands } from './AnimationEditorPreviewCommands.js';
+import { AnimationEditorRootMotion } from './AnimationEditorRootMotion.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
 import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
@@ -59,7 +61,7 @@ import {
   sampleGhostPose,
   sampleGhostPoses,
 } from './ghostPoseSampling.js';
-import { editGraphKey, graphKeys, type GraphKeyEdit, type GraphKeyRef } from './graphEditor.js';
+import type { GraphKeyEdit, GraphKeyRef } from './graphEditor.js';
 import { evaluateIKTarget } from './ikInspectorSampling.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';
 import {
@@ -79,9 +81,8 @@ import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime }
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
-import { motionPreviewSampleTime } from './motionPreview.js';
 import { PoseLibrary } from './PoseLibrary.js';
-import { rootKeys, setRootKey, duplicateRootPropertyKey, type RootKeySelection } from './rootMotionEdits.js';
+import { rootKeys, type RootKeySelection } from './rootMotionEdits.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
@@ -175,86 +176,64 @@ export class AnimationEditorState {
     return this.deformation.pasteDeformationKey();
   }
 
-  rootMotionSelected = false;
-  rootMotionProperty: RootMotionProperty = 'x';
-  selectedRootKey: RootKeySelection | null = null;
-  rootMotionEditing = false;
-  private displacementMode: WorldDisplacementMode = 'authored';
-  private rootLoop: RootLoopMode = 'reset';
+  get rootMotionSelected(): boolean {
+    return this.rootMotion.rootMotionSelected;
+  }
+  set rootMotionSelected(value: boolean) {
+    this.rootMotion.rootMotionSelected = value;
+  }
+  get rootMotionProperty(): RootMotionProperty {
+    return this.rootMotion.rootMotionProperty;
+  }
+  set rootMotionProperty(value: RootMotionProperty) {
+    this.rootMotion.rootMotionProperty = value;
+  }
+  get selectedRootKey(): RootKeySelection | null {
+    return this.rootMotion.selectedRootKey;
+  }
+  set selectedRootKey(value: RootKeySelection | null) {
+    this.rootMotion.selectedRootKey = value;
+  }
+  get rootMotionEditing(): boolean {
+    return this.rootMotion.rootMotionEditing;
+  }
+  set rootMotionEditing(value: boolean) {
+    this.rootMotion.rootMotionEditing = value;
+  }
+  get rootTrajectoryVisible(): boolean {
+    return this.rootMotion.rootTrajectoryVisible;
+  }
+  set rootTrajectoryVisible(value: boolean) {
+    this.rootMotion.rootTrajectoryVisible = value;
+  }
   get worldDisplacementMode(): WorldDisplacementMode {
-    return this.displacementMode;
+    return this.rootMotion.worldDisplacementMode;
   }
   get rootLoopMode(): RootLoopMode {
-    return this.rootLoop;
+    return this.rootMotion.rootLoopMode;
   }
   get rootMotionVisible(): boolean {
-    return this.displacementMode === 'authored';
+    return this.rootMotion.rootMotionVisible;
+  }
+  get rootMotionDragActive(): boolean {
+    return this.rootMotion.rootMotionDragActive;
+  }
+  get rootPosition(): RootMotionOffset {
+    return this.rootMotion.rootPosition;
   }
   get previewElapsedTimeMilliseconds(): number {
     return this.previewAnimation === this.workingAnimation || this.trajectoryCopyActive
       ? this.playback.elapsedTimeMilliseconds
       : this.previewTimeMilliseconds;
   }
-  setWorldDisplacementView(mode: WorldDisplacementMode, loop = this.rootLoop): void {
-    if (mode === this.displacementMode && loop === this.rootLoop) return;
-    this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.displacementMode = mode;
-      this.rootLoop = loop;
-      if (mode !== 'authored') this.rootMotionEditing = false;
-      this.notify();
-    });
-  }
-  rootTrajectoryVisible = true;
-  private rootGesture: { base: ReadonlyAnimation; preview: ReadonlyAnimation; point?: RootMotionOffset } | null = null;
-
-  get rootMotionDragActive(): boolean {
-    return this.rootGesture !== null;
-  }
-  get rootPosition(): RootMotionOffset {
-    return (
-      this.rootGesture?.point ??
-      (this.previewAnimation
-        ? sampleRootMotion(
-            this.previewAnimation,
-            motionPreviewSampleTime(this.previewAnimation, this.previewTimeMilliseconds),
-          )
-        : { x: 0, y: 0 })
-    );
+  setWorldDisplacementView(mode: WorldDisplacementMode, loop = this.rootLoopMode): void {
+    this.rootMotion.setWorldDisplacementView(mode, loop);
   }
   setRootMotionView(patch: { editing?: boolean; visible?: boolean; trajectory?: boolean }): void {
-    this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      if (patch.editing !== undefined) this.rootMotionEditing = patch.editing;
-      if (patch.visible !== undefined) this.displacementMode = patch.visible ? 'authored' : 'none';
-      if (patch.visible === false) this.rootMotionEditing = false;
-      if (patch.trajectory !== undefined) this.rootTrajectoryVisible = patch.trajectory;
-      if (patch.editing === true) {
-        this.displacementMode = 'authored';
-        this.selectRootMotion(this.rootMotionProperty);
-      }
-      this.notify();
-    });
+    this.rootMotion.setRootMotionView(patch);
   }
   selectRootMotion(property: RootMotionProperty = 'x', time?: number): boolean {
-    if (!this.working || !['x', 'y'].includes(property)) return false;
-    if (time !== undefined && !rootKeys(this.working, property).some((key) => key.time / 1000 === time)) return false;
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.selection.selectBone(null);
-      this.deformationSelected = false;
-      this.selectedDeformationTime = null;
-      this.rootMotionSelected = true;
-      this.rootMotionProperty = property;
-      this.selectedRootKey = time === undefined ? null : Object.freeze({ property, time });
-      if (time !== undefined) {
-        this.pause();
-        this.endScrub();
-        this.updateTime(time);
-      }
-      this.notify();
-      return true;
-    });
+    return this.rootMotion.selectRootMotion(property, time);
   }
   private clearRootSelection(): void {
     const changed = this.rootMotionSelected || this.selectedRootKey !== null || this.deformationSelected;
@@ -265,77 +244,28 @@ export class AnimationEditorState {
     if (changed) this.notify();
   }
   setRootPosition(values: Partial<RootMotionOffset>, time = this.currentTime): boolean {
-    if (!this.animationAuthoringEnabled || !this.working || !this.rig) return false;
-    return this.batchNotifications(() => {
-      let next = this.working!;
-      for (const property of ['x', 'y'] as const)
-        if (values[property] !== undefined) next = setRootKey(next, this.rig!, property, time * 1000, values[property]);
-      this.pause();
-      this.endScrub();
-      return this.installWorkingAnimation(next);
-    });
+    return this.rootMotion.setRootPosition(values, time);
   }
   addRootPositionKey(): boolean {
-    return this.setRootPosition(this.rootPosition);
+    return this.rootMotion.addRootPositionKey();
   }
   deleteRootKey(): boolean {
-    const key = this.selectedRootKey;
-    if (!key || !this.working || !this.rig || !this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
-      const next = setRootKey(this.working!, this.rig!, key.property, key.time * 1000, undefined);
-      this.selectedRootKey = null;
-      return this.installWorkingAnimation(next);
-    });
+    return this.rootMotion.deleteRootKey();
   }
   duplicateRootKey(time = this.currentTime): boolean {
-    const key = this.selectedRootKey;
-    if (!key || !this.working || !this.rig || !this.animationAuthoringEnabled) return false;
-    const destination = time === key.time ? time + 1 / this.keyframeFPS : time;
-    if (
-      destination > this.duration ||
-      rootKeys(this.working, key.property).some((entry) => entry.time / 1000 === destination)
-    )
-      return false;
-    return this.batchNotifications(() => {
-      const next = duplicateRootPropertyKey(this.working!, this.rig!, key, destination);
-      if (!this.installWorkingAnimation(next)) return false;
-      return this.selectRootMotion(key.property, destination);
-    });
+    return this.rootMotion.duplicateRootKey(time);
   }
   beginRootMotionDrag(): boolean {
-    if (!this.working || !this.animationAuthoringEnabled || !this.rootMotionEditing || !this.rootMotionVisible)
-      return false;
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.pause();
-      this.endScrub();
-      this.clearTransformDraft();
-      this.rootGesture = { base: this.working!, preview: this.working! };
-      this.notify();
-      return true;
-    });
+    return this.rootMotion.beginRootMotionDrag();
   }
   previewRootMotionDrag(point: RootMotionOffset): boolean {
-    if (!this.rootGesture || !this.rig) return false;
-    let next = setRootKey(this.rootGesture.base, this.rig, 'x', this.currentTimeMilliseconds, point.x);
-    next = setRootKey(next, this.rig, 'y', this.currentTimeMilliseconds, point.y);
-    this.rootGesture = { ...this.rootGesture, preview: next, point: { ...point } };
-    this.notify();
-    return true;
+    return this.rootMotion.previewRootMotionDrag(point);
   }
   cancelRootMotionDrag(): boolean {
-    if (!this.rootGesture) return false;
-    this.rootGesture = null;
-    this.notify();
-    return true;
+    return this.rootMotion.cancelRootMotionDrag();
   }
   commitRootMotionDrag(): boolean {
-    const gesture = this.rootGesture;
-    if (!gesture) return false;
-    return this.batchNotifications(() => {
-      this.rootGesture = null;
-      return gesture.base === this.working && this.installWorkingAnimation(gesture.preview);
-    });
+    return this.rootMotion.commitRootMotionDrag();
   }
 
   get trajectoryCopyActive(): boolean {
@@ -375,13 +305,6 @@ export class AnimationEditorState {
     return this.previews.cancelVariationPreview();
   }
 
-  private graphGesture: {
-    readonly base: ReadonlyAnimation;
-    readonly ref: GraphKeyRef;
-    readonly preview: ReadonlyAnimation;
-    readonly time: number;
-  } | null = null;
-
   /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
   get previewAnimation(): ReadonlyAnimation | null {
     return (
@@ -389,88 +312,28 @@ export class AnimationEditorState {
       this.previews.cleanupAnimation ??
       this.deformation.previewAnimation ??
       this.previews.variationAnimation ??
-      this.rootGesture?.preview ??
-      this.graphGesture?.preview ??
+      this.rootMotion.previewAnimation ??
+      this.graphGestures.previewAnimation ??
       this.working
     );
   }
   get graphEditActive(): boolean {
-    return this.graphGesture !== null;
+    return this.graphGestures.graphEditActive;
   }
   beginGraphEdit(ref: GraphKeyRef): boolean {
-    if (
-      !this.animationAuthoringEnabled ||
-      !this.working ||
-      !this.rig ||
-      !graphKeys(this.working, ref.channel).some((key) => key.time / 1000 === ref.time)
-    )
-      return false;
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.clearTransformDraft();
-      this.playback.pause();
-      this.graphGesture = {
-        base: this.working!,
-        ref: { channel: { ...ref.channel }, time: ref.time },
-        preview: this.working!,
-        time: ref.time,
-      };
-      this.notify();
-      return true;
-    });
+    return this.graphGestures.beginGraphEdit(ref);
   }
   previewGraphEdit(edit: GraphKeyEdit): boolean {
-    const gesture = this.graphGesture;
-    if (!gesture || !this.rig || gesture.base !== this.working || !this.animationAuthoringEnabled) return false;
-    const preview = editGraphKey(gesture.base, this.rig, gesture.ref, edit);
-    this.graphGesture = { ...gesture, preview, time: edit.time ?? gesture.ref.time };
-    this.notify();
-    return true;
+    return this.graphGestures.previewGraphEdit(edit);
   }
   cancelGraphEdit(): boolean {
-    if (!this.graphGesture) return false;
-    this.graphGesture = null;
-    this.notify();
-    return true;
+    return this.graphGestures.cancelGraphEdit();
   }
   commitGraphEdit(): boolean {
-    const gesture = this.graphGesture;
-    if (!gesture) return false;
-    return this.batchNotifications(() => {
-      this.graphGesture = null;
-      if (gesture.base !== this.working) {
-        this.notify();
-        return false;
-      }
-      const channel = gesture.ref.channel;
-      const changed = this.installWorkingAnimation(
-        gesture.preview,
-        false,
-        channel.kind === 'bone' ? [{ boneId: channel.id, property: channel.property, time: gesture.time }] : undefined,
-      );
-      if (changed && channel.kind === 'root')
-        this.selectedRootKey = Object.freeze({ property: channel.property, time: gesture.time });
-      if (changed && channel.kind === 'ik')
-        this.selection.setIKKey({
-          kind: 'ik',
-          constraintId: channel.id,
-          property: channel.property,
-          time: gesture.time,
-        });
-      return changed;
-    });
+    return this.graphGestures.commitGraphEdit();
   }
   editGraphKey(ref: GraphKeyRef, edit: GraphKeyEdit): boolean {
-    return this.batchNotifications(() => {
-      if (!this.beginGraphEdit(ref)) return false;
-      try {
-        this.previewGraphEdit(edit);
-        return this.commitGraphEdit();
-      } catch (error) {
-        this.cancelGraphEdit();
-        throw error;
-      }
-    });
+    return this.graphGestures.editGraphKey(ref, edit);
   }
 
   readonly poseLibrary: PoseLibrary;
@@ -541,6 +404,8 @@ export class AnimationEditorState {
     () => this.working?.duration ?? 0,
     () => this.working?.events ?? [],
   );
+  private readonly rootMotion: AnimationEditorRootMotion;
+  private readonly graphGestures: AnimationEditorGraphGestures;
   private readonly previews: AnimationEditorPreviewCommands;
   private readonly deformation: AnimationEditorDeformationCommands;
   private readonly selection: AnimationEditorSelection;
@@ -574,6 +439,34 @@ export class AnimationEditorState {
     );
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
+    this.rootMotion = new AnimationEditorRootMotion(this, {
+      batch: (command) => this.batchNotifications(command),
+      install: (animation) => this.installWorkingAnimation(animation),
+      cancelTimelineDrag: () => this.cancelTimelineDrag(),
+      clearOtherSelection: () => {
+        this.selection.selectBone(null);
+        this.deformationSelected = false;
+        this.selectedDeformationTime = null;
+      },
+      pause: () => this.pause(),
+      endScrub: () => this.endScrub(),
+      clearTransformDraft: () => this.clearTransformDraft(),
+      updateTime: (time) => this.updateTime(time),
+      notify: () => this.notify(),
+    });
+    this.graphGestures = new AnimationEditorGraphGestures(this, {
+      batch: (command) => this.batchNotifications(command),
+      install: (animation, retainDraft, keys) => this.installWorkingAnimation(animation, retainDraft, keys),
+      cancelTimelineDrag: () => this.cancelTimelineDrag(),
+      clearTransformDraft: () => this.clearTransformDraft(),
+      pause: () => this.playback.pause(),
+      selectCommittedKey: (channel, time) => {
+        if (channel.kind === 'root') this.selectedRootKey = Object.freeze({ property: channel.property, time });
+        if (channel.kind === 'ik')
+          this.selection.setIKKey({ kind: 'ik', constraintId: channel.id, property: channel.property, time });
+      },
+      notify: () => this.notify(),
+    });
     this.previews = new AnimationEditorPreviewCommands(this, this.document, {
       batch: (command) => this.batchNotifications(command),
       install: (animation) => this.installWorkingAnimation(animation),
@@ -751,7 +644,7 @@ export class AnimationEditorState {
   }
   get selectedIKTargetValues() {
     const id = this.selectedIKConstraintId;
-    if ((this.graphGesture || this.previews.hasIKPreview) && id && this.rig)
+    if ((this.graphEditActive || this.previews.hasIKPreview) && id && this.rig)
       return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.previewTimeMilliseconds);
     return this.ik.selectedIKTargetValues;
   }
