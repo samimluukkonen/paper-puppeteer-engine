@@ -72,6 +72,10 @@ export class SceneEditorDocument {
   private readonly entries = new Map<string, SceneEntry>();
   private selected: string | null = null;
   private revision = 0;
+  private authoredRevision = 0;
+  private selectionRevision = 0;
+  private presentationRevision = 0;
+  private notifiedScene: ReadonlyScene | null = null;
   private dragAudio: string | null = null;
   private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly audioCommands = new SceneAudioCommands(this, () => this.finishLayerGestures());
@@ -136,7 +140,28 @@ export class SceneEditorDocument {
     return () => this.listeners.delete(listener);
   };
   readonly getSnapshot = (): number => this.revision;
-  private notify(): void {
+  readonly getAuthoredSnapshot = (): number => this.authoredRevision;
+  readonly getSelectionSnapshot = (): number => this.selectionRevision;
+  readonly getPresentationSnapshot = (): number => this.presentationRevision;
+  /** Consume the revision before calling back: stage measurements can notify reentrantly. */
+  readonly subscribeAuthored = (listener: () => void): (() => void) => {
+    let revision = this.authoredRevision;
+    return this.subscribe(() => {
+      if (revision === this.authoredRevision) return;
+      revision = this.authoredRevision;
+      listener();
+    });
+  };
+  private notify(kind?: 'selection' | 'presentation'): void {
+    const scene = this.workingScene;
+    const authoredChanged = scene !== this.notifiedScene;
+    if (scene?.id !== this.notifiedScene?.id) this.selectionRevision++;
+    if (authoredChanged) {
+      this.notifiedScene = scene;
+      this.authoredRevision++;
+    }
+    if (kind === 'selection') this.selectionRevision++;
+    else if (kind === 'presentation' || !authoredChanged) this.presentationRevision++;
     this.revision++;
     notifySubscribers(this.listeners, 'Scene document subscribers failed.');
   }
@@ -221,7 +246,7 @@ export class SceneEditorDocument {
         ? [...error.issues]
         : [{ severity: 'error', message: error instanceof Error ? error.message : String(error) }],
     );
-    this.notify();
+    this.notify('presentation');
     return false;
   }
   private success(): true {
@@ -302,6 +327,7 @@ export class SceneEditorDocument {
     this.cancelCameraDrag();
     this.cancelActorDrag();
     this.groundGuide.cancelDrag();
+    if (this.selected === id) return this.success();
     this.selected = id;
     this.groundOffsets = new Map();
     this.groundContacts = new Map();
@@ -355,7 +381,7 @@ export class SceneEditorDocument {
   setCameraKeyEditing(enabled: boolean): void {
     this.selectCamera();
     if (this.entry) this.entry.cameraKeyEdit = enabled;
-    this.notify();
+    this.notify('presentation');
   }
   get selectedCameraKey(): { property: CameraProperty; key: Readonly<CameraKeyframe> } | null {
     const selected = this.cameraSelected && this.entry?.selectedCameraKey;
@@ -367,7 +393,7 @@ export class SceneEditorDocument {
     if (!this.entry || !this.workingScene?.cameraTracks?.[property]?.some((key) => key.id === id)) return;
     this.entry.selectedCameraKey = { property, id };
     this.entry.cameraKeyEdit = true;
-    this.notify();
+    this.notify('selection');
   }
   /** Explicit capture; channels at the same time are replaced without duplicating keys. */
   setCameraKey(time = this.cameraTime?.() ?? 0, values: Partial<CinematicCameraState> = this.cinematicCamera): boolean {
@@ -430,14 +456,14 @@ export class SceneEditorDocument {
       this.entry.selectedImage = null;
       this.entry.selectedAction = null;
     }
-    this.notify();
+    this.notify('selection');
   }
   setCameraPreview(enabled: boolean): void {
     this.selectCamera(this.cameraSelected);
     this.groundGuide.cancelDrag();
     if (!this.entry) return;
     this.entry.cameraPreview = enabled;
-    this.notify();
+    this.notify('presentation');
   }
   setCameraOverlays(enabled: boolean): void {
     this.cancelCameraDrag();
@@ -446,7 +472,7 @@ export class SceneEditorDocument {
     this.groundGuide.cancelDrag();
     if (!this.entry) return;
     this.entry.cameraOverlays = enabled;
-    this.notify();
+    this.notify('presentation');
   }
   updateCamera(patch: Partial<CinematicCameraState>): boolean {
     if (!this.dragCamera) this.finishLayerGestures();
@@ -499,14 +525,14 @@ export class SceneEditorDocument {
     this.dragCamera = false;
     this.dragCameraKey = false;
     this.entry?.history.endOperation();
-    this.notify();
+    this.notify('presentation');
   }
   cancelCameraDrag(): void {
     if (!this.dragCamera && !this.dragCameraKey) return;
     this.dragCamera = false;
     this.dragCameraKey = false;
     this.entry?.history.cancelOperation();
-    this.notify();
+    this.notify('presentation');
   }
 
   get selectedImageId(): string | null {
@@ -523,7 +549,7 @@ export class SceneEditorDocument {
     if (!locks) this.lockedLayers.set(this.selectedSceneId, (locks = new Set()));
     if (locked) locks.add(id);
     else locks.delete(id);
-    this.notify();
+    this.notify('presentation');
   }
   isImageLocked(id: string): boolean {
     const image = this.workingScene?.images?.find((image) => image.id === id);
@@ -569,7 +595,7 @@ export class SceneEditorDocument {
     this.entry.selectedImage = id;
     this.entry.selectedActor = null;
     this.entry.selectedAction = null;
-    this.notify();
+    this.notify('selection');
   }
   addImage(reference: string): boolean {
     return this.artworkCommands.addImage(reference);
@@ -596,13 +622,13 @@ export class SceneEditorDocument {
     if (!this.dragImage) return;
     this.dragImage = null;
     this.entry?.history.endOperation();
-    this.notify();
+    this.notify('presentation');
   }
   cancelImageDrag(): void {
     if (!this.dragImage) return;
     this.dragImage = null;
     this.entry?.history.cancelOperation();
-    this.notify();
+    this.notify('presentation');
   }
   /** Sources, checkpoints, undo, redo and active gestures all keep their binary dependencies. */
   cleanupImages(): number {
@@ -639,7 +665,7 @@ export class SceneEditorDocument {
     this.entry.selectedAudioClip = null;
     this.entry.selectedDialogueLine = null;
     this.entry.selectedActor = id;
-    this.notify();
+    this.notify('selection');
   }
   private nextActorId(stem = 'actor'): string {
     let index = 1;
@@ -807,7 +833,7 @@ export class SceneEditorDocument {
     )
       return;
     this.groundOffsets = next;
-    this.notify();
+    this.notify('presentation');
   }
   get canAlignSelectedActorFeetToGround(): boolean {
     return (
@@ -819,12 +845,12 @@ export class SceneEditorDocument {
   setGroundPreviewing(previewing: boolean): void {
     if (this.groundPreviewing === previewing) return;
     this.groundPreviewing = previewing;
-    this.notify();
+    this.notify('presentation');
   }
   setActorGroundContacts(contacts: ReadonlyMap<string, readonly ActorGroundContact[]>): void {
     if (equalJsonData([...contacts], [...this.groundContacts])) return;
     this.groundContacts = contacts;
-    this.notify();
+    this.notify('presentation');
   }
   get selectedActorGroundContacts(): readonly ActorGroundContact[] {
     return this.selectedActorId ? (this.groundContacts.get(this.selectedActorId) ?? []) : [];
@@ -836,11 +862,11 @@ export class SceneEditorDocument {
     if (!this.selectedActorId || (id && !this.selectedActorGroundContacts.some((entry) => entry.id === id))) return;
     this.selectedContacts.set(this.selectedActorId, id);
     this.showFootContacts = true;
-    this.notify();
+    this.notify('selection');
   }
   setFootContactsVisible(visible: boolean): void {
     this.showFootContacts = visible;
-    this.notify();
+    this.notify('presentation');
   }
   private actorGroundOffset(id: string): number | undefined {
     const contacts = this.groundContacts.get(id);
@@ -877,13 +903,13 @@ export class SceneEditorDocument {
     if (!this.dragActor) return;
     this.dragActor = null;
     this.entry?.history.endOperation();
-    this.notify();
+    this.notify('presentation');
   }
   cancelActorDrag(): void {
     if (!this.dragActor) return;
     this.dragActor = null;
     this.entry?.history.cancelOperation();
-    this.notify();
+    this.notify('presentation');
   }
 
   /** Project assets remain owned by Project Workspace; standalone imports retain binaries by stable path. */
@@ -906,7 +932,7 @@ export class SceneEditorDocument {
     if (!this.entry || (id !== null && !this.workingScene?.dialogue?.some((line) => line.id === id))) return;
     this.selectActor(null);
     this.entry.selectedDialogueLine = id;
-    this.notify();
+    this.notify('selection');
   }
   addDialogueLine(input: Omit<SceneDialogueLine, 'id'>): boolean {
     return this.dialogueCommands.add(input);
@@ -928,7 +954,7 @@ export class SceneEditorDocument {
     if (!this.entry || (id !== null && !this.workingScene?.audioClips?.some((clip) => clip.id === id))) return;
     this.selectActor(null);
     this.entry.selectedAudioClip = id;
-    this.notify();
+    this.notify('selection');
   }
   addAudioTrack(category: AudioCategory): boolean {
     return this.audioCommands.addTrack(category);
@@ -964,13 +990,13 @@ export class SceneEditorDocument {
     if (!this.dragAudio) return;
     this.dragAudio = null;
     this.entry?.history.endOperation();
-    this.notify();
+    this.notify('presentation');
   }
   cancelAudioDrag(): void {
     if (!this.dragAudio) return;
     this.dragAudio = null;
     this.entry?.history.cancelOperation();
-    this.notify();
+    this.notify('presentation');
   }
 
   get selectedActionId(): string | null {
@@ -984,7 +1010,7 @@ export class SceneEditorDocument {
     if (!this.entry || (id !== null && !this.workingScene?.transitions?.some((effect) => effect.id === id))) return;
     this.selectActor(null);
     this.entry.selectedTransition = id;
-    this.notify();
+    this.notify('selection');
   }
   addTransition(input: Omit<SceneTransition, 'id'>): boolean {
     return this.transitionCommands.addTransition(input);
@@ -1010,7 +1036,7 @@ export class SceneEditorDocument {
     this.entry.selectedDialogueLine = null;
     this.entry.selectedAction = id;
     if (action) this.entry.selectedActor = action.actorId;
-    this.notify();
+    this.notify('selection');
   }
   private nextActionId(): string {
     let index = 1;
@@ -1079,13 +1105,13 @@ export class SceneEditorDocument {
     if (!this.dragAction) return;
     this.dragAction = null;
     this.entry?.history.endOperation();
-    this.notify();
+    this.notify('presentation');
   }
   cancelActionDrag(): void {
     if (!this.dragAction) return;
     this.dragAction = null;
     this.entry?.history.cancelOperation();
-    this.notify();
+    this.notify('presentation');
   }
 
   updateProperties(properties: { name?: string; duration?: number }): boolean {

@@ -4,7 +4,7 @@ import { parseRigDefinition } from '../../src/engine/externalData.js';
 import { getFootContactWorldPosition } from '../../src/engine/footContactMarkers.js';
 import { parseSceneJson, createEmptyScene } from '../../src/engine/SceneDefinition.js';
 import { rigFileSchema } from '../../src/engine/schemas.js';
-import { test } from './fixtures.js';
+import { sceneInspectorGroup, test } from './fixtures.js';
 
 async function downloadAnimation(page: Page) {
   const waiting = page.waitForEvent('download');
@@ -107,6 +107,7 @@ test('ground two differently sized Actors through an explicit marker and keep pa
     buffer: Buffer.from(JSON.stringify(source)),
   });
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled();
+  await sceneInspectorGroup(page, 'Actors');
   const panel = page.locator('.ground-guide-controls');
   await expect(panel).not.toHaveAttribute('open');
   await panel.locator('summary').click();

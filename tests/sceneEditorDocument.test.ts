@@ -17,6 +17,51 @@ const source = () => ({
   ],
 });
 
+test('authored subscriptions ignore selection, diagnostics and checkpoints, including reentrant measurements', () => {
+  const document = new SceneEditorDocument();
+  document.importJson(JSON.stringify(source()));
+  const authored = document.getAuthoredSnapshot();
+  const selection = document.getSelectionSnapshot();
+  const presentation = document.getPresentationSnapshot();
+  const reconcile = vi.fn(() => {
+    document.setActorGroundOffsets(new Map([['hero', 12]]));
+    document.setActorGroundContacts(new Map([['hero', [{ id: 'foot', name: 'Foot', offset: 12 }]]]));
+  });
+  const unsubscribe = document.subscribeAuthored(reconcile);
+  document.selectActor('hero');
+  assert.isAbove(document.getSelectionSnapshot(), selection);
+  assert.equal(document.getPresentationSnapshot(), presentation);
+  document.setFootContactsVisible(true);
+  document.setGroundPreviewing(true);
+  document.setCameraPreview(true);
+  document.setCameraOverlays(true);
+  document.markSaved();
+  document.validateScene();
+  document.reportError(new Error('diagnostic'));
+  assert.isAbove(document.getPresentationSnapshot(), presentation);
+  assert.equal(document.getAuthoredSnapshot(), authored);
+  assert.equal(reconcile.mock.calls.length, 0);
+  document.updateActor('hero', { position: { x: 10, y: 20 } });
+  assert.equal(reconcile.mock.calls.length, 1, 'ground measurements do not recursively reconcile');
+  assert.equal(document.getAuthoredSnapshot(), authored + 1);
+  document.undo();
+  document.redo();
+  document.beginActorDrag('hero');
+  document.moveActorDrag({ x: 30, y: 40 });
+  document.cancelActorDrag();
+  assert.equal(reconcile.mock.calls.length, 5, 'undo, redo, drag movement and cancellation each reconcile');
+  document.createScene({ id: 'other' });
+  document.selectScene('opening');
+  assert.equal(reconcile.mock.calls.length, 7);
+  document.selectActor('hero');
+  document.selectFootContact('foot');
+  document.selectScene('opening');
+  assert.equal(document.selectedFootContactId, 'foot', 'reselecting a scene retains its measurements and selection');
+  unsubscribe();
+  document.updateProperties({ name: 'Unsubscribed' });
+  assert.equal(reconcile.mock.calls.length, 7);
+});
+
 test('new scenes are independent unsaved drafts, including after undo or revert to their initial source', () => {
   const document = new SceneEditorDocument();
   assert.isNull(document.workingScene);

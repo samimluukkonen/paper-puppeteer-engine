@@ -264,6 +264,84 @@ test('registry deduplicates concurrent metadata loads and aborts late loads on p
   assert.isUndefined(pending.get(manifest));
 });
 
+test('preview updates only changed Actor fields and layer properties without resampling unchanged Actors', () => {
+  const { document, id } = fixture();
+  document.addActor(manifest, { x: 120, y: -50 });
+  const secondId = document.selectedActorId!;
+  const preview = new SceneActorPreview(puppetScene());
+  const definitions = new Map([[manifest, character()]]);
+  preview.sync(document.workingScene!, definitions);
+  const first = preview.instances.get(id)!.actor;
+  const second = preview.instances.get(secondId)!.actor;
+  const observe = (actor: typeof first) => ({
+    position: vi.spyOn(actor, 'setPosition'),
+    facing: vi.spyOn(actor, 'setFacing'),
+    skin: vi.spyOn(actor, 'setSkin'),
+    pose: vi.spyOn(actor.puppet, 'syncPose'),
+    depth: vi.spyOn(actor.puppet.container, 'setDepth'),
+    visible: vi.spyOn(actor.puppet.container, 'setVisible'),
+  });
+  const firstCalls = observe(first);
+  const secondCalls = observe(second);
+  document.selectActor(id);
+  assert.isEmpty(preview.sync(document.workingScene!, definitions));
+  document.updateProperties({ name: 'Metadata edit' });
+  assert.isEmpty(preview.sync(document.workingScene!, definitions));
+  document.updateActor(id, { position: { x: 25, y: 40 } });
+  assert.deepEqual([...preview.sync(document.workingScene!, definitions)], [id]);
+  assert.equal(firstCalls.position.mock.calls.length, 1);
+  assert.equal(firstCalls.facing.mock.calls.length, 0);
+  assert.equal(firstCalls.skin.mock.calls.length, 0);
+  assert.equal(firstCalls.depth.mock.calls.length, 0);
+  assert.equal(firstCalls.visible.mock.calls.length, 0);
+  for (const spy of Object.values(secondCalls)) assert.equal(spy.mock.calls.length, 0);
+  const firstGround = vi.spyOn(first.puppet, 'getSlotImage');
+  const secondGround = vi.spyOn(second.puppet, 'getSlotImage');
+  preview.groundOffsets(new Set([id]));
+  assert.equal(firstGround.mock.calls.length, 1);
+  assert.equal(secondGround.mock.calls.length, 0, 'unchanged Actors skip grounding traversal');
+  assert.deepEqual([...preview.groundContacts(new Set([id])).keys()], [id]);
+  document.reorderActor(id, 1);
+  assert.isEmpty(preview.sync(document.workingScene!, definitions), 'depth changes do not invalidate grounding');
+  assert.equal(firstCalls.depth.mock.calls.length, 1);
+  assert.equal(secondCalls.depth.mock.calls.length, 1);
+  assert.equal(secondCalls.pose.mock.calls.length, 0);
+  document.updateLayer('actors', { visible: false });
+  assert.isEmpty(preview.sync(document.workingScene!, definitions));
+  assert.equal(first.puppet.container.visible, false);
+  assert.equal(second.puppet.container.visible, false);
+  document.updateActor(id, { facing: 'left', skin: 'alternate', animation: 'wave' });
+  assert.deepEqual([...preview.sync(document.workingScene!, definitions)], [id]);
+  assert.equal(firstCalls.position.mock.calls.length, 1, 'appearance changes do not reapply placement');
+  assert.equal(secondCalls.pose.mock.calls.length, 0);
+  assert.equal(first.puppet.getBone('root').pose.x, 13);
+  preview.dispose();
+});
+
+test('late and replaced character definitions reconcile only their dependent Actors', () => {
+  const { document, id } = fixture();
+  const otherManifest = '../characters/other/character.json';
+  document.addActor(otherManifest);
+  const otherId = document.selectedActorId!;
+  const definitions = new Map([[manifest, character()]]);
+  const preview = new SceneActorPreview(puppetScene());
+  assert.deepEqual([...preview.sync(document.workingScene!, definitions)], [id]);
+  const first = preview.instances.get(id)!.actor;
+  const position = vi.spyOn(first, 'setPosition');
+  definitions.set(otherManifest, character());
+  assert.deepEqual([...preview.sync(document.workingScene!, definitions)], [otherId]);
+  const other = preview.instances.get(otherId)!.actor;
+  definitions.set(otherManifest, character());
+  assert.deepEqual([...preview.sync(document.workingScene!, definitions)], [otherId]);
+  assert.isTrue(other.isDisposed);
+  assert.isFalse(first.isDisposed);
+  assert.equal(position.mock.calls.length, 0);
+  definitions.delete(otherManifest);
+  assert.deepEqual([...preview.sync(document.workingScene!, definitions)], [otherId]);
+  assert.isFalse(preview.instances.has(otherId));
+  preview.dispose();
+});
+
 test('invalid initial assets release stale previews while valid actors still reconcile and recover', () => {
   const { document, id } = fixture();
   const definition = character();

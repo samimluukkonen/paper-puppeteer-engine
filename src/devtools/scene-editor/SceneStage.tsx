@@ -26,7 +26,7 @@ import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
 import { SceneCameraPreview } from './SceneCameraPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
-import type { SceneEditorDocument } from './SceneEditorDocument.js';
+import type { ActorGroundContact, SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneGroundHandle } from './SceneGroundHandle.js';
 import { draggedPosition, stagePoint } from './stageCoordinates.js';
@@ -132,20 +132,27 @@ class SceneStage extends Phaser.Scene {
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', 'Actor placement canvas');
     const events = new AbortController();
-    const sync = (): void => {
+    const groundOffsets = new Map<string, number>();
+    const groundContacts = new Map<string, readonly ActorGroundContact[]>();
+    const syncGestures = (): void => {
       if (this.gesture && this.gesture.scene !== this.document.selectedSceneId) this.gesture = undefined;
       if (
         this.imageGesture &&
         (!this.document.hasActiveGesture || this.imageGesture.scene !== this.document.selectedSceneId)
       )
         this.imageGesture = undefined;
-      const document = this.document.workingScene;
       if (!this.document.hasActiveGesture) this.cameraGesture = undefined;
+    };
+    const sync = (): void => {
+      syncGestures();
+      const document = this.document.workingScene;
       this.syncCamera();
       this.syncArtwork();
       if (!document) {
         this.playback.dispose();
         this.preview.dispose();
+        groundOffsets.clear();
+        groundContacts.clear();
         this.document.setActorGroundOffsets(new Map());
         this.document.setActorGroundContacts(new Map());
         return;
@@ -156,6 +163,7 @@ class SceneStage extends Phaser.Scene {
       ]
         .filter(Boolean)
         .join('\n');
+      let changedActors: ReadonlySet<string> | undefined;
       try {
         assertSceneInstanceBudget(document, this.definitions);
         this.playback.sync(
@@ -183,17 +191,32 @@ class SceneStage extends Phaser.Scene {
             },
           },
         );
-        this.preview.sync(document, this.definitions);
+        changedActors = this.preview.sync(document, this.definitions);
       } catch (error) {
         message = error instanceof Error ? error.message : String(error);
       }
-      this.document.setActorGroundOffsets(this.preview.groundOffsets());
-      this.document.setActorGroundContacts(this.preview.groundContacts());
+      // Removed/replaced Actors lose old measurements; unchanged Actors keep theirs.
+      for (const id of groundOffsets.keys())
+        if (!this.preview.instances.has(id) || !changedActors || changedActors.has(id)) groundOffsets.delete(id);
+      for (const id of groundContacts.keys())
+        if (!this.preview.instances.has(id) || !changedActors || changedActors.has(id)) groundContacts.delete(id);
+      for (const [id, offset] of this.preview.groundOffsets(changedActors)) groundOffsets.set(id, offset);
+      for (const [id, contacts] of this.preview.groundContacts(changedActors)) groundContacts.set(id, contacts);
+      this.document.setActorGroundOffsets(groundOffsets);
+      this.document.setActorGroundContacts(new Map(groundContacts));
       this.status(message);
       for (const actor of document.actors) this.ensureCharacter(actor.character.manifest, sync);
     };
     this.refresh = sync;
-    const unsubscribe = this.document.subscribe(sync);
+    const unsubscribe = this.document.subscribeAuthored(sync);
+    let cameraPreviewing = this.document.cameraPreviewing;
+    const unsubscribePresentation = this.document.subscribe(() => {
+      syncGestures();
+      if (cameraPreviewing === this.document.cameraPreviewing) return;
+      cameraPreviewing = this.document.cameraPreviewing;
+      this.syncCamera();
+      this.syncArtwork();
+    });
     const unsubscribeImages = this.document.images.subscribe(sync);
     const cancel = (): void => {
       this.gesture = undefined;
@@ -432,6 +455,7 @@ class SceneStage extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.alive = false;
       unsubscribe();
+      unsubscribePresentation();
       unsubscribeImages();
       this.document.setActorBoundsProvider(undefined);
       this.document.setCameraTimeProvider(undefined);
@@ -597,12 +621,11 @@ class SceneStage extends Phaser.Scene {
     const cleanPreview = this.document.cameraPreviewing && !this.document.cameraOverlays;
     const guide = this.document.groundGuide.getSnapshot().guide;
     this.groundOverlay.render(cleanPreview ? { ...guide, enabled: false } : guide);
-    for (const { actor } of this.preview.instances.values())
-      actor.puppet.container.setVisible(
-        !this.playback.previewing &&
-          !!this.document.workingScene &&
-          sceneLayer(this.document.workingScene, 'actors').visible,
-      );
+    const actorsVisible = !this.playback.previewing && !!source && sceneLayer(source, 'actors').visible;
+    for (const { actor } of this.preview.instances.values()) {
+      const container = actor.puppet.container;
+      if (container.visible !== actorsVisible) container.setVisible(actorsVisible);
+    }
     const camera = this.cameras.main;
     this.grid.clear();
     if (this.showGrid && !cleanPreview) {
