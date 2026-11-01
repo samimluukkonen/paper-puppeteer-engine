@@ -69,3 +69,10 @@ export type { SceneDialogueLine, ActiveSceneDialogue, SceneDialogueTarget } from
 export { sceneDialogueLineSchema, getDialogueLineAtTime, getDialogueAtTime, dialogueSpeaker } from './sceneDialogue.js';
 
 export { SceneDialogueOverlay } from './SceneDialogueOverlay.js';
+
+export { DialogueKeyboardInput, type DialogueKeyboardOptions } from './DialogueKeyboardInput.js';
+export {
+  StandaloneStoryPlayer,
+  type StandaloneStoryPlayerOptions,
+  type StandaloneStorySource,
+} from './StandaloneStoryPlayer.js';

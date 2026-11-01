@@ -151,6 +151,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.4
+
+- Add a React-free standalone story viewer with load/play/stop/advance/dispose lifecycle, automatic scene sequencing, cinematic camera/subtitles and Phaser-owned updates.
+- Share focus-scoped, configurable dialogue keyboard input with the story preview; ignore repeats, typing, native controls, modifiers and IME input. Enter only advances an active hold.
+- Show an accessible advance hint and explicit browser audio enable control; an audio-unlock press never consumes a dialogue line. Document host integration and cover lifecycle, focus, real Web Audio and complete stories in local browser tests.
+
 ## 1.6.3
 
 - Add a project-owned Story Sequence panel for creating and renaming linear stories, adding existing scenes, reordering, duplicating and removing entries, and opening shared source scenes. Sequence edits use project Undo/Redo, autosave/recovery and portable project ZIPs.

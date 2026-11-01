@@ -129,7 +129,7 @@ test('two-Actor root-motion authoring, playback, conflict rejection, scrubbing a
     .locator('details')
     .filter({ has: page.locator('summary').getByText('Runtime preview', { exact: true }) });
   if (!(await runtime.evaluate((element) => (element as HTMLDetailsElement).open)))
-    await runtime.locator('summary').click();
+    await runtime.locator(':scope > summary').click();
   await time.fill('2');
   await expect(position).toHaveText('180.000, 100.000');
   await page.getByRole('button', { name: 'a: animation idle', exact: true }).click();
@@ -137,7 +137,7 @@ test('two-Actor root-motion authoring, playback, conflict rejection, scrubbing a
     .locator('details')
     .filter({ has: page.locator('summary').getByText('Action properties · animation', { exact: true }) });
   if (!(await properties.evaluate((element) => (element as HTMLDetailsElement).open)))
-    await properties.locator('summary').click();
+    await properties.locator(':scope > summary').click();
   await expect(
     page.getByRole('combobox', { name: 'Movement source', exact: true }).locator('option[value="rootMotion"]'),
   ).toHaveAttribute('disabled', '');

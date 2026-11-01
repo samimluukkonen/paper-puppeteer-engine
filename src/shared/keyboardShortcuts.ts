@@ -1,13 +1,6 @@
-/** Form controls and inherited content-editable regions retain their native keyboard behavior. */
-export function isTypingTarget(target: EventTarget | null): boolean {
-  const element = target as HTMLElement | null;
-  return (
-    /^(INPUT|SELECT|TEXTAREA)$/.test(element?.tagName ?? '') ||
-    !!element?.closest?.('select') ||
-    element?.isContentEditable === true ||
-    !!element?.closest?.('[contenteditable]:not([contenteditable="false"])')
-  );
-}
+import { isTypingTarget } from '../engine/keyboardTarget.js';
+
+export { isTypingTarget } from '../engine/keyboardTarget.js';
 
 /** Dialog controls keep their keyboard behavior without changing the background workspace. */
 export function isDialogTarget(target: EventTarget | null): boolean {

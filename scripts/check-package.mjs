@@ -71,6 +71,7 @@ try {
     'artist-workflow.md',
     'reusing-animations-and-scenes.md',
     'linear-stories.md',
+    'standalone-story-player.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 
@@ -183,7 +184,7 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
 import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
 import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
 import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
-import { SceneLoader, SceneDialogueOverlay, StoryPlayer, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
+import { SceneLoader, SceneDialogueOverlay, StoryPlayer, StandaloneStoryPlayer, DialogueKeyboardInput, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
 import type { SceneDialogueTarget, SceneDefinition, SceneRunner, StoryDefinition } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
@@ -201,6 +202,25 @@ export function linearStory(scene: import('phaser').Scene, story: StoryDefinitio
       signal: context.signal,
     }),
   });
+}
+
+export function viewer(scene: import('phaser').Scene, target: HTMLElement, story: StoryDefinition, scenes: ReadonlyMap<string, SceneDefinition>): StandaloneStoryPlayer {
+  const player = new StandaloneStoryPlayer(scene, target, {
+    loadStory: async (_id, signal) => {
+      signal.throwIfAborted();
+      return {
+        definition: story, scenes,
+        loadScene: (definition, context) => SceneLoader.fromDefinition(scene, definition, {
+          baseUrl: 'https://example.test/scenes/' + context.entry.sceneAssetId + '.json', signal: context.signal,
+        }),
+      };
+    },
+  });
+  const keyboard = new DialogueKeyboardInput(target, {
+    keys: [' '], waiting: () => player.waitingForDialogue, advanceDialogue: () => { player.advanceDialogue(); },
+  });
+  keyboard.dispose();
+  return player;
 }
 
 export function dialogue(scene: import('phaser').Scene, definition: SceneDefinition, runner: SceneRunner): void {

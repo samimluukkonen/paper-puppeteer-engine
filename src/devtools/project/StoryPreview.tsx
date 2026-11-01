@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import { useEffect, useId, useRef, useState } from 'react';
+import { DialogueKeyboardInput } from '../../engine/DialogueKeyboardInput.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import { SceneLoader, type LoadedScene } from '../../engine/SceneLoader.js';
 import type { StoryDefinition } from '../../engine/StoryDefinition.js';
 import { StoryPlayer } from '../../engine/StoryPlayer.js';
-import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
 import { buildProjectScenePackage } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
@@ -105,6 +105,9 @@ class StoryPreviewScene extends Phaser.Scene {
       this.failed(error);
     }
   }
+  get waitingForDialogue(): boolean {
+    return this.player?.currentSession?.runner.status === 'waiting-for-dialogue-advance';
+  }
   enableAudio(): void {
     void this.loaded?.runner.audio?.unlock().then(
       () => this.publish(),
@@ -157,8 +160,14 @@ export default function StoryPreview({
     const preview = new StoryPreviewScene(story, workspace, setState);
     runtime.current = preview;
     const game = createEditorGame(parent, preview, { width: 960, height: 540 });
-    document.getElementById(parent)?.focus();
+    const target = document.getElementById(parent)!;
+    const keyboard = new DialogueKeyboardInput(target, {
+      waiting: () => preview.waitingForDialogue,
+      advanceDialogue: () => preview.advance(),
+    });
+    target.focus();
     return () => {
+      keyboard.dispose();
       runtime.current = undefined;
       try {
         preview.disposePreview();
@@ -174,28 +183,6 @@ export default function StoryPreview({
       aria-label="Entire story preview"
       onClose={close}
       onCancel={close}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' && event.repeat && !isTypingTarget(event.target)) {
-          event.preventDefault();
-          return;
-        }
-        if (
-          event.key !== 'Enter' ||
-          event.repeat ||
-          event.ctrlKey ||
-          event.metaKey ||
-          event.altKey ||
-          event.defaultPrevented ||
-          event.nativeEvent.isComposing ||
-          isTypingTarget(event.target) ||
-          (event.target as Element).closest('button, a[href], summary')
-        )
-          return;
-        if (state.waiting) {
-          event.preventDefault();
-          runtime.current?.advance();
-        }
-      }}
     >
       <h2>Preview · {story.name}</h2>
       <p className="workspace-caption">

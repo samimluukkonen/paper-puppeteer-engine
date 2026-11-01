@@ -35,3 +35,5 @@ Focus the preview canvas and press **Enter** once per held line, or click **Adva
 Story creation, naming and sequence changes use **Undo Project / Redo Project**. Dialogue, idle and audio changes use the source scene’s Undo/Redo. Story operations never rewrite or dirty source scenes or animations. Preview, selection and guide navigation do not create authored history or save runtime state.
 
 Committed stories use the existing project autosave and **Local draft** recovery. **Export Project** downloads a portable ZIP containing every story, shared scene and dependency; **Import Project** restores them. Recovery restores documents with fresh history, following the project’s existing behavior. Keep a project ZIP as your portable backup. A standalone scene/character download does not include project-owned story sequences.
+
+For application integration, see the [standalone story player guide](standalone-story-player.md). It covers the React-free viewer controller, configured advance input and browser audio activation.

@@ -1,0 +1,152 @@
+import { fileURLToPath } from 'node:url';
+import { expect, test, type Page } from '@playwright/test';
+import { build } from 'vite';
+
+let consumerScript = '';
+test.beforeAll(async () => {
+  const result = await build({
+    configFile: false,
+    logLevel: 'error',
+    build: {
+      write: false,
+      minify: false,
+      lib: { entry: fileURLToPath(new URL('./standaloneStoryHarness.ts', import.meta.url)), formats: ['es'] },
+    },
+  });
+  for (const output of Array.isArray(result) ? result : [result])
+    if ('output' in output)
+      for (const chunk of output.output) if (chunk.type === 'chunk' && chunk.isEntry) consumerScript = chunk.code;
+  if (!consumerScript) throw new Error('Missing standalone story consumer.');
+});
+
+async function mount(page: Page, space = false, audio = false) {
+  await page.route('**/story-host', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Story viewer</title>' }),
+  );
+  await page.route('**/story-consumer.js', (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: consumerScript }),
+  );
+  await page.goto('story-host');
+  await page.evaluate(
+    async ({ space, audio }) => {
+      const url = new URL('story-consumer.js', location.href).href;
+      const api = (await import(/* @vite-ignore */ url)) as typeof import('./standaloneStoryHarness.js');
+      window.storyConsumer = await api.mountStory(space, audio);
+    },
+    { space, audio },
+  );
+}
+const snapshot = (page: Page) => page.evaluate(() => window.storyConsumer.snapshot());
+const focus = (page: Page) => page.evaluate(() => window.storyConsumer.focus());
+
+test('standalone viewer honors focus, consecutive lines, transitions, restart and repeated mount/cleanup', async ({
+  page,
+}, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await mount(page);
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({ status: 'playing', index: 0, line: '01-first', waiting: true });
+  await expect(page.getByRole('status')).toHaveText('Press Enter to continue');
+  expect((await snapshot(page)).text).toContain('森は静かだった。');
+  await page.screenshot({ path: info.outputPath('standalone-story.png') });
+  const baselineListeners = (await snapshot(page)).updateListeners;
+  await page.getByRole('textbox', { name: 'Outside editor field' }).fill('typing');
+  await page.keyboard.press('Enter');
+  await page.getByRole('textbox', { name: 'Embedded editor field' }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Host button' }).focus();
+  await page.keyboard.press('Enter');
+  expect((await snapshot(page)).line).toBe('01-first');
+  await focus(page);
+  for (const key of ['Shift+Enter', 'Control+Enter', 'Alt+Enter', 'Meta+Enter', 'Space'])
+    await page.keyboard.press(key);
+  await page.evaluate(() => {
+    const host = document.querySelector('[aria-label="Standalone story"]')!;
+    host.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
+    const consumed = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+    consumed.preventDefault();
+    host.dispatchEvent(consumed);
+  });
+  expect((await snapshot(page)).line).toBe('01-first');
+  await page.keyboard.down('Enter');
+  await page.keyboard.down('Enter');
+  expect((await snapshot(page)).line).toBe('02-second');
+  await page.keyboard.up('Enter');
+  await page.keyboard.down('Enter');
+  await expect.poll(() => snapshot(page)).toMatchObject({ index: 1, line: '01-first' });
+  await page.keyboard.down('Enter'); // Still held across scene load.
+  expect((await snapshot(page)).line).toBe('01-first');
+  await page.keyboard.up('Enter');
+  await page.evaluate(() => {
+    window.storyConsumer.advance();
+    window.storyConsumer.advance();
+  });
+  await expect.poll(() => snapshot(page)).toMatchObject({ status: 'completed', objects: 0 });
+  await expect(page.getByRole('status')).toHaveText('Story complete');
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => window.storyConsumer.remount());
+    expect((await snapshot(page)).updateListeners).toBe(baselineListeners);
+    await page.keyboard.press('Enter');
+    expect((await snapshot(page)).line).toBe('02-second');
+  }
+  await page.evaluate(() => window.storyConsumer.stop());
+  expect((await snapshot(page)).objects).toBe(0);
+  await page.keyboard.press('Enter');
+  expect((await snapshot(page)).status).toBe('stopped');
+  await page.evaluate(() => window.storyConsumer.restart());
+  expect((await snapshot(page)).line).toBe('01-first');
+  await page.evaluate(() => window.storyConsumer.dispose());
+  await page.keyboard.press('Enter');
+  expect(await snapshot(page)).toMatchObject({
+    status: 'disposed',
+    objects: 0,
+    updateListeners: baselineListeners - 1,
+  });
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await page.evaluate(() => window.storyConsumer.destroy());
+  expect(errors).toEqual([]);
+});
+
+test('host-configured Space is the only keyboard advance action', async ({ page }) => {
+  await mount(page, true);
+  await expect(page.getByRole('status')).toHaveText('Press Space to continue');
+  await page.keyboard.press('Enter');
+  expect((await snapshot(page)).line).toBe('01-first');
+  await page.keyboard.press('Space');
+  expect((await snapshot(page)).line).toBe('02-second');
+  await page.evaluate(() => window.storyConsumer.destroy());
+});
+
+test('audio unlock press preserves the first line and releases real browser voices/contexts', async ({ page }) => {
+  await mount(page, false, true);
+  await expect(page.getByRole('button', { name: 'Enable story audio' })).toBeVisible();
+  await page.keyboard.down('Enter');
+  await expect.poll(async () => (await snapshot(page)).audio).toBe('ready');
+  await page.keyboard.down('Enter');
+  expect((await snapshot(page)).line).toBe('01-first');
+  expect((await snapshot(page)).voices).toBe(1);
+  await page.keyboard.up('Enter');
+  await expect(page.getByRole('status')).toHaveText('Press Enter to continue');
+  await page.keyboard.press('Enter');
+  expect((await snapshot(page)).line).toBe('02-second');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => snapshot(page)).toMatchObject({ index: 1, line: '01-first', audio: 'locked' });
+  await page.getByRole('button', { name: 'Enable story audio' }).click();
+  await expect.poll(async () => (await snapshot(page)).audio).toBe('ready');
+  expect((await snapshot(page)).line).toBe('01-first');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => snapshot(page)).toMatchObject({ status: 'completed', voices: 0, contextsClosed: 2 });
+  const state = await snapshot(page);
+  expect(state.decoded).toBeGreaterThan(0);
+  expect(state.released).toBe(state.decoded);
+  await page.evaluate(() => window.storyConsumer.restart());
+  await page.getByRole('button', { name: 'Enable story audio' }).click();
+  await expect.poll(async () => (await snapshot(page)).voices).toBe(1);
+  const destroyed = await page.evaluate(() => window.storyConsumer.destroyGame());
+  expect(destroyed).toMatchObject({ status: 'disposed', voices: 0, contextsClosed: 3 });
+  expect(destroyed.released).toBe(destroyed.decoded);
+  await expect(page.getByRole('status')).toHaveCount(0);
+});
