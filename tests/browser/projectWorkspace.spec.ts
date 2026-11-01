@@ -18,7 +18,7 @@ async function reveal(frame: Frame, selector: string) {
   return (await inspectorControl(frame, selector)).first();
 }
 
-test('project validation reports broken dependencies, blocks export, opens the affected scene and refreshes after undo', async ({
+test('project scene authoring rejects missing animation dependencies atomically and keeps project exports valid', async ({
   page,
 }) => {
   await page.goto('project/');
@@ -43,26 +43,29 @@ test('project validation reports broken dependencies, blocks export, opens the a
     .getByRole('button', { name: 'Add actor', exact: true })
     .click();
   await expect(frame.locator('#scene-stage-canvas canvas')).toBeVisible();
-  // Simulate a dependency removed by another asset owner through the public project bridge.
+  // Public authoring commands now reject unavailable dependencies before they enter history.
   const token = new URL(frame.url()).searchParams.get('projectSession')!;
   await page.evaluate((token) => {
     const document = window.paperProjectEditor?.(token)?.scenes;
-    if (!document?.setActorAppearance('actor-1', 'animation', 'missing-wave'))
-      throw new Error('Could not author the fixture dependency.');
+    if (!document) throw new Error('Scene document is unavailable.');
+    const before = document.workingScene;
+    const history = [document.canUndo, document.canRedo];
+    if (document.setActorAppearance('actor-1', 'animation', 'missing-wave'))
+      throw new Error('An unavailable animation was accepted.');
+    if (document.workingScene !== before || document.canUndo !== history[0] || document.canRedo !== history[1])
+      throw new Error('Rejected dependency changed the scene or its history.');
   }, token);
+  await expect(frame.getByRole('alert')).toContainText('Unknown animation "missing-wave"');
   await frame.getByRole('button', { name: '← Project', exact: true }).click();
   await page.getByRole('button', { name: 'Validate Project', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Project validation', exact: true });
-  await expect(panel).toContainText('Unknown animation "missing-wave"');
-  await expect(panel).toContainText('1 Errors');
-  let downloads = 0;
-  page.on('download', () => downloads++);
+  await expect(panel).toContainText('No problems found');
+  await expect(panel).toContainText('0 Errors');
+  const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Project', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Export blocked');
-  expect(downloads).toBe(0);
-  await panel.getByRole('button', { name: /Open Affected Asset/ }).click();
+  expect((await downloading).suggestedFilename()).toMatch(/\.zip$/);
+  await page.getByRole('button', { name: 'Scene Editor', exact: true }).click();
   const reopened = await activeEditor(page);
-  await expect(reopened.locator('.scene-inspector details[open]')).toHaveCount(0);
   const reopenedToken = new URL(reopened.url()).searchParams.get('projectSession')!;
   await page.evaluate((token) => {
     if (!window.paperProjectEditor?.(token)?.scenes?.undo()) throw new Error('Undo failed.');

@@ -6,6 +6,7 @@ import { LocalAutosave } from '../src/devtools/shared/autosave/LocalAutosave.js'
 import * as packages from '../src/devtools/shared/package/characterPackage.js';
 import { RetargetComparisonScene } from '../src/devtools/shared/RetargetComparison.js';
 import { RetargetComparisonPlayback } from '../src/devtools/shared/RetargetComparisonPlayback.js';
+import { retargetAnimation } from '../src/engine/animationRetargeting.js';
 import type { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { getFootContactWorldPosition } from '../src/engine/footContactMarkers.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
@@ -13,6 +14,7 @@ import { Puppet } from '../src/engine/Puppet.js';
 import { createRigBoneMapping } from '../src/engine/rigBoneMapping.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 import * as loader from '../src/shared/loadSceneCharacter.js';
+import { productionMesh } from './helpers/productionMesh.js';
 import { puppetScene } from './helpers/puppetScene.js';
 import { retargetFixture } from './helpers/retargetFixture.js';
 
@@ -24,6 +26,81 @@ vi.mock('phaser', () => ({
   },
 }));
 afterEach(() => vi.restoreAllMocks());
+
+test.each(['shared-mesh', 'different-topology', 'rigid-to-mesh', 'mesh-to-rigid'] as const)(
+  '%s retargeting preserves target skinning and transfers only verified corrective vertices',
+  (kind) => {
+    const meshSource = productionMesh(2).rig;
+    const rigid = {
+      ...meshSource,
+      attachments: [
+        { id: 'sleeve', texture: 'paper' },
+        { id: 'rigid', texture: 'paper' },
+      ],
+    };
+    const source = { id: 'source', rig: kind === 'rigid-to-mesh' ? rigid : meshSource };
+    const target = {
+      id: 'target',
+      rig: kind === 'mesh-to-rigid' ? rigid : kind === 'different-topology' ? productionMesh(3).rig : meshSource,
+    };
+    const sourceClip = {
+      name: 'cut',
+      duration: 1000,
+      loop: false,
+      tracks: {
+        lower: [
+          { time: 0, rotation: 0 },
+          { time: 1000, rotation: 1 },
+        ],
+      },
+      ...(kind === 'rigid-to-mesh'
+        ? {}
+        : { deformationTracks: { sleeve: [{ time: 1000, offsets: { v0: { x: 2, y: 1 } } }] } }),
+    };
+    const before = structuredClone({ source, target, sourceClip });
+    const result = retargetAnimation({
+      sourceRig: source,
+      targetRig: target,
+      sourceAnimation: sourceClip,
+      boneMapping: createRigBoneMapping(
+        source,
+        target,
+        source.rig.bones.map(({ id }) => ({ sourceBoneId: id, targetBoneId: id })),
+        'map',
+        'Reviewed map',
+      ),
+      options: { name: 'target-cut', rootMotion: 'preserve' },
+    });
+    expect(result.animation).not.toBeNull();
+    expect(result.animation!.deformationTracks).toEqual(
+      kind === 'shared-mesh' ? sourceClip.deformationTracks : undefined,
+    );
+    expect(result.skippedTracks.some(({ kind }) => kind === 'mesh')).toBe(
+      ['different-topology', 'mesh-to-rigid'].includes(kind),
+    );
+    const puppet = new Puppet(puppetScene(), {
+      rig: target.rig,
+      skin: 'default',
+      animations: [result.animation!],
+      autoUpdate: false,
+    });
+    try {
+      puppet.play('target-cut', { loop: false });
+      puppet.sampleAnimation(0);
+      const beforeVertices = puppet.getSlotMesh('cloth')?.vertices.slice();
+      puppet.sampleAnimation(700);
+      expect(puppet.getBone('lower').pose.rotation).toBeCloseTo(0.7);
+      if (kind !== 'mesh-to-rigid') {
+        expect(puppet.getSlotMesh('cloth')!.vertices).not.toEqual(beforeVertices);
+        expect(puppet.getSlotMesh('cloth')!.vertices.every(Number.isFinite)).toBe(true);
+      }
+      expect(puppet.animationPlayer.meshDeformation.size).toBe(kind === 'shared-mesh' ? 1 : 0);
+      expect({ source, target, sourceClip }).toEqual(before);
+    } finally {
+      puppet.destroy();
+    }
+  },
+);
 
 async function fixture() {
   const f = await retargetFixture();

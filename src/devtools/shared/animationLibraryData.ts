@@ -47,7 +47,8 @@ export function filterAnimationLibrary(
 export function independentAnimationName(name: string, ids: readonly string[]): string {
   const stem = name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/^[^a-zA-Z0-9]+/, '') || 'animation';
   const base = `${stem}-variation`;
+  const used = new Set(ids);
   let next = base;
-  for (let suffix = 2; ids.includes(next); suffix++) next = `${base}-${suffix}`;
+  for (let suffix = 2; used.has(next); suffix++) next = `${base}-${suffix}`;
   return next;
 }

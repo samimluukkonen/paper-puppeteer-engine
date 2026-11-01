@@ -69,6 +69,7 @@ try {
     'runtime-api.md',
     'runtime-integration.md',
     'artist-workflow.md',
+    'reusing-animations-and-scenes.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 

@@ -72,6 +72,7 @@ The [runtime integration guide](docs/runtime-integration.md) covers portable cha
 - [Mesh deformation integration across editors and runtime](docs/mesh-integration.md)
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
+- [Reusing Animations and Scenes — artist walkthrough](docs/reusing-animations-and-scenes.md)
 - [Reusable Animation Library](docs/animation-library.md)
 - [Character variants and reusable templates](docs/character-variants.md)
 - [Rig compatibility and bone mapping](docs/rig-compatibility.md)

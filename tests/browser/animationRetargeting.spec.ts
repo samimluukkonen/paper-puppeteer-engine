@@ -70,6 +70,9 @@ test('visual retargeting compares real mesh/rigid characters, repairs maps, crea
   await frame.locator('#animation-undo').click();
   await frame.locator('#animation-redo').click();
   await frame.getByRole('button', { name: '← Project', exact: true }).click();
+  // Returning to the workspace remounts its collapsed-by-default library disclosure.
+  if ((await library.locator('.animation-library').getAttribute('open')) === null)
+    await library.locator('.animation-library > summary').click();
   await expect(library.locator('.animation-library-list li')).toHaveCount(2);
   const guide = guideRegistry.getGuideById('project-animation-retargeting')!;
   await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();

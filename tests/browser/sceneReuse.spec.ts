@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { guideRegistry } from '../../src/devtools/shared/guides/registry.js';
 import { parseSceneReuseLibrary } from '../../src/devtools/shared/sceneReuse.js';
 import { parseSceneJson } from '../../src/engine/SceneDefinition.js';
 import { sceneInspectorGroup } from './fixtures.js';
@@ -211,6 +212,21 @@ test('desktop multi-Actor choreography, detached preview, atomic insertion and i
   await page.getByLabel('Select scene').selectOption('samurai-meeting');
   expect((await download()).actions).toEqual(source.actions);
   await upload(edited);
+  expect(await download()).toEqual(edited);
+  for (const id of ['scene-reusing-choreography', 'scene-templates']) {
+    const guide = guideRegistry.getGuideById(id)!;
+    await page.getByRole('button', { name: 'Feature Guide', exact: true }).click();
+    const catalog = page.getByRole('dialog', { name: 'Feature Guide', exact: true });
+    await catalog.getByRole('button', { name: `Start Guide: ${guide.title}`, exact: true }).click();
+    const tour = page.getByRole('dialog', { name: guide.title, exact: true });
+    for (const [index, step] of guide.steps.entries()) {
+      await expect(tour.getByRole('heading', { name: step.title, exact: true })).toBeVisible();
+      await expect(tour).not.toContainText('Target unavailable');
+      await tour
+        .getByRole('button', { name: index === guide.steps.length - 1 ? 'Finish' : 'Next', exact: true })
+        .click();
+    }
+  }
   expect(await download()).toEqual(edited);
   expect(errors).toEqual([]);
 });

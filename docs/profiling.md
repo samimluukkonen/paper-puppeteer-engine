@@ -200,3 +200,7 @@ VITE_PROFILE=1 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/meshR
 ```
 
 The Node profile uses affine scene doubles and separates reusable-buffer vertex updates from IK/skinning during seeking and playback. The native WebGL profile measures Phaser CPU render submission across painted frames, seek/playback and SceneRunner updates with owned Actors. It checks retained geometry buffers and released GameObjects/textures between workloads. Numeric XYUV payload estimates exclude object overhead, bind caches and textures; GPU completion and total heap usage are not measured. Neither profile sets timing thresholds. See [mesh production readiness](mesh-production-readiness.md) for observations and workload boundaries.
+
+## Reusable animation and scene assets
+
+Run `VITE_PROFILE=1 npx vitest run tests/reusableAssets.profile.test.ts --maxWorkers=1 --reporter=verbose` separately from other suites. The opt-in workload measures 10,000 derived library rows, collision-heavy variation naming, 2,001-key transfer to four rig proportions, rapid document switching, eight 144-vertex mesh Actors, repeated choreography insertion and project export/import. It uses renderer doubles, excludes DOM/GPU/texture timing and has no performance thresholds. The [v1.5.6 report](reusable-assets-readiness.md#10-performance-findings) records exact workloads, measurements and the naming improvement.

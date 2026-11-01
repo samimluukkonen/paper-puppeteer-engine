@@ -145,6 +145,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.6
+
+- Harden reusable asset integration with a sword-cut workflow spanning rig mapping, proportion-scaled retargeting, independent target corrections, shared-skin variants, choreography, scene templates, project drafts/ZIPs and standalone deterministic scene playback. Cover compatible/different-topology meshes and both rigid/mesh transfer directions without silently copying corrective vertices.
+- Avoid quadratic animation-copy naming in large variation families by indexing occupied IDs once, preserving the first available variation name.
+- Add focused Reusable Choreography and Scene Templates Feature Guides using existing editor targets, with shared-asset ownership and passive-seeking guidance. Add the artist guide “Reusing Animations and Scenes” and a v1.5 integration verification report.
+- Update desktop regression fixtures to reopen the collapsed workspace library after editor navigation and verify that unavailable animation references are rejected without changing scene data or history.
+- Add opt-in local reusable-asset performance workloads; keep desktop browser verification local-only and all test runners sequential with one worker.
+
 ## 1.5.5
 
 - Add reusable choreography presets with multi-action timeline selection, named Actor roles, relative timing, explicit relative origins or absolute world positions, unchanged root-motion ownership and detached playback previews. Insertion validates assets, rig identity, duration and channel conflicts and copies actions in one Undo/Redo step.

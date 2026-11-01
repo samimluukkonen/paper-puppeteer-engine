@@ -56,7 +56,19 @@ const retargeted = retargetAnimation({
     name: 'source-clip',
     duration: 100,
     loop: false,
-    tracks: { tip: [{ time: 0, x: 12, rotation: 0.2 }] },
+    tracks: {
+      tip: [
+        { time: 0, x: 12, rotation: 0.2 },
+        { time: 100, x: 16, rotation: 1.2 },
+      ],
+    },
+    rootMotion: {
+      translationKeys: [
+        { time: 0, x: 0 },
+        { time: 100, x: 20 },
+      ],
+    },
+    events: [{ time: 50, name: 'cut' }],
   },
   sourceRig: retargetSource,
   targetRig: retargetTarget,
@@ -78,6 +90,25 @@ assert.equal(retargeted.animation.tracks.tip[0].rotation, 0.7);
 assert.doesNotThrow(() =>
   serialization.serializeAnimationDefinition({ version: 1, ...retargeted.animation }, retargetTarget.rig),
 );
+// Reload exported retargeted data into the actual installed evaluator, outside the editors.
+const retargetRig = new Rig(retargetTarget.rig);
+const reloadedRetarget = serialization.parseAnimationClip(
+  JSON.parse(serialization.serializeAnimationDefinition({ version: 1, ...retargeted.animation }, retargetRig)),
+  retargetRig,
+);
+const retargetJoints = new Map(retargetRig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+const retargetPlayer = new AnimationPlayer(retargetRig, retargetJoints, [compileClip(reloadedRetarget, retargetRig)]);
+let retargetEvents = 0;
+retargetPlayer.onAnimationEvent(() => retargetEvents++);
+retargetPlayer.play('retargeted');
+for (const time of [25, 100, 0, 75, 25]) retargetPlayer.sample(time);
+assert.equal(retargetJoints.get('tip').pose.x, 26);
+assert.ok(Math.abs(retargetJoints.get('tip').pose.rotation - 0.95) < 1e-10);
+assert.deepEqual(retargetPlayer.sampleRootMotion(25), { x: 5, y: 0 });
+assert.equal(retargetEvents, 0, 'Sampling reloaded motion never delivers animation events.');
+retargetPlayer.update(75);
+assert.equal(retargetEvents, 1, 'Ordinary standalone playback retains event timing.');
+retargetPlayer.dispose();
 const mesh = createRectangleMeshAttachment({ id: 'cloth', texture: 'paper' }, { width: 20, height: 10 }, meshRest);
 mesh.vertices = mesh.vertices.map((vertex) => ({
   ...vertex,

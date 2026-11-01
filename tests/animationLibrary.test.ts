@@ -8,6 +8,7 @@ import {
   animationCompatibility,
   existingAnimationReference,
   filterAnimationLibrary,
+  independentAnimationName,
   type AnimationLibraryEntry,
 } from '../src/devtools/shared/animationLibraryData.js';
 import { AnimationLibraryRuntimeScene } from '../src/devtools/shared/AnimationLibraryPreview.js';
@@ -32,6 +33,15 @@ vi.mock('phaser', () => ({
     GameObjects: { Events: { DESTROY: 'destroy' } },
   },
 }));
+
+test('large variation families choose the first free ID without changing the library', () => {
+  const ids = Array.from({ length: 10_000 }, (_, index) => (index ? `cut-variation-${index + 1}` : 'cut-variation'));
+  assert.equal(independentAnimationName('cut', ids), 'cut-variation-10001');
+  ids.splice(499, 1);
+  assert.equal(independentAnimationName('cut', ids), 'cut-variation-500');
+  assert.lengthOf(ids, 9999);
+  assert.equal(independentAnimationName(' / ', []), 'animation-variation');
+});
 
 function fixture(mesh = false) {
   const base = {

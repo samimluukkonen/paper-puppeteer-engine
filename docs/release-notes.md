@@ -6,6 +6,8 @@ These historical summaries were moved from the README. Version numbers, completi
 
 ## Release reports
 
+- [v1.5.6 reusable animation and scene assets](reusable-assets-readiness.md)
+
 - [v0.6 Production Authoring release notes](release-notes-v0.6.md) and [release gates](release-readiness.md)
 - [v0.8 Actor and choreography release report](release-notes-v0.8.md)
 - [v0.9 Scene Editor readiness](scene-editor-readiness.md)
