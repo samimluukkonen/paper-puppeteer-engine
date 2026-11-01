@@ -96,7 +96,7 @@ function ActorProperties({
             ))}
           </select>
           <span className="workspace-caption">
-            Snap overlay: loops tracked pose channels during Advance Required holds, then snaps back. Actor displacement
+            Snap overlay: loops tracked pose channels during Wait for Enter holds, then snaps back. Actor displacement
             and animation events are ignored. Choose a subtle idle that matches the held pose.
           </span>
         </label>

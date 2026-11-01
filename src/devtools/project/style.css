@@ -59,6 +59,31 @@
   align-items: center;
   gap: 8px;
 }
+.story-entries {
+  padding-left: 24px;
+}
+.story-entries > li {
+  border-top: 1px solid var(--border-default);
+  padding: 12px 8px;
+}
+.story-entries .workspace-caption {
+  display: block;
+  margin-top: 4px;
+}
+.story-preview {
+  width: 1010px;
+  max-width: calc(100vw - 48px);
+}
+.story-preview-canvas {
+  width: 960px;
+  max-width: 100%;
+  height: 540px;
+  margin-top: 16px;
+  background: var(--bg-inset);
+}
+.story-preview-dialogue {
+  white-space: pre-wrap;
+}
 .project-template-toggle input {
   flex: none;
   margin: 0;

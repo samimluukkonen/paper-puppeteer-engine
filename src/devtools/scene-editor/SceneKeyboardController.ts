@@ -34,6 +34,12 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
       return;
     }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'Enter' && playback.status === 'waiting-for-dialogue-advance') {
+      if ((event.target as Element | null)?.closest?.('button, a[href], summary')) return;
+      event.preventDefault();
+      if (!event.repeat) playback.advanceDialogue();
+      return;
+    }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       if (event.repeat) return;

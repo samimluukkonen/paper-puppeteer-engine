@@ -157,7 +157,7 @@ export function SceneInspector({
             id: 'scene-inspector-dialogue',
             label: 'Dialogue',
             icon: MessagesSquare,
-            content: <SceneDialogueInspector document={document} />,
+            content: <SceneDialogueInspector document={document} registry={registry} />,
           },
           {
             id: 'scene-inspector-audio',

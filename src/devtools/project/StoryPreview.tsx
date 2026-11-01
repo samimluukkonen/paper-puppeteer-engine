@@ -1,0 +1,236 @@
+import Phaser from 'phaser';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { DeepReadonly } from '../../engine/readonlyData.js';
+import { SceneLoader, type LoadedScene } from '../../engine/SceneLoader.js';
+import type { StoryDefinition } from '../../engine/StoryDefinition.js';
+import { StoryPlayer } from '../../engine/StoryPlayer.js';
+import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
+import { buildProjectScenePackage } from './projectPackage.js';
+import type { ProjectWorkspace } from './ProjectWorkspace.js';
+
+type PreviewState = { status: string; index: number; waiting: boolean; text: string; audio: string; error: string };
+
+/** Artist-only host around the public StoryPlayer and SceneLoader. No viewer controls enter the runtime. */
+class StoryPreviewScene extends Phaser.Scene {
+  private player: StoryPlayer | undefined;
+  private loaded: LoadedScene | undefined;
+  private ticking = false;
+  private closed = false;
+  private failure = '';
+  private lastReport = '';
+  constructor(
+    private readonly story: DeepReadonly<StoryDefinition>,
+    private readonly workspace: ProjectWorkspace,
+    private readonly report: (state: PreviewState) => void,
+  ) {
+    super('StoryPreview');
+  }
+  create(): void {
+    if (this.closed) return;
+    this.events.once('shutdown', () => this.disposePreview());
+    const scenes = new Map(
+      this.story.scenes.map(({ sceneAssetId }) => [sceneAssetId, this.workspace.scenes.scene(sceneAssetId)]),
+    );
+    try {
+      this.player = new StoryPlayer(this.story, {
+        scenes,
+        loadScene: async (definition, context) => {
+          const files = await buildProjectScenePackage(this.workspace, definition);
+          context.signal.throwIfAborted();
+          const loaded = await SceneLoader.loadPackage(this, files, { signal: context.signal });
+          try {
+            context.signal.throwIfAborted();
+            loaded.applyCamera(this.cameras.main, { x: 0, y: 0, width: 960, height: 540 });
+            this.loaded = loaded;
+          } catch (error) {
+            loaded.dispose();
+            throw error;
+          }
+          return {
+            runner: loaded.runner,
+            dispose: () => {
+              if (this.loaded === loaded) this.loaded = undefined;
+              loaded.dispose();
+            },
+          };
+        },
+      });
+      this.restart();
+    } catch (error) {
+      this.failed(error);
+    }
+  }
+  private failed(error: unknown): void {
+    if (this.closed) return;
+    this.failure = error instanceof Error ? error.message : String(error);
+    this.publish();
+  }
+  private publish(): void {
+    if (this.closed) return;
+    const runner = this.loaded?.runner;
+    const state: PreviewState = {
+      status: this.player?.status ?? 'loading',
+      index: this.player?.index ?? -1,
+      waiting: runner?.status === 'waiting-for-dialogue-advance',
+      text: runner?.dialogue?.line.text ?? '',
+      audio: runner?.audio?.status ?? 'disabled',
+      error: this.failure || runner?.audio?.error || '',
+    };
+    const signature = JSON.stringify(state);
+    if (signature !== this.lastReport) {
+      this.lastReport = signature;
+      this.report(state);
+    }
+  }
+  restart(): void {
+    if (!this.player || this.closed) return;
+    this.failure = '';
+    this.player.stop();
+    void this.player.start().then(
+      () => this.publish(),
+      (error: unknown) => this.failed(error),
+    );
+    this.publish();
+  }
+  stop(): void {
+    this.player?.stop();
+    this.publish();
+  }
+  advance(): void {
+    try {
+      this.player?.advanceDialogue();
+      this.publish();
+    } catch (error) {
+      this.failed(error);
+    }
+  }
+  enableAudio(): void {
+    void this.loaded?.runner.audio?.unlock().then(
+      () => this.publish(),
+      (error: unknown) => this.failed(error),
+    );
+  }
+  update(_time: number, delta: number): void {
+    if (this.closed || this.ticking || !this.player) return;
+    this.ticking = true;
+    void this.player
+      .update(delta)
+      .then(
+        () => this.publish(),
+        (error: unknown) => this.failed(error),
+      )
+      .finally(() => {
+        this.ticking = false;
+      });
+  }
+  disposePreview(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.player?.dispose();
+    this.player = undefined;
+  }
+}
+
+export default function StoryPreview({
+  story,
+  workspace,
+  close,
+}: {
+  story: DeepReadonly<StoryDefinition>;
+  workspace: ProjectWorkspace;
+  close: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const runtime = useRef<StoryPreviewScene | undefined>(undefined);
+  const parent = `story-preview-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const [state, setState] = useState<PreviewState>({
+    status: 'loading',
+    index: -1,
+    waiting: false,
+    text: '',
+    audio: 'disabled',
+    error: '',
+  });
+  useEffect(() => {
+    dialog.current?.showModal();
+    const preview = new StoryPreviewScene(story, workspace, setState);
+    runtime.current = preview;
+    const game = createEditorGame(parent, preview, { width: 960, height: 540 });
+    document.getElementById(parent)?.focus();
+    return () => {
+      runtime.current = undefined;
+      try {
+        preview.disposePreview();
+      } finally {
+        destroyEditorGame(game);
+      }
+    };
+  }, [story, workspace, parent]);
+  return (
+    <dialog
+      ref={dialog}
+      className="workspace-dialog story-preview"
+      aria-label="Entire story preview"
+      onClose={close}
+      onCancel={close}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && event.repeat && !isTypingTarget(event.target)) {
+          event.preventDefault();
+          return;
+        }
+        if (
+          event.key !== 'Enter' ||
+          event.repeat ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.altKey ||
+          event.defaultPrevented ||
+          event.nativeEvent.isComposing ||
+          isTypingTarget(event.target) ||
+          (event.target as Element).closest('button, a[href], summary')
+        )
+          return;
+        if (state.waiting) {
+          event.preventDefault();
+          runtime.current?.advance();
+        }
+      }}
+    >
+      <h2>Preview · {story.name}</h2>
+      <p className="workspace-caption">
+        Artist preview · Stop and Restart affect this preview only. Close to return to editing.
+      </p>
+      <div className="project-actions">
+        <button onClick={() => runtime.current?.stop()} disabled={state.status === 'stopped'}>
+          Stop story
+        </button>
+        <button onClick={() => runtime.current?.restart()}>Restart story</button>
+        <button onClick={() => runtime.current?.advance()} disabled={!state.waiting}>
+          Advance dialogue (Enter)
+        </button>
+        {['locked', 'error'].includes(state.audio) && (
+          <button onClick={() => runtime.current?.enableAudio()}>Enable story audio</button>
+        )}
+        <button onClick={close}>Close preview</button>
+      </div>
+      <p role="status">
+        {state.status} ·{' '}
+        {state.index >= 0 && state.index < story.scenes.length
+          ? `Scene ${state.index + 1} of ${story.scenes.length}: ${workspace.scenes.scene(story.scenes[state.index]!.sceneAssetId)?.name ?? story.scenes[state.index]!.sceneAssetId}`
+          : `${story.scenes.length} scenes`}
+        {state.waiting ? ' · Wait for Enter' : ''}
+      </p>
+      {state.text && <p className="story-preview-dialogue">{state.text}</p>}
+      {state.error && <p role="alert">{state.error}</p>}
+      <div
+        id={parent}
+        className="story-preview-canvas"
+        tabIndex={0}
+        role="group"
+        aria-label="Story preview canvas"
+        onPointerDown={(event) => event.currentTarget.focus()}
+      />
+    </dialog>
+  );
+}

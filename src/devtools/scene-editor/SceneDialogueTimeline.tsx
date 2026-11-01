@@ -1,3 +1,4 @@
+import CornerDownLeft from 'lucide-react/icons/corner-down-left';
 import { compareDialogueLines, dialogueSpeaker } from '../../engine/sceneDialogue.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
@@ -34,8 +35,8 @@ export function SceneDialogueControls({
         Add Dialogue Line
       </button>
       <span className="workspace-caption">
-        Select a line to edit text, timing and progression. Timed lines cannot overlap; Advance Required lines can share
-        a start.
+        Select a line to edit text, timing and progression. Timed lines cannot overlap; Wait for Enter lines can share a
+        start.
       </span>
     </div>
   );
@@ -75,15 +76,25 @@ export function SceneDialogueTrack({
             key={line.id}
             type="button"
             className="scene-action clip scene-dialogue-line"
-            aria-label={`Dialogue ${line.id}: ${dialogueSpeaker(line)}`}
+            aria-label={`Dialogue ${line.id}: ${dialogueSpeaker(line)}${line.progression === 'advance-required' ? ' · Wait for Enter' : ''}`}
             aria-pressed={document.selectedDialogueLine?.id === line.id}
-            title={`${line.time / 1000}–${(line.time + line.duration) / 1000} s · ${line.progression === 'advance-required' ? 'Advance Required · ' : ''}${dialogueSpeaker(line)}: ${line.text}`}
-            style={{ left: x(line.time), width: Math.max(6, x(line.duration)), top: 4 + lane * 28 }}
+            title={`${line.time / 1000}–${(line.time + line.duration) / 1000} s · ${line.progression === 'advance-required' ? `Wait for Enter · Sequence ${lane + 1} · ` : 'Timed · '}${dialogueSpeaker(line)}: ${line.text}`}
+            style={{
+              left: x(line.time),
+              width: Math.max(line.progression === 'advance-required' ? 76 : 6, x(line.duration)),
+              top: 4 + lane * 28,
+            }}
             onClick={() => {
               playback.pause();
               document.selectDialogueLine(line.id);
             }}
           >
+            {line.progression === 'advance-required' && (
+              <span className="scene-dialogue-hold-marker">
+                <CornerDownLeft size={12} aria-hidden="true" />
+                Enter · {lane + 1}{' '}
+              </span>
+            )}
             {dialogueSpeaker(line)}: {line.text || '(empty line)'}
           </button>
         ))}

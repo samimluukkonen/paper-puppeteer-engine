@@ -9,6 +9,7 @@ import { projectGuideHost } from '../src/devtools/shared/guides/projectGuideHost
 import { guideRegistry } from '../src/devtools/shared/guides/registry.js';
 import { FeatureGuideCatalog } from '../src/ui/FeatureGuideCatalog.js';
 
+const storyGuide = guideRegistry.getGuideById('project-story-sequence')!;
 const guide = guideRegistry.getGuideById('project-audio-assets')!;
 const meshGuide = guideRegistry.getGuideById('project-mesh-handoff')!;
 const libraryGuide = guideRegistry.getGuideById('project-animation-library')!;
@@ -51,6 +52,7 @@ test('project audio guide uses stable anchors and reveal-only steps without asse
   assert.equal(guide.category, 'audio');
   assert.lengthOf(guide.steps, 7);
   assert.deepEqual(guideRegistry.getGuidesForEditor('project'), [
+    storyGuide,
     variantsGuide,
     retargetGuide,
     mappingGuide,
@@ -71,7 +73,7 @@ test('project audio guide uses stable anchors and reveal-only steps without asse
   );
 });
 
-test.each([guide, meshGuide, libraryGuide, mappingGuide, retargetGuide, variantsGuide])(
+test.each([storyGuide, guide, meshGuide, libraryGuide, mappingGuide, retargetGuide, variantsGuide])(
   '$id rechecks live availability and preserves metadata, binaries and history without navigating',
   (guide) => {
     let project: ProjectWorkspace | undefined;

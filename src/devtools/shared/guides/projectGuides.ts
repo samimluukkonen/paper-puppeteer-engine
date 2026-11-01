@@ -11,6 +11,63 @@ const step = (id: string, title: string, targetId: string, description: string):
 
 export const projectGuides: readonly GuideDefinition[] = [
   {
+    id: 'project-story-sequence',
+    title: 'Assembling and Previewing a Story',
+    description: 'Build a linear scene sequence, configure dialogue holds and preview the complete story.',
+    editor: 'project',
+    category: 'scene',
+    prerequisites: [
+      {
+        capability: 'tool:project',
+        reason: 'Create or import a project first. An empty project is enough to read this guide.',
+      },
+    ],
+    steps: [
+      step(
+        'create',
+        'Create or select a story',
+        T.projectStories,
+        'After exiting this tour, choose **New Story**, enter a name and **Create Story**. Use **Story** to switch stories, and **Rename Story** to apply a new name. Stories belong to this project. This guide only reveals controls; it never creates assets, changes selection or starts playback.',
+      ),
+      step(
+        'sequence',
+        'Arrange existing scenes',
+        T.projectStories,
+        'Create scenes in **Scenes** first. In **Story Sequence**, choose an **Existing scene** and **Add Scene**. Use **Up** and **Down** to change playback order; each completed move is one project history operation. **Duplicate entry** inserts another reference immediately after the original. Repeated scenes have independent playback sessions.',
+      ),
+      step(
+        'source',
+        'Edit the shared source',
+        T.projectStories,
+        '**Open source scene** opens Scene Editor. In **Dialogue**, select a line, expand its properties and choose **Timed** or **Wait for Enter** under **Dialogue progression**, then **Apply dialogue properties**. Same-start holds advance individually in stable Line ID order, shown by numbered **Enter** markers. **Remove entry** keeps the underlying scene and every other story reference.',
+      ),
+      step(
+        'holds',
+        'Keep reading holds alive',
+        T.projectStories,
+        'For **Wait for Enter**, the dialogue inspector offers an optional **Actor idle during holds**. It applies immediately to that scene Actor during all holds and uses Scene Undo. To add sound, select an audio clip on a Music or Ambience track and choose **Hold-only loop** in the Audio inspector. Its eligibility window must include the dialogue start. Ordinary audio, camera and scene time pause while waiting.',
+      ),
+      step(
+        'preview',
+        'Preview the entire sequence',
+        T.projectStories,
+        '**Preview Entire Story** runs the actual story player, camera, transitions and dialogue holds. Focus its canvas and press **Enter** once per line, or click **Advance dialogue (Enter)**. **Enable story audio** unlocks sound if needed. **Stop story**, **Restart story** and **Close preview** affect only this artist preview; finished viewers have no authoring controls. Scene Editor Play also honors holds; Stop and silent scrubbing keep editing available.',
+      ),
+      step(
+        'validation',
+        'Resolve story warnings',
+        T.projectStories,
+        'Expand **Story validation** to inspect missing scenes, dialogue, idle-animation, audio and dependency problems. **Open source scene** opens the affected scene or dialogue item for repair. **Validate Project** checks the complete project. Invalid references cannot start playback. Complete or cancel temporary source edits before exporting.',
+      ),
+      step(
+        'save',
+        'Save and recover the complete story',
+        T.projectExport,
+        '**Undo Project / Redo Project** restore story names and sequence edits. Scene dialogue uses its own Undo/Redo. Browser autosave includes committed stories and scenes; use **Local draft** for status and recovery. **Export Project** creates a portable ZIP; **Import Project** restores all stories, shared scenes and dependencies. This tour never exports, changes checkpoints or authors history.',
+      ),
+    ],
+  },
+  {
     id: 'project-character-variants',
     title: 'Creating Character Variants and Templates',
     description:

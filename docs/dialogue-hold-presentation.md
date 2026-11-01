@@ -2,19 +2,21 @@
 
 [All guides](../README.md#guides) · [Dialogue and subtitles](scene-dialogue.md) · [Scene audio](scene-audio-playback.md)
 
-Advance Required dialogue can keep selected idle animations and dedicated music/ambience loops alive while the viewer reads. The default retains the cinematic pose and pauses all scene audio. These settings are optional and remain scene format **2** data.
+Wait for Enter dialogue can keep selected idle animations and dedicated music/ambience loops alive while the viewer reads. The default retains the cinematic pose and pauses all scene audio. These settings are optional and remain scene format **2** data.
 
 ## Author and preview
 
 1. Select an Actor and expand **Actors → Actor properties**. Choose **Dialogue hold idle** from its existing character animations. Configure each Actor separately; the speaker does not select an idle automatically. **Hold cinematic pose** disables the overlay.
 2. Choose a subtle looping pose such as breathing or blinking. The explicit **snap overlay** policy replaces only channels tracked by that animation. Entry samples its start immediately; Advance restores the exact held cinematic pose immediately. There is no entrance/exit crossfade in this policy. Match the idle to the cinematic pose to minimize visible snapping. Existing cinematic blends remain frozen and intact underneath the overlay.
-3. Add/select dialogue and set **Dialogue progression → Advance Required**, then **Apply dialogue properties**. The line's start is the hold boundary; its duration controls passive preview only.
+3. Add/select dialogue and set **Dialogue progression → Wait for Enter**, then **Apply dialogue properties**. The line's start is the hold boundary; its duration controls passive preview only.
 4. For sound, add a **Music** or **Ambience** track and an audio clip. Expand **Audio → Audio clip**, choose **Audio playback → Hold-only loop (music / ambience)** and **Apply audio clip properties**. This selects looping and clears scene fades. Set **Source offset** and **Volume**. The asset uses the existing audio backend and browser unlock flow.
 5. Set the clip's **Start** and **Duration** to cover the scene timestamps where it may sound during holds. The interval is half-open, except a window ending exactly at scene end also includes an ending hold. These values select eligible holds; they do not limit how long the viewer may wait. A hold-only clip is silent during ordinary scene playback.
 6. Choose **Play**. At the hold, the subtitle remains visible, the playhead stops, and configured idle/audio loops continue. **Runtime preview** shows separate Scene time and Hold elapsed values. **Pause** freezes the idle and stops audio. **Play** retains the idle phase and restarts hold audio at the matching local source position. Mute and preview speed also apply to holds.
-7. Click **Advance dialogue** to end one hold. Same-time successor lines start fresh local sessions. The last advance resumes the cinematic scene at its exact frozen time; an ending hold completes the scene. Restart, Stop, seek and scene switching release hold state and audio.
+7. Focus the editor stage and press **Enter**, or click **Advance dialogue** to end one hold. Same-time successor lines start fresh local sessions. The last advance resumes the cinematic scene at its exact frozen time; an ending hold completes the scene. Restart, Stop, seek and scene switching release hold state and audio.
 
 **Feature Guide → Idle Animation & Audio During Dialogue Holds** explains these controls without editing or starting playback. Add and select an Actor first. Actor and audio inspector disclosures start collapsed. Idle/audio settings participate in scene Undo/Redo, JSON, portable packages, project exports and local recovery; they do not edit character animation assets.
+
+The **Dialogue** inspector also offers **Hold Actor** and **Actor idle during holds** when Wait for Enter is selected, plus links to eligible hold-audio clips. These change the same Actor/audio settings described above. See the [Story Editor guide](story-editor.md) for complete story sequencing and preview.
 
 ## Clock ownership and pose safety
 

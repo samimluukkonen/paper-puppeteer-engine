@@ -151,6 +151,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.3
+
+- Add a project-owned Story Sequence panel for creating and renaming linear stories, adding existing scenes, reordering, duplicating and removing entries, and opening shared source scenes. Sequence edits use project Undo/Redo, autosave/recovery and portable project ZIPs.
+- Add Preview Entire Story using StoryPlayer and the scene runtime, including dialogue holds, cinematic camera, transitions and hold presentation. Stop, restart, close and dialogue advancement controls remain artist-only.
+- Label dialogue progression Timed / Wait for Enter, show numbered Enter markers on the timeline, support Enter advancement during scene preview and expose Actor idle selection and eligible hold-audio links in the dialogue inspector. Silent scrubbing remains available.
+- Surface story dependency diagnostics with source navigation and add the Assembling and Previewing a Story Feature Guide and written workflow guide.
+
 ## 1.6.2-2
 
 - Add a scene-owned dialogue hold clock for optional per-Actor idle overlays. Reuse existing bone/IK/mesh evaluators without advancing cinematic layers, movement, root motion, camera, fades, dialogue schedules or cues; preserve playback identities and restore the exact main pose with an explicit conservative snap policy.

@@ -226,7 +226,7 @@ test('inspector starts collapsed and treats markup as literal text', () => {
   expect(html).toContain('&lt;script&gt;');
   expect(html).toContain('日本語');
   expect(html).toContain('Dialogue progression');
-  expect(html).toContain('Advance Required');
+  expect(html).toContain('Wait for Enter');
 });
 
 test('progression edits use scene history, preserve legacy fields and persist through JSON', () => {
@@ -280,6 +280,10 @@ test('simultaneous holds have separate selectable timeline lanes in stable playb
   );
   expect(html).toContain('height:64px');
   expect(html).toContain('top:32px');
+  expect(html).toContain('Wait for Enter');
+  expect(html).toContain('scene-dialogue-hold-marker');
+  expect(html).toContain('Enter · 1');
+  expect(html).toContain('Enter · 2');
   expect(html.indexOf('Dialogue dialogue-1:')).toBeLessThan(html.indexOf('Dialogue opening:'));
 });
 

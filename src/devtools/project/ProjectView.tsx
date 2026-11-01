@@ -48,6 +48,7 @@ import {
 import { ProjectRigMapping } from './ProjectRigMapping.js';
 import { ProjectValidationPanel } from './ProjectValidationPanel.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
+import { StorySequencePanel } from './StorySequencePanel.js';
 import '../../ui/theme.css';
 import '../../ui/viewShell.css';
 import '../../ui/workspace.css';
@@ -690,6 +691,12 @@ export function ProjectView() {
                 {!workspace.definition.scenes.length && <p>No scenes. New scenes start empty.</p>}
               </section>
             </div>
+            <StorySequencePanel
+              key={`stories:${selected.key}`}
+              workspace={workspace}
+              busy={busy}
+              openScene={(id) => run(() => openAsset('scene', id))}
+            />
             <ProjectAnimationLibrary
               key={`animations:${selected.key}`}
               workspace={workspace}

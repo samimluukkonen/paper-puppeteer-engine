@@ -24,7 +24,14 @@ export function ScenePlaybackControls({ playback }: { playback: SceneEditorPlayb
         {pausable ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
       </button>
       {playback.status === 'waiting-for-dialogue-advance' && (
-        <button type="button" onClick={() => playback.advanceDialogue()}>
+        <button
+          type="button"
+          title="Advance dialogue (Enter)"
+          onClick={() => playback.advanceDialogue()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && event.repeat) event.preventDefault();
+          }}
+        >
           Advance dialogue
         </button>
       )}

@@ -577,3 +577,13 @@
   align-items: center;
   margin: 0;
 }
+.scene-dialogue-hold-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+.scene-dialogue-hold-settings {
+  display: grid;
+  gap: 8px;
+}

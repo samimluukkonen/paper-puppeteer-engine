@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { dialogueSpeaker, type SceneDialogueLine } from '../../engine/sceneDialogue.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
-function DialogueProperties({ document, line }: { document: SceneEditorDocument; line: Readonly<SceneDialogueLine> }) {
+function DialogueProperties({
+  document,
+  line,
+  registry,
+}: {
+  document: SceneEditorDocument;
+  line: Readonly<SceneDialogueLine>;
+  registry?: SceneCharacterRegistry;
+}) {
   const [draft, setDraft] = useState({ ...line });
   useEffect(() => setDraft({ ...line }), [line]);
   return (
@@ -80,7 +89,7 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
               }
             >
               <option value="timed">Timed</option>
-              <option value="advance-required">Advance Required</option>
+              <option value="advance-required">Wait for Enter</option>
             </select>
           </label>
           {(
@@ -102,7 +111,7 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
             </label>
           ))}
           <p className="workspace-caption">
-            Timed lines cannot overlap. Advance Required lines may share a start and play in stable ID order. Their
+            Timed lines cannot overlap. Wait for Enter lines may share a start and play in stable ID order. Their
             duration controls passive preview only; zero allows a point hold, including at scene end. Other overlapping
             intervals are rejected. Each line must end within scene duration.
           </p>
@@ -127,6 +136,9 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
         </div>
         <button type="submit">Apply dialogue properties</button>
       </form>
+      {draft.progression === 'advance-required' && (
+        <DialogueHoldSettings document={document} line={draft} {...(registry ? { registry } : {})} />
+      )}
       <div className="scene-audio-actions" data-guide-id={GUIDE_TARGETS.sceneDialogueActions}>
         <button type="button" onClick={() => document.duplicateDialogueLine(line.id)}>
           Duplicate dialogue line
@@ -136,18 +148,118 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
         </button>
       </div>
       <p className="workspace-caption">
-        Timed lines use scene time. Advance Required pauses playback until Advance dialogue is clicked. Duplicate places
-        the copy in the next available interval after this line. Play or scrub to preview subtitles; Pause holds the
-        current line and Stop clears it. Scrubbing stays silent and never waits for input.
+        Timed lines use scene time. Wait for Enter pauses playback until Enter is pressed or Advance dialogue is
+        clicked. Duplicate places the copy in the next available interval after this line. Play or scrub to preview
+        subtitles; Pause holds the current line and Stop clears it. Scrubbing stays silent and never waits for input.
       </p>
     </details>
   );
 }
 
-export function SceneDialogueInspector({ document }: { document: SceneEditorDocument }) {
+function DialogueHoldSettings({
+  document,
+  line,
+  registry,
+}: {
+  document: SceneEditorDocument;
+  line: Readonly<SceneDialogueLine>;
+  registry?: SceneCharacterRegistry;
+}) {
+  const scene = document.workingScene;
+  const [selected, setSelected] = useState(line.actorId ?? '');
+  const actor =
+    scene?.actors.find(({ id }) => id === selected) ??
+    scene?.actors.find(({ id }) => id === line.actorId) ??
+    scene?.actors[0];
+  const definition = actor && registry?.get(actor.character.manifest);
+  const clips =
+    scene?.audioClips?.filter(
+      (clip) =>
+        clip.playback === 'dialogue-hold' &&
+        clip.time <= line.time &&
+        (line.time < clip.time + clip.duration ||
+          (line.time === scene.duration && line.time === clip.time + clip.duration)),
+    ) ?? [];
+  return (
+    <div className="scene-dialogue-hold-settings">
+      <p className="workspace-caption">
+        The scene clock freezes at this line. Enter advances one line. Stop or scrub to return to ordinary editing.
+        Apply dialogue properties to save progression changes.
+      </p>
+      {actor && (
+        <>
+          <label>
+            Hold Actor{' '}
+            <select
+              aria-label="Dialogue hold Actor"
+              value={actor.id}
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {scene?.actors.map(({ id }) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Actor idle during holds{' '}
+            <select
+              aria-label="Actor idle during holds"
+              disabled={!definition}
+              value={actor.dialogueIdle?.animation ?? ''}
+              onChange={(event) => document.setActorAppearance(actor.id, 'dialogueIdle', event.target.value || null)}
+            >
+              <option value="">Hold cinematic pose</option>
+              {definition?.animations.map(({ name }) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="workspace-caption">
+            Applies immediately to this Actor during every dialogue hold in this scene. Only tracked pose channels loop;
+            movement and animation events are ignored. Scene Undo restores the selection.
+          </p>
+        </>
+      )}
+      <p className="workspace-caption">
+        Ordinary audio pauses. Only dedicated Music / Ambience hold loops play while waiting. Configure their
+        eligibility window in the Audio inspector.
+      </p>
+      {clips.length ? (
+        <ul>
+          {clips.map((clip) => (
+            <li key={clip.id}>
+              <button onClick={() => document.selectAudioClip(clip.id)}>Edit hold audio · {clip.id}</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="workspace-caption">No hold audio at this line.</p>
+      )}
+    </div>
+  );
+}
+
+const noSubscribe = () => () => {};
+const zero = () => 0;
+export function SceneDialogueInspector({
+  document,
+  registry,
+}: {
+  document: SceneEditorDocument;
+  registry?: SceneCharacterRegistry;
+}) {
+  useSyncExternalStore(
+    registry?.subscribe ?? noSubscribe,
+    registry?.getSnapshot ?? zero,
+    registry?.getSnapshot ?? zero,
+  );
   const line = document.selectedDialogueLine;
   return line ? (
-    <DialogueProperties key={line.id} document={document} line={line} />
+    <DialogueProperties key={line.id} document={document} line={line} {...(registry ? { registry } : {})} />
   ) : (
     <details data-guide-id={GUIDE_TARGETS.sceneDialogueProperties}>
       <summary>Dialogue line</summary>
@@ -166,7 +278,7 @@ export function SceneDialogueInspector({ document }: { document: SceneEditorDocu
       <div data-guide-id={GUIDE_TARGETS.sceneDialogueTiming}>
         <p className="workspace-caption">
           Select a line to set Dialogue progression, Dialogue start and Dialogue duration in seconds. Timed lines cannot
-          overlap. Advance Required lines may share a start in stable ID order; other overlaps are rejected. Their
+          overlap. Wait for Enter lines may share a start in stable ID order; other overlaps are rejected. Their
           duration controls passive preview, with zero allowed at scene end. Each line must end within scene duration.
         </p>
       </div>

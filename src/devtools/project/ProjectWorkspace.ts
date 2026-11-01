@@ -28,7 +28,7 @@ import {
   type SceneDefinition,
 } from '../../engine/SceneDefinition.js';
 import { identifierSchema } from '../../engine/schemas.js';
-import { parseStoryDefinition } from '../../engine/StoryDefinition.js';
+import { parseStoryDefinition, type StoryDefinition } from '../../engine/StoryDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import {
@@ -172,6 +172,52 @@ export class ProjectWorkspace {
   }
 
   /** Story edits share project membership history, dirty tracking and autosave. */
+  createStory(name: string): string {
+    let index = 1;
+    while (this.metadata.stories?.some(({ id }) => id.toLowerCase() === `story-${index}`)) index++;
+    return this.setStory({ version: 1, id: `story-${index}`, name: name.trim(), scenes: [] });
+  }
+  private story(id: string): DeepReadonly<StoryDefinition> {
+    const story = this.metadata.stories?.find((entry) => entry.id === id);
+    if (!story) throw new Error(`Unknown story "${id}".`);
+    return story;
+  }
+  renameStory(id: string, name: string): void {
+    this.setStory({ ...this.story(id), name: name.trim() });
+  }
+  addStoryScene(id: string, sceneAssetId: string, afterEntry?: string): string {
+    const story = this.story(id);
+    if (afterEntry && !story.scenes.some((entry) => entry.id === afterEntry))
+      throw new Error(`Unknown story entry "${afterEntry}".`);
+    let index = 1;
+    while (story.scenes.some((entry) => entry.id.toLowerCase() === `entry-${index}`)) index++;
+    const entry = { id: `entry-${index}`, sceneAssetId };
+    const scenes = [...story.scenes];
+    scenes.splice(afterEntry ? scenes.findIndex(({ id }) => id === afterEntry) + 1 : scenes.length, 0, entry);
+    this.setStory({ ...story, scenes });
+    return entry.id;
+  }
+  duplicateStoryScene(id: string, entryId: string): string {
+    const entry = this.story(id).scenes.find((entry) => entry.id === entryId);
+    if (!entry) throw new Error(`Unknown story entry "${entryId}".`);
+    return this.addStoryScene(id, entry.sceneAssetId, entry.id);
+  }
+  removeStoryScene(id: string, entryId: string): void {
+    const story = this.story(id);
+    if (!story.scenes.some((entry) => entry.id === entryId)) throw new Error(`Unknown story entry "${entryId}".`);
+    this.setStory({ ...story, scenes: story.scenes.filter((entry) => entry.id !== entryId) });
+  }
+  /** A completed move is a single project operation; scene documents are never rewritten. */
+  reorderStoryScene(id: string, entryId: string, destination: number): void {
+    const story = this.story(id);
+    const index = story.scenes.findIndex((entry) => entry.id === entryId);
+    if (index < 0) throw new Error(`Unknown story entry "${entryId}".`);
+    if (!Number.isInteger(destination) || destination < 0 || destination >= story.scenes.length)
+      throw new Error('Story destination is outside the sequence.');
+    const scenes = [...story.scenes];
+    scenes.splice(destination, 0, scenes.splice(index, 1)[0]!);
+    this.setStory({ ...story, scenes });
+  }
   setStory(input: unknown): string {
     const story = parseStoryDefinition(input, {
       scenes: new Map(this.metadata.scenes.map(({ id }) => [id, this.scenes.scene(id)])),

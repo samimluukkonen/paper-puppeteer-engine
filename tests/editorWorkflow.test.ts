@@ -46,10 +46,40 @@ function scene() {
     }),
   );
   document.selectAction('hold');
-  const playback = { ready: true, status: 'playing', play: vi.fn(), pause: vi.fn(), restart: vi.fn(), seek: vi.fn() };
+  const playback = {
+    ready: true,
+    status: 'playing',
+    play: vi.fn(),
+    pause: vi.fn(),
+    restart: vi.fn(),
+    seek: vi.fn(),
+    advanceDialogue: vi.fn(),
+  };
   const release = bindSceneShortcuts(document, playback as unknown as SceneEditorPlayback);
   return { document, playback, release };
 }
+
+test('Enter advances one held dialogue and preserves fields, modals, repeated keys and passive editing', () => {
+  const { key } = browser();
+  const { document, playback, release } = scene();
+  const before = document.workingScene;
+  try {
+    key({ key: 'Enter' });
+    assert.equal(playback.advanceDialogue.mock.calls.length, 0);
+    playback.status = 'waiting-for-dialogue-advance';
+    for (const options of [{ field: true }, { dialog: true }, { modal: true }, { editable: true }, { consumed: true }])
+      key({ key: 'Enter' }, options);
+    key({ key: 'Enter', repeat: true });
+    key({ key: 'Enter', ctrlKey: true });
+    assert.equal(playback.advanceDialogue.mock.calls.length, 0);
+    assert.isTrue(key({ key: 'Enter' }).defaultPrevented);
+    assert.equal(playback.advanceDialogue.mock.calls.length, 1);
+    assert.equal(document.workingScene, before);
+    assert.isFalse(document.dirty);
+  } finally {
+    release();
+  }
+});
 
 test('scene Delete, Undo, both Redo conventions and staged deselection use one document owner', () => {
   const { key, confirm } = browser();

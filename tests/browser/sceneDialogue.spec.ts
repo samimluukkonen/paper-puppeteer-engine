@@ -55,7 +55,7 @@ test('dialogue authors multiline Unicode and instance speakers, rejects overlaps
   await page.getByLabel('Dialogue start (seconds)', { exact: true }).fill('1');
   await page.getByRole('button', { name: 'Apply dialogue properties', exact: true }).click();
   await expect(
-    page.getByRole('alert').filter({ hasText: 'Dialogue intervals must not overlap. Move or shorten this line.' }),
+    page.getByRole('alert').filter({ hasText: /Dialogue intervals must not overlap.*Move or shorten this line\./ }),
   ).toBeVisible();
   await page.getByLabel('Dialogue start (seconds)', { exact: true }).fill('3');
   await page.getByLabel('Speaker Actor', { exact: true }).selectOption('');

@@ -2,6 +2,8 @@
 export const GUIDE_TARGETS = {
   projectCharacters: 'project-characters',
   projectScenes: 'project-scenes',
+  projectStories: 'project-stories',
+  projectStorySequence: 'project-story-sequence',
   projectAssets: 'project-assets',
   projectAnimationLibrary: 'project-animation-library',
   projectRigMapping: 'project-rig-mapping',
