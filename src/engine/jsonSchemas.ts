@@ -7,6 +7,7 @@ import {
   rigFileSchema,
   skinFileSchema,
 } from './schemas.js';
+import { storyDefinitionSchema } from './StoryDefinition.js';
 
 /** Editor schemas describe file shapes; rig references and timelines use shared semantic checks. */
 export function generateJsonSchemas() {
@@ -17,6 +18,7 @@ export function generateJsonSchemas() {
     pose: { schema: poseDefinitionSchema, title: 'Paper Puppeteer static pose' },
     character: { schema: characterManifestSchema, title: 'Paper Puppeteer character manifest' },
     scene: { schema: sceneDefinitionSchema, title: 'Paper Puppeteer scene' },
+    story: { schema: storyDefinitionSchema, title: 'Paper Puppeteer linear story' },
   };
   return Object.fromEntries(
     Object.entries(definitions).map(([name, { schema, title }]) => [

@@ -65,6 +65,8 @@ The [runtime integration guide](docs/runtime-integration.md) covers portable cha
 
 ## Guides
 
+- [Linear stories](docs/linear-stories.md) — ordered scene references, validation, persistence and runtime sequencing (API foundation).
+
 - [Character runtime integration](docs/runtime-integration.md)
 - [Rig constraint workflow, transform audit and optional deformation design](docs/rig-constraints-and-deformation.md)
 - [Getting Started with Mesh Deformation](docs/getting-started-mesh-deformation.md)

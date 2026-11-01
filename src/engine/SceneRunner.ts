@@ -19,6 +19,7 @@ import {
 } from './SceneDefinition.js';
 import { getDialogueAtTime, type SceneDialogueTarget } from './sceneDialogue.js';
 import { sceneActorDepth, sceneLayer } from './sceneLayers.js';
+import type { ScenePlayback, SceneRunnerStatus } from './ScenePlayback.js';
 import {
   CLEAR_SCENE_TRANSITION,
   evaluateTransitionAtTime,
@@ -27,15 +28,7 @@ import {
 } from './sceneTransitions.js';
 import { assertFinite } from './types.js';
 
-export type SceneRunnerStatus =
-  | 'stopped'
-  | 'playing'
-  | 'paused'
-  | 'completed'
-  | 'cancelled'
-  | 'interrupted'
-  | 'disposed'
-  | 'failed';
+export type { SceneRunnerStatus } from './ScenePlayback.js';
 export interface SceneCue {
   readonly name: string;
   readonly actorId: string;
@@ -71,7 +64,7 @@ export interface SceneRunnerOptions {
  * action boundaries, rather than Promise continuations, determine scheduling order.
  * Arbitrary choreography scripts/callbacks are deliberately not a seeking input.
  */
-export class SceneRunner {
+export class SceneRunner implements ScenePlayback {
   readonly definition: DeepReadonly<SceneDefinition>;
   readonly audio: SceneAudioController | undefined;
   private instances = new Map<string, Actor>();

@@ -288,7 +288,7 @@ export async function importProjectPackage(
     ...metadata,
     ...(metadata.audio ? { audio: workspace.definition.audio! } : {}),
   });
-  workspace.installImportedMetadata({ ...importedMetadata, scenes: [] });
+  workspace.installImportedMetadata({ ...importedMetadata, scenes: [], stories: [] });
   for (const entry of metadata.scenes) {
     options.signal?.throwIfAborted();
     const bytes = files.get(entry.path);
@@ -300,6 +300,11 @@ export async function importProjectPackage(
   for (const entry of [...(metadata.sceneReuse?.choreographies ?? []), ...(metadata.sceneReuse?.templates ?? [])])
     workspace.validateScene(entry.scene);
   workspace.installImportedMetadata(importedMetadata);
+  if (metadata.stories?.length) {
+    const storyReport = workspace.inspect('export');
+    if (storyReport.issues.some(({ severity, asset }) => severity === 'error' && asset.kind === 'story'))
+      requireValidExport(storyReport);
+  }
   options.signal?.throwIfAborted();
   return workspace;
 }

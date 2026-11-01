@@ -12,6 +12,7 @@ import {
   validateSceneDefinition,
   type SceneCharacterAssets,
 } from '../../engine/SceneDefinition.js';
+import { validateStoryDefinition } from '../../engine/StoryDefinition.js';
 import type { ValidationIssue } from '../../engine/validation.js';
 import { inspectSpriteHeader } from '../shared/artwork/spriteImport.js';
 import type { PackageFiles, PackageSnapshot } from '../shared/package/characterPackage.js';
@@ -21,6 +22,7 @@ import { parseProjectDefinition } from './ProjectDefinition.js';
 export type ValidationContext = 'draft' | 'export';
 export type AssetKind =
   | 'project'
+  | 'story'
   | 'rig-mapping'
   | 'audio'
   | 'character'
@@ -629,6 +631,52 @@ export class ProjectInspector {
             asset('animation', referenceIds.get(actor.character.manifest) ?? actor.character.manifest, item.animation),
             `Scene "${scene.name}", clip "${item.id}" on Actor "${item.actorId}"`,
           );
+      }
+    }
+    if (project.stories?.length) {
+      const assetKey = (value: AssetReference) => JSON.stringify([value.kind, value.owner, value.id]);
+      const outgoing = new Map<string, AssetReference[]>();
+      for (const { from, to } of dependencies) {
+        const key = assetKey(from);
+        const list = outgoing.get(key) ?? [];
+        list.push(to);
+        outgoing.set(key, list);
+      }
+      const errors = new Map<string, ProjectDiagnostic[]>();
+      for (const issue of issues) {
+        if (issue.severity !== 'error') continue;
+        const key = assetKey(issue.asset);
+        const list = errors.get(key) ?? [];
+        list.push(issue);
+        errors.set(key, list);
+      }
+      const registeredScenes = new Set(project.scenes.map(({ id }) => id));
+      for (const story of project.stories ?? []) {
+        const target = asset('story', project.id, story.id);
+        edge(asset('project', project.id), target, `Project "${project.name}"`);
+        for (const [index, entry] of story.scenes.entries()) {
+          edge(target, asset('scene', entry.sceneAssetId), `Story "${story.name}", entry "${entry.id}"`);
+          if (!registeredScenes.has(entry.sceneAssetId))
+            add(
+              target,
+              `Story "${story.name}": Missing scene asset "${entry.sceneAssetId}".`,
+              `scenes[${index}].sceneAssetId`,
+            );
+        }
+        for (const issue of validateStoryDefinition(story))
+          add(target, `Story "${story.name}": ${issue.message}`, issue.path, issue.severity);
+        // Follow existing scene/Actor/character edges to include broken transitive assets.
+        const queue = story.scenes.map(({ sceneAssetId }) => asset('scene', sceneAssetId));
+        const visited = new Set<string>();
+        while (queue.length) {
+          const current = queue.pop()!;
+          const key = assetKey(current);
+          if (visited.has(key)) continue;
+          visited.add(key);
+          for (const issue of errors.get(key) ?? [])
+            add(target, `Story "${story.name}" dependency: ${issue.message}`, 'scenes');
+          queue.push(...(outgoing.get(key) ?? []));
+        }
       }
     }
     const characterIds = new Set(project.characters.map((entry) => entry.id));

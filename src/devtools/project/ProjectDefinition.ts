@@ -3,6 +3,7 @@ import { audioAssetDefinitionSchema } from '../../engine/AudioAsset.js';
 import { assertJsonInputSize } from '../../engine/jsonInput.js';
 import { packagePath } from '../../engine/packageZip.js';
 import { rigBoneMappingSchema } from '../../engine/rigBoneMapping.js';
+import { parseStoryDefinition, storyDefinitionSchema } from '../../engine/StoryDefinition.js';
 import { animationPreviewPreferencesSchema } from '../shared/animationPreviewPreferences.js';
 import { parseSceneReuseLibrary, sceneReuseLibrarySchema } from '../shared/sceneReuse.js';
 
@@ -12,6 +13,7 @@ export const projectDefinitionSchema = z.strictObject({
   version: z.literal(1),
   id: identity,
   name: identity,
+  stories: z.array(storyDefinitionSchema).max(1024).exactOptional(),
   sceneReuse: sceneReuseLibrarySchema.exactOptional(),
   rigMappings: z.array(rigBoneMappingSchema).max(128).exactOptional(),
   audio: z.array(audioAssetDefinitionSchema).max(128).exactOptional(),
@@ -42,6 +44,9 @@ export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>;
 
 export function parseProjectDefinition(input: unknown): ProjectDefinition {
   const project = projectDefinitionSchema.parse(input);
+  for (const story of project.stories ?? []) parseStoryDefinition(story);
+  if (new Set(project.stories?.map(({ id }) => id.toLowerCase())).size !== (project.stories?.length ?? 0))
+    throw new Error('Duplicate story ID.');
   if (project.sceneReuse) project.sceneReuse = parseSceneReuseLibrary(project.sceneReuse);
   for (const entry of project.characters) {
     if (!entry.variant) continue;

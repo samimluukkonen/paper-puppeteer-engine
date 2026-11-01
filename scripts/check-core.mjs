@@ -21,6 +21,9 @@ const {
   Joint,
   Rig,
   retargetAnimation,
+  StoryPlayer,
+  parseStoryDefinition,
+  serializeStoryDefinition,
   solveTwoBoneIK,
   validatePoseDefinition,
   validateRigDefinition,
@@ -28,6 +31,17 @@ const {
 
 // Exercise the built subpath in plain Node, with no browser globals or Phaser mock.
 assert.equal(typeof globalThis.window, 'undefined');
+const storyDraft = { version: 1, id: 'film', name: 'Film', scenes: [] };
+assert.deepEqual(parseStoryDefinition(JSON.parse(serializeStoryDefinition(storyDraft))), storyDraft);
+const storyPlayer = new StoryPlayer(storyDraft, {
+  scenes: new Map(),
+  loadScene: async () => {
+    throw new Error('Empty story must not load a scene.');
+  },
+});
+await assert.rejects(storyPlayer.start(), /Empty story/);
+storyPlayer.dispose();
+assert.equal(storyPlayer.status, 'disposed');
 const subtitle = { id: 'line', text: 'Hello\nWorld', time: 500, duration: 500 };
 assert.equal(getDialogueAtTime({ dialogue: [subtitle] }, 750).line.text, 'Hello\nWorld');
 assert.equal(getDialogueAtTime({ dialogue: [subtitle] }, 1000), undefined);

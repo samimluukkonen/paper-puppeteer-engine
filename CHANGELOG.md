@@ -151,6 +151,13 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.1
+
+- Add version-1 linear story definitions with stable story/entry IDs and ordered references to existing scene assets, strict validation, JSON serialization and a generated schema. Empty stories remain editable, saveable drafts.
+- Add the React-independent `StoryPlayer` service over existing scene sessions, with ordered automatic advancement, fresh runtime instances for repeated references, completion, cancellation-safe loading, stop/dispose and observable failures.
+- Persist optional stories in version-1 project metadata through history, autosave, recovery and project archives. Track transitive asset dependencies and protect referenced scenes from removal; retain compatibility with older projects and standalone scene exports.
+- Document story authoring APIs, sequencing semantics and shared resource ownership in `docs/linear-stories.md`; add schema, lifecycle, immutability and persistence regression coverage.
+
 ## 1.5.6
 
 - Harden reusable asset integration with a sword-cut workflow spanning rig mapping, proportion-scaled retargeting, independent target corrections, shared-skin variants, choreography, scene templates, project drafts/ZIPs and standalone deterministic scene playback. Cover compatible/different-topology meshes and both rigid/mesh transfer directions without silently copying corrective vertices.

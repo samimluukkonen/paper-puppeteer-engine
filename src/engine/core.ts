@@ -336,3 +336,19 @@ export { meshEdges, subdivideMeshEdge, deleteMeshVertex } from './meshEditing.js
 
 export { inspectMeshDeformation } from './meshDiagnostics.js';
 export type { MeshTriangleDiagnostic } from './meshDiagnostics.js';
+
+export type { StoryDefinition, StorySceneEntry, StoryValidationOptions } from './StoryDefinition.js';
+export {
+  STORY_FORMAT_VERSION,
+  StoryValidationError,
+  storyDefinitionSchema,
+  storySceneEntrySchema,
+  validateStoryDefinition,
+  parseStoryDefinition,
+  parseStoryJson,
+  serializeStoryDefinition,
+} from './StoryDefinition.js';
+
+export { StoryPlayer } from './StoryPlayer.js';
+export type { ScenePlayback, SceneRunnerStatus } from './ScenePlayback.js';
+export type { StoryPlayerStatus, StoryPlayerOptions, StorySceneSession, StorySceneContext } from './StoryPlayer.js';

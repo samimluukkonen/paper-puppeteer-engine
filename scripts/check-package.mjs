@@ -70,6 +70,7 @@ try {
     'runtime-integration.md',
     'artist-workflow.md',
     'reusing-animations-and-scenes.md',
+    'linear-stories.md',
   ])
     assert.ok(guides.includes(guide), `The package must retain the ${guide} guide.`);
 
@@ -86,8 +87,8 @@ try {
   await writeFile(
     join(consumer, 'core.ts'),
     `
-import { AnimationPlayer, CharacterLoader, Joint, Rig, compileClip, evaluateClip } from 'paper-puppeteer-engine/core';
-import type { AnimationClip, CharacterDefinition, CharacterLoadOptions, CompiledClip, DeepReadonly, RigJsonDefinition } from 'paper-puppeteer-engine/core';
+import { AnimationPlayer, CharacterLoader, Joint, Rig, StoryPlayer, compileClip, evaluateClip } from 'paper-puppeteer-engine/core';
+import type { AnimationClip, CharacterDefinition, CharacterLoadOptions, CompiledClip, DeepReadonly, RigJsonDefinition, StoryDefinition, StoryPlayerOptions } from 'paper-puppeteer-engine/core';
 import type { CharacterManifest, IKAnimationTrack, RigDefinition } from 'paper-puppeteer-engine/data';
 import { validateCharacterDefinition, parseRigDefinition } from 'paper-puppeteer-engine/serialization';
 
@@ -99,6 +100,10 @@ export function checkData(manifest: CharacterManifest, rig: RigDefinition, track
 
 export function loadCharacter(url: string, options: CharacterLoadOptions): Promise<CharacterDefinition> {
   return CharacterLoader.load(url, undefined, options);
+}
+
+export function linearStory(story: StoryDefinition, options: StoryPlayerOptions): StoryPlayer {
+  return new StoryPlayer(story, options);
 }
 
 export function sample(): number | undefined {
@@ -178,8 +183,8 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
 import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
 import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
 import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
-import { SceneLoader, SceneDialogueOverlay, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
-import type { SceneDialogueTarget, SceneDefinition, SceneRunner } from 'paper-puppeteer-engine/runtime';
+import { SceneLoader, SceneDialogueOverlay, StoryPlayer, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
+import type { SceneDialogueTarget, SceneDefinition, SceneRunner, StoryDefinition } from 'paper-puppeteer-engine/runtime';
 export { Puppet } from 'paper-puppeteer-engine/runtime';
 export { runRuntimeExample } from './runtime-example.js';
 export { createScriptedScene } from './choreography-example.js';
@@ -187,6 +192,16 @@ export { createScriptedScene } from './choreography-example.js';
 if (RootPuppet !== RuntimePuppet) throw new Error('Root and /runtime must share the Puppet class.');
 if (RootActor !== Actor) throw new Error('Root and /runtime must share the Actor class.');
 export const load = loadSceneCharacter;
+
+export function linearStory(scene: import('phaser').Scene, story: StoryDefinition, scenes: ReadonlyMap<string, SceneDefinition>): StoryPlayer {
+  return new StoryPlayer(story, {
+    scenes,
+    loadScene: (definition, context) => SceneLoader.fromDefinition(scene, definition, {
+      baseUrl: 'https://example.test/scenes/' + context.entry.sceneAssetId + '.json',
+      signal: context.signal,
+    }),
+  });
+}
 
 export function dialogue(scene: import('phaser').Scene, definition: SceneDefinition, runner: SceneRunner): void {
   const overlay: SceneDialogueTarget = new SceneDialogueOverlay(scene);

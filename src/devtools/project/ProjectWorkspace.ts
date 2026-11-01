@@ -28,6 +28,7 @@ import {
   type SceneDefinition,
 } from '../../engine/SceneDefinition.js';
 import { identifierSchema } from '../../engine/schemas.js';
+import { parseStoryDefinition } from '../../engine/StoryDefinition.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import {
@@ -170,6 +171,24 @@ export class ProjectWorkspace {
     this.change({ ...this.metadata, sceneReuse: parseSceneReuseLibrary(input) });
   }
 
+  /** Story edits share project membership history, dirty tracking and autosave. */
+  setStory(input: unknown): string {
+    const story = parseStoryDefinition(input, {
+      scenes: new Map(this.metadata.scenes.map(({ id }) => [id, this.scenes.scene(id)])),
+    });
+    const stories = this.metadata.stories ?? [];
+    const existing = stories.some(({ id }) => id === story.id);
+    this.change({
+      ...this.metadata,
+      stories: existing ? stories.map((entry) => (entry.id === story.id ? story : entry)) : [...stories, story],
+    });
+    return story.id;
+  }
+  removeStory(id: string): void {
+    if (!this.metadata.stories?.some((entry) => entry.id === id)) throw new Error(`Unknown story "${id}".`);
+    this.change({ ...this.metadata, stories: this.metadata.stories.filter((entry) => entry.id !== id) });
+  }
+
   animationPreviewPreferences(id: string): DeepReadonly<AnimationPreviewPreferences> | undefined {
     return this.previewPreferences[id];
   }
@@ -207,6 +226,9 @@ export class ProjectWorkspace {
     return new SnapshotHistory(
       () => this.metadata,
       (value) => {
+        const scenes = new Set(value.scenes.map(({ id }) => id));
+        if (value.stories?.some((story) => story.scenes.some((entry) => !scenes.has(entry.sceneAssetId))))
+          throw new Error('Project history would orphan a story scene reference. Restore the scene first.');
         for (const entry of value.characters) {
           if (!entry.variant) continue;
           const owner = this.characters.get(entry.variant.rig);
@@ -782,6 +804,7 @@ export class ProjectWorkspace {
     const metadata = references
       ? {
           ...this.definition,
+          stories: [],
           rigMappings: [],
           sceneReuse: emptySceneReuseLibrary(),
           characters: this.metadata.characters.filter(
@@ -822,6 +845,13 @@ export class ProjectWorkspace {
     return assetDependents(this.inspect(), target);
   }
   remove(kind: 'characters' | 'scenes', id: string): void {
+    if (kind === 'scenes') {
+      const dependents = this.dependents({ kind: 'scene', owner: id, id }).filter(({ from }) => from.kind === 'story');
+      if (dependents.length)
+        throw new Error(
+          `Scene is used by stories: ${dependents.map(({ label }) => label).join('; ')}. Remove or replace these references first.`,
+        );
+    }
     if (kind === 'characters') {
       const dependents = this.dependents({ kind: 'character', owner: id, id }).filter(
         ({ from }) => from.kind !== 'project',
@@ -860,6 +890,8 @@ export class ProjectWorkspace {
   /** Archive import keeps stable paths; initialized documents remain separate owners. */
   installImportedMetadata(metadata: ProjectDefinition): void {
     const value = parseProjectDefinition(metadata);
+    for (const story of value.stories ?? [])
+      parseStoryDefinition(story, { scenes: new Map(value.scenes.map(({ id }) => [id, this.scenes.scene(id)])) });
     if (
       value.characters.some(({ id }) => !this.characters.has(id)) ||
       value.audio?.some(({ id }) => !this.audioFiles.has(id)) ||

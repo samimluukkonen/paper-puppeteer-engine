@@ -104,3 +104,15 @@ export type { ActiveSceneAudioClip } from './sceneAudio.js';
 
 export type { SceneDialogueLine, ActiveSceneDialogue, SceneDialogueTarget } from './sceneDialogue.js';
 export { sceneDialogueLineSchema, getDialogueLineAtTime, getDialogueAtTime, dialogueSpeaker } from './sceneDialogue.js';
+
+export type { StoryDefinition, StorySceneEntry, StoryValidationOptions } from './StoryDefinition.js';
+export {
+  STORY_FORMAT_VERSION,
+  StoryValidationError,
+  storyDefinitionSchema,
+  storySceneEntrySchema,
+  validateStoryDefinition,
+  parseStoryDefinition,
+  parseStoryJson,
+  serializeStoryDefinition,
+} from './StoryDefinition.js';

@@ -1,0 +1,281 @@
+import { expect, test, vi } from 'vitest';
+import { Actor } from '../src/engine/Actor.js';
+import { Puppet } from '../src/engine/Puppet.js';
+import type { DeepReadonly } from '../src/engine/readonlyData.js';
+import { createEmptyScene, type SceneDefinition } from '../src/engine/SceneDefinition.js';
+import { SceneRunner } from '../src/engine/SceneRunner.js';
+import { StoryPlayer, type StorySceneContext, type StorySceneSession } from '../src/engine/StoryPlayer.js';
+import { puppetScene } from './helpers/puppetScene.js';
+
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
+
+function fixture(ids = ['a', 'b', 'a']) {
+  const scenes = new Map([...new Set(ids)].map((id) => [id, createEmptyScene({ id, duration: 100 })]));
+  const story = {
+    version: 1,
+    id: 'film',
+    name: 'Film',
+    scenes: ids.map((sceneAssetId, index) => ({ id: `entry-${index}`, sceneAssetId })),
+  };
+  const loaded: { context: StorySceneContext; runner: SceneRunner; dispose: ReturnType<typeof vi.fn> }[] = [];
+  const order: string[] = [];
+  const loadScene = (definition: DeepReadonly<SceneDefinition>, context: StorySceneContext) => {
+    order.push(`load:${context.index}`);
+    const runner = new SceneRunner(definition, {
+      createActor: ({ id }) =>
+        new Actor({
+          id,
+          puppetOwnership: 'owned',
+          puppet: new Puppet(puppetScene(), {
+            autoUpdate: false,
+            rig: { root: 'root', bones: [{ id: 'root' }] },
+            animations: [],
+          }),
+        }),
+    });
+    const dispose = vi.fn(() => {
+      order.push(`dispose:${context.index}`);
+      runner.dispose();
+    });
+    loaded.push({ context, runner, dispose });
+    return Promise.resolve({ runner, dispose });
+  };
+  return { scenes, story, loaded, order, loadScene };
+}
+
+test.each([['a'], ['a', 'b', 'c'], ['a', 'b', 'a']])('plays ordered scenes through completion: %j', async (...ids) => {
+  const f = fixture(ids);
+  const player = new StoryPlayer(f.story, f);
+  await player.start();
+  for (const [index, id] of ids.entries()) {
+    expect(player.status).toBe('playing');
+    expect(player.index).toBe(index);
+    expect(player.currentEntry?.sceneAssetId).toBe(id);
+    expect(f.loaded[index]!.runner.time).toBe(0);
+    await player.update(1000); // Excess time never skips an authored entry.
+  }
+  expect(player.status).toBe('completed');
+  expect(player.currentEntry).toBeUndefined();
+  expect(player.currentSession).toBeUndefined();
+  expect(f.order).toEqual(ids.flatMap((_, index) => [`load:${index}`, `dispose:${index}`]));
+  expect(new Set(f.loaded.map(({ context }) => context.instanceId)).size).toBe(ids.length);
+  expect(new Set(f.loaded.map(({ runner }) => runner)).size).toBe(ids.length);
+  await player.update(50);
+  expect(f.loaded).toHaveLength(ids.length);
+  player.dispose();
+});
+
+test('stop releases the current session, prevents advancing and restarts with fresh identity', async () => {
+  const f = fixture();
+  const player = new StoryPlayer(f.story, f);
+  await player.start();
+  await player.update(40);
+  expect(f.loaded[0]!.runner.time).toBe(40);
+  player.stop();
+  expect(player.index).toBe(-1);
+  expect(player.status).toBe('stopped');
+  await player.update(1000);
+  expect(f.loaded).toHaveLength(1);
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledTimes(1);
+  await player.start();
+  expect(f.loaded[1]!.context.instanceId).not.toBe(f.loaded[0]!.context.instanceId);
+  expect(player.index).toBe(0);
+  player.dispose();
+  player.dispose();
+  expect(f.loaded[1]!.dispose).toHaveBeenCalledTimes(1);
+  await expect(player.start()).rejects.toThrow(/disposed/);
+  await expect(player.update(1)).rejects.toThrow(/disposed/);
+});
+
+test.each(['stop', 'dispose'] as const)(
+  '%s during loading aborts and releases a late session without playing it',
+  async (command) => {
+    const f = fixture();
+    let resolve!: (session: StorySceneSession) => void;
+    let signal!: AbortSignal;
+    const player = new StoryPlayer(f.story, {
+      scenes: f.scenes,
+      loadScene: (_, context) => {
+        signal = context.signal;
+        return new Promise((ready) => {
+          resolve = ready;
+        });
+      },
+    });
+    const starting = player.start();
+    expect(player.status).toBe('loading');
+    await player.update(1000);
+    player[command]();
+    expect(signal.aborted).toBe(true);
+    const session = {
+      runner: { status: 'stopped' as const, error: undefined, play: vi.fn(), update: vi.fn() },
+      dispose: vi.fn(),
+    };
+    resolve(session);
+    await starting;
+    expect(session.dispose).toHaveBeenCalledTimes(1);
+    expect(session.runner.play).not.toHaveBeenCalled();
+    expect(player.status).toBe(command === 'stop' ? 'stopped' : 'disposed');
+    player.dispose();
+  },
+);
+
+test('a superseded load cannot replace a restarted story session', async () => {
+  const f = fixture();
+  let resolve!: (session: StorySceneSession) => void;
+  let first = true;
+  const player = new StoryPlayer(f.story, {
+    scenes: f.scenes,
+    loadScene: (definition, context) => {
+      if (first) {
+        first = false;
+        return new Promise((ready) => {
+          resolve = ready;
+        });
+      }
+      return f.loadScene(definition, context);
+    },
+  });
+  const old = player.start();
+  player.stop();
+  await player.start();
+  const session = {
+    runner: { status: 'stopped' as const, error: undefined, play: vi.fn(), update: vi.fn() },
+    dispose: vi.fn(),
+  };
+  resolve(session);
+  await old;
+  expect(player.currentSession?.runner).toBe(f.loaded[0]!.runner);
+  expect(session.dispose).toHaveBeenCalledTimes(1);
+  player.dispose();
+});
+
+test('loader failure on a later scene stops playback and retains an observable error', async () => {
+  const f = fixture();
+  const error = new Error('missing artwork');
+  const player = new StoryPlayer(f.story, {
+    scenes: f.scenes,
+    loadScene: (definition, context) =>
+      context.index === 1 ? Promise.reject(error) : f.loadScene(definition, context),
+  });
+  await player.start();
+  await expect(player.update(100)).rejects.toBe(error);
+  expect(player.status).toBe('failed');
+  expect(player.error).toBe(error);
+  expect(player.currentSession).toBeUndefined();
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledTimes(1);
+  player.dispose();
+});
+
+test('interrupted scene and throwing runtime fail without advancing', async () => {
+  for (const throws of [false, true]) {
+    const f = fixture();
+    const player = new StoryPlayer(f.story, f);
+    await player.start();
+    if (throws)
+      vi.spyOn(f.loaded[0]!.runner, 'update').mockImplementation(() => {
+        throw new Error('runtime');
+      });
+    else f.loaded[0]!.runner.cancel();
+    await expect(player.update(100)).rejects.toThrow(throws ? /runtime/ : /cancelled/);
+    expect(player.status).toBe('failed');
+    expect(f.loaded).toHaveLength(1);
+    expect(f.loaded[0]!.dispose).toHaveBeenCalledTimes(1);
+    player.dispose();
+  }
+});
+
+test('empty draft cannot start and missing references fail before allocating runtime objects', async () => {
+  const f = fixture([]);
+  const loadScene = vi.fn(f.loadScene);
+  const player = new StoryPlayer(f.story, { ...f, loadScene });
+  await expect(player.start()).rejects.toThrow(/Empty story/);
+  expect(player.status).toBe('stopped');
+  expect(loadScene).not.toHaveBeenCalled();
+  expect(() => new StoryPlayer(fixture().story, { scenes: new Map(), loadScene })).toThrow(/Missing scene/);
+  player.dispose();
+});
+
+test.each(['stop', 'dispose'] as const)(
+  'reentrant %s during session cleanup prevents loading another entry',
+  async (command) => {
+    const f = fixture();
+    const player = new StoryPlayer(f.story, f);
+    await player.start();
+    f.loaded[0]!.dispose.mockImplementation(() => {
+      f.loaded[0]!.runner.dispose();
+      player[command]();
+    });
+    await player.update(100);
+    expect(player.status).toBe(command === 'stop' ? 'stopped' : 'disposed');
+    expect(player.index).toBe(-1);
+    expect(f.loaded).toHaveLength(1);
+    expect(f.loaded[0]!.dispose).toHaveBeenCalledTimes(1);
+    player.dispose();
+  },
+);
+
+test('a failed start releases its session and invalid deltas do not alter playback', async () => {
+  const f = fixture();
+  const error = new Error('cannot play');
+  const player = new StoryPlayer(f.story, {
+    ...f,
+    loadScene: async (definition, context) => {
+      const session = await f.loadScene(definition, context);
+      vi.spyOn(session.runner, 'play').mockImplementation(() => {
+        throw error;
+      });
+      return session;
+    },
+  });
+  await expect(player.start()).rejects.toBe(error);
+  expect(player.status).toBe('failed');
+  expect(player.error).toBe(error);
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledTimes(1);
+  player.dispose();
+
+  const active = new StoryPlayer(f.story, f);
+  await active.start();
+  await active.start();
+  for (const delta of [-1, NaN, Infinity]) await expect(active.update(delta)).rejects.toThrow();
+  expect(active.status).toBe('playing');
+  expect(active.index).toBe(0);
+  active.dispose();
+});
+
+test('repeated source scenes and shared assets stay immutable with independent Actor clocks and fades', async () => {
+  const f = fixture(['a', 'a']);
+  const source = f.scenes.get('a')!;
+  source.actors.push({ id: 'hero', character: { manifest: 'shared/character.json' }, position: { x: 5, y: 0 } });
+  source.actions.push({
+    id: 'move',
+    actorId: 'hero',
+    type: 'move',
+    time: 0,
+    duration: 100,
+    destination: { x: 105, y: 0 },
+  });
+  source.transitions = [{ id: 'fade', time: 0, duration: 100, type: 'fade-out', color: '#000000' }];
+  const snapshot = structuredClone(source);
+  const player = new StoryPlayer(f.story, f);
+  source.actors[0]!.position.x = 999; // Mutations after construction do not change the playback snapshot.
+  await player.start();
+  const first = f.loaded[0]!.runner.actors.get('hero')!;
+  await player.update(50);
+  expect(first.position.x).toBe(55);
+  expect(f.loaded[0]!.runner.transition.opacity).toBe(0.5);
+  await player.update(50);
+  const second = f.loaded[1]!.runner.actors.get('hero')!;
+  expect(second).not.toBe(first);
+  expect(first.isDisposed).toBe(true);
+  expect(second.position.x).toBe(5);
+  await player.update(100);
+  expect(player.status).toBe('completed');
+  expect(source).toEqual({ ...snapshot, actors: [{ ...snapshot.actors[0], position: { x: 999, y: 0 } }] });
+  player.dispose();
+});
