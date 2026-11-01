@@ -221,7 +221,7 @@ export function ProjectView() {
     const signal = AbortSignal.any([transferLifetime.current.signal, AbortSignal.timeout(60_000)]);
     signal.throwIfAborted();
     const bytes = new Uint8Array(await abortable(file.arrayBuffer(), signal));
-    return packageZipWorker.decode(bytes, signal);
+    return packageZipWorker.decodeOwned(bytes, signal);
   };
   const importScene = async (file: File): Promise<void> => {
     if (!workspace) return;

@@ -5,6 +5,8 @@ export interface WorkerTask<Response> {
 
 interface WorkerTaskOptions {
   readonly signal?: AbortSignal;
+  /** Transfer only exclusively owned inputs; posting detaches their buffers even if the task later fails. */
+  readonly transfer?: Transferable[];
   readonly errorMessage: string;
   readonly messageErrorMessage: string;
   readonly cancelReason?: unknown;
@@ -51,8 +53,9 @@ export function startWorkerTask<Response>(
             finish(() => reject(new DOMException(options.timeoutMessage ?? 'Worker task timed out.', 'TimeoutError'))),
           options.timeoutMs,
         );
-      // Clone inputs so cancellation never detaches buffers retained by the caller.
-      worker.postMessage(request);
+      // Shared inputs are cloned unless the caller explicitly gives up ownership.
+      if (options.transfer) worker.postMessage(request, options.transfer);
+      else worker.postMessage(request);
     } catch (error) {
       finish(() => reject(error));
     }

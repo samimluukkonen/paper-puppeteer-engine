@@ -160,7 +160,7 @@ export class PackageController {
     try {
       if (file.size > PACKAGE_MAX_BYTES) throw new Error('Package exceeds 100 MiB.');
       const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]);
-      const files = await this.zip.decode(new Uint8Array(await file.arrayBuffer()), signal);
+      const files = await this.zip.decodeOwned(new Uint8Array(await file.arrayBuffer()), signal);
       await validatePackage(files, signal);
       signal.throwIfAborted();
       this.publish({

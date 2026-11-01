@@ -240,6 +240,10 @@ const zipProcessor: PackageZipProcessor = {
     signal.throwIfAborted();
     return processPackageZip({ operation: 'decode', bytes }).files;
   },
+  async decodeOwned(bytes, signal) {
+    signal.throwIfAborted();
+    return processPackageZip({ operation: 'decode', bytes }).files;
+  },
 };
 
 test('new-character package checkpoints only clear after a successful complete download', async () => {
@@ -929,18 +933,18 @@ test.each(['dispose', 'rebind'] as const)(
 
 test('canceling a ZIP import prevents a delayed decoded archive from opening a preview', async () => {
   const files = await buildCharacterPackage(fixture(), fetchImage);
-  let complete!: (result: Awaited<ReturnType<PackageZipProcessor['decode']>>) => void;
-  const decode = vi.fn<PackageZipProcessor['decode']>(
+  let complete!: (result: Awaited<ReturnType<PackageZipProcessor['decodeOwned']>>) => void;
+  const decodeOwned = vi.fn<PackageZipProcessor['decodeOwned']>(
     () =>
       new Promise((resolve) => {
         complete = resolve;
       }),
   );
-  const controller = new PackageController({ ...zipProcessor, decode });
+  const controller = new PackageController({ ...zipProcessor, decodeOwned });
   const pending = controller.importPreview(new File([encodePackageZip(files)], 'character.zip'));
-  await vi.waitFor(() => assert.equal(decode.mock.calls.length, 1));
+  await vi.waitFor(() => assert.equal(decodeOwned.mock.calls.length, 1));
   controller.unbind();
-  assert.isTrue(decode.mock.calls[0]![1].aborted);
+  assert.isTrue(decodeOwned.mock.calls[0]![1].aborted);
   complete(files);
   await pending;
   assert.isFalse(controller.getSnapshot().busy);
