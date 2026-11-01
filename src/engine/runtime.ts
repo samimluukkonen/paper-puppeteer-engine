@@ -38,7 +38,13 @@ export {
 export * from './core.js';
 export type { PuppetOptions, SyncPoseOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
-export { SceneRunner, type SceneRunnerStatus, type SceneRunnerOptions, type SceneCue } from './SceneRunner.js';
+export {
+  SceneRunner,
+  type AdvanceResult,
+  type SceneRunnerStatus,
+  type SceneRunnerOptions,
+  type SceneCue,
+} from './SceneRunner.js';
 export {
   type CharacterTextureLoadOptions,
   CharacterTextureLimitError,

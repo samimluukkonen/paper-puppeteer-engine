@@ -115,6 +115,39 @@ const noActor = () => {
   throw new Error('No Actors expected');
 };
 
+test('dialogue waiting stops timeline voices and resumes at scene offset without wall-time catch-up', async () => {
+  const f = fixture();
+  const runner = new SceneRunner(
+    {
+      ...f.scene,
+      dialogue: [{ id: 'wait', time: 1500, duration: 0, text: 'Wait', progression: 'advance-required' }],
+    },
+    { createActor: noActor, audio: f.options },
+  );
+  try {
+    await runner.audio!.unlock();
+    runner.play();
+    runner.update(1000);
+    expect(f.voices).toHaveLength(1);
+    f.advance(500);
+    runner.update(500);
+    expect(runner.status).toBe('waiting-for-dialogue-advance');
+    expect(f.voices[0]!.stop).toHaveBeenCalledTimes(1);
+    f.advance(60000);
+    runner.update(60000);
+    expect(runner.time).toBe(1500);
+    expect(f.voices).toHaveLength(1);
+    runner.advanceDialogue();
+    expect(f.voices).toHaveLength(2);
+    expect(f.voices[1]!.options.offset).toBeCloseTo(0.7);
+    runner.update(100);
+    expect(runner.time).toBe(1600);
+  } finally {
+    runner.dispose();
+    f.audio.dispose();
+  }
+});
+
 test('dialogue voice metadata and sound cue payloads coexist with exactly one audio timeline voice', async () => {
   const f = fixture();
   const onCue = vi.fn();

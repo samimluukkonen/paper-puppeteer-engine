@@ -8,19 +8,42 @@ import { assertFinite } from './types.js';
 const dialogueIdentifier = identifierSchema.regex(/\S/, 'Must contain a non-whitespace character.');
 
 /** Plain text only; time and duration are milliseconds. Actor IDs are scene-local instances. */
-export const sceneDialogueLineSchema = z.strictObject({
-  id: dialogueIdentifier,
-  actorId: dialogueIdentifier.exactOptional(),
-  speakerName: z.string().max(1000).exactOptional(),
-  text: z.string().max(100000),
-  time: z.number().nonnegative(),
-  duration: z.number().positive(),
-  /** Organizational metadata only. The audio timeline remains the sole playback owner. */
-  voiceClipId: dialogueIdentifier.exactOptional(),
-});
+export const sceneDialogueLineSchema = z
+  .strictObject({
+    id: dialogueIdentifier,
+    actorId: dialogueIdentifier.exactOptional(),
+    speakerName: z.string().max(1000).exactOptional(),
+    text: z.string().max(100000),
+    time: z.number().nonnegative(),
+    duration: z.number().nonnegative(),
+    /** Omitted means timed. Hold duration controls passive preview only; zero is a point sample. */
+    progression: z.enum(['timed', 'advance-required']).exactOptional(),
+    /** Organizational metadata only. The audio timeline remains the sole playback owner. */
+    voiceClipId: dialogueIdentifier.exactOptional(),
+  })
+  .refine((line) => line.duration > 0 || line.progression === 'advance-required', {
+    path: ['duration'],
+    message: 'Timed dialogue duration must be positive.',
+  });
 export type SceneDialogueLine = z.infer<typeof sceneDialogueLineSchema>;
 
-const lineIndices = new WeakMap<readonly Readonly<SceneDialogueLine>[], readonly Readonly<SceneDialogueLine>[]>();
+type DialogueGroup = { readonly time: number; readonly lines: readonly Readonly<SceneDialogueLine>[] };
+const lineIndices = new WeakMap<readonly Readonly<SceneDialogueLine>[], readonly DialogueGroup[]>();
+
+/** Locale-independent stable order, including simultaneous holds. */
+export function compareDialogueLines(a: Readonly<SceneDialogueLine>, b: Readonly<SceneDialogueLine>): number {
+  return a.time - b.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+function dialogueGroups(lines: readonly Readonly<SceneDialogueLine>[]): readonly DialogueGroup[] {
+  const groups: { time: number; lines: Readonly<SceneDialogueLine>[] }[] = [];
+  for (const line of [...lines].sort(compareDialogueLines)) {
+    const last = groups.at(-1);
+    if (last?.time === line.time) last.lines.push(line);
+    else groups.push({ time: line.time, lines: [line] });
+  }
+  return groups;
+}
 type DialogueActors = readonly DeepReadonly<SceneActorDefinition>[];
 const actorIndices = new WeakMap<DialogueActors, ReadonlyMap<string, DeepReadonly<SceneActorDefinition>>>();
 
@@ -35,7 +58,9 @@ function getDialogueActor(actors: DialogueActors | undefined, id: string) {
   return index.get(id);
 }
 
-/** Single-subtitle policy: validated lines never overlap; intervals are [time, time + duration). */
+/** Pure preview: half-open intervals, with point holds visible exactly at their start.
+ * Simultaneous holds preview the first active line in stable ID order, without waiting.
+ */
 export function getDialogueLineAtTime(
   scene: { readonly dialogue?: readonly Readonly<SceneDialogueLine>[] },
   time: number,
@@ -44,12 +69,12 @@ export function getDialogueLineAtTime(
   if (!lines || !Number.isFinite(time)) return undefined;
   let sorted = lineIndices.get(lines);
   if (!sorted) {
-    if (!isFullyFrozen(lines)) return lines.find((line) => time >= line.time && time < line.time + line.duration);
-    sorted = [...lines].sort((a, b) => a.time - b.time);
-    lineIndices.set(lines, sorted);
+    sorted = dialogueGroups(lines);
+    if (isFullyFrozen(lines)) lineIndices.set(lines, sorted);
   }
-  const line = latestSceneInterval(sorted, time);
-  return line && time < line.time + line.duration ? line : undefined;
+  return latestSceneInterval(sorted, time)?.lines.find(
+    (line) => time < line.time + line.duration || (line.duration === 0 && time === line.time),
+  );
 }
 
 export interface ActiveSceneDialogue {
@@ -65,7 +90,7 @@ export interface SceneDialogueTarget {
   setDialogue(dialogue: ActiveSceneDialogue | undefined): void;
 }
 
-/** Pure half-open interval evaluation. Missing Actors still display their authored ID;
+/** Pure interval/point evaluation. Missing Actors still display their authored ID;
  * complete scene validation rejects dangling speaker references before playback.
  */
 export function getDialogueAtTime(

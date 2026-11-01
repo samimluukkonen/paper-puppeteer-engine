@@ -2,16 +2,18 @@
 
 [All guides](../README.md#guides) · [Scene Editor](scene-editor.md)
 
-Scene Editor authors timed plain-text dialogue for narration and Actor exchanges. Dialogue is portable scene data. Scene Editor and standalone Phaser consumers display it from the same scene clock. Input waits, branching, typewriter effects, localization automation and lip sync remain outside this milestone.
+Scene Editor authors plain-text dialogue for narration and Actor exchanges. Dialogue is portable scene data. Scene Editor and standalone Phaser consumers display it from the same scene clock. Choose **Timed** for existing subtitle timing or **Advance Required** to freeze the cinematic timeline until an explicit advance. There are no choices or branches; keyboard wiring, typewriter effects, localization automation and lip sync remain outside this milestone.
 
 1. Set the scene playhead and click **Add Dialogue Line**. With an Actor selected, the new line uses that instance as speaker; otherwise it starts as narration. The initial duration is up to two seconds, bounded by the next line and scene end. Adding inside an occupied interval reports an overlap error.
 2. Select the line in the **Dialogue** track and expand the initially collapsed **Dialogue line** inspector.
 3. Edit **Dialogue text** with multiple lines in any language, including Japanese. Whitespace and intentional line breaks are preserved. Text is literal, never HTML or executable markup.
 4. Choose a **Speaker Actor** or **Narration (no Actor)**. **Speaker label** overrides the displayed Actor ID or the default Narrator label. Two instances of the same character remain distinct speakers through their scene-local Actor IDs.
-5. Set **Dialogue start** and **Dialogue duration** in seconds and click **Apply dialogue properties**. Each application is one scene Undo/Redo action. Scene duration never expands automatically.
+5. Set **Dialogue progression**, **Dialogue start** and **Dialogue duration** in seconds and click **Apply dialogue properties**. Each application is one scene Undo/Redo action. Scene duration never expands automatically. Timed duration must be positive. Advance Required duration controls passive preview only and may be zero, including a line starting exactly at scene end. To author an ending hold, add a line earlier, choose Advance Required, then move its start to scene duration and set its duration to zero.
 6. **Duplicate dialogue line** creates a new stable ID in the first gap after the source that fits its whole duration. If no gap fits, extend the scene or move/shorten lines. **Delete dialogue line**, Delete/Backspace outside text controls and scene Undo/Redo use the same document history.
 
 The timeline shows speaker/text clips aligned with its existing ruler and playhead. Select a clip to pause and edit its timing in the inspector. Dialogue edges also participate in shared timeline snapping. Selection and inspector expansion remain view state and are excluded from exports.
+
+For an exchange at one scene timestamp, create the lines in separate free intervals, choose **Advance Required** for each, then give them the same start. Simultaneous lines occupy separate selectable timeline lanes in playback order. Generated IDs stay visible in the inspector; imported JSON can supply IDs such as `01-question` and `02-reply` for explicit ordering.
 
 Open **Feature Guide** and choose **Dialogue & Subtitle Authoring** for a nine-step Explain tour. It needs only an open scene, reveals the relevant controls and empty-state guidance, and preserves authored data, selection, playback and history.
 
@@ -35,9 +37,9 @@ Scene format remains **2**. Legacy scenes omit `dialogue` and load unchanged. A 
 }
 ```
 
-`id`, `text`, `time` and `duration` are required. Times use **milliseconds**, matching actions and audio. `actorId`, `speakerName` and `voiceClipId` are optional. Text is bounded to 100,000 characters and labels to 1,000. Empty text is allowed while authoring. IDs follow the existing identifier bounds. Unknown fields and non-text markup objects are rejected.
+`id`, `text`, `time` and `duration` are required. Times use **milliseconds**, matching actions and audio. `actorId`, `speakerName`, `voiceClipId` and `progression` are optional. Omitted progression and explicit `"timed"` retain existing behavior; `"advance-required"` enables a hold. Old dialogue is never converted automatically. Text is bounded to 100,000 characters and labels to 1,000. Empty text is allowed while authoring. IDs follow the existing identifier bounds. Unknown fields and non-text markup objects are rejected.
 
-The initial policy is **one subtitle at a time**. Intervals are half-open `[time, time + duration)`: a line includes its start and excludes its end, so exact adjacency is valid. Start must be nonnegative, duration positive, and the finite end must advance time and fit inside the scene. Overlapping lines are rejected atomically in imports and edits, regardless of speaker or authored array order. Timing is deterministic and never waits for player input.
+Only **one subtitle at a time** is presented. Timed intervals are half-open `[time, time + duration)`: a line includes its start and excludes its end, so exact adjacency is valid. Start must be nonnegative, timed duration positive, and the finite end must fit inside the scene. Advance Required permits zero-duration point holds, visible in passive evaluation exactly at their start. Overlapping intervals are rejected atomically, except Advance Required lines sharing exactly the same start. Mixed timed/hold lines at the same start and overlapping holds at different starts are invalid. For simultaneous holds, passive preview chooses the first active line in ascending, case-sensitive JavaScript string ID order; interactive playback presents every line in that same order, independent of array order. Use IDs such as `01-question`, `02-reply` to make the intended order explicit.
 
 Actor renames update dialogue references in the same history entry. Removing a speaking Actor reports the affected line IDs and requires reassignment or conversion to narration first. Invalid imported speaker IDs identify the offending line and explain the repair. Speaker labels never resolve character or Actor identity.
 
@@ -53,7 +55,29 @@ Regression coverage lives in `tests/sceneDialogue.test.ts` and the local desktop
 
 ## Playback and presentation
 
-Play displays the line active at the current scene time. Pause holds it, Restart begins again at zero, and Stop clears it and restores authored placement. Seeking, including backward or directly into the middle of a line, immediately displays the active text without replaying it or emitting gameplay events. Scene switching, cancellation, interruption, failure and disposal clear presentation. Completion naturally clears it at the exclusive final boundary.
+Play displays timed lines at the current scene time. Advance Required pauses at the exact authored start and shows **Advance dialogue** in the editor transport. Click it once per line. The final line at a shared timestamp resumes playback; an ending hold delays completion until advanced. Pause suspends an active wait: Play restores the wait, while Advance is ignored during Pause. Play alone never bypasses a wait. Restart begins again at zero, and Stop clears text and restores authored placement. Scene switching, cancellation, interruption, failure and disposal clear presentation.
+
+Scrubbing and programmatic `seek(T)` are always passive: they display the pure sample at T, suppress cues/audio and never start a viewer-input session. Their result does not depend on previous advances. Resuming consumes holds at or before T and can wait only at later holds. Seeking backward rearms later holds. A consumed interactive line clears immediately even if its passive-preview duration has not ended. Passive seeking to an ending point hold may display it in completed state; advancing there is ignored, and Play follows the existing completed-scene restart behavior.
+
+### Runtime advancement and clock semantics
+
+```ts
+// Add these lines to the existing scene dialogue array.
+const dialogue = [
+  { id: '01-question', text: 'Who are you?', time: 1000, duration: 0, progression: 'advance-required' },
+  { id: '02-reply', text: 'I am Yagyū Sekishūsai.', time: 1000, duration: 0, progression: 'advance-required' },
+];
+
+// Call from your host's explicit Advance command. No keyboard binding is installed.
+const result = loaded.runner.advanceDialogue();
+if (result.advanced) console.log('Consumed', result.lineId);
+```
+
+`advanceDialogue(): AdvanceResult` returns `{ advanced: true, lineId }` only for an active wait, otherwise `{ advanced: false }`. Each call consumes one pending line, including simultaneous exchanges. A second call can consume the next simultaneous line; reentrant calls from presentation during advancement are ignored. When no next line shares the timestamp, cinematic playback resumes from the held time. An ending hold completes immediately after its last advance. `StoryPlayer.advanceDialogue()` forwards to the current session; the next story `update()` loads the next scene only after completion. Legacy scene adapters may omit the optional advance method.
+
+`SceneRunner.status` explicitly distinguishes `playing`, `waiting-for-dialogue-advance`, `paused`, `completed` and `stopped`, alongside cancellation, interruption, failure and disposal. Story loading owns scene transitions. A wait retains the runner's Actor contexts and frozen poses without cancelling choreography. The runner processes actions/cues **at** the hold timestamp once, then waits; all later actions, animation events, root-motion displacement, camera tracks, fades and cues remain frozen. Time-zero holds run time-zero actions once before waiting. Scene-end holds run terminal actions/cues once before waiting and defer completion.
+
+Only the host's next supplied delta advances playback after release. A frame crossing a hold clamps to its exact timestamp and discards the excess delta. Frames supplied while waiting are ignored; no accumulated wall time catches up after an advance. Existing audio pause behavior stops voices during waiting and restarts currently active clips at the held scene offset when released. There is no special voice/music continuation policy, automatic voice playback or idle animation during a wait.
 
 The shared React-free `SceneDialogueOverlay` uses Phaser text with a system sans-serif font, optional speaker label, multiline wrapping, safe padding and a dark translucent backing near the bottom of the **1000 × 700 cinematic output**. Unlabelled narration omits the speaker row; Actor lines use their scene-local ID unless a label overrides it. Text is literal. The default presentation bounds exceptionally long content to twelve wrapped text rows and two label rows, fitting the result inside the frame. A custom target can present the complete authored content differently.
 

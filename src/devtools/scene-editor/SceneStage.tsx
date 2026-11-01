@@ -6,7 +6,6 @@ import { cinematicFrame, SCENE_OUTPUT_VIEWPORT } from '../../engine/cinematicCam
 import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
 import { throwNotificationErrors } from '../../engine/notifications.js';
 import { Puppet } from '../../engine/Puppet.js';
-import { getDialogueAtTime } from '../../engine/sceneDialogue.js';
 import { SceneDialogueOverlay } from '../../engine/SceneDialogueOverlay.js';
 import { SceneImageLayer } from '../../engine/SceneImageLayer.js';
 import { sceneLayer } from '../../engine/sceneLayers.js';
@@ -609,7 +608,7 @@ class SceneStage extends Phaser.Scene {
       source &&
         this.playback.previewing &&
         !['failed', 'cancelled', 'interrupted', 'disposed'].includes(this.playback.status)
-        ? getDialogueAtTime(source, this.playback.time)
+        ? this.playback.dialogue
         : undefined,
     );
     this.transitions.setCamera(this.document.cinematicCamera);

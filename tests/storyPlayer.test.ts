@@ -279,3 +279,39 @@ test('repeated source scenes and shared assets stay immutable with independent A
   expect(source).toEqual({ ...snapshot, actors: [{ ...snapshot.actors[0], position: { x: 999, y: 0 } }] });
   player.dispose();
 });
+
+test('dialogue holds keep the story session alive through its final boundary until explicitly advanced', async () => {
+  const f = fixture(['a', 'b']);
+  f.scenes.get('a')!.dialogue = [
+    { id: 'opening', time: 0, duration: 0, text: 'Who?', progression: 'advance-required' },
+    { id: 'end-a', time: 100, duration: 0, text: 'Answer.', progression: 'advance-required' },
+    { id: 'end-b', time: 100, duration: 0, text: 'Continue.', progression: 'advance-required' },
+  ];
+  const player = new StoryPlayer(f.story, f);
+  expect(player.advanceDialogue()).toEqual({ advanced: false });
+  await player.start();
+  await player.update(99999);
+  expect(player.status).toBe('playing');
+  expect(player.index).toBe(0);
+  expect(f.loaded).toHaveLength(1);
+  expect(f.loaded[0]!.runner.time).toBe(0);
+  player.advanceDialogue();
+  await player.update(99999);
+  expect(f.loaded[0]!.runner.time).toBe(100);
+  expect(f.loaded[0]!.runner.status).toBe('waiting-for-dialogue-advance');
+  expect(player.index).toBe(0);
+  expect(player.advanceDialogue()).toEqual({ advanced: true, lineId: 'end-a' });
+  await player.update(1000);
+  expect(player.index).toBe(0);
+  expect(player.advanceDialogue()).toEqual({ advanced: true, lineId: 'end-b' });
+  expect(player.advanceDialogue()).toEqual({ advanced: false });
+  await player.update(0);
+  expect(player.index).toBe(1);
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledTimes(1);
+  await player.update(100);
+  expect(player.status).toBe('completed');
+  player.stop();
+  await player.start();
+  expect(f.loaded.at(-1)!.runner.dialogue?.line.id).toBe('opening');
+  player.dispose();
+});

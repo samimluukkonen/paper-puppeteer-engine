@@ -419,6 +419,8 @@ export function checkSceneDefinitionDomains(
     const dialogue = (scene.dialogue ?? []).map((line, index) => ({ line, index }));
     dialogue.sort((a, b) => a.line.time - b.line.time);
     let dialogueEnd = -1;
+    let groupTime = -1;
+    let groupOnlyHolds = false;
     for (const { line, index } of dialogue) {
       const path = `dialogue[${index}]`;
       if (dialogueIds.has(line.id)) report(`${path}.id`, 'Dialogue line IDs must be unique.');
@@ -434,10 +436,21 @@ export function checkSceneDefinitionDomains(
           `Missing voice clip "${line.voiceClipId}". Choose an existing audio clip or clear the voice reference.`,
         );
       const end = line.time + line.duration;
-      if (!Number.isFinite(end) || end <= line.time || end > scene.duration)
+      if (
+        !Number.isFinite(end) ||
+        (end <= line.time && !(line.progression === 'advance-required' && line.duration === 0)) ||
+        end > scene.duration
+      )
         report(`${path}.duration`, 'Dialogue end must advance time and stay within scene duration.');
-      if (line.time < dialogueEnd)
-        report(`${path}.time`, 'Dialogue intervals must not overlap. Move or shorten this line.');
+      const hold = line.progression === 'advance-required';
+      const sameGroup = line.time === groupTime;
+      if ((line.time < dialogueEnd || sameGroup) && !(sameGroup && groupOnlyHolds && hold))
+        report(
+          `${path}.time`,
+          'Dialogue intervals must not overlap, except advance-required lines at the same start. Move or shorten this line.',
+        );
+      groupOnlyHolds = sameGroup ? groupOnlyHolds && hold : hold;
+      groupTime = line.time;
       dialogueEnd = Math.max(dialogueEnd, end);
     }
   });

@@ -151,6 +151,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.2-1
+
+- Add optional Advance Required dialogue progression to the existing scene schema and runner, preserving legacy timed dialogue. Clamp playback to exact hold boundaries, freeze cinematic time without wall-time catch-up, and expose an explicit waiting state and one-line `advanceDialogue()` API.
+- Order simultaneous dialogue holds by stable ID, support time-zero and scene-end holds, defer story completion until the final advance, and keep passive seeking independent of interactive input. Preserve cue/event consumption, Actor motion, camera, fades and existing audio pause/resume behavior.
+- Add Scene Editor progression authoring and an Advance dialogue command, update the Dialogue & Subtitle Authoring Feature Guide and runtime guide, regenerate the scene schema, and cover boundaries, lifecycle, seeking, events, audio, persistence and story sequencing in regression tests.
+
 ## 1.6.1
 
 - Add version-1 linear story definitions with stable story/entry IDs and ordered references to existing scene assets, strict validation, JSON serialization and a generated schema. Empty stories remain editable, saveable drafts.

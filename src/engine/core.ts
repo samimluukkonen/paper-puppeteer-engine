@@ -350,5 +350,5 @@ export {
 } from './StoryDefinition.js';
 
 export { StoryPlayer } from './StoryPlayer.js';
-export type { ScenePlayback, SceneRunnerStatus } from './ScenePlayback.js';
+export type { AdvanceResult, ScenePlayback, SceneRunnerStatus } from './ScenePlayback.js';
 export type { StoryPlayerStatus, StoryPlayerOptions, StorySceneSession, StorySceneContext } from './StoryPlayer.js';

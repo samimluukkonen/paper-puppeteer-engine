@@ -16,6 +16,7 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
             text: draft.text,
             time: draft.time,
             duration: draft.duration,
+            ...(draft.progression ? { progression: draft.progression } : {}),
             actorId: draft.actorId || null,
             speakerName: draft.speakerName || null,
             voiceClipId: draft.voiceClipId || null,
@@ -66,6 +67,22 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
           />
         </label>
         <div data-guide-id={GUIDE_TARGETS.sceneDialogueTiming}>
+          <label>
+            Dialogue progression
+            <select
+              aria-label="Dialogue progression"
+              value={draft.progression ?? 'timed'}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  progression: event.target.value === 'advance-required' ? 'advance-required' : 'timed',
+                })
+              }
+            >
+              <option value="timed">Timed</option>
+              <option value="advance-required">Advance Required</option>
+            </select>
+          </label>
           {(
             [
               ['time', 'Dialogue start'],
@@ -77,7 +94,7 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
               <input
                 type="number"
                 required
-                min={field === 'time' ? '0' : '0.000001'}
+                min={field === 'time' || draft.progression === 'advance-required' ? '0' : '0.000001'}
                 step="any"
                 value={Number.isNaN(draft[field]) ? '' : draft[field] / 1000}
                 onChange={(event) => setDraft({ ...draft, [field]: event.target.valueAsNumber * 1000 })}
@@ -85,7 +102,9 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
             </label>
           ))}
           <p className="workspace-caption">
-            Lines cannot overlap. Adjacent intervals are allowed; each line must end within scene duration.
+            Timed lines cannot overlap. Advance Required lines may share a start and play in stable ID order. Their
+            duration controls passive preview only; zero allows a point hold, including at scene end. Other overlapping
+            intervals are rejected. Each line must end within scene duration.
           </p>
         </div>
         <div data-guide-id={GUIDE_TARGETS.sceneDialogueVoice}>
@@ -117,9 +136,9 @@ function DialogueProperties({ document, line }: { document: SceneEditorDocument;
         </button>
       </div>
       <p className="workspace-caption">
-        Lines use scene time without pausing for input. Overlapping intervals are rejected; adjacent lines are allowed.
-        Duplicate places the copy in the next available interval after this line. Play or scrub to preview subtitles;
-        Pause holds the current line and Stop clears it. Scrubbing stays silent.
+        Timed lines use scene time. Advance Required pauses playback until Advance dialogue is clicked. Duplicate places
+        the copy in the next available interval after this line. Play or scrub to preview subtitles; Pause holds the
+        current line and Stop clears it. Scrubbing stays silent and never waits for input.
       </p>
     </details>
   );
@@ -146,8 +165,9 @@ export function SceneDialogueInspector({ document }: { document: SceneEditorDocu
       </div>
       <div data-guide-id={GUIDE_TARGETS.sceneDialogueTiming}>
         <p className="workspace-caption">
-          Select a line to set Dialogue start and Dialogue duration in seconds. Lines cannot overlap. Adjacent intervals
-          are allowed; each line must end within scene duration.
+          Select a line to set Dialogue progression, Dialogue start and Dialogue duration in seconds. Timed lines cannot
+          overlap. Advance Required lines may share a start in stable ID order; other overlaps are rejected. Their
+          duration controls passive preview, with zero allowed at scene end. Each line must end within scene duration.
         </p>
       </div>
       <div data-guide-id={GUIDE_TARGETS.sceneDialogueVoice}>

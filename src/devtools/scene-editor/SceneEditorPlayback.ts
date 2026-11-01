@@ -61,6 +61,12 @@ export class SceneEditorPlayback {
   get actors() {
     return this.previewing ? this.runner?.actors : undefined;
   }
+  get dialogue() {
+    return this.runner?.dialogue;
+  }
+  advanceDialogue(): void {
+    this.command(() => this.runner?.advanceDialogue());
+  }
 
   /** Selection notifications reuse the same immutable snapshot and keep playback running.
    * Artwork-only edits retain the current Actors and clock. Other authored edits/switches reset playback to initial placement; incomplete assets disable it.

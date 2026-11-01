@@ -1,6 +1,6 @@
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { parseSceneDefinition, type SceneDefinition } from './SceneDefinition.js';
-import type { ScenePlayback } from './ScenePlayback.js';
+import type { AdvanceResult, ScenePlayback } from './ScenePlayback.js';
 import {
   parseStoryDefinition,
   type StoryDefinition,
@@ -97,11 +97,22 @@ export class StoryPlayer {
       session.runner.update(deltaMilliseconds);
       if (generation !== this.generation) return;
       if (session.runner.status === 'completed') await this.open(this.cursor + 1);
-      else if (session.runner.status !== 'playing')
+      else if (!['playing', 'waiting-for-dialogue-advance', 'paused'].includes(session.runner.status))
         throw session.runner.error ?? new Error(`Story scene stopped unexpectedly (${session.runner.status}).`);
     } catch (error) {
       if (generation === this.generation) this.fail(error);
       throw error;
+    }
+  }
+
+  /** Forward one explicit command to the current scene. Scene completion transitions on the next update. */
+  advanceDialogue(): AdvanceResult {
+    this.assertActive();
+    if (this.state !== 'playing') return { advanced: false };
+    try {
+      return this.session?.runner.advanceDialogue?.() ?? { advanced: false };
+    } catch (error) {
+      return this.fail(error);
     }
   }
 

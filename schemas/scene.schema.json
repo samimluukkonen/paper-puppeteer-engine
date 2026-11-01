@@ -227,7 +227,11 @@
           },
           "duration": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "minimum": 0
+          },
+          "progression": {
+            "type": "string",
+            "enum": ["timed", "advance-required"]
           },
           "voiceClipId": {
             "type": "string",

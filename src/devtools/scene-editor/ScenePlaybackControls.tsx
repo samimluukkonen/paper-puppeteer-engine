@@ -10,18 +10,24 @@ import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 /** Only clock observations subscribe to frames; the authored track tree stays unchanged during playback. */
 export function ScenePlaybackControls({ playback }: { playback: SceneEditorPlayback }) {
   useSyncExternalStore(playback.subscribe, playback.getSnapshot, playback.getSnapshot);
+  const pausable = playback.status === 'playing' || playback.status === 'waiting-for-dialogue-advance';
   return (
     <>
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.scenePlayback}
-        aria-label={playback.status === 'playing' ? 'Pause' : 'Play'}
-        title={playback.status === 'playing' ? 'Pause' : 'Play'}
+        aria-label={pausable ? 'Pause' : 'Play'}
+        title={pausable ? 'Pause' : 'Play'}
         disabled={!playback.ready}
-        onClick={() => (playback.status === 'playing' ? playback.pause() : playback.play())}
+        onClick={() => (pausable ? playback.pause() : playback.play())}
       >
-        {playback.status === 'playing' ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+        {pausable ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
       </button>
+      {playback.status === 'waiting-for-dialogue-advance' && (
+        <button type="button" onClick={() => playback.advanceDialogue()}>
+          Advance dialogue
+        </button>
+      )}
       <button
         type="button"
         data-guide-id={GUIDE_TARGETS.sceneRestart}

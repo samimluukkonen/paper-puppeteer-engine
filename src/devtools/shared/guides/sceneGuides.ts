@@ -32,7 +32,7 @@ const workflowGuides: readonly GuideDefinition[] = [
   guide(
     'scene-dialogue-authoring',
     'Dialogue & Subtitle Authoring',
-    'Write timed dialogue, assign Actor speakers and save portable subtitles with optional voice references.',
+    'Write timed or Advance Required dialogue, assign Actor speakers and save portable subtitles with optional voice references.',
     scene,
     [
       step(
@@ -63,7 +63,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'timing',
         'Set timing and resolve overlaps',
         T.sceneDialogueTiming,
-        '**Dialogue start** and **Dialogue duration** use seconds in the inspector. Apply dialogue properties validates the whole proposal. Duration must be positive and the line must end within scene duration. Only **one subtitle at a time** is allowed: overlapping intervals are rejected, even for different speakers. Adjacent lines are valid; the next line owns the exact shared boundary. Move or shorten a conflicting line, or explicitly extend the scene. The tour changes no timing.',
+        '**Dialogue start** and **Dialogue duration** use seconds in the inspector. Apply dialogue properties validates the whole proposal. Choose **Dialogue progression**: **Timed** keeps existing intervals; **Advance Required** holds playback at the start until **Advance dialogue** is clicked. Timed duration must be positive; hold duration controls passive preview and may be zero, including at scene end. Lines must end within scene duration. Only **one subtitle at a time** is shown. Overlaps are rejected except holds sharing the same start, which advance individually in stable, case-sensitive ID order. Adjacent intervals are valid. Move or shorten a conflicting line, or explicitly extend the scene. The tour changes no timing.',
       ),
       step(
         'voice',
@@ -81,13 +81,13 @@ const workflowGuides: readonly GuideDefinition[] = [
         'time',
         'Understand deterministic subtitle timing',
         T.sceneTime,
-        'Dialogue uses **scene time** without pausing for player input. A line’s interval includes its start and excludes its end, so seeking to the same time identifies the same authored line. **Play** displays the active subtitle; Pause holds it, Restart begins again and Stop clears it. **Scrubbing** immediately displays the line at the target time without playing audio or dispatching scene cues. Subtitles stay within the cinematic camera frame and remain readable above scene fades. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
+        '**Timed** dialogue uses scene time. **Advance Required** freezes Actors, camera, fades and future cues at the authored start until **Advance dialogue** is clicked once per line. Waiting time never catches up. **Scrubbing** stays nonblocking and independent of earlier advances; resuming consumes holds at or before the sample. Same-time holds preview the first active ID; zero-duration holds appear exactly at their start. **Play** displays the active subtitle; Pause holds it, Restart begins again and Stop clears it. **Scrubbing** immediately displays the line at the target time without playing audio or dispatching scene cues. Subtitles stay within the cinematic camera frame and remain readable above scene fades. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
       ),
       step(
         'save',
         'Save dialogue with the scene',
         T.scenePackage,
-        '**Download scene JSON** preserves text, line breaks, speaker IDs, labels, timing and voice references. **Download scene package** includes the referenced character and audio files for portable handoff. **Export Project** and local recovery retain dialogue too. JSON alone needs its referenced assets alongside it. Exit the guide before editing; authored data, selection, playhead, speed, mute, preview and Undo/Redo are preserved.',
+        '**Download scene JSON** preserves text, line breaks, speaker IDs, labels, timing, progression and voice references. **Download scene package** includes the referenced character and audio files for portable handoff. **Export Project** and local recovery retain dialogue too. JSON alone needs its referenced assets alongside it. Exit the guide before editing; authored data, selection, playhead, speed, mute, preview and Undo/Redo are preserved.',
       ),
     ],
   ),

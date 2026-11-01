@@ -11,7 +11,9 @@ import {
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharacterRegistry.js';
 import { SceneDialogueInspector } from '../src/devtools/scene-editor/SceneDialogueInspector.js';
+import { SceneDialogueTrack } from '../src/devtools/scene-editor/SceneDialogueTimeline.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
+import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
 import { snapSceneTime } from '../src/devtools/scene-editor/timelineActions.js';
 import { sceneDraftSource } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { sceneFingerprint } from '../src/devtools/shared/sceneFingerprint.js';
@@ -124,6 +126,7 @@ test.each([
   { duration: 0 },
   { duration: -1 },
   { duration: Infinity },
+  { progression: 'manual' },
   { time: 1900 },
   { actorId: 'missing' },
   { voiceClipId: 'missing' },
@@ -222,6 +225,40 @@ test('inspector starts collapsed and treats markup as literal text', () => {
   expect(html).not.toContain('<script>');
   expect(html).toContain('&lt;script&gt;');
   expect(html).toContain('日本語');
+  expect(html).toContain('Dialogue progression');
+  expect(html).toContain('Advance Required');
+});
+
+test('progression edits use scene history, preserve legacy fields and persist through JSON', () => {
+  const doc = document();
+  const original = doc.workingScene;
+  expect(doc.updateDialogueLine('opening', { progression: 'advance-required' })).toBe(true);
+  const edited = doc.workingScene;
+  expect(edited!.dialogue![0]!.progression).toBe('advance-required');
+  expect(edited!.dialogue![1]).not.toHaveProperty('progression');
+  expect(parseSceneJson(serializeSceneDefinition(edited)).dialogue).toEqual(edited!.dialogue);
+  expect(doc.undo()).toBe(true);
+  expect(doc.workingScene).toBe(original);
+  expect(doc.redo()).toBe(true);
+  expect(doc.workingScene).toBe(edited);
+});
+
+test('simultaneous holds have separate selectable timeline lanes in stable playback order', () => {
+  const doc = document();
+  doc.updateDialogueLine('opening', { progression: 'advance-required' });
+  expect(doc.addDialogueLine({ ...line, progression: 'advance-required' })).toBe(true);
+  const html = renderToStaticMarkup(
+    createElement(SceneDialogueTrack, {
+      scene: doc.workingScene!,
+      document: doc,
+      playback: new SceneEditorPlayback(),
+      width: 200,
+      x: (time) => time / 10,
+    }),
+  );
+  expect(html).toContain('height:64px');
+  expect(html).toContain('top:32px');
+  expect(html.indexOf('Dialogue dialogue-1:')).toBeLessThan(html.indexOf('Dialogue opening:'));
 });
 
 test('JSON and standalone ZIPs preserve dialogue and scene-local speaker identities after character rebasing', async () => {
@@ -250,7 +287,11 @@ function voiceProject() {
     volume: 1,
     loop: false,
   });
-  workspace.scenes.addDialogueLine({ ...line, voiceClipId: workspace.scenes.selectedAudioClip!.id });
+  workspace.scenes.addDialogueLine({
+    ...line,
+    progression: 'advance-required',
+    voiceClipId: workspace.scenes.selectedAudioClip!.id,
+  });
   return workspace;
 }
 

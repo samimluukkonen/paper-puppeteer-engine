@@ -1,4 +1,4 @@
-import { dialogueSpeaker } from '../../engine/sceneDialogue.js';
+import { compareDialogueLines, dialogueSpeaker } from '../../engine/sceneDialogue.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
@@ -34,7 +34,8 @@ export function SceneDialogueControls({
         Add Dialogue Line
       </button>
       <span className="workspace-caption">
-        Dialogue uses scene time. Select a line to edit its text and interval; lines cannot overlap.
+        Select a line to edit text, timing and progression. Timed lines cannot overlap; Advance Required lines can share
+        a start.
       </span>
     </div>
   );
@@ -53,19 +54,31 @@ export function SceneDialogueTrack({
   width: number;
   x: (time: number) => number;
 }) {
+  // Same-start holds are individually selectable, in the same order as playback.
+  const counts = new Map<number, number>();
+  const lines = [...(scene.dialogue ?? [])].sort(compareDialogueLines).map((line) => {
+    const lane = counts.get(line.time) ?? 0;
+    counts.set(line.time, lane + 1);
+    return { line, lane };
+  });
+  const laneCount = Math.max(1, ...counts.values());
   return (
-    <div className="scene-track-row" data-guide-id={GUIDE_TARGETS.sceneDialogueTrack} style={{ height: 36 }}>
+    <div
+      className="scene-track-row"
+      data-guide-id={GUIDE_TARGETS.sceneDialogueTrack}
+      style={{ height: 8 + laneCount * 28 }}
+    >
       <span className="scene-track-label">Dialogue</span>
       <div className="scene-track-lane" style={{ width }} aria-label="Dialogue lines">
-        {(scene.dialogue ?? []).map((line) => (
+        {lines.map(({ line, lane }) => (
           <button
             key={line.id}
             type="button"
             className="scene-action clip scene-dialogue-line"
             aria-label={`Dialogue ${line.id}: ${dialogueSpeaker(line)}`}
             aria-pressed={document.selectedDialogueLine?.id === line.id}
-            title={`${line.time / 1000}–${(line.time + line.duration) / 1000} s · ${dialogueSpeaker(line)}: ${line.text}`}
-            style={{ left: x(line.time), width: Math.max(6, x(line.duration)), top: 4 }}
+            title={`${line.time / 1000}–${(line.time + line.duration) / 1000} s · ${line.progression === 'advance-required' ? 'Advance Required · ' : ''}${dialogueSpeaker(line)}: ${line.text}`}
+            style={{ left: x(line.time), width: Math.max(6, x(line.duration)), top: 4 + lane * 28 }}
             onClick={() => {
               playback.pause();
               document.selectDialogueLine(line.id);
