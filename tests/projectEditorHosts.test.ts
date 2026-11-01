@@ -59,6 +59,36 @@ function fixture(changed?: (hosts: readonly ProjectEditorHost[]) => void) {
   return { controller, activate, hosts: () => hosts };
 }
 
+test('variant editor requests share the sole owner host and expose shared impact and scene rig identity', async () => {
+  const owner = await session();
+  owner.workspace.createCharacterVariant('hero', 'Blue Soldier', 'default', 'blue');
+  vi.spyOn(packages, 'openPackageRuntime').mockImplementation(async () => ({
+    definition: owner.workspace.character('hero').definition,
+    dispose() {},
+  }));
+  const f = fixture();
+  try {
+    await f.controller.open(owner, 'character', 'blue');
+    const host = f.hosts()[0]!;
+    assert.equal(host.asset, 'hero');
+    assert.strictEqual(host.context.characterDocuments, owner.workspace.characterDocuments('hero'));
+    assert.include(host.context.sharedRigNotice!, 'Blue Soldier');
+    assert.include(host.context.sharedRigNotice!, 'independent character copy');
+    assert.equal(host.context.choices.find((entry) => entry.id === 'blue')!.rigIdentity, 'hero');
+    host.context.bindCharacter(
+      () => false,
+      () => {},
+    );
+    await f.controller.open(owner, 'character', 'hero', 'animation');
+    assert.lengthOf(f.hosts(), 1);
+    assert.isUndefined(owner.workspace.character('blue').documents);
+  } finally {
+    f.controller.dispose();
+    owner.workspace.disposeCharacterDocuments();
+    owner.autosave.dispose();
+  }
+});
+
 test('renderer cache suspends inactive hosts and evicts LRU renderers without losing documents or history', async () => {
   const sessions: ProjectSession[] = [];
   for (let index = 0; index < 6; index++) sessions.push(await session());

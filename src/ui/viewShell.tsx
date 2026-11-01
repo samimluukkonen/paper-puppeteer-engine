@@ -66,6 +66,7 @@ export function ViewHeader({
       ? `Project: ${project.projectName} · ${view === 'scene' ? 'Scene' : 'Character'}: ${project.assetName}`
       : '',
   );
+  const sharedRigNotice = useSyncExternalStore(project?.subscribe ?? noSubscribe, () => project?.sharedRigNotice);
   const root = '../';
   const characterId = selectedCharacterId();
   const choices = workspaceCharacterChoices();
@@ -111,6 +112,11 @@ export function ViewHeader({
               {current.description}
             </p>
             {projectIdentity && <p className="project-identity">{projectIdentity}</p>}
+            {sharedRigNotice && (
+              <p className="project-identity" role="status">
+                {sharedRigNotice}
+              </p>
+            )}
             {characterView && !project && (
               <label className="character-choice">
                 Character

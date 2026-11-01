@@ -20,7 +20,8 @@ export function SceneAnimationLibrary({
 }) {
   const project = projectEditorContext();
   useSyncExternalStore(project?.subscribe ?? noSubscribe, project?.animationLibraryRevision ?? emptySnapshot);
-  const targetRig = project?.choices.find((choice) => choice.manifest === manifest)?.id ?? manifest;
+  const choice = project?.choices.find((choice) => choice.manifest === manifest);
+  const targetRig = choice?.rigIdentity ?? choice?.id ?? manifest;
   const entries =
     project?.animationLibrary?.() ??
     definition.animations.map((clip) => ({

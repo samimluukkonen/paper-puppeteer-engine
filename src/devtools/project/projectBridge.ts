@@ -24,6 +24,7 @@ export interface ProjectEditorContext {
   readonly projectId?: string;
   readonly projectName: string;
   readonly assetName: string;
+  readonly sharedRigNotice?: string | undefined;
   subscribe: (listener: () => void) => () => void;
   bindGuide(open: (guideId?: string) => void): () => void;
   readonly characterId?: string;
@@ -32,7 +33,7 @@ export interface ProjectEditorContext {
   readonly fetcher?: typeof fetch;
   readonly scenes?: SceneEditorDocument;
   readonly imageAssets?: SceneImageRegistry;
-  readonly choices: readonly { id: string; label: string; manifest: string }[];
+  readonly choices: readonly { id: string; label: string; manifest: string; rigIdentity?: string }[];
   readonly animationPreviewPreferences?: DeepReadonly<AnimationPreviewPreferences> | undefined;
   saveAnimationPreviewPreferences?(preferences: DeepReadonly<AnimationPreviewPreferences>): void;
   changed(): void;

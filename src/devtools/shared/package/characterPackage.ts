@@ -20,6 +20,8 @@ import { PACKAGE_MAX_FILE_BYTES, packagePath, validatePackageFiles } from './pac
 
 export interface PackageSnapshot {
   readonly definition: CharacterDefinition;
+  /** Project variants borrow source data; portable packages receive their own identity and appearance. */
+  readonly identity?: Readonly<Pick<CharacterManifest, 'id' | 'defaultSkin'>>;
   readonly rig: RigJsonDefinition;
   readonly skins: readonly SkinDefinition[];
   readonly animations: readonly AnimationClip[];
@@ -38,6 +40,7 @@ export function capturePackage(snapshot: PackageSnapshot): PackageSnapshot {
   if (snapshot.pendingArtwork) throw new Error('Apply or cancel the artwork proposal before exporting a package.');
   return {
     definition: snapshot.definition,
+    ...(snapshot.identity ? { identity: { ...snapshot.identity } } : {}),
     rig: structuredClone(snapshot.rig),
     skins: structuredClone(snapshot.skins),
     animations: structuredClone(snapshot.animations),
@@ -231,6 +234,7 @@ export class CharacterDraftSerializer {
     const own = <T extends object>(value: T): T => (isFullyFrozen(value) ? value : structuredClone(value));
     const snapshot: PackageSnapshot = {
       definition: input.definition,
+      ...(input.identity ? { identity: { ...input.identity } } : {}),
       rig: input.replacements.length ? structuredClone(input.rig) : own(input.rig),
       skins: input.skins.map(own),
       animations: input.animations.map(own),
@@ -309,6 +313,7 @@ async function serializeCharacterFiles(
   if (new Set(skinNames).size !== skinNames.length)
     throw new Error('Duplicate standalone skin names. Rename the duplicate skin before export.');
   const manifest = structuredClone(definition.manifest) as CharacterManifest;
+  Object.assign(manifest, snapshot.identity);
   for (const path of manifestPaths(manifest)) packagePath(path);
   // Reserve source paths before generating any names, even when their files are added later.
   const reservedPaths = new Set(['character.json', ...manifestPaths(manifest)].map((path) => path.toLowerCase()));

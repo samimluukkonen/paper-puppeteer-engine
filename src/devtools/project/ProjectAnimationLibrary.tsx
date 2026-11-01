@@ -42,7 +42,11 @@ export function ProjectAnimationLibrary({
       <AnimationLibrary
         guideTarget={GUIDE_TARGETS.projectAnimationLibrary}
         entries={entries}
-        targets={workspace.definition.characters.map(({ id, name }) => ({ id, name }))}
+        targets={workspace.definition.characters.map(({ id, name }) => ({
+          id,
+          name,
+          rigIdentity: workspace.rigOwner(id),
+        }))}
         disabled={busy}
         onPreview={(entry) => {
           // Capture the current authored snapshot before asynchronous image loading.

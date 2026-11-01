@@ -561,6 +561,7 @@ export class RigEditorState {
 
   private restoreHistory(entry: HistoryEntry): void {
     this.assertRetainedReferences(entry.rig);
+    this.assertRetainedSkins(entry.rig.skins ?? [], entry.standaloneSkins ?? this.initialExternalSkins);
     this.externalSkins = entry.standaloneSkins ?? this.initialExternalSkins;
     this.restore(entry.rig);
     this.childDirections.clear();
@@ -627,6 +628,7 @@ export class RigEditorState {
   resetRig(): void {
     this.change(() => {
       this.assertRetainedReferences(this.initialCopy);
+      this.assertRetainedSkins(this.initialCopy.skins ?? [], this.initialExternalSkins);
       this.restore(this.initialCopy);
       this.externalSkins = this.initialExternalSkins;
       this.childDirections.clear();
@@ -724,6 +726,7 @@ export class RigEditorState {
     if (!data) return undefined;
     try {
       this.assertRetainedReferences(data.rig);
+      this.assertRetainedSkins(data.rig.skins ?? [], data.standaloneSkins ?? this.initialExternalSkins);
     } catch (error) {
       if (explainDependencies) throw error;
       return undefined;
@@ -965,6 +968,10 @@ export class RigEditorState {
 
   /** All artwork commands commit through the same snapshot/history boundary as joint and hierarchy edits. */
   private installArtwork(update: RigArtworkUpdate): void {
+    this.assertRetainedSkins(
+      update.skins ?? this.workingCopy.skins ?? [],
+      update.standaloneSkins ?? this.externalSkins,
+    );
     this.endOperation();
     this.change(() => {
       if (update.attachments !== undefined) {
@@ -978,6 +985,16 @@ export class RigEditorState {
   private assertArtwork(attachment: AttachmentDefinition): void {
     const issue = this.artworkIssue?.(attachment.texture, attachment.frame);
     if (issue) throw new Error(issue);
+  }
+
+  private assertRetainedSkins(embedded: readonly SkinDefinition[], standalone: readonly SkinDefinition[]): void {
+    const names = new Set(mergeSkins(embedded, standalone).map((skin) => skin.name));
+    for (const skin of this.skins) {
+      if (names.has(skin.name)) continue;
+      const references = this.skinReferences?.(skin.name) ?? [];
+      if (references.length)
+        throw new Error(`Skin "${skin.name}" is used by ${references.join(', ')}. Remove these references first.`);
+    }
   }
 
   /** Structural edits validate the complete candidate before installing one history entry. */

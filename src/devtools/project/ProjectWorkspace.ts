@@ -11,6 +11,7 @@ import type { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';
 import { canonicalJson } from '../../engine/authoredSerialization.js';
 import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
 import { equalJsonData } from '../../engine/equalJsonData.js';
+import { mergeSkins } from '../../engine/mergeSkins.js';
 import { validatePackageFiles } from '../../engine/packageZip.js';
 import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import {
@@ -26,6 +27,7 @@ import {
   type SceneCharacterAssets,
   type SceneDefinition,
 } from '../../engine/SceneDefinition.js';
+import { identifierSchema } from '../../engine/schemas.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import {
@@ -34,6 +36,7 @@ import {
 } from '../shared/animationPreviewPreferences.js';
 import { draftSource } from '../shared/draftSource.js';
 import {
+  buildCharacterPackage,
   capturePackage,
   type PackageFiles,
   type PackageSnapshot,
@@ -53,8 +56,10 @@ import {
   type InspectionCharacter,
   type ValidationContext,
 } from './projectInspection.js';
+import { characterFileFetcher } from './projectPackage.js';
 
 export interface ProjectCharacter {
+  readonly id: string;
   readonly definition: CharacterDefinition;
   readonly files: PackageFiles;
   /** Project-owned documents outlive renderer eviction, including their histories. */
@@ -76,6 +81,15 @@ export class ProjectWorkspace {
   private readonly artwork = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly audioFiles = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly checkpoints = new Map<string, string>();
+  private readonly variantAppearances = new WeakMap<
+    object,
+    {
+      source: PackageSnapshot['skins'];
+      selected: PackageSnapshot['skins'][number];
+      base: PackageSnapshot['skins'][number] | undefined;
+      skins: PackageSnapshot['skins'];
+    }
+  >();
   private sceneCheckpoints = new Map<string, string>();
   readonly scenes = new SceneEditorDocument(
     {
@@ -166,7 +180,8 @@ export class ProjectWorkspace {
     const characters: string[] = [];
     for (const { id } of this.metadata.characters) {
       const entry = this.character(id);
-      if (entry.loading || entry.pending?.()) return undefined;
+      const owner = this.character(this.rigOwner(id));
+      if (entry.loading || entry.pending?.() || owner.loading || owner.pending?.()) return undefined;
       characters.push(this.characterDigest(id, entry));
     }
     return draftSource({
@@ -179,6 +194,16 @@ export class ProjectWorkspace {
     return new SnapshotHistory(
       () => this.metadata,
       (value) => {
+        for (const entry of value.characters) {
+          if (!entry.variant) continue;
+          const owner = this.characters.get(entry.variant.rig);
+          if (!owner) throw new Error(`Variant "${entry.name}" has no shared rig owner.`);
+          const snapshot = this.workingCharacter(owner);
+          if (!mergeSkins(snapshot.rig.skins ?? [], snapshot.skins).some((skin) => skin.name === entry.variant!.skin))
+            throw new Error(
+              `Variant "${entry.name}" needs skin "${entry.variant.skin}". Restore that skin before project history.`,
+            );
+        }
         const characters = new Set(value.characters.map((entry) => entry.manifest));
         const audio = new Set(value.audio?.map((entry) => entry.id));
         // Images live in the scene registry, so membership restoration cannot remove them.
@@ -217,14 +242,22 @@ export class ProjectWorkspace {
     if (!entry) throw new Error(`Unknown project character "${id}".`);
     return entry.manifest;
   }
+  /** Read-only asset feedback remains available while a renderer is opening or a proposal is pending. */
+  characterInventory(id: string): PackageSnapshot {
+    return this.workingCharacter(this.character(id));
+  }
   characterDocuments(id: string): ProjectCharacterDocument {
+    if (this.rigOwner(id) !== id)
+      throw new Error(
+        'This variant shares its rig and animations. Open the shared owner or create an independent copy.',
+      );
     const entry = this.character(id);
     if (!entry.documents) {
       entry.documents = new ProjectCharacterDocument(
         entry.definition,
         (texture) => {
           const dependents = this.dependents({ kind: 'texture', owner: id, id: texture }).filter(
-            ({ from }) => from.kind !== 'character',
+            ({ from }) => from.kind !== 'character' || from.owner !== id,
           );
           return (
             !dependents.length ||
@@ -235,12 +268,122 @@ export class ProjectWorkspace {
         },
         (skin) =>
           this.dependents({ kind: 'skin', owner: id, id: skin })
-            .filter(({ from }) => from.kind === 'actor')
+            .filter(({ from }) => from.kind === 'actor' || (from.kind === 'character' && from.owner !== id))
             .map(({ label }) => label),
       );
       entry.capture = entry.documents.capture;
     }
     return entry.documents;
+  }
+  /** Stable shared identity, independent of labels and selected appearance. No live inheritance chains. */
+  rigOwner(id: string): string {
+    const entry = this.metadata.characters.find((entry) => entry.id === id);
+    if (!entry) throw new Error(`Unknown project character "${id}".`);
+    return entry.variant?.rig ?? id;
+  }
+  sharedRigUsers(id: string): readonly string[] {
+    const owner = this.rigOwner(id);
+    return this.metadata.characters
+      .filter((entry) => entry.id === owner || entry.variant?.rig === owner)
+      .map((entry) => entry.name);
+  }
+  characterSkins(id: string): readonly string[] {
+    const source = this.workingCharacter(this.character(this.rigOwner(id)));
+    return mergeSkins(source.rig.skins ?? [], source.skins).map((skin) => skin.name);
+  }
+  appearanceWarnings(id: string, skin: string): readonly string[] {
+    const source = this.workingCharacter(this.character(this.rigOwner(id)));
+    const selected = mergeSkins(source.rig.skins ?? [], source.skins).find((entry) => entry.name === skin);
+    if (!selected) throw new Error(`Unknown appearance skin "${skin}".`);
+    const meshes = source.rig.attachments?.filter((attachment) => attachment.type === 'mesh') ?? [];
+    if (!meshes.length) return [];
+    return [
+      'Mesh skins keep their own geometry, UVs, bone weights and bind data. Artwork must keep the mesh image dimensions and pivot; use an independent copy to rebuild different geometry.',
+      ...(source.animations.some((clip) => Object.keys(clip.deformationTracks ?? {}).length)
+        ? [
+            'Corrective deformation stays with its original attachment and vertex IDs. Switching attachments does not transfer corrections to another mesh.',
+          ]
+        : []),
+    ];
+  }
+  setVariantSkin(id: string, skin: string): void {
+    this.characterDraft(this.rigOwner(id));
+    const entry = this.metadata.characters.find((entry) => entry.id === id);
+    if (!entry?.variant) throw new Error('Only a shared-rig variant has a selected appearance.');
+    this.appearanceWarnings(id, skin); // Recheck against the current committed owner, including after Undo.
+    this.change({
+      ...this.metadata,
+      characters: this.metadata.characters.map((entry) =>
+        entry.id === id ? { ...entry, variant: { ...entry.variant!, skin } } : entry,
+      ),
+    });
+  }
+  setCharacterTemplate(id: string, template: boolean): void {
+    this.character(id);
+    if (this.rigOwner(id) !== id) throw new Error('Only an independent rig owner can be a reusable template.');
+    this.change({
+      ...this.metadata,
+      characters: this.metadata.characters.map((entry) => (entry.id === id ? { ...entry, template } : entry)),
+    });
+  }
+  createCharacterVariant(source: string, name: string, skin: string, id: string = crypto.randomUUID()): string {
+    identifierSchema.parse(id);
+    const owner = this.rigOwner(source);
+    this.characterDraft(owner);
+    this.appearanceWarnings(owner, skin);
+    const issues = this.inspect('export').issues.filter(
+      (issue) => issue.asset.owner === owner && issue.severity === 'error',
+    );
+    if (issues.length)
+      throw new Error(`Repair the shared rig dependencies first: ${issues.map((issue) => issue.message).join('; ')}`);
+    this.available('characters', id);
+    if ([...this.characters.keys()].some((held) => held.toLowerCase() === id.toLowerCase()))
+      throw new Error(`Character ID "${id}" is retained by project history.`);
+    const original = this.character(owner);
+    const proposal = parseProjectDefinition({
+      ...this.metadata,
+      characters: [
+        ...this.metadata.characters,
+        {
+          id,
+          name: name.trim(),
+          manifest: this.path('characters'),
+          variant: { rig: owner, skin },
+        },
+      ],
+    });
+    // Reuse the original immutable binary map. The variant owns only metadata, never editor documents.
+    const entry: ProjectCharacter = { id, definition: original.definition, files: original.files, loading: false };
+    this.characters.set(id, entry);
+    this.characterManifests.set(id, proposal.characters.at(-1)!.manifest);
+    this.fingerprints.set(id, new PackageFingerprints());
+    this.change(proposal);
+    this.checkpoints.set(id, this.characterDigest(id, entry));
+    return id;
+  }
+  /** Explicit snapshot copy: future template/owner changes do not affect this new skeleton or clips. */
+  async copyCharacter(source: string, name: string, id: string = crypto.randomUUID()): Promise<string> {
+    this.characterDraft(source);
+    const snapshot = this.captureCharacter(source);
+    const files = this.character(source).files;
+    return this.addCharacter(
+      await buildCharacterPackage(
+        {
+          ...snapshot,
+          identity: {
+            id,
+            defaultSkin: snapshot.identity?.defaultSkin ?? snapshot.definition.defaultSkin,
+          },
+        },
+        characterFileFetcher(files),
+      ),
+      name.trim(),
+    );
+  }
+  async createCharacterFromTemplate(template: string, name: string, id?: string): Promise<string> {
+    if (!this.metadata.characters.find((entry) => entry.id === template)?.template)
+      throw new Error('Select a registered character template.');
+    return this.copyCharacter(template, name, id);
   }
   disposeCharacterDocuments(): void {
     const errors: unknown[] = [];
@@ -454,7 +597,7 @@ export class ProjectWorkspace {
         },
       ],
     });
-    const entry = { definition, files: owned, loading: false };
+    const entry = { id: definition.id, definition, files: owned, loading: false };
     for (const [path, digest] of images) {
       const bytes = this.artwork.get(digest) ?? owned.get(path)!;
       this.artwork.set(digest, bytes);
@@ -471,33 +614,32 @@ export class ProjectWorkspace {
   animationLibrary(): readonly AnimationLibraryEntry[] {
     return this.metadata.characters.flatMap(({ id, name }) => {
       const entry = this.character(id);
-      if (entry.loading) return [];
+      if (entry.loading || this.character(this.rigOwner(id)).loading) return [];
       return this.workingCharacter(entry).animations.map((clip) => ({
         character: id,
         characterName: name,
-        rigIdentity: id,
+        rigIdentity: this.rigOwner(id),
         clip,
       }));
     });
   }
   captureCharacter(id: string): PackageSnapshot {
     const entry = this.character(id);
-    if (entry.loading) throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
+    if (entry.loading || this.character(this.rigOwner(id)).loading)
+      throw new Error(`Character "${id}" is still opening. Wait for the editor to load.`);
     return capturePackage(this.workingCharacter(entry));
   }
   /** Draft serialization captures changed branches itself and reuses unchanged revisions. */
   characterDraft(id: string): PackageSnapshot {
     const entry = this.character(id);
-    if (entry.loading || entry.pending?.())
+    const owner = this.character(this.rigOwner(id));
+    if (entry.loading || entry.pending?.() || owner.loading || owner.pending?.())
       throw new Error(`Character "${id}" is opening or has pending edits. Finish them first.`);
     return this.workingCharacter(entry);
   }
   /** Borrow the current authored rig, never the preview's animated joints. */
   rigSource(id: string): IdentifiedRig {
-    const entry = this.character(id);
-    if (entry.loading || entry.pending?.())
-      throw new Error(`Character "${id}" is opening or has pending edits. Finish them first.`);
-    return { id, rig: this.workingCharacter(entry).rig };
+    return { id, rig: this.characterDraft(id).rig };
   }
   saveRigMapping(input: RigBoneMapping): void {
     const mapping = rigBoneMappingSchema.parse(input);
@@ -522,6 +664,32 @@ export class ProjectWorkspace {
     return analyzeRigCompatibility(this.rigSource(mapping.sourceRigId), this.rigSource(mapping.targetRigId), mapping);
   }
   private workingCharacter(entry: ProjectCharacter): PackageSnapshot {
+    const registration = this.metadata.characters.find(({ id }) => id === entry.id);
+    if (registration?.variant) {
+      const source = this.workingCharacter(this.character(registration.variant.rig));
+      const skins = mergeSkins(source.rig.skins ?? [], source.skins);
+      const selected = skins.find((skin) => skin.name === registration.variant!.skin);
+      if (!selected)
+        throw new Error(`Variant "${registration.name}" references missing skin "${registration.variant.skin}".`);
+      const base = skins.find((skin) => skin.name === source.definition.defaultSkin);
+      let cached = this.variantAppearances.get(registration);
+      if (!cached || cached.source !== source.skins || cached.selected !== selected || cached.base !== base) {
+        const appearance = freezeData({ ...selected, slots: { ...base?.slots, ...selected.slots } });
+        cached = {
+          source: source.skins,
+          selected,
+          base,
+          skins: freezeData([...source.skins.filter((skin) => skin.name !== selected.name), appearance]),
+        };
+        this.variantAppearances.set(registration, cached);
+      }
+      return {
+        ...source,
+        identity: { id: registration.id, defaultSkin: selected.name },
+        // Promote embedded skins for portable manifest defaults; fill inherited mappings without editing the source.
+        skins: cached.skins,
+      };
+    }
     const snapshot = entry.capture?.() ?? {
       definition: entry.definition,
       rig: entry.definition.rigFile!,
@@ -533,13 +701,7 @@ export class ProjectWorkspace {
     return { ...snapshot, definition: entry.definition };
   }
   private characterDigest(id: string, entry: ProjectCharacter): string {
-    const snapshot = entry.capture?.() ?? {
-      definition: entry.definition,
-      rig: entry.definition.rigFile!,
-      skins: entry.definition.standaloneSkins,
-      animations: entry.definition.animations,
-      replacements: [],
-    };
+    const snapshot = this.workingCharacter(entry);
     return canonicalJson(this.fingerprints.get(id)!.compute(snapshot));
   }
   characterDirty(id: string): boolean {
@@ -598,7 +760,13 @@ export class ProjectWorkspace {
       ? {
           ...this.definition,
           rigMappings: [],
-          characters: this.metadata.characters.filter((entry) => references.has(entry.manifest)),
+          characters: this.metadata.characters.filter(
+            (entry) =>
+              references.has(entry.manifest) ||
+              this.metadata.characters.some(
+                (variant) => references.has(variant.manifest) && variant.variant?.rig === entry.id,
+              ),
+          ),
           audio: this.metadata.audio ?? [],
           scenes: [{ id: scene.id, path: 'scene.json' }],
         }
@@ -635,13 +803,15 @@ export class ProjectWorkspace {
         ({ from }) => from.kind !== 'project',
       );
       if (dependents.length) {
-        const usage = dependents.every(({ from }) => from.kind === 'rig-mapping')
-          ? 'rig mappings'
-          : dependents.some(({ from }) => from.kind === 'rig-mapping')
-            ? 'scenes and rig mappings'
-            : 'scenes';
+        const usage = dependents.some(({ from }) => from.kind === 'character')
+          ? 'shared-rig variants'
+          : dependents.every(({ from }) => from.kind === 'rig-mapping')
+            ? 'rig mappings'
+            : dependents.some(({ from }) => from.kind === 'rig-mapping')
+              ? 'scenes and rig mappings'
+              : 'scenes';
         throw new Error(
-          `Character is used by ${usage}: ${dependents.map((entry) => `${entry.label} (${entry.from.kind === 'rig-mapping' ? 'mapping' : 'scene'} ID: ${entry.from.kind === 'rig-mapping' ? entry.from.id : entry.from.owner})`).join('; ')}. Remove or replace these references first.`,
+          `Character is used by ${usage}: ${dependents.map((entry) => `${entry.label} (${entry.from.kind === 'rig-mapping' ? 'mapping' : entry.from.kind === 'character' ? 'character' : 'scene'} ID: ${entry.from.kind === 'rig-mapping' ? entry.from.id : entry.from.owner})`).join('; ')}. Remove or replace these references first.`,
         );
       }
     }
@@ -675,6 +845,19 @@ export class ProjectWorkspace {
     const { editorPreferences, ...documents } = value;
     this.previewPreferences = freezeData(editorPreferences?.animationPreview ?? {});
     this.metadata = freezeData(documents);
+    for (const entry of value.characters) {
+      if (!entry.variant) continue;
+      const character = this.characters.get(entry.id)!;
+      const owner = this.characters.get(entry.variant.rig)!;
+      if (
+        !equalJsonData(character.definition.rigFile, owner.definition.rigFile) ||
+        !equalJsonData(character.definition.animations, owner.definition.animations)
+      )
+        throw new Error(
+          `Variant "${entry.name}" has diverged from its shared rig or animations. Import it as an independent character instead.`,
+        );
+      this.characters.set(entry.id, { ...character, files: owner.files });
+    }
     for (const { id, manifest } of value.characters) this.characterManifests.set(id, manifest);
     this.markExported(
       value,

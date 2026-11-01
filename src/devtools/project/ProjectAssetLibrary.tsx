@@ -122,7 +122,9 @@ export function ProjectAssetLibrary({
                 <li key={skin.name}>
                   <span className="project-asset-name">{skin.name}</span>
                   <small>
-                    {skin.name === snapshot.definition.defaultSkin ? 'Default skin · ' : ''}
+                    {skin.name === (snapshot.identity?.defaultSkin ?? snapshot.definition.defaultSkin)
+                      ? 'Default skin · '
+                      : ''}
                     {Object.keys(skin.slots).length} slot assignments
                   </small>
                 </li>

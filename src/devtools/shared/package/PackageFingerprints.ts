@@ -50,7 +50,11 @@ export class PackageFingerprints {
     const { skins: embedded, ...rig } = snapshot.rig;
     return {
       Rig: this.domain('Rig', Object.entries(rig).flat(), () => rig),
-      Skins: this.domain('Skins', [embedded, ...snapshot.skins], () => [embedded, snapshot.skins]),
+      Skins: this.domain(
+        'Skins',
+        [snapshot.identity?.id, snapshot.identity?.defaultSkin, embedded, ...snapshot.skins],
+        () => [snapshot.identity ?? null, embedded, snapshot.skins],
+      ),
       Animations: this.domain('Animations', snapshot.animations, () =>
         snapshot.animations.map((clip) => this.clip(clip)),
       ),

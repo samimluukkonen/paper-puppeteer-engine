@@ -73,6 +73,7 @@ The [runtime integration guide](docs/runtime-integration.md) covers portable cha
 - [GitHub / Primer UI style guide](docs/style-guide.md)
 - [Complete artist workflow and production character packages](docs/artist-workflow.md)
 - [Reusable Animation Library](docs/animation-library.md)
+- [Character variants and reusable templates](docs/character-variants.md)
 - [Rig compatibility and bone mapping](docs/rig-compatibility.md)
 - [Visual animation retargeting, comparison preview, API and transfer policies](docs/animation-retargeting.md)
 - [Advanced Pose Library](docs/pose-library.md)

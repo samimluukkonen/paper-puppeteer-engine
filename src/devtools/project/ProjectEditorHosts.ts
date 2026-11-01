@@ -149,6 +149,7 @@ export class ProjectEditorHosts {
     clip: AnimationClip,
     targetRevision: string,
   ): Promise<void> {
+    id = session.workspace.rigOwner(id);
     await this.open(session, 'character', id, 'animation');
     const host = [...this.owners.values()].find(
       (entry) => entry.session === session && entry.kind === 'character' && entry.asset === id,
@@ -200,6 +201,7 @@ export class ProjectEditorHosts {
     guideId?: string,
     animationRequest?: { name: string; copy: boolean },
   ): Promise<void> {
+    if (kind === 'character') id = session.workspace.rigOwner(id);
     let pending = this.pendingOpenings.get(session);
     if (!pending) {
       pending = new Map();
@@ -305,6 +307,7 @@ export class ProjectEditorHosts {
     if (kind === 'scene') workspace.scenes.selectScene(id);
     const choices = workspace.definition.characters.map((entry) => ({
       id: entry.id,
+      rigIdentity: workspace.rigOwner(entry.id),
       label: entry.name,
       manifest: entry.manifest,
     }));
@@ -335,6 +338,13 @@ export class ProjectEditorHosts {
         return kind === 'character'
           ? (workspace.definition.characters.find((entry) => entry.id === id)?.name ?? id)
           : (workspace.scenes.scene(id)?.name ?? id);
+      },
+      get sharedRigNotice() {
+        if (kind !== 'character' || !workspace.definition.characters.some((entry) => entry.id === id)) return undefined;
+        const users = workspace.sharedRigUsers(id);
+        return users.length > 1
+          ? `Shared rig and animations: edits here affect ${users.join(', ')}. Return to Project and create an independent character copy for a different skeleton or private artwork.`
+          : undefined;
       },
       subscribe: workspace.subscribe,
       bindGuide: (open) => {
@@ -433,7 +443,7 @@ export class ProjectEditorHosts {
       confirmReplacement: (assetKind, assetId) => {
         const dependents = workspace
           .dependents({ kind: assetKind, owner: id, id: assetId })
-          .filter(({ from }) => from.kind !== 'character');
+          .filter(({ from }) => from.kind !== 'character' || from.owner !== id);
         return (
           !dependents.length ||
           window.confirm(
@@ -444,7 +454,7 @@ export class ProjectEditorHosts {
       assetReferences: (kind, assetId) =>
         workspace
           .dependents({ kind, owner: id, id: assetId })
-          .filter(({ from }) => from.kind === 'actor')
+          .filter(({ from }) => from.kind === 'actor' || (from.kind === 'character' && from.owner !== id))
           .map(({ label }) => label),
       buildScenePackage: (scene) =>
         buildProjectScenePackage(workspace, scene).catch((error: unknown) => {

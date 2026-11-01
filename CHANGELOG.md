@@ -145,6 +145,14 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.5.4
+
+- Add Character Variants with stable identities and explicit shared rig/animation ownership, per-character appearance selection and inherited default-skin artwork. Route shared editing to one document owner and show every affected character in the shared header.
+- Add independent character snapshots and reusable character templates, opening template instances in Rig Editor. Preserve rig, attachment, skin, animation and pose data while interning original image binaries and deduplicating project exports.
+- Keep corrective mesh tracks bound to their original attachment/vertex IDs, preserve topology and bone weights, reuse existing texture/dimension validation and explain when geometry needs an independent copy.
+- Protect shared owners and selected skins through deletion, rename, rig reset and cross-document history. Preserve variants and templates in project export/import, local autosave/recovery and materialized standalone character/scene packages.
+- Add a Character Variants and Templates Feature Guide, workflow documentation and ownership, persistence, runtime and local desktop regression coverage. Synchronize package and lockfile versions at 1.5.4.
+
 ## 1.5.3-2
 
 - Add Retarget to Another Character to the Project Animation Library, with source/target selection, validated saved mappings and the existing Bone Mapping Editor, supported root/local/pelvis translation policies and actionable IK, missing-track, orientation, proportion and mesh diagnostics.

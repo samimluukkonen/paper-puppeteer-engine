@@ -150,6 +150,7 @@ function characterData(snapshot: PackageSnapshot) {
   ]);
   const manifest: CharacterManifest = {
     ...structuredClone(source),
+    ...snapshot.identity,
     poses: workingPoses.map((_, index) => posePath(index)),
     skins: Object.fromEntries(snapshot.skins.map((skin, index) => [skin.name, skinPath(index)])),
     animations: snapshot.animations.map((_, index) => animationPath(index)),
@@ -248,6 +249,16 @@ export class ProjectInspector {
     for (const entry of project.characters) {
       const target = asset('character', entry.id);
       edge(asset('project', project.id), target, `Project "${project.name}"`);
+      if (entry.variant) {
+        const label = `Variant "${entry.name}" (shared rig and animations)`;
+        edge(target, asset('character', entry.variant.rig), label);
+        edge(target, asset('rig', entry.variant.rig), label);
+        edge(
+          target,
+          asset('skin', entry.variant.rig, entry.variant.skin),
+          `Variant "${entry.name}" selected appearance`,
+        );
+      }
       const character = input.characters.get(entry.id);
       const snapshot = character?.snapshot;
       if (!snapshot || !character) {
@@ -261,6 +272,12 @@ export class ProjectInspector {
         continue;
       }
       const { rig, skins, animations, definition, replacements } = snapshot;
+      if (entry.variant) {
+        const label = `Variant "${entry.name}" shared assets`;
+        for (const clip of animations) edge(target, asset('animation', entry.variant.rig, clip.name), label);
+        for (const key of Object.keys(definition.textures))
+          edge(target, asset('texture', entry.variant.rig, key), label);
+      }
       catalog.set(entry.manifest, {
         animations: animations.map((clip) => clip.name),
         rootMotionAnimations: animations
@@ -311,7 +328,7 @@ export class ProjectInspector {
               );
             names.add(skin.name);
           }
-          if (definition.id !== entry.id)
+          if ((snapshot.identity?.id ?? definition.id) !== entry.id)
             add(
               target,
               `Character "${entry.name}" has a different ID from its project registration.`,
@@ -568,6 +585,9 @@ export class ProjectInspector {
           );
         if (item.skin)
           edge(from, asset('skin', owner, item.skin), `Scene "${scene.name}", Actor "${item.id}" initial skin`);
+        const sharedOwner = project.characters.find((entry) => entry.id === owner)?.variant?.rig;
+        if (sharedOwner && item.skin)
+          edge(from, asset('skin', sharedOwner, item.skin), `Scene "${scene.name}", variant Actor "${item.id}" skin`);
       }
       for (const item of scene.actions) {
         const from = asset('action', entry.id, item.id);

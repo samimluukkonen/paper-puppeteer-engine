@@ -13,7 +13,7 @@ export function animationAssetReference(entry: AnimationLibraryEntry): string {
   return JSON.stringify([entry.character, entry.clip.name]);
 }
 
-/** Version-1 characters own their rigs. Matching topology alone does not establish identity. */
+/** Direct reuse follows explicit shared ownership. Matching topology alone does not establish identity. */
 export function animationCompatibility(entry: AnimationLibraryEntry, targetRig: string | undefined): string {
   if (!entry.rigIdentity) return 'Source rig is unavailable.';
   if (!targetRig) return 'Choose a target character with an available rig.';

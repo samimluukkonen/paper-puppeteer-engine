@@ -13,7 +13,16 @@ export const projectDefinitionSchema = z.strictObject({
   name: identity,
   rigMappings: z.array(rigBoneMappingSchema).max(128).exactOptional(),
   audio: z.array(audioAssetDefinitionSchema).max(128).exactOptional(),
-  characters: z.array(z.strictObject({ id: identity, name: identity, manifest: path })),
+  characters: z.array(
+    z.strictObject({
+      id: identity,
+      name: identity,
+      manifest: path,
+      /** A single explicit owner; variants never inherit from other variants. */
+      variant: z.strictObject({ rig: identity, skin: identity }).exactOptional(),
+      template: z.boolean().exactOptional(),
+    }),
+  ),
   images: z
     .array(z.strictObject({ id: identity, name: identity, path }))
     .max(1024)
@@ -31,6 +40,13 @@ export type ProjectDefinition = z.infer<typeof projectDefinitionSchema>;
 
 export function parseProjectDefinition(input: unknown): ProjectDefinition {
   const project = projectDefinitionSchema.parse(input);
+  for (const entry of project.characters) {
+    if (!entry.variant) continue;
+    const owner = project.characters.find(({ id }) => id === entry.variant!.rig);
+    if (!owner || owner.id === entry.id || owner.variant)
+      throw new Error(`Variant "${entry.name}" requires an independent shared rig owner.`);
+    if (entry.template) throw new Error('Mark the independent rig owner as a template instead of a variant.');
+  }
   if (new Set(project.rigMappings?.map((mapping) => mapping.id)).size !== (project.rigMappings?.length ?? 0))
     throw new Error('Duplicate rig mapping ID.');
   for (const entries of [project.characters, project.scenes, project.images ?? [], project.audio ?? []]) {

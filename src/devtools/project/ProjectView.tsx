@@ -32,13 +32,19 @@ import { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
 import { buildCharacterPackage } from '../shared/package/characterPackage.js';
 import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
+import { CharacterVariantDialog, type CharacterCreationKind } from './CharacterVariantDialog.js';
 import { ProjectAnimationLibrary } from './ProjectAnimationLibrary.js';
 import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
 import { ProjectAudioLibrary } from './ProjectAudioLibrary.js';
 import { ProjectEditorHosts, type ProjectEditorHost, type ProjectSession } from './ProjectEditorHosts.js';
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
 import { ProjectValidationError, type ProjectInspection, type ValidationContext } from './projectInspection.js';
-import { buildProjectPackage, importProjectPackage, packageHostedCharacter } from './projectPackage.js';
+import {
+  buildProjectPackage,
+  characterFileFetcher,
+  importProjectPackage,
+  packageHostedCharacter,
+} from './projectPackage.js';
 import { ProjectRigMapping } from './ProjectRigMapping.js';
 import { ProjectValidationPanel } from './ProjectValidationPanel.js';
 import { ProjectWorkspace } from './ProjectWorkspace.js';
@@ -72,6 +78,7 @@ export function ProjectView() {
   const sceneDialog = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState('');
   const [characterName, setCharacterName] = useState('');
+  const [characterCreation, setCharacterCreation] = useState<{ source: string; kind: CharacterCreationKind }>();
   const [sceneName, setSceneName] = useState('');
   const [example, setExample] = useState(characterCatalog[0]!.id);
   const [settingsName, setSettingsName] = useState('');
@@ -455,6 +462,18 @@ export function ProjectView() {
                   >
                     + New Character
                   </button>
+                  <button
+                    className="workspace-primary"
+                    disabled={busy || !workspace.definition.characters.some((entry) => entry.template)}
+                    onClick={() =>
+                      setCharacterCreation({
+                        source: workspace.definition.characters.find((entry) => entry.template)!.id,
+                        kind: 'template',
+                      })
+                    }
+                  >
+                    New from Template
+                  </button>
                   <FileAction
                     label="Import Character ZIP"
                     accept=".zip"
@@ -502,7 +521,51 @@ export function ProjectView() {
                         {entry.id} · {workspace.characterDirty(entry.id) ? 'Document modified' : 'Document unchanged'}
                         <br />
                         {entry.manifest}
+                        <br />
+                        {entry.variant
+                          ? `Shared rig and animations: ${entry.variant.rig} · Appearance: ${entry.variant.skin}`
+                          : `Independent rig: ${entry.id}${entry.template ? ' · Reusable template' : ''}`}
                       </span>
+                      {entry.variant && (
+                        <label>
+                          Appearance only{' '}
+                          <select
+                            aria-label={`Appearance for ${entry.name}`}
+                            value={entry.variant.skin}
+                            disabled={busy}
+                            onChange={(event) =>
+                              attempt(() => {
+                                workspace.setVariantSkin(entry.id, event.target.value);
+                                setStatus(
+                                  [
+                                    'Appearance updated.',
+                                    ...workspace.appearanceWarnings(entry.id, event.target.value),
+                                  ].join(' '),
+                                );
+                              })
+                            }
+                          >
+                            {workspace.characterSkins(entry.id).map((skin) => (
+                              <option key={skin} value={skin}>
+                                {skin}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {!entry.variant && (
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!!entry.template}
+                            disabled={busy}
+                            onChange={(event) =>
+                              attempt(() => workspace.setCharacterTemplate(entry.id, event.target.checked))
+                            }
+                          />{' '}
+                          Reusable template
+                        </label>
+                      )}
                       <div className="project-actions">
                         <button
                           className="workspace-button-with-icon"
@@ -510,7 +573,7 @@ export function ProjectView() {
                           onClick={() => run(() => openAsset('character', entry.id, 'rig'))}
                         >
                           <Network size={16} aria-hidden="true" />
-                          Rig Editor
+                          {entry.variant ? 'Edit Shared Rig' : 'Rig Editor'}
                         </button>
                         <button
                           className="workspace-button-with-icon"
@@ -518,8 +581,48 @@ export function ProjectView() {
                           onClick={() => run(() => openAsset('character', entry.id, 'animation'))}
                         >
                           <Clapperboard size={16} aria-hidden="true" />
-                          Animation Editor
+                          {entry.variant ? 'Edit Shared Animations' : 'Animation Editor'}
                         </button>
+                        <button
+                          className="workspace-primary"
+                          disabled={busy}
+                          onClick={() => setCharacterCreation({ source: entry.id, kind: 'variant' })}
+                        >
+                          Create Character Variant
+                        </button>
+                        <button
+                          className="workspace-primary"
+                          disabled={busy}
+                          onClick={() => setCharacterCreation({ source: entry.id, kind: 'copy' })}
+                        >
+                          Create Independent Character Copy
+                        </button>
+                        {entry.variant && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              run(async () => {
+                                const signal = AbortSignal.any([
+                                  transferLifetime.current.signal,
+                                  AbortSignal.timeout(60_000),
+                                ]);
+                                const files = await buildCharacterPackage(
+                                  workspace.captureCharacter(entry.id),
+                                  characterFileFetcher(workspace.character(entry.id).files),
+                                  signal,
+                                );
+                                const { bytes } = await packageZipWorker.encode(files, signal);
+                                signal.throwIfAborted();
+                                downloadBlob(new Blob([bytes], { type: 'application/zip' }), `${entry.id}.zip`);
+                                setStatus(
+                                  'Variant character ZIP downloaded with its selected appearance, rig and animations.',
+                                );
+                              })
+                            }
+                          >
+                            Download Character ZIP
+                          </button>
+                        )}
                         <button
                           className="workspace-danger workspace-button-with-icon"
                           disabled={busy}
@@ -616,13 +719,7 @@ export function ProjectView() {
               </p>
               {workspace.definition.characters.map(({ id, name }) => {
                 const entry = workspace.character(id);
-                const snapshot = entry.capture?.() ?? {
-                  definition: entry.definition,
-                  rig: entry.definition.rigFile!,
-                  skins: entry.definition.standaloneSkins,
-                  animations: entry.definition.animations,
-                  replacements: [],
-                };
+                const snapshot = workspace.characterInventory(id);
                 return <ProjectAssetLibrary key={id} name={name} snapshot={snapshot} files={entry.files} />;
               })}
             </section>
@@ -658,6 +755,24 @@ export function ProjectView() {
           hidden={active !== host.token}
         />
       ))}
+      {workspace && characterCreation && (
+        <CharacterVariantDialog
+          key={`${selected?.key}:${characterCreation.source}:${characterCreation.kind}`}
+          workspace={workspace}
+          {...characterCreation}
+          busy={busy}
+          run={run}
+          close={() => setCharacterCreation(undefined)}
+          created={async (id, independent) => {
+            setStatus(
+              independent
+                ? 'Independent character created from the current source. Artwork binaries are reused.'
+                : 'Variant created with a shared rig and animations. Change Appearance only to select another skin.',
+            );
+            if (independent) await openAsset('character', id, 'rig');
+          }}
+        />
+      )}
       <dialog ref={projectDialog} className="workspace-dialog" aria-label="New Project">
         <h2>New Project</h2>
         <form

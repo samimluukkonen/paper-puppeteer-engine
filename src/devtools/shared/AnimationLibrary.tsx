@@ -13,7 +13,7 @@ export interface AnimationLibraryProps {
   guideTarget?: string;
   entries: readonly AnimationLibraryEntry[];
   targetRig?: string | undefined;
-  targets?: readonly { id: string; name: string }[];
+  targets?: readonly { id: string; name: string; rigIdentity?: string }[];
   disabled?: boolean | undefined;
   onPreview(this: void, entry: AnimationLibraryEntry): void;
   onUse(this: void, entry: AnimationLibraryEntry): void;
@@ -39,7 +39,7 @@ export function AnimationLibrary({
   const [target, setTarget] = useState('');
   const [compatibleOnly, setCompatibleOnly] = useState(false);
   const [open, setOpen] = useState(false);
-  const rig = targets ? target || undefined : targetRig;
+  const rig = targets ? (targets.find((entry) => entry.id === target)?.rigIdentity ?? target) || undefined : targetRig;
   const matches = filterAnimationLibrary(entries, query, rig, compatibleOnly);
   return (
     <details

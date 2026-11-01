@@ -11,6 +11,70 @@ const step = (id: string, title: string, targetId: string, description: string):
 
 export const projectGuides: readonly GuideDefinition[] = [
   {
+    id: 'project-character-variants',
+    title: 'Creating Character Variants and Templates',
+    description:
+      'Share a rig and animations, choose an appearance, or create an independent character from a reusable preset.',
+    editor: 'project',
+    category: 'rigging',
+    prerequisites: [
+      {
+        capability: 'tool:project',
+        reason: 'Create or import a project first. No character is required to read this guide.',
+      },
+    ],
+    steps: [
+      step(
+        'source',
+        'Choose a source character',
+        T.projectCharacters,
+        'After exiting this tour, register a character and choose **Create Character Variant** on its row. Enter a new name and review **Rig ownership**. **Reuse shared rig and animations** creates a stable character identity with an appearance selection. It does not duplicate the skeleton. This tour only reveals controls and never creates assets or opens editors.',
+      ),
+      step(
+        'appearance',
+        'Change appearance without editing the source',
+        T.projectCharacters,
+        'Choose an **Appearance skin** before creating the variant, or use **Appearance only** on its row later. This changes only that variant’s selected skin. Partial skins retain artwork inherited from the original default. To design new artwork, open **Edit Shared Rig**, create a new skin and map existing attachments; preserve skins already used by other characters.',
+      ),
+      step(
+        'ownership',
+        'Understand shared editing and independent copies',
+        T.projectCharacters,
+        '**Edit Shared Rig** and **Edit Shared Animations** open the original document owner. The shared header names every affected character. Rig, attachment, image and animation edits affect the whole group. Use **Create Independent Character Copy** for a different skeleton or private artwork; this snapshots the current character with its own identity and histories while reusing image binaries.',
+      ),
+      step(
+        'mesh',
+        'Preserve mesh geometry and corrections',
+        T.projectAssets,
+        'A skin selects existing rigid or mesh attachments. Meshes retain their own topology, UVs, weights and bind data. Replacing mesh artwork requires the original image dimensions and pivot. **Corrective deformation** stays with attachment and vertex IDs; it is never transferred to another mesh by a skin change. Create an independent copy to rebuild different geometry, then review or remove incompatible corrections.',
+      ),
+      step(
+        'template',
+        'Save a reusable preset',
+        T.projectCharacters,
+        'Enable **Reusable template** on an independent character. **New from Template** lets you select that preset, enter a name and **Create Character**. The new character opens in Rig Editor with copied rig, skins and animations and a new stable identity. Future preset edits or removal do not change copies. Unchecking the preset flag leaves the character intact; deleting an owner with shared variants is blocked.',
+      ),
+      step(
+        'animation',
+        'Reuse animations directly',
+        T.projectAnimationLibrary,
+        'Shared variants have the same rig identity in **Animation Library**. Choose a variant in **Compatible character / rig** to find its directly reusable animations. No playback retargeting is needed. Independent character copies use the existing compatibility and **Retarget to Another Character** workflow for later transfers.',
+      ),
+      step(
+        'scene',
+        'Use multiple appearances in one scene',
+        T.projectScenes,
+        'After exiting, open Scene Editor and **Add Actor** for the source and each variant. Each character starts with its selected default appearance and can use the shared animation names. Actor poses, clocks and placement are independent. Reopen the scene after changing shared assets or appearance to load current character definitions.',
+      ),
+      step(
+        'persist',
+        'Validate and keep the complete project',
+        T.projectExport,
+        '**Validate Project** checks shared rig owners, selected skins, textures, mesh data and animation references. Remove variant references before deleting their owner or renaming a referenced skin. **Export Project** and local autosave/recovery preserve ownership and templates. Standalone scene packages materialize complete version-1 characters, and project exports store identical image binaries once. The tour never validates, exports or changes history.',
+      ),
+    ],
+  },
+  {
     id: 'project-animation-retargeting',
     title: 'Retargeting an Animation Visually',
     description:
@@ -143,7 +207,7 @@ export const projectGuides: readonly GuideDefinition[] = [
         'compatibility',
         'Check the target character and rig',
         T.projectAnimationLibrary,
-        'Choose **Compatible character / rig**, then optionally enable **Compatible rig only**. Each row explains its compatibility. Direct reuse currently requires the **same source character identity**; matching bone names on a different character does not establish a compatible rig. Incompatible or unavailable rigs cannot be reused or copied onto that target. Use **Retarget to Another Character** for the separate mapped transfer workflow; other source characters can also be previewed and located.',
+        'Choose **Compatible character / rig**, then optionally enable **Compatible rig only**. Each row explains its compatibility. Direct reuse requires the **same shared rig identity**, including explicit character variants; matching bone names on an independent character does not establish a compatible rig. Incompatible or unavailable rigs cannot be reused or copied onto that target. Use **Retarget to Another Character** for the separate mapped transfer workflow; other source characters can also be previewed and located.',
       ),
       step(
         'preview',
