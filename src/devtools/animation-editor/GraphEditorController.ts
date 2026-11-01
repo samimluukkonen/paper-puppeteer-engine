@@ -224,7 +224,9 @@ export class GraphEditorController {
     this.panel.hidden = !active;
     this.timelinePanel.classList.toggle('graph-active', active);
     this.toggle.setAttribute('aria-pressed', String(active));
-    this.toggle.textContent = active ? 'Timeline' : 'Graph Editor';
+    const toggleLabel = active ? 'Show Timeline' : 'Show Graph';
+    this.toggle.setAttribute('aria-label', toggleLabel);
+    this.toggle.title = toggleLabel;
     this.measure();
     this.rendered = [];
     this.render();

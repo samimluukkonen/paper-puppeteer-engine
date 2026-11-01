@@ -1676,6 +1676,10 @@ a {
 #graph-toggle[aria-pressed="true"] {
   border-color: var(--accent-fg);
 }
+#graph-toggle[aria-pressed="false"] .graph-toggle-timeline-icon,
+#graph-toggle[aria-pressed="true"] .graph-toggle-graph-icon {
+  display: none;
+}
 
 .animation-motion-panel {
   width: min(520px, calc(100vw - 40px));

@@ -1,4 +1,6 @@
 import Activity from 'lucide-react/icons/activity';
+import ChartGantt from 'lucide-react/icons/chart-gantt';
+import ChartSpline from 'lucide-react/icons/chart-spline';
 import CircleHelp from 'lucide-react/icons/circle-help';
 import Diamond from 'lucide-react/icons/diamond';
 import Download from 'lucide-react/icons/download';
@@ -10,6 +12,7 @@ import Layers from 'lucide-react/icons/layers';
 import LayoutTemplate from 'lucide-react/icons/layout-template';
 import Library from 'lucide-react/icons/library';
 import Link2 from 'lucide-react/icons/link-2';
+import Magnet from 'lucide-react/icons/magnet';
 import Move from 'lucide-react/icons/move';
 import MoveHorizontal from 'lucide-react/icons/move-horizontal';
 import Network from 'lucide-react/icons/network';
@@ -638,12 +641,16 @@ export function AnimationEditorView({
                 <h2 className="editor-sr-only">Timeline</h2>
                 <button
                   id="graph-toggle"
+                  className="editor-icon-button"
                   type="button"
+                  aria-label="Show Graph"
+                  title="Show Graph"
                   aria-pressed="false"
                   aria-controls="graph-editor"
                   data-guide-id={GUIDE_TARGETS.animationGraphToggle}
                 >
-                  Graph Editor
+                  <ChartSpline className="graph-toggle-graph-icon" size={16} aria-hidden="true" />
+                  <ChartGantt className="graph-toggle-timeline-icon" size={16} aria-hidden="true" />
                 </button>
                 <div
                   data-guide-id={GUIDE_TARGETS.animationPlayback}
@@ -743,6 +750,7 @@ export function AnimationEditorView({
               {
                 id: 'timeline-tracks-tools',
                 label: 'Tracks & keys',
+                icon: Layers,
                 content: (
                   <div
                     data-guide-id={GUIDE_TARGETS.animationTrackNavigation}
@@ -827,6 +835,7 @@ export function AnimationEditorView({
               {
                 id: 'timeline-view-tools',
                 label: 'View',
+                icon: Eye,
                 content: (
                   <div className="timeline-secondary-controls" aria-label="Timeline view">
                     <div
@@ -892,6 +901,7 @@ export function AnimationEditorView({
               {
                 id: 'timeline-snapping-tools',
                 label: 'Snapping',
+                icon: Magnet,
                 content: (
                   <div className="timeline-secondary-controls">
                     <fieldset className="timeline-snapping">
