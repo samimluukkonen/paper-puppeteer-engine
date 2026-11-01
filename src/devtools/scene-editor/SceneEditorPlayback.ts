@@ -64,6 +64,9 @@ export class SceneEditorPlayback {
   get dialogue() {
     return this.runner?.dialogue;
   }
+  get dialogueHoldPlayback() {
+    return this.runner?.dialogueHoldPlayback;
+  }
   advanceDialogue(): void {
     this.command(() => this.runner?.advanceDialogue());
   }
@@ -106,7 +109,7 @@ export class SceneEditorPlayback {
         this.source = source;
         this.transportGeneration++;
         this.runner.audio?.setScene(source);
-        this.runner.audio?.sync(this.time, this.status === 'playing', this.rate);
+        this.runner.syncAudio();
         this.syncLayers();
         this.notify();
         return;
@@ -198,8 +201,7 @@ export class SceneEditorPlayback {
     this.notify();
     void pending.then(
       () => {
-        if (this.runner === runner)
-          this.command(() => runner.audio?.sync(this.time, this.status === 'playing', this.rate));
+        if (this.runner === runner) this.command(() => runner.syncAudio());
       },
       () => {
         if (this.runner === runner) this.notify();
@@ -211,7 +213,7 @@ export class SceneEditorPlayback {
     this.command(() => {
       if (this.runner?.audio) {
         this.runner.audio.muted = muted;
-        this.runner.audio.sync(this.time, this.status === 'playing', this.rate);
+        this.runner.syncAudio();
       }
     });
   }
@@ -253,7 +255,7 @@ export class SceneEditorPlayback {
     });
   }
   update(delta: number): void {
-    if (this.runner?.status !== 'playing') return;
+    if (this.runner?.status !== 'playing' && this.runner?.status !== 'waiting-for-dialogue-advance') return;
     this.command(() => {
       this.runner!.update(delta);
       if (this.runner!.error) throw this.runner!.error;

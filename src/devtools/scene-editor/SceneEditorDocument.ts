@@ -121,6 +121,17 @@ export class SceneEditorDocument {
     const scene = parseSceneDefinition(input, this.validation);
     if (!this.animationIds) return scene;
     const actors = new Map(scene.actors.map((actor) => [actor.id, actor]));
+    for (const [index, actor] of scene.actors.entries()) {
+      const animations = this.animationIds(actor.character.manifest);
+      if (actor.dialogueIdle && animations && !animations.includes(actor.dialogueIdle.animation))
+        throw new SceneValidationError([
+          {
+            severity: 'error',
+            path: `actors[${index}].dialogueIdle.animation`,
+            message: `Unknown animation "${actor.dialogueIdle.animation}" for Actor "${actor.id}".`,
+          },
+        ]);
+    }
     for (const [index, action] of scene.actions.entries()) {
       const actor = actors.get(action.actorId)!;
       const animations = this.animationIds?.(actor.character.manifest);
@@ -668,7 +679,7 @@ export class SceneEditorDocument {
     if (changed && this.entry?.selectedActor === id) this.selectActor(nextId);
     return changed;
   }
-  setActorAppearance(id: string, property: 'animation' | 'skin', value: string | null): boolean {
+  setActorAppearance(id: string, property: 'animation' | 'skin' | 'dialogueIdle', value: string | null): boolean {
     this.gestures.end();
     const scene = this.workingScene;
     if (!scene?.actors.some((actor) => actor.id === id)) return this.reportError(new Error(`Unknown actor "${id}".`));
@@ -678,7 +689,10 @@ export class SceneEditorDocument {
         if (actor.id !== id) return actor;
         const next = { ...actor };
         delete next[property];
-        if (value !== null) next[property] = value;
+        if (value !== null) {
+          if (property === 'dialogueIdle') next.dialogueIdle = { animation: value, policy: 'overlay-snap' };
+          else next[property] = value;
+        }
         return next;
       }),
     });

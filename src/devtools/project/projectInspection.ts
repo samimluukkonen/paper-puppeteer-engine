@@ -520,6 +520,7 @@ export class ProjectInspector {
         const owner = referenceIds.get(actor.character.manifest) ?? actor.character.manifest;
         edge(target, asset('character', owner), label);
         if (actor.animation) edge(target, asset('animation', owner, actor.animation), label);
+        if (actor.dialogueIdle) edge(target, asset('animation', owner, actor.dialogueIdle.animation), label);
         if (actor.skin) edge(target, asset('skin', owner, actor.skin), label);
       }
       for (const action of entry.scene.actions) {

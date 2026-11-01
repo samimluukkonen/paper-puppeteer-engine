@@ -175,7 +175,7 @@ export function SceneAudioTracks({
                     className="scene-action clip scene-audio-clip"
                     aria-label={`Audio clip ${asset?.name ?? clip.assetId} ${clip.id}`}
                     aria-pressed={document.selectedAudioClip?.id === clip.id}
-                    title={`${asset?.name ?? clip.assetId} · ${clip.time / 1000} s · ${clip.duration / 1000} s${clip.loop ? ' · Loop' : ''}`}
+                    title={`${asset?.name ?? clip.assetId} · ${clip.time / 1000} s · ${clip.duration / 1000} s${clip.playback === 'dialogue-hold' ? ' · Hold only' : ''}${clip.loop ? ' · Loop' : ''}`}
                     style={{ left: x(clip.time), width: Math.max(12, x(clip.duration)), top: lane * 26 + 4 }}
                     onClick={() => document.selectAudioClip(clip.id)}
                     onPointerDown={(event) => beginDrag(event, clip)}
@@ -188,6 +188,7 @@ export function SceneAudioTracks({
                       ⋮
                     </span>
                     {asset?.name ?? clip.assetId}
+                    {clip.playback === 'dialogue-hold' ? ' · Hold only' : ''}
                     {clip.loop ? ' ↻' : ''}
                     <span className="scene-action-resize" data-audio-edge="end" aria-hidden="true">
                       ⋮

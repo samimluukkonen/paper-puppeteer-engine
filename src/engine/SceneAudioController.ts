@@ -131,9 +131,10 @@ export class SceneAudioController {
   }
   /** Reconcile once per host scene update/transport command. Passive seeking passes playing:false.
    * Missed intervals are never replayed. Position drift is measured unwrapped through loops.
+   * A supplied hold elapsed value exclusively selects dedicated hold-only voices, even with playing:false.
    */
-  sync(time: number, playing: boolean, speed: number): void {
-    if (!playing || this.silenced || this.state !== 'ready') {
+  sync(time: number, playing: boolean, speed: number, holdElapsedTime?: number): void {
+    if ((!playing && holdElapsedTime === undefined) || this.silenced || this.state !== 'ready') {
       this.stop();
       return;
     }
@@ -143,7 +144,10 @@ export class SceneAudioController {
     }
     try {
       if (!Number.isFinite(speed) || speed <= 0) throw new Error('Audio playback speed must be positive and finite.');
-      const active = this.compiled.sample(time, this.durations);
+      const active =
+        holdElapsedTime === undefined
+          ? this.compiled.sample(time, this.durations)
+          : this.compiled.sampleHold(time, holdElapsedTime, this.durations);
       const ids = new Set(active.map(({ clip }) => clip.id));
       for (const [id, voice] of this.voices)
         if (!ids.has(id)) {
@@ -180,9 +184,9 @@ export class SceneAudioController {
           loopStart: clip.sourceOffset / 1000,
           loopEnd: resource.durationSeconds,
           elapsed: sample.elapsed / 1000,
-          duration: clip.duration / 1000,
-          fadeIn: (clip.fadeIn ?? 0) / 1000,
-          fadeOut: (clip.fadeOut ?? 0) / 1000,
+          duration: holdElapsedTime === undefined ? clip.duration / 1000 : Infinity,
+          fadeIn: holdElapsedTime === undefined ? (clip.fadeIn ?? 0) / 1000 : 0,
+          fadeOut: holdElapsedTime === undefined ? (clip.fadeOut ?? 0) / 1000 : 0,
         });
         this.voices.set(clip.id, { playback, elapsed: sample.elapsed, rate: speed, signature });
       }

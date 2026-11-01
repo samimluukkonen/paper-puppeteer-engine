@@ -115,6 +115,166 @@ const noActor = () => {
   throw new Error('No Actors expected');
 };
 
+function holdAudioScene() {
+  return parseSceneDefinition({
+    ...definition(),
+    audioTracks: [
+      { id: 'effects', name: 'Effects', category: 'sfx' },
+      { id: 'music', name: 'Music', category: 'music' },
+      { id: 'ambience', name: 'Ambience', category: 'ambience' },
+    ],
+    audioClips: [
+      { ...clip, time: 0, duration: 6000, loop: true },
+      { ...clip, id: 'future-sfx', time: 1600, duration: 500 },
+      ...['music', 'ambience'].map((trackId) => ({
+        ...clip,
+        id: `hold-${trackId}`,
+        trackId,
+        time: 1000,
+        duration: 5000,
+        loop: true,
+        playback: 'dialogue-hold',
+      })),
+    ],
+    dialogue: [
+      { id: 'a', text: 'Wait', time: 1500, duration: 0, progression: 'advance-required' },
+      { id: 'b', text: 'Reply', time: 1500, duration: 0, progression: 'advance-required' },
+      { id: 'end', text: 'End', time: 6000, duration: 0, progression: 'advance-required' },
+    ],
+  });
+}
+
+test('dedicated music and ambience loops keep playing during a hold without starting later SFX or moving scene audio', async () => {
+  const f = fixture();
+  const scene = holdAudioScene();
+  const runner = new SceneRunner(scene, { createActor: noActor, audio: f.options });
+  try {
+    await runner.audio!.unlock();
+    runner.play();
+    expect(f.voices).toHaveLength(1); // Hold-only clips never play on the scene timeline.
+    f.advance(1500);
+    runner.update(1500);
+    expect(f.voices[0]!.stop).toHaveBeenCalledOnce();
+    expect(f.voices).toHaveLength(3);
+    expect(f.voices.slice(1).map((voice) => voice.options.remaining)).toEqual([Infinity, Infinity]);
+    expect(f.voices[1]!.options.offset).toBe(0.2);
+    for (let i = 0; i < 10; i++) {
+      f.advance(1000);
+      runner.update(1000);
+    }
+    expect(runner.time).toBe(1500);
+    expect(f.voices).toHaveLength(3); // No scene cue, endpoint stop or drift restart.
+    expect(f.voices[1]!.stop).not.toHaveBeenCalled();
+    runner.advanceDialogue();
+    expect(f.voices).toHaveLength(5); // Next same-time hold starts fresh dedicated loops.
+    expect(f.voices[1]!.stop).toHaveBeenCalledOnce();
+    runner.advanceDialogue();
+    expect(f.voices).toHaveLength(6);
+    expect(f.voices[5]!.options.offset).toBeCloseTo(1.7); // Exact frozen cinematic source position.
+    expect(f.voices.slice(1, 5).every((voice) => voice.stop.mock.calls.length === 1)).toBe(true);
+    f.advance(100);
+    runner.update(100);
+    expect(f.voices).toHaveLength(7); // Future SFX only begins after scene playback resumes.
+    expect(getActiveAudioClipsAtTime(scene, 1500).map(({ clip }) => clip.id)).toEqual(['effect']);
+  } finally {
+    runner.dispose();
+  }
+  expect(f.voices.every((voice) => voice.stop.mock.calls.length === 1)).toBe(true);
+});
+
+test('hold audio pause, speed, mute, passive seek, ending hold and rapid restart dispose every owned voice', async () => {
+  const f = fixture();
+  const runner = new SceneRunner(holdAudioScene(), { createActor: noActor, audio: f.options });
+  try {
+    await runner.audio!.unlock();
+    runner.play();
+    f.advance(1500);
+    runner.update(1500);
+    f.advance(750);
+    runner.update(750);
+    runner.pause();
+    expect(f.voices.slice(1).every((voice) => voice.stop.mock.calls.length === 1)).toBe(true);
+    runner.update(5000);
+    runner.play();
+    expect(f.voices.at(-1)!.options.offset).toBeCloseTo(0.95);
+    runner.speed = 2;
+    expect(f.voices.at(-1)!.options.rate).toBe(2);
+    runner.audio!.muted = true;
+    runner.syncAudio();
+    const mutedCount = f.voices.length;
+    runner.update(100);
+    expect(f.voices).toHaveLength(mutedCount);
+    runner.audio!.muted = false;
+    runner.syncAudio();
+    expect(f.voices.at(-1)!.options.offset).toBeCloseTo(1.15);
+    runner.seek(6000);
+    expect(runner.dialogueHoldPlayback).toBeUndefined();
+    const seekCount = f.voices.length;
+    runner.update(1000);
+    expect(f.voices).toHaveLength(seekCount);
+    for (let i = 0; i < 20; i++) {
+      runner.restart();
+      runner.update(750);
+      runner.update(100);
+      runner.advanceDialogue();
+      runner.advanceDialogue();
+      runner.update(2250);
+      expect(runner.time).toBe(6000);
+      expect(runner.status).toBe('waiting-for-dialogue-advance');
+      expect(f.voices.at(-1)!.options.remaining).toBe(Infinity);
+      runner.advanceDialogue();
+      expect(runner.status).toBe('completed');
+    }
+  } finally {
+    runner.dispose();
+  }
+  expect(f.voices.every((voice) => voice.stop.mock.calls.length === 1)).toBe(true);
+});
+
+test('hold-only policies validate tracks, looping, fades, idle references and explicit snap policy', () => {
+  const scene = holdAudioScene();
+  for (const patch of [{ trackId: 'effects' }, { loop: false }, { fadeIn: 1 }, { fadeOut: 1 }])
+    expect(() => parseSceneDefinition({ ...scene, audioClips: [{ ...scene.audioClips![2], ...patch }] })).toThrow();
+  expect(() =>
+    parseSceneDefinition({
+      ...scene,
+      actors: [
+        {
+          id: 'hero',
+          character: { manifest: 'character.json' },
+          position: { x: 0, y: 0 },
+          dialogueIdle: { animation: 'idle' },
+        },
+      ],
+    }),
+  ).toThrow();
+  const withIdle = {
+    ...scene,
+    actors: [
+      {
+        id: 'hero',
+        character: { manifest: 'character.json' },
+        position: { x: 0, y: 0 },
+        dialogueIdle: { animation: 'missing', policy: 'overlay-snap' },
+      },
+    ],
+  };
+  expect(() =>
+    parseSceneDefinition(withIdle, { characters: new Map([['character.json', { animations: ['walk'], skins: [] }]]) }),
+  ).toThrow('Unknown animation');
+  expect(
+    () =>
+      new SceneRunner(withIdle, {
+        createActor: ({ id }) =>
+          new Actor({
+            id,
+            puppet: new Puppet(puppetScene(), { autoUpdate: false, rig: { root: 'root', bones: [{ id: 'root' }] } }),
+            puppetOwnership: 'owned',
+          }),
+      }),
+  ).toThrow('unknown dialogue idle');
+});
+
 test('dialogue waiting stops timeline voices and resumes at scene offset without wall-time catch-up', async () => {
   const f = fixture();
   const runner = new SceneRunner(
@@ -718,6 +878,24 @@ test('Web Audio schedules finite stops, speed, offsets, loop bounds and independ
   expect(ended).toHaveBeenCalledOnce();
   expect(source.onended).toBeNull();
   expect(source.buffer).toBeNull();
+  expect(nodes.every((node) => node.disconnect.mock.calls.length === 1)).toBe(true);
+  source.stop.mockClear();
+  const holdVoice = resource.playTimeline!({
+    offset: 0.2,
+    remaining: Infinity,
+    rate: 1,
+    volume: 0.5,
+    loop: true,
+    loopStart: 0.2,
+    loopEnd: 2,
+    elapsed: 0,
+    duration: Infinity,
+    fadeIn: 0,
+    fadeOut: 0,
+  });
+  expect(source.stop).not.toHaveBeenCalled();
+  holdVoice.stop();
+  expect(source.stop).toHaveBeenCalledOnce();
   expect(nodes.every((node) => node.disconnect.mock.calls.length === 1)).toBe(true);
   resource.dispose();
   backend.dispose();

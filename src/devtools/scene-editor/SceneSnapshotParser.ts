@@ -110,12 +110,21 @@ export class SceneSnapshotParser {
         this.animationIds!(manifest),
       ]),
     );
-    const references = scene.actors.map((actor) => [actor.id, actor.character.manifest]);
+    const references = scene.actors.map((actor) => [actor.id, actor.character.manifest, actor.dialogueIdle?.animation]);
     this.animations.check(
       'animations',
       [scene.actions, JSON.stringify(references), JSON.stringify([...catalog])],
       issues,
       () => {
+        for (const [index, actor] of scene.actors.entries()) {
+          const animations = catalog.get(actor.character.manifest);
+          if (actor.dialogueIdle && animations && !animations.includes(actor.dialogueIdle.animation))
+            issues.push({
+              severity: 'error',
+              path: `actors[${index}].dialogueIdle.animation`,
+              message: `Unknown animation "${actor.dialogueIdle.animation}" for Actor "${actor.id}".`,
+            });
+        }
         for (const [index, action] of scene.actions.entries()) {
           const actor = actors.get(action.actorId);
           const animations = actor && catalog.get(actor.character.manifest);

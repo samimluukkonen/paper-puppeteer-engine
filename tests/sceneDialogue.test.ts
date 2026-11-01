@@ -243,6 +243,28 @@ test('progression edits use scene history, preserve legacy fields and persist th
   expect(doc.workingScene).toBe(edited);
 });
 
+test('Actor hold idle authoring shares immutable history, validates live catalogs and remains optional', () => {
+  const animations = ['wave'];
+  const doc = new SceneEditorDocument({}, () => animations);
+  expect(doc.importJson(serializeSceneDefinition(scene()))).toBe(true);
+  const original = doc.workingScene;
+  expect(doc.setActorAppearance('hero', 'dialogueIdle', 'wave')).toBe(true);
+  const edited = doc.workingScene;
+  expect(edited!.actors[0]!.dialogueIdle).toEqual({ animation: 'wave', policy: 'overlay-snap' });
+  expect(doc.undo()).toBe(true);
+  expect(doc.workingScene).toBe(original);
+  expect(doc.redo()).toBe(true);
+  expect(doc.workingScene).toBe(edited);
+  expect(doc.setActorAppearance('hero', 'dialogueIdle', 'missing')).toBe(false);
+  expect(doc.workingScene).toBe(edited);
+  animations.length = 0;
+  expect(doc.updateProperties({ name: 'Rejected' })).toBe(false);
+  expect(doc.validationIssues.some((issue) => issue.path === 'actors[0].dialogueIdle.animation')).toBe(true);
+  animations.push('wave');
+  expect(doc.setActorAppearance('hero', 'dialogueIdle', null)).toBe(true);
+  expect(doc.workingScene!.actors[0]).not.toHaveProperty('dialogueIdle');
+});
+
 test('simultaneous holds have separate selectable timeline lanes in stable playback order', () => {
   const doc = document();
   doc.updateDialogueLine('opening', { progression: 'advance-required' });
@@ -263,9 +285,11 @@ test('simultaneous holds have separate selectable timeline lanes in stable playb
 
 test('JSON and standalone ZIPs preserve dialogue and scene-local speaker identities after character rebasing', async () => {
   const source = scene();
+  source.actors[0]!.dialogueIdle = { animation: 'wave', policy: 'overlay-snap' };
   const files = await buildScenePackage(source, assetFixture());
   const restored = await validateScenePackage(decodePackageZip(encodePackageZip(files)));
   expect(restored.definition.dialogue).toEqual(source.dialogue);
+  expect(restored.definition.actors[0]!.dialogueIdle).toEqual(source.actors[0]!.dialogueIdle);
   expect(restored.definition.actors[0]!.character.manifest).not.toBe(source.actors[0]!.character.manifest);
   expect(parseSceneJson(serializeSceneDefinition(restored.definition)).dialogue).toEqual(source.dialogue);
 });
@@ -322,10 +346,20 @@ test('voice associations are metadata, dependency inspection sees them and clip 
 test('project/standalone ZIPs and standalone recovery retain dialogue with voice metadata and detect authored changes', async () => {
   const workspace = voiceProject();
   const doc = workspace.scenes;
+  expect(doc.addAudioTrack('ambience')).toBe(true);
+  expect(
+    doc.addAudioClip({
+      ...doc.workingScene!.audioClips![0]!,
+      trackId: 'ambience-1',
+      loop: true,
+      playback: 'dialogue-hold',
+    }),
+  ).toBe(true);
   const authored = doc.workingScene!;
   const captured = await buildProjectPackage(workspace);
   const imported = await importProjectPackage(decodePackageZip(encodePackageZip(captured.files)));
   expect(imported.scenes.workingScene).toEqual(authored);
+  expect(imported.scenes.workingScene!.audioClips![1]!.playback).toBe('dialogue-hold');
   const portable = await buildProjectScenePackage(workspace, authored);
   expect((await validateScenePackage(portable)).definition.dialogue).toEqual(authored.dialogue);
   const standalone = new SceneEditorDocument();
@@ -336,6 +370,7 @@ test('project/standalone ZIPs and standalone recovery retain dialogue with voice
     const draft = sceneDraftSource(standalone, registry, 'dialogue-draft')!;
     const recovered = await importProjectPackage(await draft.build());
     expect(recovered.scenes.workingScene!.dialogue).toEqual(authored.dialogue);
+    expect(recovered.scenes.workingScene!.audioClips).toEqual(authored.audioClips);
     const before = sceneFingerprint(standalone.workingScene!);
     standalone.updateDialogueLine(authored.dialogue![0]!.id, { text: '変更\nnew line' });
     expect(sceneFingerprint(standalone.workingScene!)).not.toBe(before);

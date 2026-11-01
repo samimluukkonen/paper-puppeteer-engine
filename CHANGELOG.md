@@ -151,6 +151,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.2-2
+
+- Add a scene-owned dialogue hold clock for optional per-Actor idle overlays. Reuse existing bone/IK/mesh evaluators without advancing cinematic layers, movement, root motion, camera, fades, dialogue schedules or cues; preserve playback identities and restore the exact main pose with an explicit conservative snap policy.
+- Add dedicated hold-only music/ambience loops with eligibility windows, constant volume, pause/mute/speed reconciliation and owned cleanup. Ordinary scene SFX, voice and music retain frozen scene-offset resume semantics; passive scrubbing remains deterministic and silent.
+- Add Scene Editor idle/audio controls and hold elapsed observations, an Idle Animation & Audio During Dialogue Holds Feature Guide and artist/runtime documentation. Preserve history, packages, recovery and animation dependencies; regenerate the scene schema and cover clock isolation, sparse pose restoration, looping, multi-Actor playback and repeated lifecycle cleanup.
+
 ## 1.6.2-1
 
 - Add optional Advance Required dialogue progression to the existing scene schema and runner, preserving legacy timed dialogue. Clamp playback to exact hold boundaries, freeze cinematic time without wall-time catch-up, and expose an explicit waiting state and one-line `advanceDialogue()` API.

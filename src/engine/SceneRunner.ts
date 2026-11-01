@@ -34,6 +34,10 @@ import {
 import { assertFinite } from './types.js';
 
 export type { AdvanceResult, SceneRunnerStatus } from './ScenePlayback.js';
+export interface DialogueHoldPlaybackState {
+  readonly sceneTime: number;
+  readonly holdElapsedTime: number;
+}
 export interface SceneCue {
   readonly name: string;
   readonly actorId: string;
@@ -65,7 +69,8 @@ export interface SceneRunnerOptions {
   readonly dialoguePresentation?: SceneDialogueTarget;
 }
 
-/** Declarative scene adapter over the v0.8 Actor runtime. Owns one millisecond clock;
+/** Declarative scene adapter over the v0.8 Actor runtime. Owns one cinematic millisecond clock
+ * and an optional hold-local presentation sample;
  * action boundaries, rather than Promise continuations, determine scheduling order.
  * Arbitrary choreography scripts/callbacks are deliberately not a seeking input.
  */
@@ -78,6 +83,8 @@ export class SceneRunner implements ScenePlayback {
   private readonly boundaries: number[];
   private readonly dialogueHolds: readonly Readonly<SceneDialogueLine>[];
   private nextDialogueHold = 0;
+  private holdSession: { elapsed: number } | undefined;
+  private readonly idleActors = new Set<Actor>();
   /** Passive samples never create interactive input sessions. */
   private dialogueMode: 'preview' | 'interactive' = 'preview';
   private advancingDialogue = false;
@@ -150,6 +157,19 @@ export class SceneRunner implements ScenePlayback {
   get time(): number {
     return this.cursor;
   }
+  /** Session-local presentation clock; absent for passive samples. Both values are milliseconds. */
+  get dialogueHoldPlayback(): DialogueHoldPlaybackState | undefined {
+    return this.holdSession && { sceneTime: this.cursor, holdElapsedTime: this.holdSession.elapsed };
+  }
+  /** Reconcile audio after host-only mute/unlock or audio edits, using the current clock owner. */
+  syncAudio(): void {
+    this.audio?.sync(
+      this.cursor,
+      this.state === 'playing',
+      this.rate,
+      this.state === 'waiting-for-dialogue-advance' ? this.holdSession?.elapsed : undefined,
+    );
+  }
   get cinematicCamera() {
     return evaluateCameraAtTime(this.definition, this.cursor);
   }
@@ -173,7 +193,7 @@ export class SceneRunner implements ScenePlayback {
     return applyCinematicCamera(camera, this.cinematicCamera, viewport);
   }
   private syncCamera(): void {
-    this.audio?.sync(this.cursor, this.state === 'playing', this.rate);
+    this.syncAudio();
     const camera = this.options.camera;
     if (camera) this.applyCamera(camera.target, camera.viewport?.());
     this.options.onCamera?.(this.cinematicCamera);
@@ -197,7 +217,7 @@ export class SceneRunner implements ScenePlayback {
     assertFinite(value, 'Scene speed');
     if (value <= 0) throw new Error('Scene speed must be positive.');
     this.rate = value;
-    this.audio?.sync(this.cursor, this.state === 'playing', this.rate);
+    this.syncAudio();
   }
 
   play(): void {
@@ -260,6 +280,7 @@ export class SceneRunner implements ScenePlayback {
         if (this.state !== 'waiting-for-dialogue-advance') return;
         this.nextDialogueHold++;
         consumed = true;
+        this.clearHold();
         this.resumeActors();
         this.waitForDialogue();
         if (this.status === 'playing' && this.cursor === this.definition.duration) this.halt('completed');
@@ -281,6 +302,35 @@ export class SceneRunner implements ScenePlayback {
     if (this.state !== 'playing' || this.dialogueHolds[this.nextDialogueHold]?.time !== this.cursor) return;
     this.state = 'waiting-for-dialogue-advance';
     for (const actor of this.instances.values()) actor.pauseAnimation();
+    if (this.holdSession) return; // Pause/Play retains the same local phase.
+    this.holdSession = { elapsed: 0 };
+    for (const data of this.definition.actors) {
+      if (!data.dialogueIdle) continue;
+      const actor = this.instances.get(data.id)!;
+      this.idleActors.add(actor);
+      actor.puppet.beginDialogueIdle(data.dialogueIdle.animation);
+    }
+  }
+  private clearHold(): void {
+    if (!this.holdSession) return;
+    this.holdSession = undefined;
+    const actors = [...this.idleActors];
+    this.idleActors.clear();
+    const errors: unknown[] = [];
+    try {
+      this.audio?.stop();
+    } catch (error) {
+      errors.push(error);
+    }
+    for (const actor of actors) {
+      if (actor.isDisposed) continue;
+      try {
+        actor.puppet.endDialogueIdle();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    throwNotificationErrors(errors, 'Dialogue hold cleanup failed.');
   }
   /** A seek always pauses (or holds completion). Reuse the current owned state for
    * forward/same-position seeks; reconstruct backward seeks from initial data.
@@ -295,6 +345,7 @@ export class SceneRunner implements ScenePlayback {
       this.seeking = true;
       this.dialogueMode = 'preview';
       try {
+        this.clearHold();
         // Reentrant callbacks may observe a partially stepped Actor set/boundary.
         const reusable = this.started && !this.stepping && !this.ownCommand;
         this.checkOwnership();
@@ -332,9 +383,20 @@ export class SceneRunner implements ScenePlayback {
     this.assertActive();
     assertFinite(deltaMilliseconds, 'Scene delta');
     if (deltaMilliseconds < 0) throw new Error('Scene delta cannot be negative.');
-    if (this.state !== 'playing') return;
+    if (this.state !== 'playing' && this.state !== 'waiting-for-dialogue-advance') return;
     const delta = deltaMilliseconds * this.rate;
     assertFinite(delta, 'Scaled scene delta');
+    if (this.state === 'waiting-for-dialogue-advance') {
+      this.execute(() => {
+        this.checkOwnership();
+        if (this.state !== 'waiting-for-dialogue-advance' || !this.holdSession) return;
+        const elapsed = this.holdSession.elapsed + delta;
+        assertFinite(elapsed, 'Dialogue hold elapsed time');
+        this.holdSession.elapsed = elapsed;
+        for (const actor of this.idleActors) actor.puppet.sampleDialogueIdle(elapsed);
+      });
+      return;
+    }
     this.execute(() => this.advance(Math.min(this.definition.duration, this.cursor + delta), false));
   }
   dispose(): void {
@@ -374,6 +436,11 @@ export class SceneRunner implements ScenePlayback {
     this.checkedOwnershipRevision = -1;
     const errors: unknown[] = [];
     try {
+      this.clearHold();
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
       this.audio?.stop();
     } catch (error) {
       errors.push(error);
@@ -410,6 +477,8 @@ export class SceneRunner implements ScenePlayback {
           throw new Error(`Scene Actor "${data.id}" must be a fresh, live, owned instance with the authored ID.`);
         }
         this.instances.set(data.id, actor);
+        if (data.dialogueIdle && !actor.puppet.hasAnimation(data.dialogueIdle.animation))
+          throw new Error(`Actor "${data.id}": unknown dialogue idle animation "${data.dialogueIdle.animation}".`);
         actor.puppet.container.setVisible(sceneLayer(this.definition, 'actors').visible);
         actor.puppet.animationPlayer.setPreviewMode(!runtime, { applyRootMotion: true });
         actor.setPosition(data.position.x, data.position.y).setFacing(data.facing ?? 'right');
@@ -464,6 +533,11 @@ export class SceneRunner implements ScenePlayback {
     this.activeMoves.clear();
     this.ownCommand = true;
     const errors: unknown[] = [];
+    try {
+      this.clearHold();
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       this.audio?.stop();
     } catch (error) {

@@ -68,6 +68,27 @@ function AudioProperties({ document, clip }: { document: SceneEditorDocument; cl
         </div>
         <div data-guide-id={GUIDE_TARGETS.sceneAudioPlayback}>
           <label>
+            Audio playback
+            <select
+              aria-label="Audio playback"
+              value={draft.playback ?? 'scene'}
+              onChange={(event) =>
+                setDraft(
+                  event.target.value === 'dialogue-hold'
+                    ? { ...draft, playback: 'dialogue-hold', loop: true, fadeIn: 0, fadeOut: 0 }
+                    : { ...draft, playback: 'scene' },
+                )
+              }
+            >
+              <option value="scene">Scene timeline (pause during holds)</option>
+              <option value="dialogue-hold">Hold-only loop (music / ambience)</option>
+            </select>
+          </label>
+          <p className="workspace-caption">
+            Hold-only loops require a Music or Ambience track. Start and Duration select eligible holds; sound loops
+            from Source offset while waiting. Advance stops it. Scene fades do not apply.
+          </p>
+          <label>
             Volume (%)
             <input
               type="number"
@@ -82,6 +103,7 @@ function AudioProperties({ document, clip }: { document: SceneEditorDocument; cl
           <label>
             <input
               type="checkbox"
+              disabled={draft.playback === 'dialogue-hold'}
               checked={draft.loop}
               onChange={(event) => setDraft({ ...draft, loop: event.target.checked })}
             />
@@ -99,6 +121,7 @@ function AudioProperties({ document, clip }: { document: SceneEditorDocument; cl
               {label} (seconds)
               <input
                 type="number"
+                disabled={draft.playback === 'dialogue-hold'}
                 required
                 step="any"
                 min="0"
@@ -111,10 +134,10 @@ function AudioProperties({ document, clip }: { document: SceneEditorDocument; cl
         <button type="submit">Apply audio clip properties</button>
       </form>
       <p className="workspace-caption">
-        Drag to move. Drag either edge to trim. Left trim advances the source offset; right trim sets the scene end.
-        Loops repeat from source offset to media end within the clip duration. Fades are linear gain ramps at the scene
-        clip edges; overlapping fades multiply. Overlapping clips are allowed. Edits preserve the audio file and scene
-        duration.
+        {clip.playback === 'dialogue-hold'
+          ? 'Drag to move the hold eligibility window. Edges resize that window; left trim also advances Source offset. Each eligible hold loops indefinitely until Advance. Overlapping hold loops play together.'
+          : 'Drag to move. Drag either edge to trim. Left trim advances the source offset; right trim sets the scene end. Loops repeat from source offset to media end within the clip duration. Fades are linear gain ramps at the scene clip edges; overlapping fades multiply. Overlapping clips are allowed.'}{' '}
+        Edits preserve the audio file and scene duration.
       </p>
       <div className="scene-audio-actions" data-guide-id={GUIDE_TARGETS.sceneAudioActions}>
         <button type="button" onClick={() => document.duplicateAudioClip(clip.id)}>
@@ -143,8 +166,8 @@ export function SceneAudioInspector({ document }: { document: SceneEditorDocumen
       </div>
       <div data-guide-id={GUIDE_TARGETS.sceneAudioPlayback}>
         <p className="workspace-caption">
-          A selected clip exposes Volume and Loop. Looping stays within the finite clip duration. Audio follows the
-          scene clock during playback. Passive scrubbing stays silent.
+          A selected clip exposes Audio playback, Volume and Loop. Scene timeline audio pauses during dialogue holds.
+          Hold-only loops require a Music or Ambience track and play while waiting. Passive scrubbing stays silent.
         </p>
       </div>
       <div data-guide-id={GUIDE_TARGETS.sceneAudioFades}>

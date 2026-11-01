@@ -30,6 +30,12 @@ function PlaybackObservation({ playback, actorId }: { playback: SceneEditorPlayb
           <dd>{live.id}</dd>
           <dt>Scene time</dt>
           <dd>{(playback.time / 1000).toFixed(3)} s</dd>
+          {playback.dialogueHoldPlayback && (
+            <>
+              <dt>Hold elapsed</dt>
+              <dd>{(playback.dialogueHoldPlayback.holdElapsedTime / 1000).toFixed(3)} s</dd>
+            </>
+          )}
           <dt>Position</dt>
           <dd>
             {live.position.x.toFixed(3)}, {live.position.y.toFixed(3)}

@@ -92,3 +92,7 @@ The nine-step **Audio Playback & Synchronization** Explain tour is registered as
 npx vitest run tests/sceneGuides.test.ts tests/guideRegistry.test.ts tests/guideController.test.ts tests/guideTargets.test.ts tests/guideLauncher.test.ts --maxWorkers=1
 PLAYWRIGHT_CHANNEL=chrome npx playwright test tests/browser/sceneAudioGuide.spec.ts --workers=1
 ```
+
+## Dialogue holds
+
+Ordinary clips pause during Advance Required waits and resume at the frozen scene offset. For optional dedicated music/ambience during a wait, choose **Audio playback → Hold-only loop (music / ambience)** in the clip inspector. See [hold-local animation and audio](dialogue-hold-presentation.md) for eligibility windows, pause/resume, constant-volume looping and cleanup.

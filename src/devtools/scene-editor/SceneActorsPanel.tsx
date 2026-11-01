@@ -83,6 +83,25 @@ function ActorProperties({
         </label>
       )}
       {definition && (
+        <label>
+          Dialogue hold idle
+          <select
+            aria-label="Dialogue hold idle"
+            value={actor.dialogueIdle?.animation ?? ''}
+            onChange={(event) => document.setActorAppearance(actor.id, 'dialogueIdle', event.target.value || null)}
+          >
+            <option value="">Hold cinematic pose</option>
+            {definition.animations.map((clip) => (
+              <option key={clip.name}>{clip.name}</option>
+            ))}
+          </select>
+          <span className="workspace-caption">
+            Snap overlay: loops tracked pose channels during Advance Required holds, then snaps back. Actor displacement
+            and animation events are ignored. Choose a subtle idle that matches the held pose.
+          </span>
+        </label>
+      )}
+      {definition && (
         <SceneAnimationLibrary
           definition={definition}
           manifest={actor.character.manifest}

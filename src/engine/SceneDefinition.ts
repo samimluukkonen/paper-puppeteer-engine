@@ -83,6 +83,13 @@ export const sceneActorDefinitionSchema = z.strictObject({
   position: z.strictObject({ x: z.number(), y: z.number() }),
   facing: z.enum(['left', 'right']).exactOptional(),
   animation: sceneIdentifier.exactOptional(),
+  /** Sparse presentation overlay during interactive holds; cinematic playback stays frozen. */
+  dialogueIdle: z
+    .strictObject({
+      animation: sceneIdentifier,
+      policy: z.literal('overlay-snap'),
+    })
+    .exactOptional(),
   skin: sceneIdentifier.exactOptional(),
 });
 
@@ -336,6 +343,14 @@ export function checkSceneDefinitionDomains(
           report(`${path}.assetId`, 'Scene audio path differs from its project registration.');
         if (!audioTrackIds.has(clip.trackId)) report(`${path}.trackId`, 'Choose an existing audio track.');
         const end = clip.time + clip.duration;
+        if (clip.playback === 'dialogue-hold') {
+          const category = scene.audioTracks?.find((track) => track.id === clip.trackId)?.category;
+          if (category !== 'music' && category !== 'ambience')
+            report(`${path}.playback`, 'Hold-only loops require a music or ambience track.');
+          if (!clip.loop) report(`${path}.loop`, 'Hold-only audio must loop.');
+          if (clip.fadeIn || clip.fadeOut)
+            report(`${path}.playback`, 'Hold-only loops use constant volume; clear scene fades.');
+        }
         if (!Number.isFinite(end) || end <= clip.time || end > scene.duration)
           report(`${path}.duration`, 'Audio clip end must advance time and stay within scene duration.');
         for (const field of ['fadeIn', 'fadeOut'] as const)
@@ -410,6 +425,8 @@ export function checkSceneDefinitionDomains(
         report(`${path}.character.manifest`, `Unknown character "${actor.character.manifest}".`);
       if (assets && actor.animation !== undefined && !assets.animations.includes(actor.animation))
         report(`${path}.animation`, `Unknown animation "${actor.animation}".`);
+      if (assets && actor.dialogueIdle && !assets.animations.includes(actor.dialogueIdle.animation))
+        report(`${path}.dialogueIdle.animation`, `Unknown animation "${actor.dialogueIdle.animation}".`);
       if (assets && actor.skin !== undefined && !assets.skins.includes(actor.skin))
         report(`${path}.skin`, `Unknown skin "${actor.skin}".`);
     }

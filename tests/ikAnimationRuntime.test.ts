@@ -81,6 +81,31 @@ function reaches(puppet: Puppet, point: { x: number; y: number }) {
   assert.equal(puppet.getIK('arm').status, 'solved');
 }
 
+test('hold presentation reuses IK sampling while preserving the main pose and nonlooping source asset', () => {
+  const idle = clip('idle', [
+    { time: 0, x: 20, y: 65 },
+    { time: 500, x: 40, y: 70 },
+  ]);
+  const before = JSON.stringify(idle);
+  const puppet = fixture([clip(), idle]);
+  try {
+    puppet.update(250);
+    puppet.animationPlayer.pause();
+    reaches(puppet, { x: 45, y: 70 });
+    puppet.beginDialogueIdle('idle');
+    puppet.sampleDialogueIdle(1250);
+    reaches(puppet, { x: 30, y: 67.5 });
+    assert.equal(puppet.animationPlayer.elapsedTime, 250);
+    puppet.endDialogueIdle();
+    reaches(puppet, { x: 45, y: 70 });
+    assert.equal(JSON.stringify(idle), before);
+    puppet.play('idle', { fadeDuration: 0 });
+    assert.isFalse(puppet.getPlaybackStatus()!.loop);
+  } finally {
+    puppet.destroy();
+  }
+});
+
 test('authored A/B/C positions and sparse interpolation drive the existing solver without events or clock changes', () => {
   const puppet = fixture();
   const event = vi.fn();

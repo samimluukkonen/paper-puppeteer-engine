@@ -526,6 +526,22 @@ export class Puppet {
     return this;
   }
 
+  /** @internal Scene-owned presentation; never advances the Puppet/Actor update clock. */
+  beginDialogueIdle(name: string): void {
+    this.animationPlayer.beginDialogueIdle(name, this.prepareAnimationPose);
+    this.syncPose();
+  }
+  /** @internal */
+  sampleDialogueIdle(elapsed: number): void {
+    this.animationPlayer.sampleDialogueIdle(elapsed, this.prepareAnimationPose);
+    this.syncPose();
+  }
+  /** @internal */
+  endDialogueIdle(): void {
+    this.animationPlayer.endDialogueIdle(this.prepareAnimationPose);
+    this.syncPose();
+  }
+
   resetPose(): this {
     this.preparePose();
     this.poseController.clearActivePose();

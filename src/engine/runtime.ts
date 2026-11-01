@@ -40,6 +40,7 @@ export type { PuppetOptions, SyncPoseOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
 export {
   SceneRunner,
+  type DialogueHoldPlaybackState,
   type AdvanceResult,
   type SceneRunnerStatus,
   type SceneRunnerOptions,

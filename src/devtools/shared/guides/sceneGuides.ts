@@ -30,6 +30,38 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 const workflowGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-dialogue-hold-presentation',
+    'Idle Animation & Audio During Dialogue Holds',
+    'Keep selected Actors and ambience alive while Advance Required dialogue freezes cinematic time.',
+    actor,
+    [
+      step(
+        'idle',
+        'Choose an optional idle',
+        T.sceneActorProperties,
+        'In **Actor properties**, choose **Dialogue hold idle** for each Actor that should move while the viewer reads. **Hold cinematic pose** is the default. The selected existing animation loops as a sparse **snap overlay**: tracked channels replace the held pose, then snap back on Advance. Choose a compatible subtle idle. Root displacement and animation events are ignored; scene actions stay unchanged.',
+      ),
+      step(
+        'hold',
+        'Create a reading hold',
+        T.sceneDialogueTiming,
+        'After exiting, select or add a dialogue line and choose **Advance Required** under **Dialogue progression**. Its start freezes the main scene clock; duration controls passive preview only. Camera, movement, scene fades and future cues remain frozen. Scrubbing shows only the cinematic sample and never starts idle playback.',
+      ),
+      step(
+        'audio',
+        'Configure dedicated hold audio',
+        T.sceneAudioPlayback,
+        'Select an audio clip and choose **Audio playback → Hold-only loop (music / ambience)**. Use a **Music** or **Ambience** track. Start and Duration select which holds can use the loop; a window ending at scene end includes an ending hold. The loop starts at **Source offset**, uses constant Volume and stops on Advance. Ordinary scene audio, including voice and SFX, pauses and resumes at its frozen scene offset. Ordinary music does not continue automatically.',
+      ),
+      step(
+        'preview',
+        'Preview and advance',
+        T.scenePlayback,
+        'After exiting this tour, **Play** to enter the hold. The subtitle stays visible and configured idle/audio loops continue using a separate local clock. **Pause** freezes the idle and stops audio; Play restores their local phase. **Advance dialogue** ends one hold and restores the exact cinematic pose before resuming. Same-time lines begin fresh holds. Restart, Stop, seek and scene switching dispose local playback. This tour never plays, edits or enables audio.',
+      ),
+    ],
+  ),
+  guide(
     'scene-dialogue-authoring',
     'Dialogue & Subtitle Authoring',
     'Write timed or Advance Required dialogue, assign Actor speakers and save portable subtitles with optional voice references.',
@@ -81,7 +113,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'time',
         'Understand deterministic subtitle timing',
         T.sceneTime,
-        '**Timed** dialogue uses scene time. **Advance Required** freezes Actors, camera, fades and future cues at the authored start until **Advance dialogue** is clicked once per line. Waiting time never catches up. **Scrubbing** stays nonblocking and independent of earlier advances; resuming consumes holds at or before the sample. Same-time holds preview the first active ID; zero-duration holds appear exactly at their start. **Play** displays the active subtitle; Pause holds it, Restart begins again and Stop clears it. **Scrubbing** immediately displays the line at the target time without playing audio or dispatching scene cues. Subtitles stay within the cinematic camera frame and remain readable above scene fades. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
+        '**Timed** dialogue uses scene time. **Advance Required** freezes cinematic Actor playback, camera, fades and future cues at the authored start; optional **Dialogue hold idle** overlays and **Hold-only loop** audio keep presentation alive until **Advance dialogue** is clicked once per line. Waiting time never catches up. **Scrubbing** stays nonblocking and independent of earlier advances; resuming consumes holds at or before the sample. Same-time holds preview the first active ID; zero-duration holds appear exactly at their start. **Play** displays the active subtitle; Pause holds it, Restart begins again and Stop clears it. **Scrubbing** immediately displays the line at the target time without playing audio or dispatching scene cues. Subtitles stay within the cinematic camera frame and remain readable above scene fades. Branching choices and typewriter effects are outside this workflow. This tour never seeks, plays or enables audio.',
       ),
       step(
         'save',

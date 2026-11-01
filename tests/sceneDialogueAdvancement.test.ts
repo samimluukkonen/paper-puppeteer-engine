@@ -74,6 +74,40 @@ function factory(events = vi.fn<(event: FiredAnimationEvent) => void>()) {
       autoUpdate: false,
       animations: [
         {
+          name: 'idle',
+          duration: 1000,
+          loop: false,
+          tracks: {
+            root: [
+              { time: 0, rotation: 2 },
+              { time: 500, rotation: 3 },
+              { time: 1000, rotation: 2 },
+            ],
+          },
+          rootMotion: {
+            translationKeys: [
+              { time: 0, x: 0, y: 0 },
+              { time: 1000, x: 500, y: 100 },
+            ],
+          },
+          events: [
+            { time: 0, name: 'idle-start' },
+            { time: 250, name: 'idle-event' },
+          ],
+        },
+        {
+          name: 'blink',
+          duration: 500,
+          loop: true,
+          tracks: {
+            root: [
+              { time: 0, scaleY: 1 },
+              { time: 250, scaleY: 0.5 },
+              { time: 500, scaleY: 1 },
+            ],
+          },
+        },
+        {
           name: 'walk',
           duration: 2000,
           loop: false,
@@ -319,5 +353,166 @@ test('editor shows each interactive line, scrubs without waits and clears the se
   expect(playback.dialogue).toBeUndefined();
   expect(playback.status).toBe('stopped');
   playback.advanceDialogue();
+  playback.dispose();
+});
+
+function idleSource() {
+  const data = source([hold('a', 500), hold('b', 500), hold('later', 1000), hold('end', 2000)]);
+  data.actors[0]!.dialogueIdle = { animation: 'idle', policy: 'overlay-snap' };
+  data.actors[1]!.dialogueIdle = { animation: 'blink', policy: 'overlay-snap' };
+  return data;
+}
+
+test('hold-local overlays loop independently for multiple Actors while all cinematic clocks and ownership freeze', () => {
+  const data = idleSource();
+  const before = serializeSceneDefinition(data);
+  const events = vi.fn<(event: FiredAnimationEvent) => void>();
+  const onCue = vi.fn<(cue: SceneCue) => void>();
+  const runner = new SceneRunner(data, { createActor: factory(events), onCue });
+  runners.push(runner);
+  runner.play();
+  runner.update(9000); // Excess delta is discarded on entry.
+  const hero = runner.actors.get('hero')!;
+  const friend = runner.actors.get('friend')!;
+  const mainId = hero.puppet.getPlaybackStatus()!.playbackId;
+  expect(runner.dialogueHoldPlayback).toEqual({ sceneTime: 500, holdElapsedTime: 0 });
+  expect(hero.puppet.getBone('root').pose.rotation).toBe(2);
+  expect(hero.puppet.animationPlayer.elapsedTime).toBe(500);
+  runner.update(250);
+  expect(hero.puppet.getBone('root').pose.rotation).toBeCloseTo(2.5);
+  expect(friend.puppet.getBone('root').pose.scaleY).toBeCloseTo(0.5);
+  runner.update(1000);
+  expect(hero.puppet.getBone('root').pose.rotation).toBeCloseTo(2.5);
+  expect(runner.time).toBe(500);
+  expect(hero.position).toEqual({ x: 50, y: 0 });
+  expect(friend.position).toEqual({ x: 50, y: 0 });
+  expect(hero.puppet.animationPlayer.elapsedTime).toBe(500);
+  expect(hero.puppet.getPlaybackStatus()!.playbackId).toBe(mainId);
+  expect(runner.cinematicCamera.x).toBe(50);
+  expect(runner.transition.opacity).toBe(0.25);
+  expect(events.mock.calls.map(([event]) => event.name)).toEqual(['held']);
+  expect(onCue.mock.calls.map(([cue]) => cue.time)).toEqual([0, 500]);
+  runner.advanceDialogue(); // Same-time successor gets a fresh local session.
+  expect(runner.dialogueHoldPlayback?.holdElapsedTime).toBe(0);
+  runner.update(400);
+  runner.advanceDialogue();
+  expect(runner.dialogueHoldPlayback).toBeUndefined();
+  expect(hero.puppet.getBone('root').pose.rotation).toBeCloseTo(0.25);
+  expect(friend.puppet.getBone('root').pose.scaleY).toBe(1);
+  runner.update(250);
+  expect(hero.position.x).toBeCloseTo(75);
+  expect(friend.position.x).toBeCloseTo(75);
+  expect(hero.puppet.getBone('root').pose.rotation).toBeCloseTo(0.375);
+  expect(serializeSceneDefinition(data)).toBe(before);
+  expect(serializeSceneDefinition(runner.definition)).toBe(before);
+});
+
+test('pause retains local phase; every seek removes overlays before sampling the exact cinematic pose', () => {
+  const runner = new SceneRunner(idleSource(), { createActor: factory() });
+  runners.push(runner);
+  runner.play();
+  runner.update(500);
+  runner.update(250);
+  const hero = runner.actors.get('hero')!;
+  runner.pause();
+  runner.update(9000);
+  expect(runner.dialogueHoldPlayback?.holdElapsedTime).toBe(250);
+  expect(hero.puppet.getBone('root').pose.rotation).toBeCloseTo(2.5);
+  runner.play();
+  runner.update(250);
+  expect(hero.puppet.getBone('root').pose.rotation).toBe(3);
+  for (const time of [500, 750, 0, 500, 2000]) {
+    runner.seek(time);
+    expect(runner.dialogueHoldPlayback).toBeUndefined();
+    expect(runner.actors.get('hero')!.puppet.getBone('root').pose.rotation).toBeCloseTo(time / 2000);
+    runner.update(5000);
+    expect(runner.dialogueHoldPlayback).toBeUndefined();
+  }
+});
+
+test('rapid holds, restart, stop, ending holds, interruption and disposal release presentation state', () => {
+  const runner = new SceneRunner(idleSource(), { createActor: factory() });
+  runners.push(runner);
+  for (let i = 0; i < 20; i++) {
+    runner.restart();
+    runner.update(500);
+    runner.update(1100);
+    runner.advanceDialogue();
+    runner.advanceDialogue();
+    expect(runner.dialogueHoldPlayback).toBeUndefined();
+    expect(runner.actors.get('hero')!.puppet.getBone('root').pose.rotation).toBeCloseTo(0.25);
+  }
+  runner.update(500);
+  runner.update(100);
+  runner.advanceDialogue();
+  runner.update(1000);
+  runner.update(300);
+  expect(runner.time).toBe(2000);
+  runner.advanceDialogue();
+  expect(runner.status).toBe('completed');
+  expect(runner.dialogueHoldPlayback).toBeUndefined();
+  expect(runner.actors.get('hero')!.puppet.getBone('root').pose.rotation).toBe(1);
+  runner.restart();
+  runner.update(500);
+  runner.stop();
+  expect(runner.dialogueHoldPlayback).toBeUndefined();
+  runner.play();
+  runner.update(500);
+  runner.actors.get('hero')!.stop();
+  expect(runner.status).toBe('interrupted');
+  expect(runner.dialogueHoldPlayback).toBeUndefined();
+  runner.restart();
+  runner.update(500);
+  const actors = [...runner.actors.values()];
+  runner.dispose();
+  expect(runner.dialogueHoldPlayback).toBeUndefined();
+  expect(actors.every((actor) => actor.isDisposed)).toBe(true);
+});
+
+test('idle overlays preserve a frozen interrupted crossfade and sparse manual channels', () => {
+  const puppet = factory()({ id: 'fade' }).puppet;
+  try {
+    puppet.play('walk');
+    puppet.update(200);
+    puppet.play('idle', { fadeDuration: 1000 });
+    puppet.update(300);
+    puppet.play('walk', { fadeDuration: 800 });
+    puppet.update(200);
+    puppet.animationPlayer.pause();
+    puppet.getBone('root').pose.x = 17;
+    puppet.syncPose();
+    const before = { ...puppet.getBone('root').pose };
+    const transition = puppet.animationPlayer.transition;
+    const time = puppet.animationPlayer.elapsedTime;
+    puppet.beginDialogueIdle('blink');
+    puppet.sampleDialogueIdle(1250);
+    expect(puppet.getBone('root').pose.scaleY).toBeCloseTo(0.5);
+    expect(puppet.getBone('root').pose.x).toBe(17);
+    expect(puppet.animationPlayer.transition).toEqual(transition);
+    expect(puppet.animationPlayer.elapsedTime).toBe(time);
+    puppet.endDialogueIdle();
+    expect(puppet.getBone('root').pose).toEqual(before);
+    expect(puppet.animationPlayer.transition).toEqual(transition);
+  } finally {
+    puppet.destroy();
+  }
+});
+
+test('editor preview advances only the local idle clock and scene switching clears it', () => {
+  const playback = new SceneEditorPlayback();
+  playback.sync(idleSource(), true, factory());
+  playback.play();
+  playback.update(500);
+  playback.update(250);
+  expect(playback.time).toBe(500);
+  expect(playback.dialogueHoldPlayback?.holdElapsedTime).toBe(250);
+  expect(playback.actors!.get('hero')!.puppet.getBone('root').pose.rotation).toBeCloseTo(2.5);
+  playback.advanceDialogue();
+  playback.advanceDialogue();
+  expect(playback.dialogueHoldPlayback).toBeUndefined();
+  playback.restart();
+  playback.update(500);
+  playback.sync(createEmptyScene({ id: 'other' }), true, factory());
+  expect(playback.dialogueHoldPlayback).toBeUndefined();
   playback.dispose();
 });

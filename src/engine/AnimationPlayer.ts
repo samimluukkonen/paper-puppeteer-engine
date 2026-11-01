@@ -118,6 +118,13 @@ export class AnimationPlayer {
   private previewMode = false;
   private previewRootMotion = false;
   private clipRig: Rig;
+  private dialogueIdle:
+    | {
+        layer: AnimationLayer;
+        layers: ReadonlyMap<string, AnimationLayer>;
+        pose: AnimationPose;
+      }
+    | undefined;
 
   /** Isolated preview reconstruction suppresses authored events and legacy completion
    * callbacks. Lifecycle outcomes still settle runtime waits and ownership policies.
@@ -946,6 +953,63 @@ export class AnimationPlayer {
     this.poseEvaluator.applyCurrentPose(this.layers, this.playback);
   }
 
+  /** @internal Render-only sparse overlay. No playback identities, queues, events or root application.
+   * Main layers (including interrupted fades) retain their exact clocks and ownership.
+   */
+  beginDialogueIdle(name: string, preparePose?: () => void): void {
+    this.assertActive();
+    const clip = this.clips.get(name);
+    if (!clip) throw new Error(`Unknown dialogue idle animation "${name}".`);
+    if (this.dialogueIdle) throw new Error('A dialogue idle is already active.');
+    preparePose?.();
+    const pose: AnimationPose = new Map([...this.joints].map(([id, joint]) => [id, { ...joint.pose }]));
+    const layer: AnimationLayer = {
+      state: {
+        clip: { ...clip, loop: true },
+        time: 0,
+        unwrappedTime: 0,
+        speed: 1,
+        playing: false,
+        playbackId: 0,
+        rootMotion: 'ignore',
+      },
+      weight: 1,
+      stopped: true,
+      transition: undefined,
+    };
+    const layers = new Map(this.layers);
+    let key = 'dialogue-idle';
+    while (layers.has(key)) key += '-';
+    layers.set(key, layer);
+    this.dialogueIdle = { layer, layers, pose };
+    this.poseEvaluator.invalidate();
+    this.poseEvaluator.applyCurrentPose(layers, this.playback);
+  }
+
+  /** @internal Only the hold-local sample changes. Root motion and authored events are never evaluated. */
+  sampleDialogueIdle(elapsed: number, preparePose?: () => void): void {
+    this.assertActive();
+    assertFinite(elapsed, 'Dialogue idle elapsed time');
+    if (elapsed < 0) throw new Error('Dialogue idle elapsed time cannot be negative.');
+    const idle = this.dialogueIdle;
+    if (!idle) return;
+    preparePose?.();
+    idle.layer.state!.time = elapsed % idle.layer.state!.clip.duration;
+    this.poseEvaluator.applyCurrentPose(idle.layers, this.playback);
+  }
+
+  /** @internal Conservative snap back, including sparse channels absent from the cinematic clip. */
+  endDialogueIdle(preparePose?: () => void): void {
+    this.assertActive();
+    const idle = this.dialogueIdle;
+    if (!idle) return;
+    preparePose?.();
+    this.dialogueIdle = undefined;
+    for (const [id, values] of idle.pose) Object.assign(this.joints.get(id)!.pose, values);
+    this.poseEvaluator.invalidate();
+    this.applyCurrentPose();
+  }
+
   private advance(
     state: AnimationState,
     delta: number,
@@ -1115,6 +1179,7 @@ export class AnimationPlayer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.dialogueIdle = undefined;
     invalidateOwnership();
     this.discardQueue();
     const lifecycle: PlaybackLifecycleEvent[] = [];

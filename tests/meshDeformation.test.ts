@@ -102,6 +102,33 @@ function player(rig: Rig, ...clips: AnimationClip[]) {
   );
 }
 
+test('hold overlays sample mesh channels without advancing or mutating the cinematic deformation', () => {
+  const { rig, clip } = fixture();
+  const idle = { ...clip, name: 'idle' };
+  const before = JSON.stringify(idle);
+  const animation = player(rig, clip, idle);
+  try {
+    animation.play(clip.name);
+    animation.update(100);
+    animation.pause();
+    const cinematic = animation.meshDeformation;
+    animation.beginDialogueIdle('idle');
+    animation.sampleDialogueIdle(1500);
+    assert.deepEqual(animation.meshDeformation.get('mesh')?.get('top-left'), { x: 6, y: -4 });
+    assert.equal(animation.elapsedTime, 100);
+    animation.endDialogueIdle();
+    assert.deepEqual(
+      [...animation.meshDeformation].map(([id, offsets]) => [id, [...offsets]]),
+      [...cinematic].map(([id, offsets]) => [id, [...offsets]]),
+    );
+    assert.equal(JSON.stringify(idle), before);
+    animation.play('idle', { fadeDuration: 0 });
+    assert.isFalse(animation.getPlaybackStatus()!.loop);
+  } finally {
+    animation.dispose();
+  }
+});
+
 test('neutral, sparse shape snapshots, multiple vertices, endpoints and all supported curves', () => {
   const { keys } = fixture();
   assert.equal(evaluateMeshDeformation({}, 100).size, 0);

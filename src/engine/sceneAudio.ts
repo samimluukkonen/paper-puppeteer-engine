@@ -21,6 +21,8 @@ export const sceneAudioClipSchema = z.strictObject({
   volume: z.number().min(0).max(1),
   /** Repeat from sourceOffset to media end; the authored scene interval is always finite. */
   loop: z.boolean(),
+  /** Dedicated hold-only music/ambience. Its scene interval selects eligible holds. */
+  playback: z.enum(['scene', 'dialogue-hold']).exactOptional(),
   fadeIn: z.number().nonnegative().exactOptional(),
   fadeOut: z.number().nonnegative().exactOptional(),
 });
@@ -42,9 +44,16 @@ const emptyAssets: AudioAssets = Object.freeze([]);
 const emptyClips: AudioClips = Object.freeze([]);
 
 function compileAudioClips(clips: AudioClips) {
+  const holds = clips.filter((clip) => clip.playback === 'dialogue-hold');
   return {
     at: compileSceneIntervals(
-      clips,
+      clips.filter((clip) => clip.playback !== 'dialogue-hold'),
+      (clip) => clip.time,
+      (clip) => clip.time + clip.duration,
+    ),
+    holds,
+    holdAt: compileSceneIntervals(
+      holds,
       (clip) => clip.time,
       (clip) => clip.time + clip.duration,
     ),
@@ -70,8 +79,27 @@ export function compileSceneAudio(scene: DeepReadonly<SceneDefinition>) {
   }
   const durationsByAsset = assetDurations;
   const clipIndex = index;
+  const endingHolds = clipIndex.holds.filter((clip) => clip.time + clip.duration === scene.duration);
   return {
     signature: (id: string): string => clipIndex.signatures.get(id)!,
+    sampleHold(time: number, elapsed: number, durations: ReadonlyMap<string, number>): readonly ActiveSceneAudioClip[] {
+      if (!Number.isFinite(time) || !Number.isFinite(elapsed) || elapsed < 0 || time < 0 || time > scene.duration)
+        return [];
+      const eligible = time === scene.duration ? endingHolds : clipIndex.holdAt(time);
+      return eligible.flatMap((clip) => {
+        const window = (durations.get(clip.assetId) ?? 0) - clip.sourceOffset;
+        if (window <= 0) return [];
+        return [
+          {
+            clip,
+            elapsed,
+            remaining: Infinity,
+            sourcePosition: clip.sourceOffset + (elapsed % window),
+            volume: clip.volume,
+          },
+        ];
+      });
+    },
     sample(time: number, durations?: ReadonlyMap<string, number>): readonly ActiveSceneAudioClip[] {
       if (!Number.isFinite(time) || time < 0 || time >= scene.duration) return [];
       const active: ActiveSceneAudioClip[] = [];

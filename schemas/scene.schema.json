@@ -170,6 +170,10 @@
           "loop": {
             "type": "boolean"
           },
+          "playback": {
+            "type": "string",
+            "enum": ["scene", "dialogue-hold"]
+          },
           "fadeIn": {
             "type": "number",
             "minimum": 0
@@ -775,6 +779,29 @@
                 "pattern": "\\S"
               }
             ]
+          },
+          "dialogueIdle": {
+            "type": "object",
+            "properties": {
+              "animation": {
+                "type": "string",
+                "minLength": 1,
+                "allOf": [
+                  {
+                    "pattern": "^(?!__proto__$)[\\s\\S]+$"
+                  },
+                  {
+                    "pattern": "\\S"
+                  }
+                ]
+              },
+              "policy": {
+                "type": "string",
+                "const": "overlay-snap"
+              }
+            },
+            "required": ["animation", "policy"],
+            "additionalProperties": false
           },
           "skin": {
             "type": "string",

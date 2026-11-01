@@ -17,6 +17,7 @@ export interface AudioPlayback {
 /** Seconds at the backend boundary; authored scene data remains milliseconds. */
 export interface TimelineAudioOptions {
   readonly offset: number;
+  /** Infinity is reserved for owned hold-only loops; their owner must stop them. */
   readonly remaining: number;
   readonly rate: number;
   readonly volume: number;
@@ -143,7 +144,7 @@ export class WebAudioBackend implements AudioBackend {
         source.onended = release;
         try {
           source.start(start, options.offset);
-          source.stop(start + options.remaining / options.rate);
+          if (Number.isFinite(options.remaining)) source.stop(start + options.remaining / options.rate);
         } catch (error) {
           try {
             source.stop();
