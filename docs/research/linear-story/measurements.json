@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-03",
+  "environment": {
+    "platform": "Darwin x86_64",
+    "node": "24.22.1",
+    "browser": "installed headless Chrome",
+    "workers": 1,
+    "tracing": true
+  },
+  "workload": {
+    "scenes": 3,
+    "maximumActors": 2,
+    "meshVerticesPerActor": 144,
+    "backgroundWidth": 2048,
+    "backgroundHeight": 1024,
+    "sharedDecodedAudio": true,
+    "rootMotion": true,
+    "cameraAnimation": true,
+    "holdIdle": true,
+    "repeatedKeydowns": 20
+  },
+  "development": {
+    "exports": [719.3000000119209],
+    "preparations": [98.60000002384186, 12.600000023841858, 61.80000001192093],
+    "activations": [53.09999996423721, 31.80000001192093, 12.300000011920929],
+    "updateSamples": 248,
+    "updateMedianMs": 0.3999999761581421,
+    "updateP95Ms": 1.199999988079071,
+    "decodedBytes": 176400,
+    "releasedBytes": 176400
+  },
+  "production": {
+    "exports": [520.1000000238419],
+    "preparations": [102.80000001192093, 12.300000011920929, 23.100000023841858],
+    "activations": [52.69999998807907, 26.30000001192093, 15.700000047683716],
+    "updateSamples": 270,
+    "updateMedianMs": 0.3999999761581421,
+    "updateP95Ms": 1,
+    "decodedBytes": 176400,
+    "releasedBytes": 176400
+  }
+}

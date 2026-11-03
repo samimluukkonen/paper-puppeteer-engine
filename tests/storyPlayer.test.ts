@@ -437,3 +437,134 @@ test('a fade on the first entry reveals before starting, and stop clears its ove
   expect(f.loaded[0]!.dispose).toHaveBeenCalledOnce();
   player.dispose();
 });
+
+test.each(['stop', 'dispose'] as const)('a %s from the fade renderer cannot resurrect playback', async (command) => {
+  const f = fixture(['a', 'b']);
+  let cancel = false;
+  const overlay = {
+    setTransition: () => {
+      if (!cancel) return;
+      cancel = false;
+      player[command]();
+    },
+  };
+  const player = new StoryPlayer(
+    {
+      ...f.story,
+      scenes: [
+        f.story.scenes[0]!,
+        { ...f.story.scenes[1]!, transition: { type: 'fade', duration: 100, color: '#000000' } },
+      ],
+    },
+    { ...f, transitionOverlay: overlay },
+  );
+  await player.start();
+  await player.update(100);
+  cancel = true;
+  await player.update(50);
+  expect(player.status).toBe(command === 'stop' ? 'stopped' : 'disposed');
+  expect(player.currentSession).toBeUndefined();
+  expect(f.loaded).toHaveLength(1);
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledOnce();
+  player.dispose();
+});
+
+test('cancellation from an initial opaque overlay prevents scene allocation', async () => {
+  const f = fixture(['a']);
+  let cancel = true;
+  const player = new StoryPlayer(f.story, {
+    ...f,
+    transitionOverlay: {
+      setTransition: ({ opacity }) => {
+        if (!cancel || opacity !== 1) return;
+        cancel = false;
+        player.dispose();
+      },
+    },
+  });
+  await player.start();
+  expect(player.status).toBe('disposed');
+  expect(player.index).toBe(-1);
+  expect(f.loaded).toHaveLength(0);
+});
+
+test('a failing handoff renderer rejects start and leaves an observable failed player', async () => {
+  const f = fixture(['a']);
+  const error = new Error('Overlay unavailable');
+  const player = new StoryPlayer(f.story, {
+    ...f,
+    transitionOverlay: {
+      setTransition: ({ opacity }) => {
+        if (opacity === 1) throw error;
+      },
+    },
+  });
+  await expect(player.start()).rejects.toBe(error);
+  expect(player.status).toBe('failed');
+  expect(player.error).toBe(error);
+  expect(player.currentSession).toBeUndefined();
+  player.dispose();
+});
+
+test('a failed load during a fade rejects its tick and releases the outgoing scene', async () => {
+  const f = fixture(['a', 'b']);
+  const error = new Error('Incoming scene unavailable');
+  const player = new StoryPlayer(
+    {
+      ...f.story,
+      scenes: [
+        f.story.scenes[0]!,
+        {
+          ...f.story.scenes[1]!,
+          transition: { type: 'fade', duration: 100, color: '#000000' },
+        },
+      ],
+    },
+    {
+      ...f,
+      transitionOverlay: { setTransition() {} },
+      loadScene: (scene, context) => {
+        if (context.index === 1) return Promise.reject(error);
+        return f.loadScene(scene, context);
+      },
+    },
+  );
+  await player.start();
+  await player.update(100);
+  await expect(player.update(50)).rejects.toBe(error);
+  expect(player.status).toBe('failed');
+  expect(f.loaded[0]!.dispose).toHaveBeenCalledOnce();
+  player.dispose();
+});
+
+test.each([1, 2])(
+  'stopping at prepared handoff overlay %s releases the next lease without activation',
+  async (opaqueCall) => {
+    const f = fixture(['a', 'b']);
+    const release = vi.fn();
+    let remaining = Number.POSITIVE_INFINITY;
+    const player = new StoryPlayer(f.story, {
+      ...f,
+      prepareScene: (scene, context) =>
+        Promise.resolve({
+          activate: () => f.loadScene(scene, context),
+          dispose: release,
+        }),
+      transitionOverlay: {
+        setTransition: ({ opacity }) => {
+          if (opacity !== 1 || --remaining !== 0) return;
+          player.stop();
+        },
+      },
+    });
+    await player.start();
+    await Promise.resolve();
+    remaining = opaqueCall;
+    await player.update(100);
+    await Promise.resolve();
+    expect(player.status).toBe('stopped');
+    expect(f.loaded).toHaveLength(1);
+    expect(release).toHaveBeenCalledTimes(2);
+    player.dispose();
+  },
+);

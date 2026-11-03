@@ -2,7 +2,7 @@
 
 [All guides](../README.md#guides) · [Scene Editor](scene-editor.md) · [Dialogue](scene-dialogue.md)
 
-Project Workspace’s **Story Sequence** panel assembles existing scenes into a linear story. No code or JSON editing is needed. Open **Feature Guide → Assembling and Previewing a Story** for a tour; the tour only reveals controls and never changes your work.
+Project Workspace’s **Story Sequence** panel assembles existing scenes into a linear story. No code or JSON editing is needed. Start with [Creating a Linear Story](creating-a-linear-story.md). Open **Feature Guide → Creating a Story** or **Exporting a Story** for a tour; the tours only reveal controls and never change your work.
 
 1. Create your scenes in the project’s **Scenes** section. Use **Scene Editor** to author Actors, actions, camera, artwork, dialogue and audio.
 2. In **Story Sequence**, choose **New Story**, enter a name and **Create Story**. Use the **Story** selector to switch stories. Edit **Story name** and choose **Rename Story** to apply a name.

@@ -30,6 +30,38 @@ const guide = (
 /** Explain tours reuse the shared spotlight. Revealing panels never authors data or starts playback. */
 const workflowGuides: readonly GuideDefinition[] = [
   guide(
+    'scene-dialogue-advancement',
+    'Dialogue Advancement',
+    'Author Wait for Enter lines and verify one deliberate press advances one dialogue step.',
+    scene,
+    [
+      step(
+        'track',
+        'Open the dialogue track',
+        T.sceneDialogueTrack,
+        'After exiting, open the **Dialogue** timeline tab and select a line. Choose **Add Dialogue Line** first if the track is empty. Selecting a line reveals its inspector; this tour preserves the current selection.',
+      ),
+      step(
+        'progression',
+        'Set Wait for Enter',
+        T.sceneDialogueTiming,
+        'Choose **Dialogue progression → Wait for Enter**, then **Apply dialogue properties**. Start is the hold boundary; Duration controls silent scrubbing only. Timed lines continue automatically. Lines sharing a start advance in stable Line ID order, shown by numbered Enter markers.',
+      ),
+      step(
+        'preview',
+        'Preview a reading hold',
+        T.scenePlayback,
+        'After exiting, choose **Stop**, then **Play** for a fresh pass. The line stays visible while scene time, choreography, root motion, camera, ordinary audio and future cues pause. A line at time zero waits immediately. Scrubbing is a silent cinematic sample and never waits or triggers sound.',
+      ),
+      step(
+        'advance',
+        'Advance one line',
+        T.scenePlayback,
+        'Focus the canvas and press **Enter**, or use **Advance dialogue**. Held-key repeats cannot consume the next line. Each separate deliberate press advances one waiting line, including same-time exchanges. Typing fields keep Enter. Resume uses the frozen cinematic time without catching up the wait; Stop and Restart reset consumed holds.',
+      ),
+    ],
+  ),
+  guide(
     'scene-dialogue-hold-presentation',
     'Idle Animation & Audio During Dialogue Holds',
     'Keep selected Actors and ambience alive while Wait for Enter dialogue freezes cinematic time.',

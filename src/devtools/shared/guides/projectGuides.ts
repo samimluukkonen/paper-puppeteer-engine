@@ -12,7 +12,7 @@ const step = (id: string, title: string, targetId: string, description: string):
 export const projectGuides: readonly GuideDefinition[] = [
   {
     id: 'project-story-sequence',
-    title: 'Assembling and Previewing a Story',
+    title: 'Creating a Story',
     description: 'Build a linear scene sequence, configure dialogue holds and preview the complete story.',
     editor: 'project',
     category: 'scene',
@@ -70,6 +70,46 @@ export const projectGuides: readonly GuideDefinition[] = [
         'Save and recover the complete story',
         T.projectExport,
         '**Undo Project / Redo Project** restore story names and sequence edits. Scene dialogue uses its own Undo/Redo. Browser autosave includes committed stories and scenes; use **Local draft** for status and recovery. **Download story package** exports this story and its dependencies for the standalone runtime, sharing identical artwork/audio binaries. **Export Project** creates an editable workspace ZIP; **Import Project** restores all stories, shared scenes and dependencies. This tour never exports, changes checkpoints or authors history.',
+      ),
+    ],
+  },
+  {
+    id: 'project-story-export',
+    title: 'Exporting a Story',
+    description: 'Validate source assets, download a portable story and open it in a standalone runtime.',
+    editor: 'project',
+    category: 'scene',
+    prerequisites: [{ capability: 'tool:project', reason: 'Create or import a project first.' }],
+    steps: [
+      step(
+        'validate',
+        'Validate before handoff',
+        T.projectValidate,
+        'After exiting the tour, choose **Validate Project**. In **Story Sequence**, select the story and expand **Story validation** when warnings appear. Missing scenes, character animations, artwork and audio must be repaired before playback or export. The tour reveals controls without validating or exporting.',
+      ),
+      step(
+        'repair',
+        'Repair the shared source',
+        T.projectStories,
+        'Use **Open source scene** beside the affected entry or warning. Repair the referenced asset in its owning editor, then return and validate again. An entry references a shared scene: changing its dialogue changes every story using that scene. Complete or cancel temporary edits before downloading.',
+      ),
+      step(
+        'download',
+        'Download the viewer package',
+        T.projectStories,
+        '**Download story package** writes a portable story ZIP with ordered scenes, transitions, characters, mesh attachments, images and audio. Shared binaries are stored once. Preview with **Preview Entire Story** first; Enter advances one waiting line per deliberate press. This download does not mark the editable project as exported.',
+      ),
+      step(
+        'standalone',
+        'Preview in your standalone host',
+        T.projectStories,
+        'Give the ZIP to your application’s **StoryPackageLoader** and **StandaloneStoryPlayer** integration. Load, Play and focus the viewer. Use **Enable story audio** when requested, then test Enter through scene boundaries and completion. The authoring application has no standalone ZIP upload control. The standalone story player guide documents the host integration.',
+      ),
+      step(
+        'backup',
+        'Keep an editable backup',
+        T.projectExport,
+        '**Export Project** saves the editable workspace, all stories and their sources. **Import Project** restores that workspace; a story ZIP is a viewer handoff. Local draft autosave/recovery retains committed story edits in this browser. Keep the project ZIP alongside the viewer package for future editing.',
       ),
     ],
   },

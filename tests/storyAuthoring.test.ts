@@ -7,7 +7,9 @@ import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { storyDiagnostics } from '../src/devtools/project/storyDiagnostics.js';
 import { StorySequencePanel } from '../src/devtools/project/StorySequencePanel.js';
 import { buildProjectDraft } from '../src/devtools/shared/autosave/projectDrafts.js';
+import { captureChoreography, captureSceneTemplate } from '../src/devtools/shared/sceneReuse.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
+import { retargetFixture } from './helpers/retargetFixture.js';
 
 function fixture() {
   const workspace = new ProjectWorkspace('Sequence', 'film');
@@ -77,6 +79,72 @@ test('invalid references, destinations and names leave project and source histor
   const another = workspace.createStory('Second');
   expect(another).not.toBe(id);
 });
+
+test.each(['export', 'recovery'] as const)(
+  'three-scene %s preserves mesh characters, root motion and reusable sources',
+  async (mode) => {
+    const { project } = await retargetFixture();
+    for (const id of ['forest', 'encounter', 'sword']) {
+      const scene = createEmptyScene({ id, duration: 1000 });
+      scene.actors = [
+        { id: 'hero', character: { manifest: project.characterReference('source') }, position: { x: 0, y: 0 } },
+      ];
+      scene.actions = [
+        {
+          id: 'cut',
+          actorId: 'hero',
+          type: 'animation',
+          animation: 'sword-cut',
+          time: 0,
+          duration: 1000,
+          loop: false,
+          speed: 1,
+          movementSource: 'rootMotion',
+        },
+      ];
+      project.addScene(scene);
+    }
+    const source = project.scenes.scene('forest')!;
+    project.setSceneReuse({
+      version: 1,
+      choreographies: [
+        captureChoreography(source, { id: 'cut', name: 'Cut', actionIds: ['cut'], rigIdentity: () => 'source' }),
+      ],
+      templates: [
+        captureSceneTemplate(source, {
+          id: 'forest',
+          name: 'Forest',
+          actors: true,
+          timeline: true,
+          audioDialogue: true,
+        }),
+      ],
+    });
+    const library = project.sceneReuse;
+    const character = JSON.stringify(project.characterInventory('source'));
+    const other = project.scenes.scene('sword');
+    const story = project.createStory('Film');
+    const entries = ['forest', 'encounter', 'sword'].map((id) => project.addStoryScene(story, id));
+    project.reorderStoryScene(story, entries[2]!, 0);
+    project.undo();
+    const duplicate = project.duplicateStoryScene(story, entries[0]!);
+    project.removeStoryScene(story, duplicate);
+    project.scenes.selectScene('forest');
+    project.scenes.addDialogueLine({ text: 'Opening hold', time: 0, duration: 0, progression: 'advance-required' });
+    expect(project.scenes.scene('forest')!.actions).toBe(source.actions);
+    expect(project.scenes.scene('sword')).toBe(other);
+    expect(project.sceneReuse).toEqual(library);
+    expect(JSON.stringify(project.characterInventory('source'))).toBe(character);
+    const files = mode === 'export' ? (await buildProjectPackage(project)).files : await buildProjectDraft(project);
+    const restored = await importProjectPackage(files);
+    expect(restored.definition.stories).toEqual(project.definition.stories);
+    expect(restored.scenes.scene('forest')!.dialogue).toEqual(project.scenes.scene('forest')!.dialogue);
+    expect(restored.sceneReuse).toEqual(library);
+    expect(restored.characterInventory('source').animations).toEqual(project.characterInventory('source').animations);
+    expect(restored.characterInventory('source').rig).toEqual(project.characterInventory('source').rig);
+    expect(restored.inspect('export').counts.error).toBe(0);
+  },
+);
 
 test.each(['export', 'recovery'] as const)(
   'visual story and dialogue edits survive %s without mixing document owners',

@@ -103,6 +103,7 @@ The [runtime integration guide](docs/runtime-integration.md) covers portable cha
 | [Scene editor](docs/scene-editor.md)                                     | Actors, action timelines, [audio clips](docs/scene-audio-timeline.md) and [dialogue/subtitles](docs/scene-dialogue.md) |
 | [Dialogue holds](docs/dialogue-hold-presentation.md)                     | Idle overlays, hold-only ambience, frozen cinematic time and explicit Advance                                          |
 | [Story Editor](docs/story-editor.md)                                     | Visual scene sequencing, dialogue advancement, entire-story preview and project persistence                            |
+| [Creating a linear story](docs/creating-a-linear-story.md)               | Artist workflow from scene ordering through reading holds, preview, backup and standalone handoff                      |
 | [Scene handoffs and story packages](docs/story-handoffs-and-packages.md) | Entry fades, next-scene loading, shared assets, audio ownership and portable story ZIPs                                |
 | [Standalone story player](docs/standalone-story-player.md)               | Runtime viewer API, focused dialogue input, audio activation and lifecycle                                             |
 | [Audio assets](docs/audio-assets.md)                                     | Project audio import, organization, auditioning, runtime loading and limits                                            |

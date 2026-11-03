@@ -11,7 +11,7 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   const project = page.getByRole('dialog', { name: 'New Project', exact: true });
   await project.getByLabel('Project name').fill('Story film');
   await project.getByRole('button', { name: 'Create Project', exact: true }).click();
-  for (const id of ['forest', 'meeting']) {
+  for (const id of ['forest', 'meeting', 'sword']) {
     const scene = createEmptyScene({ id, name: id, duration: 400 });
     scene.dialogue = [
       { id: '01-first', text: `${id} first`, time: 0, duration: 0, progression: 'advance-required' },
@@ -31,16 +31,18 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await panel.getByRole('button', { name: 'Add Scene', exact: true }).click();
   await panel.getByLabel('Story scene').selectOption('meeting');
   await panel.getByRole('button', { name: 'Add Scene', exact: true }).click();
+  await panel.getByLabel('Story scene').selectOption('sword');
+  await panel.getByRole('button', { name: 'Add Scene', exact: true }).click();
   const entries = panel.locator('.story-entries > li');
   await panel.getByRole('button', { name: 'Move entry 2 up', exact: true }).click();
   await expect(entries.first()).toContainText('meeting');
   await page.getByRole('button', { name: 'Undo Project', exact: true }).click();
   await expect(entries.first()).toContainText('forest');
   await entries.first().getByRole('button', { name: 'Duplicate entry', exact: true }).click();
-  await expect(entries).toHaveCount(3);
+  await expect(entries).toHaveCount(4);
   await entries.nth(1).getByRole('button', { name: 'Remove entry', exact: true }).click();
-  await expect(entries).toHaveCount(2);
-  await expect(page.locator('[data-guide-id="project-scenes"] .project-assets > li')).toHaveCount(2);
+  await expect(entries).toHaveCount(3);
+  await expect(page.locator('[data-guide-id="project-scenes"] .project-assets > li')).toHaveCount(3);
   await panel.getByLabel('Entry 2 transition', { exact: true }).selectOption('fade');
   await panel.getByLabel('Entry 2 fade color', { exact: true }).fill('#123456');
   const storyDownloading = page.waitForEvent('download');
@@ -53,7 +55,7 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await panel.getByRole('button', { name: 'Preview Entire Story', exact: true }).click();
   const preview = page.getByRole('dialog', { name: 'Entire story preview', exact: true });
   const status = preview.getByRole('status');
-  await expect(status).toContainText('Scene 1 of 2: forest');
+  await expect(status).toContainText('Scene 1 of 3: forest');
   await expect(status).toContainText('Wait for Enter');
   await expect(preview.locator('.story-preview-dialogue')).toHaveText('forest first');
   await preview.screenshot({ path: info.outputPath('story-preview.png') });
@@ -63,10 +65,15 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await expect(preview.locator('.story-preview-dialogue')).toHaveText('forest second');
   await page.keyboard.up('Enter');
   await page.keyboard.press('Enter');
-  await expect(status).toContainText('Scene 2 of 2: meeting');
+  await expect(status).toContainText('Scene 2 of 3: meeting');
   await expect(preview.locator('.story-preview-dialogue')).toHaveText('meeting first');
   await preview.getByRole('button', { name: 'Advance dialogue (Enter)', exact: true }).click();
   await expect(preview.locator('.story-preview-dialogue')).toHaveText('meeting second');
+  await preview.getByRole('button', { name: 'Advance dialogue (Enter)', exact: true }).click();
+  await expect(status).toContainText('Scene 3 of 3: sword');
+  await expect(preview.locator('.story-preview-dialogue')).toHaveText('sword first');
+  await preview.getByRole('button', { name: 'Advance dialogue (Enter)', exact: true }).click();
+  await expect(preview.locator('.story-preview-dialogue')).toHaveText('sword second');
   await preview.getByRole('button', { name: 'Advance dialogue (Enter)', exact: true }).click();
   await expect(status).toContainText('completed');
   await preview.getByRole('button', { name: 'Restart story', exact: true }).click();
@@ -77,6 +84,19 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await preview.getByRole('button', { name: 'Close preview', exact: true }).click();
   await expect(preview).toHaveCount(0);
   await expect(page.locator('.story-preview-canvas canvas')).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Local draft', exact: true }).click();
+  await expect(page.getByLabel('Local save status')).toContainText('Local draft saved');
+  page.on('dialog', (dialog) => {
+    void dialog.accept();
+  });
+  await page.reload();
+  const recovery = page.getByRole('dialog', { name: 'Recover unsaved work?', exact: true });
+  await recovery.getByRole('button', { name: 'Recover Draft', exact: true }).click();
+  await expect(recovery).not.toBeVisible();
+  await page.getByRole('tab', { name: 'Project', exact: true }).click();
+  await expect(panel.getByLabel('Select story')).toContainText('The encounter');
+  await expect(entries).toHaveCount(3);
+  await expect(panel.getByLabel('Entry 2 transition', { exact: true })).toHaveValue('fade');
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export Project', exact: true }).click();
   const download = await downloading;
@@ -85,7 +105,7 @@ test('artist assembles, previews, advances, restarts and round trips a linear st
   await page.getByLabel('Import Project', { exact: true }).setInputFiles(path);
   await expect(page.getByLabel('Select project')).toHaveValue(/.+/);
   await expect(panel.getByLabel('Select story')).toContainText('The encounter');
-  await expect(entries).toHaveCount(2);
+  await expect(entries).toHaveCount(3);
   await expect(entries.first()).toContainText('forest');
   await expect(panel.getByLabel('Entry 2 transition', { exact: true })).toHaveValue('fade');
 });

@@ -151,6 +151,12 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
 
+## 1.6.6
+
+- Harden story cancellation during transition callbacks and prevent stale scene loads, frame updates and audio activation from interfering with restarted editor previews. Always release preview resources during teardown.
+- Exercise a three-scene cinematic story through portable ZIPs, root motion, IK/mesh correction, camera, narration, consecutive dialogue holds, ambient/SFX playback, ending fades and completion. Compare mixed forward/backward seeks against fresh samples and verify source isolation, restart and cleanup.
+- Add Creating a Story, Dialogue Advancement and Exporting a Story guide coverage alongside the existing idle/audio tour, plus a concise artist workflow and a production verification report with measured browser workloads and explicit acceptance limits.
+
 ## 1.6.5
 
 - Add story-entry cuts and fades through color, a story-owned handoff overlay, loading feedback and frozen incoming clocks through preparation/reveal, preserving time-zero dialogue holds.

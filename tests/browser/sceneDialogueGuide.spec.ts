@@ -12,7 +12,7 @@ declare global {
   }
 }
 
-for (const guideId of ['scene-dialogue-authoring', 'scene-creating-dialogue']) {
+for (const guideId of ['scene-dialogue-authoring', 'scene-creating-dialogue', 'scene-dialogue-advancement']) {
   for (const populated of [false, true]) {
     test(`${guideId} reveals all steps and preserves ${populated ? 'instance speakers, voice metadata, history and preview' : 'an empty scene'}`, async ({
       page,

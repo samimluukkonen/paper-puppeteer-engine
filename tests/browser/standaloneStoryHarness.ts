@@ -8,10 +8,11 @@ import {
   encodePackageZip,
   createEmptyScene,
 } from '../../src/engine/runtime.js';
+import { linearStoryFixture } from '../helpers/linearStoryFixture.js';
 import { silentWav, trackedAudioBackend } from './trackedAudioBackend.js';
 
 /** Public runtime consumer: no React or authoring modules. */
-export async function mountStory(space = false, audio = false, portable = false) {
+export async function mountStory(space = false, audio = false, portable = false, acceptance = false) {
   const host = document.createElement('div');
   host.tabIndex = 0;
   host.setAttribute('aria-label', 'Standalone story');
@@ -41,58 +42,61 @@ export async function mountStory(space = false, audio = false, portable = false)
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
   const tracking: ReturnType<typeof trackedAudioBackend>[] = [];
-  const scenes = new Map(
-    ['forest', 'meeting'].map((id) => {
-      const definition = createEmptyScene({ id, duration: 100 });
-      definition.dialogue = ['01-first', '02-second'].map((lineId) => ({
-        id: lineId,
-        speakerName: '語り手',
-        text: `${id} ${lineId}\n森は静かだった。`,
-        time: 0,
-        duration: 0,
-        progression: 'advance-required' as const,
-      }));
-      if (portable) {
-        definition.actors = [
-          {
-            id: 'hero',
-            character: { manifest: new URL('characters/demo-puppet/character.json', location.href).href },
-            position: { x: 0, y: 0 },
-            animation: 'idle',
-          },
-        ];
-        definition.images = [
-          {
-            id: 'paper',
-            image: 'paper.png',
-            position: { x: -400, y: -300 },
-            scale: { x: 800, y: 600 },
-            visible: true,
-            order: 0,
-          },
-        ];
-      }
-      if (audio) {
-        definition.audioAssets = [{ id: 'tone', name: 'Tone', path: 'tone.wav', category: 'music' }];
-        definition.audioTracks = [{ id: 'music', name: 'Music', category: 'music' }];
-        definition.audioClips = [
-          {
-            id: 'bed',
-            trackId: 'music',
-            assetId: 'tone',
-            time: 0,
-            duration: 100,
-            sourceOffset: 0,
-            volume: 0.5,
-            loop: true,
-            playback: 'dialogue-hold',
-          },
-        ];
-      }
-      return [id, definition];
-    }),
-  );
-  const definition = {
+  const acceptanceFixture = acceptance ? linearStoryFixture() : undefined;
+  const scenes =
+    acceptanceFixture?.scenes ??
+    new Map(
+      ['forest', 'meeting'].map((id) => {
+        const definition = createEmptyScene({ id, duration: 100 });
+        definition.dialogue = ['01-first', '02-second'].map((lineId) => ({
+          id: lineId,
+          speakerName: '語り手',
+          text: `${id} ${lineId}\n森は静かだった。`,
+          time: 0,
+          duration: 0,
+          progression: 'advance-required' as const,
+        }));
+        if (portable) {
+          definition.actors = [
+            {
+              id: 'hero',
+              character: { manifest: new URL('characters/demo-puppet/character.json', location.href).href },
+              position: { x: 0, y: 0 },
+              animation: 'idle',
+            },
+          ];
+          definition.images = [
+            {
+              id: 'paper',
+              image: 'paper.png',
+              position: { x: -400, y: -300 },
+              scale: { x: 800, y: 600 },
+              visible: true,
+              order: 0,
+            },
+          ];
+        }
+        if (audio) {
+          definition.audioAssets = [{ id: 'tone', name: 'Tone', path: 'tone.wav', category: 'music' }];
+          definition.audioTracks = [{ id: 'music', name: 'Music', category: 'music' }];
+          definition.audioClips = [
+            {
+              id: 'bed',
+              trackId: 'music',
+              assetId: 'tone',
+              time: 0,
+              duration: 100,
+              sourceOffset: 0,
+              volume: 0.5,
+              loop: true,
+              playback: 'dialogue-hold',
+            },
+          ];
+        }
+        return [id, definition];
+      }),
+    );
+  const definition = acceptanceFixture?.story ?? {
     version: 1,
     id: 'film',
     name: 'Film',
@@ -103,6 +107,12 @@ export async function mountStory(space = false, audio = false, portable = false)
     })),
   };
   const loaded: Awaited<ReturnType<typeof SceneLoader.fromDefinition>>[] = [];
+  const metrics = {
+    exports: [] as number[],
+    preparations: [] as number[],
+    activations: [] as number[],
+    updates: [] as number[],
+  };
   let viewer!: StandaloneStoryPlayer;
   const mount = async () => {
     viewer = new StandaloneStoryPlayer(scene, host, {
@@ -115,18 +125,37 @@ export async function mountStory(space = false, audio = false, portable = false)
             atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='),
             (value) => value.charCodeAt(0),
           );
+          const image = async (width: number, height: number) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext('2d')!;
+            context.fillStyle = '#193d29';
+            context.fillRect(0, 0, width, height);
+            context.fillStyle = '#50783b';
+            for (let x = 0; x < width; x += 80) context.fillRect(x, 0, 35, height);
+            const blob = await new Promise<Blob>((resolve) => canvas.toBlob((blob) => resolve(blob!), 'image/png'));
+            return new Uint8Array(await blob.arrayBuffer());
+          };
+          const background = acceptance ? await image(2048, 1024) : png;
+          const characterImage = acceptance ? await image(80, 40) : png;
+          if (acceptanceFixture) acceptanceFixture.assets.documents['images/paper.png'] = characterImage;
+          const exportStart = performance.now();
           const files = await buildStoryPackage(definition, {
             scenes,
             signal,
             buildScene: (definition) =>
               buildScenePackage(definition, {
-                baseUrl: location.href,
+                ...(acceptanceFixture?.assets ?? { baseUrl: location.href }),
                 signal,
-                loadImage: () => Promise.resolve(png),
+                loadImage: (reference) =>
+                  Promise.resolve(reference.endsWith('forest.png') ? background : characterImage),
                 loadAudio: () => Promise.resolve(silentWav(1)),
               }),
           });
-          const source = await StoryPackageLoader.load(scene, encodePackageZip(files), {
+          const zip = encodePackageZip(files);
+          metrics.exports.push(performance.now() - exportStart);
+          const source = await StoryPackageLoader.load(scene, zip, {
             signal,
             ...(audio ? { audioBackend: backend.backend } : {}),
           });
@@ -134,11 +163,23 @@ export async function mountStory(space = false, audio = false, portable = false)
           return {
             ...source,
             prepareScene: async (...args: Parameters<typeof prepare>) => {
+              const preparationStart = performance.now();
               const prepared = await prepare(...args);
+              metrics.preparations.push(performance.now() - preparationStart);
               return {
                 ...prepared,
                 activate: async () => {
+                  const activationStart = performance.now();
                   const session = await prepared.activate();
+                  metrics.activations.push(performance.now() - activationStart);
+                  if (acceptance) {
+                    const update = session.runner.update.bind(session.runner);
+                    session.runner.update = (delta) => {
+                      const start = performance.now();
+                      update(delta);
+                      metrics.updates.push(performance.now() - start);
+                    };
+                  }
                   loaded.push(session);
                   return session;
                 },
@@ -184,6 +225,13 @@ export async function mountStory(space = false, audio = false, portable = false)
         index: viewer.index,
         waiting: viewer.waitingForDialogue,
         line: loaded.at(-1)?.runner.dialogue?.line.id,
+        time: loaded.at(-1)?.runner.time,
+        camera: loaded.at(-1)?.runner.cinematicCamera,
+        actorPositions: [...(loaded.at(-1)?.runner.actors.values() ?? [])].map((actor) => actor.position),
+        rootScales: [...(loaded.at(-1)?.runner.actors.values() ?? [])].map(
+          (actor) => actor.puppet.getBone('root').pose.scaleY,
+        ),
+        metrics,
         text: subtitle instanceof Phaser.GameObjects.Text ? subtitle.text : '',
         audio: loaded.at(-1)?.runner.audio?.status,
         objects: scene.children.list.length,

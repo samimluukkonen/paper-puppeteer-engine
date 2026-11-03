@@ -14,12 +14,13 @@ import type { ProjectWorkspace } from './ProjectWorkspace.js';
 type PreviewState = { status: string; index: number; waiting: boolean; text: string; audio: string; error: string };
 
 /** Artist-only host around the public StoryPlayer and SceneLoader. No viewer controls enter the runtime. */
-class StoryPreviewScene extends Phaser.Scene {
+export class StoryPreviewScene extends Phaser.Scene {
   private player: StoryPlayer | undefined;
   private loaded: LoadedScene | undefined;
   private source: StandaloneStorySource | undefined;
   private readonly lifetime = new AbortController();
-  private ticking = false;
+  private generation = 0;
+  private ticking: number | undefined;
   private closed = false;
   private failure = '';
   private lastReport = '';
@@ -44,7 +45,11 @@ class StoryPreviewScene extends Phaser.Scene {
       return;
     }
     this.source = source;
-    const attach = (loaded: LoadedScene): LoadedScene => {
+    const attach = (loaded: LoadedScene, signal: AbortSignal): LoadedScene => {
+      if (this.closed || signal.aborted) {
+        loaded.dispose();
+        throw signal.reason ?? new DOMException('Story preview closed.', 'AbortError');
+      }
       try {
         loaded.applyCamera(this.cameras.main, { x: 0, y: 0, width: 960, height: 540 });
       } catch (error) {
@@ -65,9 +70,12 @@ class StoryPreviewScene extends Phaser.Scene {
       ...(source.transitionOverlay ? { transitionOverlay: source.transitionOverlay } : {}),
       prepareScene: async (definition, context) => {
         const prepared = await source.prepareScene!(definition, context);
-        return { dispose: () => prepared.dispose(), activate: async () => attach(await prepared.activate()) };
+        return {
+          dispose: () => prepared.dispose(),
+          activate: async () => attach(await prepared.activate(), context.signal),
+        };
       },
-      loadScene: async (definition, context) => attach(await source.loadScene(definition, context)),
+      loadScene: async (definition, context) => attach(await source.loadScene(definition, context), context.signal),
     });
     this.restart();
   }
@@ -96,15 +104,19 @@ class StoryPreviewScene extends Phaser.Scene {
   }
   restart(): void {
     if (!this.player || this.closed) return;
+    const generation = ++this.generation;
     this.failure = '';
     this.player.stop();
     void this.player.start().then(
       () => this.publish(),
-      (error: unknown) => this.failed(error),
+      (error: unknown) => {
+        if (generation === this.generation) this.failed(error);
+      },
     );
     this.publish();
   }
   stop(): void {
+    ++this.generation;
     this.player?.stop();
     this.publish();
   }
@@ -120,39 +132,54 @@ class StoryPreviewScene extends Phaser.Scene {
     return this.player?.currentSession?.runner.status === 'waiting-for-dialogue-advance';
   }
   enableAudio(): void {
-    void this.loaded?.runner.audio?.unlock().then(
+    const loaded = this.loaded;
+    const generation = this.generation;
+    void loaded?.runner.audio?.unlock().then(
       () => {
-        this.loaded?.runner.syncAudio();
+        if (loaded !== this.loaded) return;
+        loaded.runner.syncAudio();
         this.publish();
       },
-      (error: unknown) => this.failed(error),
+      (error: unknown) => {
+        if (generation === this.generation) this.failed(error);
+      },
     );
   }
   update(_time: number, delta: number): void {
     if (this.closed || !this.player) return;
-    if (this.ticking) {
+    if (this.ticking === this.generation) {
       this.publish();
       return;
     }
-    this.ticking = true;
+    const generation = this.generation;
+    this.ticking = generation;
     void this.player
       .update(delta)
       .then(
         () => this.publish(),
-        (error: unknown) => this.failed(error),
+        (error: unknown) => {
+          if (generation === this.generation) this.failed(error);
+        },
       )
       .finally(() => {
-        this.ticking = false;
+        if (this.ticking === generation) this.ticking = undefined;
       });
   }
   disposePreview(): void {
     if (this.closed) return;
     this.closed = true;
-    this.player?.dispose();
-    this.player = undefined;
-    this.lifetime.abort();
-    this.source?.dispose?.();
-    this.source = undefined;
+    ++this.generation;
+    try {
+      this.player?.dispose();
+    } finally {
+      this.player = undefined;
+      try {
+        this.lifetime.abort();
+      } finally {
+        this.source?.dispose?.();
+        this.source = undefined;
+      }
+    }
   }
 }
 

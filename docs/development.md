@@ -25,6 +25,8 @@ npm run check:release
 
 `check:release` runs formatting, lint, typecheck, version validation, all normal unit regressions, both builds and the packed consumer checks in sequence. It does not replace the local browser, performance and human acceptance gates in the [release-readiness report](release-readiness.md). The [v1.0.5 report](personal-production-readiness.md) covers the complete project workflow, recovery and standalone scene handoff. Run optional profiles separately from browser tests to avoid competing workloads. Browser checks stay local-only; dependency audit scheduling is unchanged.
 
+The [v1.6.6 linear story report](linear-story-readiness.md) records cinematic holds, story recovery/package integration, lifecycle hardening, local desktop browser regressions and representative story timings. Its [artist guide](creating-a-linear-story.md) follows the actual Story Sequence and dialogue controls.
+
 ### Local browser checks
 
 Browser smoke tests are local-only by project policy. Keep them out of CI and do not propose adding them to CI in improvement reviews unless the user explicitly changes this preference. Run the suite locally against the real rig editor, Phaser canvas, and shipped character assets:

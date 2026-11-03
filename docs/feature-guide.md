@@ -4,6 +4,8 @@ Open **Feature Guide** in the shared header. Choose **Project Workspace**, **Rig
 
 Guides appear in alphabetical order within each editor category. Use **Search guides** to filter titles and descriptions in the selected category; searches ignore capitalization and match all entered words. The search stays in place when switching categories. Choose **Clear search** to show the full category again.
 
+For linear films, use **Project Workspace → Creating a Story** and **Exporting a Story**. In Scene Editor, use **Dialogue Advancement** for Wait for Enter lines, then **Idle Animation & Audio During Dialogue Holds** for Actor overlays and permitted music/ambience. All four use existing UI anchors without creating assets, starting playback or changing history. See [Creating a Linear Story](creating-a-linear-story.md).
+
 **Project Workspace** opens the same catalog. Choose an editor category and a character or scene, then start the guide. The selected editor opens and checks its live requirements. Create assets first with **+ New Character** or **+ New Scene** when the project is empty. The standalone character-creation tour is unavailable within project editors; use Project Workspace to create characters.
 
 Choose the **Project Workspace** category for **Importing and Managing Audio**, a seven-step Explain tour of WAV/MP3/OGG import, Music/Ambience/Sound effects/Voice categories, Play/Stop and preview volume, rename/removal, project Undo/Redo and portable saving. Create or import a project first; no character, scene or audio asset is required. The tour reveals Audio and the Project controls without importing files, changing assets or starting sound. See [Audio assets](audio-assets.md).

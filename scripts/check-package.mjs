@@ -71,6 +71,7 @@ try {
     'artist-workflow.md',
     'reusing-animations-and-scenes.md',
     'linear-stories.md',
+    'creating-a-linear-story.md',
     'standalone-story-player.md',
     'story-handoffs-and-packages.md',
   ])

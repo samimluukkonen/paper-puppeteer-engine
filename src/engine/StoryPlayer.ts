@@ -104,7 +104,13 @@ export class StoryPlayer {
     if (['playing', 'loading', 'transitioning'].includes(this.state)) return;
     parseStoryDefinition(this.definition, { requirePlayable: true });
     this.failure = undefined;
-    await this.arrive(0);
+    try {
+      await this.arrive(0);
+    } catch (error) {
+      if (this.status === 'failed') throw this.failure;
+      if (!['stopped', 'disposed'].includes(this.state)) this.fail(error);
+      throw error;
+    }
   }
 
   /** Host ticks once per frame. During loading, elapsed time is ignored. At a boundary,
@@ -117,6 +123,7 @@ export class StoryPlayer {
     if (deltaMilliseconds < 0) throw new Error('Story delta cannot be negative.');
     if (this.state === 'transitioning' && this.fade) {
       const fade = this.fade;
+      const generation = this.generation;
       try {
         fade.elapsed = Math.min(fade.duration, fade.elapsed + deltaMilliseconds);
         const progress = fade.elapsed / fade.duration;
@@ -124,6 +131,8 @@ export class StoryPlayer {
           color: fade.color,
           opacity: fade.phase === 'out' ? progress : 1 - progress,
         });
+        // Host presentation can synchronously stop, replace or dispose this player.
+        if (generation !== this.generation) return;
         if (progress === 1) {
           if (fade.phase === 'out') await this.open(fade.index);
           else {
@@ -134,7 +143,8 @@ export class StoryPlayer {
           }
         }
       } catch (error) {
-        this.fail(error);
+        if (this.status === 'failed') throw this.failure;
+        if (generation === this.generation) this.fail(error);
       }
       return;
     }
@@ -238,7 +248,9 @@ export class StoryPlayer {
       this.fade = { index, phase: 'out', elapsed: 0, duration: transition.duration / 2, color: transition.color };
       this.state = 'transitioning';
       if (!this.session) {
+        const generation = this.generation;
         this.options.transitionOverlay!.setTransition({ color: transition.color, opacity: 1 });
+        if (generation !== this.generation) return;
         await this.open(index);
       }
     } else await this.open(index);
@@ -246,15 +258,24 @@ export class StoryPlayer {
   private async open(index: number): Promise<void> {
     const arrival = this.definition.scenes[index]?.transition;
     const next = this.next?.index === index ? this.next : undefined;
+    const discardNext = (): void => {
+      next?.controller.abort();
+      if (next)
+        void next.promise.then(
+          (prepared) => prepared.dispose(),
+          () => {},
+        );
+    };
     if (next) {
       // Keep outgoing leases until the next preparation has retained shared resources.
       // Its completed runner is never ticked during this loading interval.
       this.state = 'loading';
+      const observed = this.generation;
       this.options.transitionOverlay?.setTransition({
         color: arrival?.type === 'fade' ? arrival.color : '#000000',
         opacity: 1,
       });
-      const observed = this.generation;
+      if (observed !== this.generation) return;
       try {
         await next.promise;
       } catch (error) {
@@ -269,31 +290,31 @@ export class StoryPlayer {
     try {
       generation = this.release();
     } catch (error) {
-      next?.controller.abort();
-      if (next)
-        void next.promise.then(
-          (prepared) => prepared.dispose(),
-          () => {},
-        );
+      discardNext();
       this.fail(error);
     }
     if (generation !== this.generation) {
-      next?.controller.abort();
-      if (next)
-        void next.promise.then(
-          (prepared) => prepared.dispose(),
-          () => {},
-        );
+      discardNext();
       return;
     }
     // The opaque midpoint spans disposal and all asynchronous activation work.
-    this.options.transitionOverlay?.setTransition({
-      color: arrival?.type === 'fade' ? arrival.color : '#000000',
-      opacity: 1,
-    });
+    try {
+      this.options.transitionOverlay?.setTransition({
+        color: arrival?.type === 'fade' ? arrival.color : '#000000',
+        opacity: 1,
+      });
+    } catch (error) {
+      discardNext();
+      throw error;
+    }
+    if (generation !== this.generation) {
+      discardNext();
+      return;
+    }
     this.cursor = index;
     if (index === this.definition.scenes.length) {
       this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
+      if (generation !== this.generation) return;
       this.state = 'completed';
       return;
     }
@@ -341,6 +362,7 @@ export class StoryPlayer {
         this.state = 'transitioning';
       } else {
         this.options.transitionOverlay?.setTransition(CLEAR_SCENE_TRANSITION);
+        if (generation !== this.generation) return;
         this.state = 'playing';
         session.runner.play();
         this.preload(index + 1);
