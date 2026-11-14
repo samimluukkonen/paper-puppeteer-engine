@@ -2,6 +2,7 @@ import { type TransformProperty, transformProperties } from '../../engine/types.
 import type { AnimationEditorDocument } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
 import { findAnimationEvent, type AnimationEventRef } from './animationEvents.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import {
@@ -12,15 +13,7 @@ import {
   type KeyframeSelectionModifiers,
 } from './keyframeSelection.js';
 import type { KeyframeSelection } from './timelineTracks.js';
-import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
-
-interface SelectionCommandActions {
-  cancelTimelineDrag(): boolean;
-  cancelEventDrag(): boolean;
-  updateTime(time: Seconds): boolean;
-  updateTimeMilliseconds(time: Milliseconds): boolean;
-  notify(): void;
-}
+import { toMilliseconds, toSeconds } from './timeUnits.js';
 
 /** Selection transitions coordinate gestures and playback inside the session's notification boundary. */
 export class AnimationEditorSelectionCommands {
@@ -28,11 +21,11 @@ export class AnimationEditorSelectionCommands {
     private readonly document: AnimationEditorDocument,
     private readonly selection: AnimationEditorSelection,
     private readonly playback: AnimationEditorPlayback,
-    private readonly actions: SelectionCommandActions,
+    private readonly session: AnimationEditActions,
   ) {}
 
   private prepareSelection(): void {
-    this.actions.cancelTimelineDrag();
+    this.session.cancelActiveDrags();
     this.playback.pause();
     this.playback.endScrub();
   }
@@ -43,22 +36,17 @@ export class AnimationEditorSelectionCommands {
     if (!event) return false;
     this.prepareSelection();
     this.selection.selectEvent(ref);
-    this.actions.updateTimeMilliseconds(event.time);
-    this.actions.notify();
+    this.session.updateTimeMilliseconds(event.time);
+    this.session.notify();
     return true;
   }
 
-  clearEventSelection(): void {
-    this.actions.cancelEventDrag();
-    if (this.selection.clearEvent()) this.actions.notify();
-  }
-
   clearTimelineSelection(): void {
-    this.actions.cancelTimelineDrag();
+    this.session.cancelActiveDrags();
     const keys = this.selection.clearKey();
     const event = this.selection.clearEvent();
     const ik = this.selection.clearIKKey();
-    if (keys || event || ik) this.actions.notify();
+    if (keys || event || ik) this.session.notify();
   }
 
   /** Resolve identity through the central tolerance policy, then select and seek together. */
@@ -84,7 +72,7 @@ export class AnimationEditorSelectionCommands {
             )
           : [...this.selection.keys, clicked];
       this.selection.setKeys(modifiers.additive ? [...this.selection.keys, ...range] : range, clicked);
-      this.actions.updateTimeMilliseconds(key.time);
+      this.session.updateTimeMilliseconds(key.time);
     } else if (modifiers.additive) {
       const exists = this.selection.hasKey(clicked);
       this.selection.setKeys(
@@ -94,15 +82,15 @@ export class AnimationEditorSelectionCommands {
       // Add/toggle retains primary where possible; fallback primary never seeks.
     } else {
       this.selection.selectKey(clicked);
-      this.actions.updateTimeMilliseconds(key.time);
+      this.session.updateTimeMilliseconds(key.time);
     }
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
 
   clearKeyframeSelection(): void {
-    this.actions.cancelTimelineDrag();
-    if (this.selection.clearKey()) this.actions.notify();
+    this.session.cancelActiveDrags();
+    if (this.selection.clearKey()) this.session.notify();
   }
 
   /** Resolve externally supplied references before installing transient box selection. */
@@ -115,8 +103,8 @@ export class AnimationEditorSelectionCommands {
     const previous = this.selection.key;
     this.selection.setKeys(additive ? [...this.selection.keys, ...resolved] : resolved, previous);
     if (!additive && this.selection.key && (!previous || !sameKey(previous, this.selection.key)))
-      this.actions.updateTime(this.selection.key.time);
-    this.actions.notify();
+      this.session.updateTime(this.selection.key.time);
+    this.session.notify();
   }
 
   selectKeyframeMarquee(box: KeyframeMarquee, additive = false): void {
@@ -142,23 +130,23 @@ export class AnimationEditorSelectionCommands {
 
   setTimelineBoneExpanded(boneId: string, expanded: boolean): boolean {
     if (!this.document.rig?.hasBone(boneId)) return false;
-    this.actions.cancelTimelineDrag();
-    if (this.selection.setExpanded(boneId, expanded)) this.actions.notify();
+    this.session.cancelActiveDrags();
+    if (this.selection.setExpanded(boneId, expanded)) this.session.notify();
     return true;
   }
 
   /** Bone + property selection uses the same bone owner as hierarchy and preview picking. */
   selectTimelineProperty(boneId: string, property: TransformProperty): boolean {
     if (!this.document.rig?.hasBone(boneId) || !transformProperties.includes(property)) return false;
-    this.actions.cancelTimelineDrag();
-    if (this.selection.selectProperty(boneId, property)) this.actions.notify();
+    this.session.cancelActiveDrags();
+    if (this.selection.selectProperty(boneId, property)) this.session.notify();
     return true;
   }
 
   selectBone(id: string | null): boolean {
     if (id !== null && !this.document.rig?.hasBone(id)) return false;
-    this.actions.cancelTimelineDrag();
-    if (this.selection.selectBone(id)) this.actions.notify();
+    this.session.cancelActiveDrags();
+    if (this.selection.selectBone(id)) this.session.notify();
     return true;
   }
 }

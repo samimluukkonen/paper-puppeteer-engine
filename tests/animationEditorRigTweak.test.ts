@@ -121,7 +121,7 @@ test('structural rig edits rebuild shared runtime consumers without replacing an
     const history = state.historyLength;
     state.setEditorMode('rig');
     const listeners = scene.input.listenerCount('pointerdown');
-    const subscribers = (Reflect.get(state, 'listeners') as Set<unknown>).size;
+    const subscribers = (Reflect.get(Reflect.get(state, 'session'), 'listeners') as Set<unknown>).size;
     editor.state.createBone('branch', 'root');
     editor.refresh();
     assert.isTrue(Reflect.get(puppet.container, 'isDestroyed'));
@@ -146,7 +146,7 @@ test('structural rig edits rebuild shared runtime consumers without replacing an
       editor.redo();
       assert.strictEqual(scene.rigEditor, editor);
       assert.equal(scene.input.listenerCount('pointerdown'), listeners);
-      assert.equal((Reflect.get(state, 'listeners') as Set<unknown>).size, subscribers);
+      assert.equal((Reflect.get(Reflect.get(state, 'session'), 'listeners') as Set<unknown>).size, subscribers);
     }
     editor.state.assignAttachment('branch-art', undefined);
     editor.state.removeSlot('branch-art');
@@ -214,7 +214,7 @@ test('full rig and animation routes use one document and bounded scene listeners
   state.setCurrentTime(0.5);
   const clip = state.workingAnimation;
   const listenerCount = scene.input.listenerCount('pointerdown');
-  const subscribers = (Reflect.get(state, 'listeners') as Set<unknown>).size;
+  const subscribers = (Reflect.get(Reflect.get(state, 'session'), 'listeners') as Set<unknown>).size;
   for (let index = 0; index < 12; ++index) {
     state.setEditorMode('rig');
     assert.strictEqual(scene.rigEditor, editor);
@@ -228,12 +228,12 @@ test('full rig and animation routes use one document and bounded scene listeners
     assert.strictEqual(state.workingAnimation, clip);
     assert.equal(state.currentTime, 0.5);
     assert.equal(scene.input.listenerCount('pointerdown'), listenerCount);
-    assert.equal((Reflect.get(state, 'listeners') as Set<unknown>).size, subscribers);
+    assert.equal((Reflect.get(Reflect.get(state, 'session'), 'listeners') as Set<unknown>).size, subscribers);
   }
   scene.events.emit('shutdown');
   assert.isUndefined(scene.rigEditor);
   assert.equal(scene.input.listenerCount('pointerdown'), 0);
-  assert.equal((Reflect.get(state, 'listeners') as Set<unknown>).size, 0);
+  assert.equal((Reflect.get(Reflect.get(state, 'session'), 'listeners') as Set<unknown>).size, 0);
 });
 
 test('mode changes pause and cancel animation gestures/drafts without authoring or playback resumption', () => {

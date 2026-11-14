@@ -14,7 +14,6 @@ import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js'
 import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
 import type { IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
 import { getMeshDeformationTrack, type MeshDeformationKey, type VertexOffset } from '../../engine/meshDeformation.js';
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
 import type { PoseDefinition } from '../../engine/Pose.js';
 import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
@@ -46,6 +45,7 @@ import { AnimationEditorPreviewCommands } from './AnimationEditorPreviewCommands
 import { AnimationEditorRootMotion } from './AnimationEditorRootMotion.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
+import { AnimationEditSession } from './AnimationEditSession.js';
 import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
 import type { AnimationExportResult } from './animationSerialization.js';
 import {
@@ -71,7 +71,6 @@ import {
   type InterpolationSelectionState,
   type SegmentInterpolation,
   setAnimationInterpolation,
-  setInterpolationForKeys,
 } from './interpolation.js';
 import type { KeyframeClipboard } from './keyframeClipboard.js';
 import { setBonePropertyKeyframes } from './keyframeEdits.js';
@@ -389,16 +388,17 @@ export class AnimationEditorState {
       const next = setBonePropertyKeyframes(this.working!, this.rig!, edits, { preserveTiming: true });
       this.pause();
       this.previews.clearPose();
-      return this.installWorkingAnimation(freezeData(next));
+      return this.installWorkingAnimation(next);
     });
   }
   /** Loaded character rig, retained independently of restored drafts and preview tweaks. */
   readonly sourceRig: Rig | undefined;
   private readonly document: AnimationEditorDocument;
+  /** The deep edit-transaction module: owns the commit ordering, history install and notification boundary. */
+  private readonly session: AnimationEditSession;
   setReplacementGuard(guard: ((name: string) => boolean) | undefined): void {
     this.document.replacementGuard = guard;
   }
-  private readonly listeners = new Set<() => void>();
   private readonly clipboard = new TimelineClipboard();
   private readonly playback = new AnimationEditorPlayback(
     () => this.working?.duration ?? 0,
@@ -416,8 +416,6 @@ export class AnimationEditorState {
   private readonly events: AnimationEditorEventCommands;
   private readonly playbackController: AnimationEditorPlaybackController;
   private readonly playbackCommands: AnimationEditorPlaybackCommands;
-  private notificationDepth = 0;
-  private notificationPending = false;
   private importedSessions = 0;
   private animationSessions = 0;
   private symmetry: BoneSymmetryMapping | null;
@@ -439,71 +437,65 @@ export class AnimationEditorState {
     );
     this.symmetry = rig ? createBoneSymmetryMapping(rig).mapping : null;
     this.document = new AnimationEditorDocument(rig, animations, options);
-    this.rootMotion = new AnimationEditorRootMotion(this, {
-      batch: (command) => this.batchNotifications(command),
-      install: (animation) => this.installWorkingAnimation(animation),
-      cancelTimelineDrag: () => this.cancelTimelineDrag(),
+    this.session = new AnimationEditSession({
+      document: this.document,
+      authoringEnabled: () => this.animationAuthoringEnabled,
+      working: () => this.working,
+      rig: () => this.rig,
+      currentTime: () => this.playback.currentTime,
+      cancelActiveDrags: () => this.cancelTimelineDrag(),
+      pausePlayback: () => this.pause(),
+      endScrub: () => this.endScrub(),
+      updateTime: (time) => this.updateTime(time),
+      updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
+      clearTransformDraft: () => this.clearTransformDraft(),
+      setSelectedKeys: (keys, primary) => this.selection.setKeys(keys, primary),
+      reconcileSelection: () => this.selectionCommands.reconcile(),
+      reconcileRootKey: () => {
+        if (
+          this.selectedRootKey &&
+          !rootKeys(this.working!, this.selectedRootKey.property).some(
+            (key) => key.time / 1000 === this.selectedRootKey!.time,
+          )
+        )
+          this.selectedRootKey = null;
+      },
+      clearRootSelection: () => this.clearRootSelection(),
+      selectKeyframe: (key, modifiers) => this.selectionCommands.selectKeyframe(key, modifiers),
+      selectEvent: (ref) => this.selectionCommands.selectAnimationEvent(ref),
+      clearBoneSelection: () => this.selection.selectBone(null),
       clearOtherSelection: () => {
         this.selection.selectBone(null);
         this.deformationSelected = false;
         this.selectedDeformationTime = null;
       },
-      pause: () => this.pause(),
-      endScrub: () => this.endScrub(),
-      clearTransformDraft: () => this.clearTransformDraft(),
-      updateTime: (time) => this.updateTime(time),
-      notify: () => this.notify(),
-    });
-    this.graphGestures = new AnimationEditorGraphGestures(this, {
-      batch: (command) => this.batchNotifications(command),
-      install: (animation, retainDraft, keys) => this.installWorkingAnimation(animation, retainDraft, keys),
-      cancelTimelineDrag: () => this.cancelTimelineDrag(),
-      clearTransformDraft: () => this.clearTransformDraft(),
-      pause: () => this.playback.pause(),
       selectCommittedKey: (channel, time) => {
         if (channel.kind === 'root') this.selectedRootKey = Object.freeze({ property: channel.property, time });
         if (channel.kind === 'ik')
           this.selection.setIKKey({ kind: 'ik', constraintId: channel.id, property: channel.property, time });
       },
-      notify: () => this.notify(),
+      reconcilePreviews: () => this.previews.reconcile(),
     });
-    this.previews = new AnimationEditorPreviewCommands(this, this.document, {
-      batch: (command) => this.batchNotifications(command),
-      install: (animation) => this.installWorkingAnimation(animation),
-      notify: () => this.notify(),
-    });
+    this.rootMotion = new AnimationEditorRootMotion(this, this.session);
+    this.graphGestures = new AnimationEditorGraphGestures(this, this.session);
+    this.previews = new AnimationEditorPreviewCommands(this, this.document, this.session);
     this.selection = new AnimationEditorSelection(rig);
-    this.deformation = new AnimationEditorDeformationCommands(this, this.document, this.clipboard, {
-      batch: (command) => this.batchNotifications(command),
-      install: (animation) => this.installWorkingAnimation(animation),
-      clearBoneSelection: () => this.selection.selectBone(null),
-      cancelTimelineDrag: () => this.cancelTimelineDrag(),
-      updateTime: (time) => this.updateTime(time),
-      notify: () => this.notify(),
-    });
+    this.deformation = new AnimationEditorDeformationCommands(this, this.document, this.clipboard, this.session);
     this.snapping = new AnimationEditorTimelineSnapping(
       () => this.workingAnimation,
       () => this.notify(),
     );
-    this.selectionCommands = new AnimationEditorSelectionCommands(this.document, this.selection, this.playback, {
-      cancelTimelineDrag: () => this.cancelTimelineDrag(),
-      cancelEventDrag: () => this.cancelEventDrag(),
-      updateTime: (time) => this.updateTime(time),
-      updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
-      notify: () => this.notify(),
-    });
+    this.selectionCommands = new AnimationEditorSelectionCommands(
+      this.document,
+      this.selection,
+      this.playback,
+      this.session,
+    );
     this.keyframes = new AnimationEditorKeyframeCommands(
       this.document,
       this.selection,
       this.playback,
-      {
-        select: (key) => this.selectKeyframe(key),
-        cancelTimelineDrag: () => this.cancelTimelineDrag(),
-        updateTime: (time) => this.updateTime(time),
-        install: (animation, retainDraft, selectedKeys) =>
-          this.installWorkingAnimation(animation, retainDraft, selectedKeys),
-        notify: () => this.notify(),
-      },
+      this.session,
       this.clipboard,
       this.snapping,
     );
@@ -511,14 +503,7 @@ export class AnimationEditorState {
       this.document,
       this.selection,
       this.playback,
-      {
-        select: (ref) => this.selectAnimationEvent(ref),
-        cancelTimelineDrag: () => this.cancelTimelineDrag(),
-        updateTime: (time) => this.updateTime(time),
-        updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
-        install: (animation) => this.installWorkingAnimation(animation),
-        notify: () => this.notify(),
-      },
+      this.session,
       this.clipboard,
       this.snapping,
     );
@@ -535,18 +520,8 @@ export class AnimationEditorState {
           this.deformationEditActive
         ),
     });
-    this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, {
-      install: (animation) => this.installWorkingAnimation(animation),
-      notify: () => this.notify(),
-    });
-    this.ik = new AnimationEditorIKCommands(this.document, this.selection, this.playback, this.snapping, {
-      cancelTimelineDrag: () => this.cancelTimelineDrag(),
-      pause: () => this.pause(),
-      endScrub: () => this.endScrub(),
-      updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
-      install: (animation, retainDraft) => this.installWorkingAnimation(animation, retainDraft),
-      notify: () => this.notify(),
-    });
+    this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, this.session);
+    this.ik = new AnimationEditorIKCommands(this.document, this.selection, this.playback, this.snapping, this.session);
   }
 
   private get working(): ReadonlyAnimation | null {
@@ -763,13 +738,7 @@ export class AnimationEditorState {
   }
   /** Transient navigation only: preview sampling never dispatches authored events. */
   selectAnimationEvent(ref: AnimationEventRef): boolean {
-    return this.batchNotifications(() => {
-      this.clearRootSelection();
-      return this.selectionCommands.selectAnimationEvent(ref);
-    });
-  }
-  clearEventSelection(): void {
-    return this.batchNotifications(() => this.selectionCommands.clearEventSelection());
+    return this.session.selectEvent(ref);
   }
   clearTimelineSelection(): void {
     return this.batchNotifications(() => {
@@ -986,10 +955,7 @@ export class AnimationEditorState {
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
-    return this.batchNotifications(() => {
-      this.clearRootSelection();
-      return this.selectionCommands.selectKeyframe(selection, modifiers);
-    });
+    return this.session.selectKeyframe(selection, modifiers);
   }
   clearKeyframeSelection(): void {
     return this.batchNotifications(() => {
@@ -1237,34 +1203,16 @@ export class AnimationEditorState {
     return this.document.historyLength;
   }
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return this.session.subscribe(listener);
   }
 
   /** Nested commands publish the complete document, selection and clock together. */
   private batchNotifications<Result>(command: () => Result): Result {
-    ++this.notificationDepth;
-    try {
-      return command();
-    } finally {
-      --this.notificationDepth;
-      if (this.notificationDepth === 0 && this.notificationPending) {
-        this.notificationPending = false;
-        this.notify();
-      }
-    }
+    return this.session.batch(command);
   }
 
   private notify(): void {
-    if (this.notificationDepth > 0) {
-      this.notificationPending = true;
-      return;
-    }
-    this.previews.reconcile();
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'Animation editor listeners failed.',
-    );
+    this.session.notify();
   }
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
@@ -1346,23 +1294,11 @@ export class AnimationEditorState {
       try {
         const next = setAnimationInterpolation(this.working, this.rig, mode);
         if (next === this.working) return true;
-        return this.installWorkingAnimation(freezeData(next));
+        return this.installWorkingAnimation(next);
       } catch {
         return false;
       }
     });
-  }
-
-  /** The current format has no per-key overrides; unavailable edits preserve all session state. */
-  setSelectedKeyframeInterpolation(mode: Interpolation): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    if (!this.working) return false;
-    try {
-      setInterpolationForKeys(this.working, this.selectedKeys, mode);
-    } catch {
-      return false;
-    }
-    return false;
   }
 
   /** State-facing authoring uses continuous seconds, defaulting to the sole editor clock. */
@@ -1558,25 +1494,7 @@ export class AnimationEditorState {
     retainDraft = false,
     selectedKeys?: readonly KeyframeSelection[],
   ): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    this.cancelTimelineDrag();
-    if (!this.document.install(next)) {
-      this.notify();
-      return false;
-    }
-    if (!retainDraft) this.clearTransformDraft();
-    this.updateTime(this.currentTime);
-    if (selectedKeys) this.selection.setKeys(selectedKeys, selectedKeys[0] ?? null);
-    if (
-      this.selectedRootKey &&
-      !rootKeys(this.working!, this.selectedRootKey.property).some(
-        (key) => key.time / 1000 === this.selectedRootKey!.time,
-      )
-    )
-      this.selectedRootKey = null;
-    this.selectionCommands.reconcile();
-    this.notify();
-    return true;
+    return this.session.install(next, { retainDraft, ...(selectedKeys ? { selectedKeys } : {}) });
   }
 
   /** Advances only for successful imports/reloads, so adapters can distinguish them from selection. */

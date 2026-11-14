@@ -21,7 +21,6 @@ Last keys and single-key timelines return no outgoing segment. Looping wraps tim
 - `setAnimationInterpolation(animation, rig, mode)` adds `'linear'` or removes the declaration when passed `undefined`. It validates against the existing strict schema/rig rules and returns a new root only when metadata changes. Removing the field retains the implicit linear default.
 - `setInterpolationForKeys(animation, refs, mode)` returns an unavailable result with the unchanged input and a reason. A valid outgoing selection reports `clip-only`; empty/missing/terminal selections report their query reason. Unsupported modes throw before any operation. This explicit boundary prevents key requests from changing unrelated clip segments.
 - `state.setAuthoredInterpolation(mode)` installs a validated immutable working snapshot through the existing document/history transaction. It returns false for invalid modes or a missing clip/rig.
-- `state.setSelectedKeyframeInterpolation(mode)` returns false without changing data, history, validation, drafts, clock, selection or notifications.
 
 Pure edits never mutate or freeze mutable caller inputs. Keys retain their exact bone/property/time/value and array identities; tracks, events and playback are shared unchanged. Source animation remains immutable. Adding/removing metadata preserves strict JSON serialization; no editor-only fields are exported.
 

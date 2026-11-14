@@ -123,11 +123,9 @@ test('selection events cannot promote disabled single/batch edits to a clip muta
   state.selectKeyframes(group);
   const held = state.workingAnimation;
   const clipEdit = vi.spyOn(state, 'setAuthoredInterpolation');
-  const keyEdit = vi.spyOn(state, 'setSelectedKeyframeInterpolation');
   query('#timeline-interpolation').value = 'linear';
   await query('#timeline-interpolation').dispatch('change');
   assert.equal(clipEdit.mock.calls.length, 0);
-  assert.equal(keyEdit.mock.calls.length, 0);
   assert.strictEqual(state.workingAnimation, held);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);

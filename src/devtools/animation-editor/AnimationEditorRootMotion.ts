@@ -1,6 +1,7 @@
 import type { Rig } from '../../engine/Rig.js';
 import { sampleRootMotion, type RootMotionOffset, type RootMotionProperty } from '../../engine/rootMotion.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
 import { motionPreviewSampleTime } from './motionPreview.js';
 import { rootKeys, setRootKey, duplicateRootPropertyKey, type RootKeySelection } from './rootMotionEdits.js';
 import type { RootLoopMode, WorldDisplacementMode } from './worldDisplacement.js';
@@ -17,23 +18,11 @@ export interface RootMotionContext {
   readonly previewTimeMilliseconds: number;
 }
 
-export interface RootMotionActions {
-  batch<Result>(command: () => Result): Result;
-  install(animation: ReadonlyAnimation): boolean;
-  cancelTimelineDrag(): boolean;
-  clearOtherSelection(): void;
-  pause(): void;
-  endScrub(): void;
-  clearTransformDraft(): void;
-  updateTime(time: number): void;
-  notify(): void;
-}
-
-/** Own root selection, view preferences and provisional XY edits; commit through the shared document boundary. */
+/** Own root selection, view preferences and provisional XY edits; commits through the shared edit session. */
 export class AnimationEditorRootMotion {
   constructor(
     private readonly context: RootMotionContext,
-    private readonly actions: RootMotionActions,
+    private readonly session: AnimationEditActions,
   ) {}
 
   get previewAnimation(): ReadonlyAnimation | undefined {
@@ -56,12 +45,12 @@ export class AnimationEditorRootMotion {
   }
   setWorldDisplacementView(mode: WorldDisplacementMode, loop = this.rootLoop): void {
     if (mode === this.displacementMode && loop === this.rootLoop) return;
-    this.actions.batch(() => {
-      this.actions.cancelTimelineDrag();
+    this.session.batch(() => {
+      this.session.cancelActiveDrags();
       this.displacementMode = mode;
       this.rootLoop = loop;
       if (mode !== 'authored') this.rootMotionEditing = false;
-      this.actions.notify();
+      this.session.notify();
     });
   }
   rootTrajectoryVisible = true;
@@ -82,8 +71,8 @@ export class AnimationEditorRootMotion {
     );
   }
   setRootMotionView(patch: { editing?: boolean; visible?: boolean; trajectory?: boolean }): void {
-    this.actions.batch(() => {
-      this.actions.cancelTimelineDrag();
+    this.session.batch(() => {
+      this.session.cancelActiveDrags();
       if (patch.editing !== undefined) this.rootMotionEditing = patch.editing;
       if (patch.visible !== undefined) this.displacementMode = patch.visible ? 'authored' : 'none';
       if (patch.visible === false) this.rootMotionEditing = false;
@@ -92,7 +81,7 @@ export class AnimationEditorRootMotion {
         this.displacementMode = 'authored';
         this.selectRootMotion(this.rootMotionProperty);
       }
-      this.actions.notify();
+      this.session.notify();
     });
   }
   selectRootMotion(property: RootMotionProperty = 'x', time?: number): boolean {
@@ -102,31 +91,29 @@ export class AnimationEditorRootMotion {
       !rootKeys(this.context.workingAnimation, property).some((key) => key.time / 1000 === time)
     )
       return false;
-    return this.actions.batch(() => {
-      this.actions.cancelTimelineDrag();
-      this.actions.clearOtherSelection();
+    return this.session.batch(() => {
+      this.session.cancelActiveDrags();
+      this.session.clearOtherSelection();
       this.rootMotionSelected = true;
       this.rootMotionProperty = property;
       this.selectedRootKey = time === undefined ? null : Object.freeze({ property, time });
       if (time !== undefined) {
-        this.actions.pause();
-        this.actions.endScrub();
-        this.actions.updateTime(time);
+        this.session.pause();
+        this.session.endScrub();
+        this.session.updateTime(time);
       }
-      this.actions.notify();
+      this.session.notify();
       return true;
     });
   }
   setRootPosition(values: Partial<RootMotionOffset>, time = this.context.currentTime): boolean {
     if (!this.context.animationAuthoringEnabled || !this.context.workingAnimation || !this.context.rig) return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       let next = this.context.workingAnimation!;
       for (const property of ['x', 'y'] as const)
         if (values[property] !== undefined)
           next = setRootKey(next, this.context.rig!, property, time * 1000, values[property]);
-      this.actions.pause();
-      this.actions.endScrub();
-      return this.actions.install(next);
+      return this.session.commit(() => next);
     });
   }
   addRootPositionKey(): boolean {
@@ -136,7 +123,7 @@ export class AnimationEditorRootMotion {
     const key = this.selectedRootKey;
     if (!key || !this.context.workingAnimation || !this.context.rig || !this.context.animationAuthoringEnabled)
       return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       const next = setRootKey(
         this.context.workingAnimation!,
         this.context.rig!,
@@ -145,7 +132,7 @@ export class AnimationEditorRootMotion {
         undefined,
       );
       this.selectedRootKey = null;
-      return this.actions.install(next);
+      return this.session.commit(() => next, { pause: false });
     });
   }
   duplicateRootKey(time = this.context.currentTime): boolean {
@@ -158,9 +145,9 @@ export class AnimationEditorRootMotion {
       rootKeys(this.context.workingAnimation, key.property).some((entry) => entry.time / 1000 === destination)
     )
       return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       const next = duplicateRootPropertyKey(this.context.workingAnimation!, this.context.rig!, key, destination);
-      if (!this.actions.install(next)) return false;
+      if (!this.session.commit(() => next, { pause: false })) return false;
       return this.selectRootMotion(key.property, destination);
     });
   }
@@ -172,13 +159,13 @@ export class AnimationEditorRootMotion {
       !this.rootMotionVisible
     )
       return false;
-    return this.actions.batch(() => {
-      this.actions.cancelTimelineDrag();
-      this.actions.pause();
-      this.actions.endScrub();
-      this.actions.clearTransformDraft();
+    return this.session.batch(() => {
+      this.session.cancelActiveDrags();
+      this.session.pause();
+      this.session.endScrub();
+      this.session.clearTransformDraft();
       this.rootGesture = { base: this.context.workingAnimation!, preview: this.context.workingAnimation! };
-      this.actions.notify();
+      this.session.notify();
       return true;
     });
   }
@@ -187,21 +174,23 @@ export class AnimationEditorRootMotion {
     let next = setRootKey(this.rootGesture.base, this.context.rig, 'x', this.context.currentTimeMilliseconds, point.x);
     next = setRootKey(next, this.context.rig, 'y', this.context.currentTimeMilliseconds, point.y);
     this.rootGesture = { ...this.rootGesture, preview: next, point: { ...point } };
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   cancelRootMotionDrag(): boolean {
     if (!this.rootGesture) return false;
     this.rootGesture = null;
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   commitRootMotionDrag(): boolean {
     const gesture = this.rootGesture;
     if (!gesture) return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       this.rootGesture = null;
-      return gesture.base === this.context.workingAnimation && this.actions.install(gesture.preview);
+      return (
+        gesture.base === this.context.workingAnimation && this.session.commit(() => gesture.preview, { pause: false })
+      );
     });
   }
 }

@@ -9,24 +9,15 @@ import {
   type IKAnimationProperty,
 } from '../../engine/ik/animationKeyframes.js';
 import type { Rig } from '../../engine/Rig.js';
-import { freezeData } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
 import { evaluateIKTarget } from './ikInspectorSampling.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';
 import type { AnimationEditorTimelineSnapping } from './timelineSnapping.js';
-import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
-
-interface IKCommandActions {
-  cancelTimelineDrag(): boolean;
-  pause(): void;
-  endScrub(): void;
-  updateTimeMilliseconds(time: Milliseconds): boolean;
-  install(animation: ReadonlyAnimation, retainDraft?: boolean): boolean;
-  notify(): void;
-}
+import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 
 /** Owns IK selection, drafts and key edits using the session's existing clock and document history. */
 export class AnimationEditorIKCommands {
@@ -49,31 +40,31 @@ export class AnimationEditorIKCommands {
     if (this.drag?.constraintId === id) this.cancelIKTargetDrag();
     if (reason) this.unavailable.set(id, reason);
     else this.unavailable.delete(id);
-    this.actions.notify();
+    this.session.notify();
   }
   beginIKTargetDrag(id: string): boolean {
     if (!this.working || this.getIKManipulationDisabledReason(id) || !this.rig?.ik?.some((entry) => entry.name === id))
       return false;
-    this.actions.cancelTimelineDrag();
+    this.session.cancelActiveDrags();
     if (id !== this.selectedIKConstraintId) this.selection.selectIK(id);
-    this.actions.pause();
-    this.actions.endScrub();
+    this.session.pause();
+    this.session.endScrub();
     this.drag = Object.freeze({ constraintId: id, draft: this.selection.ikDraft });
     this.selection.setIKExpanded(id, true);
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   previewIKTargetDrag(point: Point): boolean {
     if (!this.drag || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
     this.selection.setIKDraft('x', point.x);
     this.selection.setIKDraft('y', point.y);
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   endIKTargetDrag(): boolean {
     if (!this.drag) return false;
     this.drag = null;
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   cancelIKTargetDrag(): boolean {
@@ -85,7 +76,7 @@ export class AnimationEditorIKCommands {
       const value = drag.draft[property];
       if (value !== undefined) this.selection.setIKDraft(property, value);
     }
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   /** Explicitly commit both target coordinates in one document/history installation. */
@@ -101,18 +92,17 @@ export class AnimationEditorIKCommands {
       this.ikManipulationDisabledReason
     )
       return false;
+    const time = this.playback.currentTimeMilliseconds;
     return this.editIKKeys(
-      (animation, rig) => {
-        const time = this.playback.currentTimeMilliseconds;
-        return setIKPropertyKeyframe(
+      (animation, rig) =>
+        setIKPropertyKeyframe(
           setIKPropertyKeyframe(animation, rig, id, 'x', time, values.x),
           rig,
           id,
           'y',
           time,
           values.y,
-        );
-      },
+        ),
       () => {
         this.selection.clearIKDraftProperty('x');
         this.selection.clearIKDraftProperty('y');
@@ -126,7 +116,7 @@ export class AnimationEditorIKCommands {
     private readonly selection: AnimationEditorSelection,
     private readonly playback: AnimationEditorPlayback,
     private readonly snapping: AnimationEditorTimelineSnapping,
-    private readonly actions: IKCommandActions,
+    private readonly session: AnimationEditActions,
   ) {}
 
   private get working(): ReadonlyAnimation | null {
@@ -165,15 +155,15 @@ export class AnimationEditorIKCommands {
       (property !== null && !ikAnimationProperties.includes(property))
     )
       return false;
-    this.actions.cancelTimelineDrag();
+    this.session.cancelActiveDrags();
     this.selection.selectIK(id, property);
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   setTimelineIKExpanded(id: string, expanded: boolean): boolean {
     if (!this.rig?.ik?.some((entry) => entry.name === id)) return false;
-    this.actions.cancelTimelineDrag();
-    if (this.selection.setIKExpanded(id, expanded)) this.actions.notify();
+    this.session.cancelActiveDrags();
+    if (this.selection.setIKExpanded(id, expanded)) this.session.notify();
     return true;
   }
   isTimelineIKExpanded(id: string): boolean {
@@ -197,23 +187,23 @@ export class AnimationEditorIKCommands {
       return false;
     }
     if (!key) return false;
-    this.actions.cancelTimelineDrag();
-    this.actions.pause();
-    this.actions.endScrub();
+    this.session.cancelActiveDrags();
+    this.session.pause();
+    this.session.endScrub();
     this.selection.selectIK(ref.constraintId, ref.property, Object.freeze({ ...ref, time: toSeconds(key.time) }));
-    this.actions.updateTimeMilliseconds(key.time);
-    this.actions.notify();
+    this.session.updateTimeMilliseconds(key.time);
+    this.session.notify();
     return true;
   }
   cancelIKEdit(): void {
     this.cancelIKTargetDrag();
-    if (this.selection.clearIKDraft()) this.actions.notify();
+    if (this.selection.clearIKDraft()) this.session.notify();
   }
   beginIKEdit(): void {
     if (!this.selectedIKConstraintId || !this.working) return;
-    this.actions.cancelTimelineDrag();
-    this.actions.pause();
-    this.actions.endScrub();
+    this.session.cancelActiveDrags();
+    this.session.pause();
+    this.session.endScrub();
   }
   setTemporaryIKProperty(property: IKAnimationProperty, value: number): boolean {
     if (
@@ -226,7 +216,7 @@ export class AnimationEditorIKCommands {
       return false;
     this.beginIKEdit();
     this.selection.setIKDraft(property, value);
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   commitIKProperty(property: IKAnimationProperty): boolean {
@@ -235,9 +225,9 @@ export class AnimationEditorIKCommands {
     return id !== null && value !== undefined && this.setIKPropertyKeyframe(id, property, value);
   }
   setIKPropertyKeyframe(id: string, property: IKAnimationProperty, value: number, time = this.currentTime): boolean {
+    const timeMs = this.playback.resolveTimeMilliseconds(time);
     return this.editIKKeys(
-      (animation, rig) =>
-        setIKPropertyKeyframe(animation, rig, id, property, this.playback.resolveTimeMilliseconds(time), value),
+      (animation, rig) => setIKPropertyKeyframe(animation, rig, id, property, timeMs, value),
       () => {
         if (id === this.selectedIKConstraintId && time === this.currentTime)
           this.selection.clearIKDraftProperty(property);
@@ -256,9 +246,9 @@ export class AnimationEditorIKCommands {
     } catch {
       return false;
     }
+    const timeMs = this.playback.resolveTimeMilliseconds(time);
     return this.editIKKeys(
-      (animation, rig) =>
-        removeIKPropertyKeyframe(animation, rig, id, property, this.playback.resolveTimeMilliseconds(time)),
+      (animation, rig) => removeIKPropertyKeyframe(animation, rig, id, property, timeMs),
       () => {
         const selected = this.selectedIKKeyframe;
         if (
@@ -305,7 +295,7 @@ export class AnimationEditorIKCommands {
           findIKPropertyKeyframe(next, this.rig, key.constraintId, key.property, toMilliseconds(destination));
         if (moved) {
           this.selection.setIKKey(Object.freeze({ ...key, time: toSeconds(moved.time) }));
-          this.actions.updateTimeMilliseconds(moved.time);
+          this.session.updateTimeMilliseconds(moved.time);
         }
       },
     );
@@ -321,20 +311,13 @@ export class AnimationEditorIKCommands {
     after: (next: ReadonlyAnimation) => void,
     retainDraft = false,
   ): boolean {
-    if (!this.working || !this.rig) return false;
-    let next: ReadonlyAnimation;
-    try {
-      next = edit(this.working, this.rig);
-      assertJsonExportSize(next);
-    } catch (error) {
-      this.document.reportError(error);
-      this.actions.notify();
-      return false;
-    }
-    this.actions.cancelTimelineDrag();
-    this.actions.pause();
-    this.actions.endScrub();
-    after(next);
-    return this.actions.install(freezeData(next), retainDraft);
+    return this.session.commit(
+      (animation, rig) => {
+        const next = edit(animation, rig);
+        assertJsonExportSize(next);
+        return next;
+      },
+      { retainDraft, after },
+    );
   }
 }

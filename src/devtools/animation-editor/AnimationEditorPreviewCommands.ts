@@ -3,6 +3,7 @@ import type { DeepReadonly } from '../../engine/readonlyData.js';
 import type { Rig } from '../../engine/Rig.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
 import { createAnimationVariation, type AnimationVariationOptions } from './animationVariation.js';
 import type { PropertyKeyframeTarget } from './keyframeEdits.js';
 import { previewMotionCleanup, type MotionDiagnosticOptions } from './motionDiagnostics.js';
@@ -22,18 +23,12 @@ type PreviewState = Pick<
   | 'setWorldDisplacementView'
 >;
 
-interface PreviewActions {
-  batch<Result>(command: () => Result): Result;
-  install(animation: ReadonlyAnimation): boolean;
-  notify(): void;
-}
-
 /** Own detached trajectory, cleanup, variation and pose comparisons outside authored document history. */
 export class AnimationEditorPreviewCommands {
   constructor(
     private readonly state: PreviewState,
     private readonly document: AnimationEditorDocument,
-    private readonly actions: PreviewActions,
+    private readonly session: AnimationEditActions,
   ) {}
   get trajectoryAnimation(): ReadonlyAnimation | undefined {
     return this.trajectoryCopyActive ? this.trajectoryCopy!.animation : undefined;
@@ -77,31 +72,31 @@ export class AnimationEditorPreviewCommands {
       this.document.workingAnimation,
       this.document.rig,
     );
-    this.actions.batch(() => {
+    this.session.batch(() => {
       this.state.pause();
       this.cancelCleanupPreview();
       this.cancelVariationPreview();
       this.state.rootMotionEditing = false;
       this.trajectoryCopy = { base: this.document.workingAnimation!, rig: this.document.rig!, animation };
       this.state.setWorldDisplacementView('authored');
-      this.actions.notify();
+      this.session.notify();
     });
     return true;
   }
   cancelTrajectoryCopy(): boolean {
     if (!this.trajectoryCopy) return false;
     this.trajectoryCopy = null;
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   commitTrajectoryCopy(): boolean {
     if (!this.trajectoryCopyActive || this.state.hasPendingAnimationEdits || !this.state.animationAuthoringEnabled)
       return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       const animation = this.trajectoryCopy!.animation;
       this.trajectoryCopy = null;
       this.state.pause();
-      return this.actions.install(animation);
+      return this.session.commit(() => animation, { pause: false });
     });
   }
 
@@ -127,18 +122,18 @@ export class AnimationEditorPreviewCommands {
       throw new Error('Commit or cancel temporary edits before cleanup preview.');
     if (!Number.isFinite(timeMs) || timeMs < 0 || timeMs > animation.duration) throw new Error('Invalid preview time.');
     getValidatedEditorAnimation(animation, this.document.rig);
-    this.actions.batch(() => {
+    this.session.batch(() => {
       this.state.pause();
       this.variationPreview = null;
       this.posePreview = null;
       this.cleanupPreview = { base: this.document.workingAnimation!, rig: this.document.rig!, animation, timeMs };
-      this.actions.notify();
+      this.session.notify();
     });
   }
   cancelCleanupPreview(): boolean {
     if (!this.cleanupPreview) return false;
     this.cleanupPreview = null;
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   applyMotionCleanup(
@@ -153,10 +148,10 @@ export class AnimationEditorPreviewCommands {
       !targets.length
     )
       return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       const result = previewMotionCleanup(this.document.workingAnimation!, this.document.rig!, targets, options);
       const next = this.document.inspect(result.animation);
-      return !!next && this.actions.install(next);
+      return !!next && this.session.commit(() => next, { pause: false });
     });
   }
 
@@ -187,7 +182,7 @@ export class AnimationEditorPreviewCommands {
     if (!Number.isFinite(progress) || progress < 0 || progress > 1)
       throw new Error('Preview progress must be from 0 to 1.');
     const animation = createAnimationVariation(this.document.workingAnimation, this.document.rig, options);
-    this.actions.batch(() => {
+    this.session.batch(() => {
       this.state.pause();
       this.posePreview = null;
       this.cancelCleanupPreview();
@@ -197,14 +192,14 @@ export class AnimationEditorPreviewCommands {
         animation,
         timeMs: animation.duration * progress,
       };
-      this.actions.notify();
+      this.session.notify();
     });
   }
 
   cancelVariationPreview(): boolean {
     if (!this.variationPreview) return false;
     this.variationPreview = null;
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
 
@@ -223,7 +218,7 @@ export class AnimationEditorPreviewCommands {
       this.state.poseLibrary.compatibility(id, this.document.rig)
     )
       return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       this.state.pause();
       this.cancelCleanupPreview();
       this.cancelVariationPreview();
@@ -232,7 +227,7 @@ export class AnimationEditorPreviewCommands {
         animation: this.document.workingAnimation!,
         rig: this.document.rig!,
       };
-      this.actions.notify();
+      this.session.notify();
       return true;
     });
   }
@@ -240,7 +235,7 @@ export class AnimationEditorPreviewCommands {
   cancelPosePreview(): void {
     if (!this.posePreview) return;
     this.posePreview = null;
-    this.actions.notify();
+    this.session.notify();
   }
 
   reconcile(): void {

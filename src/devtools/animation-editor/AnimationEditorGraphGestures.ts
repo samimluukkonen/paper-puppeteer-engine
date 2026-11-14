@@ -1,7 +1,7 @@
 import type { Rig } from '../../engine/Rig.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
-import { editGraphKey, graphKeys, type GraphChannel, type GraphKeyEdit, type GraphKeyRef } from './graphEditor.js';
-import type { KeyframeSelection } from './timelineTracks.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
+import { editGraphKey, graphKeys, type GraphKeyEdit, type GraphKeyRef } from './graphEditor.js';
 
 export interface GraphGestureContext {
   readonly workingAnimation: ReadonlyAnimation | null;
@@ -9,21 +9,11 @@ export interface GraphGestureContext {
   readonly animationAuthoringEnabled: boolean;
 }
 
-export interface GraphGestureActions {
-  batch<Result>(command: () => Result): Result;
-  install(animation: ReadonlyAnimation, retainDraft: boolean, selectedKeys?: readonly KeyframeSelection[]): boolean;
-  cancelTimelineDrag(): boolean;
-  clearTransformDraft(): void;
-  pause(): void;
-  selectCommittedKey(channel: GraphChannel, time: number): void;
-  notify(): void;
-}
-
-/** Own a detached curve gesture; document history and cross-channel selection remain coordinated by the host. */
+/** Own a detached curve gesture; the session owns the commit ordering, history and cross-channel selection. */
 export class AnimationEditorGraphGestures {
   constructor(
     private readonly context: GraphGestureContext,
-    private readonly actions: GraphGestureActions,
+    private readonly session: AnimationEditActions,
   ) {}
 
   get previewAnimation(): ReadonlyAnimation | undefined {
@@ -47,17 +37,17 @@ export class AnimationEditorGraphGestures {
       !graphKeys(this.context.workingAnimation, ref.channel).some((key) => key.time / 1000 === ref.time)
     )
       return false;
-    return this.actions.batch(() => {
-      this.actions.cancelTimelineDrag();
-      this.actions.clearTransformDraft();
-      this.actions.pause();
+    return this.session.batch(() => {
+      this.session.cancelActiveDrags();
+      this.session.clearTransformDraft();
+      this.session.pause();
       this.graphGesture = {
         base: this.context.workingAnimation!,
         ref: { channel: { ...ref.channel }, time: ref.time },
         preview: this.context.workingAnimation!,
         time: ref.time,
       };
-      this.actions.notify();
+      this.session.notify();
       return true;
     });
   }
@@ -72,36 +62,37 @@ export class AnimationEditorGraphGestures {
       return false;
     const preview = editGraphKey(gesture.base, this.context.rig, gesture.ref, edit);
     this.graphGesture = { ...gesture, preview, time: edit.time ?? gesture.ref.time };
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   cancelGraphEdit(): boolean {
     if (!this.graphGesture) return false;
     this.graphGesture = null;
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   commitGraphEdit(): boolean {
     const gesture = this.graphGesture;
     if (!gesture) return false;
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       this.graphGesture = null;
       if (gesture.base !== this.context.workingAnimation) {
-        this.actions.notify();
+        this.session.notify();
         return false;
       }
       const channel = gesture.ref.channel;
-      const changed = this.actions.install(
-        gesture.preview,
-        false,
-        channel.kind === 'bone' ? [{ boneId: channel.id, property: channel.property, time: gesture.time }] : undefined,
-      );
-      if (changed) this.actions.selectCommittedKey(channel, gesture.time);
+      const changed = this.session.commit(() => gesture.preview, {
+        pause: false,
+        ...(channel.kind === 'bone'
+          ? { selectedKeys: [{ boneId: channel.id, property: channel.property, time: gesture.time }] }
+          : {}),
+      });
+      if (changed) this.session.selectCommittedKey(channel, gesture.time);
       return changed;
     });
   }
   editGraphKey(ref: GraphKeyRef, edit: GraphKeyEdit): boolean {
-    return this.actions.batch(() => {
+    return this.session.batch(() => {
       if (!this.beginGraphEdit(ref)) return false;
       try {
         this.previewGraphEdit(edit);

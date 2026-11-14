@@ -275,7 +275,6 @@ test('queries, selection and unavailable edits preserve dirty/history/redo, draf
   assert.equal(state.authoredInterpolation, 'linear');
   assert.equal(state.selectedInterpolation.kind, 'uniform');
   assert.equal(state.getSegmentInterpolation(group[0]!)!.mode, 'linear');
-  assert.isFalse(state.setSelectedKeyframeInterpolation('linear'));
   assert.isTrue(state.setAuthoredInterpolation(undefined));
   assert.isTrue(state.hasTemporaryTransform);
   assert.isTrue(state.canRedo);
@@ -296,13 +295,10 @@ test('state is safe without a clip and rejects unsupported modes without session
   assert.isUndefined(state.getSegmentInterpolation(ref(0)));
   assert.equal(state.selectedInterpolation.kind, 'unavailable');
   assert.isFalse(state.setAuthoredInterpolation('linear'));
-  assert.isFalse(state.setSelectedKeyframeInterpolation('linear'));
   const selected = session().state;
   const held = selected.workingAnimation;
   // @ts-expect-error Runtime callers also cannot install a playback mode as interpolation.
   assert.isFalse(selected.setAuthoredInterpolation('stepped'));
-  // @ts-expect-error No editor-only keyframe interpolation modes may be serialized.
-  assert.isFalse(selected.setSelectedKeyframeInterpolation('smooth'));
   assert.strictEqual(selected.workingAnimation, held);
   assert.equal(selected.historyLength, 0);
   assert.isFalse(selected.dirty);

@@ -6,6 +6,7 @@ import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
 import {
   addAnimationEvent,
   findAnimationEvent,
@@ -37,16 +38,7 @@ export interface EventDrag {
   readonly previewEvent: DeepReadonly<AnimationEvent>;
 }
 
-interface EventCommandActions {
-  select(ref: AnimationEventRef): boolean;
-  cancelTimelineDrag(): boolean;
-  updateTime(time: Seconds): boolean;
-  updateTimeMilliseconds(time: Milliseconds): boolean;
-  install(animation: ReadonlyAnimation): boolean;
-  notify(): void;
-}
-
-/** Owns event mutation transactions, clipboard commands and transient movement; the session coordinates navigation. */
+/** Owns event mutation transactions, clipboard commands and transient movement; the session owns the commit ordering. */
 export class AnimationEditorEventCommands {
   private dragEvent: EventDrag | null = null;
 
@@ -54,7 +46,7 @@ export class AnimationEditorEventCommands {
     private readonly document: AnimationEditorDocument,
     private readonly selection: AnimationEditorSelection,
     private readonly playback: AnimationEditorPlayback,
-    private readonly actions: EventCommandActions,
+    private readonly session: AnimationEditActions,
     private readonly clipboard: TimelineClipboard,
     private readonly snapping: AnimationEditorTimelineSnapping,
   ) {}
@@ -87,29 +79,20 @@ export class AnimationEditorEventCommands {
     return this.editEvents((animation, rig) => removeAnimationEvent(animation, rig, ref));
   }
   private editEvents(edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation): boolean {
-    this.actions.cancelTimelineDrag();
-    if (!this.working || !this.rig) return false;
-    let next: ReadonlyAnimation;
-    try {
-      next = edit(this.working, this.rig);
+    return this.session.commit((animation, rig) => {
+      const next = edit(animation, rig);
       // Bound the complete document, including other payloads and pretty-printed JSON overhead.
       assertJsonExportSize(next);
-    } catch (error) {
-      this.document.reportError(error);
-      this.actions.notify();
-      return false;
-    }
-    this.playback.pause();
-    this.playback.endScrub();
-    return this.actions.install(next);
+      return next;
+    });
   }
   /** The required name gets a neutral default; the UI immediately focuses it for editing. */
   createAnimationEvent(): boolean {
-    this.actions.cancelTimelineDrag();
+    this.session.cancelActiveDrags();
     const previous = new Set(getAnimationEventReferences(this.working));
     if (!this.addAnimationEvent({ time: this.playback.currentTimeMilliseconds, name: 'event' })) return false;
     const ref = getAnimationEventReferences(this.working).find((entry) => !previous.has(entry));
-    return ref ? this.actions.select(ref) : false;
+    return ref ? this.session.selectEvent(ref) : false;
   }
   deleteSelectedEvent(): boolean {
     return this.selectedEvent ? this.removeAnimationEvent(this.selectedEvent) : false;
@@ -122,7 +105,7 @@ export class AnimationEditorEventCommands {
     const data = copyEventSelection(this.working, this.selectedEvent);
     if (!data) return false;
     this.clipboard.content = Object.freeze({ kind: 'event', data });
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   pasteEvent(): boolean {
@@ -157,17 +140,17 @@ export class AnimationEditorEventCommands {
       pasted = pasteEventClipboard(this.working, this.rig, data, time);
     } catch (error) {
       this.document.reportError(error);
-      this.actions.notify();
+      this.session.notify();
       return false;
     }
     if (!this.editEvents(() => pasted.animation)) return false;
     this.selection.selectEvent(pasted.ref);
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   /** Empty text removes optional data; explicit JSON null remains an authored payload. */
   setSelectedEventDataJson(text: string): boolean {
-    this.actions.cancelTimelineDrag();
+    this.session.cancelActiveDrags();
     const event = this.selectedEventData;
     const ref = this.selectedEvent;
     if (!event || !ref) return false;
@@ -183,7 +166,7 @@ export class AnimationEditorEventCommands {
           message: error instanceof JsonInputLimitError ? error.message : 'Event data must be valid JSON.',
         },
       ]);
-      this.actions.notify();
+      this.session.notify();
       return false;
     }
     return this.updateAnimationEvent(ref, next);
@@ -193,7 +176,7 @@ export class AnimationEditorEventCommands {
   }
   beginEventDrag(ref: AnimationEventRef): boolean {
     const playheadTime = this.playback.currentTime;
-    if (!this.actions.select(ref)) return false;
+    if (!this.session.selectEvent(ref)) return false;
     const event = this.selectedEventData!;
     this.dragEvent = Object.freeze({
       ref,
@@ -206,7 +189,7 @@ export class AnimationEditorEventCommands {
       proposedTime: toSeconds(event.time),
       disableSnapping: false,
     });
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   previewEventDrag(time: Seconds, disableSnapping = false): boolean {
@@ -226,8 +209,8 @@ export class AnimationEditorEventCommands {
       disableSnapping,
       previewEvent: Object.freeze({ ...drag.previewEvent, time: toMilliseconds(previewTime) }),
     });
-    this.actions.updateTime(previewTime);
-    this.actions.notify();
+    this.session.updateTime(previewTime);
+    this.session.notify();
     return true;
   }
   commitEventDrag(): boolean {
@@ -240,8 +223,8 @@ export class AnimationEditorEventCommands {
     const drag = this.dragEvent;
     if (!drag) return false;
     this.dragEvent = null;
-    this.actions.updateTimeMilliseconds(drag.originalTimeMilliseconds);
-    this.actions.notify();
+    this.session.updateTimeMilliseconds(drag.originalTimeMilliseconds);
+    this.session.notify();
     return true;
   }
   /** A new document session discards the gesture without restoring old navigation or notifying midway. */
@@ -250,7 +233,6 @@ export class AnimationEditorEventCommands {
   }
   /** Explicit inspector time edits clamp without snapping; gestures apply the shared snap policy first. */
   moveSelectedEvent(time: Seconds): boolean {
-    this.actions.cancelTimelineDrag();
     const event = this.selectedEventData;
     const ref = this.selectedEvent;
     if (!event || !ref) return false;
@@ -260,8 +242,8 @@ export class AnimationEditorEventCommands {
     // unchanged seconds value; a unit round trip can otherwise change one bit.
     const authoredTime = target === toSeconds(event.time) ? event.time : toMilliseconds(target);
     if (!this.updateAnimationEvent(ref, { ...event, time: authoredTime })) return false;
-    this.actions.updateTimeMilliseconds(authoredTime);
-    this.actions.notify();
+    this.session.updateTimeMilliseconds(authoredTime);
+    this.session.notify();
     return true;
   }
   nudgeSelectedEvent(direction: -1 | 1, large = false): boolean {

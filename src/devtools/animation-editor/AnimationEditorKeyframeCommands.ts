@@ -1,11 +1,11 @@
 import type { Rig } from '../../engine/Rig.js';
 import type { TransformProperty } from '../../engine/types.js';
 import type { BoneSymmetryMapping } from '../shared/boneSymmetry.js';
-import { freezeData } from '../shared/editorData.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';
+import type { AnimationEditActions } from './AnimationEditSession.js';
 import { copyKeyframeSelection, pasteKeyframeClipboard, type KeyframeClipboard } from './keyframeClipboard.js';
 import {
   constrainKeyframeMoveDelta,
@@ -41,15 +41,7 @@ export interface KeyframeDrag {
   readonly disableSnapping: boolean;
 }
 
-interface KeyframeCommandActions {
-  select(key: KeyframeSelection): boolean;
-  cancelTimelineDrag(): boolean;
-  updateTime(time: Seconds): boolean;
-  install(animation: ReadonlyAnimation, retainDraft?: boolean, selectedKeys?: readonly KeyframeSelection[]): boolean;
-  notify(): void;
-}
-
-/** Owns keyframe mutation transactions and transient drag/nudge state; the session coordinates navigation. */
+/** Owns keyframe mutation transactions and transient drag/nudge state; the session owns the commit ordering. */
 export class AnimationEditorKeyframeCommands {
   private drag: KeyframeDrag | null = null;
 
@@ -57,7 +49,7 @@ export class AnimationEditorKeyframeCommands {
     private readonly document: AnimationEditorDocument,
     private readonly selection: AnimationEditorSelection,
     private readonly playback: AnimationEditorPlayback,
-    private readonly actions: KeyframeCommandActions,
+    private readonly session: AnimationEditActions,
     private readonly clipboard: TimelineClipboard,
     private readonly snapping: AnimationEditorTimelineSnapping,
   ) {}
@@ -96,24 +88,24 @@ export class AnimationEditorKeyframeCommands {
       result = this.previewKeyframeRetiming(options);
     } catch (error) {
       this.document.reportError(error);
-      this.actions.notify();
+      this.session.notify();
       return false;
     }
     if (result.animation === this.working) return false;
     const primaryIndex = this.selection.key ? this.selectedKeys.indexOf(this.selection.key) : 0;
     const time = this.currentTime;
-    this.actions.cancelTimelineDrag();
-    this.playback.pause();
-    this.playback.endScrub();
-    this.actions.updateTime(time);
     // Set destination identities before the existing installation reconciliation resolves them.
     const first = result.keys[0]!;
-    if ('kind' in first) this.selection.setIKKey(first);
-    else {
-      const keys = result.keys.filter((key): key is KeyframeSelection => !('kind' in key));
-      this.selection.setKeys(keys, keys[primaryIndex] ?? null);
-    }
-    return this.actions.install(freezeData(result.animation));
+    return this.session.commit(() => result.animation, {
+      time,
+      after: () => {
+        if ('kind' in first) this.selection.setIKKey(first);
+        else {
+          const keys = result.keys.filter((key): key is KeyframeSelection => !('kind' in key));
+          this.selection.setKeys(keys, keys[primaryIndex] ?? null);
+        }
+      },
+    });
   }
 
   mirrorCurrentPoseToKeys(
@@ -155,17 +147,13 @@ export class AnimationEditorKeyframeCommands {
       result = build(this.working, this.rig);
     } catch (error) {
       this.document.reportError(error);
-      this.actions.notify();
+      this.session.notify();
       return false;
     }
     if (!result.keys.length) return false;
     const time = this.currentTime;
-    this.actions.cancelTimelineDrag();
-    this.playback.pause();
-    this.playback.endScrub();
-    this.actions.updateTime(time);
     const keys = result.keys.map(({ boneId, property, timeMs }) => ({ boneId, property, time: toSeconds(timeMs) }));
-    return this.actions.install(freezeData(result.animation), false, keys);
+    return this.session.commit(() => result.animation, { time, selectedKeys: keys });
   }
 
   get keyframeClipboard(): KeyframeClipboard | null {
@@ -177,7 +165,7 @@ export class AnimationEditorKeyframeCommands {
     const clipboard = copyKeyframeSelection(this.working, this.selectedKeys);
     if (!clipboard) return false;
     this.clipboard.content = Object.freeze({ kind: 'keyframes', data: clipboard });
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   pasteKeyframes(): boolean {
@@ -201,15 +189,11 @@ export class AnimationEditorKeyframeCommands {
       pasted = pasteKeyframeClipboard(this.working, this.rig, group, toMilliseconds(anchorTime));
     } catch (error) {
       this.document.reportError(error);
-      this.actions.notify();
+      this.session.notify();
       return false;
     }
     const time = this.currentTime;
-    this.cancelKeyframeDrag();
-    this.playback.pause();
-    this.playback.endScrub();
-    this.actions.updateTime(time);
-    return this.actions.install(freezeData(pasted.animation), false, pasted.keys);
+    return this.session.commit(() => pasted.animation, { time, selectedKeys: pasted.keys });
   }
 
   get keyframeDrag(): KeyframeDrag | null {
@@ -230,8 +214,8 @@ export class AnimationEditorKeyframeCommands {
       this.playback.pause();
       this.playback.endScrub();
       this.selection.setKeys(this.selectedKeys, key);
-      this.actions.updateTime(key.time);
-    } else if (!this.actions.select(key)) return false;
+      this.session.updateTime(key.time);
+    } else if (!this.session.selectKeyframe(key)) return false;
     const anchor = this.selection.key!;
     this.drag = Object.freeze({
       key: anchor,
@@ -244,7 +228,7 @@ export class AnimationEditorKeyframeCommands {
       proposedTime: anchor.time,
       disableSnapping: false,
     });
-    this.actions.notify();
+    this.session.notify();
     return true;
   }
   previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
@@ -270,8 +254,8 @@ export class AnimationEditorKeyframeCommands {
       proposedTime: time,
       disableSnapping,
     });
-    this.actions.updateTime(previewTime);
-    this.actions.notify();
+    this.session.updateTime(previewTime);
+    this.session.notify();
     return true;
   }
   commitKeyframeDrag(): boolean {
@@ -286,8 +270,8 @@ export class AnimationEditorKeyframeCommands {
     const time = key.time;
     this.drag = null;
     this.selection.setKeys(originalKeys, originalPrimary, false);
-    this.actions.updateTime(time);
-    this.actions.notify();
+    this.session.updateTime(time);
+    this.session.notify();
     return true;
   }
   /** A new document session discards the gesture without restoring old navigation or notifying midway. */
@@ -306,34 +290,50 @@ export class AnimationEditorKeyframeCommands {
   /** Explicit time moves translate the selection relative to its primary, without snapping. */
   moveSelectedKeyframe(time: Seconds): boolean {
     if (!Number.isFinite(time)) return false;
-    this.cancelKeyframeDrag();
-    const key = this.selection.key;
-    if (!key) return false;
-    this.playback.pause();
-    this.playback.endScrub();
-    const keys = this.selectedKeys;
-    const primaryIndex = keys.indexOf(key);
-    const delta = this.movementDelta(keys, key, time);
-    return this.editKeyframes((animation, rig) => {
-      const moved = moveBonePropertyKeyframes(
-        animation,
-        rig,
-        keys.map((entry) => ({
-          boneId: entry.boneId,
-          property: entry.property,
-          timeMs: toMilliseconds(entry.time),
-        })),
-        delta,
-      );
-      const selection = moved.keys.map((entry) => ({
-        boneId: entry.boneId,
-        property: entry.property,
-        time: toSeconds(entry.timeMs),
-      }));
-      this.selection.setKeys(selection, selection[primaryIndex] ?? null);
-      this.actions.updateTime(this.selection.key!.time);
-      return moved.animation;
-    }, key);
+    let pending: { anchor: KeyframeSelection; keys: KeyframeSelection[]; primaryIndex: number } | undefined;
+    return this.session.commit(
+      (animation, rig) => {
+        const anchor = this.selection.key;
+        if (!anchor) return undefined;
+        const keys = this.selectedKeys;
+        const primaryIndex = keys.indexOf(anchor);
+        const delta = this.movementDelta(keys, anchor, time);
+        const moved = moveBonePropertyKeyframes(
+          animation,
+          rig,
+          keys.map((entry) => ({
+            boneId: entry.boneId,
+            property: entry.property,
+            timeMs: toMilliseconds(entry.time),
+          })),
+          delta,
+        );
+        pending = {
+          anchor,
+          keys: moved.keys.map((entry) => ({
+            boneId: entry.boneId,
+            property: entry.property,
+            time: toSeconds(entry.timeMs),
+          })),
+          primaryIndex,
+        };
+        return moved.animation;
+      },
+      {
+        retainDraft: true,
+        after: () => {
+          const { anchor, keys, primaryIndex } = pending!;
+          this.selection.setKeys(keys, keys[primaryIndex] ?? null);
+          this.session.updateTime(this.selection.key!.time);
+          if (
+            anchor.boneId === this.selection.boneId &&
+            keyframeTimesMatch(toMilliseconds(anchor.time), this.playback.currentTimeMilliseconds) &&
+            this.selection.draft[anchor.property] !== undefined
+          )
+            this.selection.clearDraftProperty(anchor.property);
+        },
+      },
+    );
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
     if (!this.selection.key || this.drag) return false;
@@ -419,24 +419,19 @@ export class AnimationEditorKeyframeCommands {
     edit: (animation: ReadonlyAnimation, rig: Rig) => ReadonlyAnimation,
     draftTarget?: KeyframeSelection,
   ): boolean {
-    this.cancelKeyframeDrag();
-    if (!this.working || !this.rig) return false;
-    let next: ReadonlyAnimation;
-    try {
-      next = edit(this.working, this.rig);
-    } catch (error) {
-      this.document.reportError(error);
-      this.actions.notify();
-      return false;
-    }
-    // The mutation helper validated the result and shares only the document's owned frozen branches.
-    if (
-      draftTarget?.boneId === this.selection.boneId &&
-      keyframeTimesMatch(toMilliseconds(draftTarget.time), this.playback.currentTimeMilliseconds) &&
-      this.selection.draft[draftTarget.property] !== undefined
-    ) {
-      this.selection.clearDraftProperty(draftTarget.property);
-    }
-    return this.actions.install(freezeData(next), draftTarget !== undefined);
+    return this.session.commit(edit, {
+      pause: false,
+      retainDraft: draftTarget !== undefined,
+      after: () => {
+        // The mutation helper validated the result and shares only the document's owned frozen branches.
+        if (
+          draftTarget?.boneId === this.selection.boneId &&
+          keyframeTimesMatch(toMilliseconds(draftTarget.time), this.playback.currentTimeMilliseconds) &&
+          this.selection.draft[draftTarget.property] !== undefined
+        ) {
+          this.selection.clearDraftProperty(draftTarget.property);
+        }
+      },
+    });
   }
 }
