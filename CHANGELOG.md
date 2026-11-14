@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Add a post-build check (`npm run check:demo`) that fails CI before the Pages upload when a built demo page lacks its entry module script or references missing assets, so a broken artifact can no longer deploy an editor that stays on the loading screen.
+
 - Add matching Lucide icons to Animation Editor timeline tabs and an icon-only Graph / Timeline toggle. Switch the toggle icon, hover text and accessible label with its destination, leaving more room for duration controls.
 
 - Add matching Lucide icons to Scene Editor Edit-row buttons, inspector tabs and timeline tabs, preserving visible labels and keyboard controls.

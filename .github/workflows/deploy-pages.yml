@@ -34,6 +34,8 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Check every demo page can boot
+        run: npm run check:demo
       - name: Check packaged library in a temporary consumer
         run: npm run test:package
       - name: Upload artifact

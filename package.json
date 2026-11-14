@@ -50,6 +50,7 @@
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "audit": "npm audit --audit-level=low",
     "check:version": "node scripts/check-version.mjs",
+    "check:demo": "node scripts/check-demo-pages.mjs",
     "check:fix": "npm run lint:fix && npm run format && npm run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -62,7 +63,7 @@
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "check:release": "npm run check && npm run check:version && npm run test && npm run build && npm run test:package"
+    "check:release": "npm run check && npm run check:version && npm run test && npm run build && npm run check:demo && npm run test:package"
   },
   "peerDependencies": {
     "phaser": "4.2.1"
