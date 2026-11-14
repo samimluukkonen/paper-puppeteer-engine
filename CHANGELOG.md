@@ -152,6 +152,7 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 - Share pending import and export guards between the editors.
 - Group overlapping collapsed timeline summaries by pixel position and add `npm run profile:timeline` for local browser measurements.
 - Share responsive inspector behavior across the demo and both editors.
+- Set `NODE_COMPILE_CACHE` in the `test` and `test:watch` scripts so V8 reuses compiled bytecode across per-file module evaluations, cutting the vitest import phase of the full suite by about a quarter of its tracked time.
 
 ## 1.6.6
 

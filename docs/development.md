@@ -8,6 +8,8 @@ Use Node.js **24.22.1 or newer**. [.nvmrc](https://github.com/samimluukkonen/pap
 
 Run test commands sequentially with one worker per runner. Do not run suites concurrently or increase worker counts: parallel test execution causes substantial slowdown on this host. Vitest enforces one worker and disables file parallelism in its shared configuration, including `npm test`, watch mode and CI. Keep Playwright at one worker; for direct invocations, use `npx playwright test --workers=1` and `npx vitest run --maxWorkers=1`. Revisit this preference only if the user explicitly changes it.
 
+The `test` and `test:watch` scripts set `NODE_COMPILE_CACHE` to `node_modules/.cache/node-compile-cache`, so V8 reuses compiled bytecode across the many per-file module evaluations and runs; the first run populates the cache and later runs skip that compile work.
+
 ```bash
 npm run typecheck
 npm test
