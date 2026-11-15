@@ -53,7 +53,7 @@ export class PosePipeline {
   private activePose: { pose: PoseDefinition; mix: number } | undefined;
   private readonly poseUnderlying = new Map<string, Partial<JointTransform>>();
   private poseSource: PoseSource | undefined;
-  private projectedPose: unknown;
+  private projectedPose: ReadonlyMap<string, Readonly<JointTransform>> | undefined;
   private poseRevision = 0;
   private synchronizedPoseRevision = -1;
   private destroyed = false;
